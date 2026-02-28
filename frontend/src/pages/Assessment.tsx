@@ -70,13 +70,13 @@ export const Assessment: React.FC<AssessmentProps> = ({ onSubmit }) => {
   ];
 
   return (
-    <div className="min-h-screen bg-[#FDFCF8] flex flex-col items-center py-12 px-6 animate-fade-in">
+    <div className="min-h-screen bg-wellness-bg flex flex-col items-center py-12 px-6 animate-fadeIn">
       {/* Header */}
-      <div className="w-full max-w-3xl mb-12 flex justify-between items-center">
-        <div className="font-serif text-[1.4rem] font-medium text-[#000000] tracking-[0.1em] uppercase cursor-pointer" onClick={() => navigate('/')}>
-          MANAS<span className="font-semibold text-[#0A4E89]">360</span>
+      <div className="w-full max-w-3xl mb-16 flex justify-between items-center">
+        <div className="font-serif text-2xl font-normal text-wellness-text tracking-wide cursor-pointer hover:opacity-80 transition-smooth" onClick={() => navigate('/')}>
+          MANAS<span className="font-semibold text-calm-sage">360</span>
         </div>
-        <div className="text-sm font-bold text-[#1A1A1A] uppercase tracking-widest bg-[#F1F4F6] px-4 py-1 rounded-full">
+        <div className="text-sm font-medium text-wellness-text bg-calm-sage/15 px-5 py-2 rounded-full">
           Assessment
         </div>
       </div>
