@@ -8,14 +8,13 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 3000,
     strictPort: true,
+    allowedHosts: true, // ✅ CORRECT: Must be boolean true, not 'all'
     open: false,
     cors: true,
     hmr: {
-      host: 'therapy-connect-87.cluster-0.preview.emergentcf.cloud',
       protocol: 'wss',
       clientPort: 443,
     },
-    proxy: {},
   },
   build: {
     outDir: 'dist',
@@ -35,6 +34,7 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 3000,
     strictPort: true,
+    allowedHosts: true, // ✅ CORRECT: Must be boolean true, not 'all'
     cors: true,
   },
 })
