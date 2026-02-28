@@ -89,7 +89,7 @@ export const HomePage: React.FC = () => {
                 <>
                   <div className="flex items-center justify-between mb-8 relative">
                     <div className="w-8"></div>
-                    <h2 className="text-[1.35rem] font-bold text-[rgb(61, 72, 72)] font-serif tracking-tight">Log into your account</h2>
+                    <h2 className="text-[1.35rem] font-bold text-wellness-text font-serif tracking-tight">Log into your account</h2>
                     <button 
                       onClick={handleCloseLogin}
                       className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-all"
@@ -109,7 +109,7 @@ export const HomePage: React.FC = () => {
 
                     <button 
                       onClick={() => handleLogin('Facebook')}
-                      className="w-full flex items-center justify-center gap-3 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-[rgb(61, 72, 72)] text-[1.05rem] font-medium py-4 rounded-full transition-all relative active:scale-[0.98]"
+                      className="w-full flex items-center justify-center gap-3 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-wellness-text text-[1.05rem] font-medium py-4 rounded-full transition-all relative active:scale-[0.98]"
                     >
                        <div className="absolute left-6"><FacebookIcon /></div>
                        <span>Sign in with Facebook</span>
@@ -117,7 +117,7 @@ export const HomePage: React.FC = () => {
 
                     <button 
                       onClick={() => handleLogin('Apple')}
-                      className="w-full flex items-center justify-center gap-3 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-[rgb(61, 72, 72)] text-[1.05rem] font-medium py-4 rounded-full transition-all relative active:scale-[0.98]"
+                      className="w-full flex items-center justify-center gap-3 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-wellness-text text-[1.05rem] font-medium py-4 rounded-full transition-all relative active:scale-[0.98]"
                     >
                        <div className="absolute left-6"><AppleIcon /></div>
                        <span>Sign in with Apple</span>
@@ -125,7 +125,7 @@ export const HomePage: React.FC = () => {
 
                      <button 
                       onClick={() => handleLogin('Google')}
-                      className="w-full flex items-center justify-center gap-3 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-[rgb(61, 72, 72)] text-[1.05rem] font-medium py-4 rounded-full transition-all relative active:scale-[0.98]"
+                      className="w-full flex items-center justify-center gap-3 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-wellness-text text-[1.05rem] font-medium py-4 rounded-full transition-all relative active:scale-[0.98]"
                     >
                        <div className="absolute left-6"><GoogleIcon /></div>
                        <span>Sign in with Google</span>
@@ -133,7 +133,7 @@ export const HomePage: React.FC = () => {
                   </div>
 
                   <p className="mt-8 text-xs text-center text-slate-500 leading-relaxed px-4 opacity-80">
-                    By tapping Continue or logging into an existing Manas360 account, you agree to our <a href="#" className="text-[rgb(139, 168, 168)] font-bold hover:underline">Terms</a> and acknowledge that you have read our <a href="#" className="text-[rgb(139, 168, 168)] font-bold hover:underline">Privacy Policy</a>.
+                    By tapping Continue or logging into an existing Manas360 account, you agree to our <a href="#" className="text-wellness-primary font-bold hover:underline">Terms</a> and acknowledge that you have read our <a href="#" className="text-wellness-primary font-bold hover:underline">Privacy Policy</a>.
                   </p>
                 </>
               )}
@@ -150,10 +150,10 @@ export const HomePage: React.FC = () => {
                    <div className="w-24 h-24 bg-green-50 rounded-full flex items-center justify-center text-5xl mb-6 shadow-sm animate-breathe">
                      ✅
                    </div>
-                   <h2 className="text-[2rem] font-serif font-bold text-[rgb(139, 168, 168)] mb-4">Welcome to Manas360</h2>
-                   <p className="text-[rgb(107, 123, 123)] text-lg mb-8 leading-relaxed max-w-xs mx-auto">
+                   <h2 className="text-[2rem] font-serif font-bold text-wellness-primary mb-4">Welcome to Manas360</h2>
+                   <p className="text-wellness-muted text-lg mb-8 leading-relaxed max-w-xs mx-auto">
                      You have successfully registered! <br/>
-                     <span className="font-bold text-[rgb(157, 173, 190)]">A confirmation email has been sent to your inbox.</span>
+                     <span className="font-bold text-gentle-blue">A confirmation email has been sent to your inbox.</span>
                    </p>
                    <button 
                      onClick={handleCloseLogin}
@@ -169,7 +169,7 @@ export const HomePage: React.FC = () => {
             {loginStatus === 'idle' && (
               <div className="bg-[#F8FAFC] py-5 text-center border-t border-slate-100">
                  <p className="text-[0.95rem] text-slate-600">
-                   Don't have an account? <a href="#" className="text-[rgb(139, 168, 168)] font-bold hover:underline">Sign up</a>
+                   Don't have an account? <a href="#" className="text-wellness-primary font-bold hover:underline">Sign up</a>
                  </p>
               </div>
             )}
@@ -193,11 +193,11 @@ export const HomePage: React.FC = () => {
 
         {/* NAVIGATION */}
         <nav className="relative z-50 flex items-center justify-between px-6 md:px-10 py-6 max-w-[1400px] mx-auto w-full">
-          <div className="font-serif text-[1.6rem] md:text-[1.8rem] font-bold text-[rgb(139, 168, 168)] tracking-tight cursor-pointer hover:opacity-90 transition-opacity drop-shadow-sm z-50">
+          <div className="font-serif text-[1.6rem] md:text-[1.8rem] font-bold text-wellness-primary tracking-tight cursor-pointer hover:opacity-90 transition-opacity drop-shadow-sm z-50">
             Manas360
           </div>
 
-          <div className="hidden lg:flex items-center gap-6 xl:gap-10 font-medium text-[rgb(139, 168, 168)] text-[1.05rem]">
+          <div className="hidden lg:flex items-center gap-6 xl:gap-10 font-medium text-wellness-primary text-[1.05rem]">
             <DropdownButton title="Solutions">
               <div className="py-2 px-1 space-y-1">
                 <DropdownItem>Wellness Seekers</DropdownItem>
@@ -223,11 +223,11 @@ export const HomePage: React.FC = () => {
           <div className="hidden lg:flex items-center gap-4 xl:gap-6">
             <button 
               onClick={() => setIsLoginOpen(true)}
-              className="text-[rgb(139, 168, 168)] font-bold hover:text-[rgb(157, 173, 190)] transition-colors px-3 py-2 text-[1.05rem]"
+              className="text-wellness-primary font-bold hover:text-gentle-blue transition-colors px-3 py-2 text-[1.05rem]"
             >
               Log In
             </button>
-            <button className="text-[rgb(139, 168, 168)] text-2xl hover:scale-110 transition-transform p-2 drop-shadow-sm">🛒</button>
+            <button className="text-wellness-primary text-2xl hover:scale-110 transition-transform p-2 drop-shadow-sm">🛒</button>
             <button 
               onClick={() => navigate('/assessment')}
               className="px-10 py-3.5 rounded-full bg-gradient-calm text-white font-bold shadow-soft-md hover:shadow-soft-lg hover:-translate-y-0.5 hover:brightness-105 transition-smooth ease-out tracking-wide text-[1.05rem]"
@@ -239,14 +239,14 @@ export const HomePage: React.FC = () => {
           <div className="lg:hidden flex items-center gap-4 z-50">
              <button 
                 onClick={() => setIsLoginOpen(true)}
-                className="text-[rgb(139, 168, 168)] font-bold text-[0.95rem] hover:text-[rgb(157, 173, 190)] transition-colors"
+                className="text-wellness-primary font-bold text-[0.95rem] hover:text-gentle-blue transition-colors"
               >
                 Log In
               </button>
-              <button className="text-[rgb(139, 168, 168)] text-xl p-1">🛒</button>
+              <button className="text-wellness-primary text-xl p-1">🛒</button>
               <button 
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="text-[rgb(139, 168, 168)] text-3xl ml-1 focus:outline-none transition-transform duration-300"
+                className="text-wellness-primary text-3xl ml-1 focus:outline-none transition-transform duration-300"
                 style={{ transform: isMobileMenuOpen ? 'rotate(90deg)' : 'none' }}
               >
                 {isMobileMenuOpen ? '✕' : '☰'}
@@ -257,7 +257,7 @@ export const HomePage: React.FC = () => {
         {/* MOBILE MENU */}
         <div 
           className={`
-            fixed inset-0 z-40 bg-[rgb(253, 252, 248)] 
+            fixed inset-0 z-40 bg-wellness-bg 
             transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]
             lg:hidden flex flex-col
             ${isMobileMenuOpen ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-full pointer-events-none'}
@@ -269,26 +269,26 @@ export const HomePage: React.FC = () => {
             <div className="flex-1 overflow-y-auto pt-28 px-6 pb-12 relative z-10 flex flex-col">
                 <div className="space-y-8 flex-1">
                     <div className="space-y-4">
-                        <h4 className="font-serif text-[rgb(139, 168, 168)] text-2xl font-bold opacity-90">Solutions</h4>
+                        <h4 className="font-serif text-wellness-primary text-2xl font-bold opacity-90">Solutions</h4>
                         <div className="pl-4 border-l-2 border-blue-50 space-y-4">
-                            <a href="#" className="block text-lg font-medium text-slate-600 hover:text-[rgb(157, 173, 190)]">Wellness Seekers</a>
-                            <a href="#" className="block text-lg font-medium text-slate-600 hover:text-[rgb(157, 173, 190)]">Providers</a>
-                            <a href="#" className="block text-lg font-medium text-slate-600 hover:text-[rgb(157, 173, 190)]">Corporates</a>
-                            <a href="#" className="block text-lg font-medium text-slate-600 hover:text-[rgb(157, 173, 190)]">Education</a>
+                            <a href="#" className="block text-lg font-medium text-slate-600 hover:text-gentle-blue">Wellness Seekers</a>
+                            <a href="#" className="block text-lg font-medium text-slate-600 hover:text-gentle-blue">Providers</a>
+                            <a href="#" className="block text-lg font-medium text-slate-600 hover:text-gentle-blue">Corporates</a>
+                            <a href="#" className="block text-lg font-medium text-slate-600 hover:text-gentle-blue">Education</a>
                         </div>
                     </div>
 
                     <div className="space-y-4">
-                        <h4 className="font-serif text-[rgb(139, 168, 168)] text-2xl font-bold opacity-90">Resources</h4>
+                        <h4 className="font-serif text-wellness-primary text-2xl font-bold opacity-90">Resources</h4>
                         <div className="pl-4 border-l-2 border-blue-50 space-y-4">
-                            <a href="#" className="block text-lg font-medium text-slate-600 hover:text-[rgb(157, 173, 190)]">Sound Therapy</a>
-                            <a href="#" className="block text-lg font-medium text-slate-600 hover:text-[rgb(157, 173, 190)]">Digital Pet Therapy</a>
-                            <a href="#" className="block text-lg font-medium text-slate-600 hover:text-[rgb(157, 173, 190)]">Virtual Bot</a>
+                            <a href="#" className="block text-lg font-medium text-slate-600 hover:text-gentle-blue">Sound Therapy</a>
+                            <a href="#" className="block text-lg font-medium text-slate-600 hover:text-gentle-blue">Digital Pet Therapy</a>
+                            <a href="#" className="block text-lg font-medium text-slate-600 hover:text-gentle-blue">Virtual Bot</a>
                         </div>
                     </div>
 
                     <div>
-                        <a href="#" className="font-serif text-[rgb(139, 168, 168)] text-2xl font-bold opacity-90 block mb-4">About Us</a>
+                        <a href="#" className="font-serif text-wellness-primary text-2xl font-bold opacity-90 block mb-4">About Us</a>
                     </div>
                 </div>
 
@@ -310,11 +310,11 @@ export const HomePage: React.FC = () => {
         {/* HERO CONTENT */}
         <div className="relative z-20 flex-1 flex flex-col justify-center items-center text-center px-4 max-w-5xl mx-auto pb-24">
           <div className="relative z-10 p-6 md:p-8 rounded-[3rem] md:bg-gradient-to-b md:from-white/5 md:to-white/0 md:backdrop-blur-[2px]">
-            <h1 className="font-serif text-[2.8rem] md:text-[clamp(2.8rem,6vw,5.5rem)] font-normal text-[rgb(139, 168, 168)] leading-[1.1] mb-6 md:mb-8 drop-shadow-lg text-balance tracking-tight">
+            <h1 className="font-serif text-[2.8rem] md:text-[clamp(2.8rem,6vw,5.5rem)] font-normal text-wellness-primary leading-[1.1] mb-6 md:mb-8 drop-shadow-lg text-balance tracking-tight">
               A Holistic 360° Journey to Greater Mental Wellness
             </h1>
             
-            <p className="text-[1.1rem] md:text-[1.4rem] text-[rgb(107, 123, 123)] leading-[1.6] max-w-4xl mx-auto mb-10 md:mb-14 font-medium opacity-90 text-balance drop-shadow-sm md:text-[rgb(107, 123, 123)]">
+            <p className="text-[1.1rem] md:text-[1.4rem] text-wellness-muted leading-[1.6] max-w-4xl mx-auto mb-10 md:mb-14 font-medium opacity-90 text-balance drop-shadow-sm md:text-wellness-muted">
               Manas360 empowers individuals by connecting them with expert Mental Wellness Master Coaches across Neuro Linguistic Programming (NLP), Meditation–Aatman Engineering, Better Sleep Practices, Healthy Mind Diet coaching, Frequency-Vibes methodologies, and Hyper-Personalized wellness routines.
             </p>
 
@@ -333,7 +333,7 @@ export const HomePage: React.FC = () => {
         <div className="absolute inset-0 bg-gradient-to-b from-[rgb(253, 252, 248)] via-[#F4F9FF] to-[#F0F9FF] pointer-events-none"></div>
 
         <div className="max-w-[1280px] mx-auto relative z-10">
-          <h2 className="reveal-on-scroll font-serif text-[2.8rem] md:text-[3.2rem] text-[rgb(139, 168, 168)] mb-16 text-center tracking-tight">
+          <h2 className="reveal-on-scroll font-serif text-[2.8rem] md:text-[3.2rem] text-wellness-primary mb-16 text-center tracking-tight">
             Our Solutions
           </h2>
           
@@ -381,7 +381,7 @@ export const HomePage: React.FC = () => {
               <div className="w-24 h-24 bg-white rounded-[2rem] flex items-center justify-center text-5xl shadow-[0_10px_30px_-5px_rgba(14,165,233,0.1)] mb-10 group-hover:scale-105 transition-transform duration-300">
                 🤖
               </div>
-              <h3 className="font-serif text-[2.4rem] text-[rgb(139, 168, 168)] mb-6 leading-tight">Virtual Therapist Bot</h3>
+              <h3 className="font-serif text-[2.4rem] text-wellness-primary mb-6 leading-tight">Virtual Therapist Bot</h3>
               <p className="text-[#475569] text-[1.15rem] mb-12 leading-relaxed font-light">
                 24/7 AI-powered support to help you navigate difficult emotions instantly. Always here, never judging.
               </p>
@@ -402,7 +402,7 @@ export const HomePage: React.FC = () => {
               </div>
             </div>
             
-            <button className="self-start px-10 py-5 rounded-full bg-white text-[rgb(157, 173, 190)] font-bold text-lg border-2 border-[rgb(157, 173, 190)]/10 hover:border-[rgb(157, 173, 190)] hover:bg-[rgb(157, 173, 190)] hover:text-white transition-smooth shadow-sm hover:shadow-lg">
+            <button className="self-start px-10 py-5 rounded-full bg-white text-gentle-blue font-bold text-lg border-2 border-[rgb(157, 173, 190)]/10 hover:border-[rgb(157, 173, 190)] hover:bg-[rgb(157, 173, 190)] hover:text-white transition-smooth shadow-sm hover:shadow-lg">
               Start Chatting Now
             </button>
           </div>
@@ -412,7 +412,7 @@ export const HomePage: React.FC = () => {
               <div className="w-24 h-24 bg-white rounded-[2rem] flex items-center justify-center text-5xl shadow-[0_10px_30px_-5px_rgba(245,158,11,0.1)] mb-10 group-hover:scale-105 transition-transform duration-300">
                 🐕
               </div>
-              <h3 className="font-serif text-[2.4rem] text-[rgb(139, 168, 168)] mb-6 leading-tight">Digital Pet Therapy</h3>
+              <h3 className="font-serif text-[2.4rem] text-wellness-primary mb-6 leading-tight">Digital Pet Therapy</h3>
               <p className="text-[#475569] text-[1.15rem] mb-12 leading-relaxed font-light">
                 Find comfort and unconditional companionship with Fluffy, your emotional support digital pet.
               </p>
@@ -438,17 +438,17 @@ export const HomePage: React.FC = () => {
             <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-white/40 blur-3xl rounded-full translate-x-1/2 -translate-y-1/2 pointer-events-none"></div>
 
             <div className="flex-1 relative z-10">
-              <span className="inline-block px-6 py-2 rounded-full bg-white text-[rgb(139, 168, 168)] text-xs font-bold tracking-[0.2em] uppercase mb-10 shadow-[0_4px_10px_rgba(0,0,0,0.05)] border border-blue-50">
+              <span className="inline-block px-6 py-2 rounded-full bg-white text-wellness-primary text-xs font-bold tracking-[0.2em] uppercase mb-10 shadow-[0_4px_10px_rgba(0,0,0,0.05)] border border-blue-50">
                 Featured Collection
               </span>
-              <h2 className="font-serif text-[3rem] md:text-[4rem] text-[rgb(139, 168, 168)] leading-[1.1] mb-8 tracking-tight">
+              <h2 className="font-serif text-[3rem] md:text-[4rem] text-wellness-primary leading-[1.1] mb-8 tracking-tight">
                 Sound Therapy & Binaural Beats
               </h2>
               <p className="text-[1.25rem] text-[#475569] leading-relaxed mb-12 font-light max-w-xl">
                 Immerse yourself in Frequency-Vibes methodologies designed to realign your mind. 
                 From deep sleep to high focus, tune into the frequency your brain needs.
               </p>
-               <button className="flex items-center gap-3 text-[rgb(157, 173, 190)] font-bold text-xl hover:gap-5 transition-all group-hover:text-[rgb(139, 168, 168)]">
+               <button className="flex items-center gap-3 text-gentle-blue font-bold text-xl hover:gap-5 transition-all group-hover:text-wellness-primary">
                 Explore Library <span className="text-2xl group-hover:translate-x-1 transition-transform">→</span>
               </button>
             </div>
@@ -471,7 +471,7 @@ export const HomePage: React.FC = () => {
       {/* SUPPORT STATEMENT */}
       <section className="py-32 px-6 bg-gradient-to-b from-[#F8FAFC] to-white text-center border-b border-[#E0F2FE]/50">
         <div className="max-w-5xl mx-auto reveal-on-scroll">
-          <h2 className="font-serif text-[2.8rem] md:text-[3.5rem] text-[rgb(139, 168, 168)] mb-10 tracking-tight leading-tight">
+          <h2 className="font-serif text-[2.8rem] md:text-[3.5rem] text-wellness-primary mb-10 tracking-tight leading-tight">
             Support for Every State of Mind
           </h2>
           <p className="text-[1.4rem] text-[#475569] leading-relaxed font-light max-w-3xl mx-auto">
@@ -485,13 +485,13 @@ export const HomePage: React.FC = () => {
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-blue-50/50 rounded-full blur-[100px] pointer-events-none"></div>
 
         <div className="max-w-4xl mx-auto relative z-10 reveal-on-scroll">
-          <h2 className="font-serif text-[3.2rem] md:text-[4.5rem] text-[rgb(139, 168, 168)] mb-10 leading-[1.1] text-balance tracking-tight">
+          <h2 className="font-serif text-[3.2rem] md:text-[4.5rem] text-wellness-primary mb-10 leading-[1.1] text-balance tracking-tight">
             Ready to prioritize yourself?
           </h2>
           <p className="text-[1.35rem] text-[#475569] mb-14 font-light leading-relaxed">
             Join thousands who have found balance with Manas360.
             <br />
-            <span className="font-semibold text-[rgb(157, 173, 190)]">First assessment is free.</span>
+            <span className="font-semibold text-gentle-blue">First assessment is free.</span>
           </p>
           
           <div className="flex flex-col items-center gap-6">
@@ -511,37 +511,37 @@ export const HomePage: React.FC = () => {
         <div className="max-w-[1280px] mx-auto text-center">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-12 md:gap-8 mb-20 text-left">
             <div>
-              <h4 className="font-bold text-[rgb(139, 168, 168)] mb-8 text-lg">Manas360</h4>
+              <h4 className="font-bold text-wellness-primary mb-8 text-lg">Manas360</h4>
               <ul className="space-y-4 text-[0.95rem] text-slate-500 font-medium">
-                <li className="hover:text-[rgb(157, 173, 190)] cursor-pointer transition-colors">About Us</li>
-                <li className="hover:text-[rgb(157, 173, 190)] cursor-pointer transition-colors">Careers</li>
-                <li className="hover:text-[rgb(157, 173, 190)] cursor-pointer transition-colors">Press</li>
-                <li className="hover:text-[rgb(157, 173, 190)] cursor-pointer transition-colors">Blog</li>
+                <li className="hover:text-gentle-blue cursor-pointer transition-colors">About Us</li>
+                <li className="hover:text-gentle-blue cursor-pointer transition-colors">Careers</li>
+                <li className="hover:text-gentle-blue cursor-pointer transition-colors">Press</li>
+                <li className="hover:text-gentle-blue cursor-pointer transition-colors">Blog</li>
               </ul>
             </div>
             <div>
-              <h4 className="font-bold text-[rgb(139, 168, 168)] mb-8 text-lg">Solutions</h4>
+              <h4 className="font-bold text-wellness-primary mb-8 text-lg">Solutions</h4>
               <ul className="space-y-4 text-[0.95rem] text-slate-500 font-medium">
-                <li className="hover:text-[rgb(157, 173, 190)] cursor-pointer transition-colors">For Individuals</li>
-                <li className="hover:text-[rgb(157, 173, 190)] cursor-pointer transition-colors">For Business</li>
-                <li className="hover:text-[rgb(157, 173, 190)] cursor-pointer transition-colors">For Schools</li>
-                <li className="hover:text-[rgb(157, 173, 190)] cursor-pointer transition-colors">For Therapists</li>
+                <li className="hover:text-gentle-blue cursor-pointer transition-colors">For Individuals</li>
+                <li className="hover:text-gentle-blue cursor-pointer transition-colors">For Business</li>
+                <li className="hover:text-gentle-blue cursor-pointer transition-colors">For Schools</li>
+                <li className="hover:text-gentle-blue cursor-pointer transition-colors">For Therapists</li>
               </ul>
             </div>
             <div>
-              <h4 className="font-bold text-[rgb(139, 168, 168)] mb-8 text-lg">Support</h4>
+              <h4 className="font-bold text-wellness-primary mb-8 text-lg">Support</h4>
               <ul className="space-y-4 text-[0.95rem] text-slate-500 font-medium">
-                <li className="hover:text-[rgb(157, 173, 190)] cursor-pointer transition-colors">Help Center</li>
-                <li className="hover:text-[rgb(157, 173, 190)] cursor-pointer transition-colors">Contact Us</li>
-                <li className="hover:text-[rgb(157, 173, 190)] cursor-pointer transition-colors">Accessibility</li>
+                <li className="hover:text-gentle-blue cursor-pointer transition-colors">Help Center</li>
+                <li className="hover:text-gentle-blue cursor-pointer transition-colors">Contact Us</li>
+                <li className="hover:text-gentle-blue cursor-pointer transition-colors">Accessibility</li>
               </ul>
             </div>
              <div>
-              <h4 className="font-bold text-[rgb(139, 168, 168)] mb-8 text-lg">Legal</h4>
+              <h4 className="font-bold text-wellness-primary mb-8 text-lg">Legal</h4>
               <ul className="space-y-4 text-[0.95rem] text-slate-500 font-medium">
-                <li className="hover:text-[rgb(157, 173, 190)] cursor-pointer transition-colors">Terms</li>
-                <li className="hover:text-[rgb(157, 173, 190)] cursor-pointer transition-colors">Privacy</li>
-                <li className="hover:text-[rgb(157, 173, 190)] cursor-pointer transition-colors">Cookies</li>
+                <li className="hover:text-gentle-blue cursor-pointer transition-colors">Terms</li>
+                <li className="hover:text-gentle-blue cursor-pointer transition-colors">Privacy</li>
+                <li className="hover:text-gentle-blue cursor-pointer transition-colors">Cookies</li>
               </ul>
             </div>
           </div>
@@ -590,7 +590,7 @@ const DropdownButton: React.FC<{ title: string; children: React.ReactNode }> = (
 };
 
 const DropdownItem: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <a href="#" className="block px-5 py-3 text-[0.95rem] font-medium text-[rgb(107, 123, 123)] hover:bg-sky-50/80 hover:text-[rgb(139, 168, 168)] rounded-xl transition-all duration-200 hover:pl-6">
+  <a href="#" className="block px-5 py-3 text-[0.95rem] font-medium text-wellness-muted hover:bg-sky-50/80 hover:text-wellness-primary rounded-xl transition-all duration-200 hover:pl-6">
     {children}
   </a>
 );
@@ -612,7 +612,7 @@ const SolutionCard: React.FC<{ title: string; subtitle?: string; icon: string; g
     <div className="text-5xl mb-8 bg-white w-24 h-24 rounded-[24px] flex items-center justify-center shadow-[0_10px_25px_-5px_rgba(0,0,0,0.05)] group-hover:scale-105 transition-transform duration-300">
       {icon}
     </div>
-    <h3 className="font-serif text-[1.6rem] font-bold text-[rgb(139, 168, 168)] mb-2 leading-tight">{title}</h3>
+    <h3 className="font-serif text-[1.6rem] font-bold text-wellness-primary mb-2 leading-tight">{title}</h3>
     {subtitle && <p className="text-[1rem] text-[#475569] opacity-80 font-medium">{subtitle}</p>}
   </div>
 );
