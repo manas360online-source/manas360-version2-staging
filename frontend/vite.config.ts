@@ -30,5 +30,6 @@ export default defineConfig({
     host: '0.0.0.0', // CRITICAL: Same for preview mode
     port: 3000,
     strictPort: true,
+    allowedHosts: 'all', // CRITICAL: Allow preview domain access
   },
 })
