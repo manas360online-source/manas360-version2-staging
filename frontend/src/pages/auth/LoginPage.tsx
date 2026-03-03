@@ -19,8 +19,9 @@ export default function LoginPage() {
 			return;
 		}
 
-		navigate(getDefaultRouteForRole(user.role), { replace: true });
-	}, [isAuthenticated, navigate, user]);
+		const postLoginRoute = from || next || getDefaultRouteForRole(user.role);
+		navigate(postLoginRoute, { replace: true });
+	}, [from, isAuthenticated, navigate, next, user]);
 
 	const onSubmit = async (identifier: string, password: string) => {
 		setError(null);

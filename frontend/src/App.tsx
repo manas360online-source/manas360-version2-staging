@@ -162,6 +162,7 @@ function App() {
         </Route>
 
         <Route path="/dashboard" element={<Navigate to="/patient/dashboard" replace />} />
+        <Route path="/subscribe" element={<Navigate to="/patient/billing" replace />} />
         <Route path="/providers" element={<Navigate to="/patient/providers" replace />} />
         <Route path="/providers/:id" element={<Navigate to="/patient/providers" replace />} />
         <Route path="/book/:providerId" element={<Navigate to="/patient/providers" replace />} />
