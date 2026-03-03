@@ -161,7 +161,7 @@ export const MegaNav: React.FC<MegaNavProps> = ({ tone = 'dark' }) => {
   const handleDesktopLeave = () => {
     closeTimerRef.current = window.setTimeout(() => {
       setActiveTab(null);
-    }, 120);
+    }, 220);
   };
 
   const isLight = tone === 'light';
@@ -182,14 +182,14 @@ export const MegaNav: React.FC<MegaNavProps> = ({ tone = 'dark' }) => {
               onMouseEnter={() => handleDesktopEnter(tab.label)}
               onFocus={() => handleDesktopEnter(tab.label)}
               onClick={() => setActiveTab(isActive ? null : tab.label)}
-              className={`min-h-[36px] flex-1 whitespace-nowrap rounded-md px-2.5 py-1.5 text-[13px] font-medium tracking-wide transition-all duration-[250ms] ease-out ${
+              className={`min-h-[36px] flex-1 whitespace-nowrap border-b-2 border-transparent px-2.5 py-1.5 text-[13px] font-medium tracking-wide transition-all duration-300 ease-out ${
                 isActive
                   ? isLight
-                    ? 'bg-calm-sage/10 text-charcoal'
-                    : 'bg-cream/10 text-cream'
+                    ? 'border-b-gentle-blue text-charcoal'
+                    : 'border-b-gentle-blue text-cream [text-shadow:0_0_10px_rgba(157,173,190,0.45)]'
                   : isLight
-                    ? 'text-charcoal/70 hover:bg-calm-sage/5 hover:text-charcoal'
-                    : 'text-cream/70 hover:bg-cream/5 hover:text-cream'
+                    ? 'text-charcoal/70 hover:border-b-gentle-blue/70 hover:text-charcoal'
+                    : 'text-cream/80 hover:border-b-gentle-blue/80 hover:text-cream'
               }`}
               aria-expanded={isActive}
               aria-controls={`panel-${tab.label}`}
@@ -207,12 +207,12 @@ export const MegaNav: React.FC<MegaNavProps> = ({ tone = 'dark' }) => {
             closeTimerRef.current = null;
           }
         }}
-        className={`absolute left-1/2 top-full z-40 hidden w-screen -translate-x-1/2 px-0 pt-0 transition-all duration-[250ms] ease-out md:block ${
-          activeTab ? 'pointer-events-auto opacity-100 translate-y-0' : 'pointer-events-none opacity-0 -translate-y-2'
+        className={`absolute left-1/2 top-full z-40 hidden w-screen -translate-x-1/2 px-0 pt-0 transform-gpu transition-all duration-300 ease-out md:block ${
+          activeTab ? 'pointer-events-auto opacity-100 translate-y-0 scale-100' : 'pointer-events-none opacity-0 -translate-y-2 scale-[0.99]'
         }`}
       >
         {activeTab ? (
-          <div id={`panel-${activeTab}`} className="w-full">
+          <div id={`panel-${activeTab}`} className="w-full border border-gentle-blue/40 bg-[#075869]/98 shadow-[0_0_18px_rgba(157,173,190,0.2)]">
             <MegaPanel
               items={activeItems}
               onNavigate={() => setActiveTab(null)}
@@ -231,7 +231,7 @@ export const MegaNav: React.FC<MegaNavProps> = ({ tone = 'dark' }) => {
           className={`inline-flex min-h-[36px] items-center rounded-md border px-2.5 py-1 transition-all duration-[250ms] ease-out ${
             isLight
               ? 'border-calm-sage/35 bg-white/95 text-charcoal hover:bg-cream'
-              : 'border-calm-sage/35 bg-charcoal/92 text-cream hover:bg-charcoal/75'
+              : 'border-calm-sage/35 bg-[#075869]/92 text-cream hover:bg-[#0C7C8A]/45'
           }`}
           aria-expanded={mobileMenuOpen}
           aria-controls="mobile-left-drawer"
@@ -262,7 +262,7 @@ export const MegaNav: React.FC<MegaNavProps> = ({ tone = 'dark' }) => {
 
           <aside
             className={`absolute inset-y-0 left-0 z-10 w-[85%] max-w-sm overflow-y-auto border-r border-calm-sage/15 px-3 pb-6 pt-4 shadow-soft-lg transition-transform duration-300 ease-out will-change-transform ${
-              isLight ? 'bg-cream' : 'bg-charcoal'
+              isLight ? 'bg-cream' : 'bg-[#075869]'
             } ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}
             onClick={(event) => event.stopPropagation()}
             aria-modal="true"

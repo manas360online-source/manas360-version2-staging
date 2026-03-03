@@ -1,9 +1,17 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, ChevronDown, ShieldCheck, Heart, Zap } from 'lucide-react';
 
 export const Hero: React.FC = () => {
   const navigate = useNavigate();
+  const [isHeroImageLoaded, setIsHeroImageLoaded] = useState(false);
+
+  useEffect(() => {
+    const image = new Image();
+    image.onload = () => setIsHeroImageLoaded(true);
+    image.onerror = () => setIsHeroImageLoaded(false);
+    image.src = 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1600&auto=format&fit=crop';
+  }, []);
 
   const handleStartAssessment = () => {
     navigate('/assessment');
@@ -21,7 +29,13 @@ export const Hero: React.FC = () => {
       {/* Background layers */}
       <div
         aria-hidden="true"
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        className="absolute inset-0 bg-gradient-to-br from-[#E4F2F5] via-[#C8E6EC] to-[#7BC0CD]"
+      />
+      <div
+        aria-hidden="true"
+        className={`absolute inset-0 bg-cover bg-center bg-no-repeat transition-opacity duration-500 ${
+          isHeroImageLoaded ? 'opacity-100' : 'opacity-0'
+        }`}
         style={{
           backgroundImage:
             "url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1600&auto=format&fit=crop')",

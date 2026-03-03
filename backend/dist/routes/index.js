@@ -18,6 +18,7 @@ const webhook_routes_1 = __importDefault(require("./webhook.routes"));
 const lead_routes_1 = __importDefault(require("./lead.routes"));
 const patient_v1_routes_1 = __importDefault(require("./patient-v1.routes"));
 const certification_routes_1 = __importDefault(require("./certification.routes"));
+const landing_routes_1 = __importDefault(require("./landing.routes"));
 const router = (0, express_1.Router)();
 router.get('/health', (_req, res) => {
     res.status(200).json({
@@ -43,5 +44,7 @@ router.use('/v1/subscriptions', subscription_routes_1.default);
 router.use('/v1/leads', lead_routes_1.default);
 router.use('/certifications', certification_routes_1.default);
 router.use('/v1/certifications', certification_routes_1.default);
+router.use('/landing', landing_routes_1.default);
+router.use('/v1/landing', landing_routes_1.default);
 router.use('/webhooks', webhook_routes_1.default);
 exports.default = router;

@@ -26,10 +26,10 @@ export default function LoginForm({ onSubmit, loading = false, error = null }: L
 		<form onSubmit={handleSubmit} className="space-y-4" noValidate>
 			<Input
 				id="login-identifier"
-				label="Email"
-				type="email"
+				label="Email or Phone"
+				type="text"
 				autoComplete="username"
-				placeholder="you@example.com"
+				placeholder="you@example.com or +91XXXXXXXXXX"
 				value={identifier}
 				onChange={(event) => setIdentifier(event.target.value)}
 				required

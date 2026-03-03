@@ -3,11 +3,17 @@ import { Helmet } from 'react-helmet-async';
 import {
   Header,
   Hero,
-  TrustBar,
+  GroupSessionsStrip,
+  TrustMetrics,
   HowItWorks,
-  RoleSection,
-  LearnGrowCertificationSection,
+  PatientCapabilitiesSection,
+  ProviderCapabilitiesSection,
+  PlatformFeaturesSection,
+  PricingSection,
+  SecuritySection,
   Testimonial,
+  FAQSection,
+  FinalCtaSection,
   Footer,
   QuickAccessRail,
 } from '../components/Landing';
@@ -128,41 +134,77 @@ export const LandingPage: React.FC = () => {
         <Header />
         <QuickAccessRail />
         <Hero />
+        <GroupSessionsStrip />
 
         {/* Content sections with visual rhythm */}
-        <main>
-          {/* Trust bar — tight to hero for continuity */}
+        <main className="lg:pl-16">
+          {/* Trust metrics */}
           <section className="bg-cream px-4 pt-10 pb-2 sm:px-6 md:px-8 lg:px-12 xl:px-16">
             <div className="mx-auto max-w-6xl">
-              <TrustBar />
+              <TrustMetrics />
             </div>
           </section>
 
-          {/* How It Works — white bg for contrast */}
+          {/* How It Works */}
           <section className="bg-white px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
             <div className="mx-auto max-w-6xl">
               <HowItWorks />
             </div>
           </section>
 
-          {/* Role Section — subtle cream bg */}
+          {/* Patient capabilities */}
           <section className="bg-cream px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
             <div className="mx-auto max-w-6xl">
-              <RoleSection />
+              <PatientCapabilitiesSection />
             </div>
           </section>
 
-          {/* Learn & Grow — certification ecosystem */}
-          <section className="bg-cream px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
+          {/* Provider capabilities */}
+          <section className="bg-wellness-surface px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
             <div className="mx-auto max-w-6xl">
-              <LearnGrowCertificationSection />
+              <ProviderCapabilitiesSection />
             </div>
           </section>
 
-          {/* Testimonials — white bg */}
+          {/* Platform features */}
+          <section className="bg-cream px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
+            <div className="mx-auto max-w-6xl">
+              <PlatformFeaturesSection />
+            </div>
+          </section>
+
+          {/* Pricing */}
+          <section className="bg-white px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
+            <div className="mx-auto max-w-6xl">
+              <PricingSection />
+            </div>
+          </section>
+
+          {/* Security */}
+          <section className="bg-cream px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
+            <div className="mx-auto max-w-6xl">
+              <SecuritySection />
+            </div>
+          </section>
+
+          {/* Testimonials */}
           <section className="bg-white px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
             <div className="mx-auto max-w-6xl">
               <Testimonial />
+            </div>
+          </section>
+
+          {/* FAQ */}
+          <section className="bg-cream px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
+            <div className="mx-auto max-w-6xl">
+              <FAQSection />
+            </div>
+          </section>
+
+          {/* Final CTA */}
+          <section className="bg-cream px-4 pb-6 sm:px-6 md:px-8 lg:px-12 xl:px-16">
+            <div className="mx-auto max-w-6xl">
+              <FinalCtaSection />
             </div>
           </section>
         </main>

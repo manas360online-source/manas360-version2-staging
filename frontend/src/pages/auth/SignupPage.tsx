@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { getApiErrorMessage } from '../../api/auth';
 import RegisterForm from '../../components/auth/RegisterForm';
 import { useAuth } from '../../context/AuthContext';
@@ -7,6 +7,9 @@ import { useAuth } from '../../context/AuthContext';
 export default function SignupPage() {
 	const { register } = useAuth();
 	const navigate = useNavigate();
+	const location = useLocation();
+	const next = new URLSearchParams(location.search).get('next');
+	const loginHref = next ? `/auth/login?next=${encodeURIComponent(next)}` : '/auth/login';
 
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -19,7 +22,7 @@ export default function SignupPage() {
 		try {
 			await register(payload.email, payload.password, payload.name, payload.role);
 			setSuccess('Registration successful. Please verify email OTP to unlock login access.');
-			navigate('/auth/login', { replace: true, state: { from: '/auth/signup' } });
+			navigate(loginHref, { replace: true, state: { from: '/auth/signup' } });
 		} catch (err) {
 			setError(getApiErrorMessage(err, 'Registration failed'));
 		} finally {
@@ -43,7 +46,7 @@ export default function SignupPage() {
 					)}
 					<p className="mt-4 text-center text-sm text-wellness-muted">
 						Already registered?{' '}
-						<Link to="/auth/login" className="text-calm-sage underline underline-offset-2 hover:text-wellness-text">
+						<Link to={loginHref} className="text-calm-sage underline underline-offset-2 hover:text-wellness-text">
 							Go to login
 						</Link>
 					</p>

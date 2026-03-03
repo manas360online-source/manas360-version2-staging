@@ -29,7 +29,7 @@ export const MegaPanel: React.FC<MegaPanelProps> = ({
 
   return (
     <div
-      className={`w-full ${isLight ? 'bg-cream' : 'bg-charcoal/96'} ${
+      className={`w-full ${isLight ? 'bg-cream' : 'bg-[#075869]'} ${
         mobile
           ? 'rounded-lg p-2 shadow-soft-sm'
           : fullBleedDesktop
@@ -45,8 +45,10 @@ export const MegaPanel: React.FC<MegaPanelProps> = ({
             <Link
               to={item.route}
               onClick={onNavigate}
-              className={`group flex items-start gap-2 rounded-md px-1.5 py-1.5 text-left transition-colors duration-[200ms] focus:outline-none focus:ring-2 focus:ring-gentle-blue/60 ${
-                isLight ? 'hover:bg-white/80' : 'hover:bg-charcoal/80'
+              className={`group flex items-start gap-2 rounded-md border border-transparent px-1.5 py-1.5 text-left transition-all duration-[200ms] focus:outline-none focus:ring-2 focus:ring-gentle-blue/60 ${
+                isLight
+                  ? 'hover:border-gentle-blue/45 hover:bg-white/80 hover:shadow-[0_0_14px_rgba(157,173,190,0.18)]'
+                  : 'hover:border-gentle-blue/45 hover:bg-[#0C7C8A]/25 hover:shadow-[inset_0_-2px_0_rgba(157,173,190,0.7),0_0_12px_rgba(157,173,190,0.15)]'
               }`}
             >
               <span

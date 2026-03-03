@@ -1,75 +1,142 @@
-import React from 'react';
-import { MessageCircle, Brain, CalendarCheck } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { ClipboardList, Bot, CalendarCheck2, Sprout, BadgeCheck, UserRound, Bell, Wallet } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
-const steps = [
+type FlowKey = 'patient' | 'provider';
+
+interface FlowStep {
+  number: number;
+  title: string;
+  description: string;
+  time: string;
+  emoji: string;
+  icon: LucideIcon;
+}
+
+const patientFlow: FlowStep[] = [
   {
     number: 1,
-    icon: MessageCircle,
-    title: 'Tell Us How You Feel',
-    description:
-      'Answer a few simple questions about what you\'re experiencing. It takes just 60 seconds — no clinical jargon, just honest conversation.',
+    title: 'Free Clinical Assessment',
+    description: 'Complete a quick screening in your preferred language to understand your baseline.',
+    time: '3 min',
+    emoji: '📋',
+    icon: ClipboardList,
   },
   {
     number: 2,
-    icon: Brain,
-    title: 'Get Personalized Clarity',
-    description:
-      'Receive an evidence-based snapshot of your emotional wellbeing. Understand whether it\'s anxiety, depression, stress, or something else entirely.',
+    title: 'AI-Powered Matching',
+    description: 'Get matched to the right therapist based on specialization, language, and availability.',
+    time: 'Instant',
+    emoji: '🤖',
+    icon: Bot,
   },
   {
     number: 3,
-    icon: CalendarCheck,
-    title: 'Connect with Your Therapist',
-    description:
-      'We\'ll match you with a licensed therapist who specializes in exactly what you need. Book your first session starting at just ₹500.',
+    title: 'Book Your Session',
+    description: 'Pick a slot and preferred format (video, audio, or in-person) with secure payment.',
+    time: '2 min',
+    emoji: '📅',
+    icon: CalendarCheck2,
+  },
+  {
+    number: 4,
+    title: 'Sustained Recovery',
+    description: 'Track progress over time with between-session support and guided tools.',
+    time: 'Ongoing',
+    emoji: '🌱',
+    icon: Sprout,
+  },
+];
+
+const providerFlow: FlowStep[] = [
+  {
+    number: 1,
+    title: 'Apply & Get Verified',
+    description: 'Submit credentials for professional verification and quality screening.',
+    time: '48 hrs',
+    emoji: '✅',
+    icon: BadgeCheck,
+  },
+  {
+    number: 2,
+    title: 'Build Your Profile',
+    description: 'Set expertise, languages, pricing, and session availability in one dashboard.',
+    time: '15 min',
+    emoji: '🖼️',
+    icon: UserRound,
+  },
+  {
+    number: 3,
+    title: 'Receive Matched Patients',
+    description: 'Get relevant, pre-screened leads aligned to your specialization.',
+    time: 'Within 7 days',
+    emoji: '🔔',
+    icon: Bell,
+  },
+  {
+    number: 4,
+    title: 'Earn & Grow',
+    description: 'Track outcomes, sessions, and earnings with built-in analytics and tools.',
+    time: 'Ongoing',
+    emoji: '💰',
+    icon: Wallet,
   },
 ];
 
 export const HowItWorks: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<FlowKey>('patient');
+
+  const activeFlow = useMemo(() => (activeTab === 'patient' ? patientFlow : providerFlow), [activeTab]);
+
   return (
-    <section className="py-16 md:py-20" aria-labelledby="how-title">
-      <div className="mx-auto max-w-2xl text-center">
-        <span className="mb-3 inline-block text-sm font-semibold uppercase tracking-widest text-calm-sage">
-          How It Works
-        </span>
-        <h2
-          id="how-title"
-          className="font-serif text-3xl font-light text-charcoal md:text-4xl lg:text-5xl"
-        >
-          Three steps to feeling better
+    <section id="how-it-works" className="py-16 md:py-20" aria-labelledby="how-title">
+      <div className="mx-auto max-w-3xl text-center">
+        <span className="mb-3 inline-block text-sm font-semibold uppercase tracking-widest text-calm-sage">How It Works</span>
+        <h2 id="how-title" className="font-serif text-3xl font-light text-charcoal md:text-4xl lg:text-5xl">
+          Start your care journey in minutes
         </h2>
-        <p className="mt-3 text-base text-charcoal/60">
-          No signup walls. No waiting rooms. Start healing today.
+        <p className="mx-auto mt-3 max-w-2xl text-base text-charcoal/60">
+          Whether you need support or provide it, MANAS360 simplifies every step.
         </p>
+
+        <div className="mx-auto mt-8 inline-flex rounded-full border border-calm-sage/20 bg-cream p-1 shadow-soft-xs">
+          <button
+            type="button"
+            onClick={() => setActiveTab('patient')}
+            className={`rounded-full px-4 py-2 text-xs font-semibold md:px-6 md:text-sm ${
+              activeTab === 'patient' ? 'bg-white text-calm-sage shadow-soft-xs' : 'text-charcoal/65'
+            }`}
+          >
+            I Need Support
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('provider')}
+            className={`rounded-full px-4 py-2 text-xs font-semibold md:px-6 md:text-sm ${
+              activeTab === 'provider' ? 'bg-white text-calm-sage shadow-soft-xs' : 'text-charcoal/65'
+            }`}
+          >
+            I'm a Provider
+          </button>
+        </div>
       </div>
 
-      <div className="relative mt-12 grid grid-cols-1 gap-8 md:mt-14 md:grid-cols-3 md:gap-6">
-        {/* Connector line (desktop only) */}
-        <div
-          aria-hidden="true"
-          className="absolute left-[16.67%] right-[16.67%] top-12 hidden h-[2px] bg-gradient-to-r from-calm-sage/30 via-gentle-blue/30 to-calm-sage/30 md:block"
-        />
-
-        {steps.map((step) => {
+      <div className="relative mt-10 grid grid-cols-1 gap-5 md:mt-12 md:grid-cols-2 xl:grid-cols-4">
+        {activeFlow.map((step) => {
           const Icon = step.icon;
           return (
             <article
-              key={step.number}
-              className="relative rounded-2xl border border-calm-sage/10 bg-white/90 p-8 text-center shadow-soft-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-soft-md"
+              key={`${activeTab}-${step.number}`}
+              className="rounded-2xl border border-calm-sage/30 bg-white/95 p-6 shadow-[0_8px_26px_rgba(44,51,51,0.10)] transition-all duration-300 hover:-translate-y-1 hover:border-calm-sage/45 hover:shadow-[0_14px_32px_rgba(44,51,51,0.14)]"
             >
-              {/* Number badge */}
-              <div className="relative mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-calm text-white shadow-soft-sm">
-                <Icon className="h-6 w-6" strokeWidth={1.8} />
-                <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-charcoal text-[10px] font-bold text-cream">
-                  {step.number}
-                </span>
+              <p className="text-[11px] font-semibold tracking-widest text-calm-sage/80">STEP {String(step.number).padStart(2, '0')}</p>
+              <div className="mt-3 inline-flex h-11 w-11 items-center justify-center rounded-xl border border-calm-sage/25 bg-calm-sage/18 text-lg shadow-[0_4px_14px_rgba(44,51,51,0.08)]">
+                <span aria-hidden="true">{step.emoji}</span>
+                <Icon className="sr-only" />
               </div>
-              <h3 className="text-lg font-semibold text-charcoal">
-                {step.title}
-              </h3>
-              <p className="mt-3 text-sm leading-relaxed text-charcoal/70">
-                {step.description}
-              </p>
+              <h3 className="mt-4 text-[17px] font-semibold text-charcoal">{step.title}</h3>
+              <p className="mt-2 text-[15px] leading-relaxed text-charcoal/78">{step.description}</p>
+              <p className="mt-3 text-xs font-semibold text-calm-sage">⏱ {step.time}</p>
             </article>
           );
         })}
