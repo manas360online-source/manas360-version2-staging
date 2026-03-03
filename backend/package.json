@@ -17,6 +17,7 @@
 		"backfill:versions": "ts-node ./scripts/backfill_versions.ts",
 		"seed:templates": "ts-node ./scripts/seed_default_templates.ts",
 				"seed:login-users": "node ./scripts/seed-login-users.js",
+				"seed": "node ./seed.js",
 		"seed:users:mock": "ts-node ./scripts/seed_mock_users.ts",
 		"seed:analytics:mock": "ts-node ./scripts/seed_admin_analytics_mock_data.ts",
 		"seed:all:mock": "npm run seed:users:mock && npm run seed:analytics:mock",

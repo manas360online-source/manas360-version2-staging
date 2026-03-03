@@ -38,6 +38,7 @@ const mapSeverity = (score: number): 'Mild' | 'Moderate' | 'Severe' => {
 };
 
 const toProviderListItem = async (user: any) => {
+	// TODO: Replace therapist mock data once therapist module is integrated.
 	const categories = await db.cBTSessionTemplate.findMany({
 		where: { therapistId: user.id, status: 'PUBLISHED' },
 		select: { category: true },
@@ -63,7 +64,11 @@ export const getPatientDashboard = async (userId: string) => {
 	const patientProfile = await getPatientProfile(userId);
 	const now = new Date();
 
-	const [upcomingRaw, lastAssessment, recentMoodRaw, therapistUsers] = await Promise.all([
+	const [user, upcomingRaw, recentSessionsRaw, lastAssessment, recentMoodRaw, therapistUsers, exercises, progress] = await Promise.all([
+		db.user.findUnique({
+			where: { id: userId },
+			select: { id: true, name: true, firstName: true, lastName: true, email: true, role: true, createdAt: true },
+		}),
 		db.therapySession.findMany({
 			where: {
 				patientProfileId: patientProfile.id,
@@ -78,6 +83,18 @@ export const getPatientDashboard = async (userId: string) => {
 				dateTime: true,
 				status: true,
 				agoraChannel: true,
+				therapistProfile: { select: { id: true, firstName: true, lastName: true, name: true } },
+			},
+		}),
+		db.therapySession.findMany({
+			where: { patientProfileId: patientProfile.id },
+			orderBy: { dateTime: 'desc' },
+			take: 20,
+			select: {
+				id: true,
+				dateTime: true,
+				status: true,
+				sessionFeeMinor: true,
 				therapistProfile: { select: { id: true, firstName: true, lastName: true, name: true } },
 			},
 		}),
@@ -97,11 +114,109 @@ export const getPatientDashboard = async (userId: string) => {
 			select: { id: true, firstName: true, lastName: true, name: true },
 			take: 8,
 		}),
+		db.patientExercise.findMany({
+			where: { patientId: patientProfile.id },
+			orderBy: { createdAt: 'desc' },
+			take: 6,
+			select: { id: true, title: true, assignedBy: true, duration: true, status: true, createdAt: true },
+		}).catch(() => []),
+		db.patientProgress.findUnique({
+			where: { patientId: patientProfile.id },
+			select: {
+				sessionsCompleted: true,
+				totalSessions: true,
+				exercisesCompleted: true,
+				totalExercises: true,
+				phqStart: true,
+				phqCurrent: true,
+			},
+		}).catch(() => null),
 	]);
 
 	const recommendedProviders = await Promise.all(therapistUsers.map((u: any) => toProviderListItem(u)));
+	const userName = String(user?.name || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Patient');
+	const moodTrend = [...recentMoodRaw]
+		.reverse()
+		.map((entry: any) => ({
+			date: entry.date,
+			score: Number(entry.moodScore || 0),
+			note: entry.note || null,
+		}));
+
+	const avgMood = moodTrend.length
+		? moodTrend.reduce((sum: number, entry: any) => sum + Number(entry.score || 0), 0) / moodTrend.length
+		: 3;
+
+	const completedSessions = recentSessionsRaw.filter((row: any) => String(row.status) === 'COMPLETED').length;
+	const totalSessions = Math.max(completedSessions + upcomingRaw.length, progress?.totalSessions || 0);
+	const upcomingSession = upcomingRaw[0]
+		? {
+			id: upcomingRaw[0].id,
+			bookingReferenceId: upcomingRaw[0].bookingReferenceId,
+			scheduledAt: upcomingRaw[0].dateTime,
+			status: String(upcomingRaw[0].status).toLowerCase(),
+			agoraChannel: upcomingRaw[0].agoraChannel,
+			provider: {
+				id: upcomingRaw[0].therapistProfile.id,
+				name: String(upcomingRaw[0].therapistProfile.name || `${upcomingRaw[0].therapistProfile.firstName || ''} ${upcomingRaw[0].therapistProfile.lastName || ''}`.trim() || 'Therapist'),
+			},
+		}
+		: null;
+
+	const recentActivity = [
+		...recentSessionsRaw.slice(0, 4).map((session: any) => ({
+			id: `session-${session.id}`,
+			type: 'session',
+			title: `Session ${String(session.status).toLowerCase()}`,
+			description: String(session.therapistProfile?.name || `${session.therapistProfile?.firstName || ''} ${session.therapistProfile?.lastName || ''}`.trim() || 'Therapist'),
+			date: session.dateTime,
+		})),
+		...recentMoodRaw.slice(0, 3).map((mood: any) => ({
+			id: `mood-${mood.id || mood.date}`,
+			type: 'mood',
+			title: 'Mood check-in saved',
+			description: `Mood score ${mood.moodScore}/5`,
+			date: mood.date,
+		})),
+	]
+		.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+		.slice(0, 8);
+
+	const progressPayload = progress
+		? {
+			sessionsCompleted: progress.sessionsCompleted,
+			totalSessions: progress.totalSessions,
+			exercisesCompleted: progress.exercisesCompleted,
+			totalExercises: progress.totalExercises,
+			phqStart: progress.phqStart,
+			phqCurrent: progress.phqCurrent,
+		}
+		: {
+			sessionsCompleted: completedSessions,
+			totalSessions: Math.max(totalSessions, 1),
+			exercisesCompleted: exercises.filter((item: any) => String(item.status) === 'COMPLETED').length,
+			totalExercises: Math.max(exercises.length, 1),
+			phqStart: null,
+			phqCurrent: lastAssessment?.totalScore ?? null,
+		};
 
 	return {
+		user: {
+			id: user?.id,
+			name: userName,
+			email: user?.email || null,
+			role: String(user?.role || 'PATIENT').toLowerCase(),
+			createdAt: user?.createdAt,
+		},
+		wellnessScore: Math.max(0, Math.min(100, Math.round((avgMood / 5) * 100))),
+		sessionsCompleted: progressPayload.sessionsCompleted,
+		totalSessions: progressPayload.totalSessions,
+		streak: moodTrend.length,
+		moodTrend,
+		upcomingSession,
+		progress: progressPayload,
+		recentActivity,
+		exercises,
 		upcomingSessions: upcomingRaw.map((s: any) => ({
 			id: s.id,
 			bookingReferenceId: s.bookingReferenceId,
@@ -124,10 +239,146 @@ export const getPatientDashboard = async (userId: string) => {
 		recentMoodLogs: recentMoodRaw,
 		recommendedProviders: recommendedProviders.slice(0, 4),
 		suggestedContent: [
-			{ id: 'breathing-101', title: '5-minute calming breath practice', category: 'Mindfulness' },
-			{ id: 'sleep-reset', title: 'Reset your sleep routine', category: 'Sleep' },
+			...exercises.map((exercise: any) => ({
+				id: exercise.id,
+				title: exercise.title,
+				category: 'Exercise',
+			})),
 		],
 	};
+};
+
+const ensureSubscriptionRecord = async (userId: string) => {
+	let subscription = await db.patientSubscription.findUnique({ where: { userId } }).catch(() => null);
+	if (!subscription) {
+		subscription = await db.patientSubscription.create({
+			data: {
+				userId,
+				planName: 'Premium Plan',
+				price: 2499,
+				billingCycle: 'monthly',
+				status: 'active',
+				autoRenew: true,
+				renewalDate: new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000),
+			},
+		}).catch(() => null);
+	}
+	return subscription;
+};
+
+export const getPatientSubscription = async (userId: string) => {
+	const subscription = await ensureSubscriptionRecord(userId);
+	if (!subscription) throw new AppError('Subscription data unavailable', 500);
+	return subscription;
+};
+
+export const updatePatientSubscriptionPlan = async (userId: string, action: 'upgrade' | 'downgrade') => {
+	const subscription = await ensureSubscriptionRecord(userId);
+	if (!subscription) throw new AppError('Subscription data unavailable', 500);
+
+	const planOrder = ['basic', 'premium', 'pro'];
+	const current = String(subscription.planName || 'premium').toLowerCase().replace(' plan', '');
+	const currentIndex = Math.max(planOrder.indexOf(current), 0);
+	const nextIndex = action === 'upgrade'
+		? Math.min(planOrder.length - 1, currentIndex + 1)
+		: Math.max(0, currentIndex - 1);
+	const nextPlan = planOrder[nextIndex];
+	const price = nextPlan === 'basic' ? 999 : nextPlan === 'premium' ? 2499 : 4999;
+
+	return db.patientSubscription.update({
+		where: { userId },
+		data: {
+			planName: `${nextPlan[0].toUpperCase()}${nextPlan.slice(1)} Plan`,
+			price,
+			billingCycle: nextPlan === 'pro' ? 'yearly' : 'monthly',
+			status: 'active',
+			autoRenew: true,
+			renewalDate: new Date(new Date().getTime() + (nextPlan === 'pro' ? 365 : 30) * 24 * 60 * 60 * 1000),
+		},
+	});
+};
+
+export const cancelPatientSubscription = async (userId: string) => {
+	await ensureSubscriptionRecord(userId);
+	return db.patientSubscription.update({
+		where: { userId },
+		data: {
+			status: 'cancelled',
+			autoRenew: false,
+		},
+	});
+};
+
+export const reactivatePatientSubscription = async (userId: string) => {
+	await ensureSubscriptionRecord(userId);
+	return db.patientSubscription.update({
+		where: { userId },
+		data: {
+			status: 'active',
+			autoRenew: true,
+			renewalDate: new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000),
+		},
+	});
+};
+
+export const setPatientSubscriptionAutoRenew = async (userId: string, autoRenew: boolean) => {
+	await ensureSubscriptionRecord(userId);
+	return db.patientSubscription.update({
+		where: { userId },
+		data: { autoRenew },
+	});
+};
+
+export const getPatientPaymentMethod = async (userId: string) => {
+	return db.patientPaymentMethod.findUnique({ where: { userId } }).catch(() => null);
+};
+
+export const updatePatientPaymentMethod = async (
+	userId: string,
+	input: { cardLast4: string; cardBrand: string; expiryMonth: number; expiryYear: number },
+) => {
+	return db.patientPaymentMethod.upsert({
+		where: { userId },
+		update: {
+			cardLast4: input.cardLast4,
+			cardBrand: input.cardBrand,
+			expiryMonth: input.expiryMonth,
+			expiryYear: input.expiryYear,
+		},
+		create: {
+			userId,
+			cardLast4: input.cardLast4,
+			cardBrand: input.cardBrand,
+			expiryMonth: input.expiryMonth,
+			expiryYear: input.expiryYear,
+		},
+	});
+};
+
+export const getPatientInvoices = async (userId: string) => {
+	const invoices = await db.patientInvoice.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }).catch(() => []);
+	return invoices;
+};
+
+export const getPatientInvoiceById = async (userId: string, invoiceId: string) => {
+	const invoice = await db.patientInvoice.findFirst({ where: { id: invoiceId, userId } }).catch(() => null);
+	if (!invoice) throw new AppError('Invoice not found', 404);
+	return invoice;
+};
+
+export const getPatientExercises = async (userId: string) => {
+	const patientProfile = await getPatientProfile(userId);
+	return db.patientExercise.findMany({ where: { patientId: patientProfile.id }, orderBy: { createdAt: 'desc' } }).catch(() => []);
+};
+
+export const completePatientExercise = async (userId: string, exerciseId: string) => {
+	const patientProfile = await getPatientProfile(userId);
+	const updated = await db.patientExercise.updateMany({
+		where: { id: exerciseId, patientId: patientProfile.id },
+		data: { status: 'COMPLETED' },
+	});
+	if (!updated.count) throw new AppError('Exercise not found', 404);
+	return { id: exerciseId, status: 'COMPLETED' };
 };
 
 export const listProviders = async (filters: ProviderFilters) => {

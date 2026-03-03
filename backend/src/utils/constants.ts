@@ -1,4 +1,4 @@
-export const ALLOWED_PROFILE_UPDATE_FIELDS = ['name', 'phone'] as const;
+export const ALLOWED_PROFILE_UPDATE_FIELDS = ['name', 'phone', 'showNameToProviders'] as const;
 
 export const FORBIDDEN_PROFILE_UPDATE_FIELDS = ['role', 'email', 'password', 'passwordHash'] as const;
 
@@ -7,6 +7,7 @@ export type AllowedProfileField = (typeof ALLOWED_PROFILE_UPDATE_FIELDS)[number]
 export interface ProfileUpdatePayload {
 	name?: string;
 	phone?: string;
+	showNameToProviders?: boolean;
 }
 
 export interface ChangePasswordPayload {
@@ -36,8 +37,13 @@ export const filterProfileUpdatePayload = (
 		}
 
 		if (allowedFields.has(key)) {
-			if (typeof value === 'string') {
-				filtered[key as AllowedProfileField] = value;
+			if ((key === 'name' || key === 'phone') && typeof value === 'string') {
+				filtered[key] = value;
+				continue;
+			}
+
+			if (key === 'showNameToProviders' && typeof value === 'boolean') {
+				filtered.showNameToProviders = value;
 			}
 			continue;
 		}

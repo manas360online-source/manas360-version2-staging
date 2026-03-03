@@ -2,6 +2,7 @@ import { http } from '../lib/http';
 
 export const patientApi = {
   getDashboard: async () => (await http.get('/v1/patient/dashboard')).data,
+  getDashboardV2: async () => (await http.get('/patient/dashboard')).data,
   listProviders: async (params?: { specialization?: string; language?: string; minPrice?: number; maxPrice?: number; page?: number; limit?: number }) =>
     (await http.get('/v1/providers', { params })).data,
   getProvider: async (id: string) => (await http.get(`/v1/providers/${encodeURIComponent(id)}`)).data,
@@ -20,6 +21,22 @@ export const patientApi = {
     (await http.post('/v1/assessments/submit', payload)).data,
   addMood: async (payload: { mood: number; note?: string }) => (await http.post('/v1/mood', payload)).data,
   getMoodHistory: async () => (await http.get('/v1/mood/history')).data,
+  getMoodLogs: async () => (await http.get('/patient/mood')).data,
+  addMoodLog: async (payload: { mood: number; note?: string }) => (await http.post('/patient/mood', payload)).data,
+  getSubscription: async () => (await http.get('/patient/subscription')).data,
+  upgradeSubscription: async () => (await http.patch('/patient/subscription/upgrade')).data,
+  downgradeSubscription: async () => (await http.patch('/patient/subscription/downgrade')).data,
+  cancelSubscription: async () => (await http.patch('/patient/subscription/cancel')).data,
+  reactivateSubscription: async () => (await http.patch('/patient/subscription/reactivate')).data,
+  setSubscriptionAutoRenew: async (autoRenew: boolean) => (await http.patch('/patient/subscription/auto-renew', { autoRenew })).data,
+  getPaymentMethod: async () => (await http.get('/patient/payment-method')).data,
+  updatePaymentMethod: async (payload: { cardLast4: string; cardBrand: string; expiryMonth: number; expiryYear: number }) =>
+    (await http.put('/patient/payment-method', payload)).data,
+  getInvoices: async () => (await http.get('/patient/invoices')).data,
+  downloadInvoice: async (id: string) =>
+    (await http.get(`/patient/invoices/${encodeURIComponent(id)}/download`, { responseType: 'blob' })).data,
+  getExercises: async () => (await http.get('/patient/exercises')).data,
+  completeExercise: async (id: string) => (await http.patch(`/patient/exercises/${encodeURIComponent(id)}/complete`)).data,
   aiChat: async (payload: { message: string }) => (await http.post('/v1/ai/chat', payload)).data,
   getNotifications: async () => (await http.get('/v1/notifications')).data,
   markNotificationRead: async (id: string) => (await http.patch(`/v1/notifications/${encodeURIComponent(id)}/read`)).data,

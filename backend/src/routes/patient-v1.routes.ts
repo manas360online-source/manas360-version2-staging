@@ -5,19 +5,32 @@ import { asyncHandler } from '../middleware/validate.middleware';
 import {
 	aiChatController,
 	bookSessionController,
+	cancelPatientSubscriptionController,
+	completePatientExerciseController,
 	createMoodController,
+	downloadPatientInvoiceController,
+	downgradePatientSubscriptionController,
+	getPatientExercisesController,
 	getPatientDashboardController,
+	getPatientInvoicesController,
+	getPatientMoodController,
+	getPatientPaymentMethodController,
+	getPatientSubscriptionController,
 	getProviderByIdController,
 	listNotificationsController,
 	listProvidersController,
 	markNotificationReadController,
 	moodHistoryController,
+	reactivatePatientSubscriptionController,
 	sessionInvoicePdfController,
 	sessionDetailController,
 	sessionHistoryController,
 	sessionSummaryPdfController,
 	submitAssessmentController,
+	togglePatientSubscriptionAutoRenewController,
 	upcomingSessionsController,
+	updatePatientPaymentMethodController,
+	upgradePatientSubscriptionController,
 	verifyPaymentController,
 } from '../controllers/patient-v1.controller';
 
@@ -46,5 +59,23 @@ router.post('/ai/chat', requireAuth, requireRole('patient'), asyncHandler(aiChat
 
 router.get('/notifications', requireAuth, requireRole('patient'), asyncHandler(listNotificationsController));
 router.patch('/notifications/:id/read', requireAuth, requireRole('patient'), asyncHandler(markNotificationReadController));
+
+router.get('/subscription', requireAuth, requireRole('patient'), asyncHandler(getPatientSubscriptionController));
+router.patch('/subscription/upgrade', requireAuth, requireRole('patient'), asyncHandler(upgradePatientSubscriptionController));
+router.patch('/subscription/downgrade', requireAuth, requireRole('patient'), asyncHandler(downgradePatientSubscriptionController));
+router.patch('/subscription/cancel', requireAuth, requireRole('patient'), asyncHandler(cancelPatientSubscriptionController));
+router.patch('/subscription/reactivate', requireAuth, requireRole('patient'), asyncHandler(reactivatePatientSubscriptionController));
+router.patch('/subscription/auto-renew', requireAuth, requireRole('patient'), asyncHandler(togglePatientSubscriptionAutoRenewController));
+
+router.get('/payment-method', requireAuth, requireRole('patient'), asyncHandler(getPatientPaymentMethodController));
+router.put('/payment-method', requireAuth, requireRole('patient'), asyncHandler(updatePatientPaymentMethodController));
+
+router.get('/invoices', requireAuth, requireRole('patient'), asyncHandler(getPatientInvoicesController));
+router.get('/invoices/:id/download', requireAuth, requireRole('patient'), asyncHandler(downloadPatientInvoiceController));
+
+router.get('/mood', requireAuth, requireRole('patient'), asyncHandler(getPatientMoodController));
+
+router.get('/exercises', requireAuth, requireRole('patient'), asyncHandler(getPatientExercisesController));
+router.patch('/exercises/:id/complete', requireAuth, requireRole('patient'), asyncHandler(completePatientExerciseController));
 
 export default router;

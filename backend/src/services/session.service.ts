@@ -366,7 +366,10 @@ export const getMyTherapistSessions = async (userId: string, query: TherapistSes
 	});
 
 	const userIds = patientProfiles.map((p: any) => String(p.userId));
-	const users = await db.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true, email: true, firstName: true, lastName: true } });
+	const users = await db.user.findMany({
+		where: { id: { in: userIds } },
+		select: { id: true, name: true, email: true, firstName: true, lastName: true, showNameToProviders: true },
+	});
 
 	const patientMap: Map<string, any> = new Map(patientProfiles.map((patient: any) => [String(patient.id), patient]));
 	const userMap: Map<string, any> = new Map(users.map((u: any) => [String(u.id), u]));
@@ -377,10 +380,16 @@ export const getMyTherapistSessions = async (userId: string, query: TherapistSes
 		const sessionDate = new Date(session.dateTime);
 
 		// Minimal patient footprint for dashboard list (no PII)
-		const displayName =
+		const isNameVisible = user?.showNameToProviders !== false;
+		const resolvedName =
 			String(user?.name ?? '').trim() ||
 			`${String(user?.firstName ?? '').trim()} ${String(user?.lastName ?? '').trim()}`.trim();
-		const initials = displayName ? displayName.split(' ').map((p: string) => p.charAt(0)).join('.') : null;
+		const displayName = isNameVisible ? resolvedName : 'Anonymous Patient';
+		const initials = isNameVisible
+			? displayName
+				? displayName.split(' ').map((p: string) => p.charAt(0)).join('.')
+				: null
+			: 'A.P';
 
 		return {
 			sessionId: String(session.id),
@@ -458,13 +467,15 @@ export const getMyTherapistSessionDetail = async (userId: string, sessionId: str
 	const user = patientProfile
 		? await db.user.findUnique({
 				where: { id: String(patientProfile.userId) },
-				select: { name: true, email: true, firstName: true, lastName: true },
+				select: { name: true, email: true, firstName: true, lastName: true, showNameToProviders: true },
 		  })
 		: null;
-	const patientName =
-		String(user?.name ?? '').trim() ||
-		`${String(user?.firstName ?? '').trim()} ${String(user?.lastName ?? '').trim()}`.trim() ||
-		null;
+	const isNameVisible = user?.showNameToProviders !== false;
+	const patientName = isNameVisible
+		? String(user?.name ?? '').trim() ||
+			`${String(user?.firstName ?? '').trim()} ${String(user?.lastName ?? '').trim()}`.trim() ||
+			null
+		: 'Anonymous Patient';
 
 	const responses = await prisma.patientSessionResponse.findMany({
 		where: { sessionId: String(session.id) },
@@ -505,7 +516,7 @@ export const getMyTherapistSessionDetail = async (userId: string, sessionId: str
 		patient: {
 			id: patientProfile?.id ? String(patientProfile.id) : null,
 			name: patientName,
-			email: user?.email ?? null,
+			email: isNameVisible ? user?.email ?? null : null,
 			age: patientProfile?.age ?? null,
 			gender: patientProfile?.gender ?? null,
 		},

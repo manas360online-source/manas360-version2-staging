@@ -7,6 +7,7 @@ import {
   HeartPulse,
   Home,
   LifeBuoy,
+  LogOut,
   Menu,
   MessageSquare,
   Search,
@@ -14,7 +15,8 @@ import {
   User,
   X,
 } from 'lucide-react';
-import { Link, Outlet, useLocation } from 'react-router-dom';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 
 const mainNavItems = [
   { to: '/patient/dashboard', label: 'Dashboard', icon: Home },
@@ -55,10 +57,32 @@ type NavItem = {
 
 export default function PatientDashboardLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  const userName = [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim() || user?.email || 'Patient';
+  const initials = userName
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('') || 'PT';
+
+  const todayLabel = new Date().toLocaleDateString(undefined, {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
 
   const isActive = (path: string) =>
     location.pathname === path || location.pathname.startsWith(`${path}/`);
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/auth/login', { replace: true });
+  };
 
   useEffect(() => {
     setMobileSidebarOpen(false);
@@ -161,13 +185,21 @@ export default function PatientDashboardLayout() {
           <div className="border-t border-calm-sage/15 p-4">
             <div className="flex items-center gap-3 rounded-xl bg-white/80 p-2.5">
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-warm-terracotta/25 text-xs font-semibold text-warm-terracotta">
-                PK
+                {initials}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-charcoal">Priya Kumar</p>
-                <p className="text-[11px] text-charcoal/55">Premium · Since Jan 2026</p>
+                <p className="truncate text-sm font-semibold text-charcoal">{userName}</p>
+                <p className="text-[11px] text-charcoal/55">Patient Account</p>
               </div>
             </div>
+            <button
+              type="button"
+              onClick={() => void handleLogout()}
+              className="mt-2 inline-flex min-h-[40px] w-full items-center justify-center gap-2 rounded-xl border border-calm-sage/20 bg-white px-3 text-sm font-medium text-charcoal/80 transition hover:bg-calm-sage/10"
+            >
+              <LogOut className="h-4 w-4" />
+              Logout
+            </button>
           </div>
         </aside>
 
@@ -185,7 +217,7 @@ export default function PatientDashboardLayout() {
 
               <div>
                 <p className="font-serif text-lg font-semibold text-charcoal">Dashboard</p>
-                <p className="hidden text-[11px] text-charcoal/55 sm:block">Tuesday, 3 March 2026</p>
+                <p className="hidden text-[11px] text-charcoal/55 sm:block">{todayLabel}</p>
               </div>
 
               <div className="ml-auto flex items-center gap-2 sm:gap-3">
@@ -207,12 +239,22 @@ export default function PatientDashboardLayout() {
                   <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500" aria-hidden="true" />
                 </Link>
 
+                <button
+                  type="button"
+                  onClick={() => void handleLogout()}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-charcoal/60 transition hover:bg-calm-sage/10"
+                  aria-label="Logout"
+                  title="Logout"
+                >
+                  <LogOut className="h-4 w-4" />
+                </button>
+
                 <Link
                   to="/patient/profile"
                   className="inline-flex items-center gap-2 rounded-lg p-1 pr-2 transition hover:bg-calm-sage/10"
                 >
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-warm-terracotta/25 text-xs font-semibold text-warm-terracotta">
-                    PK
+                    {initials}
                   </div>
                 </Link>
               </div>

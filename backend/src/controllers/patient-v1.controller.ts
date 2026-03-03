@@ -4,9 +4,16 @@ import { AppError } from '../middleware/error.middleware';
 import { sendSuccess } from '../utils/response';
 import {
 	chatWithAi,
+	cancelPatientSubscription,
+	completePatientExercise,
 	createMoodLog,
+	getPatientExercises,
 	getMoodHistory,
 	getPatientDashboard,
+	getPatientInvoiceById,
+	getPatientInvoices,
+	getPatientPaymentMethod,
+	getPatientSubscription,
 	getProviderById,
 	getSessionDocumentPayload,
 	getSessionDetail,
@@ -16,7 +23,11 @@ import {
 	listNotifications,
 	listProviders,
 	markNotificationRead,
+	reactivatePatientSubscription,
+	setPatientSubscriptionAutoRenew,
 	submitAssessment,
+	updatePatientPaymentMethod,
+	updatePatientSubscriptionPlan,
 	verifySessionPaymentAndCreateSession,
 } from '../services/patient-v1.service';
 
@@ -243,4 +254,94 @@ export const markNotificationReadController = async (req: Request, res: Response
 	if (!id) throw new AppError('notification id is required', 422);
 	const data = await markNotificationRead(userId, id);
 	sendSuccess(res, data, 'Notification marked as read');
+};
+
+export const getPatientSubscriptionController = async (req: Request, res: Response): Promise<void> => {
+	const data = await getPatientSubscription(authUserId(req));
+	sendSuccess(res, data, 'Subscription fetched');
+};
+
+export const upgradePatientSubscriptionController = async (req: Request, res: Response): Promise<void> => {
+	const data = await updatePatientSubscriptionPlan(authUserId(req), 'upgrade');
+	sendSuccess(res, data, 'Subscription upgraded');
+};
+
+export const downgradePatientSubscriptionController = async (req: Request, res: Response): Promise<void> => {
+	const data = await updatePatientSubscriptionPlan(authUserId(req), 'downgrade');
+	sendSuccess(res, data, 'Subscription downgraded');
+};
+
+export const cancelPatientSubscriptionController = async (req: Request, res: Response): Promise<void> => {
+	const data = await cancelPatientSubscription(authUserId(req));
+	sendSuccess(res, data, 'Subscription cancelled');
+};
+
+export const reactivatePatientSubscriptionController = async (req: Request, res: Response): Promise<void> => {
+	const data = await reactivatePatientSubscription(authUserId(req));
+	sendSuccess(res, data, 'Subscription reactivated');
+};
+
+export const togglePatientSubscriptionAutoRenewController = async (req: Request, res: Response): Promise<void> => {
+	const autoRenew = Boolean(req.body.autoRenew);
+	const data = await setPatientSubscriptionAutoRenew(authUserId(req), autoRenew);
+	sendSuccess(res, data, 'Subscription auto-renew updated');
+};
+
+export const getPatientPaymentMethodController = async (req: Request, res: Response): Promise<void> => {
+	const data = await getPatientPaymentMethod(authUserId(req));
+	sendSuccess(res, data, 'Payment method fetched');
+};
+
+export const updatePatientPaymentMethodController = async (req: Request, res: Response): Promise<void> => {
+	const payload = {
+		cardLast4: String(req.body.cardLast4 || '').trim(),
+		cardBrand: String(req.body.cardBrand || '').trim(),
+		expiryMonth: Number(req.body.expiryMonth),
+		expiryYear: Number(req.body.expiryYear),
+	};
+	if (!payload.cardLast4 || payload.cardLast4.length !== 4) throw new AppError('cardLast4 must be exactly 4 digits', 422);
+	if (!payload.cardBrand) throw new AppError('cardBrand is required', 422);
+	if (!Number.isFinite(payload.expiryMonth) || payload.expiryMonth < 1 || payload.expiryMonth > 12) throw new AppError('expiryMonth must be between 1 and 12', 422);
+	if (!Number.isFinite(payload.expiryYear) || payload.expiryYear < 2000) throw new AppError('expiryYear is invalid', 422);
+	const data = await updatePatientPaymentMethod(authUserId(req), payload);
+	sendSuccess(res, data, 'Payment method updated');
+};
+
+export const getPatientInvoicesController = async (req: Request, res: Response): Promise<void> => {
+	const data = await getPatientInvoices(authUserId(req));
+	sendSuccess(res, data, 'Invoices fetched');
+};
+
+export const downloadPatientInvoiceController = async (req: Request, res: Response): Promise<void> => {
+	const id = String(req.params.id || '').trim();
+	if (!id) throw new AppError('invoice id is required', 422);
+	const invoice = await getPatientInvoiceById(authUserId(req), id);
+
+	const body = `MANAS360 Invoice\nInvoice ID: ${invoice.id}\nStatus: ${invoice.status}\nAmount: ${Number(invoice.amount || 0)}\nDate: ${new Date(invoice.createdAt).toISOString()}\nURL: ${invoice.invoiceUrl || ''}\n`;
+	res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+	res.setHeader('Content-Disposition', `attachment; filename="invoice-${invoice.id}.txt"`);
+	res.status(200).send(body);
+};
+
+export const getPatientMoodController = async (req: Request, res: Response): Promise<void> => {
+	const data = await getMoodHistory(authUserId(req));
+	sendSuccess(res, data, 'Mood history fetched');
+};
+
+export const createPatientMoodController = async (req: Request, res: Response): Promise<void> => {
+	const userId = authUserId(req);
+	const result = await createMoodLog(userId, { mood: Number(req.body.mood), note: req.body.note ? String(req.body.note) : undefined });
+	sendSuccess(res, result, 'Mood logged', 201);
+};
+
+export const getPatientExercisesController = async (req: Request, res: Response): Promise<void> => {
+	const data = await getPatientExercises(authUserId(req));
+	sendSuccess(res, data, 'Exercises fetched');
+};
+
+export const completePatientExerciseController = async (req: Request, res: Response): Promise<void> => {
+	const id = String(req.params.id || '').trim();
+	if (!id) throw new AppError('exercise id is required', 422);
+	const data = await completePatientExercise(authUserId(req), id);
+	sendSuccess(res, data, 'Exercise marked as completed');
 };

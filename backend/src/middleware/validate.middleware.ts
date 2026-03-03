@@ -57,6 +57,7 @@ export const validateUpdateMeRequest: RequestHandler[] = [
 		}),
 	body('name').optional().isString().trim().isLength({ min: 2, max: 50 }).withMessage('name must be 2-50 characters'),
 	body('phone').optional().isString().trim().matches(/^\+?[1-9]\d{1,14}$/).withMessage('phone must be valid E.164 format'),
+	body('showNameToProviders').optional().isBoolean().withMessage('showNameToProviders must be a boolean'),
 	(req, _res, next) => applyValidationResult(req, next),
 	extractValidatedProfileUpdate,
 ];

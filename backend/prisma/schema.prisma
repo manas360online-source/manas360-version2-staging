@@ -75,6 +75,7 @@ model User {
   googleId                      String?      @unique
   profileImageKey               String?
   profileImageUrl               String?
+  showNameToProviders           Boolean      @default(true)
   emailVerified                 Boolean      @default(false)
   phoneVerified                 Boolean      @default(false)
   emailVerificationOtpHash      String?
@@ -113,6 +114,9 @@ model User {
   notifications             Notification[]
   bookingIntentsAsPatient   SessionBookingIntent[] @relation("BookingIntentPatient")
   bookingIntentsAsProvider  SessionBookingIntent[] @relation("BookingIntentProvider")
+  patientSubscription       PatientSubscription?
+  patientPaymentMethod      PatientPaymentMethod?
+  patientInvoices           PatientInvoice[]
 
   @@index([email])
   @@index([phone])
@@ -366,6 +370,8 @@ model PatientProfile {
   assessments     PatientAssessment[]
   moodEntries     PatientMoodEntry[]
   therapySessions TherapySession[]
+  exercises       PatientExercise[]
+  progress        PatientProgress?
 
   @@index([userId])
   @@map("patient_profiles")
@@ -982,6 +988,88 @@ model SubscriptionInvoice {
 
   @@index([subscriptionId, billedAt(sort: Desc)])
   @@map("subscription_invoices")
+}
+
+model PatientSubscription {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  planName     String
+  price        Int
+  billingCycle String
+  status       String
+  autoRenew    Boolean  @default(true)
+  renewalDate  DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@map("patient_subscriptions")
+}
+
+model PatientPaymentMethod {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  cardLast4   String
+  cardBrand   String
+  expiryMonth Int
+  expiryYear  Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("patient_payment_methods")
+}
+
+model PatientInvoice {
+  id         String   @id @default(uuid())
+  userId     String
+  amount     Int
+  status     String
+  invoiceUrl String?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("patient_invoices")
+}
+
+model PatientExercise {
+  id         String   @id @default(uuid())
+  patientId  String
+  title      String
+  assignedBy String
+  duration   Int
+  status     String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // NOTE: assignedBy is currently mock therapist reference.
+  // Replace with real therapist relation once therapist module is built.
+  patient PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, status])
+  @@map("patient_exercises")
+}
+
+model PatientProgress {
+  id                 String   @id @default(uuid())
+  patientId          String   @unique
+  sessionsCompleted  Int      @default(0)
+  totalSessions      Int      @default(0)
+  exercisesCompleted Int      @default(0)
+  totalExercises     Int      @default(0)
+  phqStart           Int?
+  phqCurrent         Int?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  patient PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@map("patient_progress")
 }
 
 model RevenueLedger {

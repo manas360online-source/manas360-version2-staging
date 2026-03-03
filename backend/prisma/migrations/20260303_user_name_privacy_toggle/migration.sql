@@ -1,0 +1,2 @@
+ALTER TABLE "users"
+ADD COLUMN IF NOT EXISTS "showNameToProviders" BOOLEAN NOT NULL DEFAULT true;

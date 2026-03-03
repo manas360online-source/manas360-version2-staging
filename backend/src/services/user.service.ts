@@ -34,6 +34,7 @@ export const getMyProfile = async (userId: string) => {
 			name: true,
 			email: true,
 			phone: true,
+			showNameToProviders: true,
 			role: true,
 			provider: true,
 			emailVerified: true,
@@ -84,6 +85,10 @@ export const updateMyProfile = async (userId: string, payload: ProfileUpdatePayl
 		updatePayload.phone = payload.phone;
 	}
 
+	if (payload.showNameToProviders !== undefined) {
+		updatePayload.showNameToProviders = payload.showNameToProviders;
+	}
+
 	if (Object.keys(updatePayload).length === 0) {
 		throw new AppError('No allowed fields provided for update', 400);
 	}
@@ -103,6 +108,9 @@ export const updateMyProfile = async (userId: string, payload: ProfileUpdatePayl
 				}
 				: {}),
 			...(updatePayload.phone !== undefined ? { phone: updatePayload.phone } : {}),
+			...(updatePayload.showNameToProviders !== undefined
+				? { showNameToProviders: updatePayload.showNameToProviders }
+				: {}),
 		},
 	});
 
