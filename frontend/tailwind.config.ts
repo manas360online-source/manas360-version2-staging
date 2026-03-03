@@ -8,6 +8,22 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        sage: {
+          50: '#E8EFE6',
+          500: '#4A6741',
+        },
+        clay: {
+          50: '#F7E8D5',
+          500: '#B8654A',
+        },
+        ink: {
+          800: '#1A1A1A',
+          500: '#6B6B6B',
+        },
+        surface: {
+          bg: '#FAFAF8',
+          card: '#FFFFFF',
+        },
         'calm-sage': '#A8B5A0',
         'soft-lavender': '#C4B5D9',
         'warm-terracotta': '#D4A89E',
@@ -25,6 +41,8 @@ const config: Config = {
         'wellness-surface': '#FBFAF7',
       },
       fontFamily: {
+        display: ['Outfit', 'sans-serif'],
+        body: ['DM Sans', 'sans-serif'],
         serif: ['Crimson Pro', 'serif'],
         sans: ['DM Sans', 'sans-serif'],
       },

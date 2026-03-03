@@ -8,8 +8,6 @@ import { CrisisPage } from './pages/Crisis'
 import { OnboardingName } from './pages/OnboardingName'
 import { OnboardingEmail } from './pages/OnboardingEmail'
 import SessionSocketDemo from './components/SessionSocketDemo'
-import TherapistDashboard from './components/TherapistDashboard'
-import AnalyticsPage from './pages/therapist/AnalyticsPage'
 import LoginPage from './pages/auth/LoginPage'
 import SignupPage from './pages/auth/SignupPage'
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage'
@@ -17,6 +15,7 @@ import ResetPasswordPage from './pages/auth/ResetPasswordPage'
 import SessionDetailPage from './pages/therapist/SessionDetailPage'
 import ProtectedRoute from './components/ProtectedRoute'
 import PatientDashboardLayout from './components/layout/PatientDashboardLayout'
+import TherapistDashboardLayout from './components/layout/TherapistDashboardLayout'
 import DashboardPage from './pages/patient/DashboardPage'
 import ProvidersPage from './pages/patient/ProvidersPage'
 import ProviderDetailPage from './pages/patient/ProviderDetailPage'
@@ -42,6 +41,17 @@ import AdminSubscriptionsPage from './pages/admin/Subscriptions'
 import AdminRevenuePage from './pages/admin/Revenue'
 import AdminSettingsPage from './pages/admin/Settings'
 import CertificationsPage from './pages/CertificationsPage'
+import TherapistDashboardPage from './pages/therapist/TherapistDashboardPage'
+import TherapistPatientsPage from './pages/therapist/TherapistPatientsPage'
+import TherapistSessionsPage from './pages/therapist/TherapistSessionsPage'
+import TherapistSessionNotesPage from './pages/therapist/TherapistSessionNotesPage'
+import TherapistEarningsPage from './pages/therapist/TherapistEarningsPage'
+import TherapistPayoutHistoryPage from './pages/therapist/TherapistPayoutHistoryPage'
+import TherapistMessagesPage from './pages/therapist/TherapistMessagesPage'
+import TherapistExerciseLibraryPage from './pages/therapist/TherapistExerciseLibraryPage'
+import TherapistAnalyticsPage from './pages/therapist/TherapistAnalyticsPage'
+import TherapistSettingsPage from './pages/therapist/TherapistSettingsPage'
+import TherapistHelpSupportPage from './pages/therapist/TherapistHelpSupportPage'
 
 interface AssessmentData {
   symptoms: string[];
@@ -89,26 +99,32 @@ function App() {
           path="/therapist-dashboard"
           element={
             <ProtectedRoute>
-              <TherapistDashboard sessionId={new URLSearchParams(window.location.hash.split('?')[1]).get('sessionId')} />
+              <Navigate to="/therapist/dashboard" replace />
             </ProtectedRoute>
           }
         />
         <Route
-          path="/therapist/analytics"
+          path="/therapist"
           element={
-            <ProtectedRoute>
-              <AnalyticsPage />
+            <ProtectedRoute allowedRoles={['therapist', 'psychiatrist', 'coach']}>
+              <TherapistDashboardLayout />
             </ProtectedRoute>
           }
-        />
-        <Route
-          path="/therapist/sessions/:id"
-          element={
-            <ProtectedRoute>
-              <SessionDetailPage />
-            </ProtectedRoute>
-          }
-        />
+        >
+          <Route index element={<Navigate to="dashboard" replace />} />
+          <Route path="dashboard" element={<TherapistDashboardPage />} />
+          <Route path="patients" element={<TherapistPatientsPage />} />
+          <Route path="sessions" element={<TherapistSessionsPage />} />
+          <Route path="sessions/:id" element={<SessionDetailPage />} />
+          <Route path="session-notes" element={<TherapistSessionNotesPage />} />
+          <Route path="earnings" element={<TherapistEarningsPage />} />
+          <Route path="payout-history" element={<TherapistPayoutHistoryPage />} />
+          <Route path="messages" element={<TherapistMessagesPage />} />
+          <Route path="exercise-library" element={<TherapistExerciseLibraryPage />} />
+          <Route path="analytics" element={<TherapistAnalyticsPage />} />
+          <Route path="settings" element={<TherapistSettingsPage />} />
+          <Route path="help-support" element={<TherapistHelpSupportPage />} />
+        </Route>
         <Route path="/auth/login" element={<LoginPage />} />
         <Route path="/auth/signup" element={<SignupPage />} />
         <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
