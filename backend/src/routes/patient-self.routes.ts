@@ -27,6 +27,8 @@ import {
   upgradePatientSubscriptionController,
 } from '../controllers/patient-v1.controller';
 
+const router = Router();
+
 
 router.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'manas360-api' });
