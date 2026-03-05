@@ -26,15 +26,13 @@ import {
   updatePatientPaymentMethodController,
   upgradePatientSubscriptionController,
 } from '../controllers/patient-v1.controller';
-import express from 'express';
-const router = express.Router();
+
 
 router.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'manas360-api' });
 });
 
-// ...existing code...
-const router = Router();
+
 
 router.get('/dashboard', requireAuth, requireRole('patient'), asyncHandler(getPatientDashboardController));
 
