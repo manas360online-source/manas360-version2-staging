@@ -744,7 +744,7 @@ model MoodPrediction {
   confidencePct     Float    @map("confidence_pct")
   trendDirection    String   @map("trend_direction")
   deteriorationAlert Boolean @default(false) @map("deterioration_alert")
-  factorAnalysis    Json?
+  factorAnalysis    Json?   @map("factor_analysis")
   influencingFactors Json?   @map("influencing_factors")
   actualMood        Float?   @map("actual_mood")
   maeSnapshot       Float?   @map("mae_snapshot")
