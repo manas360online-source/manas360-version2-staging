@@ -28,7 +28,7 @@ jobs:
 
       - name: Typecheck
         working-directory: backend
-        run: npm run typecheck --prefix ./backend
+        run: npm run typecheck
 
       - name: Run targeted tests
         working-directory: backend
