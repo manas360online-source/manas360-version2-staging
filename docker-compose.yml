@@ -27,7 +27,7 @@ services:
         condition: service_healthy
     ports:
       - "5000:5000"
-    command: ["sh", "-c", "npx prisma migrate deploy && npx prisma generate && node dist/index.js"]
+    command: ["sh", "-c", "npx prisma@4.16.2 migrate deploy && npx prisma@4.16.2 generate && node dist/index.js"]
     volumes:
       - ./backend:/app
 
