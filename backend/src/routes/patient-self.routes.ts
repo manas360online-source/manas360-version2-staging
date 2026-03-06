@@ -29,6 +29,13 @@ import {
 
 const router = Router();
 
+
+router.get('/health', (req, res) => {
+  res.json({ status: 'ok', service: 'manas360-api' });
+});
+
+
+
 router.get('/dashboard', requireAuth, requireRole('patient'), asyncHandler(getPatientDashboardController));
 
 router.get('/settings', requireAuth, requireRole('patient'), asyncHandler(getPatientSettingsController));

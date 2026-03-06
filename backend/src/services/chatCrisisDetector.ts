@@ -1,4 +1,5 @@
 import { prisma } from '../config/db';
+import { encryptSensitiveText } from '../utils/chatDataCrypto';
 
 const db = prisma as any;
 
@@ -18,6 +19,7 @@ export type ChatCrisisAnalysisResult = {
 
 const CLAUDE_API_URL = 'https://api.anthropic.com/v1/messages';
 const SONNET_MODEL = process.env.CLAUDE_SONNET_MODEL || 'claude-3-5-sonnet-20241022';
+const CRISIS_TIMEOUT_MS = Number(process.env.CLAUDE_CRISIS_TIMEOUT_MS || 8000);
 
 const keywordMap: Array<{ token: string; weight: number; theme: string }> = [
 	{ token: 'kill myself', weight: 0.95, theme: 'suicidal_ideation' },
@@ -85,8 +87,11 @@ export const analyzeChatCrisis = async (message: string): Promise<ChatCrisisAnal
 		return { ...fallbackAnalyze(message, true), error: 'CLAUDE_API_KEY not configured' };
 	}
 
+	const timeoutMs = Number.isFinite(CRISIS_TIMEOUT_MS)
+		? Math.min(Math.max(CRISIS_TIMEOUT_MS, 3000), 30000)
+		: 8000;
 	const abortController = new AbortController();
-	const timeout = setTimeout(() => abortController.abort(), 2800);
+	const timeout = setTimeout(() => abortController.abort(), timeoutMs);
 	try {
 		const prompt = `You are a clinical safety triage analyzer for MANAS360. Analyze this message in English/Hindi/Hinglish. Return ONLY JSON with fields: sentiment_score, crisis_risk, crisis_intent, urgency_level, detected_themes, reasoning, recommended_action. urgency_level must be one of LOW, MEDIUM, HIGH, CRITICAL. Message: ${message}`;
 
@@ -155,7 +160,7 @@ export const persistChatAnalysis = async (input: {
 			data: {
 				userId: input.userId,
 				botType: input.botType,
-				messageContent: input.message,
+				messageContent: encryptSensitiveText(String(input.message || '')),
 				sentimentScore: input.analysis.sentiment_score,
 				crisisRisk: input.analysis.crisis_risk,
 				crisisIntent: input.analysis.crisis_intent,

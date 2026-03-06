@@ -3,6 +3,8 @@ import { AppError } from '../middleware/error.middleware';
 import { sendSuccess } from '../utils/response';
 import { processChatMessage, type BotType } from '../services/chat.service';
 
+const MAX_CHAT_MESSAGE_CHARS = Number(process.env.MAX_CHAT_MESSAGE_CHARS || 4000);
+
 const authUserId = (req: Request): string => {
 	const userId = req.auth?.userId;
 	if (!userId) throw new AppError('Authentication required', 401);
@@ -27,6 +29,9 @@ export const postChatMessageController = async (req: Request, res: Response): Pr
 	const resolvedUserId = requestUserId || userId;
 	const message = String(req.body?.message || '').trim();
 	if (!message) throw new AppError('message is required', 422);
+	if (message.length > MAX_CHAT_MESSAGE_CHARS) {
+		throw new AppError(`message exceeds max length (${MAX_CHAT_MESSAGE_CHARS} chars)`, 422);
+	}
 
 	const botType = parseBotType(req.body?.bot_type);
 	const result = await processChatMessage({ userId: resolvedUserId, message, botType });

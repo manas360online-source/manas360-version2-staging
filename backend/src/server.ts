@@ -6,6 +6,7 @@ import initSocket from './socket';
 import { startAnalyticsRollup } from './jobs/analyticsRollup.job';
 import './jobs/admin-analytics-export.worker';
 import { startDailyMoodPredictionJob } from './cron/dailyMoodPrediction';
+import { startChatRetentionJob } from './jobs/chatRetention.job';
 
 const startServer = async (): Promise<void> => {
 	await connectDatabase();
@@ -29,6 +30,7 @@ const startServer = async (): Promise<void> => {
 	// start analytics rollup job
 	void startAnalyticsRollup();
 	startDailyMoodPredictionJob();
+	startChatRetentionJob();
 
 	const shutdown = async (signal: string): Promise<void> => {
 		console.log(`${signal} received. Shutting down gracefully...`);

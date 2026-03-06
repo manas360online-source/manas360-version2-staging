@@ -55,6 +55,12 @@ export default function LoginPage() {
 							Register here
 						</Link>
 					</p>
+					<p className="mt-2 text-center text-xs text-wellness-muted">
+						Want to go back to the landing page?{' '}
+						<Link to="/" className="text-calm-sage underline underline-offset-2 hover:text-wellness-text">
+							Go to Home
+						</Link>
+					</p>
 				</div>
 			</div>
 		</div>

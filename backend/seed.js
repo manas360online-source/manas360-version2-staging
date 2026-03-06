@@ -134,6 +134,33 @@ async function seed() {
     therapists.push(therapist);
   }
 
+  // Ensure therapist profiles exist
+  for (const therapist of therapists) {
+    const displayName = `${therapist.firstName} ${therapist.lastName}`.trim();
+    await prisma.therapistProfile.upsert({
+      where: { userId: therapist.id },
+      update: {
+        displayName,
+        bio: null,
+        specializations: [],
+        languages: [],
+        yearsOfExperience: 0,
+        consultationFee: 0,
+        availability: [],
+      },
+      create: {
+        userId: therapist.id,
+        displayName,
+        bio: null,
+        specializations: [],
+        languages: [],
+        yearsOfExperience: 0,
+        consultationFee: 0,
+        availability: [],
+      },
+    }).catch(() => null);
+  }
+
   const patients = [];
   for (const patientSeed of patientSeeds) {
     const patient = await upsertUser({ ...patientSeed, role: 'PATIENT' }, passwordHash);

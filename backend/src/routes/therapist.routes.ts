@@ -52,6 +52,28 @@ import {
 	getMyTherapistPayoutHistoryController,
 	getMyTherapistSessionNotesController,
 } from '../controllers/therapist-dashboard.controller';
+import {
+	deleteMyTherapistCareTeamController,
+	deleteMyTherapistCbtModuleController,
+	deleteMyTherapistExerciseController,
+	deleteMyTherapistResourceController,
+	getMyTherapistAssessmentsController,
+	getMyTherapistCareTeamController,
+	getMyTherapistCbtModulesController,
+	getMyTherapistExercisesController,
+	getMyTherapistResourcesController,
+	getMyTherapistStructuredSessionNotesController,
+	patchMyTherapistCareTeamController,
+	patchMyTherapistExerciseController,
+	postMyTherapistAssessmentController,
+	postMyTherapistCareTeamController,
+	postMyTherapistCbtModuleController,
+	postMyTherapistExerciseController,
+	postMyTherapistExerciseTrackController,
+	postMyTherapistResourceController,
+	postMyTherapistResourceTrackController,
+	putMyTherapistStructuredSessionNoteController,
+} from '../controllers/therapist-modules.controller';
 
 const router = Router();
 
@@ -64,6 +86,31 @@ router.get('/me/sessions', requireAuth, requireTherapistRole, ...validateTherapi
 router.get('/me/dashboard', requireAuth, requireTherapistRole, asyncHandler(getMyTherapistDashboardController));
 router.get('/me/patients', requireAuth, requireTherapistRole, asyncHandler(getMyTherapistPatientsController));
 router.get('/me/notes', requireAuth, requireTherapistRole, asyncHandler(getMyTherapistSessionNotesController));
+router.get('/me/session-notes', requireAuth, requireTherapistRole, asyncHandler(getMyTherapistStructuredSessionNotesController));
+router.put('/me/session-notes/:sessionId', requireAuth, requireTherapistRole, asyncHandler(putMyTherapistStructuredSessionNoteController));
+
+router.get('/me/exercises', requireAuth, requireTherapistRole, asyncHandler(getMyTherapistExercisesController));
+router.post('/me/exercises', requireAuth, requireTherapistRole, asyncHandler(postMyTherapistExerciseController));
+router.patch('/me/exercises/:id', requireAuth, requireTherapistRole, asyncHandler(patchMyTherapistExerciseController));
+router.post('/me/exercises/:id/track', requireAuth, requireTherapistRole, asyncHandler(postMyTherapistExerciseTrackController));
+router.delete('/me/exercises/:id', requireAuth, requireTherapistRole, asyncHandler(deleteMyTherapistExerciseController));
+
+router.get('/me/cbt-modules', requireAuth, requireTherapistRole, asyncHandler(getMyTherapistCbtModulesController));
+router.post('/me/cbt-modules', requireAuth, requireTherapistRole, asyncHandler(postMyTherapistCbtModuleController));
+router.delete('/me/cbt-modules/:id', requireAuth, requireTherapistRole, asyncHandler(deleteMyTherapistCbtModuleController));
+
+router.get('/me/assessments', requireAuth, requireTherapistRole, asyncHandler(getMyTherapistAssessmentsController));
+router.post('/me/assessments', requireAuth, requireTherapistRole, asyncHandler(postMyTherapistAssessmentController));
+
+router.get('/me/resources', requireAuth, requireTherapistRole, asyncHandler(getMyTherapistResourcesController));
+router.post('/me/resources', requireAuth, requireTherapistRole, asyncHandler(postMyTherapistResourceController));
+router.post('/me/resources/:id/track', requireAuth, requireTherapistRole, asyncHandler(postMyTherapistResourceTrackController));
+router.delete('/me/resources/:id', requireAuth, requireTherapistRole, asyncHandler(deleteMyTherapistResourceController));
+
+router.get('/me/care-team', requireAuth, requireTherapistRole, asyncHandler(getMyTherapistCareTeamController));
+router.post('/me/care-team', requireAuth, requireTherapistRole, asyncHandler(postMyTherapistCareTeamController));
+router.patch('/me/care-team/:id', requireAuth, requireTherapistRole, asyncHandler(patchMyTherapistCareTeamController));
+router.delete('/me/care-team/:id', requireAuth, requireTherapistRole, asyncHandler(deleteMyTherapistCareTeamController));
 router.get('/me/messages', requireAuth, requireTherapistRole, asyncHandler(getMyTherapistMessagesController));
 router.get('/me/payout-history', requireAuth, requireTherapistRole, asyncHandler(getMyTherapistPayoutHistoryController));
 router.get('/me/sessions/:id', requireAuth, requireTherapistRole, ...validateSessionIdParam, requireSessionOwnership, asyncHandler(getMyTherapistSessionController));

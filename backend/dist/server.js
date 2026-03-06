@@ -11,6 +11,7 @@ const socket_1 = __importDefault(require("./socket"));
 const analyticsRollup_job_1 = require("./jobs/analyticsRollup.job");
 require("./jobs/admin-analytics-export.worker");
 const dailyMoodPrediction_1 = require("./cron/dailyMoodPrediction");
+const chatRetention_job_1 = require("./jobs/chatRetention.job");
 const startServer = async () => {
     await (0, db_1.connectDatabase)();
     const server = app_1.default.listen(env_1.env.port, () => {
@@ -29,6 +30,7 @@ const startServer = async () => {
     // start analytics rollup job
     void (0, analyticsRollup_job_1.startAnalyticsRollup)();
     (0, dailyMoodPrediction_1.startDailyMoodPredictionJob)();
+    (0, chatRetention_job_1.startChatRetentionJob)();
     const shutdown = async (signal) => {
         console.log(`${signal} received. Shutting down gracefully...`);
         server.close(async () => {

@@ -109,6 +109,33 @@ async function seed() {
   const patientUsers = patientsSeed.map((row) => usersByEmail.get(row.email.toLowerCase())).filter(Boolean);
   const therapistUsers = therapistsSeed.map((row) => usersByEmail.get(row.email.toLowerCase())).filter(Boolean);
 
+  // Ensure TherapistProfile rows exist for seeded therapists
+  for (const t of therapistUsers) {
+    const displayName = `${t.firstName} ${t.lastName}`.trim();
+    await prisma.therapistProfile.upsert({
+      where: { userId: t.id },
+      update: {
+        displayName,
+        bio: null,
+        specializations: [],
+        languages: [],
+        yearsOfExperience: 0,
+        consultationFee: 0,
+        availability: [],
+      },
+      create: {
+        userId: t.id,
+        displayName,
+        bio: null,
+        specializations: [],
+        languages: [],
+        yearsOfExperience: 0,
+        consultationFee: 0,
+        availability: [],
+      },
+    }).catch(() => null);
+  }
+
   const profileByUserId = new Map();
   for (const patient of patientUsers) {
     const profile = await prisma.patientProfile.upsert({

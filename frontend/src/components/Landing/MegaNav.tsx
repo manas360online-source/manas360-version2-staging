@@ -59,8 +59,7 @@ const tabs: TabConfig[] = [
       { icon: '🏢', title: 'Corporate Wellness', description: 'Employee mental wellness programs', route: '/corporate' },
       { icon: '🏫', title: 'Education Partner', description: 'Campus and school wellbeing solutions', route: '/education' },
       { icon: '🏥', title: 'Healthcare Partner', description: 'Clinical collaboration models', route: '/healthcare' },
-      { icon: '🛡️', title: 'Insurance Partner', description: 'Integrated care partnerships', route: '/insurance' },
-      { icon: '🏛️', title: 'Government Agency', description: 'Public mental health initiatives', route: '/gov' },
+      // Insurance Partner and Government Agency removed per request
     ],
   },
   {
@@ -90,7 +89,7 @@ export const MegaNav: React.FC<MegaNavProps> = ({ tone = 'dark' }) => {
     if (!activeTab) return 'grid-cols-4' as const;
     if (activeTab === 'I Need Support') return 'grid-cols-6' as const;
     if (activeTab === 'For Relationships') return 'grid-cols-4' as const;
-    if (activeTab === 'For Professionals') return 'grid-cols-5' as const;
+    if (activeTab === 'For Professionals') return 'grid-cols-3' as const;
     if (activeTab === 'Learn & Grow') return 'grid-cols-5' as const;
     return 'grid-cols-4' as const;
   }, [activeTab]);
