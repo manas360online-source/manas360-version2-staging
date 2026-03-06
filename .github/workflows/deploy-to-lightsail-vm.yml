@@ -1,0 +1,68 @@
+name: Deploy to Lightsail VM
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install & build (local runner)
+        run: |
+          npm ci || true
+          npm run build --prefix backend || true
+          npm ci --prefix frontend || true
+          npm run build --prefix frontend || true
+
+      - name: Start ssh-agent
+        uses: webfactory/ssh-agent@v0.5.4
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Deploy to Lightsail VM via SSH
+        env:
+          SSH_USER: ${{ secrets.SSH_USER }}
+          HOST: ${{ secrets.LIGHTSAIL_HOST }}
+          REMOTE_DIR: ${{ secrets.REMOTE_APP_DIR }}
+        run: |
+          if [ -z "$REMOTE_DIR" ]; then REMOTE_DIR="/home/ubuntu/MANAS360_version2"; fi
+          echo "Deploying to $SSH_USER@$HOST:$REMOTE_DIR"
+          ssh -o StrictHostKeyChecking=no "$SSH_USER@$HOST" 'bash -s' <<'REMOTE_SCRIPT'
+            set -e
+            cd "$REMOTE_DIR"
+            git fetch --all
+            git reset --hard origin/main
+            # Backend build & restart
+            if [ -d backend ]; then
+              cd backend
+              npm ci
+              npm run build
+              if command -v pm2 >/dev/null 2>&1; then
+                pm2 restart ecosystem.config.js --env production || pm2 start ecosystem.config.js --env production
+              else
+                sudo systemctl restart manas.service || true
+              fi
+              cd ..
+            fi
+            # Frontend build
+            if [ -d frontend ]; then
+              cd frontend
+              npm ci
+              npm run build
+              cd ..
+            fi
+            # If docker-compose is present, rebuild containers
+            if [ -f docker-compose.yml ]; then
+              docker-compose pull || true
+              docker-compose up -d --build
+            fi
+          REMOTE_SCRIPT
