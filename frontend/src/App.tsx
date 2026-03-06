@@ -63,6 +63,16 @@ import TherapistAssessmentsPage from './pages/therapist/TherapistAssessmentsPage
 import TherapistResourcesPage from './pages/therapist/TherapistResourcesPage';
 import TherapistCareTeamPage from './pages/therapist/TherapistCareTeamPage';
 import TherapistRouteModeGuard from './components/therapist/dashboard/TherapistRouteModeGuard';
+import PsychiatristDashboardLayout from './components/layout/PsychiatristDashboardLayout';
+import PsychiatristDashboardPage from './pages/psychiatrist/PsychiatristDashboardPage';
+import PsychiatristPatientsPage from './pages/psychiatrist/PsychiatristPatientsPage';
+import PsychiatristAssessmentsPage from './pages/psychiatrist/PsychiatristAssessmentsPage';
+import PsychiatristPrescriptionsPage from './pages/psychiatrist/PsychiatristPrescriptionsPage';
+import PsychiatristParameterTrackingPage from './pages/psychiatrist/PsychiatristParameterTrackingPage';
+import PsychiatristMedicationHistoryPage from './pages/psychiatrist/PsychiatristMedicationHistoryPage';
+import PsychiatristCareTeamPage from './pages/psychiatrist/PsychiatristCareTeamPage';
+import PsychiatristMessagesPage from './pages/psychiatrist/PsychiatristMessagesPage';
+import PsychiatristReportsPage from './pages/psychiatrist/PsychiatristReportsPage';
 
 interface AssessmentData {
   symptoms: string[];
@@ -232,6 +242,26 @@ function App() {
               </TherapistRouteModeGuard>
             }
           />
+        </Route>
+
+        <Route
+          path="/psychiatrist"
+          element={
+            <ProtectedRoute allowedRoles={['psychiatrist']}>
+              <PsychiatristDashboardLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<Navigate to="dashboard" replace />} />
+          <Route path="dashboard" element={<PsychiatristDashboardPage />} />
+          <Route path="patients" element={<PsychiatristPatientsPage />} />
+          <Route path="assessments" element={<PsychiatristAssessmentsPage />} />
+          <Route path="prescriptions" element={<PsychiatristPrescriptionsPage />} />
+          <Route path="parameter-tracking" element={<PsychiatristParameterTrackingPage />} />
+          <Route path="medication-history" element={<PsychiatristMedicationHistoryPage />} />
+          <Route path="care-team" element={<PsychiatristCareTeamPage />} />
+          <Route path="messages" element={<PsychiatristMessagesPage />} />
+          <Route path="reports" element={<PsychiatristReportsPage />} />
         </Route>
         <Route path="/auth/login" element={<LoginPage />} />
         <Route path="/auth/signup" element={<SignupPage />} />

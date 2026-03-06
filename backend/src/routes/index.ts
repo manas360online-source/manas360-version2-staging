@@ -17,6 +17,7 @@ import certificationRoutes from './certification.routes';
 import landingRoutes from './landing.routes';
 import chatRoutes from './chat.routes';
 import riskAnalyticsRoutes from './riskAnalytics.routes';
+import psychiatristRoutes from './psychiatrist.routes';
 
 const router = Router();
 
@@ -43,6 +44,7 @@ router.use('/v1/cbt-sessions', cbtSessionRoutes);
 router.use('/v1/presence', presenceRoutes);
 router.use('/v1/therapist/dashboard', dashboardRoutes);
 router.use('/v1/therapists/dashboard', dashboardRoutes);
+router.use('/v1/psychiatrist', psychiatristRoutes);
 router.use('/v1/payments', paymentRoutes);
 router.use('/v1/subscriptions', subscriptionRoutes);
 router.use('/v1/leads', leadRoutes);

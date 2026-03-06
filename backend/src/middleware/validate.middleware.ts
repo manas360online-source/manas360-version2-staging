@@ -491,6 +491,60 @@ export const validateCreateTherapistProfileRequest: RequestHandler[] = [
 	extractValidatedTherapistProfilePayload,
 ];
 
+export const validateCreatePsychiatricAssessmentRequest: RequestHandler[] = [
+	body('patientId').isString().trim().notEmpty().withMessage('patientId is required'),
+	body('chiefComplaint').isString().trim().notEmpty().withMessage('chiefComplaint is required'),
+	body('chiefComplaint').isLength({ max: 2000 }).withMessage('chiefComplaint max length is 2000'),
+	body('symptoms').optional().isArray().withMessage('symptoms must be an array'),
+	body('durationWeeks').optional().isInt({ min: 0, max: 520 }).withMessage('durationWeeks must be between 0 and 520'),
+	body('clinicalImpression').optional().isString().withMessage('clinicalImpression must be a string'),
+	body('severity').optional().isString().withMessage('severity must be a string'),
+	(req, _res, next) => applyValidationResult(req, next),
+];
+
+export const validateCreatePrescriptionRequest: RequestHandler[] = [
+	body('patientId').isString().trim().notEmpty().withMessage('patientId is required'),
+	body('drugName').isString().trim().notEmpty().withMessage('drugName is required'),
+	body('drugName').isLength({ max: 200 }).withMessage('drugName max length is 200'),
+	body('brandName').optional().isString().withMessage('brandName must be a string'),
+	body('indication').optional().isString().withMessage('indication must be a string'),
+	body('startingDose').optional().isString().withMessage('startingDose must be a string'),
+	body('targetDose').optional().isString().withMessage('targetDose must be a string'),
+	body('maxDose').optional().isString().withMessage('maxDose must be a string'),
+	body('frequency').optional().isString().withMessage('frequency must be a string'),
+	body('duration').optional().isString().withMessage('duration must be a string'),
+	body('instructions').optional().isString().withMessage('instructions must be a string'),
+	(req, _res, next) => applyValidationResult(req, next),
+];
+
+export const validateDrugInteractionCheckRequest: RequestHandler[] = [
+	body('patientId').optional().isString().withMessage('patientId must be a string'),
+	body('medications').optional().isArray().withMessage('medications must be an array'),
+	body('supplements').optional().isArray().withMessage('supplements must be an array'),
+	body('herbals').optional().isArray().withMessage('herbals must be an array'),
+	body('resolution').optional().isString().withMessage('resolution must be a string'),
+	body('overrideJustification').optional().isString().withMessage('overrideJustification must be a string'),
+	(req, _res, next) => applyValidationResult(req, next),
+];
+
+export const validateCreateMedicationHistoryRequest: RequestHandler[] = [
+	body('patientId').isString().trim().notEmpty().withMessage('patientId is required'),
+	body('medication').isString().trim().notEmpty().withMessage('medication is required'),
+	body('oldDose').optional().isString().withMessage('oldDose must be a string'),
+	body('newDose').optional().isString().withMessage('newDose must be a string'),
+	body('reason').optional().isString().withMessage('reason must be a string'),
+	body('outcome').optional().isString().withMessage('outcome must be a string'),
+	body('changedAt').optional().isISO8601().withMessage('changedAt must be an ISO-8601 date'),
+	(req, _res, next) => applyValidationResult(req, next),
+];
+
+export const validateCreatePsychiatristFollowUpRequest: RequestHandler[] = [
+	body('patientId').isString().trim().notEmpty().withMessage('patientId is required'),
+	body('type').optional().isString().withMessage('type must be a string'),
+	body('dateTime').optional().isISO8601().withMessage('dateTime must be an ISO-8601 date'),
+	(req, _res, next) => applyValidationResult(req, next),
+];
+
 const allowedTherapistDocumentMimeTypes = new Set(['application/pdf', 'image/jpeg', 'image/png']);
 
 const therapistDocumentUpload = multer({
