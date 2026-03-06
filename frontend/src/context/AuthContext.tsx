@@ -25,7 +25,8 @@ const normalizeRole = (value: unknown): AppRole | null => {
 export const getDefaultRouteForRole = (role: unknown): string => {
   const normalizedRole = normalizeRole(role);
   if (normalizedRole === 'admin') return '/admin/analytics';
-  if (normalizedRole === 'therapist' || normalizedRole === 'psychiatrist' || normalizedRole === 'coach') return '/therapist/analytics';
+  if (normalizedRole === 'psychiatrist') return '/psychiatrist/dashboard';
+  if (normalizedRole === 'therapist' || normalizedRole === 'coach') return '/therapist/analytics';
   return '/dashboard';
 };
 
