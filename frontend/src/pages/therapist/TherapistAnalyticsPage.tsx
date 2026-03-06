@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { therapistApi, type TherapistAnalyticsSummary } from '../../api/therapist.api';
+import { therapistApi, type TherapistDashboardResponse } from '../../api/therapist.api';
 import TherapistCard from '../../components/therapist/dashboard/TherapistCard';
 import {
   TherapistErrorState,
@@ -8,7 +8,13 @@ import {
 import TherapistPageShell from '../../components/therapist/dashboard/TherapistPageShell';
 
 export default function TherapistAnalyticsPage() {
-  const [summary, setSummary] = useState<TherapistAnalyticsSummary | null>(null);
+  const [summary, setSummary] = useState<{
+    completionRate: number;
+    sessions: number;
+    avgMinutes: number;
+    completion: number;
+    total: number;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -16,8 +22,10 @@ export default function TherapistAnalyticsPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await therapistApi.getAnalyticsSummary();
-      setSummary(res);
+      const dashboard = await therapistApi.getDashboard();
+
+      const derivedSummary = mapDashboardToAnalyticsSummary(dashboard);
+      setSummary(derivedSummary);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load analytics';
       setError(message);
@@ -72,4 +80,25 @@ export default function TherapistAnalyticsPage() {
       </TherapistCard>
     </TherapistPageShell>
   );
+}
+
+function mapDashboardToAnalyticsSummary(dashboard: TherapistDashboardResponse) {
+  const durations = dashboard.todaySessions
+    .map((session) => Number(session.durationMinutes || 0))
+    .filter((value) => Number.isFinite(value) && value > 0);
+
+  const avgMinutes = durations.length
+    ? durations.reduce((acc, value) => acc + value, 0) / durations.length
+    : 0;
+
+  const total = Number(dashboard.utilization.total || 0);
+  const completion = Number(dashboard.utilization.booked || 0);
+
+  return {
+    completionRate: Number(dashboard.utilization.percent || 0),
+    sessions: Number(dashboard.stats.todaysSessions || 0),
+    avgMinutes,
+    completion,
+    total,
+  };
 }
