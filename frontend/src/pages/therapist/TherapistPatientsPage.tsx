@@ -12,9 +12,11 @@ import {
 } from '../../components/therapist/dashboard/TherapistDataState';
 import TherapistPageShell from '../../components/therapist/dashboard/TherapistPageShell';
 import TherapistTable from '../../components/therapist/dashboard/TherapistTable';
+import { useProviderDashboardContext } from '../../context/ProviderDashboardContext';
 
 export default function TherapistPatientsPage() {
   const navigate = useNavigate();
+  const { dashboardMode } = useProviderDashboardContext();
   const [rows, setRows] = useState<TherapistPatientItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +53,14 @@ export default function TherapistPatientsPage() {
   }, [search]);
 
   return (
-    <TherapistPageShell title="My Patients" subtitle="Monitor patient activity, status, and continuity of care.">
+    <TherapistPageShell
+      title="My Patients"
+      subtitle={
+        dashboardMode === 'professional'
+          ? 'Monitor patient activity, status, and continuity of care.'
+          : 'Practice overview of your patient panel and completion status.'
+      }
+    >
       <TherapistCard className="p-4">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_220px]">
           <div className="flex items-center gap-2 rounded-lg border border-ink-100 bg-surface-card px-3 py-2">
@@ -87,8 +96,16 @@ export default function TherapistPatientsPage() {
           <TherapistTable
             columns={[
               { key: 'name', header: 'Patient', render: (row) => <span className="font-semibold">{row.name}</span> },
-              { key: 'concern', header: 'Primary Concern', render: (row) => row.concern },
-              { key: 'sessions', header: 'Sessions', render: (row) => row.sessions },
+              {
+                key: 'concern',
+                header: dashboardMode === 'professional' ? 'Primary Concern' : 'Practice Group',
+                render: (row) => (dashboardMode === 'professional' ? row.concern : row.concern || 'General Care'),
+              },
+              {
+                key: 'sessions',
+                header: dashboardMode === 'professional' ? 'Sessions' : 'Sessions Completed',
+                render: (row) => row.sessions,
+              },
               {
                 key: 'status',
                 header: 'Status',
@@ -101,17 +118,21 @@ export default function TherapistPatientsPage() {
               },
               {
                 key: 'actions',
-                header: 'Actions',
+                header: dashboardMode === 'professional' ? 'Actions' : 'Mode',
                 className: 'text-right',
                 render: (row) => (
                   <div className="flex justify-end">
-                    <TherapistButton
-                      variant="secondary"
-                      className="min-h-[34px] px-3 py-1 text-xs"
-                      onClick={() => navigate(`/therapist/dashboard?patientId=${encodeURIComponent(row.id)}`)}
-                    >
-                      View Mood Insights
-                    </TherapistButton>
+                    {dashboardMode === 'professional' ? (
+                      <TherapistButton
+                        variant="secondary"
+                        className="min-h-[34px] px-3 py-1 text-xs"
+                        onClick={() => navigate(`/therapist/dashboard?patientId=${encodeURIComponent(row.id)}`)}
+                      >
+                        View Mood Insights
+                      </TherapistButton>
+                    ) : (
+                      <TherapistBadge label="Overview only" variant="default" />
+                    )}
                   </div>
                 ),
               },

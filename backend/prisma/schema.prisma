@@ -125,6 +125,13 @@ model User {
   patientSubscription       PatientSubscription?
   patientPaymentMethod      PatientPaymentMethod?
   patientInvoices           PatientInvoice[]
+  therapistSessionNotesAuthored TherapistSessionNote[] @relation("TherapistSessionNoteAuthor")
+  therapistExercises        TherapistExercise[]
+  therapistCbtModules       TherapistCbtModule[]
+  therapistAssessments      TherapistAssessmentRecord[]
+  therapistResources        TherapistResource[]
+  therapistCareTeamMembers  TherapistCareTeamMember[]
+  therapistProfile          TherapistProfile?
 
   @@index([email])
   @@index([phone])
@@ -380,9 +387,38 @@ model PatientProfile {
   therapySessions TherapySession[]
   exercises       PatientExercise[]
   progress        PatientProgress?
+  therapistSessionNotes TherapistSessionNote[]
+  therapistExercisesAssigned TherapistExercise[]
+  therapistCbtModulesAssigned TherapistCbtModule[]
+  therapistAssessmentsAssigned TherapistAssessmentRecord[]
+  therapistResourcesAssigned TherapistResource[]
+  therapistCareTeamMembers TherapistCareTeamMember[]
 
   @@index([userId])
   @@map("patient_profiles")
+}
+
+// Therapist profile stored separately for therapist-specific metadata
+model TherapistProfile {
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  displayName      String
+  bio              String?
+  specializations  String[] @default([])
+  languages        String[] @default([])
+  yearsOfExperience Int?    @default(0)
+  consultationFee  Int?     @default(0) // in minor units
+  availability     Json?    // array of slots { dayOfWeek, startMinute, endMinute, isAvailable }
+  averageRating    Float?   @default(0)
+  isDeleted        Boolean  @default(false)
+  deletedAt        DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("therapist_profiles")
 }
 
 model PatientAssessment {
@@ -549,10 +585,138 @@ model TherapySession {
 
   patientProfile   PatientProfile @relation(fields: [patientProfileId], references: [id], onDelete: Cascade)
   therapistProfile User           @relation(fields: [therapistProfileId], references: [id], onDelete: Cascade)
+  therapistSessionNote TherapistSessionNote?
 
   @@index([therapistProfileId, dateTime])
   @@index([patientProfileId, dateTime])
   @@map("therapy_sessions")
+}
+
+model TherapistSessionNote {
+  id                   String   @id @default(uuid())
+  sessionId            String   @unique @map("session_id")
+  therapistId          String   @map("therapist_id")
+  patientId            String   @map("patient_id")
+  sessionType          String   @default("Therapy Session") @map("session_type")
+  subjective           String   @default("")
+  objective            String   @default("")
+  assessment           String   @default("")
+  plan                 String   @default("")
+  phq9                 Int?
+  gad7                 Int?
+  assignedExercise     String?  @map("assigned_exercise")
+  nextSessionDate      DateTime? @map("next_session_date")
+  status               String   @default("draft")
+  history              Json?
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  session    TherapySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  therapist  User           @relation("TherapistSessionNoteAuthor", fields: [therapistId], references: [id], onDelete: Cascade)
+  patient    PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([therapistId, updatedAt(sort: Desc)])
+  @@index([patientId, updatedAt(sort: Desc)])
+  @@map("therapist_session_notes")
+}
+
+model TherapistExercise {
+  id              String   @id @default(uuid())
+  therapistId     String   @map("therapist_id")
+  patientId       String?  @map("patient_id")
+  patientName     String?  @map("patient_name")
+  name            String
+  category        String
+  worksheetUrl    String?  @map("worksheet_url")
+  completionRate  Int      @default(0) @map("completion_rate")
+  status          String   @default("active")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  therapist User           @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  patient   PatientProfile? @relation(fields: [patientId], references: [id], onDelete: SetNull)
+
+  @@index([therapistId, updatedAt(sort: Desc)])
+  @@index([patientId])
+  @@map("therapist_exercises")
+}
+
+model TherapistCbtModule {
+  id              String   @id @default(uuid())
+  therapistId     String   @map("therapist_id")
+  patientId       String?  @map("patient_id")
+  patientName     String?  @map("patient_name")
+  title           String
+  approach        String
+  status          String   @default("draft")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  therapist User            @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  patient   PatientProfile? @relation(fields: [patientId], references: [id], onDelete: SetNull)
+
+  @@index([therapistId, updatedAt(sort: Desc)])
+  @@index([patientId])
+  @@map("therapist_cbt_modules")
+}
+
+model TherapistAssessmentRecord {
+  id              String   @id @default(uuid())
+  therapistId     String   @map("therapist_id")
+  patientId       String?  @map("patient_id")
+  patientName     String   @map("patient_name")
+  type            String
+  score           Int
+  assessedAt      DateTime @default(now()) @map("assessed_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  therapist User            @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  patient   PatientProfile? @relation(fields: [patientId], references: [id], onDelete: SetNull)
+
+  @@index([therapistId, assessedAt(sort: Desc)])
+  @@index([patientId])
+  @@map("therapist_assessment_records")
+}
+
+model TherapistResource {
+  id              String   @id @default(uuid())
+  therapistId     String   @map("therapist_id")
+  patientId       String?  @map("patient_id")
+  patientName     String?  @map("patient_name")
+  title           String
+  type            String
+  views           Int      @default(0)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  therapist User            @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  patient   PatientProfile? @relation(fields: [patientId], references: [id], onDelete: SetNull)
+
+  @@index([therapistId, updatedAt(sort: Desc)])
+  @@index([patientId])
+  @@map("therapist_resources")
+}
+
+model TherapistCareTeamMember {
+  id             String   @id @default(uuid())
+  therapistId    String   @map("therapist_id")
+  patientId      String?  @map("patient_id")
+  role           String
+  name           String
+  treatment      String   @default("")
+  notes          String   @default("")
+  suggestions    String   @default("")
+  prescriptions  String   @default("")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  therapist User            @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  patient   PatientProfile? @relation(fields: [patientId], references: [id], onDelete: SetNull)
+
+  @@index([therapistId, updatedAt(sort: Desc)])
+  @@index([patientId])
+  @@map("therapist_care_team_members")
 }
 
 model SessionBookingIntent {
@@ -590,6 +754,17 @@ model AIConversation {
 
   @@index([userId, createdAt])
   @@map("ai_conversations")
+}
+
+model AIDailyTokenUsage {
+  id        String   @id @default(uuid())
+  dayKey    String   @unique @map("day_key")
+  tokensUsed Int     @default(0) @map("tokens_used")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([dayKey], map: "ai_daily_token_usage_day_key_idx")
+  @@map("ai_daily_token_usage")
 }
 
 model ChatMessage {

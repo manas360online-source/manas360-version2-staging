@@ -8,6 +8,7 @@ import {
 } from './crisisEscalation.service';
 import { analyzeChatCrisis, persistChatAnalysis } from './chatCrisisDetector';
 import { recomputeCompositeRisk } from './compositeRisk';
+import { decryptSensitiveText, encryptSensitiveText } from '../utils/chatDataCrypto';
 
 const db = prisma as any;
 
@@ -76,7 +77,7 @@ const getLastMessages = (messages: any, botType: BotType): ConversationMessage[]
 		.slice(-10)
 		.map((m) => ({
 			role: m.role === 'assistant' ? 'assistant' : 'user',
-			content: String(m.content || ''),
+			content: decryptSensitiveText(String(m.content || '')),
 			at: String(m.at || new Date().toISOString()),
 			bot_type: botType,
 		}));
@@ -101,7 +102,7 @@ const getLastChatMessages = async (userId: string, botType: BotType): Promise<Co
 			.reverse()
 			.map((row: any) => ({
 				role: row.role === 'assistant' ? 'assistant' : 'user',
-				content: String(row.content || ''),
+				content: decryptSensitiveText(String(row.content || '')),
 				at: new Date(row.timestamp).toISOString(),
 				bot_type: row.botType === 'clinical_ai' ? 'clinical_ai' : 'mood_ai',
 			}));
@@ -117,7 +118,7 @@ const persistChatMessages = async (userId: string, entries: ConversationMessage[
 			data: entries.map((entry) => ({
 				userId,
 				role: entry.role,
-				content: entry.content,
+				content: encryptSensitiveText(String(entry.content || '')),
 				timestamp: new Date(entry.at),
 				botType: entry.bot_type,
 			})),
@@ -165,7 +166,17 @@ const upsertConversationMessages = async (
 	void tokensUsed;
 	const latest = await db.aIConversation.findFirst({ where: { userId }, orderBy: { createdAt: 'desc' } });
 	const previous = Array.isArray(latest?.messages) ? latest.messages : [];
-	const updatedMessages = [...previous, ...newEntries];
+	const previousDecrypted = previous.map((item: any) => ({
+		role: item?.role === 'assistant' ? 'assistant' : 'user',
+		content: decryptSensitiveText(String(item?.content || '')),
+		at: String(item?.at || new Date().toISOString()),
+		bot_type: item?.bot_type === 'clinical_ai' ? 'clinical_ai' : 'mood_ai',
+		crisis: Boolean(item?.crisis),
+	}));
+	const updatedMessages = [...previousDecrypted, ...newEntries].map((item) => ({
+		...item,
+		content: encryptSensitiveText(String(item.content || '')),
+	}));
 
 	if (latest) {
 		return db.aIConversation.update({
@@ -251,6 +262,10 @@ export const processChatMessage = async (input: {
 		maxTokens: Number(process.env.CLAUDE_MAX_TOKENS || 512),
 	});
 
+	if (aiResult.error === 'DAILY_TOKEN_BUDGET_EXCEEDED') {
+		throw new AppError('Daily AI token budget reached. Please try again tomorrow.', 429);
+	}
+
 	const entries: ConversationMessage[] = [
 		{ role: 'user', content: message, at: new Date().toISOString(), bot_type: botType },
 		{ role: 'assistant', content: aiResult.text, at: new Date().toISOString(), bot_type: botType },
@@ -273,7 +288,7 @@ export const processChatMessage = async (input: {
 		tokensUsed: aiResult.tokensUsed,
 		fallback: aiResult.fallback,
 		model: aiResult.model,
-		error: aiResult.error,
+		error: aiResult.error ? aiResult.error.slice(0, 80) : undefined,
 	});
 
 	return {

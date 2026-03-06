@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.validateAdminListSubscriptionsQuery = exports.validateTherapistProfileIdParam = exports.validateAdminGetUserIdParam = exports.validateAdminListUsersQuery = exports.validateTherapistEarningsQuery = exports.validateTherapistSessionNoteRequest = exports.validateTherapistLeadsQuery = exports.validateUploadTherapistDocumentRequest = exports.uploadTherapistDocumentMiddleware = exports.validateCreateTherapistProfileRequest = exports.validateUpdateTherapistSessionStatusRequest = exports.validateTherapistSessionHistoryQuery = exports.validatePatientSessionHistoryQuery = exports.validateBookSessionRequest = exports.validateTherapistMatchQuery = exports.validatePatientMoodHistoryQuery = exports.validatePatientAssessmentHistoryQuery = exports.validateCreatePatientAssessmentRequest = exports.validateCreatePatientProfileRequest = exports.validateSessionIdParam = exports.validateChangePasswordRequest = exports.uploadProfilePhotoMiddleware = exports.validateUpdateMeRequest = exports.asyncHandler = void 0;
+exports.validateAdminListSubscriptionsQuery = exports.validateTherapistProfileIdParam = exports.validateAdminGetUserIdParam = exports.validateAdminListUsersQuery = exports.validateTherapistEarningsQuery = exports.validateTherapistSessionNoteRequest = exports.validateTherapistLeadsQuery = exports.validateUploadTherapistDocumentRequest = exports.uploadTherapistDocumentMiddleware = exports.validateCreatePsychiatristFollowUpRequest = exports.validateCreateMedicationHistoryRequest = exports.validateDrugInteractionCheckRequest = exports.validateCreatePrescriptionRequest = exports.validateCreatePsychiatricAssessmentRequest = exports.validateCreateTherapistProfileRequest = exports.validateUpdateTherapistSessionStatusRequest = exports.validateTherapistSessionHistoryQuery = exports.validatePatientSessionHistoryQuery = exports.validateBookSessionRequest = exports.validateTherapistMatchQuery = exports.validatePatientMoodHistoryQuery = exports.validatePatientAssessmentHistoryQuery = exports.validateCreatePatientAssessmentRequest = exports.validateCreatePatientProfileRequest = exports.validateSessionIdParam = exports.validateChangePasswordRequest = exports.uploadProfilePhotoMiddleware = exports.validateUpdateMeRequest = exports.asyncHandler = void 0;
 const multer_1 = __importStar(require("multer"));
 const express_validator_1 = require("express-validator");
 const error_middleware_1 = require("./error.middleware");
@@ -437,6 +437,55 @@ exports.validateCreateTherapistProfileRequest = [
     }),
     (req, _res, next) => applyValidationResult(req, next),
     extractValidatedTherapistProfilePayload,
+];
+exports.validateCreatePsychiatricAssessmentRequest = [
+    (0, express_validator_1.body)('patientId').isString().trim().notEmpty().withMessage('patientId is required'),
+    (0, express_validator_1.body)('chiefComplaint').isString().trim().notEmpty().withMessage('chiefComplaint is required'),
+    (0, express_validator_1.body)('chiefComplaint').isLength({ max: 2000 }).withMessage('chiefComplaint max length is 2000'),
+    (0, express_validator_1.body)('symptoms').optional().isArray().withMessage('symptoms must be an array'),
+    (0, express_validator_1.body)('durationWeeks').optional().isInt({ min: 0, max: 520 }).withMessage('durationWeeks must be between 0 and 520'),
+    (0, express_validator_1.body)('clinicalImpression').optional().isString().withMessage('clinicalImpression must be a string'),
+    (0, express_validator_1.body)('severity').optional().isString().withMessage('severity must be a string'),
+    (req, _res, next) => applyValidationResult(req, next),
+];
+exports.validateCreatePrescriptionRequest = [
+    (0, express_validator_1.body)('patientId').isString().trim().notEmpty().withMessage('patientId is required'),
+    (0, express_validator_1.body)('drugName').isString().trim().notEmpty().withMessage('drugName is required'),
+    (0, express_validator_1.body)('drugName').isLength({ max: 200 }).withMessage('drugName max length is 200'),
+    (0, express_validator_1.body)('brandName').optional().isString().withMessage('brandName must be a string'),
+    (0, express_validator_1.body)('indication').optional().isString().withMessage('indication must be a string'),
+    (0, express_validator_1.body)('startingDose').optional().isString().withMessage('startingDose must be a string'),
+    (0, express_validator_1.body)('targetDose').optional().isString().withMessage('targetDose must be a string'),
+    (0, express_validator_1.body)('maxDose').optional().isString().withMessage('maxDose must be a string'),
+    (0, express_validator_1.body)('frequency').optional().isString().withMessage('frequency must be a string'),
+    (0, express_validator_1.body)('duration').optional().isString().withMessage('duration must be a string'),
+    (0, express_validator_1.body)('instructions').optional().isString().withMessage('instructions must be a string'),
+    (req, _res, next) => applyValidationResult(req, next),
+];
+exports.validateDrugInteractionCheckRequest = [
+    (0, express_validator_1.body)('patientId').optional().isString().withMessage('patientId must be a string'),
+    (0, express_validator_1.body)('medications').optional().isArray().withMessage('medications must be an array'),
+    (0, express_validator_1.body)('supplements').optional().isArray().withMessage('supplements must be an array'),
+    (0, express_validator_1.body)('herbals').optional().isArray().withMessage('herbals must be an array'),
+    (0, express_validator_1.body)('resolution').optional().isString().withMessage('resolution must be a string'),
+    (0, express_validator_1.body)('overrideJustification').optional().isString().withMessage('overrideJustification must be a string'),
+    (req, _res, next) => applyValidationResult(req, next),
+];
+exports.validateCreateMedicationHistoryRequest = [
+    (0, express_validator_1.body)('patientId').isString().trim().notEmpty().withMessage('patientId is required'),
+    (0, express_validator_1.body)('medication').isString().trim().notEmpty().withMessage('medication is required'),
+    (0, express_validator_1.body)('oldDose').optional().isString().withMessage('oldDose must be a string'),
+    (0, express_validator_1.body)('newDose').optional().isString().withMessage('newDose must be a string'),
+    (0, express_validator_1.body)('reason').optional().isString().withMessage('reason must be a string'),
+    (0, express_validator_1.body)('outcome').optional().isString().withMessage('outcome must be a string'),
+    (0, express_validator_1.body)('changedAt').optional().isISO8601().withMessage('changedAt must be an ISO-8601 date'),
+    (req, _res, next) => applyValidationResult(req, next),
+];
+exports.validateCreatePsychiatristFollowUpRequest = [
+    (0, express_validator_1.body)('patientId').isString().trim().notEmpty().withMessage('patientId is required'),
+    (0, express_validator_1.body)('type').optional().isString().withMessage('type must be a string'),
+    (0, express_validator_1.body)('dateTime').optional().isISO8601().withMessage('dateTime must be an ISO-8601 date'),
+    (req, _res, next) => applyValidationResult(req, next),
 ];
 const allowedTherapistDocumentMimeTypes = new Set(['application/pdf', 'image/jpeg', 'image/png']);
 const therapistDocumentUpload = (0, multer_1.default)({
