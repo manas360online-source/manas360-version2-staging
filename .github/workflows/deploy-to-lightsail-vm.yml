@@ -18,10 +18,17 @@ jobs:
 
       - name: Install & build (local runner)
         run: |
-          npm ci || true
-          npm run build --prefix backend || true
-          npm ci --prefix frontend || true
-          npm run build --prefix frontend || true
+          # Backend
+          cd backend
+          npm ci
+          npm run build
+          cd ..
+
+          # Frontend
+          cd frontend
+          npm ci
+          npm run build
+          cd ..
 
       - name: Start ssh-agent
         uses: webfactory/ssh-agent@v0.5.4
@@ -34,11 +41,24 @@ jobs:
           HOST: ${{ secrets.LIGHTSAIL_HOST }}
           REMOTE_DIR: ${{ secrets.REMOTE_APP_DIR }}
         run: |
-          if [ -z "$REMOTE_DIR" ]; then REMOTE_DIR="/home/ubuntu/MANAS360_version2"; fi
+          if [ -z "$REMOTE_DIR" ]; then REMOTE_DIR="/home/ubuntu/manas360-version2-staging"; fi
           echo "Deploying to $SSH_USER@$HOST:$REMOTE_DIR"
-          ssh -o StrictHostKeyChecking=no "$SSH_USER@$HOST" 'bash -s' <<'REMOTE_SCRIPT'
+          ssh -o StrictHostKeyChecking=no "$SSH_USER@$HOST" "bash -s -- '$REMOTE_DIR'" <<'REMOTE_SCRIPT'
             set -e
+            REMOTE_DIR="$1"
+            if [ -z "$REMOTE_DIR" ]; then
+              echo "REMOTE_DIR is empty"
+              exit 1
+            fi
+            if [ ! -d "$REMOTE_DIR" ]; then
+              echo "Remote directory does not exist: $REMOTE_DIR"
+              exit 1
+            fi
             cd "$REMOTE_DIR"
+            if [ ! -d .git ]; then
+              echo "Not a git repository: $REMOTE_DIR"
+              exit 1
+            fi
             git fetch --all
             git reset --hard origin/main
             # Backend build & restart
