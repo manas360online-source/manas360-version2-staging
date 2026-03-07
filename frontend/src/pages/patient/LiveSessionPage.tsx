@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import AgoraRTC, { IAgoraRTCClient, ICameraVideoTrack, IMicrophoneAudioTrack } from 'agora-rtc-sdk-ng';
+import AgoraRTC, { IAgoraRTCClient } from 'agora-rtc-sdk-ng';
 import { patientApi } from '../../api/patient';
+
+const LOCAL_MEDIA_ACCESS_PAUSED = true;
 
 export default function LiveSessionPage() {
   const { id = '' } = useParams();
@@ -11,8 +13,6 @@ export default function LiveSessionPage() {
   const localRef = useRef<HTMLDivElement | null>(null);
   const remoteRef = useRef<HTMLDivElement | null>(null);
   const clientRef = useRef<IAgoraRTCClient | null>(null);
-  const audioTrackRef = useRef<IMicrophoneAudioTrack | null>(null);
-  const videoTrackRef = useRef<ICameraVideoTrack | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -48,15 +48,14 @@ export default function LiveSessionPage() {
 
         await client.join(appId, session.agora_channel, session.agora_token, null);
 
-        const [microphoneTrack, cameraTrack] = await AgoraRTC.createMicrophoneAndCameraTracks();
-        audioTrackRef.current = microphoneTrack;
-        videoTrackRef.current = cameraTrack;
-
-        if (localRef.current) {
-          cameraTrack.play(localRef.current);
+        // Temporarily pause local media capture to avoid camera/mic permission prompts.
+        if (!LOCAL_MEDIA_ACCESS_PAUSED) {
+          const [microphoneTrack, cameraTrack] = await AgoraRTC.createMicrophoneAndCameraTracks();
+          if (localRef.current) {
+            cameraTrack.play(localRef.current);
+          }
+          await client.publish([microphoneTrack, cameraTrack]);
         }
-
-        await client.publish([microphoneTrack, cameraTrack]);
 
         if (mounted) setJoining(false);
       } catch (e: any) {
@@ -71,18 +70,7 @@ export default function LiveSessionPage() {
 
     return () => {
       mounted = false;
-      const audio = audioTrackRef.current;
-      const video = videoTrackRef.current;
       const client = clientRef.current;
-
-      if (audio) {
-        audio.stop();
-        audio.close();
-      }
-      if (video) {
-        video.stop();
-        video.close();
-      }
       if (client) {
         void client.leave();
       }
@@ -99,7 +87,9 @@ export default function LiveSessionPage() {
       <div className="responsive-grid-2">
         <div className="responsive-card">
           <h2 className="mb-2 text-sm font-medium">Your Video</h2>
-          <div ref={localRef} className="h-72 rounded-xl border bg-black" />
+          <div ref={localRef} className="flex h-72 items-center justify-center rounded-xl border bg-black/90 px-4 text-center text-xs text-white/80">
+            Camera and microphone are temporarily paused.
+          </div>
         </div>
         <div className="responsive-card">
           <h2 className="mb-2 text-sm font-medium">Therapist Video</h2>
