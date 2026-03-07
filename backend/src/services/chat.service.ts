@@ -13,6 +13,7 @@ import { decryptSensitiveText, encryptSensitiveText } from '../utils/chatDataCry
 const db = prisma as any;
 
 export type BotType = 'mood_ai' | 'clinical_ai';
+export type ResponseStyle = 'concise' | 'detailed';
 type UserRole = 'patient' | 'provider' | 'admin';
 
 type ConversationMessage = {
@@ -45,8 +46,15 @@ Rules:
 • Provide structured and professional responses.
 • Help the provider interpret patient insights and platform data.`;
 
-const resolveSystemPrompt = (botType: BotType): string =>
-	botType === 'mood_ai' ? MOOD_SUPPORT_PROMPT : CLINICAL_ASSISTANT_PROMPT;
+const RESPONSE_STYLE_PROMPTS: Record<ResponseStyle, string> = {
+	concise:
+		'Response style: concise by default. Keep answers to 3-6 short bullet points or brief paragraphs. Be direct and avoid long explanations unless user explicitly asks for detail.',
+	detailed:
+		'Response style: detailed. Provide richer explanation, clear structure, and examples when relevant while remaining focused and safe.',
+};
+
+const resolveSystemPrompt = (botType: BotType, responseStyle: ResponseStyle): string =>
+	`${botType === 'mood_ai' ? MOOD_SUPPORT_PROMPT : CLINICAL_ASSISTANT_PROMPT}\n\n${RESPONSE_STYLE_PROMPTS[responseStyle]}`;
 
 const resolveAiRole = (role: UserRole): 'patient' | 'provider' | 'admin' => {
 	if (role === 'admin') return 'admin';
@@ -199,6 +207,7 @@ export const processChatMessage = async (input: {
 	userId: string;
 	message: string;
 	botType: BotType;
+	responseStyle?: ResponseStyle;
 }): Promise<{
 	conversation_id: string;
 	response: string;
@@ -215,6 +224,7 @@ export const processChatMessage = async (input: {
 	if (!message) throw new AppError('message is required', 422);
 
 	const botType = input.botType;
+	const responseStyle: ResponseStyle = input.responseStyle === 'detailed' ? 'detailed' : 'concise';
 	const userRole = resolveUserRole(String(user.role || 'patient'));
 	assertBotPermission(userRole, botType);
 
@@ -253,18 +263,16 @@ export const processChatMessage = async (input: {
 	}
 
 	const aiInputMessages = [
-		{ role: 'system' as const, content: resolveSystemPrompt(botType) },
+		{ role: 'system' as const, content: resolveSystemPrompt(botType, responseStyle) },
 		...contextMessages.map((m) => ({ role: m.role, content: m.content })),
 		{ role: 'user' as const, content: message },
 	];
 
 	const aiResult = await generateAIResponse(resolveAiRole(userRole), aiInputMessages, {
-		maxTokens: Number(process.env.CLAUDE_MAX_TOKENS || 512),
+		maxTokens: responseStyle === 'detailed' ? Number(process.env.CLAUDE_MAX_TOKENS || 512) : 256,
 	});
 
-	if (aiResult.error === 'DAILY_TOKEN_BUDGET_EXCEEDED') {
-		throw new AppError('Daily AI token budget reached. Please try again tomorrow.', 429);
-	}
+	// Keep chat UX resilient: when AI budget is exhausted, return a fallback assistant response instead of hard failing with 429.
 
 	const entries: ConversationMessage[] = [
 		{ role: 'user', content: message, at: new Date().toISOString(), bot_type: botType },

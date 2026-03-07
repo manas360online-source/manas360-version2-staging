@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { CHAT_FALLBACK_MESSAGE } from '../../api/chat.api';
+import useSpeechAssistant from '../../hooks/useSpeechAssistant';
 import { patientApi } from '../../api/patient';
 import { useAuth } from '../../context/AuthContext';
 
@@ -19,16 +20,35 @@ export default function AIChatPage() {
   const [thread, setThread] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
   const [loading, setLoading] = useState(false);
   const [showCrisisAlert, setShowCrisisAlert] = useState(false);
-  const [botName, setBotName] = useState('dr meera · Mood Support AI');
+  const [botName, setBotName] = useState("Dr. Meera 'Ai · Mood Support");
   const [riskLevel, setRiskLevel] = useState<RiskLevel | null>(null);
+  const [responseStyle, setResponseStyle] = useState<'concise' | 'detailed'>('concise');
+  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
+  const [conversationMode, setConversationMode] = useState(false);
+  const [aiSettingsOpen, setAiSettingsOpen] = useState(false);
+  const [speechLang, setSpeechLang] = useState('en-IN');
+  const [preferIndianAccent, setPreferIndianAccent] = useState(true);
+  const [voiceName, setVoiceName] = useState('');
   const [riskPollingEnabled, setRiskPollingEnabled] = useState(true);
+  const { supportsSpeechRecognition, supportsSpeechSynthesis, availableVoices, isListening, startListening, stopListening, speak } = useSpeechAssistant();
   const riskPollingEnabledRef = useRef(true);
   const riskPollingStartedRef = useRef(false);
   const riskRequestInFlightRef = useRef(false);
+  const conversationModeRef = useRef(false);
 
   useEffect(() => {
     riskPollingEnabledRef.current = riskPollingEnabled;
   }, [riskPollingEnabled]);
+
+  useEffect(() => {
+    conversationModeRef.current = conversationMode;
+    if (!conversationMode) {
+      stopListening();
+      if (typeof window !== 'undefined' && (window as any).speechSynthesis) {
+        (window as any).speechSynthesis.cancel();
+      }
+    }
+  }, [conversationMode, stopListening]);
 
   useEffect(() => {
     riskPollingStartedRef.current = false;
@@ -73,16 +93,39 @@ export default function AIChatPage() {
     };
   }, [user?.id, riskPollingEnabled]);
 
-  const send = async () => {
-    if (!message.trim()) return;
-    const msg = message.trim();
+  const cooldownRemaining = cooldownUntil ? Math.max(0, Math.ceil((cooldownUntil - Date.now()) / 1000)) : 0;
+
+  const startConversationListening = useCallback(() => {
+    if (!conversationModeRef.current) return;
+    if (loading || cooldownRemaining > 0 || isListening || !supportsSpeechRecognition) return;
+
+    startListening((transcript) => {
+      const spoken = String(transcript || '').trim();
+      if (!spoken) {
+        window.setTimeout(() => {
+          startConversationListening();
+        }, 250);
+        return;
+      }
+      setMessage(spoken);
+      void sendMessage(spoken, true);
+    }, speechLang);
+  }, [cooldownRemaining, isListening, loading, speechLang, startListening, supportsSpeechRecognition]);
+
+  const sendMessage = async (explicitMessage?: string, fromVoice = false) => {
+    const raw = typeof explicitMessage === 'string' ? explicitMessage : message;
+    const msg = String(raw || '').trim();
+    if (!msg) return;
+    if (cooldownUntil && Date.now() < cooldownUntil) return;
+
     setThread((prev) => [...prev, { role: 'user', content: msg }]);
     setMessage('');
     setLoading(true);
+    let assistantReply = '';
     try {
-      const res = await patientApi.aiChat({ message: msg, bot_type: 'mood_ai' });
+      const res = await patientApi.aiChat({ message: msg, bot_type: 'mood_ai', response_style: responseStyle });
       const payload = res.data ?? res;
-      setBotName(`${payload?.bot_name || 'dr meera'} · Mood Support AI`);
+      setBotName(`${payload?.bot_name || "Dr. Meera 'Ai"} · Mood Support`);
       if (payload?.crisis_detected) {
         setShowCrisisAlert(true);
       }
@@ -94,10 +137,19 @@ export default function AIChatPage() {
         : null;
       if (messages) {
         setThread(messages);
+        assistantReply = String(messages.filter((row: { role: string; content: string }) => row.role === 'assistant').slice(-1)[0]?.content || '');
       } else {
-        setThread((prev) => [...prev, { role: 'assistant', content: String(payload?.response || CHAT_FALLBACK_MESSAGE) }]);
+        const fallbackResponse = String(payload?.response || CHAT_FALLBACK_MESSAGE);
+        assistantReply = fallbackResponse;
+        setThread((prev) => [...prev, { role: 'assistant', content: fallbackResponse }]);
       }
-    } catch {
+    } catch (err: any) {
+      const status = Number(err?.response?.status || 0);
+      if (status === 429) {
+        const retryAfterHeader = Number(err?.response?.headers?.['retry-after'] || 0);
+        const retryAfterSeconds = Number.isFinite(retryAfterHeader) && retryAfterHeader > 0 ? retryAfterHeader : 20;
+        setCooldownUntil(Date.now() + retryAfterSeconds * 1000);
+      }
       setThread((prev) => [
         ...prev,
         {
@@ -105,13 +157,40 @@ export default function AIChatPage() {
           content: CHAT_FALLBACK_MESSAGE,
         },
       ]);
+      assistantReply = CHAT_FALLBACK_MESSAGE;
     } finally {
       setLoading(false);
       if (riskPollingEnabledRef.current) {
         void refreshRisk();
       }
+
+      if (conversationModeRef.current && fromVoice) {
+        if (supportsSpeechSynthesis && assistantReply) {
+          speak(assistantReply, {
+            lang: speechLang,
+            preferIndianVoice: preferIndianAccent,
+            voiceName,
+            onEnd: () => {
+              window.setTimeout(() => {
+                startConversationListening();
+              }, 250);
+            },
+          });
+        } else {
+          window.setTimeout(() => {
+            startConversationListening();
+          }, 250);
+        }
+      }
     }
   };
+
+  useEffect(() => {
+    if (!conversationMode || loading || cooldownRemaining > 0) return;
+    startConversationListening();
+  }, [conversationMode, cooldownRemaining, loading, startConversationListening]);
+
+  const lastAssistantMessage = [...thread].reverse().find((item) => item.role === 'assistant')?.content || '';
 
   return (
     <div className="responsive-page">
@@ -123,7 +202,7 @@ export default function AIChatPage() {
           </span>
         </div>
       <div className="responsive-card min-h-[300px] section-stack">
-          {thread.length === 0 && <p className="text-sm text-slate-600">Start talking with the wellness AI assistant.</p>}
+          {thread.length === 0 && <p className="text-sm text-slate-600">Start talking with Dr. Meera 'Ai.</p>}
           {thread.map((m, i) => (
             <div key={i} className={`flex text-sm ${m.role === 'assistant' ? 'items-start gap-2 text-slate-900' : 'justify-end text-blue-700'}`}>
               {m.role === 'assistant' ? (
@@ -132,20 +211,110 @@ export default function AIChatPage() {
                 </span>
               ) : null}
               <div className={m.role === 'assistant' ? '' : 'max-w-[90%] rounded-lg bg-slate-100 px-3 py-2'}>
-                <strong>{m.role === 'assistant' ? 'dr meera' : 'You'}:</strong> {m.content}
+                <strong>{m.role === 'assistant' ? "Dr. Meera 'Ai" : 'You'}:</strong> {m.content}
               </div>
             </div>
           ))}
-          {loading && <p className="text-sm text-slate-500">dr meera is typing…</p>}
+          {loading && <p className="text-sm text-slate-500">Dr. Meera 'Ai is typing...</p>}
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setResponseStyle((prev) => (prev === 'concise' ? 'detailed' : 'concise'))}
+              className="rounded border bg-white px-2 py-1 text-xs"
+            >
+              {responseStyle === 'concise' ? 'Mode: Concise' : 'Mode: Detailed'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setConversationMode((prev) => !prev)}
+              className={`rounded border px-2 py-1 text-xs ${conversationMode ? 'bg-slate-900 text-white' : 'bg-white'}`}
+            >
+              {conversationMode ? 'Conversation Mode: ON' : 'Conversation Mode: OFF'}
+            </button>
+            {supportsSpeechRecognition && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (conversationMode) return;
+                  if (isListening) {
+                    stopListening();
+                    return;
+                  }
+                  startListening((transcript) => setMessage((prev) => `${prev} ${transcript}`.trim()), speechLang);
+                }}
+                className="rounded border bg-white px-2 py-1 text-xs disabled:opacity-50"
+                disabled={conversationMode}
+              >
+                {isListening ? 'Stop Mic' : 'Speak'}
+              </button>
+            )}
+            {supportsSpeechSynthesis && (
+              <button
+                type="button"
+                onClick={() => speak(lastAssistantMessage, { lang: speechLang, preferIndianVoice: preferIndianAccent, voiceName })}
+                disabled={!lastAssistantMessage}
+                className="rounded border bg-white px-2 py-1 text-xs disabled:opacity-50"
+              >
+                Talk Back
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setAiSettingsOpen((prev) => !prev)}
+              className="rounded border bg-white px-2 py-1 text-xs"
+            >
+              {aiSettingsOpen ? 'Hide AI Settings' : 'AI Settings'}
+            </button>
+            {cooldownRemaining > 0 && <span className="text-xs text-red-600">Retry in {cooldownRemaining}s</span>}
+          </div>
+          {aiSettingsOpen && (
+            <div className="grid grid-cols-1 gap-2 rounded border bg-slate-50 p-2 sm:grid-cols-3">
+              <label className="text-xs text-slate-700">
+                Voice language
+                <select
+                  value={speechLang}
+                  onChange={(event) => setSpeechLang(event.target.value)}
+                  className="mt-1 w-full rounded border bg-white px-2 py-1 text-xs"
+                >
+                  <option value="en-IN">English (India)</option>
+                  <option value="hi-IN">Hindi (India)</option>
+                  <option value="en-US">English (US)</option>
+                </select>
+              </label>
+              <label className="text-xs text-slate-700">
+                Voice profile
+                <select
+                  value={voiceName}
+                  onChange={(event) => setVoiceName(event.target.value)}
+                  className="mt-1 w-full rounded border bg-white px-2 py-1 text-xs"
+                >
+                  <option value="">Auto (Recommended)</option>
+                  {availableVoices.map((voice) => (
+                    <option key={`${voice.name}-${voice.lang}`} value={voice.name}>
+                      {voice.name} ({voice.lang})
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex items-center gap-2 text-xs text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={preferIndianAccent}
+                  onChange={(event) => setPreferIndianAccent(event.target.checked)}
+                />
+                Prefer Indian accent voice
+              </label>
+            </div>
+          )}
           <input
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             className="flex-1 rounded border p-2"
             placeholder="How are you feeling today?"
           />
-          <button onClick={send} disabled={loading} className="responsive-action-btn rounded-xl bg-slate-900 text-white">
+          <button onClick={() => void sendMessage()} disabled={loading || cooldownRemaining > 0} className="responsive-action-btn rounded-xl bg-slate-900 text-white">
             Send
           </button>
         </div>

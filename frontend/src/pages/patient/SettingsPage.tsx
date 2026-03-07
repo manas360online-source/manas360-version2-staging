@@ -12,6 +12,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { patientApi } from '../../api/patient';
 import { useAuth } from '../../context/AuthContext';
 import { http } from '../../lib/http';
@@ -157,6 +158,15 @@ const sectionMeta = [
   { id: 'security' as const, label: 'Security', icon: Shield },
 ];
 
+const validSectionIds: SectionId[] = ['profile', 'notifications', 'privacy', 'accessibility', 'preferences', 'therapy', 'billing', 'security'];
+
+const parseSectionId = (value: string | null): SectionId => {
+  if (value && validSectionIds.includes(value as SectionId)) {
+    return value as SectionId;
+  }
+  return 'profile';
+};
+
 const parseStored = (): Partial<SettingsState> => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -167,17 +177,82 @@ const parseStored = (): Partial<SettingsState> => {
   }
 };
 
+const PLAN_CATALOG = [
+  {
+    key: 'basic',
+    label: 'Basic Plan',
+    price: 999,
+    cycle: 'monthly',
+    features: ['2 therapy sessions/month', 'Mood tracker', 'Session notes access'],
+  },
+  {
+    key: 'premium',
+    label: 'Premium Plan',
+    price: 2499,
+    cycle: 'monthly',
+    features: ['4 therapy sessions/month', 'Priority booking', 'Advanced progress insights'],
+  },
+  {
+    key: 'pro',
+    label: 'Pro Plan',
+    price: 4999,
+    cycle: 'yearly',
+    features: ['Unlimited sessions', 'Highest priority support', 'Family progress dashboard'],
+  },
+] as const;
+
+const normalizePlanKey = (planName: string | undefined | null): 'basic' | 'premium' | 'pro' => {
+  const value = String(planName || '').toLowerCase();
+  if (value.includes('basic')) return 'basic';
+  if (value.includes('pro')) return 'pro';
+  return 'premium';
+};
+
+const formatCurrencyInr = (amount: number) => new Intl.NumberFormat('en-IN', {
+  style: 'currency',
+  currency: 'INR',
+  maximumFractionDigits: 0,
+}).format(amount);
+
 export default function SettingsPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const sectionFromQuery = parseSectionId(searchParams.get('section'));
+  const subscribeSelection = useMemo(() => {
+    const source = String(searchParams.get('source') || '').trim().toLowerCase();
+    const category = String(searchParams.get('category') || '').trim();
+    const item = String(searchParams.get('item') || '').trim();
+    const provider = String(searchParams.get('provider') || '').trim();
+    const beneficiariesRaw = String(searchParams.get('beneficiaries') || '').trim();
+    const beneficiaries = Number(beneficiariesRaw || '1');
+
+    const categoryLabelMap: Record<string, string> = {
+      'specialty-service': 'Specialty Service',
+      'add-on': 'Add-on Feature',
+      'platform-subscription': 'Platform Subscription',
+    };
+
+    return {
+      isFromSubscribe: source === 'subscribe' && Boolean(item),
+      category,
+      categoryLabel: categoryLabelMap[category] || 'Selected Service',
+      item,
+      provider: provider || 'Auto-assign best available provider',
+      beneficiaries: Number.isFinite(beneficiaries) && beneficiaries > 0 ? beneficiaries : 1,
+    };
+  }, [searchParams]);
   const { user, logout } = useAuth();
   const [state, setState] = useState<SettingsState>(defaultState);
   const [savedState, setSavedState] = useState<SettingsState>(defaultState);
-  const [activeSection, setActiveSection] = useState<SectionId>('profile');
-  const [mobileOpen, setMobileOpen] = useState<SectionId | null>('profile');
+  const [activeSection, setActiveSection] = useState<SectionId>(sectionFromQuery);
+  const [mobileOpen, setMobileOpen] = useState<SectionId | null>(sectionFromQuery);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [billingLoading, setBillingLoading] = useState(false);
+  const [billingActionLoading, setBillingActionLoading] = useState<string | null>(null);
+  const [showPlanCatalog, setShowPlanCatalog] = useState(false);
+  const [showSubscriptionActions, setShowSubscriptionActions] = useState(false);
   const [billingError, setBillingError] = useState<string | null>(null);
   const [billingData, setBillingData] = useState<{
     subscription: any | null;
@@ -191,6 +266,22 @@ export default function SettingsPage() {
   });
   const [securityLoading, setSecurityLoading] = useState(false);
   const [activeSessions, setActiveSessions] = useState<Array<{ id: string; device?: string; ipAddress?: string; createdAt?: string; lastActiveAt?: string; isCurrent?: boolean }>>([]);
+
+  useEffect(() => {
+    setActiveSection(sectionFromQuery);
+    setMobileOpen(sectionFromQuery);
+  }, [sectionFromQuery]);
+
+  const setSectionInUrl = (section: SectionId) => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('section', section);
+    setSearchParams(nextParams, { replace: true });
+  };
+
+  const handleSelectSection = (section: SectionId) => {
+    setActiveSection(section);
+    setSectionInUrl(section);
+  };
 
   useEffect(() => {
     const hydrate = async () => {
@@ -267,34 +358,34 @@ export default function SettingsPage() {
     const sectionVisible = activeSection === 'billing' || mobileOpen === 'billing';
     if (!sectionVisible) return;
 
-    const loadBillingData = async () => {
-      setBillingLoading(true);
-      setBillingError(null);
-      try {
-        const [subscriptionRes, paymentRes, invoicesRes] = await Promise.all([
-          patientApi.getSubscription().catch(() => null),
-          patientApi.getPaymentMethod().catch(() => null),
-          patientApi.getInvoices().catch(() => null),
-        ]);
-
-        const subscription = (subscriptionRes as any)?.data ?? subscriptionRes ?? null;
-        const paymentMethod = (paymentRes as any)?.data ?? paymentRes ?? null;
-        const invoices = (invoicesRes as any)?.data ?? invoicesRes ?? [];
-
-        setBillingData({
-          subscription,
-          paymentMethod,
-          invoices: Array.isArray(invoices) ? invoices : [],
-        });
-      } catch (err: any) {
-        setBillingError(err?.response?.data?.message || err?.message || 'Failed to load billing details.');
-      } finally {
-        setBillingLoading(false);
-      }
-    };
-
-    void loadBillingData();
+    void refreshBillingData();
   }, [activeSection, mobileOpen]);
+
+  const refreshBillingData = async () => {
+    setBillingLoading(true);
+    setBillingError(null);
+    try {
+      const [subscriptionRes, paymentRes, invoicesRes] = await Promise.all([
+        patientApi.getSubscription().catch(() => null),
+        patientApi.getPaymentMethod().catch(() => null),
+        patientApi.getInvoices().catch(() => null),
+      ]);
+
+      const subscription = (subscriptionRes as any)?.data ?? subscriptionRes ?? null;
+      const paymentMethod = (paymentRes as any)?.data ?? paymentRes ?? null;
+      const invoices = (invoicesRes as any)?.data ?? invoicesRes ?? [];
+
+      setBillingData({
+        subscription,
+        paymentMethod,
+        invoices: Array.isArray(invoices) ? invoices : [],
+      });
+    } catch (err: any) {
+      setBillingError(err?.response?.data?.message || err?.message || 'Failed to load billing details.');
+    } finally {
+      setBillingLoading(false);
+    }
+  };
 
   const sectionDirty = (section: SectionId): boolean =>
     JSON.stringify(state[section as keyof SettingsState]) !== JSON.stringify(savedState[section as keyof SettingsState]);
@@ -647,80 +738,243 @@ export default function SettingsPage() {
     </div>
   );
 
-  const renderBilling = () => (
-    <div className="space-y-4">
-      {billingError && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{billingError}</div>}
-      {billingLoading ? (
-        <div className="rounded-xl border border-calm-sage/20 bg-white/80 p-4 text-sm text-charcoal/70">Loading billing details...</div>
-      ) : (
-        <>
-          <div className="rounded-xl border border-calm-sage/20 bg-white/80 p-4">
-            <p className="text-sm font-semibold text-charcoal">Current Plan</p>
-            <p className="mt-1 text-sm text-charcoal/75">
-              {(billingData.subscription?.planName || billingData.subscription?.planType || 'No active plan')} •{' '}
-              {String(billingData.subscription?.status || 'unknown').toUpperCase()}
-            </p>
-            <p className="mt-1 text-xs text-charcoal/60">
-              Renewal: {billingData.subscription?.renewalDate ? new Date(billingData.subscription.renewalDate).toLocaleDateString() : 'N/A'}
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={async () => {
-                  await patientApi.upgradeSubscription();
-                  setSuccess('Subscription upgraded successfully.');
-                  setActiveSection('billing');
-                }}
-                className="rounded-lg bg-calm-sage px-3 py-2 text-sm font-semibold text-white"
-              >
-                Upgrade Plan
-              </button>
-              <button
-                type="button"
-                onClick={async () => {
-                  await patientApi.downgradeSubscription();
-                  setSuccess('Subscription downgraded successfully.');
-                  setActiveSection('billing');
-                }}
-                className="rounded-lg border border-calm-sage/25 bg-white px-3 py-2 text-sm text-charcoal/80"
-              >
-                Downgrade Plan
-              </button>
-              <button
-                type="button"
-                onClick={async () => {
-                  await patientApi.cancelSubscription();
-                  setSuccess('Subscription cancelled successfully.');
-                  setActiveSection('billing');
-                }}
-                className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
-              >
-                Cancel Subscription
-              </button>
-              <button
-                type="button"
-                onClick={async () => {
-                  await patientApi.reactivateSubscription();
-                  setSuccess('Subscription reactivated successfully.');
-                  setActiveSection('billing');
-                }}
-                className="rounded-lg border border-calm-sage/25 bg-white px-3 py-2 text-sm text-charcoal/80"
-              >
-                Reactivate
-              </button>
-            </div>
-          </div>
+  const renderBilling = () => {
+    const currentPlanKey = normalizePlanKey(billingData.subscription?.planName || billingData.subscription?.planType);
+    const currentPlanIndex = PLAN_CATALOG.findIndex((plan) => plan.key === currentPlanKey);
+    const resolvedCurrentPlanIndex = currentPlanIndex >= 0 ? currentPlanIndex : 1;
+    const isCancelled = String(billingData.subscription?.status || '').toLowerCase() === 'cancelled';
 
-          <div className="rounded-xl border border-calm-sage/20 bg-white/80 p-4">
+    const runBillingAction = async (actionKey: string, action: () => Promise<any>, successMessage: string) => {
+      setBillingActionLoading(actionKey);
+      setBillingError(null);
+      setSuccess(null);
+      try {
+        await action();
+        setSuccess(successMessage);
+        await refreshBillingData();
+      } catch (err: any) {
+        setBillingError(err?.response?.data?.message || err?.message || 'Unable to update subscription right now.');
+      } finally {
+        setBillingActionLoading(null);
+      }
+    };
+
+    const switchToPlan = async (targetIndex: number) => {
+      const steps = targetIndex - resolvedCurrentPlanIndex;
+      if (steps === 0) return;
+
+      const action = steps > 0 ? patientApi.upgradeSubscription : patientApi.downgradeSubscription;
+      setBillingActionLoading(`switch-${targetIndex}`);
+      setBillingError(null);
+      setSuccess(null);
+      try {
+        for (let step = 0; step < Math.abs(steps); step += 1) {
+          await action();
+        }
+        setSuccess(`Plan updated to ${PLAN_CATALOG[targetIndex].label}.`);
+        await refreshBillingData();
+      } catch (err: any) {
+        setBillingError(err?.response?.data?.message || err?.message || 'Unable to switch plan right now.');
+      } finally {
+        setBillingActionLoading(null);
+      }
+    };
+
+    return (
+      <div className="space-y-4">
+        {billingError && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{billingError}</div>}
+        {billingLoading ? (
+          <div className="rounded-xl border border-calm-sage/20 bg-white/80 p-4 text-sm text-charcoal/70">Loading billing details...</div>
+        ) : (
+          <>
+            <div className="rounded-xl border border-calm-sage/20 bg-white/80 p-4">
+              {subscribeSelection.isFromSubscribe && (
+                <div className="mb-4 rounded-xl border border-calm-sage/25 bg-[#F4F8F3] p-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-charcoal/60">Selected from Subscribe</p>
+                  <p className="mt-1 text-sm font-semibold text-charcoal">{subscribeSelection.item}</p>
+                  <div className="mt-2 grid grid-cols-1 gap-1 text-xs text-charcoal/70 sm:grid-cols-3">
+                    <p><span className="font-medium text-charcoal">Category:</span> {subscribeSelection.categoryLabel}</p>
+                    <p><span className="font-medium text-charcoal">Provider:</span> {subscribeSelection.provider}</p>
+                    <p><span className="font-medium text-charcoal">Beneficiaries:</span> {subscribeSelection.beneficiaries} patient(s)</p>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {subscribeSelection.category === 'platform-subscription' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowPlanCatalog(true);
+                          setShowSubscriptionActions(false);
+                        }}
+                        className="rounded-lg bg-calm-sage px-3 py-2 text-xs font-semibold text-white"
+                      >
+                        Confirm Plan in Billing
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nextParams = new URLSearchParams(searchParams);
+                        ['source', 'category', 'item', 'provider', 'beneficiaries'].forEach((key) => nextParams.delete(key));
+                        setSearchParams(nextParams, { replace: true });
+                      }}
+                      className="rounded-lg border border-calm-sage/25 bg-white px-3 py-2 text-xs font-medium text-charcoal/80"
+                    >
+                      Clear Selection
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-charcoal/60">Present Plan</p>
+                  <p className="mt-1 text-base font-semibold text-charcoal">
+                    {billingData.subscription?.planName || billingData.subscription?.planType || PLAN_CATALOG[resolvedCurrentPlanIndex].label}
+                  </p>
+                  <p className="mt-1 text-sm text-charcoal/75">
+                    {formatCurrencyInr(Number(billingData.subscription?.price || PLAN_CATALOG[resolvedCurrentPlanIndex].price))}/
+                    {String(billingData.subscription?.billingCycle || PLAN_CATALOG[resolvedCurrentPlanIndex].cycle).toLowerCase()}
+                  </p>
+                </div>
+                <span
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${isCancelled ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}
+                >
+                  {String(billingData.subscription?.status || 'active').toUpperCase()}
+                </span>
+              </div>
+
+              <div className="mt-3 grid grid-cols-1 gap-2 text-sm text-charcoal/75 sm:grid-cols-2">
+                <p>
+                  <span className="font-medium text-charcoal">Renewal date:</span>{' '}
+                  {billingData.subscription?.renewalDate ? new Date(billingData.subscription.renewalDate).toLocaleDateString() : 'N/A'}
+                </p>
+                <p>
+                  <span className="font-medium text-charcoal">Auto renew:</span>{' '}
+                  {billingData.subscription?.autoRenew === false ? 'Off' : 'On'}
+                </p>
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPlanCatalog((prev) => !prev);
+                    setShowSubscriptionActions(false);
+                  }}
+                  className="rounded-lg bg-calm-sage px-3 py-2 text-sm font-semibold text-white"
+                >
+                  {showPlanCatalog ? 'Hide Plans' : 'Change Plan'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSubscriptionActions((prev) => !prev);
+                    setShowPlanCatalog(false);
+                  }}
+                  className="rounded-lg border border-calm-sage/25 bg-white px-3 py-2 text-sm text-charcoal/80"
+                >
+                  {showSubscriptionActions ? 'Hide Manage Options' : 'Manage Subscription'}
+                </button>
+              </div>
+
+              <p className="mt-3 text-xs text-charcoal/60">
+                Keep it simple: use <span className="font-medium text-charcoal">Change Plan</span> to choose a new plan, or <span className="font-medium text-charcoal">Manage Subscription</span> for cancel/reactivate.
+              </p>
+            </div>
+
+            {showPlanCatalog && (
+              <div className="rounded-xl border border-calm-sage/20 bg-[#F8FAF7] p-4">
+                <p className="mb-3 text-sm font-semibold text-charcoal">Choose a Plan</p>
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+                  {PLAN_CATALOG.map((plan, index) => {
+                    const isCurrent = index === resolvedCurrentPlanIndex;
+                    const disabled = isCurrent || Boolean(billingActionLoading) || isCancelled;
+                    return (
+                      <div
+                        key={plan.key}
+                        className={`rounded-xl border p-3 ${isCurrent ? 'border-calm-sage bg-white' : 'border-calm-sage/20 bg-white/80'}`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-semibold text-charcoal">{plan.label}</p>
+                          {isCurrent && <span className="rounded-full bg-calm-sage/15 px-2 py-0.5 text-[10px] font-semibold text-calm-sage">CURRENT</span>}
+                        </div>
+                        <p className="mt-1 text-sm text-charcoal/80">{formatCurrencyInr(plan.price)}/{plan.cycle}</p>
+                        <ul className="mt-2 space-y-1 text-xs text-charcoal/70">
+                          {plan.features.map((feature) => (
+                            <li key={`${plan.key}-${feature}`}>• {feature}</li>
+                          ))}
+                        </ul>
+                        <button
+                          type="button"
+                          disabled={disabled}
+                          onClick={() => void switchToPlan(index)}
+                          className={`mt-3 w-full rounded-lg px-3 py-2 text-xs font-semibold ${isCurrent
+                            ? 'border border-calm-sage/20 bg-white text-charcoal/60'
+                            : 'bg-calm-sage text-white disabled:opacity-50'}`}
+                        >
+                          {isCurrent
+                            ? 'Current Plan'
+                            : billingActionLoading === `switch-${index}`
+                              ? 'Updating...'
+                              : `Choose ${plan.label}`}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+                {isCancelled && (
+                  <p className="mt-3 text-xs text-red-700">
+                    Reactivate your subscription first to change plans.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {showSubscriptionActions && (
+              <div className="rounded-xl border border-calm-sage/20 bg-[#F8FAF7] p-4">
+                <p className="mb-3 text-sm font-semibold text-charcoal">Manage Subscription</p>
+                <div className="flex flex-wrap gap-2">
+                  {!isCancelled ? (
+                    <button
+                      type="button"
+                      disabled={Boolean(billingActionLoading)}
+                      onClick={() => void runBillingAction('cancel', () => patientApi.cancelSubscription(), 'Subscription cancelled successfully.')}
+                      className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 disabled:opacity-50"
+                    >
+                      {billingActionLoading === 'cancel' ? 'Cancelling...' : 'Cancel Subscription'}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={Boolean(billingActionLoading)}
+                      onClick={() => void runBillingAction('reactivate', () => patientApi.reactivateSubscription(), 'Subscription reactivated successfully.')}
+                      className="rounded-lg border border-calm-sage/25 bg-white px-3 py-2 text-sm text-charcoal/80 disabled:opacity-50"
+                    >
+                      {billingActionLoading === 'reactivate' ? 'Reactivating...' : 'Reactivate Subscription'}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    disabled={Boolean(billingActionLoading) || billingLoading}
+                    onClick={() => void refreshBillingData()}
+                    className="rounded-lg border border-calm-sage/25 bg-white px-3 py-2 text-sm text-charcoal/80 disabled:opacity-50"
+                  >
+                    Refresh Billing Data
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="rounded-xl border border-calm-sage/20 bg-white/80 p-4">
             <p className="text-sm font-semibold text-charcoal">Payment Method</p>
             <p className="mt-1 text-sm text-charcoal/75">
               {billingData.paymentMethod
                 ? `${billingData.paymentMethod.cardBrand || 'Card'} •••• ${billingData.paymentMethod.cardLast4 || '----'}`
                 : 'No payment method added'}
             </p>
-          </div>
+            </div>
 
-          <div className="rounded-xl border border-calm-sage/20 bg-white/80 p-4">
+            <div className="rounded-xl border border-calm-sage/20 bg-white/80 p-4">
             <p className="text-sm font-semibold text-charcoal">Billing History</p>
             {billingData.invoices.length === 0 ? (
               <p className="mt-2 text-sm text-charcoal/65">No invoices found.</p>
@@ -729,7 +983,7 @@ export default function SettingsPage() {
                 {billingData.invoices.slice(0, 10).map((invoice: any, index: number) => (
                   <div key={`invoice-${invoice.id || index}`} className="flex items-center justify-between rounded-lg border border-calm-sage/15 bg-white px-3 py-2">
                     <div>
-                      <p className="text-sm font-medium text-charcoal">₹{Number(invoice.amount || 0)}</p>
+                      <p className="text-sm font-medium text-charcoal">{formatCurrencyInr(Number(invoice.amount || 0))}</p>
                       <p className="text-xs text-charcoal/60">{invoice.createdAt ? new Date(invoice.createdAt).toLocaleDateString() : 'Date N/A'}</p>
                     </div>
                     <span className="rounded-full bg-calm-sage/15 px-2 py-0.5 text-[11px] font-semibold text-calm-sage">
@@ -739,11 +993,12 @@ export default function SettingsPage() {
                 ))}
               </div>
             )}
-          </div>
-        </>
-      )}
-    </div>
-  );
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
 
   const renderSecurity = () => (
     <div className="space-y-3">
@@ -952,9 +1207,9 @@ export default function SettingsPage() {
       )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-[64px_1fr] xl:grid-cols-[240px_1fr]">
-        <aside className="hidden md:block">
-          <div className="rounded-2xl border border-calm-sage/20 bg-white/95 p-2 shadow-soft-sm xl:p-3">
-            <nav className="space-y-1" aria-label="Settings sections">
+        <aside className="hidden self-start md:sticky md:top-24 md:block">
+          <div className="max-h-[calc(100vh-7.5rem)] rounded-2xl border border-calm-sage/20 bg-white/95 p-2 shadow-soft-sm xl:p-3">
+            <nav className="max-h-[calc(100vh-9rem)] space-y-1 overflow-y-auto pr-1" aria-label="Settings sections">
               {sectionMeta.map((section) => {
                 const Icon = section.icon;
                 const active = activeSection === section.id;
@@ -962,7 +1217,7 @@ export default function SettingsPage() {
                   <button
                     key={section.id}
                     type="button"
-                    onClick={() => setActiveSection(section.id)}
+                    onClick={() => handleSelectSection(section.id)}
                     className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm transition xl:px-3 ${
                       active ? 'bg-[#E8EFE6] text-charcoal' : 'text-charcoal/70 hover:bg-calm-sage/10'
                     }`}
@@ -1010,7 +1265,13 @@ export default function SettingsPage() {
               <div key={section.id} className="overflow-hidden rounded-2xl border border-calm-sage/20 bg-white/95 shadow-soft-sm">
                 <button
                   type="button"
-                  onClick={() => setMobileOpen((prev) => (prev === section.id ? null : section.id))}
+                  onClick={() => {
+                    setMobileOpen((prev) => {
+                      const next = prev === section.id ? null : section.id;
+                      if (next) setSectionInUrl(next);
+                      return next;
+                    });
+                  }}
                   className="flex w-full items-center justify-between px-4 py-3 text-left"
                 >
                   <span className="inline-flex items-center gap-2 text-sm font-semibold text-charcoal">

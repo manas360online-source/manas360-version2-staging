@@ -74,6 +74,7 @@ export interface EnvConfig {
 	sessionNotesEncryptionKey: string;
 	redisUrl: string;
 	analyticsRollupIntervalSeconds?: number;
+	disableAuthRateLimit: boolean;
 	razorpayKeyId?: string;
 	razorpayKeySecret?: string;
 	razorpayWebhookSecret?: string;
@@ -113,6 +114,7 @@ export const env: EnvConfig = Object.freeze({
 	sessionNotesEncryptionKey: process.env.SESSION_NOTES_ENCRYPTION_KEY ?? '',
 	redisUrl: process.env.REDIS_URL ?? 'redis://127.0.0.1:6379',
 	analyticsRollupIntervalSeconds: parseNumber(process.env.ANALYTICS_ROLLUP_INTERVAL_SECONDS, 3600),
+	disableAuthRateLimit: parseBoolean(process.env.DISABLE_AUTH_RATE_LIMIT, false),
 	razorpayKeyId: process.env.RAZORPAY_KEY_ID,
 	razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET,
 	razorpayWebhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET,

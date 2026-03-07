@@ -52,7 +52,7 @@ const professionalSections: NavSection[] = [
       { to: '/psychiatrist/parameter-tracking', label: 'Parameter Tracking', icon: Activity },
       { to: '/psychiatrist/medication-history', label: 'Medication History', icon: Calendar },
       { to: '/psychiatrist/care-team', label: 'Care Team', icon: Users },
-      { to: '/psychiatrist/messages', label: 'Messages', icon: MessageSquare },
+      { to: '/psychiatrist/messages', label: "Dr. Meera 'Ai Chatbot", icon: MessageSquare },
       { to: '/psychiatrist/reports', label: 'Reports', icon: ShieldAlert },
     ],
   },
@@ -91,7 +91,7 @@ const professionalMobileNavItems: NavItem[] = [
   { to: '/psychiatrist/consultations', label: 'Consults', icon: Calendar },
   { to: '/psychiatrist/prescriptions', label: 'Rx', icon: Pill },
   { to: '/psychiatrist/drug-interactions', label: 'Interactions', icon: ShieldAlert },
-  { to: '/psychiatrist/messages', label: 'Messages', icon: MessageSquare },
+  { to: '/psychiatrist/messages', label: "Dr. Meera 'Ai", icon: MessageSquare },
 ];
 
 const selfMobileNavItems: NavItem[] = [
@@ -113,7 +113,7 @@ const titleMap: Record<string, string> = {
   '/psychiatrist/parameter-tracking': 'Parameter Tracking',
   '/psychiatrist/medication-history': 'Medication History',
   '/psychiatrist/care-team': 'Care Team',
-  '/psychiatrist/messages': 'Messages',
+  '/psychiatrist/messages': "Dr. Meera 'Ai Chatbot",
   '/psychiatrist/reports': 'Reports',
   '/psychiatrist/consultation-analytics': 'Consultation Analytics',
   '/psychiatrist/prescription-analytics': 'Prescription Analytics',
@@ -189,6 +189,19 @@ export default function PsychiatristDashboardLayout() {
     const loadSidebarMeta = async () => {
       try {
         const patientsRes = await psychiatristApi.getPatients();
+        const patients = patientsRes.items || [];
+        setPatientOptions(patients);
+
+        const hasSelectedPatient = selectedPatientId
+          ? patients.some((patient) => patient.patientId === selectedPatientId)
+          : false;
+        const fallbackPatientId = patients[0]?.patientId || '';
+        const effectivePatientId = hasSelectedPatient ? selectedPatientId : fallbackPatientId;
+
+        if (selectedPatientId && !hasSelectedPatient) {
+          setSelectedPatientId(effectivePatientId);
+        }
+
         if (dashboardMode === 'practice') {
           const selfRes = await psychiatristApi.getSelfMode();
           setDashboardMeta({
@@ -197,10 +210,9 @@ export default function PsychiatristDashboardLayout() {
             medicationReviewsDue: Number(selfRes.activePrescriptions || 0),
           });
         } else {
-          const dashboardRes = await psychiatristApi.getDashboard(selectedPatientId || undefined);
+          const dashboardRes = await psychiatristApi.getDashboard(effectivePatientId || undefined);
           setDashboardMeta(dashboardRes);
         }
-        setPatientOptions(patientsRes.items || []);
       } catch {
         setDashboardMeta(null);
         setPatientOptions([]);

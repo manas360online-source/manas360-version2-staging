@@ -313,7 +313,7 @@ export default function DashboardPage() {
               ₹{subscription?.price || 0}/{String(subscription?.billingCycle || 'monthly').toLowerCase()} · Renews {formatDate(subscription?.renewalDate)}
             </p>
             <p className="mt-2 text-xs text-white/85">Status: {subscription?.status || 'active'} · Auto-renew: {subscription?.autoRenew ? 'On' : 'Off'}</p>
-            <Link to="/patient/billing" className="mt-3 inline-flex rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-sage-700 hover:bg-sage-50">
+            <Link to="/patient/settings?section=billing" className="mt-3 inline-flex rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-sage-700 hover:bg-sage-50">
               Manage Subscription
             </Link>
           </article>

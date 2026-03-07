@@ -27,7 +27,6 @@ import ProfilePage from './pages/patient/ProfilePage'
 import SettingsPage from './pages/patient/SettingsPage'
 import LiveSessionPage from './pages/patient/LiveSessionPage'
 import AssessmentsPage from './pages/patient/AssessmentsPage'
-import BillingPage from './pages/patient/BillingPage'
 import DocumentsPage from './pages/patient/DocumentsPage'
 import SupportPage from './pages/patient/SupportPage'
 import NotificationsPage from './pages/patient/NotificationsPage'
@@ -82,6 +81,10 @@ import PsychiatristMedicationLibraryPage from './pages/psychiatrist/Psychiatrist
 import PsychiatristAssessmentTemplatesPage from './pages/psychiatrist/PsychiatristAssessmentTemplatesPage';
 import PsychiatristEarningsPage from './pages/psychiatrist/PsychiatristEarningsPage';
 import PsychiatristSettingsPage from './pages/psychiatrist/PsychiatristSettingsPage';
+import CancellationRefundPolicyPage from './pages/legal/CancellationRefundPolicyPage';
+import TermsOfUsePage from './pages/legal/TermsOfUsePage';
+import PrivacyPolicyPage from './pages/legal/PrivacyPolicyPage';
+import SubscribePage from './pages/SubscribePage';
 
 interface AssessmentData {
   symptoms: string[];
@@ -427,7 +430,7 @@ function App() {
           <Route path="profile" element={<ProfilePage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="assessments" element={<AssessmentsPage />} />
-          <Route path="billing" element={<BillingPage />} />
+          <Route path="billing" element={<Navigate to="/patient/settings?section=billing" replace />} />
           <Route path="documents" element={<DocumentsPage />} />
           <Route path="support" element={<SupportPage />} />
           <Route path="notifications" element={<NotificationsPage />} />
@@ -436,7 +439,7 @@ function App() {
         </Route>
 
         <Route path="/dashboard" element={<Navigate to="/patient/dashboard" replace />} />
-        <Route path="/subscribe" element={<Navigate to="/patient/billing" replace />} />
+        <Route path="/subscribe" element={<SubscribePage />} />
         <Route path="/providers" element={<Navigate to="/patient/providers" replace />} />
         <Route path="/providers/:id" element={<Navigate to="/patient/providers" replace />} />
         <Route path="/book/:providerId" element={<Navigate to="/patient/providers" replace />} />
@@ -445,6 +448,9 @@ function App() {
         <Route path="/ai-chat" element={<Navigate to="/patient/messages" replace />} />
         <Route path="/profile" element={<Navigate to="/patient/profile" replace />} />
         <Route path="/settings" element={<Navigate to="/patient/settings" replace />} />
+        <Route path="/terms" element={<TermsOfUsePage />} />
+        <Route path="/privacy" element={<PrivacyPolicyPage />} />
+        <Route path="/refunds" element={<CancellationRefundPolicyPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AuthProvider>

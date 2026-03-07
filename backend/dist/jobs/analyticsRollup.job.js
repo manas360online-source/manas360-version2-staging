@@ -10,28 +10,29 @@ async function ensureMaterializedView() {
     const createSql = `DO $$
 BEGIN
 	IF NOT EXISTS (SELECT 1 FROM pg_matviews WHERE matviewname = 'analytics_session_metrics') THEN
-		EXECUTE $$
+		-- use distinct dollar tags for nested EXECUTE to avoid delimiter collisions
+		EXECUTE $create$
 			CREATE MATERIALIZED VIEW analytics_session_metrics AS
 			SELECT
-				ps.id AS session_id,
-				t.therapist_id,
-				ps.patient_id,
-				ps.started_at,
-				ps.completed_at,
-				EXTRACT(EPOCH FROM (ps.completed_at - ps.started_at))::int AS duration_seconds,
-				(SELECT COUNT(*) FROM responses r WHERE r.session_id = ps.id) AS answered_count,
-				(SELECT COUNT(*) FROM questions q WHERE q.template_id = t.id) AS total_questions,
-				AVG((r.response_data->>'score')::numeric) AS session_score,
-				ps.template_version
-			FROM patient_sessions ps
-			JOIN templates t ON t.id = ps.template_id
-			LEFT JOIN responses r ON r.session_id = ps.id
-			WHERE ps.completed_at IS NOT NULL
-			GROUP BY ps.id, t.therapist_id, ps.patient_id, ps.started_at, ps.completed_at, ps.template_version;
-		$$;
+				ps."id" AS session_id,
+				t."therapistId" AS therapist_id,
+				ps."patientId" AS patient_id,
+				ps."startedAt" AS started_at,
+				ps."completedAt" AS completed_at,
+				EXTRACT(EPOCH FROM (ps."completedAt" - ps."startedAt"))::int AS duration_seconds,
+				(SELECT COUNT(*) FROM "patient_session_responses" r WHERE r."sessionId" = ps."id") AS answered_count,
+				(SELECT COUNT(*) FROM "cbt_questions" q WHERE q."sessionId" = t."id") AS total_questions,
+				AVG((r."responseData"->>'score')::numeric) AS session_score,
+				ps."templateVersion" AS template_version
+			FROM "patient_sessions" ps
+			JOIN "cbt_session_templates" t ON t."id" = ps."templateId"
+			LEFT JOIN "patient_session_responses" r ON r."sessionId" = ps."id"
+			WHERE ps."completedAt" IS NOT NULL
+			GROUP BY ps."id", t."id", t."therapistId", ps."patientId", ps."startedAt", ps."completedAt", ps."templateVersion";
+		$create$;
 
-		EXECUTE $$CREATE UNIQUE INDEX idx_analytics_session_metrics_session_id ON analytics_session_metrics(session_id);$$;
-		EXECUTE $$CREATE INDEX idx_analytics_session_metrics_therapist_completed_at ON analytics_session_metrics(therapist_id, completed_at);$$;
+		EXECUTE $idx$CREATE UNIQUE INDEX idx_analytics_session_metrics_session_id ON analytics_session_metrics(session_id)$idx$;
+		EXECUTE $idx2$CREATE INDEX idx_analytics_session_metrics_therapist_completed_at ON analytics_session_metrics(therapist_id, completed_at)$idx2$;
 	END IF;
 END
 $$;`;
@@ -72,11 +73,11 @@ async function refreshAnalyticsMaterializedViews() {
 async function ensureIndexes() {
     try {
         // patient_sessions: helpful composite index for therapist/time lookups
-        await db_1.prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_patient_sessions_template_started_completed ON patient_sessions(template_id, started_at, completed_at);`);
-        // responses: index by session and answered_at
-        await db_1.prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_responses_session_answered_at ON responses(session_id, answered_at);`);
-        // responses: index by question_id for drop-off computations
-        await db_1.prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_responses_question_id ON responses(question_id);`);
+        await db_1.prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_patient_sessions_template_started_completed ON "patient_sessions"("templateId", "startedAt", "completedAt");`);
+        // patient_session_responses: index by session and answeredAt
+        await db_1.prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_patient_session_responses_session_answered_at ON "patient_session_responses"("sessionId", "answeredAt");`);
+        // patient_session_responses: index by questionId for drop-off computations
+        await db_1.prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_patient_session_responses_question_id ON "patient_session_responses"("questionId");`);
         console.log('analytics: ensured base table indexes');
     }
     catch (e) {

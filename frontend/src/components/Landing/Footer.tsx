@@ -26,7 +26,7 @@ export const Footer: React.FC = () => {
     Legal: [
       { label: 'Privacy Policy', to: '/privacy' },
       { label: 'Terms of Service', to: '/terms' },
-      { label: 'Refund Policy', to: '/refunds' },
+      { label: 'Cancellation & Refund Policy', to: '/refunds' },
     ],
   };
 
