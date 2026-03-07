@@ -2,6 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 
 type SpeechResultHandler = (transcript: string) => void;
 
+type ListenOptions = {
+  lang?: string;
+  continuous?: boolean;
+  interimResults?: boolean;
+  silenceMs?: number;
+  onSpeechStart?: () => void;
+};
+
 type SpeakOptions = {
   lang?: string;
   preferIndianVoice?: boolean;
@@ -12,13 +20,16 @@ type SpeakOptions = {
 };
 
 const INDIAN_VOICE_PATTERN = /(india|indian|en-in|hi-in|ta-in|te-in|kn-in|ml-in|mr-in)/i;
+const MIC_ACCESS_PAUSED = true;
 
 export const useSpeechAssistant = () => {
   const recognitionRef = useRef<any>(null);
+  const silenceTimerRef = useRef<number | null>(null);
   const [isListening, setIsListening] = useState(false);
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
 
   const supportsSpeechRecognition =
+    !MIC_ACCESS_PAUSED &&
     typeof window !== 'undefined' &&
     Boolean((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
 
@@ -26,26 +37,79 @@ export const useSpeechAssistant = () => {
     typeof window !== 'undefined' &&
     Boolean((window as any).speechSynthesis);
 
-  const startListening = (onResult: SpeechResultHandler, lang = 'en-IN') => {
+  const clearSilenceTimer = () => {
+    if (silenceTimerRef.current !== null) {
+      window.clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+  };
+
+  const startListening = (onResult: SpeechResultHandler, langOrOptions: string | ListenOptions = 'en-IN', maybeOptions: ListenOptions = {}) => {
+    if (MIC_ACCESS_PAUSED) return;
     if (!supportsSpeechRecognition || isListening) return;
 
     const SpeechRecognitionCtor = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognitionCtor) return;
 
-    const recognition = new SpeechRecognitionCtor();
-    recognition.lang = lang;
-    recognition.continuous = false;
-    recognition.interimResults = false;
+    const options: ListenOptions = typeof langOrOptions === 'string'
+      ? { ...maybeOptions, lang: langOrOptions }
+      : langOrOptions;
 
-    recognition.onstart = () => setIsListening(true);
-    recognition.onend = () => setIsListening(false);
-    recognition.onerror = () => setIsListening(false);
+    const recognition = new SpeechRecognitionCtor();
+    recognition.lang = options.lang || 'en-IN';
+    recognition.continuous = Boolean(options.continuous);
+    recognition.interimResults = Boolean(options.interimResults);
+
+    let hasDetectedSpeech = false;
+
+    const armSilenceTimer = () => {
+      const silenceMs = Number(options.silenceMs || 0);
+      if (!silenceMs || silenceMs < 200) return;
+      clearSilenceTimer();
+      silenceTimerRef.current = window.setTimeout(() => {
+        try {
+          recognition.stop();
+        } catch {
+          // no-op
+        }
+      }, silenceMs);
+    };
+
+    recognition.onstart = () => {
+      setIsListening(true);
+      armSilenceTimer();
+    };
+    recognition.onend = () => {
+      clearSilenceTimer();
+      setIsListening(false);
+    };
+    recognition.onerror = () => {
+      clearSilenceTimer();
+      setIsListening(false);
+    };
     recognition.onresult = (event: any) => {
-      const transcript = Array.from(event.results || [])
-        .map((result: any) => result?.[0]?.transcript || '')
-        .join(' ')
-        .trim();
-      if (transcript) onResult(transcript);
+      let finalTranscript = '';
+      let interimTranscript = '';
+
+      for (let i = 0; i < event.results.length; i += 1) {
+        const result = event.results[i];
+        const text = String(result?.[0]?.transcript || '').trim();
+        if (!text) continue;
+        if (result?.isFinal) {
+          finalTranscript = `${finalTranscript} ${text}`.trim();
+        } else {
+          interimTranscript = `${interimTranscript} ${text}`.trim();
+        }
+      }
+
+      const transcript = `${finalTranscript} ${interimTranscript}`.trim();
+      if (!transcript) return;
+      if (!hasDetectedSpeech) {
+        hasDetectedSpeech = true;
+        options.onSpeechStart?.();
+      }
+      armSilenceTimer();
+      onResult(transcript);
     };
 
     recognitionRef.current = recognition;
@@ -54,6 +118,7 @@ export const useSpeechAssistant = () => {
 
   const stopListening = () => {
     try {
+      clearSilenceTimer();
       recognitionRef.current?.stop?.();
     } finally {
       setIsListening(false);
@@ -121,6 +186,7 @@ export const useSpeechAssistant = () => {
       return () => {
         synth.removeEventListener?.('voiceschanged', updateVoices);
         try {
+          clearSilenceTimer();
           recognitionRef.current?.stop?.();
         } catch {
           // no-op
@@ -131,6 +197,7 @@ export const useSpeechAssistant = () => {
 
     return () => {
       try {
+        clearSilenceTimer();
         recognitionRef.current?.stop?.();
       } catch {
         // no-op
