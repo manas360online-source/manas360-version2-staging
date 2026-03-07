@@ -61,6 +61,7 @@ const getDayKey = (): string => {
 };
 
 const getBudgetForToday = (): number => {
+	if (process.env.NODE_ENV === 'development') return 0;
 	if (!Number.isFinite(DAILY_TOKEN_BUDGET) || DAILY_TOKEN_BUDGET <= 0) return 0;
 	return Math.floor(DAILY_TOKEN_BUDGET);
 };

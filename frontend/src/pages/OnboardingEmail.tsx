@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 interface OnboardingEmailProps {
   userName: string;
@@ -45,7 +46,7 @@ export const OnboardingEmail: React.FC<OnboardingEmailProps> = ({ userName }) =>
                 )}
              </div>
              <p className="text-sm text-slate-500 leading-tight pt-1">
-               I agree to the <a href="#" className="text-[#1E59FF] font-bold">Terms of Service</a> and <a href="#" className="text-[#1E59FF] font-bold">Privacy Policy</a>.
+               I agree to the <Link to="/terms" className="text-[#1E59FF] font-bold">Terms of Service</Link> and <Link to="/privacy" className="text-[#1E59FF] font-bold">Privacy Policy</Link>.
              </p>
           </div>
 

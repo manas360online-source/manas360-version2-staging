@@ -4,6 +4,7 @@ export const CHAT_FALLBACK_MESSAGE =
 	"I'm here to help, but I'm having trouble responding right now. Please try again shortly.";
 
 export type BotType = 'mood_ai' | 'clinical_ai';
+export type ResponseStyle = 'concise' | 'detailed';
 
 export type ChatMessageItem = {
 	role: 'user' | 'assistant';
@@ -27,6 +28,6 @@ export type ChatMessageResponse = {
 };
 
 export const chatApi = {
-	sendMessage: async (payload: { message: string; bot_type: BotType }) =>
+	sendMessage: async (payload: { message: string; bot_type: BotType; response_style?: ResponseStyle }) =>
 		(await http.post('/chat/message', payload)).data as { data?: ChatMessageResponse } | ChatMessageResponse,
 };

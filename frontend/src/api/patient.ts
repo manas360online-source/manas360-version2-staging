@@ -95,8 +95,12 @@ export const patientApi = {
     (await http.get(`/patient/invoices/${encodeURIComponent(id)}/download`, { responseType: 'blob' })).data,
   getExercises: async () => (await http.get('/patient/exercises')).data,
   completeExercise: async (id: string) => (await http.patch(`/patient/exercises/${encodeURIComponent(id)}/complete`)).data,
-  aiChat: async (payload: { message: string; bot_type?: 'mood_ai' | 'clinical_ai' }) =>
-    (await http.post('/chat/message', { message: payload.message, bot_type: payload.bot_type || 'mood_ai' })).data,
+  aiChat: async (payload: { message: string; bot_type?: 'mood_ai' | 'clinical_ai'; response_style?: 'concise' | 'detailed' }) =>
+    (await http.post('/chat/message', {
+      message: payload.message,
+      bot_type: payload.bot_type || 'mood_ai',
+      response_style: payload.response_style || 'concise',
+    })).data,
   getCurrentRisk: async (userId: string) =>
     (await http.get(`/v1/risk/${encodeURIComponent(userId)}/current`)).data,
   getNotifications: async () => (await http.get('/v1/notifications')).data,

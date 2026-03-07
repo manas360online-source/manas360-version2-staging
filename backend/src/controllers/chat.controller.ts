@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import { AppError } from '../middleware/error.middleware';
 import { sendSuccess } from '../utils/response';
-import { processChatMessage, type BotType } from '../services/chat.service';
+import { processChatMessage, type BotType, type ResponseStyle } from '../services/chat.service';
 
 const MAX_CHAT_MESSAGE_CHARS = Number(process.env.MAX_CHAT_MESSAGE_CHARS || 4000);
 
@@ -19,6 +19,12 @@ const parseBotType = (raw: unknown): BotType => {
 	return botType;
 };
 
+const parseResponseStyle = (raw: unknown): ResponseStyle => {
+	const style = String(raw || '').trim().toLowerCase();
+	if (style === 'detailed') return 'detailed';
+	return 'concise';
+};
+
 export const postChatMessageController = async (req: Request, res: Response): Promise<void> => {
 	const userId = authUserId(req);
 	const requestUserId = String(req.body?.user_id || '').trim();
@@ -34,6 +40,7 @@ export const postChatMessageController = async (req: Request, res: Response): Pr
 	}
 
 	const botType = parseBotType(req.body?.bot_type);
-	const result = await processChatMessage({ userId: resolvedUserId, message, botType });
+	const responseStyle = parseResponseStyle(req.body?.response_style);
+	const result = await processChatMessage({ userId: resolvedUserId, message, botType, responseStyle });
 	sendSuccess(res, result, 'Chat response generated');
 };
