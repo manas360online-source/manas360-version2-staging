@@ -19,8 +19,8 @@
 		"test:chat": "jest --runInBand chat.integration.test.ts chat-route.integration.test.ts",
 		"backfill:versions": "ts-node ./scripts/backfill_versions.ts",
 		"seed:templates": "ts-node ./scripts/seed_default_templates.ts",
-				"seed:login-users": "node ./scripts/seed-login-users.js",
-				"seed": "node ./prisma/seed.js",
+		"seed:login-users": "node ./scripts/seed-login-users.js",
+		"seed": "node ./prisma/seed.js",
 		"seed:users:mock": "ts-node ./scripts/seed_mock_users.ts",
 		"seed:analytics:mock": "ts-node ./scripts/seed_admin_analytics_mock_data.ts",
 		"seed:patient:mock-dashboard": "node ./scripts/seed_mock_patient_dashboard.js",
@@ -49,7 +49,11 @@
 		"otplib": "^12.0.1",
 		"pdfkit": "^0.17.2",
 		"redis": "^5.11.0",
-		"socket.io": "^4.8.3"
+		"socket.io": "^4.8.3",
+		"xlsx": "^0.18.5"
+		,
+		"openid-client": "^6.8.2",
+		"uuid": "^9.0.0"
 	},
 	"optionalDependencies": {
 		"prom-client": "^14.2.0"

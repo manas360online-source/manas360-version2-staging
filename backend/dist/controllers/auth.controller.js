@@ -85,6 +85,8 @@ const meController = async (req, res) => {
     if (!user) {
         throw new error_middleware_1.AppError('User not found', 404);
     }
+    const companyRows = (await db_1.prisma.$queryRawUnsafe('SELECT company_key, is_company_admin FROM users WHERE id = $1 LIMIT 1', user.id));
+    const companyMeta = companyRows?.[0] ?? { company_key: null, is_company_admin: false };
     (0, response_1.sendSuccess)(res, {
         id: String(user.id),
         email: user.email,
@@ -95,6 +97,10 @@ const meController = async (req, res) => {
         emailVerified: user.emailVerified,
         phoneVerified: user.phoneVerified,
         mfaEnabled: user.mfaEnabled,
+        companyKey: companyMeta.company_key,
+        company_key: companyMeta.company_key,
+        isCompanyAdmin: Boolean(companyMeta.is_company_admin),
+        is_company_admin: Boolean(companyMeta.is_company_admin),
     }, 'Authenticated user fetched');
 };
 exports.meController = meController;

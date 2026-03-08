@@ -30,6 +30,32 @@ export const getDefaultRouteForRole = (role: unknown): string => {
   return '/dashboard';
 };
 
+const toBoolean = (value: unknown): boolean => value === true || value === 'true' || value === 1 || value === '1';
+
+export const isCorporateAdminUser = (user: AuthUser | null | undefined): boolean => {
+  if (!user) return false;
+
+  const isAdminRole = normalizeRole(user.role) === 'admin';
+  if (!isAdminRole) return false;
+
+  const explicitAdminFlag = toBoolean(user.isCompanyAdmin) || toBoolean(user.is_company_admin);
+  if (explicitAdminFlag) return true;
+
+  // Fallback for legacy payloads that expose company key but not the boolean flag.
+  const companyKey = user.companyKey ?? user.company_key;
+  return typeof companyKey === 'string' && companyKey.trim().length > 0;
+};
+
+export const getPostLoginRoute = (user: AuthUser | null | undefined): string => {
+  if (!user) return '/dashboard';
+
+  if (isCorporateAdminUser(user)) {
+    return '/corporate/dashboard';
+  }
+
+  return getDefaultRouteForRole(user.role);
+};
+
 type AuthContextValue = {
   user: AuthUser | null;
   loading: boolean;

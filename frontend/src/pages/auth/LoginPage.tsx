@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { getApiErrorMessage } from '../../api/auth';
 import LoginForm from '../../components/auth/LoginForm';
-import { getDefaultRouteForRole, useAuth } from '../../context/AuthContext';
+import { getPostLoginRoute, useAuth } from '../../context/AuthContext';
 
 export default function LoginPage() {
 	const { user, isAuthenticated, login } = useAuth();
@@ -19,7 +19,7 @@ export default function LoginPage() {
 			return;
 		}
 
-		const postLoginRoute = from || next || getDefaultRouteForRole(user.role);
+		const postLoginRoute = from || next || getPostLoginRoute(user);
 		navigate(postLoginRoute, { replace: true });
 	}, [from, isAuthenticated, navigate, next, user]);
 
@@ -28,7 +28,7 @@ export default function LoginPage() {
 		setLoading(true);
 		try {
 			const loggedInUser = await login(identifier, password);
-			const postLoginRoute = from || next || getDefaultRouteForRole(loggedInUser.role);
+			const postLoginRoute = from || next || getPostLoginRoute(loggedInUser);
 			navigate(postLoginRoute, { replace: true });
 		} catch (err) {
 			setError(getApiErrorMessage(err, 'Login failed'));

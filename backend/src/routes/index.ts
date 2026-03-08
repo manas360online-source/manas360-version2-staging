@@ -18,6 +18,8 @@ import landingRoutes from './landing.routes';
 import chatRoutes from './chat.routes';
 import riskAnalyticsRoutes from './riskAnalytics.routes';
 import psychiatristRoutes from './psychiatrist.routes';
+import corporateRoutes from './corporate.routes';
+import ssoRoutes from './sso.routes';
 
 const router = Router();
 
@@ -40,12 +42,14 @@ router.use('/v1/patients', patientRoutes);
 router.use('/v1/therapists', therapistRoutes);
 router.use('/v1/therapist', therapistRoutes);
 router.use('/v1/admin', adminRoutes);
+router.use('/v1/corporate', corporateRoutes);
 router.use('/v1/cbt-sessions', cbtSessionRoutes);
 router.use('/v1/presence', presenceRoutes);
 router.use('/v1/therapist/dashboard', dashboardRoutes);
 router.use('/v1/therapists/dashboard', dashboardRoutes);
 router.use('/v1/psychiatrist', psychiatristRoutes);
 router.use('/v1/payments', paymentRoutes);
+router.use('/v1/sso', ssoRoutes);
 router.use('/v1/subscriptions', subscriptionRoutes);
 router.use('/v1/leads', leadRoutes);
 router.use('/certifications', certificationRoutes);

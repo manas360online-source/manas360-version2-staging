@@ -7,9 +7,25 @@ import { startAnalyticsRollup } from './jobs/analyticsRollup.job';
 import './jobs/admin-analytics-export.worker';
 import { startDailyMoodPredictionJob } from './cron/dailyMoodPrediction';
 import { startChatRetentionJob } from './jobs/chatRetention.job';
+import { ensureSsoTables } from './services/sso.service';
+import { createOrEnsureTenant, azureTemplate, googleTemplate, oktaTemplate } from './services/sso.service';
 
 const startServer = async (): Promise<void> => {
 	await connectDatabase();
+
+	// ensure SSO tables exist
+	void ensureSsoTables()
+		.then(async () => {
+			try {
+				// create example tenants for quick testing (no secrets included)
+				await createOrEnsureTenant(googleTemplate({ key: 'sso-google-demo', name: 'Google Workspace (demo)', domain: 'techcorp-india.com' }));
+				await createOrEnsureTenant(azureTemplate({ tenantId: 'common', key: 'sso-azure-demo', name: 'Azure AD (demo)', domain: 'techcorp-india.com' }));
+				await createOrEnsureTenant(oktaTemplate({ key: 'sso-okta-demo', name: 'Okta (demo)', issuer: 'https://example.okta.com/oauth2/default', domain: 'techcorp-india.com' }));
+			} catch (err) {
+				console.error('SSO tenant seed failed', err);
+			}
+		})
+		.catch((err) => console.error('SSO table init failed', err));
 
 	const server = app.listen(env.port, () => {
 		console.log(`Server running on port ${env.port}`);

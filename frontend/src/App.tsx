@@ -36,6 +36,7 @@ import MyProgressPage from './pages/patient/MyProgressPage'
 import AdminPortalLoginPage from './pages/admin/AdminPortalLoginPage'
 import AdminDashboardPage from './pages/admin/Dashboard'
 import AdminShellLayout from './components/admin/AdminShellLayout'
+import AdminEntryGate from './components/admin/AdminEntryGate'
 import AdminUsersPage from './pages/admin/Users'
 import AdminTherapistsPage from './pages/admin/Therapists'
 import AdminVerificationPage from './pages/admin/Verification'
@@ -85,6 +86,19 @@ import CancellationRefundPolicyPage from './pages/legal/CancellationRefundPolicy
 import TermsOfUsePage from './pages/legal/TermsOfUsePage';
 import PrivacyPolicyPage from './pages/legal/PrivacyPolicyPage';
 import SubscribePage from './pages/SubscribePage';
+import CorporateAnalyticsPage from './pages/corporate/CorporateAnalyticsPage';
+import CorporateEmployeeDirectoryPage from './pages/corporate/CorporateEmployeeDirectoryPage';
+import CorporateEnrollmentPage from './pages/corporate/CorporateEnrollmentPage';
+import CorporateSessionAllocationPage from './pages/corporate/CorporateSessionAllocationPage';
+import CorporateUtilizationReportsPage from './pages/corporate/CorporateUtilizationReportsPage';
+import CorporateWellbeingReportsPage from './pages/corporate/CorporateWellbeingReportsPage';
+import CorporateEngagementReportsPage from './pages/corporate/CorporateEngagementReportsPage';
+import CorporateInvoicesPage from './pages/corporate/CorporateInvoicesPage';
+import CorporatePaymentMethodsPage from './pages/corporate/CorporatePaymentMethodsPage';
+import CorporatePlanPage from './pages/corporate/CorporatePlanPage';
+import CorporateHelpPage from './pages/corporate/CorporateHelpPage';
+import SSOSettingsPage from './pages/corporate/SSOSettingsPage';
+import CorporateDashboardPage from './pages/corporate/CorporateDashboardPage';
 
 interface AssessmentData {
   symptoms: string[];
@@ -391,10 +405,11 @@ function App() {
           path="/admin"
           element={
             <ProtectedRoute allowedRoles={['admin']}>
-              <AdminShellLayout />
+              <AdminEntryGate />
             </ProtectedRoute>
           }
         >
+          <Route element={<AdminShellLayout />}>
           <Route index element={<Navigate to="analytics" replace />} />
           <Route path="analytics" element={<AdminDashboardPage />} />
           <Route path="users" element={<AdminUsersPage />} />
@@ -405,7 +420,116 @@ function App() {
           <Route path="clinical-assistant" element={<ClinicalAssistantPage />} />
           <Route path="settings" element={<AdminSettingsPage />} />
           <Route path="dashboard" element={<Navigate to="/admin/analytics" replace />} />
+          </Route>
         </Route>
+        <Route
+          path="/corporate/dashboard"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <CorporateDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/corporate"
+          element={<Navigate to="/corporate/dashboard" replace />}
+        />
+        <Route
+          path="/corporate/analytics"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <CorporateAnalyticsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/corporate/employees/directory"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <CorporateEmployeeDirectoryPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/corporate/employees/enrollment"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <CorporateEnrollmentPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/corporate/employees/allocation"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <CorporateSessionAllocationPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/corporate/reports/utilization"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <CorporateUtilizationReportsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/corporate/reports/wellbeing"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <CorporateWellbeingReportsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/corporate/reports/engagement"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <CorporateEngagementReportsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/corporate/billing/invoices"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <CorporateInvoicesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/corporate/billing/payment-methods"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <CorporatePaymentMethodsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/corporate/billing/plan"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <CorporatePlanPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/corporate/account/help"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <CorporateHelpPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/corporate/sso"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <SSOSettingsPage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/login" element={<Navigate to="/auth/login" replace />} />
         <Route path="/register" element={<Navigate to="/auth/signup" replace />} />
 
