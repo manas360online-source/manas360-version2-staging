@@ -26,7 +26,7 @@ const mainNavItems = [
 ];
 
 const wellnessNavItems = [
-  { to: '/patient/messages', label: 'Dr. Meera', icon: MessageSquare, badge: 'AI' },
+  { to: '/patient/messages', label: "Dr. Meera 'Ai", icon: MessageSquare, badge: 'AI' },
   { to: '/patient/assessments', label: 'CBT Exercises', icon: FileText },
   { to: '/patient/mood', label: 'Mood Tracker', icon: HeartPulse },
   { to: '/patient/progress', label: 'My Progress', icon: Sparkles },
@@ -43,7 +43,7 @@ const bottomNavItems = [
   { to: '/patient/dashboard', label: 'Dashboard', icon: Home },
   { to: '/patient/sessions', label: 'Sessions', icon: CalendarDays },
   { to: '/patient/providers', label: 'Find Therapist', icon: Search },
-  { to: '/patient/messages', label: 'Messages', icon: MessageSquare },
+  { to: '/patient/messages', label: "Dr. Meera 'Ai", icon: MessageSquare },
   { to: '/patient/settings', label: 'Settings', icon: User },
 ];
 
@@ -159,9 +159,9 @@ export default function PatientDashboardLayout() {
         />
       )}
 
-      <div className="mx-auto flex w-full max-w-[1600px]">
+      <div className="mx-auto flex w-full max-w-[1600px] items-start">
         <aside
-          className={`fixed left-0 top-0 z-50 flex h-full w-64 flex-col border-r border-calm-sage/15 bg-[#F5F3F0] transition-transform duration-300 lg:sticky lg:z-20 lg:translate-x-0 ${
+          className={`fixed left-0 top-0 z-50 flex h-full w-64 flex-col border-r border-calm-sage/15 bg-[#F5F3F0] transition-transform duration-300 lg:sticky lg:top-0 lg:self-start lg:z-20 lg:h-screen lg:translate-x-0 ${
             mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >

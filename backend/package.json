@@ -23,6 +23,7 @@
 				"seed": "node ./prisma/seed.js",
 		"seed:users:mock": "ts-node ./scripts/seed_mock_users.ts",
 		"seed:analytics:mock": "ts-node ./scripts/seed_admin_analytics_mock_data.ts",
+		"seed:patient:mock-dashboard": "node ./scripts/seed_mock_patient_dashboard.js",
 		"seed:all:mock": "npm run seed:users:mock && npm run seed:analytics:mock",
 		"test:watch": "jest --watch"
 	},

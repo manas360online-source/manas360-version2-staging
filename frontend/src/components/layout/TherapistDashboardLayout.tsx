@@ -50,7 +50,7 @@ const professionalSections: NavSection[] = [
       { to: '/therapist/mood-tracking', label: 'Mood Tracking', icon: HeartPulse },
       { to: '/therapist/cbt-modules', label: 'CBT Modules', icon: Wrench },
       { to: '/therapist/assessments', label: 'Assessments', icon: Activity },
-      { to: '/therapist/messages', label: 'Messages', icon: MessageSquare },
+      { to: '/therapist/messages', label: "Dr. Meera 'Ai", icon: MessageSquare },
       { to: '/therapist/exercise-library', label: 'Exercise Library', icon: Wrench },
       { to: '/therapist/resources', label: 'Resources', icon: BookOpen },
       { to: '/therapist/care-team', label: 'Care Team', icon: Users },
@@ -88,7 +88,7 @@ const selfSections: NavSection[] = [
 const professionalMobileNavItems: NavItem[] = [
   { to: '/therapist/patients', label: 'Patients', icon: Users },
   { to: '/therapist/sessions', label: 'Sessions', icon: Calendar },
-  { to: '/therapist/messages', label: 'Messages', icon: MessageSquare },
+  { to: '/therapist/messages', label: "Dr. Meera 'Ai", icon: MessageSquare },
   { to: '/therapist/mood-tracking', label: 'Mood', icon: HeartPulse },
   { to: '/therapist/care-team', label: 'Care Team', icon: Users },
 ];
@@ -96,7 +96,7 @@ const professionalMobileNavItems: NavItem[] = [
 const selfMobileNavItems: NavItem[] = [
   { to: '/therapist/patients', label: 'Patients', icon: Users },
   { to: '/therapist/sessions', label: 'Sessions', icon: Calendar },
-  { to: '/therapist/messages', label: 'Messages', icon: MessageSquare },
+  { to: '/therapist/messages', label: "Dr. Meera 'Ai", icon: MessageSquare },
   { to: '/therapist/analytics', label: 'Analytics', icon: LineChart },
   { to: '/therapist/profile', label: 'Profile', icon: Settings },
 ];
@@ -108,7 +108,7 @@ const titleMap: Record<string, string> = {
   '/therapist/session-notes': 'Session Notes',
   '/therapist/earnings': 'Earnings',
   '/therapist/payout-history': 'Payout History',
-  '/therapist/messages': 'Messages',
+  '/therapist/messages': "Dr. Meera 'Ai",
   '/therapist/exercise-library': 'Exercise Library',
   '/therapist/cbt-modules': 'CBT Modules',
   '/therapist/assessments': 'Assessments',
@@ -345,7 +345,7 @@ export default function TherapistDashboardLayout() {
                       {item.badge ? (
                         <span
                           className={`ml-auto rounded-full px-1.5 py-0.5 text-[11px] font-medium ${
-                            item.label === 'Messages' ? 'bg-red-50 text-red-600' : item.label === 'Sessions' ? 'bg-clay-50 text-clay-500' : 'bg-sage-50 text-sage-500'
+                            item.to === '/therapist/messages' ? 'bg-red-50 text-red-600' : item.label === 'Sessions' ? 'bg-clay-50 text-clay-500' : 'bg-sage-50 text-sage-500'
                           }`}
                         >
                           {item.badge}

@@ -1,16 +1,25 @@
 import { useState } from 'react';
 import { CHAT_FALLBACK_MESSAGE, chatApi } from '../../api/chat.api';
+import useSpeechAssistant from '../../hooks/useSpeechAssistant';
 
 export default function ClinicalAssistantPage() {
 	const [thread, setThread] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
 	const [message, setMessage] = useState('');
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
-	const [botName, setBotName] = useState('dr meera · Clinical Assistant AI');
+	const [botName, setBotName] = useState("Dr. Meera 'Ai · Clinical Assistant");
+	const [responseStyle, setResponseStyle] = useState<'concise' | 'detailed'>('concise');
+	const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
+	const [aiSettingsOpen, setAiSettingsOpen] = useState(false);
+	const [speechLang, setSpeechLang] = useState('en-IN');
+	const [preferIndianAccent, setPreferIndianAccent] = useState(true);
+	const [voiceName, setVoiceName] = useState('');
+	const { supportsSpeechRecognition, supportsSpeechSynthesis, availableVoices, isListening, startListening, stopListening, speak } = useSpeechAssistant();
 
 	const send = async () => {
 		const text = message.trim();
 		if (!text || loading) return;
+		if (cooldownUntil && Date.now() < cooldownUntil) return;
 
 		setThread((prev) => [...prev, { role: 'user', content: text }]);
 		setMessage('');
@@ -18,17 +27,25 @@ export default function ClinicalAssistantPage() {
 		setError(null);
 
 		try {
-			const res = await chatApi.sendMessage({ message: text, bot_type: 'clinical_ai' });
+			const res = await chatApi.sendMessage({ message: text, bot_type: 'clinical_ai', response_style: responseStyle });
 			const payload: any = (res as any)?.data ?? res;
-			setBotName(`${payload?.bot_name || 'dr meera'} · Clinical Assistant AI`);
+			setBotName(`${payload?.bot_name || "Dr. Meera 'Ai"} · Clinical Assistant`);
 			const messages = Array.isArray(payload?.messages) ? payload.messages : [];
 			if (!messages.length) {
 				setThread((prev) => [...prev, { role: 'assistant', content: String(payload?.response || CHAT_FALLBACK_MESSAGE) }]);
 			} else {
 				setThread(messages.map((m: any) => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: String(m.content || '') })));
 			}
-		} catch (err) {
-			setError(err instanceof Error ? err.message : 'Unable to reach clinical assistant');
+		} catch (err: any) {
+			const status = Number(err?.response?.status || 0);
+			if (status === 429) {
+				const retryAfterHeader = Number(err?.response?.headers?.['retry-after'] || 0);
+				const retryAfterSeconds = Number.isFinite(retryAfterHeader) && retryAfterHeader > 0 ? retryAfterHeader : 20;
+				setCooldownUntil(Date.now() + retryAfterSeconds * 1000);
+				setError(`Too many requests. Please wait ${retryAfterSeconds} seconds and try again.`);
+			} else {
+				setError(err?.response?.data?.message || err?.message || 'Unable to reach clinical assistant');
+			}
 			setThread((prev) => [
 				...prev,
 				{
@@ -40,6 +57,9 @@ export default function ClinicalAssistantPage() {
 			setLoading(false);
 		}
 	};
+
+	const cooldownRemaining = cooldownUntil ? Math.max(0, Math.ceil((cooldownUntil - Date.now()) / 1000)) : 0;
+	const lastAssistantMessage = [...thread].reverse().find((item) => item.role === 'assistant')?.content || '';
 
 	return (
 		<div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -67,10 +87,92 @@ export default function ClinicalAssistantPage() {
 						<span>{item.content}</span>
 					</div>
 				))}
-				{loading ? <p className="text-xs text-slate-500">dr meera is typing…</p> : null}
+				{loading ? <p className="text-xs text-slate-500">Dr. Meera 'Ai is typing...</p> : null}
 			</div>
 
-			<div className="mt-3 flex gap-2">
+			<div className="mt-3 space-y-2">
+				<div className="flex flex-wrap items-center gap-2">
+					<button
+						type="button"
+						onClick={() => setResponseStyle((prev) => (prev === 'concise' ? 'detailed' : 'concise'))}
+						className="rounded border bg-white px-2 py-1 text-xs"
+					>
+						{responseStyle === 'concise' ? 'Mode: Concise' : 'Mode: Detailed'}
+					</button>
+					{supportsSpeechRecognition && (
+						<button
+							type="button"
+							onClick={() => {
+								if (isListening) {
+									stopListening();
+									return;
+								}
+								startListening((transcript) => setMessage((prev) => `${prev} ${transcript}`.trim()), speechLang);
+							}}
+							className="rounded border bg-white px-2 py-1 text-xs"
+						>
+							{isListening ? 'Stop Mic' : 'Speak'}
+						</button>
+					)}
+					{supportsSpeechSynthesis && (
+						<button
+							type="button"
+							onClick={() => speak(lastAssistantMessage, { lang: speechLang, preferIndianVoice: preferIndianAccent, voiceName })}
+							disabled={!lastAssistantMessage}
+							className="rounded border bg-white px-2 py-1 text-xs disabled:opacity-50"
+						>
+							Talk Back
+						</button>
+					)}
+					<button
+						type="button"
+						onClick={() => setAiSettingsOpen((prev) => !prev)}
+						className="rounded border bg-white px-2 py-1 text-xs"
+					>
+						{aiSettingsOpen ? 'Hide AI Settings' : 'AI Settings'}
+					</button>
+					{cooldownRemaining > 0 && <span className="text-xs text-red-600">Retry in {cooldownRemaining}s</span>}
+				</div>
+				{aiSettingsOpen && (
+					<div className="grid grid-cols-1 gap-2 rounded border bg-slate-50 p-2 sm:grid-cols-3">
+						<label className="text-xs text-slate-700">
+							Voice language
+							<select
+								value={speechLang}
+								onChange={(event) => setSpeechLang(event.target.value)}
+								className="mt-1 w-full rounded border bg-white px-2 py-1 text-xs"
+							>
+								<option value="en-IN">English (India)</option>
+								<option value="hi-IN">Hindi (India)</option>
+								<option value="en-US">English (US)</option>
+							</select>
+						</label>
+						<label className="text-xs text-slate-700">
+							Voice profile
+							<select
+								value={voiceName}
+								onChange={(event) => setVoiceName(event.target.value)}
+								className="mt-1 w-full rounded border bg-white px-2 py-1 text-xs"
+							>
+								<option value="">Auto (Recommended)</option>
+								{availableVoices.map((voice) => (
+									<option key={`${voice.name}-${voice.lang}`} value={voice.name}>
+										{voice.name} ({voice.lang})
+									</option>
+								))}
+							</select>
+						</label>
+						<label className="flex items-center gap-2 text-xs text-slate-700">
+							<input
+								type="checkbox"
+								checked={preferIndianAccent}
+								onChange={(event) => setPreferIndianAccent(event.target.checked)}
+							/>
+							Prefer Indian accent voice
+						</label>
+					</div>
+				)}
+				<div className="flex gap-2">
 				<input
 					value={message}
 					onChange={(event) => setMessage(event.target.value)}
@@ -80,16 +182,17 @@ export default function ClinicalAssistantPage() {
 							void send();
 						}
 					}}
-					placeholder="Ask Dr Meera..."
+					placeholder="Ask Dr. Meera 'Ai..."
 					className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm"
 				/>
 				<button
 					onClick={() => void send()}
-					disabled={loading}
+					disabled={loading || cooldownRemaining > 0}
 					className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
 				>
 					Send
 				</button>
+				</div>
 			</div>
 		</div>
 	);

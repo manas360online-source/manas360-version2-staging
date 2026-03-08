@@ -36,9 +36,17 @@ export default function PsychiatristDashboardPage() {
       setError(null);
       try {
         const patientRes = await psychiatristApi.getPatients();
-        setPatients(patientRes.items || []);
-        if (!selectedPatientId && patientRes.items?.length) {
-          setSelectedPatientId(patientRes.items[0].patientId);
+        const patientItems = patientRes.items || [];
+        setPatients(patientItems);
+
+        const hasSelectedPatient = selectedPatientId
+          ? patientItems.some((item) => item.patientId === selectedPatientId)
+          : false;
+        const fallbackPatientId = patientItems[0]?.patientId || '';
+        const effectivePatientId = hasSelectedPatient ? selectedPatientId : fallbackPatientId;
+
+        if (effectivePatientId !== selectedPatientId) {
+          setSelectedPatientId(effectivePatientId);
         }
 
         if (dashboardMode === 'practice') {
@@ -46,7 +54,7 @@ export default function PsychiatristDashboardPage() {
           setSelfMode(selfData);
           setDashboard(null);
         } else {
-          const data = await psychiatristApi.getDashboard(selectedPatientId || undefined);
+          const data = await psychiatristApi.getDashboard(effectivePatientId || undefined);
           setDashboard(data);
           setSelfMode(null);
         }

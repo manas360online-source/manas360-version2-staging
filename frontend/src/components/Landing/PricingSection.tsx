@@ -60,7 +60,7 @@ export const PricingSection: React.FC = () => {
               ))}
             </ul>
             <Link
-              to="/auth/login?next=/patient/billing"
+              to="/subscribe"
               className={`mt-6 inline-flex min-h-[42px] w-full items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold transition-colors duration-200 ${
                 tier.featured ? 'bg-cream text-charcoal hover:bg-white' : 'bg-gradient-calm text-white hover:opacity-90'
               }`}

@@ -1,0 +1,125 @@
+name: Deploy to Lightsail VM
+
+on:
+  push:
+    branches: [ sync/staging-docker ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install & build (local runner)
+        run: |
+          # Backend
+          cd backend
+          npm ci
+          npm run build
+          cd ..
+
+          # Frontend
+          cd frontend
+          npm ci
+          npm run build
+          cd ..
+
+      - name: Start ssh-agent
+        uses: webfactory/ssh-agent@v0.5.4
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Deploy to Lightsail VM via SSH
+        env:
+          SSH_USER: ${{ secrets.SSH_USER }}
+          HOST: ${{ secrets.LIGHTSAIL_HOST }}
+          REMOTE_DIR: ${{ secrets.REMOTE_APP_DIR }}
+          BRANCH_NAME: ${{ github.ref_name }}
+        run: |
+          if [ -z "$REMOTE_DIR" ]; then REMOTE_DIR="/home/ubuntu/manas360-version2-staging"; fi
+          if [ -z "$BRANCH_NAME" ]; then BRANCH_NAME="sync/staging-docker"; fi
+          echo "Deploying to $SSH_USER@$HOST:$REMOTE_DIR"
+          echo "Deploying branch: $BRANCH_NAME"
+          ssh -o StrictHostKeyChecking=no "$SSH_USER@$HOST" "bash -s -- '$REMOTE_DIR' '$BRANCH_NAME'" <<'REMOTE_SCRIPT'
+            set -e
+            REMOTE_DIR="$1"
+            BRANCH_NAME="$2"
+            if [ -z "$REMOTE_DIR" ]; then
+              echo "REMOTE_DIR is empty"
+              exit 1
+            fi
+            if [ -z "$BRANCH_NAME" ]; then
+              echo "BRANCH_NAME is empty"
+              exit 1
+            fi
+            if [ ! -d "$REMOTE_DIR" ]; then
+              echo "Remote directory does not exist: $REMOTE_DIR"
+              exit 1
+            fi
+            cd "$REMOTE_DIR"
+            if [ ! -d .git ]; then
+              echo "Not a git repository: $REMOTE_DIR"
+              exit 1
+            fi
+            git fetch --all
+            git checkout "$BRANCH_NAME" || git checkout -b "$BRANCH_NAME" "origin/$BRANCH_NAME"
+            git reset --hard "origin/$BRANCH_NAME"
+
+            ensure_writable_dir() {
+              local target_dir="$1"
+              if [ -z "$target_dir" ] || [ ! -d "$target_dir" ]; then
+                return 0
+              fi
+
+              # Fix ownership when previous deploys ran as root.
+              if ! touch "$target_dir/.perm-check" 2>/dev/null; then
+                sudo -n chown -R "$(id -un):$(id -gn)" "$target_dir" || true
+              fi
+              rm -f "$target_dir/.perm-check" 2>/dev/null || true
+            }
+
+            clean_node_modules() {
+              local project_dir="$1"
+              if [ ! -d "$project_dir" ]; then
+                return 0
+              fi
+
+              ensure_writable_dir "$project_dir"
+              if [ -d "$project_dir/node_modules" ]; then
+                rm -rf "$project_dir/node_modules" 2>/dev/null || sudo -n rm -rf "$project_dir/node_modules" || true
+              fi
+            }
+
+            # Backend build & restart
+            if [ -d backend ]; then
+              clean_node_modules "backend"
+              cd backend
+              npm ci
+              npm run build
+              if command -v pm2 >/dev/null 2>&1; then
+                pm2 restart ecosystem.config.js --env production || pm2 start ecosystem.config.js --env production
+              else
+                sudo systemctl restart manas.service || true
+              fi
+              cd ..
+            fi
+            # Frontend build
+            if [ -d frontend ]; then
+              clean_node_modules "frontend"
+              cd frontend
+              npm ci
+              npm run build
+              cd ..
+            fi
+            # If docker-compose is present, rebuild containers
+            if [ -f docker-compose.yml ]; then
+              docker-compose pull || true
+              docker-compose up -d --build
+            fi
+          REMOTE_SCRIPT
