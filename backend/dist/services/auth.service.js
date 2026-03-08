@@ -23,6 +23,16 @@ const toPrismaUserRole = (role) => {
     return 'COACH';
 };
 let supportedUserRolesCache = null;
+const getCompanyAdminMeta = async (userId) => {
+    const rows = (await db.$queryRawUnsafe('SELECT company_key, is_company_admin FROM users WHERE id = $1 LIMIT 1', userId));
+    const row = rows?.[0] ?? { company_key: null, is_company_admin: false };
+    return {
+        companyKey: row.company_key,
+        company_key: row.company_key,
+        isCompanyAdmin: Boolean(row.is_company_admin),
+        is_company_admin: Boolean(row.is_company_admin),
+    };
+};
 const getSupportedUserRoles = async () => {
     if (supportedUserRolesCache) {
         return supportedUserRolesCache;
@@ -243,6 +253,7 @@ const loginWithPassword = async (input, meta) => {
         },
     });
     const tokenPair = await issueSessionTokens(String(user.id), meta);
+    const companyAdminMeta = await getCompanyAdminMeta(String(user.id));
     await audit('LOGIN_SUCCESS', 'success', meta, { userId: user.id, email: user.email, phone: user.phone });
     return {
         user: {
@@ -253,6 +264,7 @@ const loginWithPassword = async (input, meta) => {
             emailVerified: user.emailVerified,
             phoneVerified: user.phoneVerified,
             mfaEnabled: user.mfaEnabled,
+            ...companyAdminMeta,
         },
         ...tokenPair,
     };
@@ -303,6 +315,7 @@ const loginWithGoogle = async (input, meta) => {
         });
     }
     const tokenPair = await issueSessionTokens(String(user.id), meta);
+    const companyAdminMeta = await getCompanyAdminMeta(String(user.id));
     await audit('LOGIN_SUCCESS', 'success', meta, { userId: user.id, email: user.email });
     return {
         user: {
@@ -313,6 +326,7 @@ const loginWithGoogle = async (input, meta) => {
             emailVerified: user.emailVerified,
             phoneVerified: user.phoneVerified,
             mfaEnabled: user.mfaEnabled,
+            ...companyAdminMeta,
         },
         ...tokenPair,
     };

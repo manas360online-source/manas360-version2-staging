@@ -23,6 +23,8 @@ const landing_routes_1 = __importDefault(require("./landing.routes"));
 const chat_routes_1 = __importDefault(require("./chat.routes"));
 const riskAnalytics_routes_1 = __importDefault(require("./riskAnalytics.routes"));
 const psychiatrist_routes_1 = __importDefault(require("./psychiatrist.routes"));
+const corporate_routes_1 = __importDefault(require("./corporate.routes"));
+const sso_routes_1 = __importDefault(require("./sso.routes"));
 const router = (0, express_1.Router)();
 router.get('/health', (_req, res) => {
     res.status(200).json({
@@ -42,12 +44,14 @@ router.use('/v1/patients', patient_routes_1.default);
 router.use('/v1/therapists', therapist_routes_1.default);
 router.use('/v1/therapist', therapist_routes_1.default);
 router.use('/v1/admin', admin_routes_1.default);
+router.use('/v1/corporate', corporate_routes_1.default);
 router.use('/v1/cbt-sessions', cbt_session_routes_1.default);
 router.use('/v1/presence', presence_routes_1.default);
 router.use('/v1/therapist/dashboard', dashboard_routes_1.default);
 router.use('/v1/therapists/dashboard', dashboard_routes_1.default);
 router.use('/v1/psychiatrist', psychiatrist_routes_1.default);
 router.use('/v1/payments', payment_routes_1.default);
+router.use('/v1/sso', sso_routes_1.default);
 router.use('/v1/subscriptions', subscription_routes_1.default);
 router.use('/v1/leads', lead_routes_1.default);
 router.use('/certifications', certification_routes_1.default);

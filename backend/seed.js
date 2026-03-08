@@ -307,12 +307,30 @@ async function seed() {
     );
   }
 
+  // Seed a corporate/admin user for local testing (can login with email+password)
+  const corporateSeeds = [
+    { email: 'corp.user@manas360.local', firstName: 'Corporate', lastName: 'Admin' },
+  ];
+
+  const corporatePassword = 'Corporate@123';
+  const corporatePasswordHash = await bcrypt.hash(corporatePassword, 12);
+  const corporateUsers = [];
+  for (const cSeed of corporateSeeds) {
+    const corpUser = await upsertUser({ ...cSeed, role: 'ADMIN' }, corporatePasswordHash);
+    corporateUsers.push(corpUser);
+  }
+
   console.log(JSON.stringify({
     ok: true,
     patients: patients.map((u) => ({ id: u.id, email: u.email })),
     therapists: therapists.map((u) => ({ id: u.id, email: u.email })),
+    corporateUsers: corporateUsers.map((u) => ({ id: u.id, email: u.email })),
     credentials: {
-      password: 'Manas@123',
+      defaultUserPassword: 'Manas@123',
+      corporateUser: {
+        email: corporateUsers.length ? corporateUsers[0].email : 'corp.user@manas360.local',
+        password: corporatePassword,
+      },
     },
   }, null, 2));
 }

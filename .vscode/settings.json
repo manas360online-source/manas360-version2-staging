@@ -4,5 +4,6 @@
     "prisma/migrations/**/*.sql": "postgresql",
     "backend/prisma/migrations/**/*.sql": "postgresql"
   },
-  "mssql.intelliSense.enableErrorChecking": false
+  "mssql.intelliSense.enableErrorChecking": false,
+  "typescript.tsserver.experimental.enableProjectDiagnostics": false
 }

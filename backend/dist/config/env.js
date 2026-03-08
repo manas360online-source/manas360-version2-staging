@@ -72,4 +72,5 @@ exports.env = Object.freeze({
     paymentPlatformSharePercent: parseNumber(process.env.PAYMENT_PLATFORM_SHARE_PERCENT, 40),
     webhookIdempotencyTtlSeconds: parseNumber(process.env.WEBHOOK_IDEMPOTENCY_TTL_SECONDS, 3600),
     minPayoutMinor: parseNumber(process.env.MIN_PAYOUT_MINOR, 10000),
+    secretEncryptionKey: process.env.SECRET_ENCRYPTION_KEY ?? undefined,
 });

@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CHAT_FALLBACK_MESSAGE, chatApi } from '../../api/chat.api';
 import useSpeechAssistant from '../../hooks/useSpeechAssistant';
+import { readAIAssistantPreferences } from '../../lib/aiAssistantPreferences';
 import TherapistBadge from '../../components/therapist/dashboard/TherapistBadge';
 import TherapistCard from '../../components/therapist/dashboard/TherapistCard';
 import {
@@ -16,11 +17,18 @@ export default function TherapistMessagesPage() {
   const [botName, setBotName] = useState("Dr. Meera 'Ai · Clinical Assistant");
   const [responseStyle, setResponseStyle] = useState<'concise' | 'detailed'>('concise');
   const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
-  const [aiSettingsOpen, setAiSettingsOpen] = useState(false);
   const [speechLang, setSpeechLang] = useState('en-IN');
   const [preferIndianAccent, setPreferIndianAccent] = useState(true);
   const [voiceName, setVoiceName] = useState('');
-  const { supportsSpeechRecognition, supportsSpeechSynthesis, availableVoices, isListening, startListening, stopListening, speak } = useSpeechAssistant();
+  const { supportsSpeechRecognition, supportsSpeechSynthesis, isListening, startListening, stopListening, speak } = useSpeechAssistant();
+
+  useEffect(() => {
+    const prefs = readAIAssistantPreferences();
+    setSpeechLang(prefs.voiceLanguage);
+    setPreferIndianAccent(prefs.preferIndianAccent);
+    setVoiceName(prefs.voiceName);
+    setResponseStyle(prefs.responseLength);
+  }, []);
 
   const send = async () => {
     const message = input.trim();
@@ -127,54 +135,8 @@ export default function TherapistMessagesPage() {
                 Talk Back
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => setAiSettingsOpen((prev) => !prev)}
-              className="rounded-lg border border-ink-100 bg-white px-2.5 py-1.5 text-xs font-medium text-ink-700"
-            >
-              {aiSettingsOpen ? 'Hide AI Settings' : 'AI Settings'}
-            </button>
             {cooldownRemaining > 0 && <span className="text-xs text-red-600">Retry in {cooldownRemaining}s</span>}
           </div>
-          {aiSettingsOpen && (
-            <div className="mb-2 grid grid-cols-1 gap-2 rounded-lg border border-ink-100 bg-surface-card p-2 sm:grid-cols-3">
-              <label className="text-xs text-ink-700">
-                Voice language
-                <select
-                  value={speechLang}
-                  onChange={(event) => setSpeechLang(event.target.value)}
-                  className="mt-1 w-full rounded border border-ink-100 bg-white px-2 py-1 text-xs"
-                >
-                  <option value="en-IN">English (India)</option>
-                  <option value="hi-IN">Hindi (India)</option>
-                  <option value="en-US">English (US)</option>
-                </select>
-              </label>
-              <label className="text-xs text-ink-700">
-                Voice profile
-                <select
-                  value={voiceName}
-                  onChange={(event) => setVoiceName(event.target.value)}
-                  className="mt-1 w-full rounded border border-ink-100 bg-white px-2 py-1 text-xs"
-                >
-                  <option value="">Auto (Recommended)</option>
-                  {availableVoices.map((voice) => (
-                    <option key={`${voice.name}-${voice.lang}`} value={voice.name}>
-                      {voice.name} ({voice.lang})
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex items-center gap-2 text-xs text-ink-700">
-                <input
-                  type="checkbox"
-                  checked={preferIndianAccent}
-                  onChange={(event) => setPreferIndianAccent(event.target.checked)}
-                />
-                Prefer Indian accent voice
-              </label>
-            </div>
-          )}
           <div className="flex flex-col gap-2 sm:flex-row">
             <input
               type="text"

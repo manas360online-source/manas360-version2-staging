@@ -24,13 +24,40 @@ export default defineConfig({
     minify: 'terser',
     cssMinify: true,
     rollupOptions: {
+      onwarn(warning, warn) {
+        const message = String(warning?.message || '')
+        const source = String((warning as any)?.id || '')
+        const isReactHelmetPureAnnotationWarning =
+          warning?.code === 'INVALID_ANNOTATION' &&
+          source.includes('react-helmet-async/lib/index.module.js') &&
+          message.includes('annotation that Rollup cannot interpret')
+
+        // Known upstream package annotation placement warning; safe to ignore.
+        if (isReactHelmetPureAnnotationWarning) return
+        warn(warning)
+      },
       output: {
-        manualChunks: {
-          'vendor': ['react', 'react-dom', 'react-router-dom'],
-          'ui': ['react-helmet-async'],
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('agora-rtc-sdk-ng')) return 'vendor-agora'
+            if (id.includes('lucide-react')) return 'vendor-icons'
+            if (id.includes('recharts') || id.includes('chart.js')) return 'vendor-charts'
+            if (id.includes('socket.io') || id.includes('engine.io')) return 'vendor-realtime'
+            if (id.includes('pdfkit')) return 'vendor-pdf'
+            return 'vendor'
+          }
+
+          if (id.includes('/src/pages/patient/')) return 'pages-patient'
+          if (id.includes('/src/pages/therapist/')) return 'pages-therapist'
+          if (id.includes('/src/pages/psychiatrist/')) return 'pages-psychiatrist'
+          if (id.includes('/src/pages/admin/')) return 'pages-admin'
+          if (id.includes('/src/components/')) return 'components-core'
+          if (id.includes('/src/api/')) return 'api-core'
+          if (id.includes('/src/lib/')) return 'lib-core'
         },
       },
     },
+    chunkSizeWarningLimit: 1400,
   },
   preview: {
     host: '0.0.0.0',

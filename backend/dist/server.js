@@ -12,8 +12,24 @@ const analyticsRollup_job_1 = require("./jobs/analyticsRollup.job");
 require("./jobs/admin-analytics-export.worker");
 const dailyMoodPrediction_1 = require("./cron/dailyMoodPrediction");
 const chatRetention_job_1 = require("./jobs/chatRetention.job");
+const sso_service_1 = require("./services/sso.service");
+const sso_service_2 = require("./services/sso.service");
 const startServer = async () => {
     await (0, db_1.connectDatabase)();
+    // ensure SSO tables exist
+    void (0, sso_service_1.ensureSsoTables)()
+        .then(async () => {
+        try {
+            // create example tenants for quick testing (no secrets included)
+            await (0, sso_service_2.createOrEnsureTenant)((0, sso_service_2.googleTemplate)({ key: 'sso-google-demo', name: 'Google Workspace (demo)', domain: 'techcorp-india.com' }));
+            await (0, sso_service_2.createOrEnsureTenant)((0, sso_service_2.azureTemplate)({ tenantId: 'common', key: 'sso-azure-demo', name: 'Azure AD (demo)', domain: 'techcorp-india.com' }));
+            await (0, sso_service_2.createOrEnsureTenant)((0, sso_service_2.oktaTemplate)({ key: 'sso-okta-demo', name: 'Okta (demo)', issuer: 'https://example.okta.com/oauth2/default', domain: 'techcorp-india.com' }));
+        }
+        catch (err) {
+            console.error('SSO tenant seed failed', err);
+        }
+    })
+        .catch((err) => console.error('SSO table init failed', err));
     const server = app_1.default.listen(env_1.env.port, () => {
         console.log(`Server running on port ${env_1.env.port}`);
     });

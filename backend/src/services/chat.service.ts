@@ -48,7 +48,7 @@ Rules:
 
 const RESPONSE_STYLE_PROMPTS: Record<ResponseStyle, string> = {
 	concise:
-		'Response style: concise by default. Keep answers to 3-6 short bullet points or brief paragraphs. Be direct and avoid long explanations unless user explicitly asks for detail.',
+		'Response style: concise. Keep answers short and practical: 2-4 brief sentences or up to 4 short bullets. Avoid repeating the user message. Ask at most one focused follow-up question.',
 	detailed:
 		'Response style: detailed. Provide richer explanation, clear structure, and examples when relevant while remaining focused and safe.',
 };
@@ -269,7 +269,7 @@ export const processChatMessage = async (input: {
 	];
 
 	const aiResult = await generateAIResponse(resolveAiRole(userRole), aiInputMessages, {
-		maxTokens: responseStyle === 'detailed' ? Number(process.env.CLAUDE_MAX_TOKENS || 512) : 256,
+		maxTokens: responseStyle === 'detailed' ? Number(process.env.CLAUDE_MAX_TOKENS || 512) : 160,
 	});
 
 	// Keep chat UX resilient: when AI budget is exhausted, return a fallback assistant response instead of hard failing with 429.

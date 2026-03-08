@@ -12,6 +12,10 @@ export interface AuthUser {
 	email: string | null;
 	phone: string | null;
 	role: 'patient' | 'therapist' | 'psychiatrist' | 'coach' | 'admin' | string;
+	companyKey?: string | null;
+	company_key?: string | null;
+	isCompanyAdmin?: boolean | null;
+	is_company_admin?: boolean | null;
 	firstName?: string | null;
 	lastName?: string | null;
 	emailVerified?: boolean;

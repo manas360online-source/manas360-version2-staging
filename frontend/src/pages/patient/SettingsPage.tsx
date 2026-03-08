@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Bell,
+  Bot,
   Eye,
   Gauge,
   Globe,
@@ -16,6 +17,12 @@ import { useSearchParams } from 'react-router-dom';
 import { patientApi } from '../../api/patient';
 import { useAuth } from '../../context/AuthContext';
 import { http } from '../../lib/http';
+import {
+  defaultAIAssistantPreferences,
+  readAIAssistantPreferences,
+  saveAIAssistantPreferences,
+  type AIAssistantPreferences,
+} from '../../lib/aiAssistantPreferences';
 
 type SectionId =
   | 'profile'
@@ -24,6 +31,7 @@ type SectionId =
   | 'accessibility'
   | 'preferences'
   | 'therapy'
+  | 'aiAssistant'
   | 'billing'
   | 'security';
 
@@ -154,11 +162,12 @@ const sectionMeta = [
   { id: 'accessibility' as const, label: 'Accessibility', icon: Gauge },
   { id: 'preferences' as const, label: 'Preferences', icon: SlidersHorizontal },
   { id: 'therapy' as const, label: 'Therapy Preferences', icon: Globe },
+  { id: 'aiAssistant' as const, label: 'AI Assistant', icon: Bot },
   { id: 'billing' as const, label: 'Billing & Subscription', icon: Wallet },
   { id: 'security' as const, label: 'Security', icon: Shield },
 ];
 
-const validSectionIds: SectionId[] = ['profile', 'notifications', 'privacy', 'accessibility', 'preferences', 'therapy', 'billing', 'security'];
+const validSectionIds: SectionId[] = ['profile', 'notifications', 'privacy', 'accessibility', 'preferences', 'therapy', 'aiAssistant', 'billing', 'security'];
 
 const parseSectionId = (value: string | null): SectionId => {
   if (value && validSectionIds.includes(value as SectionId)) {
@@ -266,6 +275,8 @@ export default function SettingsPage() {
   });
   const [securityLoading, setSecurityLoading] = useState(false);
   const [activeSessions, setActiveSessions] = useState<Array<{ id: string; device?: string; ipAddress?: string; createdAt?: string; lastActiveAt?: string; isCurrent?: boolean }>>([]);
+  const [aiAssistant, setAiAssistant] = useState<AIAssistantPreferences>(defaultAIAssistantPreferences);
+  const [savedAiAssistant, setSavedAiAssistant] = useState<AIAssistantPreferences>(defaultAIAssistantPreferences);
 
   useEffect(() => {
     setActiveSection(sectionFromQuery);
@@ -289,6 +300,9 @@ export default function SettingsPage() {
       setError(null);
       try {
         const fromStorage = parseStored();
+        const aiPrefs = readAIAssistantPreferences();
+        setAiAssistant(aiPrefs);
+        setSavedAiAssistant(aiPrefs);
         let merged = { ...defaultState, ...fromStorage } as SettingsState;
         const [me, settingsRes] = await Promise.all([
           http.get('/v1/users/me'),
@@ -387,10 +401,14 @@ export default function SettingsPage() {
     }
   };
 
-  const sectionDirty = (section: SectionId): boolean =>
-    JSON.stringify(state[section as keyof SettingsState]) !== JSON.stringify(savedState[section as keyof SettingsState]);
+  const sectionDirty = (section: SectionId): boolean => {
+    if (section === 'aiAssistant') {
+      return JSON.stringify(aiAssistant) !== JSON.stringify(savedAiAssistant);
+    }
+    return JSON.stringify(state[section as keyof SettingsState]) !== JSON.stringify(savedState[section as keyof SettingsState]);
+  };
 
-  const anyDirty = useMemo(() => sectionMeta.some((section) => sectionDirty(section.id)), [state, savedState]);
+  const anyDirty = useMemo(() => sectionMeta.some((section) => sectionDirty(section.id)), [aiAssistant, savedAiAssistant, state, savedState]);
 
   const persistLocal = (next: SettingsState) => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
@@ -401,7 +419,11 @@ export default function SettingsPage() {
     setError(null);
     setSuccess(null);
     try {
-      if (section === 'profile') {
+      if (section === 'aiAssistant') {
+        saveAIAssistantPreferences(aiAssistant);
+        setSavedAiAssistant(aiAssistant);
+        setSuccess('AI Assistant settings saved successfully.');
+      } else if (section === 'profile') {
         const name = state.profile.name.trim();
         const phone = state.profile.phone.trim();
         const email = state.profile.email.trim();
@@ -447,7 +469,11 @@ export default function SettingsPage() {
   };
 
   const discardSection = (section: SectionId) => {
-    setState((prev) => ({ ...prev, [section]: savedState[section as keyof SettingsState] }));
+    if (section === 'aiAssistant') {
+      setAiAssistant(savedAiAssistant);
+    } else {
+      setState((prev) => ({ ...prev, [section]: savedState[section as keyof SettingsState] }));
+    }
     setSuccess(null);
     setError(null);
   };
@@ -734,6 +760,58 @@ export default function SettingsPage() {
             className="mt-1 w-full rounded-xl border border-calm-sage/25 bg-white px-3 py-2"
           />
         </label>
+      </div>
+    </div>
+  );
+
+  const renderAIAssistant = () => (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-calm-sage/20 bg-white/80 p-3">
+        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-charcoal/60">Voice Language</p>
+        <select
+          value={aiAssistant.voiceLanguage}
+          onChange={(event) => setAiAssistant((prev) => ({ ...prev, voiceLanguage: event.target.value as AIAssistantPreferences['voiceLanguage'] }))}
+          className="mt-2 w-full rounded-xl border border-calm-sage/25 bg-white px-3 py-2 text-sm"
+        >
+          <option value="en-IN">English (India)</option>
+          <option value="hi-IN">Hindi (India)</option>
+          <option value="en-US">English (US)</option>
+        </select>
+      </div>
+
+      <div className="rounded-xl border border-calm-sage/20 bg-white/80 p-3">
+        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-charcoal/60">Voice Profile</p>
+        <input
+          value={aiAssistant.voiceName}
+          onChange={(event) => setAiAssistant((prev) => ({ ...prev, voiceName: event.target.value }))}
+          placeholder="Auto (leave blank)"
+          className="mt-2 w-full rounded-xl border border-calm-sage/25 bg-white px-3 py-2 text-sm"
+        />
+      </div>
+
+      {renderSwitch(
+        aiAssistant.preferIndianAccent,
+        () => setAiAssistant((prev) => ({ ...prev, preferIndianAccent: !prev.preferIndianAccent })),
+        'Prefer Indian accent voice',
+      )}
+
+      <div className="rounded-xl border border-calm-sage/20 bg-white/80 p-3">
+        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-charcoal/60">Response Length</p>
+        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {[
+            { id: 'concise', label: 'Concise (default)' },
+            { id: 'detailed', label: 'Detailed' },
+          ].map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => setAiAssistant((prev) => ({ ...prev, responseLength: option.id as AIAssistantPreferences['responseLength'] }))}
+              className={`rounded-lg border px-3 py-2 text-sm ${aiAssistant.responseLength === option.id ? 'border-calm-sage bg-[#E8EFE6] text-charcoal' : 'border-calm-sage/20 text-charcoal/70'}`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -1174,6 +1252,8 @@ export default function SettingsPage() {
         return renderPreferences();
       case 'therapy':
         return renderTherapy();
+      case 'aiAssistant':
+        return renderAIAssistant();
       case 'billing':
         return renderBilling();
       case 'security':
@@ -1194,7 +1274,7 @@ export default function SettingsPage() {
           <Settings2 className="h-5 w-5 text-calm-sage" />
           <h1 className="font-serif text-xl font-semibold text-charcoal">Settings</h1>
         </div>
-        <p className="mt-1 text-sm text-charcoal/65">Manage your profile, preferences, privacy, and security in one place.</p>
+        <p className="mt-1 text-sm text-charcoal/65">Manage your profile, AI assistant preferences, privacy, and security in one place.</p>
       </section>
 
       {error && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
