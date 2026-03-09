@@ -14,6 +14,8 @@ import ForgotPasswordPage from './pages/auth/ForgotPasswordPage'
 import ResetPasswordPage from './pages/auth/ResetPasswordPage'
 import SessionDetailPage from './pages/therapist/SessionDetailPage'
 import ProtectedRoute from './components/ProtectedRoute'
+import PlatformAdminRoute from './components/PlatformAdminRoute'
+import CorporateRoute from './components/CorporateRoute'
 import PatientDashboardLayout from './components/layout/PatientDashboardLayout'
 import TherapistDashboardLayout from './components/layout/TherapistDashboardLayout'
 import DashboardPage from './pages/patient/DashboardPage'
@@ -36,13 +38,18 @@ import MyProgressPage from './pages/patient/MyProgressPage'
 import AdminPortalLoginPage from './pages/admin/AdminPortalLoginPage'
 import AdminDashboardPage from './pages/admin/Dashboard'
 import AdminShellLayout from './components/admin/AdminShellLayout'
+import AdminEntryGate from './components/admin/AdminEntryGate'
 import AdminUsersPage from './pages/admin/Users'
-import AdminTherapistsPage from './pages/admin/Therapists'
+import AdminRolesPage from './pages/admin/Roles'
+import AdminCompaniesPage from './pages/admin/Companies'
+import AdminCompanySubscriptionsPage from './pages/admin/CompanySubscriptions'
+import AdminCompanyReportsPage from './pages/admin/CompanyReports'
+import AdminPlatformHealthPage from './pages/admin/PlatformHealth'
 import AdminVerificationPage from './pages/admin/Verification'
-import AdminSubscriptionsPage from './pages/admin/Subscriptions'
 import AdminRevenuePage from './pages/admin/Revenue'
 import AdminSettingsPage from './pages/admin/Settings'
 import ClinicalAssistantPage from './pages/admin/ClinicalAssistantPage'
+import AdminSectionPage from './pages/admin/AdminSectionPage'
 import CertificationsPage from './pages/CertificationsPage'
 import TherapistDashboardPage from './pages/therapist/TherapistDashboardPage'
 import TherapistPatientsPage from './pages/therapist/TherapistPatientsPage'
@@ -85,6 +92,20 @@ import CancellationRefundPolicyPage from './pages/legal/CancellationRefundPolicy
 import TermsOfUsePage from './pages/legal/TermsOfUsePage';
 import PrivacyPolicyPage from './pages/legal/PrivacyPolicyPage';
 import SubscribePage from './pages/SubscribePage';
+import CorporateAnalyticsPage from './pages/corporate/CorporateAnalyticsPage';
+import CorporateEmployeeDirectoryPage from './pages/corporate/CorporateEmployeeDirectoryPage';
+import CorporateEnrollmentPage from './pages/corporate/CorporateEnrollmentPage';
+import CorporateSessionAllocationPage from './pages/corporate/CorporateSessionAllocationPage';
+import CorporateUtilizationReportsPage from './pages/corporate/CorporateUtilizationReportsPage';
+import CorporateWellbeingReportsPage from './pages/corporate/CorporateWellbeingReportsPage';
+import CorporateEngagementReportsPage from './pages/corporate/CorporateEngagementReportsPage';
+import CorporateInvoicesPage from './pages/corporate/CorporateInvoicesPage';
+import CorporatePaymentMethodsPage from './pages/corporate/CorporatePaymentMethodsPage';
+import CorporatePlanPage from './pages/corporate/CorporatePlanPage';
+import CorporateHelpPage from './pages/corporate/CorporateHelpPage';
+import SSOSettingsPage from './pages/corporate/SSOSettingsPage';
+import CorporateDashboardPage from './pages/corporate/CorporateDashboardPage';
+import CorporateOnboardingPage from './pages/corporate/CorporateOnboardingPage';
 
 interface AssessmentData {
   symptoms: string[];
@@ -387,25 +408,161 @@ function App() {
         <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
         <Route path="/admin-portal/login" element={<AdminPortalLoginPage />} />
+        <Route path="/corporate/login" element={<Navigate to="/auth/login" replace />} />
         <Route
           path="/admin"
           element={
-            <ProtectedRoute allowedRoles={['admin']}>
-              <AdminShellLayout />
-            </ProtectedRoute>
+            <PlatformAdminRoute>
+              <AdminEntryGate />
+            </PlatformAdminRoute>
           }
         >
-          <Route index element={<Navigate to="analytics" replace />} />
-          <Route path="analytics" element={<AdminDashboardPage />} />
+          <Route element={<AdminShellLayout />}>
+          <Route index element={<Navigate to="dashboard" replace />} />
+          <Route path="dashboard" element={<AdminDashboardPage />} />
+          <Route path="platform-analytics" element={<AdminSectionPage title="Platform Analytics" description="Growth, monetization, retention, and operational analytics across the platform." bullets={['User growth by role', 'Revenue trends and cohorts', 'Session completion and drop rates', 'Subscription funnel and churn intelligence']} />} />
+
+          <Route path="user-approvals" element={<AdminSectionPage title="User Approvals" description="Approve, reject, and monitor pending user onboarding requests." bullets={['Pending approval queue', 'KYC validation status', 'Approval SLA tracking', 'Escalation workflow']} />} />
+          <Route path="therapist-verification" element={<AdminVerificationPage />} />
           <Route path="users" element={<AdminUsersPage />} />
-          <Route path="therapists" element={<AdminTherapistsPage />} />
-          <Route path="verification" element={<AdminVerificationPage />} />
-          <Route path="subscriptions" element={<AdminSubscriptionsPage />} />
+          <Route path="roles" element={<AdminRolesPage />} />
+
+          <Route path="companies" element={<AdminCompaniesPage />} />
+          <Route path="company-subscriptions" element={<AdminCompanySubscriptionsPage />} />
+          <Route path="company-reports" element={<AdminCompanyReportsPage />} />
+
+          <Route path="live-sessions" element={<AdminSectionPage title="Live Sessions" description="Monitor active sessions, disruptions, and quality metrics in real-time." bullets={['Live session monitor', 'Drop/disconnect alerts', 'Therapist capacity overview', 'Session intervention controls']} />} />
+          <Route path="templates" element={<AdminSectionPage title="Template Management" description="Manage intervention templates, exercises, and standardized care workflows." bullets={['CBT template library', 'Versioning and rollback', 'Usage analytics', 'Quality review']} />} />
+          <Route path="crisis-alerts" element={<AdminSectionPage title="Crisis Alerts" description="Triage and escalate high-risk events with defined safety protocols." bullets={['Suicide risk alerts', 'Escalate to psychiatrist', 'Emergency protocol status', 'Resolution timeline']} />} />
+
           <Route path="revenue" element={<AdminRevenuePage />} />
+          <Route path="payouts" element={<AdminSectionPage title="Payouts" description="Review provider payouts, schedules, holds, and reconciliation exceptions." bullets={['Scheduled payout runs', 'Manual adjustments', 'Failed transfer handling', 'Payout audit log']} />} />
+          <Route path="invoices" element={<AdminSectionPage title="Invoices" description="Track invoices, collections, refunds, and payment disputes." bullets={['Invoice lifecycle tracking', 'Corporate and individual invoices', 'Refund analytics', 'Collection status by segment']} />} />
+
+          <Route path="user-growth" element={<AdminSectionPage title="User Growth Analytics" description="Analyze growth trends across patients, therapists, corporate users, and partners." bullets={['Monthly active users by role', 'Acquisition vs activation', 'Retention cohorts', 'Regional growth patterns']} />} />
+          <Route path="session-analytics" element={<AdminSectionPage title="Session Analytics" description="Track platform-wide session quality, throughput, and completion metrics." bullets={['Sessions per day/week/month', 'Completion and dropout rates', 'Average session duration', 'Service line distribution']} />} />
+          <Route path="therapist-performance" element={<AdminSectionPage title="Therapist Performance" description="Benchmark provider outcomes, ratings, and engagement effectiveness." bullets={['Sessions completed', 'Patient ratings', 'Improvement score trend', 'Retention and revisit rates']} />} />
+          <Route path="mental-health-trends" element={<AdminSectionPage title="Mental Health Trends" description="Monitor category-level trends to plan interventions and workforce readiness." bullets={['Depression and anxiety trends', 'Sleep and stress categories', 'High-risk cluster detection', 'Program outcome comparisons']} />} />
+
+          <Route path="support-tickets" element={<AdminSectionPage title="Support Tickets" description="Operational support queue with category insights and SLA compliance." bullets={['Open vs resolved volume', 'Ticket category analytics', 'Average resolution time', 'Satisfaction tracking']} />} />
+          <Route path="feedback" element={<AdminSectionPage title="Feedback" description="Collect and analyze user and provider feedback loops for product quality." bullets={['NPS and CSAT trends', 'Feedback themes', 'Feature request clusters', 'Escalation tagging']} />} />
+
+          <Route path="audit-logs" element={<AdminSectionPage title="Audit Logs" description="Security-grade activity timeline for admin actions and sensitive operations." bullets={['User login and role changes', 'Account suspension events', 'Payment and billing actions', 'Immutable audit export']} />} />
+          <Route path="compliance" element={<AdminSectionPage title="Compliance" description="Track DPDPA/HIPAA controls, policy adherence, and privacy operations." bullets={['Consent lifecycle logs', 'Data access events', 'Compliance readiness status', 'Policy exception management']} />} />
+          <Route path="data-requests" element={<AdminSectionPage title="Data Requests" description="Manage export, deletion, and data-subject requests with approvals." bullets={['Export requests', 'Deletion requests', 'Legal hold checks', 'Request SLA and closure']} />} />
+
+          <Route path="platform-health" element={<AdminPlatformHealthPage />} />
+          <Route path="ai-monitoring" element={<AdminSectionPage title="AI Monitoring" description="Supervise AI safety, moderation outcomes, and risk alert precision." bullets={['Self-harm detection quality', 'Prompt/response moderation', 'Flagged response queue', 'Model safety policy controls']} />} />
           <Route path="clinical-assistant" element={<ClinicalAssistantPage />} />
           <Route path="settings" element={<AdminSettingsPage />} />
-          <Route path="dashboard" element={<Navigate to="/admin/analytics" replace />} />
+
+          </Route>
         </Route>
+        <Route
+          path="/corporate/dashboard"
+          element={
+            <CorporateRoute>
+              <CorporateDashboardPage />
+            </CorporateRoute>
+          }
+        />
+        <Route path="/corporate" element={<CorporateOnboardingPage />} />
+        <Route
+          path="/corporate/analytics"
+          element={
+            <CorporateRoute>
+              <CorporateAnalyticsPage />
+            </CorporateRoute>
+          }
+        />
+        <Route
+          path="/corporate/employees/directory"
+          element={
+            <CorporateRoute>
+              <CorporateEmployeeDirectoryPage />
+            </CorporateRoute>
+          }
+        />
+        <Route
+          path="/corporate/employees/enrollment"
+          element={
+            <CorporateRoute>
+              <CorporateEnrollmentPage />
+            </CorporateRoute>
+          }
+        />
+        <Route
+          path="/corporate/employees/allocation"
+          element={
+            <CorporateRoute>
+              <CorporateSessionAllocationPage />
+            </CorporateRoute>
+          }
+        />
+        <Route
+          path="/corporate/reports/utilization"
+          element={
+            <CorporateRoute>
+              <CorporateUtilizationReportsPage />
+            </CorporateRoute>
+          }
+        />
+        <Route
+          path="/corporate/reports/wellbeing"
+          element={
+            <CorporateRoute>
+              <CorporateWellbeingReportsPage />
+            </CorporateRoute>
+          }
+        />
+        <Route
+          path="/corporate/reports/engagement"
+          element={
+            <CorporateRoute>
+              <CorporateEngagementReportsPage />
+            </CorporateRoute>
+          }
+        />
+        <Route
+          path="/corporate/billing/invoices"
+          element={
+            <CorporateRoute>
+              <CorporateInvoicesPage />
+            </CorporateRoute>
+          }
+        />
+        <Route
+          path="/corporate/billing/payment-methods"
+          element={
+            <CorporateRoute>
+              <CorporatePaymentMethodsPage />
+            </CorporateRoute>
+          }
+        />
+        <Route
+          path="/corporate/billing/plan"
+          element={
+            <CorporateRoute>
+              <CorporatePlanPage />
+            </CorporateRoute>
+          }
+        />
+        <Route
+          path="/corporate/account/help"
+          element={
+            <CorporateRoute>
+              <CorporateHelpPage />
+            </CorporateRoute>
+          }
+        />
+        <Route
+          path="/corporate/sso"
+          element={
+            <CorporateRoute>
+              <SSOSettingsPage />
+            </CorporateRoute>
+          }
+        />
         <Route path="/login" element={<Navigate to="/auth/login" replace />} />
         <Route path="/register" element={<Navigate to="/auth/signup" replace />} />
 

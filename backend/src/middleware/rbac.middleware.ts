@@ -214,6 +214,71 @@ export const requireAdminRole = requireRole('admin') as (
 ) => Promise<void>;
 
 /**
+ * Corporate access middleware.
+ * Allows:
+ * 1) Platform admin role
+ * 2) Any user mapped to a company tenant (company_key present)
+ */
+export const requireCorporateMemberAccess = async (
+	req: Request,
+	_res: Response,
+	next: NextFunction,
+): Promise<void> => {
+	try {
+		const userId = req.auth?.userId;
+		if (!userId) {
+			next(new AppError('Authentication required', 401));
+			return;
+		}
+
+		const user = await db.user.findUnique({
+			where: { id: userId },
+			select: { role: true, isDeleted: true },
+		});
+
+		if (!user) {
+			next(new AppError('User not found', 404));
+			return;
+		}
+
+		if (user.isDeleted) {
+			next(new AppError('User account is deleted. Please contact support.', 410));
+			return;
+		}
+
+		const role = String(user.role).toLowerCase() as UserRole;
+		if (role === 'admin') {
+			if (!req.auth) {
+				req.auth = { userId: '', sessionId: '', jti: '' };
+			}
+			req.auth.role = role;
+			next();
+			return;
+		}
+
+		const rows = (await db.$queryRawUnsafe(
+			'SELECT company_key FROM users WHERE id = $1 LIMIT 1',
+			userId,
+		)) as Array<{ company_key: string | null }>;
+
+		const companyKey = rows?.[0]?.company_key;
+		if (!companyKey || !String(companyKey).trim()) {
+			next(new AppError('Access denied. Corporate member account is required.', 403));
+			return;
+		}
+
+		if (!req.auth) {
+			req.auth = { userId: '', sessionId: '', jti: '' };
+		}
+		req.auth.role = role;
+		next();
+	} catch (error) {
+		console.error('[RBAC] Error during corporate access verification:', error);
+		next(new AppError('Authorization failed', 500));
+	}
+};
+
+/**
  * Advanced: Check if user has ANY of the given permissions
  * Useful for permission-based access control (PBAC)
  * Can be extended with permission mapping

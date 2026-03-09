@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { companyInfo } from '../../config/companyInfo';
 
 const sectionTitleClass = 'mt-10 text-xl font-semibold text-charcoal';
 const cardClass = 'mt-4 overflow-x-auto rounded-xl border border-calm-sage/20 bg-white';
@@ -130,9 +131,21 @@ export default function CancellationRefundPolicyPage() {
         <section>
           <h2 className={sectionTitleClass}>Grievance Redressal</h2>
           <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-charcoal/75">
-            <li>Customer support: support@manas360.com (response within 24 hours, resolution within 72 hours).</li>
-            <li>Grievance officer: grievance@manas360.com (response within 48 hours, resolution within 30 days).</li>
-            <li>External support: National Consumer Helpline 1800-11-4000 and consumerhelpline.gov.in.</li>
+            <li>Customer support: <a href={`mailto:${companyInfo.supportEmail}`} className="underline hover:text-charcoal/60">{companyInfo.supportEmail}</a> (response within {companyInfo.supportResponseTime}, resolution within {companyInfo.supportResolutionTime}).</li>
+            <li>Grievance officer: <a href={`mailto:${companyInfo.grievanceEmail}`} className="underline hover:text-charcoal/60">{companyInfo.grievanceEmail}</a> (response within {companyInfo.grievanceResponseTime}, resolution within {companyInfo.grievanceResolutionTime}).</li>
+            <li>External support: National Consumer Helpline <a href="tel:1800110400" className="underline hover:text-charcoal/60">{companyInfo.consumerHelpline}</a> and <a href={`https://${companyInfo.consumerHelplineWebsite}`} target="_blank" rel="noopener noreferrer" className="underline hover:text-charcoal/60">{companyInfo.consumerHelplineWebsite}</a>.</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2 className={sectionTitleClass}>Company Information</h2>
+          <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-charcoal/75">
+            <li><strong>Email:</strong> <a href={`mailto:${companyInfo.email}`} className="underline hover:text-charcoal/60">{companyInfo.email}</a></li>
+            <li><strong>Phone:</strong> <a href={`tel:${companyInfo.phone.replace(/[^\d+]/g, '')}`} className="underline hover:text-charcoal/60">{companyInfo.phone}</a> | <a href={`tel:${companyInfo.alternatePhone.replace(/[^\d+]/g, '')}`} className="underline hover:text-charcoal/60">{companyInfo.alternatePhone}</a></li>
+            <li><strong>Corporate Identification Number (CIN):</strong> {companyInfo.cin}</li>
+            <li><strong>GSTIN:</strong> {companyInfo.gstin}</li>
+            <li><strong>UDHYAM Registration Number:</strong> {companyInfo.udhyam}</li>
+            <li><strong>DPIIT Number:</strong> {companyInfo.dpiitNo}</li>
           </ul>
         </section>
 
@@ -145,9 +158,9 @@ export default function CancellationRefundPolicyPage() {
         </section>
 
         <div className="mt-10 border-t border-calm-sage/15 pt-6 text-sm text-charcoal/65">
-          <p>This policy forms an integral part of MANAS360 Terms of Service.</p>
-          <p className="mt-2">Document Control: MANAS360-LEGAL-CRP-001</p>
-          <p className="mt-1">Registered Address: [Company Address], Bengaluru, Karnataka, India | CIN: [Company Identification Number]</p>
+          <p>This policy forms an integral part of {companyInfo.name} Terms of Service.</p>
+          <p className="mt-2">Document Control: {companyInfo.cancellationRefundPolicyVersion}</p>
+          <p className="mt-1">Registered Address: {companyInfo.fullAddress} | CIN: {companyInfo.cin}</p>
           <Link to="/" className="mt-4 inline-block text-charcoal underline underline-offset-4">Back to Home</Link>
         </div>
       </div>

@@ -6,6 +6,7 @@ const rbac_middleware_1 = require("../middleware/rbac.middleware");
 const validate_middleware_1 = require("../middleware/validate.middleware");
 const admin_controller_1 = require("../controllers/admin.controller");
 const admin_analytics_controller_1 = require("../controllers/admin-analytics.controller");
+const admin_module_controller_1 = require("../controllers/admin-module.controller");
 const rateLimiter_middleware_1 = require("../middleware/rateLimiter.middleware");
 const router = (0, express_1.Router)();
 /**
@@ -58,6 +59,11 @@ router.get('/metrics', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requ
  * Response: Paginated list of subscriptions with user and plan details
  */
 router.get('/subscriptions', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), ...validate_middleware_1.validateAdminListSubscriptionsQuery, (0, validate_middleware_1.asyncHandler)(admin_controller_1.listSubscriptionsController));
+/**
+ * GET /api/v1/admin/modules/:module/summary
+ * Generic real-time summary for admin module pages.
+ */
+router.get('/modules/:module/summary', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, validate_middleware_1.asyncHandler)(admin_module_controller_1.getAdminModuleSummaryController));
 /**
  * GET /api/v1/admin/analytics/summary
  * Query params:

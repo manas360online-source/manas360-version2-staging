@@ -14,6 +14,7 @@ import {
   MessageSquare,
   Search,
   Settings,
+  ShieldCheck,
   TrendingUp,
   User,
   Users,
@@ -64,6 +65,7 @@ const selfSections: NavSection[] = [
     items: [
       { to: '/therapist/dashboard', label: 'Dashboard', icon: LayoutDashboard },
       { to: '/therapist/patients', label: 'My Patients', icon: Users },
+      { to: '/certifications', label: 'Certifications', icon: ShieldCheck },
     ],
   },
   {
@@ -98,7 +100,7 @@ const selfMobileNavItems: NavItem[] = [
   { to: '/therapist/sessions', label: 'Sessions', icon: Calendar },
   { to: '/therapist/messages', label: "Dr. Meera 'Ai", icon: MessageSquare },
   { to: '/therapist/analytics', label: 'Analytics', icon: LineChart },
-  { to: '/therapist/profile', label: 'Profile', icon: Settings },
+  { to: '/certifications', label: 'Certify', icon: ShieldCheck },
 ];
 
 const titleMap: Record<string, string> = {
@@ -120,6 +122,7 @@ const titleMap: Record<string, string> = {
   '/therapist/profile': 'Profile',
   '/therapist/settings': 'Settings',
   '/therapist/help-support': 'Help & Support',
+  '/certifications': 'Certifications',
 };
 
 const DASHBOARD_MODE_STORAGE_KEY = 'manas360.therapist.dashboardMode';

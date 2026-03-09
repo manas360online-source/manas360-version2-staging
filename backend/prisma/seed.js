@@ -95,8 +95,10 @@ async function seed() {
 
   const adminsSeed = createUsersByRole({
     role: 'ADMIN',
-    count: 2,
-    predefined: [{ email: 'admin@demo.com', firstName: 'Admin', lastName: 'Demo', role: 'ADMIN' }],
+    count: 1,
+    predefined: [
+      { email: 'admin@demo.com', firstName: 'Admin', lastName: 'Demo', role: 'ADMIN' },
+    ],
   });
 
   const allUsers = [...patientsSeed, ...therapistsSeed, ...coachesSeed, ...psychiatristsSeed, ...adminsSeed];

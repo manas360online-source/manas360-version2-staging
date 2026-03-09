@@ -25,6 +25,7 @@
 		"seed:analytics:mock": "ts-node ./scripts/seed_admin_analytics_mock_data.ts",
 		"seed:patient:mock-dashboard": "node ./scripts/seed_mock_patient_dashboard.js",
 		"seed:all:mock": "npm run seed:users:mock && npm run seed:analytics:mock",
+		"guard:single-admin": "node ./scripts/check-single-platform-admin.js",
 		"test:watch": "jest --watch"
 	},
 	"dependencies": {
@@ -49,7 +50,11 @@
 		"otplib": "^12.0.1",
 		"pdfkit": "^0.17.2",
 		"redis": "^5.11.0",
-		"socket.io": "^4.8.3"
+		"socket.io": "^4.8.3",
+		"xlsx": "^0.18.5"
+		,
+		"openid-client": "^6.8.2",
+		"uuid": "^9.0.0"
 	},
 	"optionalDependencies": {
 		"prom-client": "^14.2.0"

@@ -18,6 +18,7 @@ import {
 	getAdminAnalyticsExportStatusController,
 	downloadAdminAnalyticsExportController,
 } from '../controllers/admin-analytics.controller';
+import { getAdminModuleSummaryController } from '../controllers/admin-module.controller';
 import { adminAnalyticsExportRateLimiter } from '../middleware/rateLimiter.middleware';
 
 const router = Router();
@@ -82,6 +83,12 @@ router.get('/metrics', requireAuth, requireRole('admin'), asyncHandler(getMetric
  * Response: Paginated list of subscriptions with user and plan details
  */
 router.get('/subscriptions', requireAuth, requireRole('admin'), ...validateAdminListSubscriptionsQuery, asyncHandler(listSubscriptionsController));
+
+/**
+ * GET /api/v1/admin/modules/:module/summary
+ * Generic real-time summary for admin module pages.
+ */
+router.get('/modules/:module/summary', requireAuth, requireRole('admin'), asyncHandler(getAdminModuleSummaryController));
 
 /**
  * GET /api/v1/admin/analytics/summary

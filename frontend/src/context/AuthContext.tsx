@@ -24,10 +24,42 @@ const normalizeRole = (value: unknown): AppRole | null => {
 
 export const getDefaultRouteForRole = (role: unknown): string => {
   const normalizedRole = normalizeRole(role);
-  if (normalizedRole === 'admin') return '/admin/analytics';
+  if (normalizedRole === 'admin') return '/admin/dashboard';
   if (normalizedRole === 'psychiatrist') return '/psychiatrist/dashboard';
   if (normalizedRole === 'therapist' || normalizedRole === 'coach') return '/therapist/analytics';
   return '/dashboard';
+};
+
+const toBoolean = (value: unknown): boolean => value === true || value === 'true' || value === 1 || value === '1';
+
+export const hasCorporateAccess = (user: AuthUser | null | undefined): boolean => {
+  if (!user) return false;
+
+  const explicitAdminFlag = toBoolean(user.isCompanyAdmin) || toBoolean(user.is_company_admin);
+  if (explicitAdminFlag) return true;
+
+  // Fallback for legacy payloads that expose company key but not the boolean flag.
+  const companyKey = user.companyKey ?? user.company_key;
+  return typeof companyKey === 'string' && companyKey.trim().length > 0;
+};
+
+export const isPlatformAdminUser = (user: AuthUser | null | undefined): boolean => {
+  if (!user) return false;
+  return normalizeRole(user.role) === 'admin' && !hasCorporateAccess(user);
+};
+
+export const getPostLoginRoute = (user: AuthUser | null | undefined): string => {
+  if (!user) return '/dashboard';
+
+  if (hasCorporateAccess(user)) {
+    return '/corporate/dashboard';
+  }
+
+  if (isPlatformAdminUser(user)) {
+    return '/admin/dashboard';
+  }
+
+  return getDefaultRouteForRole(user.role);
 };
 
 type AuthContextValue = {
@@ -40,7 +72,17 @@ type AuthContextValue = {
   checkAuth: () => Promise<void>;
 };
 
-const AuthContext = createContext<AuthContextValue | null>(null);
+type AuthContextGlobal = typeof globalThis & {
+  __MANAS360_AUTH_CONTEXT__?: React.Context<AuthContextValue | null>;
+};
+
+const authContextGlobal = globalThis as AuthContextGlobal;
+
+// Keep a single context instance across Vite HMR updates.
+const AuthContext = authContextGlobal.__MANAS360_AUTH_CONTEXT__ ?? createContext<AuthContextValue | null>(null);
+if (!authContextGlobal.__MANAS360_AUTH_CONTEXT__) {
+  authContextGlobal.__MANAS360_AUTH_CONTEXT__ = AuthContext;
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);

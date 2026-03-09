@@ -42,6 +42,8 @@ export interface AdminListUsersResponse {
 		firstName: string;
 		lastName: string;
 		role: 'patient' | 'therapist' | 'psychiatrist' | 'coach' | 'admin';
+		isTherapistVerified: boolean;
+		therapistVerifiedAt: Date | null;
 		createdAt: Date;
 		updatedAt: Date;
 	}>;
@@ -52,7 +54,7 @@ export interface AdminListUsersResponse {
  * List users with pagination and filtering
  *
  * Query filters:
- * - role: 'patient' | 'therapist' | 'admin' (optional)
+ * - role: 'patient' | 'therapist' | 'psychiatrist' | 'coach' | 'admin' (optional)
  * - status: 'active' | 'deleted' (optional)
  * - page: pagination page (default: 1)
  * - limit: items per page (default: 10, max: 50)
@@ -104,6 +106,8 @@ export const listUsers = async (
 				firstName: true,
 				lastName: true,
 				role: true,
+				isTherapistVerified: true,
+				therapistVerifiedAt: true,
 				createdAt: true,
 				updatedAt: true,
 			},
@@ -118,6 +122,8 @@ export const listUsers = async (
 			firstName: user.firstName,
 			lastName: user.lastName,
 			role: String(user.role).toLowerCase(),
+			isTherapistVerified: Boolean(user.isTherapistVerified),
+			therapistVerifiedAt: user.therapistVerifiedAt ?? null,
 			createdAt: user.createdAt,
 			updatedAt: user.updatedAt,
 		})),
@@ -137,6 +143,9 @@ export const getUserById = async (userId: string): Promise<{
 	firstName: string;
 	lastName: string;
 	role: string;
+	isTherapistVerified: boolean;
+	therapistVerifiedAt: Date | null;
+	therapistVerifiedByUserId: string | null;
 	createdAt: Date;
 	updatedAt: Date;
 }> => {
@@ -148,6 +157,9 @@ export const getUserById = async (userId: string): Promise<{
 			firstName: true,
 			lastName: true,
 			role: true,
+			isTherapistVerified: true,
+			therapistVerifiedAt: true,
+			therapistVerifiedByUserId: true,
 			createdAt: true,
 			updatedAt: true,
 		},
@@ -159,6 +171,9 @@ export const getUserById = async (userId: string): Promise<{
 
 	return {
 		...user,
+		isTherapistVerified: Boolean(user.isTherapistVerified),
+		therapistVerifiedAt: user.therapistVerifiedAt ?? null,
+		therapistVerifiedByUserId: user.therapistVerifiedByUserId ?? null,
 		role: String(user.role).toLowerCase(),
 	} as any;
 };
@@ -186,14 +201,60 @@ export const verifyTherapist = async (
 		throw new AppError('Admin user not found', 404);
 	}
 
-	const therapistUser = await db.user.findUnique({ where: { id: therapistProfileId }, select: { id: true, firstName: true, lastName: true, role: true, updatedAt: true } });
+	const therapistUser = await db.user.findUnique({
+		where: { id: therapistProfileId },
+		select: {
+			id: true,
+			firstName: true,
+			lastName: true,
+			role: true,
+			updatedAt: true,
+			isTherapistVerified: true,
+			therapistVerifiedAt: true,
+			therapistVerifiedByUserId: true,
+		},
+	});
 	if (!therapistUser || therapistUser.role !== 'THERAPIST') {
 		throw new AppError('Therapist profile not found', 404);
 	}
 
-	throw new AppError('Therapist verification state is not yet modeled in Prisma schema', 501, {
-		therapistId: therapistUser.id,
+	if (therapistUser.isTherapistVerified) {
+		return {
+			_id: therapistUser.id,
+			displayName: `${therapistUser.firstName ?? ''} ${therapistUser.lastName ?? ''}`.trim() || 'Therapist',
+			isVerified: true,
+			verifiedAt: therapistUser.therapistVerifiedAt ?? null,
+			verifiedBy: therapistUser.therapistVerifiedByUserId ?? null,
+			updatedAt: therapistUser.updatedAt,
+		};
+	}
+
+	const updated = await db.user.update({
+		where: { id: therapistUser.id },
+		data: {
+			isTherapistVerified: true,
+			therapistVerifiedAt: new Date(),
+			therapistVerifiedByUserId: adminUserId,
+		},
+		select: {
+			id: true,
+			firstName: true,
+			lastName: true,
+			isTherapistVerified: true,
+			therapistVerifiedAt: true,
+			therapistVerifiedByUserId: true,
+			updatedAt: true,
+		},
 	});
+
+	return {
+		_id: updated.id,
+		displayName: `${updated.firstName ?? ''} ${updated.lastName ?? ''}`.trim() || 'Therapist',
+		isVerified: Boolean(updated.isTherapistVerified),
+		verifiedAt: updated.therapistVerifiedAt ?? null,
+		verifiedBy: updated.therapistVerifiedByUserId ?? null,
+		updatedAt: updated.updatedAt,
+	};
 };
 
 /**
@@ -207,9 +268,17 @@ export const getMetrics = async (): Promise<{
 	totalRevenue: number;
 	activeSubscriptions: number;
 }> => {
-	const [totalUsersResult, totalTherapistsResult, completedSessionsResult, revenueAgg, activeSubscriptionsResult] = await Promise.all([
+	const [
+		totalUsersResult,
+		totalTherapistsResult,
+		verifiedTherapistsResult,
+		completedSessionsResult,
+		revenueAgg,
+		activeSubscriptionsResult,
+	] = await Promise.all([
 		db.user.count(),
 		db.user.count({ where: { role: 'THERAPIST' } }),
+		db.user.count({ where: { role: 'THERAPIST', isTherapistVerified: true } }),
 		db.therapySession.count({ where: { status: 'COMPLETED' } }),
 		db.revenueLedger.aggregate({ _sum: { grossAmountMinor: true } }),
 		db.marketplaceSubscription.count({ where: { status: 'ACTIVE' } }),
@@ -217,8 +286,6 @@ export const getMetrics = async (): Promise<{
 
 	const grossMinor = BigInt(revenueAgg?._sum?.grossAmountMinor ?? 0);
 	const totalRevenue = Number(grossMinor) / 100;
-	const verifiedTherapistsResult = totalTherapistsResult;
-
 	return {
 		totalUsers: totalUsersResult,
 		totalTherapists: totalTherapistsResult,

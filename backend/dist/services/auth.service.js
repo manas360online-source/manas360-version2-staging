@@ -23,6 +23,52 @@ const toPrismaUserRole = (role) => {
     return 'COACH';
 };
 let supportedUserRolesCache = null;
+const getCompanyAdminMeta = async (userId) => {
+    const rows = (await db.$queryRawUnsafe('SELECT company_key, is_company_admin FROM users WHERE id = $1 LIMIT 1', userId));
+    const row = rows?.[0] ?? { company_key: null, is_company_admin: false };
+    return {
+        companyKey: row.company_key,
+        company_key: row.company_key,
+        isCompanyAdmin: Boolean(row.is_company_admin),
+        is_company_admin: Boolean(row.is_company_admin),
+    };
+};
+const getEmailDomain = (email) => {
+    if (!email)
+        return null;
+    const parts = String(email).toLowerCase().split('@');
+    if (parts.length !== 2)
+        return null;
+    const domain = parts[1].trim();
+    return domain || null;
+};
+const resolveUserCompanyMeta = async (userId, email) => {
+    const existingMeta = await getCompanyAdminMeta(userId);
+    if (existingMeta.company_key) {
+        return existingMeta;
+    }
+    const domain = getEmailDomain(email);
+    if (!domain) {
+        return existingMeta;
+    }
+    try {
+        const rows = (await db.$queryRawUnsafe(`SELECT "companyKey" FROM "companies" WHERE LOWER(COALESCE("domain", '')) = $1 LIMIT 1`, domain));
+        const companyKey = rows?.[0]?.companyKey;
+        if (!companyKey) {
+            return existingMeta;
+        }
+        await db.$executeRawUnsafe('UPDATE users SET company_key = $2, is_company_admin = false WHERE id = $1', userId, companyKey);
+        return {
+            companyKey,
+            company_key: companyKey,
+            isCompanyAdmin: false,
+            is_company_admin: false,
+        };
+    }
+    catch {
+        return existingMeta;
+    }
+};
 const getSupportedUserRoles = async () => {
     if (supportedUserRolesCache) {
         return supportedUserRolesCache;
@@ -243,6 +289,7 @@ const loginWithPassword = async (input, meta) => {
         },
     });
     const tokenPair = await issueSessionTokens(String(user.id), meta);
+    const companyAdminMeta = await resolveUserCompanyMeta(String(user.id), user.email);
     await audit('LOGIN_SUCCESS', 'success', meta, { userId: user.id, email: user.email, phone: user.phone });
     return {
         user: {
@@ -253,6 +300,7 @@ const loginWithPassword = async (input, meta) => {
             emailVerified: user.emailVerified,
             phoneVerified: user.phoneVerified,
             mfaEnabled: user.mfaEnabled,
+            ...companyAdminMeta,
         },
         ...tokenPair,
     };
@@ -303,6 +351,7 @@ const loginWithGoogle = async (input, meta) => {
         });
     }
     const tokenPair = await issueSessionTokens(String(user.id), meta);
+    const companyAdminMeta = await resolveUserCompanyMeta(String(user.id), user.email);
     await audit('LOGIN_SUCCESS', 'success', meta, { userId: user.id, email: user.email });
     return {
         user: {
@@ -313,6 +362,7 @@ const loginWithGoogle = async (input, meta) => {
             emailVerified: user.emailVerified,
             phoneVerified: user.phoneVerified,
             mfaEnabled: user.mfaEnabled,
+            ...companyAdminMeta,
         },
         ...tokenPair,
     };

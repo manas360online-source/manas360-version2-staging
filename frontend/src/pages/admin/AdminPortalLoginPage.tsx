@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getApiErrorMessage } from '../../api/auth';
-import { useAuth } from '../../context/AuthContext';
+import { hasCorporateAccess, isPlatformAdminUser, useAuth } from '../../context/AuthContext';
 
 export default function AdminPortalLoginPage() {
 	const { isAuthenticated, user, login, logout } = useAuth();
@@ -17,8 +17,13 @@ export default function AdminPortalLoginPage() {
 			return;
 		}
 
-		if (String(user.role || '').toLowerCase() === 'admin') {
-			navigate('/admin/analytics', { replace: true });
+		if (isPlatformAdminUser(user)) {
+			navigate('/admin/dashboard', { replace: true });
+			return;
+		}
+
+		if (hasCorporateAccess(user)) {
+			navigate('/corporate/dashboard', { replace: true });
 			return;
 		}
 
@@ -37,15 +42,14 @@ export default function AdminPortalLoginPage() {
 
 		try {
 			const loggedInUser = await login(identifier.trim(), password);
-			const role = String(loggedInUser.role || '').toLowerCase();
 
-			if (role !== 'admin') {
+			if (!isPlatformAdminUser(loggedInUser)) {
 				await logout();
-				setError('Access denied. This URL is only for admin users.');
+				setError('Access denied. This URL is only for platform admin users.');
 				return;
 			}
 
-			navigate('/admin/analytics', { replace: true });
+			navigate('/admin/dashboard', { replace: true });
 		} catch (err) {
 			setError(getApiErrorMessage(err, 'Admin login failed'));
 		} finally {

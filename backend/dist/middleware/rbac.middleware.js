@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.requireMinimumRole = exports.requirePermission = exports.requireAdminRole = exports.requireTherapistRole = exports.requirePatientRole = exports.requireRole = exports.clearRoleCache = exports.roleHierarchy = void 0;
+exports.requireMinimumRole = exports.requirePermission = exports.requireCorporateMemberAccess = exports.requireAdminRole = exports.requireTherapistRole = exports.requirePatientRole = exports.requireRole = exports.clearRoleCache = exports.roleHierarchy = void 0;
 const db_1 = require("../config/db");
 const error_middleware_1 = require("./error.middleware");
 const db = db_1.prisma;
@@ -167,6 +167,58 @@ exports.requireTherapistRole = (0, exports.requireRole)(['therapist', 'psychiatr
  * @deprecated Use requireRole('admin') instead
  */
 exports.requireAdminRole = (0, exports.requireRole)('admin');
+/**
+ * Corporate access middleware.
+ * Allows:
+ * 1) Platform admin role
+ * 2) Any user mapped to a company tenant (company_key present)
+ */
+const requireCorporateMemberAccess = async (req, _res, next) => {
+    try {
+        const userId = req.auth?.userId;
+        if (!userId) {
+            next(new error_middleware_1.AppError('Authentication required', 401));
+            return;
+        }
+        const user = await db.user.findUnique({
+            where: { id: userId },
+            select: { role: true, isDeleted: true },
+        });
+        if (!user) {
+            next(new error_middleware_1.AppError('User not found', 404));
+            return;
+        }
+        if (user.isDeleted) {
+            next(new error_middleware_1.AppError('User account is deleted. Please contact support.', 410));
+            return;
+        }
+        const role = String(user.role).toLowerCase();
+        if (role === 'admin') {
+            if (!req.auth) {
+                req.auth = { userId: '', sessionId: '', jti: '' };
+            }
+            req.auth.role = role;
+            next();
+            return;
+        }
+        const rows = (await db.$queryRawUnsafe('SELECT company_key FROM users WHERE id = $1 LIMIT 1', userId));
+        const companyKey = rows?.[0]?.company_key;
+        if (!companyKey || !String(companyKey).trim()) {
+            next(new error_middleware_1.AppError('Access denied. Corporate member account is required.', 403));
+            return;
+        }
+        if (!req.auth) {
+            req.auth = { userId: '', sessionId: '', jti: '' };
+        }
+        req.auth.role = role;
+        next();
+    }
+    catch (error) {
+        console.error('[RBAC] Error during corporate access verification:', error);
+        next(new error_middleware_1.AppError('Authorization failed', 500));
+    }
+};
+exports.requireCorporateMemberAccess = requireCorporateMemberAccess;
 /**
  * Advanced: Check if user has ANY of the given permissions
  * Useful for permission-based access control (PBAC)
