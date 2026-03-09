@@ -12,9 +12,26 @@ datasource db {
 enum UserRole {
   PATIENT
   THERAPIST
+  PSYCHOLOGIST
   PSYCHIATRIST
   COACH
   ADMIN
+  SUPER_ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  INVITED
+  SUSPENDED
+  DISABLED
+  DELETED
+}
+
+enum ProviderType {
+  THERAPIST
+  PSYCHOLOGIST
+  COACH
+  PSYCHIATRIST
 }
 
 enum SessionStatus {
@@ -70,6 +87,9 @@ model User {
   firstName                     String       @default("")
   lastName                      String       @default("")
   role                          UserRole
+  providerType                  ProviderType? @map("provider_type")
+  companyId                     String?      @map("company_id")
+  status                        UserStatus   @default(ACTIVE)
   provider                      UserProvider @default(LOCAL)
   passwordHash                  String?
   googleId                      String?      @unique
@@ -90,6 +110,9 @@ model User {
   lockUntil                     DateTime?
   lastLoginAt                   DateTime?
   passwordChangedAt             DateTime?
+  isTherapistVerified           Boolean      @default(false)
+  therapistVerifiedAt           DateTime?
+  therapistVerifiedByUserId     String?
   isDeleted                     Boolean      @default(false)
   deletedAt                     DateTime?
   createdAt                     DateTime     @default(now())
@@ -132,12 +155,132 @@ model User {
   therapistResources        TherapistResource[]
   therapistCareTeamMembers  TherapistCareTeamMember[]
   therapistProfile          TherapistProfile?
+  userCapabilities          UserCapability[]            @relation("UserCapabilitiesOwner")
+  grantedCapabilities       UserCapability[]            @relation("UserCapabilitiesGrantor")
+  careTeamAssignmentsAsPatient  CareTeamAssignment[]   @relation("CareTeamAssignmentPatient")
+  careTeamAssignmentsAsProvider CareTeamAssignment[]   @relation("CareTeamAssignmentProvider")
+  careTeamAssignmentsCreated    CareTeamAssignment[]   @relation("CareTeamAssignmentCreator")
+  consents                  Consent[]
+  consentRevocations        Consent[]                  @relation("ConsentRevokedByUser")
+  auditEventsAsActor        AuditEvent[]               @relation("AuditEventsActor")
+  tenantPoliciesUpdated     TenantPolicy[]             @relation("TenantPolicyUpdatedBy")
 
   @@index([email])
   @@index([phone])
   @@index([role])
+  @@index([providerType])
+  @@index([companyId])
+  @@index([status])
+  @@index([companyId, status])
   @@index([isDeleted])
   @@map("users")
+}
+
+model UserCapability {
+  id           String    @id @default(uuid())
+  userId       String
+  capability   String
+  source       String    @default("effective")
+  isEffective  Boolean   @default(true)
+  grantedById  String?
+  computedAt   DateTime  @default(now())
+  expiresAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user      User  @relation("UserCapabilitiesOwner", fields: [userId], references: [id], onDelete: Cascade)
+  grantedBy User? @relation("UserCapabilitiesGrantor", fields: [grantedById], references: [id], onDelete: SetNull)
+
+  @@unique([userId, capability])
+  @@index([capability, isEffective])
+  @@index([computedAt])
+  @@map("user_capabilities")
+}
+
+model CareTeamAssignment {
+  id              String    @id @default(uuid())
+  patientId       String
+  providerId      String
+  assignedById    String?
+  accessScope     Json
+  status          String    @default("ACTIVE")
+  assignedAt      DateTime  @default(now())
+  revokedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  patient     User  @relation("CareTeamAssignmentPatient", fields: [patientId], references: [id], onDelete: Cascade)
+  provider    User  @relation("CareTeamAssignmentProvider", fields: [providerId], references: [id], onDelete: Cascade)
+  assignedBy  User? @relation("CareTeamAssignmentCreator", fields: [assignedById], references: [id], onDelete: SetNull)
+
+  @@unique([patientId, providerId])
+  @@index([providerId, status])
+  @@index([assignedAt])
+  @@map("care_team_assignments")
+}
+
+model Consent {
+  id             String    @id @default(uuid())
+  userId         String
+  consentType    String
+  purpose        String
+  artifactRef    String?
+  status         String    @default("GRANTED")
+  grantedAt      DateTime  @default(now())
+  revokedAt      DateTime?
+  revokedById    String?
+  metadata       Json?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user       User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  revokedBy  User? @relation("ConsentRevokedByUser", fields: [revokedById], references: [id], onDelete: SetNull)
+
+  @@index([userId, consentType, status])
+  @@index([grantedAt])
+  @@map("consents")
+}
+
+model AuditEvent {
+  id          String   @id @default(uuid())
+  actorId     String?
+  actorRole   String?
+  tenantId    String?
+  scope       String
+  action      String
+  entityType  String
+  entityId    String?
+  beforeJson  Json?
+  afterJson   Json?
+  ipAddress   String?
+  userAgent   String?
+  traceId     String?
+  createdAt   DateTime @default(now())
+
+  actor User? @relation("AuditEventsActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, scope, createdAt(sort: Desc)])
+  @@index([actorId, createdAt(sort: Desc)])
+  @@index([entityType, entityId])
+  @@index([traceId])
+  @@map("audit_events")
+}
+
+model TenantPolicy {
+  id               String   @id @default(uuid())
+  tenantId         String   @unique
+  privacyPolicy    Json
+  featureFlags     Json
+  policyVersion    Int      @default(1)
+  updatedById      String?
+  effectiveFrom    DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  updatedBy User? @relation("TenantPolicyUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([effectiveFrom])
+  @@map("tenant_policies")
 }
 
 enum BookingIntentStatus {

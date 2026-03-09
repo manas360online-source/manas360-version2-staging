@@ -1,5 +1,7 @@
 import { randomUUID } from 'crypto';
 import { prisma } from '../config/db';
+import { AppError } from '../middleware/error.middleware';
+import { hashPassword } from '../utils/hash';
 
 type BulkEmployeeRow = {
   employeeId?: string;
@@ -67,6 +69,26 @@ type PaymentMethodUpdateInput = {
   isActive?: boolean;
 };
 
+type CorporateDemoRequestInput = {
+  companyName?: string;
+  workEmail?: string;
+  companySize?: string;
+  industry?: string;
+  country?: string;
+  contactName?: string;
+  phone?: string;
+};
+
+type CorporateAccountCreateInput = {
+  companyName?: string;
+  workEmail?: string;
+  password?: string;
+  companySize?: string;
+  industry?: string;
+  country?: string;
+  contactName?: string;
+};
+
 const DEFAULT_COMPANY_KEY = 'techcorp-india';
 
 const queryRaw = async <T>(sql: string, ...params: unknown[]): Promise<T> => (
@@ -84,6 +106,42 @@ const toPct = (value: number, total: number): number => {
   return Number(((value / total) * 100).toFixed(1));
 };
 
+const sanitizeKeyPart = (value: string): string =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40);
+
+const resolveUniqueCompanyKey = async (companyName: string): Promise<string> => {
+  const base = sanitizeKeyPart(companyName) || `company-${randomUUID().slice(0, 8)}`;
+
+  const existing = await queryRaw<Array<{ companyKey: string }>>(
+    `SELECT "companyKey" FROM "companies" WHERE "companyKey" LIKE $1`,
+    `${base}%`,
+  );
+
+  const existingSet = new Set(existing.map((row) => String(row.companyKey)));
+  if (!existingSet.has(base)) {
+    return base;
+  }
+
+  let suffix = 2;
+  while (existingSet.has(`${base}-${suffix}`)) {
+    suffix += 1;
+  }
+  return `${base}-${suffix}`;
+};
+
+const normalizeEmail = (value: unknown): string => String(value || '').trim().toLowerCase();
+
+const getDomainFromEmail = (email: string): string | null => {
+  const parts = String(email || '').toLowerCase().split('@');
+  if (parts.length !== 2) return null;
+  const domain = parts[1].trim();
+  return domain || null;
+};
+
 const normalizeRisk = (value: string | null | undefined): 'HIGH' | 'MEDIUM' | 'LOW' => {
   const raw = String(value || '').toUpperCase();
   if (raw === 'HIGH') return 'HIGH';
@@ -92,6 +150,9 @@ const normalizeRisk = (value: string | null | undefined): 'HIGH' | 'MEDIUM' | 'L
 };
 
 export const ensureCorporateTables = async (): Promise<void> => {
+  await prisma.$executeRawUnsafe(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS company_key text;`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS is_company_admin boolean DEFAULT false;`);
+
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "companies" (
       "id" TEXT PRIMARY KEY,
@@ -107,6 +168,10 @@ export const ensureCorporateTables = async (): Promise<void> => {
       "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
+  `);
+
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "companies" ADD COLUMN IF NOT EXISTS "domain" TEXT;
   `);
 
   await prisma.$executeRawUnsafe(`
@@ -286,6 +351,27 @@ export const ensureCorporateTables = async (): Promise<void> => {
       CONSTRAINT "corporate_invoices_companyId_invoiceCode_key" UNIQUE ("companyId", "invoiceCode")
     );
   `);
+
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "corporate_demo_requests" (
+      "id" TEXT PRIMARY KEY,
+      "companyName" TEXT NOT NULL,
+      "companyKey" TEXT,
+      "workEmail" TEXT NOT NULL,
+      "companySize" TEXT,
+      "industry" TEXT,
+      "country" TEXT,
+      "contactName" TEXT,
+      "phone" TEXT,
+      "status" TEXT NOT NULL DEFAULT 'NEW',
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "corporate_demo_requests_workEmail_idx" ON "corporate_demo_requests"("workEmail");
+  `);
 };
 
 const getCompanyByKey = async (companyKey = DEFAULT_COMPANY_KEY): Promise<{ id: string; name: string } | null> => {
@@ -302,12 +388,21 @@ const seedCorporateDemoData = async (companyKey = DEFAULT_COMPANY_KEY): Promise<
   const existing = await getCompanyByKey(companyKey);
   let companyId = existing?.id || randomUUID();
 
+  const defaultDomain = companyKey === 'techcorp-india'
+    ? 'techcorp.com'
+    : companyKey === 'global-fintech-labs'
+      ? 'globalfintech.com'
+      : companyKey === 'zen-retail-group'
+        ? 'zenretail.com'
+        : `${companyKey.replace(/-+/g, '')}.com`;
+
   await prisma.$executeRawUnsafe(
     `INSERT INTO "companies" (
-      "id","companyKey","name","employeeLimit","sessionQuota","ssoProvider","privacyPolicy","supportEmail","supportPhone","supportSla","createdAt","updatedAt"
+      "id","companyKey","domain","name","employeeLimit","sessionQuota","ssoProvider","privacyPolicy","supportEmail","supportPhone","supportSla","createdAt","updatedAt"
     )
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW(),NOW())
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW(),NOW())
      ON CONFLICT ("companyKey") DO UPDATE SET
+      "domain"=EXCLUDED."domain",
       "name"=EXCLUDED."name",
       "employeeLimit"=EXCLUDED."employeeLimit",
       "sessionQuota"=EXCLUDED."sessionQuota",
@@ -319,6 +414,7 @@ const seedCorporateDemoData = async (companyKey = DEFAULT_COMPANY_KEY): Promise<
       "updatedAt"=NOW();`,
     companyId,
     companyKey,
+    defaultDomain,
     'TechCorp India',
     300,
     200,
@@ -1547,4 +1643,149 @@ export const updateCorporatePaymentMethod = async (
   );
 
   return getCorporatePaymentMethods(companyKey);
+};
+
+export const submitCorporateDemoRequest = async (payload: CorporateDemoRequestInput) => {
+  await ensureCorporateTables();
+
+  const companyName = String(payload.companyName || '').trim();
+  const workEmail = normalizeEmail(payload.workEmail);
+
+  if (!companyName) {
+    throw new AppError('companyName is required', 400);
+  }
+
+  if (!workEmail || !workEmail.includes('@')) {
+    throw new AppError('A valid workEmail is required', 400);
+  }
+
+  const companyKey = sanitizeKeyPart(companyName);
+  const requestId = randomUUID();
+
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO "corporate_demo_requests" (
+      "id","companyName","companyKey","workEmail","companySize","industry","country","contactName","phone","status","createdAt","updatedAt"
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'NEW',NOW(),NOW())`,
+    requestId,
+    companyName,
+    companyKey || null,
+    workEmail,
+    String(payload.companySize || '').trim() || null,
+    String(payload.industry || '').trim() || null,
+    String(payload.country || '').trim() || null,
+    String(payload.contactName || '').trim() || null,
+    String(payload.phone || '').trim() || null,
+  );
+
+  return {
+    requestId,
+    companyName,
+    workEmail,
+    status: 'NEW',
+  };
+};
+
+export const createCorporateAccount = async (payload: CorporateAccountCreateInput) => {
+  await ensureCorporateTables();
+
+  const companyName = String(payload.companyName || '').trim();
+  const workEmail = normalizeEmail(payload.workEmail);
+  const password = String(payload.password || '');
+  const contactName = String(payload.contactName || '').trim();
+
+  if (!companyName) {
+    throw new AppError('companyName is required', 400);
+  }
+
+  if (!workEmail || !workEmail.includes('@')) {
+    throw new AppError('A valid workEmail is required', 400);
+  }
+
+  if (password.length < 8) {
+    throw new AppError('Password must be at least 8 characters long', 400);
+  }
+
+  const existingUser = await prisma.user.findUnique({ where: { email: workEmail } });
+  if (existingUser && !existingUser.isDeleted) {
+    throw new AppError('Work email is already registered', 409);
+  }
+
+  const companyKey = await resolveUniqueCompanyKey(companyName);
+  const companyDomain = getDomainFromEmail(workEmail);
+  const companyId = randomUUID();
+  const defaultEmployeeLimit = Math.max(50, toInt(payload.companySize, 300));
+  const defaultSessionQuota = Math.max(25, Math.round(defaultEmployeeLimit * 0.65));
+
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO "companies" (
+      "id","companyKey","domain","name","employeeLimit","sessionQuota","ssoProvider","privacyPolicy","supportEmail","supportPhone","supportSla","createdAt","updatedAt"
+    ) VALUES ($1,$2,$3,$4,$5,$6,'Google Workspace',$7,$8,$9,$10,NOW(),NOW())`,
+    companyId,
+    companyKey,
+    companyDomain,
+    companyName,
+    defaultEmployeeLimit,
+    defaultSessionQuota,
+    'Only aggregate analytics are visible to HR. Individual therapy notes, diagnosis, medications, and provider details are never shown.',
+    'enterprise-support@manas360.com',
+    '+91-80-4000-3600',
+    'Priority support within 4 business hours.',
+  );
+
+  const passwordHash = await hashPassword(password);
+  const nameParts = contactName ? contactName.split(/\s+/).filter(Boolean) : [];
+  const firstName = nameParts[0] || companyName;
+  const lastName = nameParts.slice(1).join(' ');
+
+  const corporateMember = await prisma.user.create({
+    data: {
+      email: workEmail,
+      passwordHash,
+      provider: 'LOCAL',
+      role: 'PATIENT',
+      firstName,
+      lastName,
+      name: contactName || companyName,
+      emailVerified: true,
+    },
+    select: {
+      id: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+    },
+  });
+
+  await prisma.$executeRawUnsafe(
+    `UPDATE "users"
+     SET company_key = $2,
+         is_company_admin = false,
+         "updatedAt" = NOW()
+     WHERE id = $1`,
+    corporateMember.id,
+    companyKey,
+  );
+
+  const corporateMemberPayload = {
+    id: corporateMember.id,
+    email: corporateMember.email,
+    firstName: corporateMember.firstName,
+    lastName: corporateMember.lastName,
+    isCompanyAdmin: false,
+  };
+
+  return {
+    company: {
+      id: companyId,
+      companyKey,
+      name: companyName,
+      employeeLimit: defaultEmployeeLimit,
+      sessionQuota: defaultSessionQuota,
+      industry: String(payload.industry || '').trim() || null,
+      country: String(payload.country || '').trim() || null,
+    },
+    corporateMember: corporateMemberPayload,
+    // Backward compatibility for older consumers still reading `corporateAdmin`.
+    corporateAdmin: corporateMemberPayload,
+  };
 };

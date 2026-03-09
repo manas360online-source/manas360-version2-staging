@@ -23,6 +23,8 @@ import {
   updateCorporatePaymentMethod,
   updateCorporateSessionAllocations,
   updateCorporateSettings,
+  submitCorporateDemoRequest,
+  createCorporateAccount,
 } from '../services/corporate.service';
 
 const resolveCompanyKey = (req: Request): string | undefined => {
@@ -226,4 +228,14 @@ export const updateCorporateSettingsController = async (req: Request, res: Respo
   const companyKey = resolveCompanyKey(req);
   const data = await updateCorporateSettings(req.body || {}, companyKey);
   sendSuccess(res, data, 'Corporate settings updated successfully');
+};
+
+export const submitCorporateDemoRequestController = async (req: Request, res: Response): Promise<void> => {
+  const data = await submitCorporateDemoRequest(req.body || {});
+  sendSuccess(res, data, 'Corporate demo request submitted successfully', 201);
+};
+
+export const createCorporateAccountController = async (req: Request, res: Response): Promise<void> => {
+  const data = await createCorporateAccount(req.body || {});
+  sendSuccess(res, data, 'Corporate account created successfully', 201);
 };

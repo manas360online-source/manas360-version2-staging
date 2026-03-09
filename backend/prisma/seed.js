@@ -95,10 +95,9 @@ async function seed() {
 
   const adminsSeed = createUsersByRole({
     role: 'ADMIN',
-    count: 3,
+    count: 1,
     predefined: [
       { email: 'admin@demo.com', firstName: 'Admin', lastName: 'Demo', role: 'ADMIN' },
-      { email: 'corp.user@manas360.local', firstName: 'Corporate', lastName: 'Admin', role: 'ADMIN' },
     ],
   });
 

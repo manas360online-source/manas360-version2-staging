@@ -34,7 +34,7 @@ export default function CorporateHelpPage() {
   }, []);
 
   return (
-    <CorporateShellLayout title="Help & Support" subtitle="Support channels for corporate admins.">
+    <CorporateShellLayout title="Help & Support" subtitle="Support channels for corporate members.">
       {loading ? <div className="text-sm text-ink-600">Loading support details...</div> : null}
       {error ? <div className="mb-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{error}</div> : null}
       {!loading && settings ? (

@@ -59,6 +59,53 @@ const getCompanyAdminMeta = async (userId: string) => {
 	};
 };
 
+const getEmailDomain = (email?: string | null): string | null => {
+	if (!email) return null;
+	const parts = String(email).toLowerCase().split('@');
+	if (parts.length !== 2) return null;
+	const domain = parts[1].trim();
+	return domain || null;
+};
+
+const resolveUserCompanyMeta = async (userId: string, email?: string | null) => {
+	const existingMeta = await getCompanyAdminMeta(userId);
+	if (existingMeta.company_key) {
+		return existingMeta;
+	}
+
+	const domain = getEmailDomain(email);
+	if (!domain) {
+		return existingMeta;
+	}
+
+	try {
+		const rows = (await db.$queryRawUnsafe(
+			`SELECT "companyKey" FROM "companies" WHERE LOWER(COALESCE("domain", '')) = $1 LIMIT 1`,
+			domain,
+		)) as Array<{ companyKey: string | null }>;
+
+		const companyKey = rows?.[0]?.companyKey;
+		if (!companyKey) {
+			return existingMeta;
+		}
+
+		await db.$executeRawUnsafe(
+			'UPDATE users SET company_key = $2, is_company_admin = false WHERE id = $1',
+			userId,
+			companyKey,
+		);
+
+		return {
+			companyKey,
+			company_key: companyKey,
+			isCompanyAdmin: false,
+			is_company_admin: false,
+		};
+	} catch {
+		return existingMeta;
+	}
+};
+
 const getSupportedUserRoles = async (): Promise<Set<string>> => {
 	if (supportedUserRolesCache) {
 		return supportedUserRolesCache;
@@ -319,7 +366,7 @@ export const loginWithPassword = async (input: LoginInput, meta: RequestMeta) =>
 	});
 
 	const tokenPair = await issueSessionTokens(String(user.id), meta);
-	const companyAdminMeta = await getCompanyAdminMeta(String(user.id));
+	const companyAdminMeta = await resolveUserCompanyMeta(String(user.id), user.email);
 	await audit('LOGIN_SUCCESS', 'success', meta, { userId: user.id, email: user.email, phone: user.phone });
 
 	return {
@@ -387,7 +434,7 @@ export const loginWithGoogle = async (input: GoogleLoginInput, meta: RequestMeta
 	}
 
 	const tokenPair = await issueSessionTokens(String(user.id), meta);
-	const companyAdminMeta = await getCompanyAdminMeta(String(user.id));
+	const companyAdminMeta = await resolveUserCompanyMeta(String(user.id), user.email);
 	await audit('LOGIN_SUCCESS', 'success', meta, { userId: user.id, email: user.email });
 
 	return {

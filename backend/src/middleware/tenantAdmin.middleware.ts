@@ -13,7 +13,7 @@ export const requireTenantAdmin = (tenantKeyParam = 'tenantKey') => {
                 return;
             }
 
-            const user = await db.user.findUnique({ where: { id: userId }, select: { id: true, company_key: true, is_company_admin: true, role: true } });
+            const user = await db.user.findUnique({ where: { id: userId }, select: { id: true, company_key: true, role: true } });
             if (!user) {
                 next(new AppError('User not found', 404));
                 return;
@@ -39,8 +39,8 @@ export const requireTenantAdmin = (tenantKeyParam = 'tenantKey') => {
                 return;
             }
 
-            if (!user.is_company_admin || user.company_key !== ownerCompanyKey) {
-                next(new AppError('Tenant admin privileges required', 403));
+            if (!user.company_key || user.company_key !== ownerCompanyKey) {
+                next(new AppError('Corporate member access for this tenant is required', 403));
                 return;
             }
 

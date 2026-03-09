@@ -307,16 +307,25 @@ async function seed() {
     );
   }
 
-  // Seed a corporate/admin user for local testing (can login with email+password)
+  // Seed a corporate member user for local testing (can login with email+password)
   const corporateSeeds = [
-    { email: 'corp.user@manas360.local', firstName: 'Corporate', lastName: 'Admin' },
+    { email: 'corp.user@manas360.local', firstName: 'Corporate', lastName: 'Member' },
   ];
 
   const corporatePassword = 'Corporate@123';
   const corporatePasswordHash = await bcrypt.hash(corporatePassword, 12);
   const corporateUsers = [];
   for (const cSeed of corporateSeeds) {
-    const corpUser = await upsertUser({ ...cSeed, role: 'ADMIN' }, corporatePasswordHash);
+    const corpUser = await upsertUser({ ...cSeed, role: 'PATIENT' }, corporatePasswordHash);
+
+    await prisma.$executeRawUnsafe(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS company_key text;`);
+    await prisma.$executeRawUnsafe(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS is_company_admin boolean DEFAULT false;`);
+    await prisma.$executeRawUnsafe(
+      `UPDATE "users" SET company_key = $2, is_company_admin = false WHERE id = $1`,
+      corpUser.id,
+      'techcorp-india',
+    );
+
     corporateUsers.push(corpUser);
   }
 

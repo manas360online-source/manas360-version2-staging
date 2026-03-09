@@ -45,7 +45,7 @@ export default function CorporateSidebar({ variant, isOpen = false, onClose }: C
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sage-500 text-sm font-bold text-white">M</div>
           <div>
             <p className="font-display text-sm font-bold text-sage-800">MANAS360 Enterprise</p>
-            <p className="text-[10px] text-ink-500">Corporate Admin</p>
+            <p className="text-[10px] text-ink-500">Corporate Member</p>
           </div>
         </div>
 
@@ -92,7 +92,7 @@ export default function CorporateSidebar({ variant, isOpen = false, onClose }: C
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sage-500 text-sm font-bold text-white">M</div>
           <div>
             <p className="font-display text-sm font-bold text-sage-800">MANAS360 Enterprise</p>
-            <p className="text-[10px] text-ink-500">Corporate Admin</p>
+            <p className="text-[10px] text-ink-500">Corporate Member</p>
           </div>
         </div>
 
