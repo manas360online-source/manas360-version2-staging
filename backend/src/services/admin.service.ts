@@ -54,7 +54,7 @@ export interface AdminListUsersResponse {
  * List users with pagination and filtering
  *
  * Query filters:
- * - role: 'patient' | 'therapist' | 'admin' (optional)
+ * - role: 'patient' | 'therapist' | 'psychiatrist' | 'coach' | 'admin' (optional)
  * - status: 'active' | 'deleted' (optional)
  * - page: pagination page (default: 1)
  * - limit: items per page (default: 10, max: 50)

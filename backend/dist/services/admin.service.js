@@ -51,7 +51,7 @@ const mapSubscriptionStatusToEnum = (status) => {
  * List users with pagination and filtering
  *
  * Query filters:
- * - role: 'patient' | 'therapist' | 'admin' (optional)
+ * - role: 'patient' | 'therapist' | 'psychiatrist' | 'coach' | 'admin' (optional)
  * - status: 'active' | 'deleted' (optional)
  * - page: pagination page (default: 1)
  * - limit: items per page (default: 10, max: 50)
@@ -83,6 +83,8 @@ const listUsers = async (page, limit, { role, status, } = {}) => {
                 firstName: true,
                 lastName: true,
                 role: true,
+                isTherapistVerified: true,
+                therapistVerifiedAt: true,
                 createdAt: true,
                 updatedAt: true,
             },
@@ -96,6 +98,8 @@ const listUsers = async (page, limit, { role, status, } = {}) => {
             firstName: user.firstName,
             lastName: user.lastName,
             role: String(user.role).toLowerCase(),
+            isTherapistVerified: Boolean(user.isTherapistVerified),
+            therapistVerifiedAt: user.therapistVerifiedAt ?? null,
             createdAt: user.createdAt,
             updatedAt: user.updatedAt,
         })),
@@ -118,6 +122,9 @@ const getUserById = async (userId) => {
             firstName: true,
             lastName: true,
             role: true,
+            isTherapistVerified: true,
+            therapistVerifiedAt: true,
+            therapistVerifiedByUserId: true,
             createdAt: true,
             updatedAt: true,
         },
@@ -127,6 +134,9 @@ const getUserById = async (userId) => {
     }
     return {
         ...user,
+        isTherapistVerified: Boolean(user.isTherapistVerified),
+        therapistVerifiedAt: user.therapistVerifiedAt ?? null,
+        therapistVerifiedByUserId: user.therapistVerifiedByUserId ?? null,
         role: String(user.role).toLowerCase(),
     };
 };
@@ -143,29 +153,73 @@ const verifyTherapist = async (therapistProfileId, adminUserId) => {
     if (!admin || admin.role !== 'ADMIN') {
         throw new error_middleware_1.AppError('Admin user not found', 404);
     }
-    const therapistUser = await db.user.findUnique({ where: { id: therapistProfileId }, select: { id: true, firstName: true, lastName: true, role: true, updatedAt: true } });
+    const therapistUser = await db.user.findUnique({
+        where: { id: therapistProfileId },
+        select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+            updatedAt: true,
+            isTherapistVerified: true,
+            therapistVerifiedAt: true,
+            therapistVerifiedByUserId: true,
+        },
+    });
     if (!therapistUser || therapistUser.role !== 'THERAPIST') {
         throw new error_middleware_1.AppError('Therapist profile not found', 404);
     }
-    throw new error_middleware_1.AppError('Therapist verification state is not yet modeled in Prisma schema', 501, {
-        therapistId: therapistUser.id,
+    if (therapistUser.isTherapistVerified) {
+        return {
+            _id: therapistUser.id,
+            displayName: `${therapistUser.firstName ?? ''} ${therapistUser.lastName ?? ''}`.trim() || 'Therapist',
+            isVerified: true,
+            verifiedAt: therapistUser.therapistVerifiedAt ?? null,
+            verifiedBy: therapistUser.therapistVerifiedByUserId ?? null,
+            updatedAt: therapistUser.updatedAt,
+        };
+    }
+    const updated = await db.user.update({
+        where: { id: therapistUser.id },
+        data: {
+            isTherapistVerified: true,
+            therapistVerifiedAt: new Date(),
+            therapistVerifiedByUserId: adminUserId,
+        },
+        select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            isTherapistVerified: true,
+            therapistVerifiedAt: true,
+            therapistVerifiedByUserId: true,
+            updatedAt: true,
+        },
     });
+    return {
+        _id: updated.id,
+        displayName: `${updated.firstName ?? ''} ${updated.lastName ?? ''}`.trim() || 'Therapist',
+        isVerified: Boolean(updated.isTherapistVerified),
+        verifiedAt: updated.therapistVerifiedAt ?? null,
+        verifiedBy: updated.therapistVerifiedByUserId ?? null,
+        updatedAt: updated.updatedAt,
+    };
 };
 exports.verifyTherapist = verifyTherapist;
 /**
  * Get admin metrics from PostgreSQL via Prisma queries.
  */
 const getMetrics = async () => {
-    const [totalUsersResult, totalTherapistsResult, completedSessionsResult, revenueAgg, activeSubscriptionsResult] = await Promise.all([
+    const [totalUsersResult, totalTherapistsResult, verifiedTherapistsResult, completedSessionsResult, revenueAgg, activeSubscriptionsResult,] = await Promise.all([
         db.user.count(),
         db.user.count({ where: { role: 'THERAPIST' } }),
+        db.user.count({ where: { role: 'THERAPIST', isTherapistVerified: true } }),
         db.therapySession.count({ where: { status: 'COMPLETED' } }),
         db.revenueLedger.aggregate({ _sum: { grossAmountMinor: true } }),
         db.marketplaceSubscription.count({ where: { status: 'ACTIVE' } }),
     ]);
     const grossMinor = BigInt(revenueAgg?._sum?.grossAmountMinor ?? 0);
     const totalRevenue = Number(grossMinor) / 100;
-    const verifiedTherapistsResult = totalTherapistsResult;
     return {
         totalUsers: totalUsersResult,
         totalTherapists: totalTherapistsResult,

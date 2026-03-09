@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, Phone } from 'lucide-react';
+import { companyInfo } from '../../config/companyInfo';
 
 export const Footer: React.FC = () => {
   const navigate = useNavigate();
@@ -83,6 +84,10 @@ export const Footer: React.FC = () => {
                 India&rsquo;s compassionate mental health platform — connecting
                 you with licensed therapists and AI-powered support.
               </p>
+              <div className="mt-4 space-y-1 text-xs text-charcoal/55">
+                <p><strong className="text-charcoal/70">Email:</strong> <a href={`mailto:${companyInfo.email}`} className="underline hover:text-charcoal">{companyInfo.email}</a></p>
+                <p><strong className="text-charcoal/70">Phone:</strong> <a href={`tel:${companyInfo.phone.replace(/[^\d+]/g, '')}`} className="underline hover:text-charcoal">{companyInfo.phone}</a></p>
+              </div>
             </div>
 
             {/* Link columns */}

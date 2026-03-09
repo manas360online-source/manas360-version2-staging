@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { companyInfo } from '../../config/companyInfo';
 
 const sectionTitleClass = 'mt-10 text-xl font-semibold text-charcoal';
 
@@ -28,8 +29,8 @@ export default function TermsOfUsePage() {
         </p>
 
         <p className="mt-3 text-sm leading-6 text-charcoal/75">
-          The Platform is owned by Manas360 Mental Wellness Pvt Ltd, incorporated under the Companies Act, 1956,
-          with registered office at 6 MLV, Talaghatpura Kanakapura Road, Bengaluru 560062 (Platform Owner, we, us,
+          The Platform is owned by {companyInfo.legalName}, incorporated under the Companies Act, 1956,
+          with registered office at {companyInfo.fullAddress} (Platform Owner, we, us,
           our).
         </p>
 
@@ -56,8 +57,8 @@ export default function TermsOfUsePage() {
             <li>Initiating a transaction creates a legally binding and enforceable contract with the Platform Owner.</li>
             <li>You agree to indemnify and hold harmless Platform Owner and its affiliates against third-party claims arising from your breach of these terms, policies or law.</li>
             <li>Neither party is liable for non-performance caused by force majeure events.</li>
-            <li>These Terms are governed by laws of India, and disputes are subject to exclusive jurisdiction of courts in Bengaluru, Karnataka.</li>
-            <li>All concerns regarding these Terms must be communicated through contact details provided on the Platform.</li>
+            <li>These Terms are governed by laws of India, and disputes are subject to exclusive jurisdiction of courts in {companyInfo.jurisdiction}.</li>
+            <li>All concerns regarding these Terms must be communicated to <a href={`mailto:${companyInfo.supportEmail}`} className="underline hover:text-charcoal/60">{companyInfo.supportEmail}</a> or <a href={`tel:${companyInfo.phone.replace(/[^\d+]/g, '')}`} className="underline hover:text-charcoal/60">{companyInfo.phone}</a>.</li>
           </ol>
         </section>
 
@@ -71,7 +72,9 @@ export default function TermsOfUsePage() {
 
         <div className="mt-10 border-t border-calm-sage/15 pt-6 text-sm text-charcoal/65">
           <p>By using the Platform and Services, you confirm that you have read and agreed to these Terms.</p>
-          <p className="mt-2">Registered Office: 6 MLV, Talaghatpura Kanakapura Road, Bengaluru 560062</p>
+          <p className="mt-2">Registered Office: {companyInfo.fullAddress}</p>
+          <p className="mt-1">Corporate Identification Number (CIN): {companyInfo.cin}</p>
+          <p className="mt-1">Email: <a href={`mailto:${companyInfo.email}`} className="underline hover:text-charcoal/60">{companyInfo.email}</a></p>
           <div className="mt-4 flex flex-wrap gap-4">
             <Link to="/privacy" className="underline underline-offset-4">Read Privacy Policy</Link>
             <Link to="/refunds" className="underline underline-offset-4">Read Cancellation & Refund Policy</Link>

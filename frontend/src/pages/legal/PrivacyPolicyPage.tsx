@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { companyInfo } from '../../config/companyInfo';
 
 const sectionTitleClass = 'mt-10 text-xl font-semibold text-charcoal';
 
@@ -15,8 +16,8 @@ export default function PrivacyPolicyPage() {
         <h1 className="mt-2 text-3xl font-semibold text-charcoal md:text-4xl">Privacy Policy</h1>
 
         <p className="mt-4 text-sm leading-6 text-charcoal/75">
-          This Privacy Policy describes how Manas360 Mental Wellness Pvt Ltd and its affiliates (we, our, us) collect,
-          use, share and protect personal data through www.Manas360.com and related Platform experiences.
+          This Privacy Policy describes how {companyInfo.legalName} and its affiliates (we, our, us) collect,
+          use, share and protect personal data through www.{companyInfo.website} and related Platform experiences.
         </p>
 
         <p className="mt-3 text-sm leading-6 text-charcoal/75">
@@ -77,7 +78,7 @@ export default function PrivacyPolicyPage() {
           <h2 className={sectionTitleClass}>Your Rights and Consent</h2>
           <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-charcoal/75">
             <li>You may access, rectify and update personal data using Platform features.</li>
-            <li>You may withdraw consent by writing to the Grievance Officer.</li>
+            <li>You may withdraw consent by writing to our Grievance Officer at <a href={`mailto:${companyInfo.grievanceEmail}`} className="underline hover:text-charcoal/60">{companyInfo.grievanceEmail}</a> or <a href={`tel:${companyInfo.phone.replace(/[^\d+]/g, '')}`} className="underline hover:text-charcoal/60">{companyInfo.phone}</a>.</li>
             <li>Withdrawal is prospective and may limit certain services where data is necessary.</li>
           </ul>
         </section>
@@ -92,14 +93,20 @@ export default function PrivacyPolicyPage() {
 
         <section>
           <h2 className={sectionTitleClass}>Grievance Officer</h2>
-          <p className="mt-3 text-sm leading-6 text-charcoal/75">
-            For privacy concerns or consent withdrawal requests, contact the Grievance Officer via details provided on
-            the Platform.
-          </p>
+          <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-charcoal/75">
+            <li>For privacy concerns or consent withdrawal requests, contact the Grievance Officer:</li>
+            <li><strong>Email:</strong> <a href={`mailto:${companyInfo.grievanceEmail}`} className="underline hover:text-charcoal/60">{companyInfo.grievanceEmail}</a></li>
+            <li><strong>Phone:</strong> <a href={`tel:${companyInfo.phone.replace(/[^\d+]/g, '')}`} className="underline hover:text-charcoal/60">{companyInfo.phone}</a></li>
+            <li><strong>Address:</strong> {companyInfo.fullAddress}</li>
+          </ul>
         </section>
 
         <div className="mt-10 border-t border-calm-sage/15 pt-6 text-sm text-charcoal/65">
-          <div className="mt-1 flex flex-wrap gap-4">
+          <p><strong>Company:</strong> {companyInfo.legalName}</p>
+          <p className="mt-1"><strong>Registered Address:</strong> {companyInfo.fullAddress}</p>
+          <p className="mt-1"><strong>CIN:</strong> {companyInfo.cin} | <strong>GSTIN:</strong> {companyInfo.gstin}</p>
+          <p className="mt-1"><strong>Email:</strong> <a href={`mailto:${companyInfo.email}`} className="underline hover:text-charcoal/60">{companyInfo.email}</a></p>
+          <div className="mt-4 flex flex-wrap gap-4">
             <Link to="/terms" className="underline underline-offset-4">Read Terms of Use</Link>
             <Link to="/refunds" className="underline underline-offset-4">Read Cancellation & Refund Policy</Link>
             <Link to="/" className="underline underline-offset-4">Back to Home</Link>
