@@ -30,6 +30,15 @@ const client = {
 		const res = await fetch(joinUrl(url), { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 		return parseResponse<T>(res);
 	},
+	async patch<T = any>(url: string, body?: any) {
+		const res = await fetch(joinUrl(url), {
+			method: 'PATCH',
+			credentials: 'include',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(body ?? {}),
+		});
+		return parseResponse<T>(res);
+	},
 };
 
 export default client;

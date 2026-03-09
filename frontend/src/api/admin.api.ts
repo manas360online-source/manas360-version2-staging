@@ -36,6 +36,112 @@ export type RangeParams = {
 	limit?: number;
 };
 
+export type AdminUserRole = 'patient' | 'therapist' | 'psychiatrist' | 'coach' | 'admin';
+
+export type AdminSubscriptionPlanType = 'basic' | 'premium' | 'pro';
+export type AdminSubscriptionStatus = 'active' | 'expired' | 'cancelled' | 'paused';
+
+export type AdminUser = {
+	id: string;
+	email: string;
+	firstName: string;
+	lastName: string;
+	role: AdminUserRole;
+	isTherapistVerified?: boolean;
+	therapistVerifiedAt?: string | null;
+	createdAt: string;
+	updatedAt: string;
+};
+
+export type AdminUsersMeta = {
+	page: number;
+	limit: number;
+	totalItems: number;
+	totalPages: number;
+	hasNextPage: boolean;
+	hasPrevPage: boolean;
+};
+
+export type AdminUsersResponse = {
+	data: AdminUser[];
+	meta: AdminUsersMeta;
+};
+
+export type AdminUserDetail = {
+	id: string;
+	email: string;
+	firstName: string;
+	lastName: string;
+	role: AdminUserRole;
+	isTherapistVerified?: boolean;
+	therapistVerifiedAt?: string | null;
+	therapistVerifiedByUserId?: string | null;
+	createdAt: string;
+	updatedAt: string;
+};
+
+export type AdminMetrics = {
+	totalUsers: number;
+	totalTherapists: number;
+	verifiedTherapists: number;
+	completedSessions: number;
+	totalRevenue: number;
+	activeSubscriptions: number;
+};
+
+export type AdminModuleSummaryStat = {
+	label: string;
+	value: string;
+	note?: string;
+};
+
+export type AdminModuleSummaryItem = {
+	title: string;
+	subtitle: string;
+	meta?: string;
+};
+
+export type AdminModuleSummary = {
+	module: string;
+	stats: AdminModuleSummaryStat[];
+	items: AdminModuleSummaryItem[];
+	refreshedAt: string;
+};
+
+export type AdminSubscription = {
+	_id: string;
+	user: {
+		id: string;
+		name: string | null;
+		email: string;
+		phone: string | null;
+	};
+	plan: {
+		type: string;
+		name: string;
+	};
+	status: string;
+	startDate: string;
+	expiryDate: string;
+	price: number;
+	currency: string;
+	billingCycle: string;
+	autoRenew: boolean;
+	createdAt: string;
+};
+
+export type AdminSubscriptionsResponse = {
+	data: AdminSubscription[];
+	meta: {
+		page: number;
+		limit: number;
+		totalItems: number;
+		totalPages: number;
+		hasNextPage: boolean;
+		hasPrevPage: boolean;
+	};
+};
+
 const buildQuery = (params: Record<string, string | number | undefined>) => {
 	const query = Object.entries(params)
 		.filter(([, value]) => value !== undefined && value !== '')
@@ -83,4 +189,52 @@ export const getAdminTherapistUtilization = async (
 		lastTherapistKey: params.lastTherapistKey,
 	});
 	return (await client.get<ApiEnvelope<{ items: AdminUtilizationItem[]; nextCursor: { lastWeekStartDate: string; lastTherapistKey: number } | null }>>(`/v1/admin/analytics/utilization${query}`)).data;
+};
+
+export const getAdminUsers = async (params?: {
+	page?: number;
+	limit?: number;
+	role?: AdminUserRole;
+	status?: 'active' | 'deleted';
+}): Promise<ApiEnvelope<AdminUsersResponse>> => {
+	const query = buildQuery({
+		page: params?.page,
+		limit: params?.limit,
+		role: params?.role,
+		status: params?.status,
+	});
+
+	return (await client.get<ApiEnvelope<AdminUsersResponse>>(`/v1/admin/users${query}`)).data;
+};
+
+export const getAdminUserById = async (userId: string): Promise<ApiEnvelope<AdminUserDetail>> => {
+	return (await client.get<ApiEnvelope<AdminUserDetail>>(`/v1/admin/users/${encodeURIComponent(userId)}`)).data;
+};
+
+export const getAdminMetrics = async (): Promise<ApiEnvelope<AdminMetrics>> => {
+	return (await client.get<ApiEnvelope<AdminMetrics>>('/v1/admin/metrics')).data;
+};
+
+export const getAdminSubscriptions = async (params?: {
+	page?: number;
+	limit?: number;
+	planType?: AdminSubscriptionPlanType;
+	status?: AdminSubscriptionStatus;
+}): Promise<ApiEnvelope<AdminSubscriptionsResponse>> => {
+	const query = buildQuery({
+		page: params?.page,
+		limit: params?.limit,
+		planType: params?.planType,
+		status: params?.status,
+	});
+
+	return (await client.get<ApiEnvelope<AdminSubscriptionsResponse>>(`/v1/admin/subscriptions${query}`)).data;
+};
+
+export const verifyAdminTherapist = async (therapistId: string): Promise<ApiEnvelope<unknown>> => {
+	return (await client.patch<ApiEnvelope<unknown>>(`/v1/admin/therapists/${encodeURIComponent(therapistId)}/verify`)).data;
+};
+
+export const getAdminModuleSummary = async (module: string): Promise<ApiEnvelope<AdminModuleSummary>> => {
+	return (await client.get<ApiEnvelope<AdminModuleSummary>>(`/v1/admin/modules/${encodeURIComponent(module)}/summary`)).data;
 };

@@ -9,6 +9,24 @@ on:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: manas360_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d manas360_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/manas360_ci?schema=public
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/manas360_ci?schema=public
+      NODE_ENV: test
     steps:
       - uses: actions/checkout@v4
 
@@ -21,6 +39,22 @@ jobs:
       - name: Install backend dependencies
         working-directory: backend
         run: npm ci
+
+      - name: Generate Prisma client
+        working-directory: backend
+        run: npm run prisma:generate
+
+      - name: Apply database migrations
+        working-directory: backend
+        run: npm run prisma:migrate:deploy
+
+      - name: Seed baseline login users
+        working-directory: backend
+        run: npm run seed:login-users
+
+      - name: Enforce single platform admin
+        working-directory: backend
+        run: npm run guard:single-admin
 
       - name: Run npm audit
         working-directory: backend

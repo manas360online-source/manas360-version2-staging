@@ -239,9 +239,15 @@ export const promoteUserController = async (req: Request, res: Response): Promis
     const user = await db.user.findFirst({ where: { email: email, company_key: ownerCompanyKey } });
     if (!user) throw new AppError('User not found in company', 404);
 
-    await db.user.update({ where: { id: user.id }, data: { is_company_admin: true } });
+    await db.user.update({
+        where: { id: user.id },
+        data: {
+            company_key: ownerCompanyKey,
+            is_company_admin: false,
+        },
+    });
 
-    sendSuccess(res, { ok: true }, 'User promoted to company admin');
+    sendSuccess(res, { ok: true }, 'User mapped as corporate member for tenant access');
 };
 
 export default {

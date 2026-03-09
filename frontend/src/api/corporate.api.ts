@@ -23,7 +23,35 @@ export type BulkEmployeeRow = {
   manager?: string;
 };
 
+export type CorporateDemoRequestPayload = {
+  companyName: string;
+  workEmail: string;
+  companySize?: string;
+  industry?: string;
+  country?: string;
+  contactName?: string;
+  phone?: string;
+};
+
+export type CorporateCreateAccountPayload = {
+  companyName: string;
+  workEmail: string;
+  password: string;
+  companySize?: string;
+  industry?: string;
+  country?: string;
+  contactName?: string;
+};
+
 export const corporateApi = {
+  requestDemo: async (payload: CorporateDemoRequestPayload) => {
+    const response = await http.post('/v1/corporate/public/request-demo', payload);
+    return unwrap(response.data);
+  },
+  createCorporateAccount: async (payload: CorporateCreateAccountPayload) => {
+    const response = await http.post('/v1/corporate/public/create-account', payload);
+    return unwrap(response.data);
+  },
   listCompanies: async () => {
     const response = await http.get('/v1/corporate/companies');
     return unwrap(response.data);
