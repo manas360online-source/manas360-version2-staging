@@ -19,7 +19,7 @@ describe('Auth form components', () => {
 			</MemoryRouter>,
 		);
 
-		expect(screen.getByLabelText('Email')).toBeTruthy();
+		expect(screen.getByLabelText('Email or Phone')).toBeTruthy();
 		expect(screen.getByLabelText('Password')).toBeTruthy();
 		expect(screen.getByRole('link', { name: 'Forgot password?' })).toBeTruthy();
 	});
