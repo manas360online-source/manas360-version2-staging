@@ -31,6 +31,9 @@ import {
 	listNotifications,
 	listProviders,
 	markNotificationRead,
+	requestAppointmentWithPreferredProviders,
+	patientConfirmProposedAppointmentSlot,
+	therapistProposeAppointmentSlot,
 	getPatientSettings,
 	updatePatientSettings,
 	getPatientSupportCenter,
@@ -73,6 +76,7 @@ export const listProvidersController = async (req: Request, res: Response): Prom
 	const result = await listProviders({
 		specialization: typeof req.query.specialization === 'string' ? req.query.specialization : undefined,
 		language: typeof req.query.language === 'string' ? req.query.language : undefined,
+		role: typeof req.query.role === 'string' ? req.query.role : undefined,
 		minPrice: req.query.minPrice ? Number(req.query.minPrice) : undefined,
 		maxPrice: req.query.maxPrice ? Number(req.query.maxPrice) : undefined,
 		page: req.query.page ? Number(req.query.page) : 1,
@@ -86,6 +90,7 @@ export const listAvailableProvidersController = async (req: Request, res: Respon
 		search: typeof req.query.search === 'string' ? req.query.search : undefined,
 		specialization: typeof req.query.specialization === 'string' ? req.query.specialization : undefined,
 		language: typeof req.query.language === 'string' ? req.query.language : undefined,
+		role: typeof req.query.role === 'string' ? req.query.role : undefined,
 		minPrice: req.query.minPrice ? Number(req.query.minPrice) : undefined,
 		maxPrice: req.query.maxPrice ? Number(req.query.maxPrice) * 100 : undefined,
 		page: req.query.page ? Number(req.query.page) : 1,
@@ -318,6 +323,62 @@ export const markNotificationReadController = async (req: Request, res: Response
 	if (!id) throw new AppError('notification id is required', 422);
 	const data = await markNotificationRead(userId, id);
 	sendSuccess(res, data, 'Notification marked as read');
+};
+
+export const requestAppointmentWithPreferredProvidersController = async (req: Request, res: Response): Promise<void> => {
+	const userId = authUserId(req);
+	const providerIds = Array.isArray(req.body?.providerIds) ? req.body.providerIds.map((id: any) => String(id || '').trim()) : [];
+	if (!providerIds.length) {
+		throw new AppError('providerIds is required', 422);
+	}
+
+	const data = await requestAppointmentWithPreferredProviders(userId, {
+		providerIds,
+		preferredLanguage: req.body?.preferredLanguage ? String(req.body.preferredLanguage) : undefined,
+		preferredTime: req.body?.preferredTime ? String(req.body.preferredTime) : undefined,
+		preferredSpecialization: req.body?.preferredSpecialization ? String(req.body.preferredSpecialization) : undefined,
+		carePath: req.body?.carePath ? String(req.body.carePath) : undefined,
+		urgency: req.body?.urgency ? String(req.body.urgency) : undefined,
+		note: req.body?.note ? String(req.body.note) : undefined,
+	});
+
+	sendSuccess(res, data, 'Appointment request sent', 201);
+};
+
+export const patientConfirmProposedAppointmentSlotController = async (req: Request, res: Response): Promise<void> => {
+	const userId = authUserId(req);
+	const requestRef = String(req.body?.requestRef || '').trim();
+	const providerId = String(req.body?.providerId || '').trim();
+	const accept = Boolean(req.body?.accept);
+	if (!requestRef || !providerId) {
+		throw new AppError('requestRef and providerId are required', 422);
+	}
+
+	const data = await patientConfirmProposedAppointmentSlot(userId, {
+		requestRef,
+		providerId,
+		proposedStartAt: req.body?.proposedStartAt ? String(req.body.proposedStartAt) : undefined,
+		accept,
+	});
+
+	sendSuccess(res, data, 'Appointment slot response recorded');
+};
+
+export const therapistProposeAppointmentSlotController = async (req: Request, res: Response): Promise<void> => {
+	const userId = authUserId(req);
+	const requestRef = String(req.body?.requestRef || '').trim();
+	const proposedStartAt = String(req.body?.proposedStartAt || '').trim();
+	if (!requestRef || !proposedStartAt) {
+		throw new AppError('requestRef and proposedStartAt are required', 422);
+	}
+
+	const data = await therapistProposeAppointmentSlot(userId, {
+		requestRef,
+		proposedStartAt,
+		note: req.body?.note ? String(req.body.note) : undefined,
+	});
+
+	sendSuccess(res, data, 'Proposed slot sent to patient');
 };
 
 export const getPatientSettingsController = async (req: Request, res: Response): Promise<void> => {

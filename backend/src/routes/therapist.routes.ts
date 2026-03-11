@@ -28,6 +28,7 @@ import {
 	sendReminderController,
 	startLiveSessionController,
 	duplicateTemplateController,
+	therapistProposeAppointmentSlotController,
 } from '../controllers/therapist.actions.controller';
 import { analyticsController } from '../controllers/analytics.controller';
 import { requireSessionOwnership } from '../middleware/ownership.middleware';
@@ -125,6 +126,7 @@ router.post('/me/sessions/:id/actions/reschedule', requireAuth, requireTherapist
 router.post('/me/sessions/:id/actions/cancel', requireAuth, requireTherapistRole, ...validateSessionIdParam, asyncHandler(cancelSessionController));
 router.post('/me/sessions/:id/actions/remind', requireAuth, requireTherapistRole, ...validateSessionIdParam, asyncHandler(sendReminderController));
 router.post('/me/sessions/:id/actions/start-live', requireAuth, requireTherapistRole, ...validateSessionIdParam, asyncHandler(startLiveSessionController));
+router.post('/me/appointments/propose-slot', requireAuth, requireTherapistRole, asyncHandler(therapistProposeAppointmentSlotController));
 // Analytics
 router.get('/me/analytics/summary', requireAuth, requireTherapistRole, asyncHandler(analyticsController.getSummary.bind(analyticsController)));
 router.get('/me/analytics/sessions', requireAuth, requireTherapistRole, asyncHandler(analyticsController.getTimeSeries.bind(analyticsController)));

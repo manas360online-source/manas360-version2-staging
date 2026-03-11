@@ -153,6 +153,7 @@ const processSubscriptionWebhook = async (rawBody, signature) => {
                     grossAmountMinor: amountMinor,
                     platformCommissionMinor: amountMinor,
                     providerShareMinor: 0,
+                    paymentType: 'PLATFORM_FEE',
                     taxAmountMinor: 0,
                     currency: String(paymentEntity?.currency ?? 'INR'),
                     referenceId: sub.id,

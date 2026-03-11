@@ -28,6 +28,7 @@ import {
 	createQuestionOptionAdminController,
 	createScreeningTemplateAdminController,
 	createTemplateQuestionAdminController,
+	ensureScreeningTemplateDefaultAdminController,
 	listAllProviderExtraQuestionsAdminController,
 	listScoringBandsAdminController,
 	listScreeningTemplatesAdminController,
@@ -108,6 +109,7 @@ router.patch('/pricing', requireAuth, requireRole('admin'), asyncHandler(updateA
 
 router.get('/screening/templates', requireAuth, requireRole('admin'), asyncHandler(listScreeningTemplatesAdminController));
 router.post('/screening/templates', requireAuth, requireRole('admin'), asyncHandler(createScreeningTemplateAdminController));
+router.post('/screening/templates/defaults/:templateKey/ensure', requireAuth, requireRole('admin'), asyncHandler(ensureScreeningTemplateDefaultAdminController));
 router.put('/screening/templates/:templateId', requireAuth, requireRole('admin'), asyncHandler(updateScreeningTemplateAdminController));
 
 router.get('/screening/templates/:templateId/questions', requireAuth, requireRole('admin'), asyncHandler(listTemplateQuestionsAdminController));

@@ -1,10 +1,9 @@
 import crypto from 'crypto';
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/error.middleware';
+import { ensureDefaultScreeningTemplate, FREE_SCREENING_TEMPLATE_KEY } from './screening-template-defaults.service';
 
 const db = prisma as any;
-
-const DEFAULT_TEMPLATE_KEY = 'free-mental-health-screening-v1';
 
 type StartInput = {
 	templateKey?: string;
@@ -21,104 +20,6 @@ type SubmitInput = {
 	answers: SubmitAnswerInput[];
 	attemptToken?: string;
 	patientUserId?: string;
-};
-
-const DEFAULT_TEMPLATE = {
-	key: DEFAULT_TEMPLATE_KEY,
-	title: 'FREE MENTAL HEALTH SCREENING ASSESSMENT',
-	description: '5-Question General Wellbeing Screener | 2-3 minutes | Immediate Results',
-	estimatedMinutes: 3,
-	questions: [
-		{
-			orderIndex: 1,
-			prompt: 'Over the last 2 weeks, how often have you felt down, depressed, or hopeless?',
-			options: [
-				{ optionIndex: 0, label: 'Not at all', points: 0 },
-				{ optionIndex: 1, label: 'Several days', points: 1 },
-				{ optionIndex: 2, label: 'More than half the days', points: 2 },
-				{ optionIndex: 3, label: 'Nearly every day', points: 3 },
-			],
-		},
-		{
-			orderIndex: 2,
-			prompt: 'Over the last 2 weeks, how often have you felt nervous, anxious, or on edge?',
-			options: [
-				{ optionIndex: 0, label: 'Not at all', points: 0 },
-				{ optionIndex: 1, label: 'Several days', points: 1 },
-				{ optionIndex: 2, label: 'More than half the days', points: 2 },
-				{ optionIndex: 3, label: 'Nearly every day', points: 3 },
-			],
-		},
-		{
-			orderIndex: 3,
-			prompt: 'How would you rate your overall sleep quality in the past week?',
-			options: [
-				{ optionIndex: 0, label: 'Very good - I sleep well most nights', points: 0 },
-				{ optionIndex: 1, label: 'Fairly good - Some difficulties but manageable', points: 1 },
-				{ optionIndex: 2, label: 'Fairly bad - Frequent sleep problems', points: 2 },
-				{ optionIndex: 3, label: 'Very bad - Severe sleep difficulties', points: 3 },
-			],
-		},
-		{
-			orderIndex: 4,
-			prompt: 'How often do you feel overwhelmed by daily responsibilities?',
-			options: [
-				{ optionIndex: 0, label: 'Rarely or never', points: 0 },
-				{ optionIndex: 1, label: 'Sometimes (once or twice a week)', points: 1 },
-				{ optionIndex: 2, label: 'Often (3-5 days a week)', points: 2 },
-				{ optionIndex: 3, label: 'Almost always (daily)', points: 3 },
-			],
-		},
-		{
-			orderIndex: 5,
-			prompt: 'In the past month, how satisfied have you been with your relationships and social connections?',
-			options: [
-				{ optionIndex: 0, label: 'Very satisfied - Strong support system', points: 0 },
-				{ optionIndex: 1, label: 'Somewhat satisfied - Adequate connections', points: 1 },
-				{ optionIndex: 2, label: 'Somewhat dissatisfied - Limited support', points: 2 },
-				{ optionIndex: 3, label: 'Very dissatisfied - Feeling isolated', points: 3 },
-			],
-		},
-	],
-	scoringBands: [
-		{
-			orderIndex: 1,
-			minScore: 0,
-			maxScore: 3,
-			severity: 'Minimal',
-			interpretation: 'You appear to be doing well overall with minimal mental health concerns.',
-			recommendation: 'Continue healthy habits. Maintain work-life balance.',
-			actionLabel: 'Keep monitoring',
-		},
-		{
-			orderIndex: 2,
-			minScore: 4,
-			maxScore: 7,
-			severity: 'Mild',
-			interpretation: 'You may be experiencing some mild stress or mood changes that could benefit from attention.',
-			recommendation: 'Consider self-care activities. Try meditation, exercise, or journaling.',
-			actionLabel: 'Self-care recommended',
-		},
-		{
-			orderIndex: 3,
-			minScore: 8,
-			maxScore: 11,
-			severity: 'Moderate',
-			interpretation: 'You are experiencing moderate mental health symptoms that warrant professional attention.',
-			recommendation: 'Speak with a mental health professional. Consider therapy sessions.',
-			actionLabel: 'Professional help suggested',
-		},
-		{
-			orderIndex: 4,
-			minScore: 12,
-			maxScore: 15,
-			severity: 'Severe',
-			interpretation: 'You are experiencing significant mental health difficulties requiring immediate professional support.',
-			recommendation:
-				'Schedule consultation with psychiatrist or psychologist urgently. Consider therapy + medication evaluation.',
-			actionLabel: 'Urgent - Book session now',
-		},
-	],
 };
 
 const hashToken = (token: string): string => crypto.createHash('sha256').update(token).digest('hex');
@@ -156,7 +57,7 @@ const getPatientProfileByUserId = async (userId: string) => {
 };
 
 const getTemplate = async (templateKey?: string) => {
-	const key = String(templateKey || DEFAULT_TEMPLATE_KEY).trim() || DEFAULT_TEMPLATE_KEY;
+	const key = String(templateKey || FREE_SCREENING_TEMPLATE_KEY).trim() || FREE_SCREENING_TEMPLATE_KEY;
 	const template = await db.screeningTemplate.findFirst({
 		where: { key, status: 'PUBLISHED' },
 		include: {
@@ -170,47 +71,7 @@ const getTemplate = async (templateKey?: string) => {
 	});
 	if (template) return template;
 
-	await db.$transaction(async (tx: any) => {
-		const created = await tx.screeningTemplate.create({
-			data: {
-				key: DEFAULT_TEMPLATE.key,
-				title: DEFAULT_TEMPLATE.title,
-				description: DEFAULT_TEMPLATE.description,
-				estimatedMinutes: DEFAULT_TEMPLATE.estimatedMinutes,
-				isPublic: true,
-				randomizeOrder: true,
-				status: 'PUBLISHED',
-			},
-		});
-
-		for (const question of DEFAULT_TEMPLATE.questions) {
-			await tx.screeningQuestion.create({
-				data: {
-					templateId: created.id,
-					prompt: question.prompt,
-					sectionKey: 'general',
-					orderIndex: question.orderIndex,
-					isActive: true,
-					options: {
-						create: question.options,
-					},
-				},
-			});
-		}
-
-		await tx.screeningScoringBand.createMany({
-			data: DEFAULT_TEMPLATE.scoringBands.map((band) => ({
-				templateId: created.id,
-				orderIndex: band.orderIndex,
-				minScore: band.minScore,
-				maxScore: band.maxScore,
-				severity: band.severity,
-				interpretation: band.interpretation,
-				recommendation: band.recommendation,
-				actionLabel: band.actionLabel,
-			})),
-		});
-	});
+	await ensureDefaultScreeningTemplate(db, key);
 
 	return db.screeningTemplate.findFirst({
 		where: { key, status: 'PUBLISHED' },
@@ -238,6 +99,7 @@ const buildQuestionPayload = (template: any, presentedOrder: string[]) => {
 			options: (question.options || []).map((option: any) => ({
 				optionIndex: option.optionIndex,
 				label: option.label,
+				points: option.points,
 			})),
 		}));
 };

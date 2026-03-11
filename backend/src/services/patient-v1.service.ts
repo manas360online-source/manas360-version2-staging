@@ -10,6 +10,7 @@ import { syncTreatmentPlanFromAssessment } from './treatment-plan.service';
 import { getSessionQuote } from './pricing.service';
 import { getActivePlatformPlan } from './pricing.service';
 import { scoreGAD7, scorePHQ9 } from './riskScoring';
+import { sendSubscriptionActivationEmail } from './email.service';
 
 const db = prisma as any;
 
@@ -18,12 +19,46 @@ type ProviderFilters = {
 	language?: string;
 	minPrice?: number;
 	maxPrice?: number;
+	role?: string;
 	page?: number;
 	limit?: number;
 };
 
 const DEFAULT_SESSION_FEE_MINOR = 150000;
 const DEFAULT_DURATION_MINUTES = 50;
+const PAYMENT_DEADLINE_HOURS = 12;
+const PROVIDER_ROLES = ['THERAPIST', 'PSYCHOLOGIST', 'PSYCHIATRIST', 'COACH'] as const;
+
+const normalizeProviderRole = (role: string | null | undefined): 'THERAPIST' | 'PSYCHOLOGIST' | 'PSYCHIATRIST' | 'COACH' | null => {
+	const normalized = String(role || '').trim().toUpperCase();
+	if (normalized === 'THERAPIST' || normalized === 'PSYCHOLOGIST' || normalized === 'PSYCHIATRIST' || normalized === 'COACH') {
+		return normalized;
+	}
+	return null;
+};
+
+const roleToProviderType = (role: string | null | undefined): 'specialized-therapist' | 'clinical-psychologist' | 'psychiatrist' => {
+	const normalized = normalizeProviderRole(role);
+	if (normalized === 'PSYCHOLOGIST') return 'clinical-psychologist';
+	if (normalized === 'PSYCHIATRIST') return 'psychiatrist';
+	return 'specialized-therapist';
+};
+
+const roleLabel = (role: string | null | undefined): string => {
+	const normalized = normalizeProviderRole(role);
+	if (normalized === 'PSYCHOLOGIST') return 'Psychologist';
+	if (normalized === 'PSYCHIATRIST') return 'Psychiatrist';
+	if (normalized === 'COACH') return 'Coach';
+	return 'Therapist';
+};
+
+const defaultFeeByRoleMinor = (role: string | null | undefined): number => {
+	const normalized = normalizeProviderRole(role);
+	if (normalized === 'PSYCHOLOGIST') return 69900;
+	if (normalized === 'PSYCHIATRIST') return 99900;
+	if (normalized === 'COACH') return 49900;
+	return DEFAULT_SESSION_FEE_MINOR;
+};
 
 const normalizePagination = (page = 1, limit = 10) => {
 	const safePage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
@@ -33,8 +68,35 @@ const normalizePagination = (page = 1, limit = 10) => {
 
 const getPatientProfile = async (userId: string) => {
 	const profile = await db.patientProfile.findUnique({ where: { userId }, select: { id: true } });
-	if (!profile) throw new AppError('Patient profile not found. Please complete onboarding.', 404);
-	return profile;
+	if (profile) return profile;
+
+	const created = await db.patientProfile.create({
+		data: {
+			userId,
+			age: 25,
+			gender: 'prefer_not_to_say',
+			emergencyContact: {
+				name: 'Not provided',
+				relation: 'Not provided',
+				phone: 'Not provided',
+			},
+		},
+		select: { id: true },
+	}).catch(() => null);
+
+	if (!created) {
+		throw new AppError('Patient profile unavailable', 500);
+	}
+
+	return created;
+};
+
+const assertPaymentDeadlineWindow = (scheduledAt: Date): void => {
+	const now = Date.now();
+	const threshold = scheduledAt.getTime() - PAYMENT_DEADLINE_HOURS * 60 * 60 * 1000;
+	if (now > threshold) {
+		throw new AppError(`Session payment must be completed at least ${PAYMENT_DEADLINE_HOURS} hours before start time`, 409);
+	}
 };
 
 const mapSeverity = (score: number): 'Mild' | 'Moderate' | 'Severe' => {
@@ -167,13 +229,23 @@ const toProviderListItem = async (user: any) => {
 	});
 	const specializations = [...new Set(categories.map((c: any) => String(c.category || '').trim()).filter(Boolean))];
 	const completedSessions = await db.therapySession.count({ where: { therapistProfileId: user.id, status: 'COMPLETED' } });
+	const providerType = roleToProviderType(user.role);
+	const fallbackSpecialization = providerType === 'psychiatrist'
+		? 'Medication & Clinical Psychiatry'
+		: providerType === 'clinical-psychologist'
+			? 'Clinical Psychology'
+			: normalizeProviderRole(user.role) === 'COACH'
+				? 'Wellness Coaching'
+				: 'General Wellness Therapy';
 	return {
 		id: user.id,
 		name: String(user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Therapist'),
-		specialization: specializations[0] || 'General Wellness',
-		specializations,
+		role: roleLabel(user.role),
+		providerType,
+		specialization: specializations[0] || fallbackSpecialization,
+		specializations: specializations.length ? specializations : [fallbackSpecialization],
 		experience_years: 3,
-		session_rate: DEFAULT_SESSION_FEE_MINOR,
+		session_rate: defaultFeeByRoleMinor(user.role),
 		bio: user.bio || 'Experienced mental wellness professional.',
 		languages: ['English', 'Hindi'],
 		rating_avg: completedSessions > 0 ? 4.6 : 4.4,
@@ -231,8 +303,8 @@ export const getPatientDashboard = async (userId: string) => {
 			select: { id: true, moodScore: true, note: true, date: true },
 		}),
 		db.user.findMany({
-			where: { role: 'THERAPIST', isDeleted: false },
-			select: { id: true, firstName: true, lastName: true, name: true },
+			where: { role: { in: PROVIDER_ROLES as any }, isDeleted: false },
+			select: { id: true, firstName: true, lastName: true, name: true, role: true },
 			take: 8,
 		}),
 		db.patientExercise.findMany({
@@ -380,23 +452,11 @@ const ensureSubscriptionRecord = async (userId: string) => {
 				planName: activePlan.planName,
 				price: activePlan.monthlyFee,
 				billingCycle: 'monthly',
-				status: 'active',
-				autoRenew: true,
+				status: 'inactive',
+				autoRenew: false,
 				renewalDate,
 			},
 		}).catch(() => null);
-
-		if (subscription) {
-			await db.$executeRawUnsafe(
-				`INSERT INTO user_subscriptions (id, user_id, plan_id, start_date, end_date, status, price_snapshot, created_at, updated_at)
-				 VALUES ($1, $2, $3, CURRENT_DATE, $4::date, 'active', $5, NOW(), NOW())`,
-				crypto.randomUUID(),
-				userId,
-				activePlan.id,
-				renewalDate,
-				activePlan.monthlyFee,
-			).catch(() => null);
-		}
 	} else if (
 		String(subscription.status || '').toLowerCase() === 'active'
 		&& subscription.autoRenew
@@ -453,7 +513,7 @@ export const updatePatientSubscriptionPlan = async (userId: string, action: 'upg
 	const nextPlan = planOrder[nextIndex];
 	const price = activePlan.monthlyFee;
 
-	return db.patientSubscription.update({
+	const updated = await db.patientSubscription.update({
 		where: { userId },
 		data: {
 			planName: activePlan.planName || `${nextPlan[0].toUpperCase()}${nextPlan.slice(1)} Plan`,
@@ -464,6 +524,18 @@ export const updatePatientSubscriptionPlan = async (userId: string, action: 'upg
 			renewalDate: new Date(new Date().getTime() + (nextPlan === 'pro' ? 365 : 30) * 24 * 60 * 60 * 1000),
 		},
 	});
+
+	if (String(updated.status || '').toLowerCase() === 'active') {
+		const user = await db.user.findUnique({ where: { id: userId }, select: { email: true, name: true, firstName: true, lastName: true } }).catch(() => null);
+		await sendSubscriptionActivationEmail({
+			to: String(user?.email || ''),
+			name: String(user?.name || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || ''),
+			planName: String(updated.planName || 'Standard Plan'),
+			priceInr: Math.round(Number(updated.price || 0) / 100),
+		});
+	}
+
+	return updated;
 };
 
 export const cancelPatientSubscription = async (userId: string) => {
@@ -480,7 +552,7 @@ export const cancelPatientSubscription = async (userId: string) => {
 export const reactivatePatientSubscription = async (userId: string) => {
 	await ensureSubscriptionRecord(userId);
 	const activePlan = await getActivePlatformPlan();
-	return db.patientSubscription.update({
+	const updated = await db.patientSubscription.update({
 		where: { userId },
 		data: {
 			planName: activePlan.planName,
@@ -490,6 +562,16 @@ export const reactivatePatientSubscription = async (userId: string) => {
 			renewalDate: new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000),
 		},
 	});
+
+	const user = await db.user.findUnique({ where: { id: userId }, select: { email: true, name: true, firstName: true, lastName: true } }).catch(() => null);
+	await sendSubscriptionActivationEmail({
+		to: String(user?.email || ''),
+		name: String(user?.name || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || ''),
+		planName: String(updated.planName || activePlan.planName || 'Standard Plan'),
+		priceInr: Math.round(Number(updated.price || activePlan.monthlyFee || 0) / 100),
+	});
+
+	return updated;
 };
 
 export const setPatientSubscriptionAutoRenew = async (userId: string, autoRenew: boolean) => {
@@ -554,14 +636,18 @@ export const completePatientExercise = async (userId: string, exerciseId: string
 
 export const listProviders = async (filters: ProviderFilters) => {
 	const { page, limit, skip } = normalizePagination(filters.page, filters.limit);
+	const requestedRole = normalizeProviderRole(filters.role);
+	const roleFilter = requestedRole
+		? [requestedRole]
+		: [...PROVIDER_ROLES];
 	const therapists = await db.user.findMany({
-		where: { role: 'THERAPIST', isDeleted: false },
-		select: { id: true, firstName: true, lastName: true, name: true },
+		where: { role: { in: roleFilter as any }, isDeleted: false },
+		select: { id: true, firstName: true, lastName: true, name: true, role: true },
 		orderBy: { createdAt: 'desc' },
 		skip,
 		take: limit,
 	});
-	const total = await db.user.count({ where: { role: 'THERAPIST', isDeleted: false } });
+	const total = await db.user.count({ where: { role: { in: roleFilter as any }, isDeleted: false } });
 	let items = await Promise.all(therapists.map((u: any) => toProviderListItem(u)));
 
 	if (filters.specialization) {
@@ -588,7 +674,7 @@ export const getProviderById = async (providerId: string) => {
 		where: { id: providerId },
 		select: { id: true, firstName: true, lastName: true, name: true, role: true, isDeleted: true },
 	});
-	if (!therapist || therapist.isDeleted || String(therapist.role) !== 'THERAPIST') throw new AppError('Provider not found', 404);
+	if (!therapist || therapist.isDeleted || !normalizeProviderRole(String(therapist.role))) throw new AppError('Provider not found', 404);
 
 	const profile = await toProviderListItem(therapist);
 	const now = new Date();
@@ -643,13 +729,14 @@ export const initiateSessionBooking = async (
 ) => {
 	await getPatientProfile(userId);
 	const provider = await db.user.findUnique({ where: { id: input.providerId }, select: { id: true, role: true, isDeleted: true } });
-	if (!provider || provider.isDeleted || String(provider.role) !== 'THERAPIST') throw new AppError('Provider not found', 404);
+	if (!provider || provider.isDeleted || !normalizeProviderRole(String(provider.role))) throw new AppError('Provider not found', 404);
 
 	const scheduledAt = new Date(input.scheduledAt);
 	if (Number.isNaN(scheduledAt.getTime()) || scheduledAt <= new Date()) throw new AppError('scheduledAt must be a future datetime', 422);
+	assertPaymentDeadlineWindow(scheduledAt);
 	const duration = input.durationMinutes && input.durationMinutes > 0 ? Math.min(180, Math.floor(input.durationMinutes)) : DEFAULT_DURATION_MINUTES;
 	const quote = await getSessionQuote({
-		providerType: input.providerType,
+		providerType: input.providerType || roleToProviderType(provider.role),
 		durationMinutes: duration,
 		preferredTime: Boolean(input.preferredTime),
 	});
@@ -685,6 +772,7 @@ export const initiateSessionBooking = async (
 		duration_minutes: quote.durationMinutes,
 		pricing: {
 			provider_type: quote.providerType,
+			provider_role: roleLabel(provider.role),
 			base_price: quote.basePrice,
 			surcharge_percent: quote.surchargePercent,
 			preferred_time: quote.preferredTime,
@@ -714,6 +802,7 @@ export const verifySessionPaymentAndCreateSession = async (
 
 	const intent = await db.sessionBookingIntent.findUnique({ where: { razorpayOrderId: input.razorpay_order_id } });
 	if (!intent || String(intent.patientId) !== userId) throw new AppError('Booking intent not found', 404);
+	assertPaymentDeadlineWindow(new Date(intent.scheduledAt));
 	if (String(intent.status) === 'CONFIRMED' && intent.sessionId) {
 		const existing = await db.therapySession.findUnique({ where: { id: intent.sessionId } });
 		if (existing) return { sessionId: existing.id, status: 'confirmed', agora_channel: existing.agoraChannel, agora_token: existing.agoraToken };
@@ -809,6 +898,157 @@ export const verifySessionPaymentAndCreateSession = async (
 		agora_channel: created.agoraChannel,
 		agora_token: created.agoraToken,
 		scheduled_at: created.dateTime,
+	};
+};
+
+export const therapistProposeAppointmentSlot = async (
+	therapistId: string,
+	input: { requestRef: string; proposedStartAt: string; note?: string },
+) => {
+	const requestRef = String(input.requestRef || '').trim();
+	const proposedStartAt = new Date(input.proposedStartAt);
+	if (!requestRef) throw new AppError('requestRef is required', 422);
+	if (Number.isNaN(proposedStartAt.getTime()) || proposedStartAt <= new Date()) {
+		throw new AppError('proposedStartAt must be a future datetime', 422);
+	}
+
+	const providerRequests = await db.notification.findMany({
+		where: { userId: therapistId, type: 'APPOINTMENT_REQUEST' },
+		orderBy: { createdAt: 'desc' },
+		take: 100,
+	});
+	const requestNotification = providerRequests.find((item: any) => String(item?.payload?.requestRef || '') === requestRef);
+	if (!requestNotification) {
+		throw new AppError('Appointment request not found for this provider', 404);
+	}
+
+	const patientId = String(requestNotification?.payload?.patientId || '').trim();
+	if (!patientId) throw new AppError('Appointment request is invalid', 422);
+
+	await db.notification.update({
+		where: { id: requestNotification.id },
+		data: {
+			payload: {
+				...(requestNotification.payload || {}),
+				requestStatus: 'PROPOSED_SLOT',
+				proposedStartAt: proposedStartAt.toISOString(),
+				note: input.note || null,
+			},
+		},
+	});
+
+	await db.notification.create({
+		data: {
+			userId: patientId,
+			type: 'APPOINTMENT_SLOT_PROPOSED',
+			title: 'Provider proposed a new slot',
+			message: 'Your selected provider proposed a slot. Confirm to continue to payment and final booking.',
+			payload: {
+				requestRef,
+				providerId: therapistId,
+				proposedStartAt: proposedStartAt.toISOString(),
+				note: input.note || null,
+				requestStatus: 'WAITING_PATIENT_CONFIRMATION',
+			},
+			sentAt: new Date(),
+		},
+	});
+
+	return {
+		requestRef,
+		providerId: therapistId,
+		proposedStartAt: proposedStartAt.toISOString(),
+		status: 'waiting_patient_confirmation',
+	};
+};
+
+export const patientConfirmProposedAppointmentSlot = async (
+	patientUserId: string,
+	input: { requestRef: string; providerId: string; proposedStartAt?: string; accept: boolean },
+) => {
+	const requestRef = String(input.requestRef || '').trim();
+	const providerId = String(input.providerId || '').trim();
+	if (!requestRef || !providerId) {
+		throw new AppError('requestRef and providerId are required', 422);
+	}
+
+	const proposals = await db.notification.findMany({
+		where: { userId: patientUserId, type: 'APPOINTMENT_SLOT_PROPOSED' },
+		orderBy: { createdAt: 'desc' },
+		take: 100,
+	});
+	const proposal = proposals.find(
+		(item: any) => String(item?.payload?.requestRef || '') === requestRef && String(item?.payload?.providerId || '') === providerId,
+	);
+	if (!proposal) {
+		throw new AppError('Proposed appointment slot not found', 404);
+	}
+
+	if (!input.accept) {
+		await db.notification.create({
+			data: {
+				userId: providerId,
+				type: 'APPOINTMENT_SLOT_REJECTED',
+				title: 'Patient declined proposed slot',
+				message: 'Patient declined the proposed slot. Please offer another suitable time.',
+				payload: { requestRef, patientId: patientUserId },
+				sentAt: new Date(),
+			},
+		});
+
+		await db.notification.update({ where: { id: proposal.id }, data: { isRead: true } });
+		return { requestRef, status: 'declined' };
+	}
+
+	const proposedStartAtIso = String(input.proposedStartAt || proposal?.payload?.proposedStartAt || '').trim();
+	const proposedStartAt = new Date(proposedStartAtIso);
+	if (!proposedStartAtIso || Number.isNaN(proposedStartAt.getTime())) {
+		throw new AppError('Valid proposedStartAt is required', 422);
+	}
+
+	const booking = await initiateSessionBooking(patientUserId, {
+		providerId,
+		scheduledAt: proposedStartAt,
+		preferredTime: false,
+		preferredWindow: 'Provider proposed slot',
+	});
+
+	await db.notification.createMany({
+		data: [
+			{
+				userId: patientUserId,
+				type: 'APPOINTMENT_SLOT_CONFIRMED',
+				title: 'Slot confirmed - payment pending',
+				message: `Complete payment before ${PAYMENT_DEADLINE_HOURS} hours of the session start to finalize your booking.`,
+				payload: {
+					requestRef,
+					providerId,
+					scheduledAt: proposedStartAt.toISOString(),
+					orderId: booking.order_id,
+				},
+				sentAt: new Date(),
+			},
+			{
+				userId: providerId,
+				type: 'APPOINTMENT_SLOT_ACCEPTED',
+				title: 'Patient accepted proposed slot',
+				message: 'Patient accepted your proposed slot and is proceeding to payment.',
+				payload: {
+					requestRef,
+					patientId: patientUserId,
+					scheduledAt: proposedStartAt.toISOString(),
+				},
+				sentAt: new Date(),
+			},
+		],
+	});
+
+	await db.notification.update({ where: { id: proposal.id }, data: { isRead: true } });
+
+	return {
+		requestRef,
+		status: 'accepted',
+		booking,
 	};
 };
 
@@ -1472,7 +1712,7 @@ export const getMyCareTeamProviders = async (userId: string) => {
 			dateTime: true,
 			status: true,
 			therapistProfileId: true,
-			therapistProfile: { select: { id: true, firstName: true, lastName: true, name: true } },
+			therapistProfile: { select: { id: true, firstName: true, lastName: true, name: true, role: true } },
 		},
 		take: 60,
 	});
@@ -1483,7 +1723,7 @@ export const getMyCareTeamProviders = async (userId: string) => {
 
 	const providerUsers = await db.user.findMany({
 		where: { id: { in: providerIds } },
-		select: { id: true, firstName: true, lastName: true, name: true },
+		select: { id: true, firstName: true, lastName: true, name: true, role: true },
 	});
 	const providerMeta = new Map<string, any>();
 	for (const user of providerUsers) {
@@ -1501,7 +1741,7 @@ export const getMyCareTeamProviders = async (userId: string) => {
 		return {
 			id: providerId,
 			name: String(latest?.therapistProfile?.name || `${latest?.therapistProfile?.firstName || ''} ${latest?.therapistProfile?.lastName || ''}`.trim() || 'Provider'),
-			role: 'Therapist',
+			role: roleLabel(latest?.therapistProfile?.role || meta?.role),
 			nextSession: nextSession
 				? {
 					date: new Date(nextSession.dateTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
@@ -1523,6 +1763,7 @@ export const listAvailableProvidersForPatient = async (
 	let items = result.items.map((provider: any) => ({
 		id: provider.id,
 		name: provider.name,
+		role: provider.role || 'Therapist',
 		specialization: Array.isArray(provider.specializations) && provider.specializations.length
 			? provider.specializations
 			: [provider.specialization].filter(Boolean),
@@ -1534,6 +1775,7 @@ export const listAvailableProvidersForPatient = async (
 		availability: 'Available this week',
 		location: 'Online',
 		bio: provider.bio || '',
+		providerType: provider.providerType || roleToProviderType(provider.role),
 	}));
 
 	if (filters.search) {
@@ -1577,6 +1819,109 @@ export const markNotificationRead = async (userId: string, notificationId: strin
 	const updated = await db.notification.updateMany({ where: { id: notificationId, userId }, data: { isRead: true } });
 	if (!updated.count) throw new AppError('Notification not found', 404);
 	return { id: notificationId, is_read: true };
+};
+
+export const requestAppointmentWithPreferredProviders = async (
+	userId: string,
+	input: {
+		providerIds: string[];
+		preferredLanguage?: string;
+		preferredTime?: string;
+		preferredSpecialization?: string;
+		carePath?: string;
+		urgency?: string;
+		note?: string;
+	},
+) => {
+	const providerIds = Array.from(new Set((input.providerIds || []).map((id) => String(id || '').trim()).filter(Boolean)));
+	if (!providerIds.length) {
+		throw new AppError('At least one provider is required', 422);
+	}
+	if (providerIds.length > 3) {
+		throw new AppError('You can select up to 3 preferred providers', 422);
+	}
+
+	const [patientUser, providers] = await Promise.all([
+		db.user.findUnique({
+			where: { id: userId },
+			select: { id: true, name: true, firstName: true, lastName: true, email: true },
+		}),
+		db.user.findMany({
+			where: {
+				id: { in: providerIds },
+				isDeleted: false,
+				role: { in: ['THERAPIST', 'PSYCHIATRIST', 'COACH', 'PSYCHOLOGIST'] },
+			},
+			select: { id: true, name: true, firstName: true, lastName: true, role: true },
+		}),
+	]);
+
+	if (!patientUser) {
+		throw new AppError('Patient account not found', 404);
+	}
+	if (!providers.length) {
+		throw new AppError('No valid providers found for appointment request', 422);
+	}
+
+	const patientName = String(patientUser.name || `${patientUser.firstName || ''} ${patientUser.lastName || ''}`.trim() || 'Patient');
+	const requestRef = `APR-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+
+	await Promise.all([
+		...providers.map((provider: any) =>
+			db.notification.create({
+				data: {
+					userId: String(provider.id),
+					type: 'APPOINTMENT_REQUEST',
+					title: 'New Appointment Request',
+					message: `${patientName} selected you as a preferred provider.`,
+					payload: {
+						requestRef,
+						patientId: userId,
+						patientName,
+						carePath: input.carePath || 'direct-selection',
+						urgency: input.urgency || 'routine',
+						preferredLanguage: input.preferredLanguage || null,
+						preferredTime: input.preferredTime || null,
+						preferredSpecialization: input.preferredSpecialization || null,
+						note: input.note || null,
+						requestStatus: 'PENDING_PROVIDER_RESPONSE',
+					},
+					sentAt: new Date(),
+				},
+			}),
+		),
+		db.notification.create({
+			data: {
+				userId,
+				type: 'APPOINTMENT_REQUEST_SUBMITTED',
+				title: 'Appointment request submitted',
+				message: `Your request was sent to ${providers.length} preferred provider${providers.length > 1 ? 's' : ''}.`,
+				payload: {
+					requestRef,
+					providerIds: providers.map((provider: any) => String(provider.id)),
+					carePath: input.carePath || 'direct-selection',
+					urgency: input.urgency || 'routine',
+					preferredLanguage: input.preferredLanguage || null,
+					preferredTime: input.preferredTime || null,
+					preferredSpecialization: input.preferredSpecialization || null,
+					requestStatus: 'PENDING_PROVIDER_RESPONSE',
+				},
+				sentAt: new Date(),
+			},
+		}),
+	]);
+
+	return {
+		requestRef,
+		requestedAt: new Date().toISOString(),
+		providerCount: providers.length,
+		providers: providers.map((provider: any) => ({
+			id: String(provider.id),
+			name: String(provider.name || `${provider.firstName || ''} ${provider.lastName || ''}`.trim() || 'Provider'),
+			role: String(provider.role || '').toLowerCase(),
+		})),
+		nextStep: 'Providers can propose or confirm available slots. You can confirm the altered slot from your notifications before final booking.',
+	};
 };
 
 export const getPatientSettings = async (userId: string) => {

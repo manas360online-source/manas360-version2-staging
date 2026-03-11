@@ -1,5 +1,6 @@
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/error.middleware';
+import { ensureDefaultScreeningTemplate, PHQ9_SCREENING_TEMPLATE_KEY } from './screening-template-defaults.service';
 
 const db = prisma as any;
 
@@ -19,6 +20,13 @@ const templateSelect = {
 export const listScreeningTemplatesAdmin = async () => {
 	const rows = await db.screeningTemplate.findMany({ orderBy: [{ updatedAt: 'desc' }], select: templateSelect });
 	return { items: rows };
+};
+
+export const ensureScreeningTemplateDefaultAdmin = async (templateKey?: string) => {
+	const key = String(templateKey || PHQ9_SCREENING_TEMPLATE_KEY).trim() || PHQ9_SCREENING_TEMPLATE_KEY;
+	const template = await ensureDefaultScreeningTemplate(db, key);
+	if (!template) throw new AppError('Unsupported default template key', 404);
+	return db.screeningTemplate.findUnique({ where: { id: template.id }, select: templateSelect });
 };
 
 export const createScreeningTemplateAdmin = async (input: {

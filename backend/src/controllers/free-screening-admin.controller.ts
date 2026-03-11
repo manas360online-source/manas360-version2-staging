@@ -5,6 +5,7 @@ import {
 	createQuestionOptionAdmin,
 	createScreeningTemplateAdmin,
 	createTemplateQuestionAdmin,
+	ensureScreeningTemplateDefaultAdmin,
 	listAllProviderExtraQuestionsAdmin,
 	listScoringBandsAdmin,
 	listScreeningTemplatesAdmin,
@@ -42,6 +43,16 @@ export const listScreeningTemplatesAdminController = async (_req: Request, res: 
 export const createScreeningTemplateAdminController = async (req: Request, res: Response): Promise<void> => {
 	const data = await createScreeningTemplateAdmin(req.body || {});
 	sendSuccess(res, data, 'Screening template created', 201);
+};
+
+export const ensureScreeningTemplateDefaultAdminController = async (req: Request, res: Response): Promise<void> => {
+	const templateKey = typeof req.body?.templateKey === 'string'
+		? req.body.templateKey
+		: typeof req.params?.templateKey === 'string'
+			? req.params.templateKey
+			: undefined;
+	const data = await ensureScreeningTemplateDefaultAdmin(templateKey);
+	sendSuccess(res, data, 'Default screening template ensured');
 };
 
 export const updateScreeningTemplateAdminController = async (req: Request, res: Response): Promise<void> => {

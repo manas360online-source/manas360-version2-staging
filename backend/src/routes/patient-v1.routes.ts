@@ -31,6 +31,8 @@ import {
 	listProvidersController,
 	markNotificationReadController,
 	moodHistoryController,
+	patientConfirmProposedAppointmentSlotController,
+	requestAppointmentWithPreferredProvidersController,
 	reactivatePatientSubscriptionController,
 	sessionInvoicePdfController,
 	sessionDetailController,
@@ -51,6 +53,8 @@ router.get('/patient/insights', requireAuth, requireRole('patient'), asyncHandle
 router.get('/patient/reports', requireAuth, requireRole('patient'), asyncHandler(getPatientReportsController));
 router.get('/patient/care-team', requireAuth, requireRole('patient'), asyncHandler(getMyCareTeamController));
 router.get('/patient/providers/available', requireAuth, requireRole('patient'), asyncHandler(listAvailableProvidersController));
+router.post('/patient/appointments/request', requireAuth, requireRole('patient'), asyncHandler(requestAppointmentWithPreferredProvidersController));
+router.post('/patient/appointments/confirm-slot', requireAuth, requireRole('patient'), asyncHandler(patientConfirmProposedAppointmentSlotController));
 
 router.get('/providers', requireAuth, requireRole('patient'), asyncHandler(listProvidersController));
 router.get('/providers/:id', requireAuth, requireRole('patient'), asyncHandler(getProviderByIdController));

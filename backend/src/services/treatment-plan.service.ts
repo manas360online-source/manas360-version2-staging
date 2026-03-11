@@ -48,10 +48,27 @@ const ensureTreatmentPlanTables = async (): Promise<void> => {
 
 const getPatientProfile = async (userId: string) => {
   const patient = await db.patientProfile.findUnique({ where: { userId }, select: { id: true, userId: true } });
-  if (!patient) {
-    throw new AppError('Patient profile not found. Please complete onboarding first.', 404);
+  if (patient) return patient;
+
+  const created = await db.patientProfile.create({
+    data: {
+      userId,
+      age: 25,
+      gender: 'prefer_not_to_say',
+      emergencyContact: {
+        name: 'Not provided',
+        relation: 'Not provided',
+        phone: 'Not provided',
+      },
+    },
+    select: { id: true, userId: true },
+  }).catch(() => null);
+
+  if (!created) {
+    throw new AppError('Patient profile unavailable', 500);
   }
-  return patient;
+
+  return created;
 };
 
 const defaultTaskTemplate = [

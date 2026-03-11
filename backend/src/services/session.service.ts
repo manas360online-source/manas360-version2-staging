@@ -58,16 +58,35 @@ const buildBookingReferenceId = (): string => {
 	return `${prefix}-${datePart}-${randomPart}`;
 };
 
+const ensurePatientProfile = async (userId: string) => {
+	const patientProfile = await db.patientProfile.findUnique({ where: { userId }, select: { id: true } });
+	if (patientProfile) return patientProfile;
+
+	const created = await db.patientProfile.create({
+		data: {
+			userId,
+			age: 25,
+			gender: 'prefer_not_to_say',
+			emergencyContact: {
+				name: 'Not provided',
+				relation: 'Not provided',
+				phone: 'Not provided',
+			},
+		},
+		select: { id: true },
+	}).catch(() => null);
+
+	if (!created) {
+		throw new AppError('Patient profile unavailable', 500);
+	}
+
+	return created;
+};
+
 const getSlotMinuteOfDay = (date: Date): number => date.getHours() * 60 + date.getMinutes();
 
 export const bookPatientSession = async (userId: string, input: BookSessionInput) => {
-	const patientProfile = await db.patientProfile.findUnique({
-		where: { userId },
-		select: { id: true },
-	});
-	if (!patientProfile) {
-		throw new AppError('Patient profile not found. Please create profile first.', 404);
-	}
+	const patientProfile = await ensurePatientProfile(userId);
 
 	const therapist = await db.user.findUnique({
 		where: { id: input.therapistId },
@@ -161,10 +180,7 @@ export const bookPatientSession = async (userId: string, input: BookSessionInput
 };
 
 export const getMySessionHistory = async (userId: string, query: SessionHistoryQuery) => {
-	const patientProfile = await db.patientProfile.findUnique({ where: { userId }, select: { id: true } });
-	if (!patientProfile) {
-		throw new AppError('Patient profile not found. Please create profile first.', 404);
-	}
+	const patientProfile = await ensurePatientProfile(userId);
 
 	const pagination = normalizePagination(
 		{ page: query.page, limit: query.limit },

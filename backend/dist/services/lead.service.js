@@ -235,6 +235,7 @@ const confirmMyTherapistLeadPurchase = async (userId, leadId, input) => {
                 grossAmountMinor: lead.amountMinor,
                 platformCommissionMinor: lead.amountMinor,
                 providerShareMinor: 0,
+                paymentType: 'PLATFORM_FEE',
                 taxAmountMinor: 0,
                 currency: lead.currency,
                 referenceId: `lead:${lead.id}`,

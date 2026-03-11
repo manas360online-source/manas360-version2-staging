@@ -67,7 +67,9 @@ const assertPaymentActors = async (tx, patientId, providerId) => {
     if (!patient || patient.isDeleted || String(patient.role) !== 'PATIENT') {
         throw new error_middleware_1.AppError('Invalid patient account', 422);
     }
-    if (!provider || provider.isDeleted || String(provider.role) !== 'THERAPIST') {
+    const providerRole = String(provider?.role || '');
+    const isValidProviderRole = ['THERAPIST', 'PSYCHOLOGIST', 'PSYCHIATRIST', 'COACH'].includes(providerRole);
+    if (!provider || provider.isDeleted || !isValidProviderRole) {
         throw new error_middleware_1.AppError('Invalid provider account', 422);
     }
 };
@@ -132,9 +134,14 @@ const createSessionPayment = async (input) => {
     return {
         sessionId: created.session.id,
         paymentId: created.payment.id,
+        paymentType: 'provider_fee',
         razorpayOrderId: order.id,
         amountMinor,
         currency: input.currency ?? 'INR',
+        feeBreakdown: {
+            platformFeeMinor: Math.round(amountMinor * platformShareRatio),
+            providerFeeMinor: Math.floor(amountMinor * providerShareRatio),
+        },
         idempotencyKey,
     };
 };
@@ -273,6 +280,7 @@ const processRazorpayWebhook = async (rawBody, signature) => {
                     grossAmountMinor: amountMinor,
                     platformCommissionMinor: platformShareMinor,
                     providerShareMinor: therapistShareMinor,
+                    paymentType: 'PROVIDER_FEE',
                     taxAmountMinor: 0,
                     currency: payment.currency,
                     referenceId: payment.sessionId,

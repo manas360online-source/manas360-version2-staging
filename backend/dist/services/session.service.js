@@ -19,15 +19,31 @@ const buildBookingReferenceId = () => {
     const randomPart = (0, crypto_1.randomBytes)(4).toString('hex').toUpperCase();
     return `${prefix}-${datePart}-${randomPart}`;
 };
+const ensurePatientProfile = async (userId) => {
+    const patientProfile = await db.patientProfile.findUnique({ where: { userId }, select: { id: true } });
+    if (patientProfile)
+        return patientProfile;
+    const created = await db.patientProfile.create({
+        data: {
+            userId,
+            age: 25,
+            gender: 'prefer_not_to_say',
+            emergencyContact: {
+                name: 'Not provided',
+                relation: 'Not provided',
+                phone: 'Not provided',
+            },
+        },
+        select: { id: true },
+    }).catch(() => null);
+    if (!created) {
+        throw new error_middleware_1.AppError('Patient profile unavailable', 500);
+    }
+    return created;
+};
 const getSlotMinuteOfDay = (date) => date.getHours() * 60 + date.getMinutes();
 const bookPatientSession = async (userId, input) => {
-    const patientProfile = await db.patientProfile.findUnique({
-        where: { userId },
-        select: { id: true },
-    });
-    if (!patientProfile) {
-        throw new error_middleware_1.AppError('Patient profile not found. Please create profile first.', 404);
-    }
+    const patientProfile = await ensurePatientProfile(userId);
     const therapist = await db.user.findUnique({
         where: { id: input.therapistId },
         select: {
@@ -110,10 +126,7 @@ const bookPatientSession = async (userId, input) => {
 };
 exports.bookPatientSession = bookPatientSession;
 const getMySessionHistory = async (userId, query) => {
-    const patientProfile = await db.patientProfile.findUnique({ where: { userId }, select: { id: true } });
-    if (!patientProfile) {
-        throw new error_middleware_1.AppError('Patient profile not found. Please create profile first.', 404);
-    }
+    const patientProfile = await ensurePatientProfile(userId);
     const pagination = (0, pagination_1.normalizePagination)({ page: query.page, limit: query.limit }, { defaultPage: 1, defaultLimit: 10, maxLimit: 50 });
     const filter = {
         patientId: patientProfile.id,

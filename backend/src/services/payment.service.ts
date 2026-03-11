@@ -51,7 +51,9 @@ const assertPaymentActors = async (tx: any, patientId: string, providerId: strin
 		throw new AppError('Invalid patient account', 422);
 	}
 
-	if (!provider || provider.isDeleted || String(provider.role) !== 'THERAPIST') {
+	const providerRole = String(provider?.role || '');
+	const isValidProviderRole = ['THERAPIST', 'PSYCHOLOGIST', 'PSYCHIATRIST', 'COACH'].includes(providerRole);
+	if (!provider || provider.isDeleted || !isValidProviderRole) {
 		throw new AppError('Invalid provider account', 422);
 	}
 };
@@ -114,7 +116,6 @@ export const createSessionPayment = async (input: CreateFinancialSessionInput) =
 				providerId: input.providerId,
 				razorpayOrderId: order.id,
 				status: 'PENDING_CAPTURE',
-				paymentType: 'PROVIDER_FEE',
 				amountMinor,
 				currency: input.currency ?? 'INR',
 			},
@@ -253,7 +254,6 @@ export const processRazorpayWebhook = async (rawBody: string, signature: string)
 				},
 				data: {
 					status: 'CAPTURED',
-					paymentType: 'PROVIDER_FEE',
 					razorpayPaymentId,
 					capturedAt: new Date(),
 					therapistShareMinor,
