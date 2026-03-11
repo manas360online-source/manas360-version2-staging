@@ -2,7 +2,7 @@ import TherapistButton from '../../components/therapist/dashboard/TherapistButto
 import TherapistCard from '../../components/therapist/dashboard/TherapistCard';
 import TherapistPageShell from '../../components/therapist/dashboard/TherapistPageShell';
 
-const items = ['PHQ-9', 'GAD-7', 'Burnout Assessment', 'Stress Index'];
+const items = ['PHQ-9', 'GAD-7'];
 
 export default function PsychologistSelfAssessmentsPage() {
   return (

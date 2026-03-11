@@ -1,10 +1,12 @@
 import { FormEvent, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { getApiErrorMessage } from '../../api/auth';
 import { patientApi } from '../../api/patient';
 
 export default function PatientOnboardingPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const next = new URLSearchParams(location.search).get('next') || '/patient/assessments';
   const [age, setAge] = useState('25');
   const [gender, setGender] = useState<'male' | 'female' | 'other' | 'prefer_not_to_say'>('prefer_not_to_say');
   const [medicalHistory, setMedicalHistory] = useState('');
@@ -30,7 +32,7 @@ export default function PatientOnboardingPage() {
         medicalHistory: medicalHistory.trim() || undefined,
         carrier: carrier.trim() || undefined,
       });
-      navigate('/patient/dashboard', { replace: true });
+      navigate(next, { replace: true });
     } catch (err) {
       setError(getApiErrorMessage(err, 'Unable to complete onboarding.'));
     } finally {

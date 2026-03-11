@@ -10,6 +10,10 @@ const isSubscriptionActive = (subscription: any): boolean => {
   return false;
 };
 
+// TODO(payment-gateway): Set VITE_PAYMENT_GATEWAY_DECIDED=true after final gateway integration.
+// Until then, keep test payment bypass enabled so booking flow development can continue.
+const PAYMENT_GATEWAY_DECIDED = import.meta.env.VITE_PAYMENT_GATEWAY_DECIDED === 'true';
+
 const loadRazorpayScript = async (): Promise<boolean> => {
   if (window.Razorpay) return true;
 
@@ -35,6 +39,11 @@ export default function BookSessionPage() {
   const [checkingAccess, setCheckingAccess] = useState(true);
 
   const inferProviderType = (): string => {
+    const providerRole = String(provider?.role || '').toLowerCase();
+    const providerType = String(provider?.providerType || '').toLowerCase();
+    if (providerType === 'psychiatrist' || providerRole.includes('psychiat')) return 'psychiatrist';
+    if (providerType === 'clinical-psychologist' || providerRole.includes('psycholog')) return 'clinical-psychologist';
+
     const specialization = String(provider?.specialization || '').toLowerCase();
     if (specialization.includes('psychiat')) return 'psychiatrist';
     if (specialization.includes('clinical')) return 'clinical-psychologist';
@@ -66,7 +75,8 @@ export default function BookSessionPage() {
     () => (preferredTime ? Math.round(baseAmountMinor * 1.2) : baseAmountMinor),
     [baseAmountMinor, preferredTime],
   );
-  const canUseDevPaidFlow = import.meta.env.DEV;
+  const testPaymentMode = !PAYMENT_GATEWAY_DECIDED;
+  const canUseDevPaidFlow = import.meta.env.DEV || testPaymentMode;
 
   const onDevMarkAsPaid = async () => {
     if (!providerId || !slot) return;
@@ -199,7 +209,9 @@ export default function BookSessionPage() {
       ) : null}
       {canUseDevPaidFlow && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          Development mode: real Razorpay payment is optional. Use <strong>Paid (Dev)</strong> to simulate a successful payment.
+          {testPaymentMode
+            ? 'Test payment mode: gateway checkout is bypassed. Use test completion to continue booking flow.'
+            : 'Development mode: real Razorpay payment is optional. Use Paid (Dev) to simulate a successful payment.'}
         </div>
       )}
       <p>Provider: {provider.name}</p>
@@ -245,7 +257,7 @@ export default function BookSessionPage() {
             onClick={onDevMarkAsPaid}
             className="responsive-action-btn rounded-xl bg-emerald-700 text-white disabled:opacity-60"
           >
-            {loading ? 'Processing...' : 'Paid (Dev)'}
+            {loading ? 'Processing...' : testPaymentMode ? 'Skip Payment (Test)' : 'Paid (Dev)'}
           </button>
         )}
       </div>

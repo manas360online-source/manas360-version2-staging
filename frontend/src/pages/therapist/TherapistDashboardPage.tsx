@@ -72,7 +72,7 @@ const THERAPIST_MODULES: DashboardModule[] = [
   { key: 'notes', title: 'Session Notes', description: 'Create SOAP notes and track submission history.', route: '/therapist/session-notes', icon: FileText },
   { key: 'mood', title: 'Mood Tracking', description: 'Review mood trend chart, timeline, and alerts.', route: '/therapist/mood-tracking', icon: HeartPulse },
   { key: 'cbt', title: 'CBT Modules', description: 'Manage thought records, restructuring, and exposure plans.', route: '/therapist/cbt-modules', icon: Brain },
-  { key: 'assessments', title: 'Assessments', description: 'Assign PHQ-9, GAD-7, and custom assessment tools.', route: '/therapist/assessments', icon: ClipboardList },
+  { key: 'assessments', title: 'Assessments', description: 'Assign PHQ-9 and GAD-7 assessment tools.', route: '/therapist/assessments', icon: ClipboardList },
   { key: 'messages', title: "Dr. Meera 'Ai", description: "Dr. Meera 'Ai support for provider and care-team coordination.", route: '/therapist/messages', icon: MessageSquare },
   { key: 'exercise', title: 'Exercise Library', description: 'Create, assign, and track exercise completion.', route: '/therapist/exercise-library', icon: Target },
   { key: 'resources', title: 'Resources', description: 'Assign worksheets, videos, and meditation assets.', route: '/therapist/resources', icon: Target },

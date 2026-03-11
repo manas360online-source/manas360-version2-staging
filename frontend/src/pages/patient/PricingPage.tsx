@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Bot, Brain, CalendarClock, Clock3, HeartPulse, MoonStar, ShieldCheck, Sparkles, Waves } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { patientApi } from '../../api/patient';
+import { isOnboardingRequiredError, patientApi } from '../../api/patient';
 
 const platformFeatures = [
   'Therapist search and browsing',
@@ -64,6 +64,10 @@ const providerLabelMap: Record<string, string> = {
 
 const defaultPlatformFee = 199;
 
+// TODO(payment-gateway): Set VITE_PAYMENT_GATEWAY_DECIDED=true once gateway integration is live.
+// Until then, we intentionally keep a test bypass flow enabled so product work can continue.
+const PAYMENT_GATEWAY_DECIDED = import.meta.env.VITE_PAYMENT_GATEWAY_DECIDED === 'true';
+
 const isSubscriptionActive = (subscription: any): boolean => {
   if (!subscription) return false;
 
@@ -76,6 +80,7 @@ const isSubscriptionActive = (subscription: any): boolean => {
 
 export default function PricingPage() {
   const navigate = useNavigate();
+  const testPaymentMode = !PAYMENT_GATEWAY_DECIDED;
   const [platformFee, setPlatformFee] = useState<number>(defaultPlatformFee);
   const [sessionPricingConfig, setSessionPricingConfig] = useState<SessionTier[]>(therapyPricing);
   const [bundleConfig, setBundleConfig] = useState<BundleTier[]>(bundles);
@@ -175,8 +180,17 @@ export default function PricingPage() {
       await patientApi.upgradeSubscription();
       setSubscriptionMessage('Subscription activated successfully.');
       setHasActiveSubscription(true);
-      setTimeout(() => {
-        navigate('/patient/assessments');
+      setTimeout(async () => {
+        try {
+          await patientApi.getDashboardV2();
+          navigate('/patient/assessments', { replace: true });
+        } catch (error) {
+          if (isOnboardingRequiredError(error)) {
+            navigate('/patient/onboarding?next=/patient/assessments', { replace: true });
+            return;
+          }
+          navigate('/patient/assessments', { replace: true });
+        }
       }, 700);
     } catch (error: any) {
       setSubscriptionMessage(error?.response?.data?.message || 'Could not activate subscription right now.');
@@ -200,6 +214,11 @@ export default function PricingPage() {
 
       <section className="rounded-3xl border border-indigo-100 bg-white p-6 shadow-sm">
         <p className="text-xs font-semibold uppercase tracking-[0.12em] text-indigo-600">Section 1 - Platform Access</p>
+        {testPaymentMode ? (
+          <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+            Test payment mode is enabled. Platform activation will skip gateway checkout until payment gateway selection is finalized.
+          </div>
+        ) : null}
         <div className="mt-3 rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-xs text-indigo-900">
           Step 1: Platform fee unlocks assessments, AI insights, and matching tools. Step 2: provider fee is paid later only when booking a therapy session.
         </div>
@@ -213,7 +232,13 @@ export default function PricingPage() {
               disabled={subscribing || hasActiveSubscription}
               className="mt-4 inline-flex min-h-[40px] items-center rounded-xl bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-70"
             >
-              {hasActiveSubscription ? 'Platform Access Active' : subscribing ? 'Activating...' : 'Start Subscription'}
+              {hasActiveSubscription
+                ? 'Platform Access Active'
+                : subscribing
+                  ? 'Activating...'
+                  : testPaymentMode
+                    ? 'Activate Platform Access (Test)'
+                    : 'Proceed to Payment'}
             </button>
             {subscriptionMessage ? <p className="mt-2 text-xs text-indigo-800">{subscriptionMessage}</p> : null}
             <p className="mt-2 text-xs text-indigo-700">This payment does not include therapy session fees.</p>

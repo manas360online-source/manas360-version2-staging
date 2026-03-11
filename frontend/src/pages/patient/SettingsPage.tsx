@@ -225,6 +225,9 @@ const formatCurrencyInr = (amount: number) => new Intl.NumberFormat('en-IN', {
   maximumFractionDigits: 0,
 }).format(amount);
 
+// TODO(payment-gateway): Switch this to true via env once gateway selection and integration are complete.
+const PAYMENT_GATEWAY_DECIDED = import.meta.env.VITE_PAYMENT_GATEWAY_DECIDED === 'true';
+
 export default function SettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const sectionFromQuery = parseSectionId(searchParams.get('section'));
@@ -831,6 +834,7 @@ export default function SettingsPage() {
   );
 
   const renderBilling = () => {
+    const testPaymentMode = !PAYMENT_GATEWAY_DECIDED;
     const currentPlanKey = normalizePlanKey(billingData.subscription?.planName || billingData.subscription?.planType);
     const currentPlanIndex = PLAN_CATALOG.findIndex((plan) => plan.key === currentPlanKey);
     const resolvedCurrentPlanIndex = currentPlanIndex >= 0 ? currentPlanIndex : 1;
@@ -880,6 +884,60 @@ export default function SettingsPage() {
         ) : (
           <>
             <div className="rounded-xl border border-calm-sage/20 bg-white/80 p-4">
+              {testPaymentMode && (
+                <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-amber-900">Test Payment Mode</p>
+                  <p className="mt-1 text-sm text-amber-900">
+                    Payment gateway is not finalized yet. Use test actions below to continue platform and billing flows without real checkout.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={Boolean(billingActionLoading)}
+                      onClick={() =>
+                        void runBillingAction(
+                          'test-activate',
+                          () => patientApi.reactivateSubscription(),
+                          'Platform access activated in test mode.',
+                        )
+                      }
+                      className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                    >
+                      {billingActionLoading === 'test-activate' ? 'Activating...' : 'Activate Platform (Test)'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={Boolean(billingActionLoading)}
+                      onClick={() =>
+                        void runBillingAction(
+                          'test-payment-method',
+                          () =>
+                            patientApi.updatePaymentMethod({
+                              cardBrand: 'TEST-CARD',
+                              cardLast4: '4242',
+                              expiryMonth: 12,
+                              expiryYear: new Date().getFullYear() + 2,
+                            }),
+                          'Mock payment method saved in test mode.',
+                        )
+                      }
+                      className="rounded-lg border border-amber-400 bg-white px-3 py-2 text-xs font-semibold text-amber-900 disabled:opacity-50"
+                    >
+                      {billingActionLoading === 'test-payment-method' ? 'Saving...' : 'Add Mock Payment Method'}
+                    </button>
+                  </div>
+                  <div className="mt-3 rounded-lg border border-amber-200 bg-white p-2 text-[11px] text-amber-900">
+                    {/* TODO(payment-gateway): Replace test actions with real gateway checkout flow. */}
+                    {/* 1) Create order/payment intent from backend */}
+                    {/* 2) Launch chosen gateway SDK/hosted checkout */}
+                    {/* 3) Verify signature/webhook and mark invoice paid */}
+                    {/* 4) Persist payment method token and billing events */}
+                    {/* 5) Disable test mode and remove bypass actions */}
+                    Gateway integration checklist is intentionally left here for handoff once payment provider is decided.
+                  </div>
+                </div>
+              )}
+
               {subscribeSelection.isFromSubscribe && (
                 <div className="mb-4 rounded-xl border border-calm-sage/25 bg-[#F4F8F3] p-3">
                   <p className="text-xs font-semibold uppercase tracking-[0.08em] text-charcoal/60">Selected from Subscribe</p>

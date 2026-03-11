@@ -9,7 +9,7 @@ import TherapistModeGate from '../../components/therapist/dashboard/TherapistMod
 import TherapistPageShell from '../../components/therapist/dashboard/TherapistPageShell';
 import { useProviderDashboardContext } from '../../context/ProviderDashboardContext';
 
-type AssessmentType = 'PHQ-9' | 'GAD-7' | 'Stress Score' | 'Custom Assessment';
+type AssessmentType = 'PHQ-9' | 'GAD-7';
 
 export default function TherapistAssessmentsPage() {
   const { dashboardMode } = useProviderDashboardContext();
@@ -76,7 +76,7 @@ export default function TherapistAssessmentsPage() {
   }, [rows]);
 
   return (
-    <TherapistPageShell title="Assessments" subtitle="Manage PHQ-9, GAD-7, stress, and custom assessments with assignment and trend tracking.">
+    <TherapistPageShell title="Assessments" subtitle="Manage PHQ-9 and GAD-7 assessments with assignment and trend tracking.">
       {dashboardMode !== 'professional' ? (
         <TherapistModeGate
           requiredMode="professional"
@@ -96,8 +96,6 @@ export default function TherapistAssessmentsPage() {
               <select value={type} onChange={(event) => setType(event.target.value as AssessmentType)} className="rounded-lg border border-ink-100 bg-white px-3 py-2 text-sm text-ink-800 focus:border-sage-500 focus:ring-0">
                 <option>PHQ-9</option>
                 <option>GAD-7</option>
-                <option>Stress Score</option>
-                <option>Custom Assessment</option>
               </select>
               <input value={patient} onChange={(event) => setPatient(event.target.value)} placeholder="Patient name" className="rounded-lg border border-ink-100 px-3 py-2 text-sm text-ink-800 focus:border-sage-500 focus:ring-0" />
               <input value={score} onChange={(event) => setScore(event.target.value)} placeholder="Score" className="rounded-lg border border-ink-100 px-3 py-2 text-sm text-ink-800 focus:border-sage-500 focus:ring-0" />

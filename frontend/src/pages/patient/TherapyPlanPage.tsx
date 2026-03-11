@@ -5,7 +5,7 @@ import { patientApi } from '../../api/patient';
 const weekPlan = [
   {
     week: 'Week 1',
-    goals: ['Daily mood check-in', 'Breathing exercise (5 min)', 'Complete quick mental check'],
+    goals: ['Daily mood check-in', 'Breathing exercise (5 min)', 'Complete daily assessment'],
     status: 'In Progress',
   },
   {

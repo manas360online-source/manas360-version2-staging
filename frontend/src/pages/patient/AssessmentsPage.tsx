@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { patientApi } from '../../api/patient';
+import { patientApi, type StructuredAssessmentQuestion, type StructuredAssessmentStartResponse } from '../../api/patient';
 import { parseJourneyPayload, type JourneyPayload } from '../../utils/journey';
 import { Calendar, TrendingUp } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
-type AssessmentMode = 'quick' | 'clinical' | 'daily';
-type ClinicalAssessmentKey = 'PHQ-9' | 'GAD-7' | 'PSS-10' | 'ISI';
+type AssessmentMode = 'daily' | 'clinical';
+type ClinicalAssessmentKey = 'PHQ-9' | 'GAD-7';
 
 type AssessmentHistoryEntry = {
   id?: string;
@@ -17,14 +17,12 @@ type AssessmentHistoryEntry = {
   createdAt?: string;
 };
 
-const quickQuestions = [
-  'Mood',
-  'Sleep quality',
-  'Stress load',
-  'Energy level',
-  'Focus ability',
-  'Social connection',
-];
+const PHQ9_TEMPLATE_KEY = 'phq-9-paid-assessment-v1';
+const GAD7_TEMPLATE_KEY = 'gad-7-paid-assessment-v1';
+const structuredTemplateKeys: Record<'PHQ-9' | 'GAD-7', string> = {
+  'PHQ-9': PHQ9_TEMPLATE_KEY,
+  'GAD-7': GAD7_TEMPLATE_KEY,
+};
 
 const dailyCheckQuestions = [
   { label: 'How is your mood today?', key: 'mood' },
@@ -37,8 +35,6 @@ const dailyCheckQuestions = [
 const clinicalCards: Array<{ key: ClinicalAssessmentKey; description: string; max: number }> = [
   { key: 'PHQ-9', description: 'Depression symptom screening', max: 27 },
   { key: 'GAD-7', description: 'Anxiety severity screening', max: 21 },
-  { key: 'PSS-10', description: 'Perceived stress evaluation', max: 40 },
-  { key: 'ISI', description: 'Insomnia severity index', max: 28 },
 ];
 
 const recommendationBySeverity = {
@@ -52,6 +48,15 @@ const getSeverity = (score: number) => {
   if (score >= 8) return 'moderate';
   return 'mild';
 };
+
+const normalizeResultLevel = (value: string): 'mild' | 'moderate' | 'severe' => {
+  const normalized = String(value || '').toLowerCase();
+  if (normalized.includes('severe')) return 'severe';
+  if (normalized.includes('moderate')) return 'moderate';
+  return 'mild';
+};
+
+const dedupeText = (items: string[]): string[] => Array.from(new Set(items.map((item) => String(item || '').trim()).filter(Boolean)));
 
 const asArray = (value: unknown): any[] => {
   if (Array.isArray(value)) return value;
@@ -80,10 +85,11 @@ const isSubscriptionActive = (subscription: any): boolean => {
 };
 
 export default function AssessmentsPage() {
-  const [mode, setMode] = useState<AssessmentMode>('quick');
+  const navigate = useNavigate();
+  const [mode, setMode] = useState<AssessmentMode>('daily');
   const [selectedClinical, setSelectedClinical] = useState<ClinicalAssessmentKey>('PHQ-9');
   const [score, setScore] = useState(10);
-  const [quickAnswers, setQuickAnswers] = useState<number[]>(Array(quickQuestions.length).fill(2));
+  // quickAnswers removed
   const [dailyAnswers, setDailyAnswers] = useState<Record<string, number>>(
     dailyCheckQuestions.reduce((acc, q) => ({ ...acc, [q.key]: 5 }), {})
   );
@@ -91,6 +97,10 @@ export default function AssessmentsPage() {
   const [assessmentHistory, setAssessmentHistory] = useState<AssessmentHistoryEntry[]>([]);
   const [subscription, setSubscription] = useState<any>(null);
   const [subscriptionLoading, setSubscriptionLoading] = useState(true);
+  const [structuredAttempt, setStructuredAttempt] = useState<StructuredAssessmentStartResponse | null>(null);
+  const [structuredAnswers, setStructuredAnswers] = useState<Record<string, number>>({});
+  const [currentStructuredQuestionIndex, setCurrentStructuredQuestionIndex] = useState(0);
+  const [structuredLoading, setStructuredLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [resultCard, setResultCard] = useState<null | {
@@ -104,6 +114,29 @@ export default function AssessmentsPage() {
     followUpDays?: number;
     rationale?: string[];
   }>(null);
+  const hasPremiumAssessmentAccess = useMemo(() => isSubscriptionActive(subscription), [subscription]);
+
+  const startCarePath = async (path: 'recommended' | 'direct' | 'urgent') => {
+    const pathway = path === 'urgent' ? 'urgent-care' : path === 'direct' ? 'direct-provider' : 'stepped-care';
+    const preferredSpecialization = path === 'urgent'
+      ? 'Psychiatrist'
+      : path === 'recommended'
+        ? (resultCard?.pathway?.toLowerCase().includes('psychiatrist') ? 'Psychiatrist' : 'Psychologist')
+        : 'Psychologist';
+
+    await patientApi.selectJourneyPathway({
+      pathway,
+      reason: `Selected from assessment result (${path})`,
+      metadata: {
+        severity: resultCard?.level || 'mild',
+        preferredSpecialization,
+      },
+    }).catch(() => null);
+
+    const careType = path === 'urgent' ? 'urgent' : path === 'recommended' ? 'recommended' : 'direct';
+    const urgency = path === 'urgent' || resultCard?.level === 'severe' ? 'urgent' : 'routine';
+    navigate(`/patient/care-team?tab=browse&careType=${encodeURIComponent(careType)}&urgency=${encodeURIComponent(urgency)}&specialization=${encodeURIComponent(preferredSpecialization)}`);
+  };
 
   const loadLatestJourney = async (): Promise<JourneyPayload | null> => {
     try {
@@ -116,11 +149,38 @@ export default function AssessmentsPage() {
 
   const loadAssessmentHistory = async () => {
     try {
-      const response = await patientApi.getMoodHistory();
-      const payload: any = response as any;
-      setAssessmentHistory(asArray(payload));
+      const [legacyResponse, structuredResponse] = await Promise.all([
+        patientApi.getMoodHistory().catch(() => null),
+        patientApi.getStructuredAssessmentHistory().catch(() => null),
+      ]);
+      const legacyItems = asArray(legacyResponse as any);
+      const structuredItems = asArray((structuredResponse as any)?.data ?? structuredResponse).map((entry: any) => ({
+        id: entry.attemptId,
+        type: entry.templateTitle || entry.templateKey || 'Assessment',
+        score: Number(entry.totalScore || 0),
+        maxScore: String(entry.templateKey || '').includes('gad-7') ? 21 : String(entry.templateKey || '').includes('phq-9') ? 27 : 27,
+        level: String(entry.severityLevel || 'mild').toLowerCase(),
+        createdAt: entry.submittedAt,
+      }));
+      setAssessmentHistory([...structuredItems, ...legacyItems]);
     } catch {
       console.error('Failed to load assessment history');
+    }
+  };
+
+  const startStructuredAssessment = async (assessmentType: 'PHQ-9' | 'GAD-7') => {
+    setStructuredLoading(true);
+    setMessage('');
+    try {
+      const response = await patientApi.startStructuredAssessment({ templateKey: structuredTemplateKeys[assessmentType] });
+      setStructuredAttempt(response);
+      setStructuredAnswers({});
+      setCurrentStructuredQuestionIndex(0);
+    } catch (error) {
+      setStructuredAttempt(null);
+      setMessage(error instanceof Error ? error.message : `Unable to start ${assessmentType} assessment right now.`);
+    } finally {
+      setStructuredLoading(false);
     }
   };
 
@@ -143,6 +203,18 @@ export default function AssessmentsPage() {
     })();
   }, []);
 
+  useEffect(() => {
+    if (
+      mode === 'clinical'
+      && hasPremiumAssessmentAccess
+      && (selectedClinical === 'PHQ-9' || selectedClinical === 'GAD-7')
+      && (!structuredAttempt || structuredAttempt.template?.key !== structuredTemplateKeys[selectedClinical])
+      && !structuredLoading
+    ) {
+      void startStructuredAssessment(selectedClinical);
+    }
+  }, [mode, hasPremiumAssessmentAccess, selectedClinical, structuredAttempt, structuredLoading]);
+
   const loadMoodHistory = async () => {
     setLoading(true);
     try {
@@ -155,22 +227,90 @@ export default function AssessmentsPage() {
   };
 
   const onSubmitClinical = async () => {
+    if (selectedClinical === 'PHQ-9' || selectedClinical === 'GAD-7') {
+      if (!structuredAttempt) {
+        setMessage(`${selectedClinical} questionnaire is not loaded yet. Please try again.`);
+        return;
+      }
+
+      const unanswered = structuredAttempt.questions.some((question) => structuredAnswers[question.questionId] === undefined);
+      if (unanswered) {
+        setMessage(`Please answer all ${structuredAttempt.questions.length} ${selectedClinical} questions before submitting.`);
+        return;
+      }
+
+      const submitClinicalFromAnswers = async (answerMap: Record<string, number>) => {
+        setLoading(true);
+        setMessage('');
+        try {
+          const answers = structuredAttempt.questions.map((question) => ({
+            questionId: question.questionId,
+            optionIndex: answerMap[question.questionId],
+          }));
+          const numericAnswers = structuredAttempt.questions.map((question) => answerMap[question.questionId]);
+          const [structuredResult, journeyResponse] = await Promise.all([
+            patientApi.submitStructuredAssessment(structuredAttempt.attemptId, { answers }),
+            patientApi.submitClinicalJourney({ type: selectedClinical, answers: numericAnswers }),
+          ]);
+          const journey = parseJourneyPayload(journeyResponse) ?? (await loadLatestJourney());
+          const selectedLabels = structuredAttempt.questions.map((question) => {
+            const selectedOption = question.options.find((option) => option.optionIndex === answerMap[question.questionId]);
+            return `${question.position}. ${selectedOption?.label || 'Unknown'}`;
+          });
+          const normalized = normalizeResultLevel(structuredResult.severityLevel);
+
+          setMessage(`Saved: ${selectedClinical} • Score ${structuredResult.totalScore}`);
+          setResultCard({
+            type: selectedClinical,
+            score: structuredResult.totalScore,
+            level: normalized,
+            recommendations: dedupeText([
+              structuredResult.recommendation,
+              structuredResult.action,
+              ...(journey?.actions || []),
+            ]),
+            pathway: journey?.pathway,
+            selectedPathway: journey?.selectedPathway,
+            urgency: journey?.urgency,
+            followUpDays: journey?.followUpDays,
+            rationale: dedupeText([
+              structuredResult.interpretation,
+              ...selectedLabels,
+              ...(journey?.rationale || []),
+            ]),
+          });
+          setAssessmentHistory((prev) => [
+            {
+              id: structuredResult.attemptId,
+              type: selectedClinical,
+              score: structuredResult.totalScore,
+              maxScore: selectedClinical === 'PHQ-9' ? 27 : 21,
+              level: normalized,
+              createdAt: new Date().toISOString(),
+            },
+            ...prev,
+          ]);
+          await loadMoodHistory();
+          void startStructuredAssessment(selectedClinical);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      await submitClinicalFromAnswers(structuredAnswers);
+      return;
+    }
+
     setLoading(true);
     setMessage('');
     try {
-      const response = selectedClinical === 'PHQ-9' || selectedClinical === 'GAD-7'
-        ? await patientApi.submitClinicalJourney({
-            type: selectedClinical,
-            score,
-          })
-        : await patientApi.submitAssessment({
-            type: selectedClinical,
-            score,
-          });
+      const response = await patientApi.submitAssessment({
+        type: selectedClinical,
+        score,
+      });
       const payload: any = response as any;
       const journey: JourneyPayload | null = parseJourneyPayload(response) ?? (await loadLatestJourney());
-      const level = String(payload.severity || payload.result_level || getSeverity(Number(payload?.assessment?.score || payload.score || 0))).toLowerCase();
-      const normalized = level.includes('severe') ? 'severe' : level.includes('moderate') ? 'moderate' : 'mild';
+      const normalized = normalizeResultLevel(String(payload.severity || payload.result_level || getSeverity(Number(payload?.assessment?.score || payload.score || 0))));
       setMessage(`Saved: ${payload?.assessment?.type || payload.type || selectedClinical} • Score ${payload?.assessment?.score ?? payload.score}`);
       setResultCard({
         type: String(payload?.assessment?.type || payload.type || selectedClinical),
@@ -189,34 +329,80 @@ export default function AssessmentsPage() {
     }
   };
 
-  const onSubmitQuickCheck = async () => {
-    setLoading(true);
+  const onStructuredOptionSelect = async (question: StructuredAssessmentQuestion, optionIndex: number) => {
+    if (!structuredAttempt || loading) return;
+
+    const updatedAnswers = {
+      ...structuredAnswers,
+      [question.questionId]: optionIndex,
+    };
+
+    setStructuredAnswers(updatedAnswers);
     setMessage('');
-    try {
-      const computed = quickAnswers.reduce((sum, value) => sum + Number(value || 0), 0);
-      const level = getSeverity(computed);
-      const response = await patientApi.submitQuickScreeningJourney({
-        answers: quickAnswers,
-      });
-      const payload: any = response as any;
-      const journey: JourneyPayload | null = parseJourneyPayload(response) ?? (await loadLatestJourney());
-      setMessage(`Saved: Quick Mental Check • Score ${payload?.assessment?.score ?? payload.score ?? computed}`);
-      setResultCard({
-        type: 'Quick Mental Check',
-        score: Number(payload?.assessment?.score ?? payload.score ?? computed),
-        level,
-        recommendations: journey?.actions?.length ? journey.actions : recommendationBySeverity[level],
-        pathway: journey?.pathway,
-        selectedPathway: journey?.selectedPathway,
-        urgency: journey?.urgency,
-        followUpDays: journey?.followUpDays,
-        rationale: journey?.rationale || [],
-      });
-      await loadMoodHistory();
-      await loadAssessmentHistory();
-    } finally {
-      setLoading(false);
+
+    const isLastQuestion = currentStructuredQuestionIndex >= structuredAttempt.questions.length - 1;
+    if (!isLastQuestion) {
+      setCurrentStructuredQuestionIndex((prev) => prev + 1);
+      return;
     }
+
+    await (async () => {
+      setLoading(true);
+      setMessage('');
+      try {
+        const answers = structuredAttempt.questions.map((question) => ({
+          questionId: question.questionId,
+          optionIndex: updatedAnswers[question.questionId],
+        }));
+        const numericAnswers = structuredAttempt.questions.map((question) => updatedAnswers[question.questionId]);
+        const [structuredResult, journeyResponse] = await Promise.all([
+          patientApi.submitStructuredAssessment(structuredAttempt.attemptId, { answers }),
+          patientApi.submitClinicalJourney({ type: selectedClinical, answers: numericAnswers }),
+        ]);
+        const journey = parseJourneyPayload(journeyResponse) ?? (await loadLatestJourney());
+        const selectedLabels = structuredAttempt.questions.map((question) => {
+          const selectedOption = question.options.find((option) => option.optionIndex === updatedAnswers[question.questionId]);
+          return `${question.position}. ${selectedOption?.label || 'Unknown'}`;
+        });
+        const normalized = normalizeResultLevel(structuredResult.severityLevel);
+
+        setMessage(`Saved: ${selectedClinical} • Score ${structuredResult.totalScore}`);
+        setResultCard({
+          type: selectedClinical,
+          score: structuredResult.totalScore,
+          level: normalized,
+          recommendations: dedupeText([
+            structuredResult.recommendation,
+            structuredResult.action,
+            ...(journey?.actions || []),
+          ]),
+          pathway: journey?.pathway,
+          selectedPathway: journey?.selectedPathway,
+          urgency: journey?.urgency,
+          followUpDays: journey?.followUpDays,
+          rationale: dedupeText([
+            structuredResult.interpretation,
+            ...selectedLabels,
+            ...(journey?.rationale || []),
+          ]),
+        });
+        setAssessmentHistory((prev) => [
+          {
+            id: structuredResult.attemptId,
+            type: selectedClinical,
+            score: structuredResult.totalScore,
+            maxScore: selectedClinical === 'PHQ-9' ? 27 : 21,
+            level: normalized,
+            createdAt: new Date().toISOString(),
+          },
+          ...prev,
+        ]);
+        await loadMoodHistory();
+        void startStructuredAssessment(selectedClinical);
+      } finally {
+        setLoading(false);
+      }
+    })();
   };
 
   const onSubmitDailyCheck = async () => {
@@ -320,20 +506,15 @@ export default function AssessmentsPage() {
     };
   }, [historyRows]);
 
-  const selectedClinicalMax = clinicalCards.find((item) => item.key === selectedClinical)?.max || 27;
-  const hasPremiumAssessmentAccess = useMemo(() => isSubscriptionActive(subscription), [subscription]);
-
   return (
     <div className="space-y-5 pb-20 lg:pb-6">
       <h1 className="font-serif text-3xl font-light md:text-4xl">Assessments</h1>
-      <p className="text-sm text-charcoal/65">Run quick checks or full clinical assessments and get actionable recommendations.</p>
+      <p className="text-sm text-charcoal/65">Run daily checks or full clinical assessments and get actionable recommendations.</p>
 
       {!subscriptionLoading && !hasPremiumAssessmentAccess && (
         <section className="rounded-2xl border border-indigo-200 bg-indigo-50/60 p-4 shadow-soft-sm">
           <p className="text-sm font-semibold text-indigo-900">Advanced assessments are part of Platform Access.</p>
-          <p className="mt-1 text-xs text-indigo-800">
-            Upgrade to unlock PHQ-9, GAD-7, PSS-10, and ISI. Quick and daily checks remain available.
-          </p>
+          <p className="mt-1 text-xs text-indigo-800">Upgrade to unlock PHQ-9 and GAD-7. Daily checks remain available.</p>
           <Link
             to="/patient/pricing"
             className="mt-3 inline-flex min-h-[36px] items-center rounded-xl bg-indigo-600 px-3 text-xs font-semibold text-white hover:bg-indigo-500"
@@ -344,17 +525,6 @@ export default function AssessmentsPage() {
       )}
 
       <section className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <button
-          type="button"
-          onClick={() => setMode('quick')}
-          className={`rounded-2xl border p-4 text-left transition ${
-            mode === 'quick' ? 'border-calm-sage bg-calm-sage/10' : 'border-calm-sage/15 bg-white/85 hover:bg-calm-sage/5'
-          }`}
-        >
-          <p className="text-sm font-semibold">Quick Mental Check</p>
-          <p className="mt-1 text-xs text-charcoal/65">6-question, 1-minute self-check.</p>
-        </button>
-
         <button
           type="button"
           onClick={() => setMode('daily')}
@@ -382,53 +552,14 @@ export default function AssessmentsPage() {
         >
           <p className="text-sm font-semibold">Clinical Assessments</p>
           <p className="mt-1 text-xs text-charcoal/65">
-            PHQ-9, GAD-7, PSS-10, and ISI scoring workflows.
+            PHQ-9 and GAD-7 scoring workflows.
             {!hasPremiumAssessmentAccess ? ' (Platform Access required)' : ''}
           </p>
         </button>
       </section>
 
       <section className="rounded-2xl border border-calm-sage/15 bg-white/85 p-5 shadow-soft-sm">
-        {mode === 'quick' ? (
-          <>
-            <h2 className="text-base font-semibold">Quick Mental Check</h2>
-            <p className="mt-1 text-sm text-charcoal/65">Rate each dimension from 0 (very low) to 4 (very high).</p>
-
-            <div className="mt-4 space-y-3">
-              {quickQuestions.map((question, index) => (
-                <div key={question} className="rounded-xl border border-calm-sage/10 p-3">
-                  <p className="text-sm font-medium text-charcoal">{question}</p>
-                  <input
-                    type="range"
-                    min={0}
-                    max={4}
-                    value={quickAnswers[index]}
-                    onChange={(event) =>
-                      setQuickAnswers((prev) => {
-                        const next = [...prev];
-                        next[index] = Number(event.target.value);
-                        return next;
-                      })
-                    }
-                    className="mt-2 w-full"
-                  />
-                  <p className="text-xs text-charcoal/60">Score: {quickAnswers[index]}/4</p>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-4 flex gap-2">
-              <button
-                type="button"
-                onClick={onSubmitQuickCheck}
-                disabled={loading}
-                className="inline-flex min-h-[40px] items-center rounded-full bg-charcoal px-4 text-sm font-medium text-cream disabled:opacity-60"
-              >
-                {loading ? 'Saving...' : 'Submit Quick Check'}
-              </button>
-            </div>
-          </>
-        ) : mode === 'daily' ? (
+        {mode === 'daily' ? (
           <>
             <h2 className="text-base font-semibold">Daily Assessment</h2>
             <p className="mt-1 text-sm text-charcoal/65">Track your daily wellbeing across key dimensions (0=Low, 10=High).</p>
@@ -476,7 +607,7 @@ export default function AssessmentsPage() {
         ) : hasPremiumAssessmentAccess ? (
           <>
             <h2 className="text-base font-semibold">Clinical Assessments</h2>
-            <p className="mt-1 text-sm text-charcoal/65">Choose a clinical tool and submit your score.</p>
+            <p className="mt-1 text-sm text-charcoal/65">Choose a clinical tool. PHQ-9 and GAD-7 now use the full structured questionnaires.</p>
 
             <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
               {clinicalCards.map((item) => (
@@ -499,34 +630,92 @@ export default function AssessmentsPage() {
               ))}
             </div>
 
-            <div className="mt-4">
-              <label className="block text-sm font-medium">Score ({selectedClinical}): {score}</label>
-              <input
-                type="range"
-                min={0}
-                max={selectedClinicalMax}
-                value={Math.min(score, selectedClinicalMax)}
-                onChange={(event) => setScore(Number(event.target.value))}
-                className="mt-2 w-full"
-              />
-            </div>
+            {selectedClinical === 'PHQ-9' || selectedClinical === 'GAD-7' ? (
+              <div className="mt-4 rounded-2xl border border-calm-sage/15 bg-calm-sage/5 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-charcoal">{structuredAttempt?.template?.title || `${selectedClinical} Questionnaire`}</p>
+                    <p className="mt-1 whitespace-pre-line text-xs text-charcoal/70">
+                      {structuredAttempt?.template?.description || 'Over the last 2 weeks, how often have you been bothered by the following problems?'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void startStructuredAssessment(selectedClinical)}
+                    disabled={structuredLoading || loading}
+                    className="inline-flex min-h-[36px] items-center rounded-lg border border-calm-sage/25 px-3 text-xs font-semibold text-charcoal/75 disabled:opacity-60"
+                  >
+                    {structuredLoading ? 'Loading...' : `Restart ${selectedClinical}`}
+                  </button>
+                </div>
+
+                <div className="mt-4 space-y-4">
+                  {structuredAttempt?.questions?.length ? (
+                    <>
+                      <div className="flex items-center justify-between rounded-xl border border-calm-sage/10 bg-white/70 px-3 py-2 text-xs text-charcoal/70">
+                        <span>Question {Math.min(currentStructuredQuestionIndex + 1, structuredAttempt.questions.length)} of {structuredAttempt.questions.length}</span>
+                        <span>{Object.keys(structuredAnswers).length} answered</span>
+                      </div>
+
+                      {structuredAttempt.questions[currentStructuredQuestionIndex] ? (
+                        <div className="rounded-xl border border-calm-sage/10 bg-white p-4">
+                          <p className="text-sm font-medium text-charcoal">
+                            Q{structuredAttempt.questions[currentStructuredQuestionIndex].position}. {structuredAttempt.questions[currentStructuredQuestionIndex].prompt}
+                          </p>
+                          <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                            {structuredAttempt.questions[currentStructuredQuestionIndex].options.map((option) => (
+                              <button
+                                key={`${structuredAttempt.questions[currentStructuredQuestionIndex].questionId}-${option.optionIndex}`}
+                                type="button"
+                                disabled={loading || structuredLoading}
+                                onClick={() => void onStructuredOptionSelect(structuredAttempt.questions[currentStructuredQuestionIndex], option.optionIndex)}
+                                className={`rounded-xl border px-3 py-2 text-left text-sm transition ${structuredAnswers[structuredAttempt.questions[currentStructuredQuestionIndex].questionId] === option.optionIndex ? 'border-calm-sage bg-calm-sage/10 text-charcoal' : 'border-calm-sage/10 bg-white text-charcoal/75 hover:bg-calm-sage/5'} disabled:opacity-60`}
+                              >
+                                <span className="block font-medium text-charcoal">{option.label}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      <div className="flex justify-start">
+                        <button
+                          type="button"
+                          onClick={() => setCurrentStructuredQuestionIndex((prev) => Math.max(0, prev - 1))}
+                          disabled={loading || structuredLoading || currentStructuredQuestionIndex === 0}
+                          className="inline-flex min-h-[36px] items-center rounded-lg border border-calm-sage/25 px-3 text-xs font-semibold text-charcoal/75 disabled:opacity-60"
+                        >
+                          Previous
+                        </button>
+                      </div>
+                    </>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
 
             <div className="mt-4 flex gap-2">
-              <button
-                type="button"
-                onClick={onSubmitClinical}
-                disabled={loading}
-                className="inline-flex min-h-[40px] items-center rounded-full bg-charcoal px-4 text-sm font-medium text-cream disabled:opacity-60"
-              >
-                {loading ? 'Saving...' : 'Save Clinical Assessment'}
-              </button>
+              {selectedClinical === 'PHQ-9' || selectedClinical === 'GAD-7' ? (
+                <p className="text-xs text-charcoal/70">
+                  {loading ? 'Submitting your responses...' : 'Select one option to move automatically to the next question.'}
+                </p>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onSubmitClinical}
+                  disabled={loading || structuredLoading}
+                  className="inline-flex min-h-[40px] items-center rounded-full bg-charcoal px-4 text-sm font-medium text-cream disabled:opacity-60"
+                >
+                  {loading ? 'Saving...' : 'Save Clinical Assessment'}
+                </button>
+              )}
             </div>
           </>
         ) : (
           <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-4">
             <h2 className="text-base font-semibold text-indigo-900">Clinical Assessments Locked</h2>
             <p className="mt-1 text-sm text-indigo-800">
-              Activate Platform Access to unlock PHQ-9, GAD-7, PSS-10, and ISI clinical reports.
+              Activate Platform Access to unlock PHQ-9 and GAD-7 clinical reports.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               <Link
@@ -535,13 +724,6 @@ export default function AssessmentsPage() {
               >
                 View Platform Plan
               </Link>
-              <button
-                type="button"
-                onClick={() => setMode('quick')}
-                className="inline-flex min-h-[36px] items-center rounded-xl border border-indigo-300 px-3 text-xs font-semibold text-indigo-900 hover:bg-indigo-100"
-              >
-                Continue With Quick Check
-              </button>
             </div>
           </div>
         )}
@@ -579,17 +761,35 @@ export default function AssessmentsPage() {
                   <li key={item}>{item}</li>
                 ))}
               </ul>
+
+            <div className="mt-3 grid gap-2 md:grid-cols-3">
+              <button
+                type="button"
+                onClick={() => void startCarePath('recommended')}
+                className="rounded-xl border border-calm-sage/25 bg-white p-3 text-left hover:border-calm-sage/45"
+              >
+                <p className="text-xs font-semibold uppercase tracking-wide text-calm-sage">Recommended Care</p>
+                <p className="mt-1 text-sm font-medium text-charcoal">Best match from your assessment</p>
+              </button>
+              <button
+                type="button"
+                onClick={() => void startCarePath('direct')}
+                className="rounded-xl border border-calm-sage/25 bg-white p-3 text-left hover:border-calm-sage/45"
+              >
+                <p className="text-xs font-semibold uppercase tracking-wide text-calm-sage">Direct Selection</p>
+                <p className="mt-1 text-sm font-medium text-charcoal">Choose any provider category and fee</p>
+              </button>
+              <button
+                type="button"
+                onClick={() => void startCarePath('urgent')}
+                className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-left hover:border-rose-300"
+              >
+                <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">Urgent Care</p>
+                <p className="mt-1 text-sm font-medium text-rose-900">Priority psychiatrist pathway</p>
+              </button>
             </div>
-          ) : null}
-          <div className="mt-3">
-            <p className="text-sm font-medium text-charcoal">Recommendations</p>
-            <ul className="mt-1 list-disc space-y-1 pl-4 text-sm text-charcoal/75">
-              {resultCard.recommendations.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-              <li>Continue mood tracking and follow your therapy plan.</li>
-            </ul>
           </div>
+          ) : null}
         </section>
       ) : null}
 

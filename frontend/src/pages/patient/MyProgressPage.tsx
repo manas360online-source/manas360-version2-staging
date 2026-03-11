@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { isOnboardingRequiredError, patientApi } from '../../api/patient';
+import { patientApi } from '../../api/patient';
 
 const asPayload = <T,>(value: any): T => (value?.data ?? value) as T;
 
@@ -13,7 +12,6 @@ const formatDate = (value?: string) => {
 };
 
 export default function MyProgressPage() {
-  const navigate = useNavigate();
   const [progress, setProgress] = useState<any>(null);
   const [sessionHistory, setSessionHistory] = useState<any[]>([]);
   const [moodStats, setMoodStats] = useState<any>(null);
@@ -33,16 +31,12 @@ export default function MyProgressPage() {
         setSessionHistory(asPayload<any[]>(sessionRes) || []);
         setMoodStats(asPayload<any>(moodStatsRes));
       } catch (err: any) {
-        if (isOnboardingRequiredError(err)) {
-          navigate('/patient/onboarding', { replace: true });
-          return;
-        }
         setError(err?.response?.data?.message || err?.message || 'Unable to load progress right now.');
       } finally {
         setLoading(false);
       }
     })();
-  }, [navigate]);
+  }, []);
 
   const summary = progress?.summary || {};
   const moodTrend = Array.isArray(progress?.moodTrend) ? progress.moodTrend : [];

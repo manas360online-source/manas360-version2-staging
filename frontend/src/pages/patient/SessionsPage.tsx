@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { CalendarPlus, MessageSquare, XCircle, RefreshCw, Video, FileText, Download, Star } from 'lucide-react';
-import { isOnboardingRequiredError, patientApi } from '../../api/patient';
+import { patientApi } from '../../api/patient';
 
 export default function SessionsPage() {
-  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'upcoming' | 'completed' | 'cancelled'>('upcoming');
   const [upcoming, setUpcoming] = useState<any[]>([]);
   const [history, setHistory] = useState<any[]>([]);
@@ -22,16 +21,12 @@ export default function SessionsPage() {
         setUpcoming(Array.isArray(upData) ? upData : []);
         setHistory(Array.isArray(histData) ? histData : []);
       } catch (err: any) {
-        if (isOnboardingRequiredError(err)) {
-          navigate('/patient/onboarding', { replace: true });
-          return;
-        }
         setError(err?.response?.data?.message || err?.message || 'Unable to load sessions right now.');
       } finally {
         setLoading(false);
       }
     })();
-  }, [navigate]);
+  }, []);
 
   const completed = history.filter((session) => session.status === 'completed');
   const cancelled = history.filter((session) => session.status === 'cancelled');

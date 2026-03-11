@@ -63,6 +63,7 @@ export default function DashboardPage() {
   const [savingMood, setSavingMood] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showAssessmentPrompt, setShowAssessmentPrompt] = useState(false);
 
   const fetchDashboardData = async () => {
     const [dashboardRes, subscriptionRes, historyRes] = await Promise.all([
@@ -92,7 +93,7 @@ export default function DashboardPage() {
         await fetchDashboardData();
       } catch (err: any) {
         if (isOnboardingRequiredError(err)) {
-          navigate('/patient/onboarding', { replace: true });
+          navigate('/patient/onboarding?next=/patient/assessments', { replace: true });
           return;
         }
         setError(err?.response?.data?.message || err?.message || 'Unable to load dashboard right now.');
@@ -119,6 +120,19 @@ export default function DashboardPage() {
   const recentActivity = Array.isArray(dashboard?.recentActivity) ? dashboard.recentActivity : [];
   const exercises = Array.isArray(dashboard?.exercises) ? dashboard.exercises : [];
   const hasPlatformAccess = isSubscriptionActive(subscription);
+  const hasClinicalAssessment = useMemo(() => {
+    const items = Array.isArray(recentActivity) ? recentActivity : [];
+    return items.some((item: any) => {
+      const title = String(item?.title || '').toLowerCase();
+      return title.includes('phq') || title.includes('gad') || title.includes('assessment');
+    });
+  }, [recentActivity]);
+
+  useEffect(() => {
+    if (!loading && hasPlatformAccess && !hasClinicalAssessment) {
+      setShowAssessmentPrompt(true);
+    }
+  }, [loading, hasPlatformAccess, hasClinicalAssessment]);
 
   const normalizedMoodTrend = useMemo(() => {
     if (!moodTrend.length) return [];
@@ -229,6 +243,36 @@ export default function DashboardPage() {
 
   return (
     <div className="mx-auto w-full max-w-[1400px] space-y-6 pb-20 lg:pb-6">
+      {showAssessmentPrompt ? (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-charcoal/45 p-4">
+          <div className="w-full max-w-lg rounded-2xl border border-calm-sage/20 bg-white p-5 shadow-xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-calm-sage">First Step</p>
+            <h2 className="mt-2 font-serif text-2xl font-semibold text-charcoal">Complete Your Mental Health Assessment</h2>
+            <p className="mt-2 text-sm text-charcoal/70">Start with PHQ-9 and GAD-7. It usually takes about 3 minutes and helps us match the right care path.</p>
+            <ul className="mt-3 space-y-1 text-sm text-charcoal/80">
+              <li>• PHQ-9 Depression Test</li>
+              <li>• GAD-7 Anxiety Test</li>
+            </ul>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => navigate('/patient/assessments')}
+                className="inline-flex min-h-[40px] items-center rounded-xl bg-charcoal px-4 text-sm font-medium text-cream"
+              >
+                Start Assessment
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowAssessmentPrompt(false)}
+                className="inline-flex min-h-[40px] items-center rounded-xl border border-calm-sage/25 px-4 text-sm font-medium text-charcoal/80"
+              >
+                Remind me later
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <section className="rounded-2xl border border-ink-100 bg-white p-4 shadow-soft-sm sm:p-5">
         <p className="text-xs text-charcoal/55 sm:text-sm">{todayLabel}</p>
         <h1 className="mt-1 font-serif text-2xl font-semibold text-charcoal sm:text-3xl">Good day, {userName}</h1>
@@ -501,7 +545,7 @@ export default function DashboardPage() {
               <>
                 <p className="text-sm font-semibold text-white">Platform Access Not Active</p>
                 <p className="mt-1 text-xs text-white/85">
-                  Unlock advanced assessments (PHQ-9, GAD-7, PSS-10, ISI), AI insights, and provider matching.
+                  Unlock advanced assessments (PHQ-9, GAD-7), AI insights, and provider matching.
                 </p>
                 <p className="mt-2 text-xs text-white/85">Pay platform fee first. Provider session fees are paid later at booking.</p>
                 <Link to="/patient/pricing" className="mt-3 inline-flex rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-sage-700 hover:bg-sage-50">
