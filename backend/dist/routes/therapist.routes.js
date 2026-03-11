@@ -13,6 +13,7 @@ const session_controller_1 = require("../controllers/session.controller");
 const exportRateLimiter_middleware_1 = require("../middleware/exportRateLimiter.middleware");
 const therapist_dashboard_controller_1 = require("../controllers/therapist-dashboard.controller");
 const therapist_modules_controller_1 = require("../controllers/therapist-modules.controller");
+const free_screening_provider_controller_1 = require("../controllers/free-screening-provider.controller");
 const router = (0, express_1.Router)();
 router.post('/profile', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, ...validate_middleware_1.validateCreateTherapistProfileRequest, (0, validate_middleware_1.asyncHandler)(therapist_controller_1.createTherapistProfileController));
 router.get('/me/profile', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, (0, validate_middleware_1.asyncHandler)(therapist_controller_1.getMyTherapistProfileController));
@@ -65,4 +66,8 @@ router.delete('/me/sessions/:id/responses/:responseId/notes/:noteId', auth_middl
 router.post('/me/documents', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, validate_middleware_1.uploadTherapistDocumentMiddleware, ...validate_middleware_1.validateUploadTherapistDocumentRequest, (0, validate_middleware_1.asyncHandler)(therapist_controller_1.uploadMyTherapistDocumentController));
 // Template actions
 router.post('/me/templates/:id/actions/duplicate', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, (0, validate_middleware_1.asyncHandler)(therapist_actions_controller_1.duplicateTemplateController));
+router.get('/me/free-screening/questions', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, (0, validate_middleware_1.asyncHandler)(free_screening_provider_controller_1.listProviderExtraQuestionsController));
+router.post('/me/free-screening/questions', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, (0, validate_middleware_1.asyncHandler)(free_screening_provider_controller_1.createProviderExtraQuestionController));
+router.post('/me/free-screening/questions/:questionId/assign', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, (0, validate_middleware_1.asyncHandler)(free_screening_provider_controller_1.assignProviderQuestionController));
+router.get('/me/free-screening/assignments', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, (0, validate_middleware_1.asyncHandler)(free_screening_provider_controller_1.listProviderQuestionAssignmentsController));
 exports.default = router;

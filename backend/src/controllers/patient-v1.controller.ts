@@ -10,12 +10,16 @@ import {
 	getMoodToday,
 	getMoodStats,
 	getPatientExercises,
+	getPatientInsights,
 	getMoodHistory,
+	getMyCareTeamProviders,
 	getPatientProgressAnalytics,
 	getPatientDashboard,
 	getPatientInvoiceById,
 	getPatientInvoices,
+	getLatestJourneyRecommendation,
 	getPatientPaymentMethod,
+	getPatientReports,
 	getPatientSubscription,
 	getProviderById,
 	getSessionDocumentPayload,
@@ -23,6 +27,7 @@ import {
 	getSessionHistory,
 	getUpcomingSessions,
 	initiateSessionBooking,
+	listAvailableProvidersForPatient,
 	listNotifications,
 	listProviders,
 	markNotificationRead,
@@ -76,6 +81,34 @@ export const listProvidersController = async (req: Request, res: Response): Prom
 	sendSuccess(res, result, 'Providers fetched');
 };
 
+export const listAvailableProvidersController = async (req: Request, res: Response): Promise<void> => {
+	const result = await listAvailableProvidersForPatient(authUserId(req), {
+		search: typeof req.query.search === 'string' ? req.query.search : undefined,
+		specialization: typeof req.query.specialization === 'string' ? req.query.specialization : undefined,
+		language: typeof req.query.language === 'string' ? req.query.language : undefined,
+		minPrice: req.query.minPrice ? Number(req.query.minPrice) : undefined,
+		maxPrice: req.query.maxPrice ? Number(req.query.maxPrice) * 100 : undefined,
+		page: req.query.page ? Number(req.query.page) : 1,
+		limit: req.query.limit ? Number(req.query.limit) : 12,
+	});
+	sendSuccess(res, result, 'Available providers fetched');
+};
+
+export const getPatientInsightsController = async (req: Request, res: Response): Promise<void> => {
+	const data = await getPatientInsights(authUserId(req));
+	sendSuccess(res, data, 'Patient insights fetched');
+};
+
+export const getPatientReportsController = async (req: Request, res: Response): Promise<void> => {
+	const data = await getPatientReports(authUserId(req));
+	sendSuccess(res, data, 'Patient reports fetched');
+};
+
+export const getMyCareTeamController = async (req: Request, res: Response): Promise<void> => {
+	const data = await getMyCareTeamProviders(authUserId(req));
+	sendSuccess(res, data, 'Care team fetched');
+};
+
 export const getProviderByIdController = async (req: Request, res: Response): Promise<void> => {
 	const id = String(req.params.id || '').trim();
 	if (!id) throw new AppError('provider id is required', 422);
@@ -95,6 +128,9 @@ export const bookSessionController = async (req: Request, res: Response): Promis
 		scheduledAt,
 		durationMinutes: req.body.durationMinutes ? Number(req.body.durationMinutes) : undefined,
 		amountMinor: req.body.amountMinor ? Number(req.body.amountMinor) : undefined,
+		providerType: req.body.providerType ? String(req.body.providerType) : undefined,
+		preferredTime: req.body.preferredTime !== undefined ? Boolean(req.body.preferredTime) : undefined,
+		preferredWindow: req.body.preferredWindow ? String(req.body.preferredWindow) : undefined,
 	});
 
 	sendSuccess(res, result, 'Booking initiated', 201);
@@ -235,6 +271,11 @@ export const submitAssessmentController = async (req: Request, res: Response): P
 		answers: Array.isArray(req.body.answers) ? req.body.answers.map((a: any) => Number(a)) : undefined,
 	});
 	sendSuccess(res, result, 'Assessment submitted', 201);
+};
+
+export const getJourneyRecommendationController = async (req: Request, res: Response): Promise<void> => {
+	const data = await getLatestJourneyRecommendation(authUserId(req));
+	sendSuccess(res, data, 'Journey recommendation fetched');
 };
 
 export const getMyTreatmentPlanController = async (req: Request, res: Response): Promise<void> => {

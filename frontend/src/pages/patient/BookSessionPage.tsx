@@ -2,6 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { patientApi } from '../../api/patient';
 
+const isSubscriptionActive = (subscription: any): boolean => {
+  if (!subscription) return false;
+  const status = String(subscription?.status || '').toLowerCase();
+  if (status === 'active' || status === 'trialing') return true;
+  if (subscription?.isActive === true || subscription?.active === true) return true;
+  return false;
+};
+
 const loadRazorpayScript = async (): Promise<boolean> => {
   if (window.Razorpay) return true;
 
@@ -21,27 +29,63 @@ export default function BookSessionPage() {
   const [slot, setSlot] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [preferredTime, setPreferredTime] = useState(false);
+  const [preferredWindow, setPreferredWindow] = useState('Evenings (6-9 PM)');
+  const [hasPlatformAccess, setHasPlatformAccess] = useState(false);
+  const [checkingAccess, setCheckingAccess] = useState(true);
+
+  const inferProviderType = (): string => {
+    const specialization = String(provider?.specialization || '').toLowerCase();
+    if (specialization.includes('psychiat')) return 'psychiatrist';
+    if (specialization.includes('clinical')) return 'clinical-psychologist';
+    return 'specialized-therapist';
+  };
 
   useEffect(() => {
     if (!providerId) return;
     (async () => {
-      const res = await patientApi.getProvider(providerId);
-      const p = res.data ?? res;
-      setProvider(p);
-      if (p.available_slots?.[0]) setSlot(String(p.available_slots[0]));
+      try {
+        const [providerRes, subscriptionRes] = await Promise.all([
+          patientApi.getProvider(providerId),
+          patientApi.getSubscription().catch(() => null),
+        ]);
+        const p = providerRes.data ?? providerRes;
+        setProvider(p);
+        if (p.available_slots?.[0]) setSlot(String(p.available_slots[0]));
+
+        const subscription = subscriptionRes ? ((subscriptionRes as any).data ?? subscriptionRes) : null;
+        setHasPlatformAccess(isSubscriptionActive(subscription));
+      } finally {
+        setCheckingAccess(false);
+      }
     })();
   }, [providerId]);
 
-  const amountMinor = useMemo(() => Number(provider?.session_rate || 150000), [provider]);
+  const baseAmountMinor = useMemo(() => Number(provider?.session_rate || 150000), [provider]);
+  const amountMinor = useMemo(
+    () => (preferredTime ? Math.round(baseAmountMinor * 1.2) : baseAmountMinor),
+    [baseAmountMinor, preferredTime],
+  );
   const canUseDevPaidFlow = import.meta.env.DEV;
 
   const onDevMarkAsPaid = async () => {
     if (!providerId || !slot) return;
+    if (!hasPlatformAccess) {
+      navigate('/patient/pricing');
+      return;
+    }
     setLoading(true);
     setError(null);
 
     try {
-      const initRes = await patientApi.bookSession({ providerId, scheduledAt: slot, amountMinor });
+      const initRes = await patientApi.bookSession({
+        providerId,
+        scheduledAt: slot,
+        amountMinor,
+        providerType: inferProviderType(),
+        preferredTime,
+        preferredWindow,
+      });
       const payload = initRes.data ?? initRes;
 
       await patientApi.verifyPayment({
@@ -60,6 +104,11 @@ export default function BookSessionPage() {
 
   const onBook = async () => {
     if (!providerId || !slot) return;
+    if (!hasPlatformAccess) {
+      setError('Platform Access is required before booking a paid session.');
+      navigate('/patient/pricing');
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -75,7 +124,14 @@ export default function BookSessionPage() {
         return;
       }
 
-      const initRes = await patientApi.bookSession({ providerId, scheduledAt: slot, amountMinor });
+      const initRes = await patientApi.bookSession({
+        providerId,
+        scheduledAt: slot,
+        amountMinor,
+        providerType: inferProviderType(),
+        preferredTime,
+        preferredWindow,
+      });
       const payload = initRes.data ?? initRes;
 
       const options = {
@@ -126,6 +182,21 @@ export default function BookSessionPage() {
     <div className="responsive-page">
       <div className="responsive-container section-stack">
       <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold">Book Session</h1>
+      {checkingAccess ? (
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">Checking platform access...</div>
+      ) : !hasPlatformAccess ? (
+        <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-3 text-sm text-indigo-900">
+          <p className="font-semibold">Platform Access required before provider booking.</p>
+          <p className="mt-1 text-xs text-indigo-800">Complete platform activation first. Provider session fee is paid separately during booking.</p>
+          <button
+            type="button"
+            onClick={() => navigate('/patient/pricing')}
+            className="mt-2 inline-flex min-h-[34px] items-center rounded-lg bg-indigo-600 px-3 text-xs font-semibold text-white hover:bg-indigo-500"
+          >
+            Activate Platform Access
+          </button>
+        </div>
+      ) : null}
       {canUseDevPaidFlow && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
           Development mode: real Razorpay payment is optional. Use <strong>Paid (Dev)</strong> to simulate a successful payment.
@@ -138,12 +209,39 @@ export default function BookSessionPage() {
           {(provider.available_slots || []).map((s: string) => <option key={s} value={s}>{new Date(s).toLocaleString()}</option>)}
         </select>
       </label>
-      <p className="text-sm">Session Fee: ₹{(amountMinor / 100).toFixed(0)}</p>
+      <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-3">
+        <p className="text-sm font-medium text-indigo-900">Premium Scheduling</p>
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          <span className="text-sm text-slate-700">Standard Time</span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={preferredTime}
+            onClick={() => setPreferredTime((prev) => !prev)}
+            className={`relative h-6 w-11 rounded-full transition ${preferredTime ? 'bg-indigo-600' : 'bg-slate-300'}`}
+          >
+            <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${preferredTime ? 'left-5' : 'left-0.5'}`} />
+          </button>
+          <span className="text-sm font-medium text-indigo-800">Preferred Time (+20%)</span>
+        </div>
+        {preferredTime ? (
+          <label className="mt-3 block">
+            <span className="mb-1 block text-xs text-slate-600">Preferred Window</span>
+            <select value={preferredWindow} onChange={(e) => setPreferredWindow(e.target.value)} className="w-full rounded border border-slate-300 p-2 text-sm">
+              <option value="Evenings (6-9 PM)">Evenings (6-9 PM)</option>
+              <option value="Weekends">Weekends</option>
+              <option value="Early mornings">Early mornings</option>
+            </select>
+          </label>
+        ) : null}
+      </div>
+      <p className="text-sm">Base Fee: ₹{(baseAmountMinor / 100).toFixed(0)}</p>
+      <p className="text-sm font-semibold text-indigo-800">Final Session Fee: ₹{(amountMinor / 100).toFixed(0)}{preferredTime ? ` (${preferredWindow})` : ''}</p>
       <div className="flex flex-col sm:flex-row gap-4 justify-center">
-        <button disabled={loading || !slot} onClick={onBook} className="responsive-action-btn rounded-xl bg-slate-900 text-white disabled:opacity-60">{loading ? 'Processing...' : 'Proceed to Pay'}</button>
+        <button disabled={loading || !slot || !hasPlatformAccess || checkingAccess} onClick={onBook} className="responsive-action-btn rounded-xl bg-slate-900 text-white disabled:opacity-60">{loading ? 'Processing...' : 'Proceed to Pay'}</button>
         {canUseDevPaidFlow && (
           <button
-            disabled={loading || !slot}
+            disabled={loading || !slot || !hasPlatformAccess || checkingAccess}
             onClick={onDevMarkAsPaid}
             className="responsive-action-btn rounded-xl bg-emerald-700 text-white disabled:opacity-60"
           >

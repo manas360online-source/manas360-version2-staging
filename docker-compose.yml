@@ -5,7 +5,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: manas360
-      POSTGRES_PASSWORD: changeme
+      POSTGRES_PASSWORD: manas360
       POSTGRES_DB: manas360
     ports:
       - "5432:5432"

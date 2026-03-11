@@ -21,6 +21,9 @@ import psychiatristRoutes from './psychiatrist.routes';
 import psychologistRoutes from './psychologist.routes';
 import corporateRoutes from './corporate.routes';
 import ssoRoutes from './sso.routes';
+import pricingRoutes from './pricing.routes';
+import patientJourneyRoutes from './patient-journey.routes';
+import freeScreeningRoutes from './free-screening.routes';
 
 const router = Router();
 
@@ -53,6 +56,10 @@ router.use('/v1/psychologist', psychologistRoutes);
 router.use('/v1/payments', paymentRoutes);
 router.use('/v1/sso', ssoRoutes);
 router.use('/v1/subscriptions', subscriptionRoutes);
+router.use('/v1/pricing', pricingRoutes);
+router.use('/pricing', pricingRoutes);
+router.use('/v1/patient-journey', patientJourneyRoutes);
+router.use('/v1', freeScreeningRoutes);
 router.use('/v1/leads', leadRoutes);
 router.use('/certifications', certificationRoutes);
 router.use('/v1/certifications', certificationRoutes);

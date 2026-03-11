@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom'
 import LandingPage from './pages/LandingPage'
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, getPostLoginRoute, useAuth } from './context/AuthContext';
 import { Assessment } from './pages/Assessment'
 import { ResultsPage } from './pages/Results'
 import { CrisisPage } from './pages/Crisis'
@@ -19,8 +19,6 @@ import CorporateRoute from './components/CorporateRoute'
 import PatientDashboardLayout from './components/layout/PatientDashboardLayout'
 import TherapistDashboardLayout from './components/layout/TherapistDashboardLayout'
 import DashboardPage from './pages/patient/DashboardPage'
-import ProvidersPage from './pages/patient/ProvidersPage'
-import ProviderDetailPage from './pages/patient/ProviderDetailPage'
 import BookSessionPage from './pages/patient/BookSessionPage'
 import SessionsPage from './pages/patient/SessionsPage'
 import PatientSessionDetailPage from './pages/patient/SessionDetailPage'
@@ -29,17 +27,22 @@ import ProfilePage from './pages/patient/ProfilePage'
 import SettingsPage from './pages/patient/SettingsPage'
 import LiveSessionPage from './pages/patient/LiveSessionPage'
 import AssessmentsPage from './pages/patient/AssessmentsPage'
+import AssessmentReportsPage from './pages/patient/AssessmentReportsPage'
 import DocumentsPage from './pages/patient/DocumentsPage'
+import ProgressPage from './pages/patient/ProgressPage'
 import SupportPage from './pages/patient/SupportPage'
-import NotificationsPage from './pages/patient/NotificationsPage'
 import CBTSessionPlayerPage from './pages/patient/CBTSessionPlayerPage'
-import MoodTrackerPage from './pages/patient/MoodTrackerPage'
-import MyProgressPage from './pages/patient/MyProgressPage'
 import PatientOnboardingPage from './pages/patient/PatientOnboardingPage'
 import TherapyPlanPage from './pages/patient/TherapyPlanPage'
 import ExercisesPage from './pages/patient/ExercisesPage'
 import CareTeamPage from './pages/patient/CareTeamPage'
+import PricingPage from './pages/patient/PricingPage'
+import PatientTimelinePage from './pages/patient/PatientTimelinePage'
+import MoodTrackerPage from './pages/patient/MoodTrackerPage'
 import ReportsPage from './pages/patient/ReportsPage'
+import NotificationsPage from './pages/patient/NotificationsPage'
+import SoundTherapyPage from './pages/patient/SoundTherapyPage'
+import ProviderMessagesPage from './pages/patient/ProviderMessagesPage'
 import AdminPortalLoginPage from './pages/admin/AdminPortalLoginPage'
 import AdminDashboardPage from './pages/admin/Dashboard'
 import AdminShellLayout from './components/admin/AdminShellLayout'
@@ -53,6 +56,7 @@ import AdminPlatformHealthPage from './pages/admin/PlatformHealth'
 import AdminVerificationPage from './pages/admin/Verification'
 import AdminRevenuePage from './pages/admin/Revenue'
 import AdminSettingsPage from './pages/admin/Settings'
+import AdminPricingManagementPage from './pages/admin/PricingManagement'
 import ClinicalAssistantPage from './pages/admin/ClinicalAssistantPage'
 import AdminSectionPage from './pages/admin/AdminSectionPage'
 import CertificationsPage from './pages/CertificationsPage'
@@ -121,7 +125,6 @@ import ProviderDocumentVerificationGuard from './components/providers/ProviderDo
 import CancellationRefundPolicyPage from './pages/legal/CancellationRefundPolicyPage';
 import TermsOfUsePage from './pages/legal/TermsOfUsePage';
 import PrivacyPolicyPage from './pages/legal/PrivacyPolicyPage';
-import SubscribePage from './pages/SubscribePage';
 import CorporateAnalyticsPage from './pages/corporate/CorporateAnalyticsPage';
 import CorporateEmployeeDirectoryPage from './pages/corporate/CorporateEmployeeDirectoryPage';
 import CorporateEnrollmentPage from './pages/corporate/CorporateEnrollmentPage';
@@ -138,9 +141,19 @@ import CorporateDashboardPage from './pages/corporate/CorporateDashboardPage';
 import CorporateOnboardingPage from './pages/corporate/CorporateOnboardingPage';
 
 interface AssessmentData {
-  symptoms: string[];
-  impact: string;
-  selfHarm: string;
+  symptoms?: string[];
+  impact?: string;
+  selfHarm?: string;
+  totalScore?: number;
+  severityLevel?: string;
+  interpretation?: string;
+  recommendation?: string;
+  action?: string;
+}
+
+function DashboardRedirect() {
+  const { user } = useAuth();
+  return <Navigate to={getPostLoginRoute(user)} replace />;
 }
 
 function App() {
@@ -637,6 +650,14 @@ function App() {
         <Route path="/admin-portal/login" element={<AdminPortalLoginPage />} />
         <Route path="/corporate/login" element={<Navigate to="/auth/login" replace />} />
         <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <DashboardRedirect />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/admin"
           element={
             <PlatformAdminRoute>
@@ -663,6 +684,7 @@ function App() {
           <Route path="crisis-alerts" element={<AdminSectionPage title="Crisis Alerts" description="Triage and escalate high-risk events with defined safety protocols." bullets={['Suicide risk alerts', 'Escalate to psychiatrist', 'Emergency protocol status', 'Resolution timeline']} />} />
 
           <Route path="revenue" element={<AdminRevenuePage />} />
+          <Route path="pricing-management" element={<AdminPricingManagementPage />} />
           <Route path="payouts" element={<AdminSectionPage title="Payouts" description="Review provider payouts, schedules, holds, and reconciliation exceptions." bullets={['Scheduled payout runs', 'Manual adjustments', 'Failed transfer handling', 'Payout audit log']} />} />
           <Route path="invoices" element={<AdminSectionPage title="Invoices" description="Track invoices, collections, refunds, and payment disputes." bullets={['Invoice lifecycle tracking', 'Corporate and individual invoices', 'Refund analytics', 'Collection status by segment']} />} />
 
@@ -806,38 +828,37 @@ function App() {
           <Route path="onboarding" element={<PatientOnboardingPage />} />
           <Route path="therapy-plan" element={<TherapyPlanPage />} />
           <Route path="care-team" element={<CareTeamPage />} />
-          <Route path="providers" element={<ProvidersPage />} />
-          <Route path="providers/:id" element={<ProviderDetailPage />} />
+          <Route path="providers" element={<Navigate to="/patient/care-team?tab=browse" replace />} />
+          <Route path="providers/:id" element={<Navigate to="/patient/care-team?tab=browse" replace />} />
           <Route path="book/:providerId" element={<BookSessionPage />} />
           <Route path="sessions" element={<SessionsPage />} />
           <Route path="sessions/:id" element={<PatientSessionDetailPage />} />
           <Route path="cbt/:sessionId" element={<CBTSessionPlayerPage />} />
           <Route path="exercises" element={<ExercisesPage />} />
           <Route path="sessions/:id/live" element={<LiveSessionPage />} />
+          <Route path="mood" element={<MoodTrackerPage />} />
+          <Route path="sound-therapy" element={<SoundTherapyPage />} />
+          <Route path="provider-messages" element={<ProviderMessagesPage />} />
           <Route path="messages" element={<AIChatPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="assessments" element={<AssessmentsPage />} />
+          <Route path="assessment-reports" element={<AssessmentReportsPage />} />
           <Route path="billing" element={<Navigate to="/patient/settings?section=billing" replace />} />
           <Route path="documents" element={<DocumentsPage />} />
           <Route path="support" element={<SupportPage />} />
-          <Route path="notifications" element={<NotificationsPage />} />
-          <Route path="mood" element={<MoodTrackerPage />} />
-          <Route path="insights" element={<MyProgressPage />} />
-          <Route path="progress" element={<MyProgressPage />} />
+          <Route path="timeline" element={<PatientTimelinePage />} />
+          <Route path="insights" element={<ProgressPage />} />
+          <Route path="progress" element={<ProgressPage />} />
           <Route path="reports" element={<ReportsPage />} />
-        </Route>
-
-        <Route path="/dashboard" element={<Navigate to="/patient/dashboard" replace />} />
-        <Route path="/subscribe" element={<SubscribePage />} />
-        <Route path="/providers" element={<Navigate to="/patient/providers" replace />} />
-        <Route path="/providers/:id" element={<Navigate to="/patient/providers" replace />} />
-        <Route path="/book/:providerId" element={<Navigate to="/patient/providers" replace />} />
+          <Route path="notifications" element={<NotificationsPage />} />
+          <Route path="pricing" element={<PricingPage />} />
+          </Route>
+        <Route path="/providers/:id" element={<Navigate to="/patient/care-team?tab=browse" replace />} />
+        <Route path="/book/:providerId" element={<Navigate to="/patient/care-team?tab=browse" replace />} />
         <Route path="/sessions" element={<Navigate to="/patient/sessions" replace />} />
         <Route path="/sessions/:id/live" element={<Navigate to="/patient/sessions" replace />} />
         <Route path="/ai-chat" element={<Navigate to="/patient/messages" replace />} />
-        <Route path="/patient/progress" element={<Navigate to="/patient/insights" replace />} />
-        <Route path="/patient/cbt" element={<Navigate to="/patient/exercises" replace />} />
         <Route path="/profile" element={<Navigate to="/patient/profile" replace />} />
         <Route path="/settings" element={<Navigate to="/patient/settings" replace />} />
         <Route path="/terms" element={<TermsOfUsePage />} />

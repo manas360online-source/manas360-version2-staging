@@ -8,6 +8,8 @@ const admin_controller_1 = require("../controllers/admin.controller");
 const admin_analytics_controller_1 = require("../controllers/admin-analytics.controller");
 const admin_module_controller_1 = require("../controllers/admin-module.controller");
 const rateLimiter_middleware_1 = require("../middleware/rateLimiter.middleware");
+const pricing_controller_1 = require("../controllers/pricing.controller");
+const free_screening_admin_controller_1 = require("../controllers/free-screening-admin.controller");
 const router = (0, express_1.Router)();
 /**
  * GET /api/v1/admin/users
@@ -59,6 +61,21 @@ router.get('/metrics', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requ
  * Response: Paginated list of subscriptions with user and plan details
  */
 router.get('/subscriptions', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), ...validate_middleware_1.validateAdminListSubscriptionsQuery, (0, validate_middleware_1.asyncHandler)(admin_controller_1.listSubscriptionsController));
+router.get('/pricing', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, validate_middleware_1.asyncHandler)(pricing_controller_1.getAdminPricingConfigController));
+router.put('/pricing', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, validate_middleware_1.asyncHandler)(pricing_controller_1.updateAdminPricingConfigController));
+router.patch('/pricing', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, validate_middleware_1.asyncHandler)(pricing_controller_1.updateAdminPricingConfigController));
+router.get('/screening/templates', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, validate_middleware_1.asyncHandler)(free_screening_admin_controller_1.listScreeningTemplatesAdminController));
+router.post('/screening/templates', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, validate_middleware_1.asyncHandler)(free_screening_admin_controller_1.createScreeningTemplateAdminController));
+router.put('/screening/templates/:templateId', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, validate_middleware_1.asyncHandler)(free_screening_admin_controller_1.updateScreeningTemplateAdminController));
+router.get('/screening/templates/:templateId/questions', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, validate_middleware_1.asyncHandler)(free_screening_admin_controller_1.listTemplateQuestionsAdminController));
+router.post('/screening/templates/:templateId/questions', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, validate_middleware_1.asyncHandler)(free_screening_admin_controller_1.createTemplateQuestionAdminController));
+router.put('/screening/questions/:questionId', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, validate_middleware_1.asyncHandler)(free_screening_admin_controller_1.updateTemplateQuestionAdminController));
+router.post('/screening/questions/:questionId/options', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, validate_middleware_1.asyncHandler)(free_screening_admin_controller_1.createQuestionOptionAdminController));
+router.put('/screening/options/:optionId', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, validate_middleware_1.asyncHandler)(free_screening_admin_controller_1.updateQuestionOptionAdminController));
+router.get('/screening/templates/:templateId/scoring-bands', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, validate_middleware_1.asyncHandler)(free_screening_admin_controller_1.listScoringBandsAdminController));
+router.put('/screening/templates/:templateId/scoring-bands', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, validate_middleware_1.asyncHandler)(free_screening_admin_controller_1.replaceScoringBandsAdminController));
+router.post('/screening/templates/:templateId/simulate', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, validate_middleware_1.asyncHandler)(free_screening_admin_controller_1.simulateTemplateScoringController));
+router.get('/screening/provider-questions', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, validate_middleware_1.asyncHandler)(free_screening_admin_controller_1.listAllProviderExtraQuestionsAdminController));
 /**
  * GET /api/v1/admin/modules/:module/summary
  * Generic real-time summary for admin module pages.

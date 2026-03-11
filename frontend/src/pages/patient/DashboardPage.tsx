@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { isOnboardingRequiredError, patientApi } from '../../api/patient';
+import { parseJourneyPayload, type JourneyPayload } from '../../utils/journey';
 
 const moodEmojiMap: Record<number, string> = {
   1: '😢',
@@ -42,11 +43,22 @@ const formatDateTime = (value?: string | Date) => {
   return date.toLocaleString();
 };
 
+const isSubscriptionActive = (subscription: any): boolean => {
+  if (!subscription) return false;
+
+  const status = String(subscription?.status || '').toLowerCase();
+  if (status === 'active' || status === 'trialing') return true;
+  if (subscription?.isActive === true || subscription?.active === true) return true;
+
+  return false;
+};
+
 export default function DashboardPage() {
   const navigate = useNavigate();
   const [dashboard, setDashboard] = useState<any>(null);
   const [subscription, setSubscription] = useState<any>(null);
   const [sessions, setSessions] = useState<any[]>([]);
+  const [journey, setJourney] = useState<JourneyPayload | null>(null);
   const [moodValue, setMoodValue] = useState<number>(3);
   const [savingMood, setSavingMood] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -58,6 +70,7 @@ export default function DashboardPage() {
       patientApi.getSubscription().catch(() => null),
       patientApi.getSessionHistory(),
     ]);
+    const journeyRes = await patientApi.getJourneyRecommendation().catch(() => null);
 
     const dashboardData = dashboardRes?.data ?? dashboardRes;
     const subscriptionData = subscriptionRes ? (subscriptionRes.data ?? subscriptionRes) : null;
@@ -66,6 +79,7 @@ export default function DashboardPage() {
     setDashboard(dashboardData || null);
     setSubscription(subscriptionData || null);
     setSessions(Array.isArray(sessionHistory) ? sessionHistory : []);
+    setJourney(journeyRes ? parseJourneyPayload(journeyRes) : null);
 
     const latestMood = dashboardData?.moodTrend?.[dashboardData.moodTrend.length - 1]?.score;
     if (typeof latestMood === 'number') setMoodValue(latestMood);
@@ -104,6 +118,7 @@ export default function DashboardPage() {
   const moodTrend = Array.isArray(dashboard?.moodTrend) ? dashboard.moodTrend : [];
   const recentActivity = Array.isArray(dashboard?.recentActivity) ? dashboard.recentActivity : [];
   const exercises = Array.isArray(dashboard?.exercises) ? dashboard.exercises : [];
+  const hasPlatformAccess = isSubscriptionActive(subscription);
 
   const normalizedMoodTrend = useMemo(() => {
     if (!moodTrend.length) return [];
@@ -160,30 +175,30 @@ export default function DashboardPage() {
     const hasUpcomingSession = Boolean(upcomingSession?.scheduledAt);
 
     return [
-      { label: 'Mood check-in', done: moodChecked },
-      { label: pendingExercise ? `CBT Exercise (${pendingExercise.duration || 5} min)` : 'CBT Exercise', done: !pendingExercise },
-      { label: 'Meditation session', done: false },
-      { label: hasUpcomingSession ? 'Therapist session tomorrow' : 'Schedule next therapist session', done: hasUpcomingSession },
+      { label: 'Mood check-in', done: moodChecked, to: '/patient/mood' },
+      { label: pendingExercise ? `CBT Exercise (${pendingExercise.duration || 5} min)` : 'CBT Exercise', done: !pendingExercise, to: '/patient/exercises' },
+      { label: 'Meditation session', done: false, to: '/patient/sound-therapy' },
+      { label: hasUpcomingSession ? 'Therapist session tomorrow' : 'Schedule next therapist session', done: hasUpcomingSession, to: hasUpcomingSession ? '/patient/sessions' : '/patient/care-team?tab=browse' },
     ];
   }, [normalizedMoodTrend.length, exercises, upcomingSession]);
 
   const aiSuggestions = useMemo(() => {
-    const items: string[] = [];
+    const items: { text: string; to: string }[] = [];
 
     if (avgMood > 0 && avgMood <= 2.5) {
-      items.push('Grounding + breathing reset (5 min)');
-      items.push('Low-mood thought reframing worksheet');
+      items.push({ text: 'Grounding + breathing reset (5 min)', to: '/patient/sound-therapy' });
+      items.push({ text: 'Low-mood thought reframing worksheet', to: '/patient/exercises' });
     } else if (avgMood > 2.5 && avgMood < 4) {
-      items.push('Sleep improvement CBT micro exercise');
-      items.push('Evening reflection journal');
+      items.push({ text: 'Sleep improvement CBT micro exercise', to: '/patient/exercises' });
+      items.push({ text: 'Evening reflection journal', to: '/patient/mood' });
     } else {
-      items.push('Maintain momentum with gratitude practice');
-      items.push('Short mindfulness session');
+      items.push({ text: 'Maintain momentum with gratitude practice', to: '/patient/exercises' });
+      items.push({ text: 'Short mindfulness session', to: '/patient/sound-therapy' });
     }
 
     const pendingCount = exercises.filter((item: any) => String(item?.status || '').toUpperCase() !== 'COMPLETED').length;
     if (pendingCount > 0) {
-      items.push('Complete one pending assigned exercise today');
+      items.push({ text: 'Complete one pending assigned exercise today', to: '/patient/exercises' });
     }
 
     return items.slice(0, 3);
@@ -286,12 +301,12 @@ export default function DashboardPage() {
           <h2 className="text-base font-semibold text-charcoal">Today's Plan</h2>
           <div className="mt-3 space-y-2">
             {todayPlanItems.map((item) => (
-              <div key={item.label} className="flex items-center gap-2">
+              <Link key={item.label} to={item.to} className="flex items-center gap-2 rounded-lg p-1 transition hover:bg-calm-sage/5">
                 <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-semibold ${item.done ? 'bg-emerald-100 text-emerald-700' : 'bg-ink-100 text-ink-500'}`}>
                   {item.done ? '✓' : '○'}
                 </span>
                 <p className="text-sm text-charcoal/80">{item.label}</p>
-              </div>
+              </Link>
             ))}
           </div>
         </article>
@@ -301,7 +316,7 @@ export default function DashboardPage() {
           {!upcomingSession ? (
             <div className="mt-3 space-y-2">
               <p className="text-sm text-charcoal/70">No therapist session is currently scheduled.</p>
-              <Link to="/patient/providers" className="inline-flex min-h-[36px] items-center rounded-full border border-calm-sage/25 px-3 text-xs font-medium text-charcoal/80">
+              <Link to="/patient/care-team?tab=browse" className="inline-flex min-h-[36px] items-center rounded-full border border-calm-sage/25 px-3 text-xs font-medium text-charcoal/80">
                 Find Therapist
               </Link>
             </div>
@@ -320,9 +335,14 @@ export default function DashboardPage() {
         <article className="rounded-2xl border border-ink-100 bg-white p-4 shadow-soft-sm">
           <h2 className="text-base font-semibold text-charcoal">AI Suggestions</h2>
           <p className="mt-1 text-xs text-charcoal/60">Based on your mood trend and activity</p>
-          <ul className="mt-3 list-disc space-y-1 pl-4 text-sm text-charcoal/80">
+          <ul className="mt-3 space-y-1 pl-1 text-sm text-charcoal/80">
             {aiSuggestions.map((item) => (
-              <li key={item}>{item}</li>
+              <li key={item.text}>
+                <Link to={item.to} className="flex items-start gap-2 rounded-lg p-1 transition hover:bg-calm-sage/5">
+                  <span className="mt-1 text-calm-sage">•</span>
+                  <span>{item.text}</span>
+                </Link>
+              </li>
             ))}
           </ul>
         </article>
@@ -360,7 +380,7 @@ export default function DashboardPage() {
               <h2 className="text-base font-semibold text-charcoal">Mood Trend</h2>
               <div className="flex items-center gap-3">
                 <span className="text-xs font-medium text-calm-sage">Average: {avgMood || '—'} / 5</span>
-                <Link to="/patient/progress" className="text-xs font-medium text-calm-sage hover:underline">View Progress →</Link>
+                <Link to="/patient/insights" className="text-xs font-medium text-calm-sage hover:underline">View Progress →</Link>
               </div>
             </div>
 
@@ -403,6 +423,28 @@ export default function DashboardPage() {
         </div>
 
         <div className="space-y-6">
+          <article className="rounded-2xl border border-ink-100 bg-white p-5 shadow-soft-sm">
+            <h2 className="text-base font-semibold text-charcoal">Journey Timeline</h2>
+            {!journey ? (
+              <p className="mt-2 text-sm text-charcoal/70">No journey data yet. Complete an assessment to start building your timeline.</p>
+            ) : (
+              <div className="mt-3 space-y-2">
+                {Array.isArray(journey?.actions) && journey.actions.length > 0 ? (
+                  <ul className="list-disc space-y-1 pl-4 text-xs text-charcoal/70">
+                    {journey.actions.slice(0, 3).map((item: string) => <li key={item}>{item}</li>)}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-charcoal/70">Your therapy journey is being tracked. View your full timeline for details.</p>
+                )}
+                <div className="mt-2">
+                  <Link to="/patient/timeline" className="inline-flex min-h-[34px] items-center rounded-full border border-calm-sage/25 px-3 text-xs font-medium text-charcoal/80 hover:bg-calm-sage/10">
+                    Open Timeline
+                  </Link>
+                </div>
+              </div>
+            )}
+          </article>
+
           <article className="overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-soft-sm">
             <div className="flex items-center justify-between border-b border-calm-sage/15 px-5 py-4">
               <h2 className="text-base font-semibold text-charcoal">Exercises</h2>
@@ -434,14 +476,39 @@ export default function DashboardPage() {
           </article>
 
           <article className="rounded-2xl bg-gradient-to-br from-sage-700 to-sage-800 p-5 text-white shadow-soft-md">
-            <p className="text-sm font-semibold text-white">{subscription?.planName || 'Subscription Plan'}</p>
-            <p className="mt-1 text-xs text-white/80">
-              ₹{subscription?.price || 0}/{String(subscription?.billingCycle || 'monthly').toLowerCase()} · Renews {formatDate(subscription?.renewalDate)}
-            </p>
-            <p className="mt-2 text-xs text-white/85">Status: {subscription?.status || 'active'} · Auto-renew: {subscription?.autoRenew ? 'On' : 'Off'}</p>
-            <Link to="/patient/settings?section=billing" className="mt-3 inline-flex rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-sage-700 hover:bg-sage-50">
-              Manage Subscription
-            </Link>
+            {hasPlatformAccess ? (
+              <>
+                <p className="text-sm font-semibold text-white">{subscription?.planName || 'Platform Access'}</p>
+                <p className="mt-1 text-xs text-white/80">
+                  ₹{subscription?.price || 0}/{String(subscription?.billingCycle || 'monthly').toLowerCase()} · Renews {formatDate(subscription?.renewalDate)}
+                </p>
+                {subscription?.nextRenewalPrice ? (
+                  <p className="mt-1 text-xs text-white/85">
+                    Next renewal price: ₹{subscription.nextRenewalPrice} (locked until {formatDate(subscription?.priceLockedUntil || subscription?.renewalDate)})
+                  </p>
+                ) : null}
+                <p className="mt-2 text-xs text-white/85">Status: {subscription?.status || 'active'} · Auto-renew: {subscription?.autoRenew ? 'On' : 'Off'}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Link to="/patient/assessments" className="inline-flex rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-sage-700 hover:bg-sage-50">
+                    Take Advanced Assessments
+                  </Link>
+                  <Link to="/patient/pricing" className="inline-flex rounded-lg border border-white/40 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10">
+                    Manage Plan
+                  </Link>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-semibold text-white">Platform Access Not Active</p>
+                <p className="mt-1 text-xs text-white/85">
+                  Unlock advanced assessments (PHQ-9, GAD-7, PSS-10, ISI), AI insights, and provider matching.
+                </p>
+                <p className="mt-2 text-xs text-white/85">Pay platform fee first. Provider session fees are paid later at booking.</p>
+                <Link to="/patient/pricing" className="mt-3 inline-flex rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-sage-700 hover:bg-sage-50">
+                  Activate Platform Access
+                </Link>
+              </>
+            )}
           </article>
         </div>
       </section>

@@ -20,11 +20,13 @@
 		"backfill:versions": "ts-node ./scripts/backfill_versions.ts",
 		"seed:templates": "ts-node ./scripts/seed_default_templates.ts",
 		"seed:login-users": "node ./scripts/seed-login-users.js",
+		"seed:demo:saas": "node ./scripts/seed-demo-saas.js",
 		"seed": "node ./prisma/seed.js",
 		"seed:users:mock": "ts-node ./scripts/seed_mock_users.ts",
 		"seed:analytics:mock": "ts-node ./scripts/seed_admin_analytics_mock_data.ts",
 		"seed:patient:mock-dashboard": "node ./scripts/seed_mock_patient_dashboard.js",
 		"seed:all:mock": "npm run seed:users:mock && npm run seed:analytics:mock",
+		"smoke:patient:saas": "bash ./scripts/run-patient-saas-smoke.sh",
 		"guard:single-admin": "node ./scripts/check-single-platform-admin.js",
 		"test:watch": "jest --watch"
 	},

@@ -7,6 +7,9 @@ import { createSessionPayment } from './payment.service';
 import { verifyRazorpayPaymentSignature } from './razorpay.service';
 import { processChatMessage } from './chat.service';
 import { syncTreatmentPlanFromAssessment } from './treatment-plan.service';
+import { getSessionQuote } from './pricing.service';
+import { getActivePlatformPlan } from './pricing.service';
+import { scoreGAD7, scorePHQ9 } from './riskScoring';
 
 const db = prisma as any;
 
@@ -38,6 +41,121 @@ const mapSeverity = (score: number): 'Mild' | 'Moderate' | 'Severe' => {
 	if (score <= 9) return 'Mild';
 	if (score <= 19) return 'Moderate';
 	return 'Severe';
+};
+
+type JourneyPathway = 'SELF_CARE' | 'THERAPIST' | 'PSYCHIATRIST' | 'CRISIS_SUPPORT';
+type JourneyUrgency = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+
+type JourneyRecommendation = {
+	pathway: JourneyPathway;
+	urgency: JourneyUrgency;
+	recommendedProvider: 'self-guided' | 'therapist' | 'psychiatrist' | 'crisis-team';
+	followUpDays: number;
+	rationale: string[];
+	actions: string[];
+};
+
+const buildJourneyRecommendation = (input: { type: string; score: number; answers: number[] }): JourneyRecommendation => {
+	const type = String(input.type || '').toUpperCase();
+
+	if (type === 'PHQ-9') {
+		const phq = scorePHQ9(input.answers.length ? input.answers : [input.score]);
+		if (phq.q9Score >= 3) {
+			return {
+				pathway: 'CRISIS_SUPPORT',
+				urgency: 'CRITICAL',
+				recommendedProvider: 'crisis-team',
+				followUpDays: 0,
+				rationale: ['PHQ-9 item 9 indicates frequent self-harm thoughts.', `PHQ-9 total ${phq.total} (${phq.severity}).`],
+				actions: ['Contact immediate crisis support now.', 'Enable urgent care-team outreach.', 'Schedule same-day clinical review.'],
+			};
+		}
+
+		if (phq.q9Score > 0 || phq.total >= 20) {
+			return {
+				pathway: 'PSYCHIATRIST',
+				urgency: 'HIGH',
+				recommendedProvider: 'psychiatrist',
+				followUpDays: 1,
+				rationale: ['Elevated depression severity and safety risk factors.', `PHQ-9 total ${phq.total} (${phq.severity}).`],
+				actions: ['Book psychiatrist consult within 24 hours.', 'Assign therapist follow-up session this week.', 'Continue daily mood and safety check-ins.'],
+			};
+		}
+
+		if (phq.total >= 10) {
+			return {
+				pathway: 'THERAPIST',
+				urgency: 'MEDIUM',
+				recommendedProvider: 'therapist',
+				followUpDays: 3,
+				rationale: [`PHQ-9 indicates ${phq.severity} depressive symptoms.`],
+				actions: ['Book therapist session this week.', 'Start structured CBT activity plan.', 'Track mood and sleep for 7 days.'],
+			};
+		}
+
+		return {
+			pathway: 'SELF_CARE',
+			urgency: 'LOW',
+			recommendedProvider: 'self-guided',
+			followUpDays: 7,
+			rationale: [`PHQ-9 indicates ${phq.severity} symptoms.`],
+			actions: ['Continue self-care routines.', 'Repeat assessment in one week.', 'Use breathing and sleep hygiene exercises.'],
+		};
+	}
+
+	if (type === 'GAD-7') {
+		const gad = scoreGAD7(input.answers.length ? input.answers : [input.score]);
+		if (gad.total >= 15) {
+			return {
+				pathway: 'THERAPIST',
+				urgency: 'HIGH',
+				recommendedProvider: 'therapist',
+				followUpDays: 2,
+				rationale: [`GAD-7 indicates severe anxiety (${gad.total}).`],
+				actions: ['Book therapist session within 48 hours.', 'Apply anxiety grounding protocol daily.', 'Reduce known high-trigger situations this week.'],
+			};
+		}
+
+		if (gad.total >= 10) {
+			return {
+				pathway: 'THERAPIST',
+				urgency: 'MEDIUM',
+				recommendedProvider: 'therapist',
+				followUpDays: 4,
+				rationale: [`GAD-7 indicates ${gad.severity} anxiety.`],
+				actions: ['Schedule therapist follow-up this week.', 'Continue CBT and relaxation routines.', 'Track anxiety triggers in daily journal.'],
+			};
+		}
+
+		return {
+			pathway: 'SELF_CARE',
+			urgency: 'LOW',
+			recommendedProvider: 'self-guided',
+			followUpDays: 7,
+			rationale: [`GAD-7 indicates ${gad.severity} anxiety.`],
+			actions: ['Maintain self-care and breathwork.', 'Repeat anxiety check next week.', 'Follow your current therapy-plan tasks.'],
+		};
+	}
+
+	if (input.score >= 15) {
+		return {
+			pathway: 'THERAPIST',
+			urgency: 'MEDIUM',
+			recommendedProvider: 'therapist',
+			followUpDays: 3,
+			rationale: [`Assessment score ${input.score} indicates elevated distress.`],
+			actions: ['Schedule therapist follow-up this week.', 'Continue mood tracking daily.', 'Prioritize sleep and routine stabilization.'],
+		};
+	}
+
+	return {
+		pathway: 'SELF_CARE',
+		urgency: 'LOW',
+		recommendedProvider: 'self-guided',
+		followUpDays: 7,
+		rationale: [`Assessment score ${input.score} suggests manageable symptoms.`],
+		actions: ['Continue self-care plan.', 'Reassess in 7 days.', 'Keep routine mood logs.'],
+	};
 };
 
 const toProviderListItem = async (user: any) => {
@@ -254,17 +372,58 @@ export const getPatientDashboard = async (userId: string) => {
 const ensureSubscriptionRecord = async (userId: string) => {
 	let subscription = await db.patientSubscription.findUnique({ where: { userId } }).catch(() => null);
 	if (!subscription) {
+		const activePlan = await getActivePlatformPlan();
+		const renewalDate = new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000);
 		subscription = await db.patientSubscription.create({
 			data: {
 				userId,
-				planName: 'Premium Plan',
-				price: 2499,
+				planName: activePlan.planName,
+				price: activePlan.monthlyFee,
 				billingCycle: 'monthly',
 				status: 'active',
 				autoRenew: true,
-				renewalDate: new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000),
+				renewalDate,
 			},
 		}).catch(() => null);
+
+		if (subscription) {
+			await db.$executeRawUnsafe(
+				`INSERT INTO user_subscriptions (id, user_id, plan_id, start_date, end_date, status, price_snapshot, created_at, updated_at)
+				 VALUES ($1, $2, $3, CURRENT_DATE, $4::date, 'active', $5, NOW(), NOW())`,
+				crypto.randomUUID(),
+				userId,
+				activePlan.id,
+				renewalDate,
+				activePlan.monthlyFee,
+			).catch(() => null);
+		}
+	} else if (
+		String(subscription.status || '').toLowerCase() === 'active'
+		&& subscription.autoRenew
+		&& new Date(subscription.renewalDate).getTime() <= Date.now()
+	) {
+		const activePlan = await getActivePlatformPlan();
+		const renewalDays = String(subscription.billingCycle || '').toLowerCase() === 'yearly' ? 365 : 30;
+		const nextRenewalDate = new Date(Date.now() + renewalDays * 24 * 60 * 60 * 1000);
+
+		subscription = await db.patientSubscription.update({
+			where: { userId },
+			data: {
+				planName: activePlan.planName,
+				price: activePlan.monthlyFee,
+				renewalDate: nextRenewalDate,
+			},
+		}).catch(() => subscription);
+
+		await db.$executeRawUnsafe(
+			`INSERT INTO user_subscriptions (id, user_id, plan_id, start_date, end_date, status, price_snapshot, created_at, updated_at)
+			 VALUES ($1, $2, $3, CURRENT_DATE, $4::date, 'active', $5, NOW(), NOW())`,
+			crypto.randomUUID(),
+			userId,
+			activePlan.id,
+			nextRenewalDate,
+			activePlan.monthlyFee,
+		).catch(() => null);
 	}
 	return subscription;
 };
@@ -272,12 +431,18 @@ const ensureSubscriptionRecord = async (userId: string) => {
 export const getPatientSubscription = async (userId: string) => {
 	const subscription = await ensureSubscriptionRecord(userId);
 	if (!subscription) throw new AppError('Subscription data unavailable', 500);
-	return subscription;
+	const activePlan = await getActivePlatformPlan();
+	return {
+		...subscription,
+		nextRenewalPrice: activePlan.monthlyFee,
+		priceLockedUntil: subscription.renewalDate,
+	};
 };
 
 export const updatePatientSubscriptionPlan = async (userId: string, action: 'upgrade' | 'downgrade') => {
 	const subscription = await ensureSubscriptionRecord(userId);
 	if (!subscription) throw new AppError('Subscription data unavailable', 500);
+	const activePlan = await getActivePlatformPlan();
 
 	const planOrder = ['basic', 'premium', 'pro'];
 	const current = String(subscription.planName || 'premium').toLowerCase().replace(' plan', '');
@@ -286,12 +451,12 @@ export const updatePatientSubscriptionPlan = async (userId: string, action: 'upg
 		? Math.min(planOrder.length - 1, currentIndex + 1)
 		: Math.max(0, currentIndex - 1);
 	const nextPlan = planOrder[nextIndex];
-	const price = nextPlan === 'basic' ? 999 : nextPlan === 'premium' ? 2499 : 4999;
+	const price = activePlan.monthlyFee;
 
 	return db.patientSubscription.update({
 		where: { userId },
 		data: {
-			planName: `${nextPlan[0].toUpperCase()}${nextPlan.slice(1)} Plan`,
+			planName: activePlan.planName || `${nextPlan[0].toUpperCase()}${nextPlan.slice(1)} Plan`,
 			price,
 			billingCycle: nextPlan === 'pro' ? 'yearly' : 'monthly',
 			status: 'active',
@@ -314,9 +479,12 @@ export const cancelPatientSubscription = async (userId: string) => {
 
 export const reactivatePatientSubscription = async (userId: string) => {
 	await ensureSubscriptionRecord(userId);
+	const activePlan = await getActivePlatformPlan();
 	return db.patientSubscription.update({
 		where: { userId },
 		data: {
+			planName: activePlan.planName,
+			price: activePlan.monthlyFee,
 			status: 'active',
 			autoRenew: true,
 			renewalDate: new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000),
@@ -461,7 +629,18 @@ const generateAgoraDetails = (sessionId: string, scheduledAt: Date, durationMinu
 	return { channel, token, expireAt };
 };
 
-export const initiateSessionBooking = async (userId: string, input: { providerId: string; scheduledAt: Date; durationMinutes?: number; amountMinor?: number }) => {
+export const initiateSessionBooking = async (
+	userId: string,
+	input: {
+		providerId: string;
+		scheduledAt: Date;
+		durationMinutes?: number;
+		amountMinor?: number;
+		providerType?: string;
+		preferredTime?: boolean;
+		preferredWindow?: string;
+	},
+) => {
 	await getPatientProfile(userId);
 	const provider = await db.user.findUnique({ where: { id: input.providerId }, select: { id: true, role: true, isDeleted: true } });
 	if (!provider || provider.isDeleted || String(provider.role) !== 'THERAPIST') throw new AppError('Provider not found', 404);
@@ -469,7 +648,12 @@ export const initiateSessionBooking = async (userId: string, input: { providerId
 	const scheduledAt = new Date(input.scheduledAt);
 	if (Number.isNaN(scheduledAt.getTime()) || scheduledAt <= new Date()) throw new AppError('scheduledAt must be a future datetime', 422);
 	const duration = input.durationMinutes && input.durationMinutes > 0 ? Math.min(180, Math.floor(input.durationMinutes)) : DEFAULT_DURATION_MINUTES;
-	const amountMinor = input.amountMinor && input.amountMinor > 0 ? Math.floor(input.amountMinor) : DEFAULT_SESSION_FEE_MINOR;
+	const quote = await getSessionQuote({
+		providerType: input.providerType,
+		durationMinutes: duration,
+		preferredTime: Boolean(input.preferredTime),
+	});
+	const amountMinor = quote.finalPrice;
 
 	const conflict = await db.therapySession.findFirst({
 		where: { therapistProfileId: input.providerId, dateTime: scheduledAt, status: { in: ['PENDING', 'CONFIRMED'] } },
@@ -498,7 +682,15 @@ export const initiateSessionBooking = async (userId: string, input: { providerId
 		currency: 'INR',
 		provider_id: input.providerId,
 		scheduled_at: scheduledAt.toISOString(),
-		duration_minutes: duration,
+		duration_minutes: quote.durationMinutes,
+		pricing: {
+			provider_type: quote.providerType,
+			base_price: quote.basePrice,
+			surcharge_percent: quote.surchargePercent,
+			preferred_time: quote.preferredTime,
+			preferred_window: input.preferredWindow || null,
+			final_price: quote.finalPrice,
+		},
 	};
 };
 
@@ -837,6 +1029,7 @@ export const submitAssessment = async (userId: string, input: { type: string; sc
 	const computedScore = typeof input.score === 'number' ? Math.max(0, Math.floor(input.score)) : (input.answers || []).reduce((a, b) => a + Number(b || 0), 0);
 	const answers = Array.isArray(input.answers) && input.answers.length > 0 ? input.answers.map((v) => Number(v || 0)) : [computedScore];
 	const severity = mapSeverity(computedScore);
+	const journey = buildJourneyRecommendation({ type: input.type, score: computedScore, answers });
 	const created = await db.patientAssessment.create({
 		data: {
 			patientId: patientProfile.id,
@@ -869,12 +1062,51 @@ export const submitAssessment = async (userId: string, input: { type: string; sc
 		type: created.type,
 		score: created.totalScore,
 		result_level: created.severityLevel,
+		journey,
 		recommendation:
 			severity === 'Severe'
 				? 'Please schedule a therapist session within 24 hours.'
 				: severity === 'Moderate'
 					? 'Consider booking a session this week and continue mood tracking.'
 					: 'Maintain your routine and continue weekly check-ins.',
+	};
+};
+
+export const getLatestJourneyRecommendation = async (userId: string) => {
+	const patientProfile = await getPatientProfile(userId);
+	const latest = await db.patientAssessment.findFirst({
+		where: { patientId: patientProfile.id },
+		orderBy: { createdAt: 'desc' },
+		select: {
+			id: true,
+			type: true,
+			answers: true,
+			totalScore: true,
+			severityLevel: true,
+			createdAt: true,
+		},
+	});
+
+	if (!latest) {
+		throw new AppError('No assessments found for journey recommendation', 404);
+	}
+
+	const answers = Array.isArray(latest.answers) ? latest.answers.map((value: number) => Number(value || 0)) : [];
+	const score = Number(latest.totalScore || 0);
+
+	return {
+		assessment: {
+			id: latest.id,
+			type: latest.type,
+			score,
+			severityLevel: latest.severityLevel,
+			createdAt: latest.createdAt,
+		},
+		journey: buildJourneyRecommendation({
+			type: latest.type,
+			score,
+			answers,
+		}),
 	};
 };
 
@@ -1147,6 +1379,169 @@ export const getPatientProgressAnalytics = async (userId: string) => {
 			assessmentScoreDelta: scoreDelta,
 		},
 	};
+};
+
+export const getPatientInsights = async (userId: string) => {
+	const analytics = await getPatientProgressAnalytics(userId);
+	const assessmentRows = Array.isArray(analytics.assessmentTrend) ? analytics.assessmentTrend : [];
+	const moodRows = Array.isArray(analytics.moodTrend) ? analytics.moodTrend : [];
+
+	const assessmentTrendMap = new Map<string, { date: string; phq9Score: number; gad7Score: number }>();
+	for (const row of assessmentRows) {
+		const dateKey = new Date(row.createdAt).toISOString().slice(0, 10);
+		const current = assessmentTrendMap.get(dateKey) || { date: dateKey, phq9Score: 0, gad7Score: 0 };
+		if (String(row.type || '').toUpperCase() === 'PHQ-9') current.phq9Score = Number(row.score || 0);
+		if (String(row.type || '').toUpperCase() === 'GAD-7') current.gad7Score = Number(row.score || 0);
+		assessmentTrendMap.set(dateKey, current);
+	}
+
+	const gad7Rows = assessmentRows.filter((row: any) => String(row.type || '').toUpperCase() === 'GAD-7');
+	const firstGad7 = gad7Rows[0] ? Number(gad7Rows[0].score || 0) : 0;
+	const latestGad7 = gad7Rows.length ? Number(gad7Rows[gad7Rows.length - 1].score || 0) : 0;
+	const anxietyReduction = firstGad7 > 0 ? Math.max(0, Math.round(((firstGad7 - latestGad7) / firstGad7) * 100)) : 0;
+
+	const recommendations: string[] = [];
+	if (analytics.summary.sessionCompletionRate < 70) recommendations.push('Try to keep a fixed weekly session slot to improve continuity.');
+	if (analytics.summary.exerciseCompletionRate < 60) recommendations.push('Complete at least one therapeutic exercise every two days for steady progress.');
+	if (anxietyReduction < 10 && gad7Rows.length >= 2) recommendations.push('Discuss anxiety coping strategies with your therapist in the next session.');
+	if (!recommendations.length) recommendations.push('Great momentum. Continue your current therapy plan and mood check-ins.');
+
+	return {
+		moodImprovement: Math.max(0, Math.min(100, Math.round((Number(moodRows[moodRows.length - 1]?.averageMood || 0) / 5) * 100))),
+		sessionAttendance: Number(analytics.summary.sessionCompletionRate || 0),
+		exerciseCompletion: Number(analytics.summary.exerciseCompletionRate || 0),
+		anxietyReduction,
+		moodTrend: moodRows.map((row: any) => ({ date: row.week, score: Number(row.averageMood || 0) })),
+		assessmentTrend: [...assessmentTrendMap.values()].sort((a, b) => a.date.localeCompare(b.date)),
+		recommendations,
+	};
+};
+
+export const getPatientReports = async (userId: string) => {
+	const patientProfile = await getPatientProfile(userId);
+
+	const [assessments, sessions] = await Promise.all([
+		db.patientAssessment.findMany({
+			where: { patientId: patientProfile.id },
+			orderBy: { createdAt: 'desc' },
+			take: 12,
+			select: { id: true, type: true, totalScore: true, severityLevel: true, createdAt: true },
+		}),
+		db.therapySession.findMany({
+			where: { patientProfileId: patientProfile.id, status: 'COMPLETED' },
+			orderBy: { dateTime: 'desc' },
+			take: 8,
+			select: {
+				id: true,
+				dateTime: true,
+				therapistProfile: { select: { firstName: true, lastName: true, name: true } },
+			},
+		}),
+	]);
+
+	const assessmentReports = assessments.map((item: any) => ({
+		id: `assessment-${item.id}`,
+		type: 'Assessment',
+		title: `${String(item.type || 'Assessment')} Report`,
+		createdAt: item.createdAt,
+		summary: `Score ${Number(item.totalScore || 0)} (${String(item.severityLevel || 'unknown')}).`,
+		providerName: 'MANAS360 Clinical Engine',
+	}));
+
+	const sessionReports = sessions.map((session: any) => ({
+		id: `session-${session.id}`,
+		type: 'Session',
+		title: 'Session Summary',
+		createdAt: session.dateTime,
+		summary: 'Completed therapy session summary available for review.',
+		providerName: String(session.therapistProfile?.name || `${session.therapistProfile?.firstName || ''} ${session.therapistProfile?.lastName || ''}`.trim() || 'Therapist'),
+	}));
+
+	return [...assessmentReports, ...sessionReports]
+		.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+		.slice(0, 20);
+};
+
+export const getMyCareTeamProviders = async (userId: string) => {
+	const patientProfile = await getPatientProfile(userId);
+	const sessions = await db.therapySession.findMany({
+		where: { patientProfileId: patientProfile.id },
+		orderBy: { dateTime: 'desc' },
+		select: {
+			id: true,
+			dateTime: true,
+			status: true,
+			therapistProfileId: true,
+			therapistProfile: { select: { id: true, firstName: true, lastName: true, name: true } },
+		},
+		take: 60,
+	});
+
+	const now = new Date();
+	const providerIds = Array.from(new Set<string>(sessions.map((s: any) => String(s.therapistProfileId || '')).filter(Boolean)));
+	if (!providerIds.length) return [];
+
+	const providerUsers = await db.user.findMany({
+		where: { id: { in: providerIds } },
+		select: { id: true, firstName: true, lastName: true, name: true },
+	});
+	const providerMeta = new Map<string, any>();
+	for (const user of providerUsers) {
+		providerMeta.set(String(user.id), await toProviderListItem(user));
+	}
+
+	return providerIds.map((providerId: string) => {
+		const providerSessions = sessions
+			.filter((s: any) => String(s.therapistProfileId) === providerId)
+			.sort((a: any, b: any) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
+		const nextSession = providerSessions.find((s: any) => new Date(s.dateTime) >= now);
+		const latest = providerSessions[providerSessions.length - 1];
+		const meta = providerMeta.get(providerId);
+
+		return {
+			id: providerId,
+			name: String(latest?.therapistProfile?.name || `${latest?.therapistProfile?.firstName || ''} ${latest?.therapistProfile?.lastName || ''}`.trim() || 'Provider'),
+			role: 'Therapist',
+			nextSession: nextSession
+				? {
+					date: new Date(nextSession.dateTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+					time: new Date(nextSession.dateTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+				}
+				: undefined,
+			specialization: Array.isArray(meta?.specializations) && meta.specializations.length ? meta.specializations : [meta?.specialization || 'General Wellness'],
+			canMessage: true,
+		};
+	});
+};
+
+export const listAvailableProvidersForPatient = async (
+	userId: string,
+	filters: ProviderFilters & { search?: string },
+) => {
+	await getPatientProfile(userId);
+	const result = await listProviders(filters);
+	let items = result.items.map((provider: any) => ({
+		id: provider.id,
+		name: provider.name,
+		specialization: Array.isArray(provider.specializations) && provider.specializations.length
+			? provider.specializations
+			: [provider.specialization].filter(Boolean),
+		experience: Number(provider.experience_years || 0),
+		rating: Number(provider.rating_avg || 0),
+		reviewsCount: 0,
+		sessionPrice: Math.round(Number(provider.session_rate || 0) / 100),
+		language: Array.isArray(provider.languages) ? provider.languages : ['English'],
+		availability: 'Available this week',
+		location: 'Online',
+		bio: provider.bio || '',
+	}));
+
+	if (filters.search) {
+		const q = filters.search.trim().toLowerCase();
+		items = items.filter((item: any) => item.name.toLowerCase().includes(q) || item.specialization.some((s: string) => s.toLowerCase().includes(q)));
+	}
+
+	return items;
 };
 
 export const chatWithAi = async (userId: string, input: { message: string }) => {

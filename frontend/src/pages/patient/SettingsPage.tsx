@@ -944,6 +944,14 @@ export default function SettingsPage() {
                   <span className="font-medium text-charcoal">Auto renew:</span>{' '}
                   {billingData.subscription?.autoRenew === false ? 'Off' : 'On'}
                 </p>
+                <p>
+                  <span className="font-medium text-charcoal">Current cycle price lock:</span>{' '}
+                  {billingData.subscription?.priceLockedUntil ? new Date(billingData.subscription.priceLockedUntil).toLocaleDateString() : 'N/A'}
+                </p>
+                <p>
+                  <span className="font-medium text-charcoal">Next renewal price:</span>{' '}
+                  {billingData.subscription?.nextRenewalPrice ? formatCurrencyInr(Number(billingData.subscription.nextRenewalPrice)) : 'N/A'}
+                </p>
               </div>
 
               <div className="mt-4 flex flex-wrap gap-2">

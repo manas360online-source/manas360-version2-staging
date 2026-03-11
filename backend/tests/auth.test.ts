@@ -86,6 +86,8 @@ describe('auth registration and login', () => {
 				emailVerified: true,
 				phoneVerified: false,
 				mfaEnabled: false,
+				isTherapistVerified: false,
+				therapistVerifiedAt: null,
 			},
 			accessToken: 'access-token',
 			refreshToken: 'refresh-token',

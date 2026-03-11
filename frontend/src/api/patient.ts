@@ -1,5 +1,57 @@
 import { http } from '../lib/http';
 
+export type JourneyPathway = 'stepped-care' | 'direct-provider' | 'urgent-care';
+
+export type JourneyRecommendationResponse = {
+  pathway: JourneyPathway;
+  severity?: string;
+  followUpDays?: number;
+  recommendation?: {
+    providerTypes?: string[];
+    urgency?: 'routine' | 'priority' | 'urgent' | string;
+    rationale?: string[];
+  };
+  crisis?: {
+    detected: boolean;
+    reason?: string | null;
+  };
+  nextActions?: string[];
+  assessment?: {
+    id?: string;
+    type?: string;
+    score?: number;
+  };
+  selectedPathway?: {
+    pathway: JourneyPathway;
+    reason?: string | null;
+    selectedAt?: string;
+    updatedAt?: string;
+  };
+};
+
+export type JourneySelectPathwayRequest = {
+  pathway: JourneyPathway;
+  reason?: string;
+  metadata?: Record<string, any>;
+};
+
+export type JourneySelectPathwayResponse = {
+  pathway: JourneyPathway;
+  reason?: string | null;
+  selectedAt?: string;
+  updatedAt?: string;
+};
+
+export type JourneyQuickScreeningRequest = {
+  answers: number[];
+};
+
+export type JourneyClinicalRequest = {
+  type: 'PHQ-9' | 'GAD-7';
+  score?: number;
+  answers?: number[];
+};
+
 const isOnboardingMessage = (message: string): boolean => {
   const normalized = message.toLowerCase();
   return normalized.includes('patient profile not found') || normalized.includes('complete onboarding');
@@ -71,7 +123,15 @@ export const patientApi = {
   listProviders: async (params?: { specialization?: string; language?: string; minPrice?: number; maxPrice?: number; page?: number; limit?: number }) =>
     (await http.get('/v1/providers', { params })).data,
   getProvider: async (id: string) => (await http.get(`/v1/providers/${encodeURIComponent(id)}`)).data,
-  bookSession: async (payload: { providerId: string; scheduledAt: string; durationMinutes?: number; amountMinor?: number }) =>
+  bookSession: async (payload: {
+    providerId: string;
+    scheduledAt: string;
+    durationMinutes?: number;
+    amountMinor?: number;
+    providerType?: string;
+    preferredTime?: boolean;
+    preferredWindow?: string;
+  }) =>
     (await http.post('/v1/sessions/book', payload)).data,
   verifyPayment: async (payload: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) =>
     (await http.post('/v1/payments/verify', payload)).data,
@@ -98,6 +158,14 @@ export const patientApi = {
     (await http.get(`/v1/sessions/${encodeURIComponent(id)}/documents/invoice`, { responseType: 'blob' })).data,
   submitAssessment: async (payload: { type: string; score?: number; answers?: number[] }) =>
     (await http.post('/v1/assessments/submit', payload)).data,
+  submitQuickScreeningJourney: async (payload: JourneyQuickScreeningRequest): Promise<JourneyRecommendationResponse> =>
+    (await http.post('/v1/patient-journey/quick-screening', payload)).data,
+  submitClinicalJourney: async (payload: JourneyClinicalRequest): Promise<JourneyRecommendationResponse> =>
+    (await http.post('/v1/patient-journey/clinical-assessment', payload)).data,
+  getJourneyRecommendation: async (): Promise<JourneyRecommendationResponse> =>
+    (await http.get('/v1/patient-journey/recommendation')).data,
+  selectJourneyPathway: async (payload: JourneySelectPathwayRequest): Promise<JourneySelectPathwayResponse> =>
+    (await http.post('/v1/patient-journey/select-pathway', payload)).data,
   addMood: async (payload: { mood: number; note?: string }) => (await http.post('/v1/mood', payload)).data,
   getMoodHistory: async () => (await http.get('/v1/mood/history')).data,
   getMoodLogs: async () => (await http.get('/patient/mood')).data,
@@ -173,6 +241,11 @@ export const patientApi = {
   completeExercise: async (id: string) => (await http.patch(`/patient/exercises/${encodeURIComponent(id)}/complete`)).data,
   getTherapyPlan: async () => (await http.get('/v1/therapy-plan')).data,
   completeTherapyPlanTask: async (id: string) => (await http.patch(`/v1/therapy-plan/tasks/${encodeURIComponent(id)}/complete`)).data,
+  getPricing: async () =>
+    withFallbackChain([
+      async () => (await http.get('/v1/pricing')).data,
+      async () => (await http.get('/pricing')).data,
+    ]),
   aiChat: async (payload: { message: string; bot_type?: 'mood_ai' | 'clinical_ai'; response_style?: 'concise' | 'detailed' }) =>
     (await http.post('/chat/message', {
       message: payload.message,
@@ -183,4 +256,44 @@ export const patientApi = {
     (await http.get(`/v1/risk/${encodeURIComponent(userId)}/current`)).data,
   getNotifications: async () => (await http.get('/v1/notifications')).data,
   markNotificationRead: async (id: string) => (await http.patch(`/v1/notifications/${encodeURIComponent(id)}/read`)).data,
+    // Progress & Analytics
+    getInsights: async () =>
+      withFallbackChain([
+        async () => (await http.get('/v1/patient/insights')).data,
+        async () => (await http.get('/patient/insights')).data,
+      ]),
+    getReports: async () =>
+      withFallbackChain([
+        async () => (await http.get('/v1/patient/reports')).data,
+        async () => (await http.get('/patient/reports')).data,
+      ]),
+    // Care Team
+    getMyProviders: async () =>
+      withFallbackChain([
+        async () => (await http.get('/v1/patient/care-team')).data,
+        async () => (await http.get('/patient/care-team')).data,
+      ]),
+    getAvailableProviders: async (params?: { specialization?: string; language?: string; maxPrice?: number }) =>
+      withFallbackChain([
+        async () => (await http.get('/v1/patient/providers/available', { params })).data,
+        async () => (await http.get('/v1/providers', { params })).data,
+      ]),
+    // Messaging
+    getConversations: async () =>
+      withFallbackChain([
+        async () => (await http.get('/v1/patient/messages/conversations')).data,
+        async () => (await http.get('/patient/messages/conversations')).data,
+        async () => ([]),
+      ]),
+    getMessages: async (conversationId: string) =>
+      withFallbackChain([
+        async () => (await http.get(`/v1/patient/messages/${encodeURIComponent(conversationId)}`)).data,
+        async () => (await http.get(`/patient/messages/${encodeURIComponent(conversationId)}`)).data,
+        async () => ([]),
+      ]),
+    sendMessage: async (payload: { conversationId: string; content: string }) =>
+      withFallbackChain([
+        async () => (await http.post('/v1/patient/messages', payload)).data,
+        async () => (await http.post('/patient/messages', payload)).data,
+      ]),
 };

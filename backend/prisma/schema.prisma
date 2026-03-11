@@ -77,6 +77,24 @@ enum CertificationLevel {
   MASTERY
 }
 
+enum ScreeningTemplateStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ScreeningAttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+  EXPIRED
+}
+
+enum ProviderExtraQuestionStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
 // ============ USERS ============
 
 model User {
@@ -160,6 +178,7 @@ model User {
   careTeamAssignmentsAsPatient  CareTeamAssignment[]   @relation("CareTeamAssignmentPatient")
   careTeamAssignmentsAsProvider CareTeamAssignment[]   @relation("CareTeamAssignmentProvider")
   careTeamAssignmentsCreated    CareTeamAssignment[]   @relation("CareTeamAssignmentCreator")
+  providerExtraQuestionsCreated ProviderExtraQuestion[]
   consents                  Consent[]
   consentRevocations        Consent[]                  @relation("ConsentRevokedByUser")
   auditEventsAsActor        AuditEvent[]               @relation("AuditEventsActor")
@@ -536,6 +555,8 @@ model PatientProfile {
   therapistAssessmentsAssigned TherapistAssessmentRecord[]
   therapistResourcesAssigned TherapistResource[]
   therapistCareTeamMembers TherapistCareTeamMember[]
+  screeningAttempts        ScreeningAttempt[]
+  providerQuestionAssignments ProviderQuestionAssignment[]
 
   @@index([userId])
   @@map("patient_profiles")
@@ -579,6 +600,196 @@ model PatientAssessment {
 
   @@index([patientId, createdAt])
   @@map("patient_assessments")
+}
+
+model ScreeningTemplate {
+  id               String                  @id @default(uuid())
+  key              String                  @unique
+  title            String
+  description      String?
+  estimatedMinutes Int                     @default(3)
+  isPublic         Boolean                 @default(true)
+  randomizeOrder   Boolean                 @default(true)
+  status           ScreeningTemplateStatus @default(DRAFT)
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  questions        ScreeningQuestion[]
+  scoringBands     ScreeningScoringBand[]
+  attempts         ScreeningAttempt[]
+
+  @@index([key, status])
+  @@map("screening_templates")
+}
+
+model ScreeningQuestion {
+  id          String   @id @default(uuid())
+  templateId  String
+  prompt      String
+  sectionKey  String   @default("general")
+  orderIndex  Int
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  template    ScreeningTemplate       @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  options     ScreeningQuestionOption[]
+  answers     ScreeningAnswer[]
+  providerExtraQuestionsFromTemplate ProviderExtraQuestion[]
+
+  @@unique([templateId, orderIndex])
+  @@index([templateId, isActive])
+  @@map("screening_questions")
+}
+
+model ScreeningQuestionOption {
+  id          String   @id @default(uuid())
+  questionId  String
+  label       String
+  optionIndex Int
+  points      Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  question    ScreeningQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  answers     ScreeningAnswer[]
+  providerExtraOptionLinks ProviderExtraQuestionOption[]
+
+  @@unique([questionId, optionIndex])
+  @@index([questionId])
+  @@map("screening_question_options")
+}
+
+model ScreeningScoringBand {
+  id             String   @id @default(uuid())
+  templateId     String
+  minScore       Int
+  maxScore       Int
+  severity       String
+  interpretation String
+  recommendation String
+  actionLabel    String
+  orderIndex     Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  template       ScreeningTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([templateId, minScore, maxScore])
+  @@unique([templateId, orderIndex])
+  @@map("screening_scoring_bands")
+}
+
+model ScreeningAttempt {
+  id               String                 @id @default(uuid())
+  templateId       String
+  patientId        String?
+  accessTokenHash  String?
+  status           ScreeningAttemptStatus @default(IN_PROGRESS)
+  attemptSeed      Int
+  presentedOrder   Json
+  totalScore       Int?
+  severityLevel    String?
+  interpretation   String?
+  recommendation   String?
+  actionLabel      String?
+  startedAt        DateTime               @default(now())
+  submittedAt      DateTime?
+  expiresAt        DateTime?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  template         ScreeningTemplate      @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  patient          PatientProfile?        @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  answers          ScreeningAnswer[]
+  providerAssignments ProviderQuestionAssignment[]
+
+  @@index([templateId, status])
+  @@index([patientId, createdAt])
+  @@map("screening_attempts")
+}
+
+model ScreeningAnswer {
+  id          String   @id @default(uuid())
+  attemptId   String
+  questionId  String
+  optionId    String
+  optionIndex Int
+  points      Int
+  createdAt   DateTime @default(now())
+
+  attempt     ScreeningAttempt        @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question    ScreeningQuestion       @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  option      ScreeningQuestionOption @relation(fields: [optionId], references: [id], onDelete: Restrict)
+
+  @@unique([attemptId, questionId])
+  @@index([attemptId])
+  @@index([questionId])
+  @@map("screening_answers")
+}
+
+model ProviderExtraQuestion {
+  id                  String                      @id @default(uuid())
+  providerId          String
+  templateQuestionId  String?
+  prompt              String
+  sectionKey          String                      @default("provider-extra")
+  isRequired          Boolean                     @default(false)
+  status              ProviderExtraQuestionStatus @default(DRAFT)
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @updatedAt
+
+  provider            User                        @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  templateQuestion    ScreeningQuestion?          @relation(fields: [templateQuestionId], references: [id], onDelete: SetNull)
+  options             ProviderExtraQuestionOption[]
+  assignments         ProviderQuestionAssignment[]
+
+  @@index([providerId, status])
+  @@map("provider_extra_questions")
+}
+
+model ProviderExtraQuestionOption {
+  id             String               @id @default(uuid())
+  questionId     String
+  label          String
+  optionIndex    Int
+  points         Int
+  templateOptionId String?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  question              ProviderExtraQuestion        @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  templateOption        ScreeningQuestionOption?     @relation(fields: [templateOptionId], references: [id], onDelete: SetNull)
+  selectedInAssignments ProviderQuestionAssignment[]
+
+  @@unique([questionId, optionIndex])
+  @@index([questionId])
+  @@map("provider_extra_question_options")
+}
+
+model ProviderQuestionAssignment {
+  id                 String    @id @default(uuid())
+  providerQuestionId String
+  patientId          String
+  attemptId          String?
+  isActive           Boolean   @default(true)
+  assignedAt         DateTime  @default(now())
+  expiresAt          DateTime?
+  selectedOptionId   String?
+  patientNotes       String?
+  answeredAt         DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  providerQuestion   ProviderExtraQuestion        @relation(fields: [providerQuestionId], references: [id], onDelete: Cascade)
+  patient            PatientProfile               @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  attempt            ScreeningAttempt?            @relation(fields: [attemptId], references: [id], onDelete: SetNull)
+  selectedOption     ProviderExtraQuestionOption? @relation(fields: [selectedOptionId], references: [id], onDelete: SetNull)
+
+  @@index([patientId, isActive])
+  @@index([providerQuestionId])
+  @@index([attemptId])
+  @@map("provider_question_assignments")
 }
 
 model PatientMoodEntry {
@@ -1193,6 +1404,11 @@ enum FinancialPaymentStatus {
   PARTIAL_REFUNDED
 }
 
+enum FinancialPaymentType {
+  PLATFORM_FEE
+  PROVIDER_FEE
+}
+
 enum WalletTxnType {
   CREDIT_PENDING
   RELEASE
@@ -1339,6 +1555,7 @@ model FinancialPayment {
   razorpayOrderId       String                 @unique
   razorpayPaymentId     String?                @unique
   status                FinancialPaymentStatus @default(INITIATED)
+  paymentType           FinancialPaymentType   @default(PROVIDER_FEE)
   amountMinor           BigInt
   currency              String                 @default("INR")
   therapistShareMinor   BigInt                 @default(0)
@@ -1357,6 +1574,7 @@ model FinancialPayment {
 
   @@index([sessionId, status])
   @@index([providerId, status])
+  @@index([paymentType, status])
   @@index([razorpayOrderId])
   @@index([createdAt])
   @@map("financial_payments")
@@ -1571,6 +1789,7 @@ model RevenueLedger {
   grossAmountMinor        BigInt
   platformCommissionMinor BigInt
   providerShareMinor      BigInt
+  paymentType             FinancialPaymentType?
   taxAmountMinor          BigInt      @default(0)
   currency                String      @default("INR")
   referenceId             String

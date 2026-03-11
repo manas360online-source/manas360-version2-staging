@@ -10,15 +10,19 @@ import {
   downgradePatientSubscriptionController,
   getPatientDashboardController,
   getPatientExercisesController,
+  getPatientInsightsController,
   getPatientInvoicesController,
   getPatientMoodController,
   getPatientMoodStatsController,
   getPatientMoodTodayController,
   getPatientPaymentMethodController,
   getPatientProgressController,
+  getPatientReportsController,
   getPatientSettingsController,
   getPatientSupportCenterController,
   getPatientSubscriptionController,
+  getMyCareTeamController,
+  listAvailableProvidersController,
   reactivatePatientSubscriptionController,
   createPatientSupportTicketController,
   togglePatientSubscriptionAutoRenewController,
@@ -37,6 +41,10 @@ router.get('/health', (req, res) => {
 
 
 router.get('/dashboard', requireAuth, requireRole('patient'), asyncHandler(getPatientDashboardController));
+router.get('/insights', requireAuth, requireRole('patient'), asyncHandler(getPatientInsightsController));
+router.get('/reports', requireAuth, requireRole('patient'), asyncHandler(getPatientReportsController));
+router.get('/care-team', requireAuth, requireRole('patient'), asyncHandler(getMyCareTeamController));
+router.get('/providers/available', requireAuth, requireRole('patient'), asyncHandler(listAvailableProvidersController));
 
 router.get('/settings', requireAuth, requireRole('patient'), asyncHandler(getPatientSettingsController));
 router.put('/settings', requireAuth, requireRole('patient'), asyncHandler(updatePatientSettingsController));

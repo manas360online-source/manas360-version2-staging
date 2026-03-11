@@ -142,6 +142,53 @@ export type AdminSubscriptionsResponse = {
 	};
 };
 
+export type AdminPricingPlatformFee = {
+	id: string;
+	planName: string;
+	monthlyFee: number;
+	description?: string | null;
+	active: boolean;
+	effectiveFrom?: string | null;
+	effectiveTo?: string | null;
+};
+
+export type AdminPricingSessionItem = {
+	id: string;
+	providerType: string;
+	durationMinutes: number;
+	price: number;
+	providerShare: number;
+	platformShare: number;
+	active: boolean;
+	effectiveFrom?: string | null;
+	effectiveTo?: string | null;
+};
+
+export type AdminPricingBundleItem = {
+	id: string;
+	bundleName: string;
+	minutes: number;
+	price: number;
+	active: boolean;
+	effectiveFrom?: string | null;
+	effectiveTo?: string | null;
+};
+
+export type AdminPricingConfig = {
+	platformFee: AdminPricingPlatformFee | null;
+	sessionPricing: AdminPricingSessionItem[];
+	premiumBundles: AdminPricingBundleItem[];
+	surchargePercent: number;
+	impactSummary?: {
+		totalSubscriptions: number;
+		activeSubscriptions: number;
+		lockedToPreviousPrice: number;
+		alignedWithCurrentPrice: number;
+		renewalsNext7Days: number;
+		renewalsNext30Days: number;
+	};
+};
+
 const buildQuery = (params: Record<string, string | number | undefined>) => {
 	const query = Object.entries(params)
 		.filter(([, value]) => value !== undefined && value !== '')
@@ -237,4 +284,29 @@ export const verifyAdminTherapist = async (therapistId: string): Promise<ApiEnve
 
 export const getAdminModuleSummary = async (module: string): Promise<ApiEnvelope<AdminModuleSummary>> => {
 	return (await client.get<ApiEnvelope<AdminModuleSummary>>(`/v1/admin/modules/${encodeURIComponent(module)}/summary`)).data;
+};
+
+export const getAdminPricingConfig = async (): Promise<ApiEnvelope<AdminPricingConfig>> => {
+	return (await client.get<ApiEnvelope<AdminPricingConfig>>('/v1/admin/pricing')).data;
+};
+
+export const updateAdminPricingConfig = async (payload: {
+	platform_fee?: number;
+	preferred_time_surcharge?: number;
+	session_pricing?: Array<{
+		providerType: string;
+		durationMinutes: number;
+		price: number;
+		providerShare?: number;
+		platformShare?: number;
+		active?: boolean;
+	}>;
+	premium_bundles?: Array<{
+		bundleName: string;
+		minutes: number;
+		price: number;
+		active?: boolean;
+	}>;
+}): Promise<ApiEnvelope<AdminPricingConfig>> => {
+	return (await client.patch<ApiEnvelope<AdminPricingConfig>>('/v1/admin/pricing', payload)).data;
 };

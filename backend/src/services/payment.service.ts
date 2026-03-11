@@ -64,16 +64,28 @@ export const createSessionPayment = async (input: CreateFinancialSessionInput) =
 
 	const idempotencyKey = randomUUID();
 	const receipt = `sess_${Date.now()}_${idempotencyKey.slice(0, 8)}`;
+	const shouldBypass = env.allowDevPaymentBypass && env.nodeEnv === 'development';
 
-	const order = await createRazorpayOrder({
-		amountMinor,
-		currency: input.currency ?? 'INR',
-		receipt,
-		notes: {
-			patientId: input.patientId,
-			providerId: input.providerId,
-		},
-	});
+	let order: { id: string };
+	try {
+		order = await createRazorpayOrder({
+			amountMinor,
+			currency: input.currency ?? 'INR',
+			receipt,
+			notes: {
+				patientId: input.patientId,
+				providerId: input.providerId,
+			},
+		});
+	} catch (error: any) {
+		if (!shouldBypass) {
+			throw new AppError(error?.message || 'Failed to create Razorpay order', 500);
+		}
+
+		order = {
+			id: `order_dev_${Date.now()}_${idempotencyKey.slice(0, 8)}`,
+		};
+	}
 
 	const created = await db.$transaction(async (tx: any) => {
 		await assertPaymentActors(tx, input.patientId, input.providerId);
@@ -102,6 +114,7 @@ export const createSessionPayment = async (input: CreateFinancialSessionInput) =
 				providerId: input.providerId,
 				razorpayOrderId: order.id,
 				status: 'PENDING_CAPTURE',
+				paymentType: 'PROVIDER_FEE',
 				amountMinor,
 				currency: input.currency ?? 'INR',
 			},
@@ -113,9 +126,14 @@ export const createSessionPayment = async (input: CreateFinancialSessionInput) =
 	return {
 		sessionId: created.session.id,
 		paymentId: created.payment.id,
+		paymentType: 'provider_fee',
 		razorpayOrderId: order.id,
 		amountMinor,
 		currency: input.currency ?? 'INR',
+		feeBreakdown: {
+			platformFeeMinor: Math.round(amountMinor * platformShareRatio),
+			providerFeeMinor: Math.floor(amountMinor * providerShareRatio),
+		},
 		idempotencyKey,
 	};
 };
@@ -235,6 +253,7 @@ export const processRazorpayWebhook = async (rawBody: string, signature: string)
 				},
 				data: {
 					status: 'CAPTURED',
+					paymentType: 'PROVIDER_FEE',
 					razorpayPaymentId,
 					capturedAt: new Date(),
 					therapistShareMinor,
@@ -281,6 +300,7 @@ export const processRazorpayWebhook = async (rawBody: string, signature: string)
 					grossAmountMinor: amountMinor,
 					platformCommissionMinor: platformShareMinor,
 					providerShareMinor: therapistShareMinor,
+					paymentType: 'PROVIDER_FEE',
 					taxAmountMinor: 0,
 					currency: payment.currency,
 					referenceId: payment.sessionId,

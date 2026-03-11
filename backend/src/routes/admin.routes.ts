@@ -20,6 +20,24 @@ import {
 } from '../controllers/admin-analytics.controller';
 import { getAdminModuleSummaryController } from '../controllers/admin-module.controller';
 import { adminAnalyticsExportRateLimiter } from '../middleware/rateLimiter.middleware';
+import {
+	getAdminPricingConfigController,
+	updateAdminPricingConfigController,
+} from '../controllers/pricing.controller';
+import {
+	createQuestionOptionAdminController,
+	createScreeningTemplateAdminController,
+	createTemplateQuestionAdminController,
+	listAllProviderExtraQuestionsAdminController,
+	listScoringBandsAdminController,
+	listScreeningTemplatesAdminController,
+	listTemplateQuestionsAdminController,
+	replaceScoringBandsAdminController,
+	simulateTemplateScoringController,
+	updateQuestionOptionAdminController,
+	updateScreeningTemplateAdminController,
+	updateTemplateQuestionAdminController,
+} from '../controllers/free-screening-admin.controller';
 
 const router = Router();
 
@@ -83,6 +101,26 @@ router.get('/metrics', requireAuth, requireRole('admin'), asyncHandler(getMetric
  * Response: Paginated list of subscriptions with user and plan details
  */
 router.get('/subscriptions', requireAuth, requireRole('admin'), ...validateAdminListSubscriptionsQuery, asyncHandler(listSubscriptionsController));
+
+router.get('/pricing', requireAuth, requireRole('admin'), asyncHandler(getAdminPricingConfigController));
+router.put('/pricing', requireAuth, requireRole('admin'), asyncHandler(updateAdminPricingConfigController));
+router.patch('/pricing', requireAuth, requireRole('admin'), asyncHandler(updateAdminPricingConfigController));
+
+router.get('/screening/templates', requireAuth, requireRole('admin'), asyncHandler(listScreeningTemplatesAdminController));
+router.post('/screening/templates', requireAuth, requireRole('admin'), asyncHandler(createScreeningTemplateAdminController));
+router.put('/screening/templates/:templateId', requireAuth, requireRole('admin'), asyncHandler(updateScreeningTemplateAdminController));
+
+router.get('/screening/templates/:templateId/questions', requireAuth, requireRole('admin'), asyncHandler(listTemplateQuestionsAdminController));
+router.post('/screening/templates/:templateId/questions', requireAuth, requireRole('admin'), asyncHandler(createTemplateQuestionAdminController));
+router.put('/screening/questions/:questionId', requireAuth, requireRole('admin'), asyncHandler(updateTemplateQuestionAdminController));
+
+router.post('/screening/questions/:questionId/options', requireAuth, requireRole('admin'), asyncHandler(createQuestionOptionAdminController));
+router.put('/screening/options/:optionId', requireAuth, requireRole('admin'), asyncHandler(updateQuestionOptionAdminController));
+
+router.get('/screening/templates/:templateId/scoring-bands', requireAuth, requireRole('admin'), asyncHandler(listScoringBandsAdminController));
+router.put('/screening/templates/:templateId/scoring-bands', requireAuth, requireRole('admin'), asyncHandler(replaceScoringBandsAdminController));
+router.post('/screening/templates/:templateId/simulate', requireAuth, requireRole('admin'), asyncHandler(simulateTemplateScoringController));
+router.get('/screening/provider-questions', requireAuth, requireRole('admin'), asyncHandler(listAllProviderExtraQuestionsAdminController));
 
 /**
  * GET /api/v1/admin/modules/:module/summary

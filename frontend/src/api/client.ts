@@ -1,5 +1,19 @@
 type Resp<T> = { data: T };
 
+export class ApiClientError extends Error {
+	status: number;
+	url: string;
+	isExpectedAuthFailure: boolean;
+
+	constructor(message: string, status: number, url: string, isExpectedAuthFailure: boolean) {
+		super(message);
+		this.name = 'ApiClientError';
+		this.status = status;
+		this.url = url;
+		this.isExpectedAuthFailure = isExpectedAuthFailure;
+	}
+}
+
 const configuredBase =
 	import.meta.env.VITE_API_BASE_URL?.trim() ||
 	import.meta.env.VITE_API_URL?.trim() ||
@@ -12,11 +26,17 @@ const joinUrl = (path: string): string => {
 	return `${configuredBase}${path}`;
 };
 
+const isExpectedAuthFailure = (status: number, url: string): boolean => {
+	if (status === 401 && url.includes('/auth/me')) return true;
+	if ((status === 401 || status === 403) && url.includes('/v1/admin/pricing')) return true;
+	return false;
+};
+
 const parseResponse = async <T = any>(res: Response): Promise<Resp<T>> => {
 	const data = await res.json().catch(() => ({}));
 	if (!res.ok) {
 		const message = data?.message || data?.error || `Request failed with status ${res.status}`;
-		throw new Error(message);
+		throw new ApiClientError(message, res.status, res.url, isExpectedAuthFailure(res.status, res.url));
 	}
 	return { data } as Resp<T>;
 };

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Bell,
   CalendarDays,
@@ -6,6 +6,7 @@ import {
   FileText,
   HeartPulse,
   Home,
+  BarChart3,
   LifeBuoy,
   LogOut,
   Menu,
@@ -16,13 +17,13 @@ import {
   X,
 } from 'lucide-react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { patientApi } from '../../api/patient';
 import { useAuth } from '../../context/AuthContext';
 
 const mainNavItems = [
   { to: '/patient/dashboard', label: 'Dashboard', icon: Home },
   { to: '/patient/therapy-plan', label: 'My Therapy Plan', icon: ClipboardList },
   { to: '/patient/sessions', label: 'Sessions', icon: CalendarDays, badge: '1 upcoming' },
-  { to: '/patient/providers', label: 'Therapists', icon: User },
   { to: '/patient/care-team', label: 'Care Team', icon: User },
   { to: '/patient/assessments', label: 'Assessments', icon: HeartPulse },
 ];
@@ -31,25 +32,30 @@ const selfCareNavItems = [
   { to: '/patient/messages', label: 'AI Support (Dr. Meera)', icon: MessageSquare, badge: 'AI' },
   { to: '/patient/exercises', label: 'Exercises', icon: FileText },
   { to: '/patient/mood', label: 'Mood Tracker', icon: HeartPulse },
-  { to: '/patient/support?section=faq', label: 'Sound Therapy', icon: Sparkles },
+  { to: '/patient/sound-therapy', label: 'Sound Therapy', icon: Sparkles },
 ];
 
 const progressNavItems = [
   { to: '/patient/insights', label: 'Progress Insights', icon: Sparkles },
+  { to: '/patient/timeline', label: 'Patient Timeline', icon: CalendarDays },
+  { to: '/patient/assessment-reports', label: 'Assessment Analytics', icon: FileText },
   { to: '/patient/reports', label: 'Reports', icon: FileText },
+  { to: '/patient/progress', label: 'Progress & Analytics', icon: BarChart3 },
+  { to: '/patient/pricing', label: 'Pricing & Plans', icon: Settings2 },
 ];
 
 const supportNavItems = [
+  { to: '/patient/provider-messages', label: 'Messages', icon: MessageSquare },
   { to: '/patient/support', label: 'Help Center', icon: LifeBuoy },
   { to: '/crisis', label: 'Crisis Support', icon: LifeBuoy },
 ];
 
 const bottomNavItems = [
-  { to: '/patient/dashboard', label: 'Dashboard', icon: Home },
-  { to: '/patient/sessions', label: 'Sessions', icon: CalendarDays },
-  { to: '/patient/therapy-plan', label: 'Plan', icon: ClipboardList },
-  { to: '/patient/messages', label: 'AI Support', icon: MessageSquare },
-  { to: '/patient/settings', label: 'Settings', icon: User },
+  { to: '/patient/dashboard', label: 'Home', icon: Home },
+  { to: '/patient/mood', label: 'Mood', icon: HeartPulse },
+  { to: '/patient/assessments', label: 'Check-In', icon: ClipboardList },
+  { to: '/patient/messages', label: 'Support', icon: MessageSquare },
+  { to: '/patient/settings', label: 'Account', icon: Settings2 },
 ];
 
 type NavItem = {
@@ -65,6 +71,18 @@ export default function PatientDashboardLayout() {
   const { user, logout } = useAuth();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const fetchUnread = useCallback(async () => {
+    try {
+      const res = await patientApi.getNotifications();
+      const data = (res as any)?.data ?? res;
+      const items = Array.isArray(data) ? data : [];
+      setUnreadCount(items.filter((n: any) => !n.read).length);
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => { void fetchUnread(); }, [fetchUnread]);
 
   const userName = [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim() || user?.email || 'Patient';
   const initials = userName
@@ -90,15 +108,21 @@ export default function PatientDashboardLayout() {
     '/patient/sessions': 'Sessions',
     '/patient/care-team': 'Care Team',
     '/patient/assessments': 'Assessments',
-    '/patient/providers': 'Therapists',
     '/patient/messages': 'AI Support',
     '/patient/exercises': 'Exercises',
     '/patient/mood': 'Mood Tracker',
     '/patient/insights': 'Progress Insights',
+    '/patient/timeline': 'Patient Timeline',
+    '/patient/assessment-reports': 'Assessment Analytics',
     '/patient/reports': 'Reports',
+    '/patient/pricing': 'Pricing & Plans',
     '/patient/support': 'Help Center',
     '/patient/settings': 'Settings',
     '/patient/profile': 'Profile',
+    '/patient/sound-therapy': 'Sound Therapy',
+    '/patient/notifications': 'Notifications',
+    '/patient/progress': 'Progress & Analytics',
+    '/patient/provider-messages': 'Messages',
   };
   const pageTitle = Object.entries(pageTitleMap).find(([path]) => location.pathname.startsWith(path))?.[1] || 'Dashboard';
 
@@ -144,6 +168,7 @@ export default function PatientDashboardLayout() {
             <Link
               key={`${heading}-${item.to}-${item.label}`}
               to={item.to}
+              onClick={() => setMobileSidebarOpen(false)}
               className={`flex min-h-[42px] items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${
                 active
                   ? 'bg-[#E8EFE6] font-semibold text-sage-700'
@@ -271,7 +296,11 @@ export default function PatientDashboardLayout() {
                   aria-label="Open notifications"
                 >
                   <Bell className="h-4 w-4" />
-                  <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500" aria-hidden="true" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white" aria-hidden="true">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
                 </Link>
 
                 <button

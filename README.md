@@ -13,7 +13,7 @@ Prerequisites: Node 18+, npm (or yarn), Docker (optional, for Postgres/Redis), a
 - Start Postgres and Redis (Docker examples):
 
 	```bash
-	docker run -d --name manas-postgres -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=manas -p 5432:5432 postgres:15
+	docker run -d --name manas-postgres -e POSTGRES_USER=manas360 -e POSTGRES_PASSWORD=manas360 -e POSTGRES_DB=manas360 -p 5432:5432 postgres:15
 	docker run -d --name manas-redis -p 6379:6379 redis:7
 	```
 
