@@ -189,6 +189,12 @@ model User {
   directConversationsAsPatient  DirectConversation[]         @relation("DirectConversationPatient")
   directConversationsAsProvider DirectConversation[]         @relation("DirectConversationProvider")
   directMessagesSent            DirectMessage[]              @relation("DirectMessageSender")
+  prescriptionsAsPatient        Prescription[]               @relation("PrescriptionPatient")
+  prescriptionsAsProvider       Prescription[]               @relation("PrescriptionProvider")
+  labOrdersAsPatient            LabOrder[]                   @relation("LabOrderPatient")
+  labOrdersAsProvider           LabOrder[]                   @relation("LabOrderProvider")
+  goalsAsPatient                Goal[]                       @relation("GoalPatient")
+  goalsAsProvider               Goal[]                       @relation("GoalProvider")
 
   @@index([email])
   @@index([phone])
@@ -942,6 +948,7 @@ model TherapySession {
   bookingReferenceId String        @unique
   patientProfileId   String
   therapistProfileId String
+  meetingRoomName    String?       @map("meeting_room_name")
   dateTime           DateTime
   durationMinutes    Int           @default(50)
   sessionFeeMinor    BigInt        @default(0)
@@ -2008,6 +2015,70 @@ model TherapyPlanActivity {
 
   @@index([planId])
   @@map("therapy_plan_activities")
+}
+
+model Prescription {
+  id               String   @id @default(uuid())
+  patientId        String
+  providerId       String
+  drugName         String
+  dosage           String
+  instructions     String
+  prescribedDate   DateTime @default(now())
+  refillsRemaining Int      @default(0)
+  status           String   @default("ACTIVE")
+  adherenceRate    Int      @default(0)
+  warnings         String[] @default([])
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  patient  User @relation("PrescriptionPatient", fields: [patientId], references: [id], onDelete: Cascade)
+  provider User @relation("PrescriptionProvider", fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, status])
+  @@index([providerId, status])
+  @@map("prescriptions")
+}
+
+model LabOrder {
+  id                String   @id @default(uuid())
+  patientId         String
+  providerId        String
+  testName          String
+  dateOrdered       DateTime @default(now())
+  status            String   @default("PENDING")
+  orderingPhysician String
+  interpretation    String
+  biomarkers        Json
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  patient  User @relation("LabOrderPatient", fields: [patientId], references: [id], onDelete: Cascade)
+  provider User @relation("LabOrderProvider", fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, status])
+  @@index([providerId, status])
+  @@map("lab_orders")
+}
+
+model Goal {
+  id          String   @id @default(uuid())
+  patientId   String
+  providerId  String
+  title       String
+  category    String?
+  status      String   @default("IN_PROGRESS")
+  startDate   DateTime @default(now())
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  patient  User @relation("GoalPatient", fields: [patientId], references: [id], onDelete: Cascade)
+  provider User @relation("GoalProvider", fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, status])
+  @@index([providerId, status])
+  @@map("goals")
 }
 
 // ─── Direct Provider ↔ Patient Messaging ────────────────────────────────────

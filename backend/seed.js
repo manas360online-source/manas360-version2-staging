@@ -15,6 +15,11 @@ const therapistSeeds = [
   { email: 'therapist2@manas360.local', firstName: 'Vikram', lastName: 'Rao' },
 ];
 
+const psychiatristSeeds = [
+  { email: 'psychiatrist1@manas360.local', firstName: 'Meera', lastName: 'Kapoor' },
+  { email: 'psychiatrist2@manas360.local', firstName: 'Arjun', lastName: 'Menon' },
+];
+
 const plusDays = (days) => {
   const date = new Date();
   date.setDate(date.getDate() + days);
@@ -132,6 +137,12 @@ async function seed() {
   for (const therapistSeed of therapistSeeds) {
     const therapist = await upsertUser({ ...therapistSeed, role: 'THERAPIST' }, passwordHash);
     therapists.push(therapist);
+  }
+
+  const psychiatrists = [];
+  for (const psychiatristSeed of psychiatristSeeds) {
+    const psychiatrist = await upsertUser({ ...psychiatristSeed, role: 'PSYCHIATRIST' }, passwordHash);
+    psychiatrists.push(psychiatrist);
   }
 
   // Ensure therapist profiles exist
@@ -333,9 +344,11 @@ async function seed() {
     ok: true,
     patients: patients.map((u) => ({ id: u.id, email: u.email })),
     therapists: therapists.map((u) => ({ id: u.id, email: u.email })),
+    psychiatrists: psychiatrists.map((u) => ({ id: u.id, email: u.email })),
     corporateUsers: corporateUsers.map((u) => ({ id: u.id, email: u.email })),
     credentials: {
       defaultUserPassword: 'Manas@123',
+      psychiatristUsers: psychiatrists.map((u) => ({ email: u.email, password: 'Manas@123' })),
       corporateUser: {
         email: corporateUsers.length ? corporateUsers[0].email : 'corp.user@manas360.local',
         password: corporatePassword,

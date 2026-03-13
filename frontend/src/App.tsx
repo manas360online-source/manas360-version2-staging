@@ -1,5 +1,6 @@
 import { useState, Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import { GlobalFallbackLoader } from './components/ui/FallbackLoader';
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 import { AuthProvider, getPostLoginRoute, useAuth } from './context/AuthContext';
@@ -13,12 +14,10 @@ const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
 const SignupPage = lazy(() => import('./pages/auth/SignupPage'));
 const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage'));
 const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage'));
-const SessionDetailPage = lazy(() => import('./pages/therapist/SessionDetailPage'));
 import ProtectedRoute from './components/ProtectedRoute'
 import PlatformAdminRoute from './components/PlatformAdminRoute'
 import CorporateRoute from './components/CorporateRoute'
 const PatientDashboardLayout = lazy(() => import('./components/layout/PatientDashboardLayout'));
-const TherapistDashboardLayout = lazy(() => import('./components/layout/TherapistDashboardLayout'));
 const DashboardPage = lazy(() => import('./pages/patient/DashboardPage'));
 const BookSessionPage = lazy(() => import('./pages/patient/BookSessionPage'));
 const SessionsPage = lazy(() => import('./pages/patient/SessionsPage'));
@@ -44,6 +43,7 @@ const SoundTherapyPage = lazy(() => import('./pages/patient/SoundTherapyPage'));
 const ProviderMessagesPage = lazy(() => import('./pages/patient/ProviderMessagesPage'));
 const PatientOnboardingPage = lazy(() => import('./pages/patient/PatientOnboardingPage'));
 const DailyCheckInPage = lazy(() => import('./pages/patient/DailyCheckInPage'));
+const VideoSessionPage = lazy(() => import('./pages/shared/VideoSessionPage'));
 const AdminPortalLoginPage = lazy(() => import('./pages/admin/AdminPortalLoginPage'));
 const AdminDashboardPage = lazy(() => import('./pages/admin/Dashboard'));
 const AdminShellLayout = lazy(() => import('./components/admin/AdminShellLayout'));
@@ -62,68 +62,6 @@ const ClinicalAssistantPage = lazy(() => import('./pages/admin/ClinicalAssistant
 const AdminSectionPage = lazy(() => import('./pages/admin/AdminSectionPage'));
 const AdminTemplatesPage = lazy(() => import('./pages/admin/Templates'));
 const CertificationsPage = lazy(() => import('./pages/CertificationsPage'));
-const TherapistDashboardPage = lazy(() => import('./pages/therapist/TherapistDashboardPage'));
-const TherapistPatientsPage = lazy(() => import('./pages/therapist/TherapistPatientsPage'));
-const TherapistSessionsPage = lazy(() => import('./pages/therapist/TherapistSessionsPage'));
-const TherapistSessionNotesPage = lazy(() => import('./pages/therapist/TherapistSessionNotesPage'));
-const TherapistEarningsPage = lazy(() => import('./pages/therapist/TherapistEarningsPage'));
-const TherapistPayoutHistoryPage = lazy(() => import('./pages/therapist/TherapistPayoutHistoryPage'));
-const TherapistMessagesPage = lazy(() => import('./pages/therapist/TherapistMessagesPage'));
-const TherapistExerciseLibraryPage = lazy(() => import('./pages/therapist/TherapistExerciseLibraryPage'));
-const TherapistAnalyticsPage = lazy(() => import('./pages/therapist/TherapistAnalyticsPage'));
-const TherapistSettingsPage = lazy(() => import('./pages/therapist/TherapistSettingsPage'));
-const TherapistHelpSupportPage = lazy(() => import('./pages/therapist/TherapistHelpSupportPage'));
-const TherapistProfilePage = lazy(() => import('./pages/therapist/Profile'));
-const TherapistMoodTrackingPage = lazy(() => import('./pages/therapist/TherapistMoodTrackingPage'));
-const TherapistCbtModulesPage = lazy(() => import('./pages/therapist/TherapistCbtModulesPage'));
-const TherapistAssessmentsPage = lazy(() => import('./pages/therapist/TherapistAssessmentsPage'));
-const TherapistResourcesPage = lazy(() => import('./pages/therapist/TherapistResourcesPage'));
-const TherapistCareTeamPage = lazy(() => import('./pages/therapist/TherapistCareTeamPage'));
-import TherapistRouteModeGuard from './components/therapist/dashboard/TherapistRouteModeGuard';
-const PsychiatristDashboardLayout = lazy(() => import('./components/layout/PsychiatristDashboardLayout'));
-const PsychiatristDashboardPage = lazy(() => import('./pages/psychiatrist/PsychiatristDashboardPage'));
-const PsychiatristPatientsPage = lazy(() => import('./pages/psychiatrist/PsychiatristPatientsPage'));
-const PsychiatristAssessmentsPage = lazy(() => import('./pages/psychiatrist/PsychiatristAssessmentsPage'));
-const PsychiatristPrescriptionsPage = lazy(() => import('./pages/psychiatrist/PsychiatristPrescriptionsPage'));
-const PsychiatristParameterTrackingPage = lazy(() => import('./pages/psychiatrist/PsychiatristParameterTrackingPage'));
-const PsychiatristMedicationHistoryPage = lazy(() => import('./pages/psychiatrist/PsychiatristMedicationHistoryPage'));
-const PsychiatristCareTeamPage = lazy(() => import('./pages/psychiatrist/PsychiatristCareTeamPage'));
-const PsychiatristMessagesPage = lazy(() => import('./pages/psychiatrist/PsychiatristMessagesPage'));
-const PsychiatristReportsPage = lazy(() => import('./pages/psychiatrist/PsychiatristReportsPage'));
-const PsychiatristConsultationsPage = lazy(() => import('./pages/psychiatrist/PsychiatristConsultationsPage'));
-const PsychiatristDrugInteractionsPage = lazy(() => import('./pages/psychiatrist/PsychiatristDrugInteractionsPage'));
-const PsychiatristHelpSupportPage = lazy(() => import('./pages/psychiatrist/PsychiatristHelpSupportPage'));
-const PsychiatristConsultationAnalyticsPage = lazy(() => import('./pages/psychiatrist/PsychiatristConsultationAnalyticsPage'));
-const PsychiatristPrescriptionAnalyticsPage = lazy(() => import('./pages/psychiatrist/PsychiatristPrescriptionAnalyticsPage'));
-const PsychiatristMedicationLibraryPage = lazy(() => import('./pages/psychiatrist/PsychiatristMedicationLibraryPage'));
-const PsychiatristAssessmentTemplatesPage = lazy(() => import('./pages/psychiatrist/PsychiatristAssessmentTemplatesPage'));
-const PsychiatristEarningsPage = lazy(() => import('./pages/psychiatrist/PsychiatristEarningsPage'));
-const PsychiatristSettingsPage = lazy(() => import('./pages/psychiatrist/PsychiatristSettingsPage'));
-const PsychologistDashboardPage = lazy(() => import('./pages/psychologist/PsychologistDashboardPage'));
-const PsychologistPatientsPage = lazy(() => import('./pages/psychologist/PsychologistPatientsPage'));
-const PsychologistAssessmentsPage = lazy(() => import('./pages/psychologist/PsychologistAssessmentsPage'));
-const PsychologistSchedulePage = lazy(() => import('./pages/psychologist/PsychologistSchedulePage'));
-const PsychologistMessagesPage = lazy(() => import('./pages/psychologist/PsychologistMessagesPage'));
-const PsychologistProfilePage = lazy(() => import('./pages/psychologist/PsychologistProfilePage'));
-const PsychologistSettingsPage = lazy(() => import('./pages/psychologist/PsychologistSettingsPage'));
-const PsychologistDiagnosticReportsPage = lazy(() => import('./pages/psychologist/PsychologistDiagnosticReportsPage'));
-const PsychologistCognitiveTestsPage = lazy(() => import('./pages/psychologist/PsychologistCognitiveTestsPage'));
-const PsychologistMoodAnalyticsPage = lazy(() => import('./pages/psychologist/PsychologistMoodAnalyticsPage'));
-const PsychologistRiskMonitoringPage = lazy(() => import('./pages/psychologist/PsychologistRiskMonitoringPage'));
-const PsychologistTreatmentPlansPage = lazy(() => import('./pages/psychologist/PsychologistTreatmentPlansPage'));
-const PsychologistCareTeamPage = lazy(() => import('./pages/psychologist/PsychologistCareTeamPage'));
-const PsychologistAiClinicalAssistantPage = lazy(() => import('./pages/psychologist/PsychologistAiClinicalAssistantPage'));
-const PsychologistResearchInsightsPage = lazy(() => import('./pages/psychologist/PsychologistResearchInsightsPage'));
-const PsychologistResourcesPage = lazy(() => import('./pages/psychologist/PsychologistResourcesPage'));
-const PsychologistPersonalMoodPage = lazy(() => import('./pages/psychologist/PsychologistPersonalMoodPage'));
-const PsychologistSelfAssessmentsPage = lazy(() => import('./pages/psychologist/PsychologistSelfAssessmentsPage'));
-const PsychologistSelfCbtExercisesPage = lazy(() => import('./pages/psychologist/PsychologistSelfCbtExercisesPage'));
-const PsychologistMeditationPage = lazy(() => import('./pages/psychologist/PsychologistMeditationPage'));
-const PsychologistJournalPage = lazy(() => import('./pages/psychologist/PsychologistJournalPage'));
-const PsychologistInsightsPage = lazy(() => import('./pages/psychologist/PsychologistInsightsPage'));
-const PsychologistAiChatPage = lazy(() => import('./pages/psychologist/PsychologistAiChatPage'));
-const ProviderDocumentVerificationPage = lazy(() => import('./pages/providers/ProviderDocumentVerificationPage'));
-import ProviderDocumentVerificationGuard from './components/providers/ProviderDocumentVerificationGuard';
 const CancellationRefundPolicyPage = lazy(() => import('./pages/legal/CancellationRefundPolicyPage'));
 const TermsOfUsePage = lazy(() => import('./pages/legal/TermsOfUsePage'));
 const PrivacyPolicyPage = lazy(() => import('./pages/legal/PrivacyPolicyPage'));
@@ -141,6 +79,18 @@ const CorporateHelpPage = lazy(() => import('./pages/corporate/CorporateHelpPage
 const SSOSettingsPage = lazy(() => import('./pages/corporate/SSOSettingsPage'));
 const CorporateDashboardPage = lazy(() => import('./pages/corporate/CorporateDashboardPage'));
 const CorporateOnboardingPage = lazy(() => import('./pages/corporate/CorporateOnboardingPage'));
+const ProviderDashboardHubPage = lazy(() => import('./pages/provider/ProviderDashboardHubPage'));
+const ProviderDashboard = lazy(() => import('./pages/provider/Dashboard/ProviderDashboard'));
+const HubLayout = lazy(() => import('./components/layout/HubLayout'));
+const PatientList = lazy(() => import('./pages/provider/Patients/PatientList'));
+const PatientChartLayout = lazy(() => import('./components/layout/PatientChartLayout'));
+const ChartOverview = lazy(() => import('./pages/provider/Patients/Tabs/ChartOverview'));
+const SessionNotes = lazy(() => import('./pages/provider/Patients/Tabs/SessionNotes'));
+const Assessments = lazy(() => import('./pages/provider/Patients/Tabs/Assessments'));
+const CBTModules = lazy(() => import('./pages/provider/Patients/Tabs/CBTModules'));
+const Prescriptions = lazy(() => import('./pages/provider/Patients/Tabs/Prescriptions'));
+const LabOrders = lazy(() => import('./pages/provider/Patients/Tabs/LabOrders'));
+const GoalsAndHabits = lazy(() => import('./pages/provider/Patients/Tabs/GoalsAndHabits'));
 
 interface AssessmentData {
   symptoms?: string[];
@@ -178,6 +128,25 @@ function App() {
 
   return (
     <AuthProvider>
+      <Toaster
+        position="top-center"
+        toastOptions={{
+          duration: 3500,
+          style: {
+            borderRadius: '16px',
+            background: '#F8FCFA',
+            color: '#23313A',
+            border: '1px solid #D8EAE1',
+            boxShadow: '0 12px 32px rgba(23, 39, 54, 0.12)',
+          },
+          success: {
+            iconTheme: {
+              primary: '#2F7A5F',
+              secondary: '#F8FCFA',
+            },
+          },
+        }}
+      />
       <Suspense fallback={<GlobalFallbackLoader />}>
         <Routes>
       <Route path="/" element={<LandingPage />} />
@@ -199,454 +168,49 @@ function App() {
           path="/therapist-dashboard"
           element={
             <ProtectedRoute>
-              <Navigate to="/therapist/dashboard" replace />
+              <Navigate to="/provider/dashboard" replace />
             </ProtectedRoute>
           }
         />
         <Route
-          path="/therapist"
+          path="/provider"
           element={
-            <ProtectedRoute allowedRoles={['therapist', 'psychiatrist', 'coach']}>
-              <TherapistDashboardLayout />
+            <ProtectedRoute allowedRoles={['therapist', 'psychiatrist', 'psychologist', 'coach']}>
+              <HubLayout />
             </ProtectedRoute>
           }
         >
           <Route index element={<Navigate to="dashboard" replace />} />
-          <Route path="dashboard" element={<TherapistDashboardPage />} />
-          <Route
-            path="patients"
-            element={
-              <ProviderDocumentVerificationGuard redirectTo="/therapist/document-verification">
-                <TherapistPatientsPage />
-              </ProviderDocumentVerificationGuard>
-            }
-          />
-          <Route path="document-verification" element={<ProviderDocumentVerificationPage />} />
-          <Route path="sessions" element={<TherapistSessionsPage />} />
-          <Route path="sessions/:id" element={<SessionDetailPage />} />
-          <Route
-            path="session-notes"
-            element={
-              <TherapistRouteModeGuard allowedModes={['professional']}>
-                <TherapistSessionNotesPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="earnings"
-            element={
-              <TherapistRouteModeGuard allowedModes={['practice']}>
-                <TherapistEarningsPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="payout-history"
-            element={
-              <TherapistRouteModeGuard allowedModes={['practice']}>
-                <TherapistPayoutHistoryPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route path="messages" element={<TherapistMessagesPage />} />
-          <Route
-            path="exercise-library"
-            element={
-              <TherapistRouteModeGuard allowedModes={['professional']}>
-                <TherapistExerciseLibraryPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="cbt-modules"
-            element={
-              <TherapistRouteModeGuard allowedModes={['professional']}>
-                <TherapistCbtModulesPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="assessments"
-            element={
-              <TherapistRouteModeGuard allowedModes={['professional']}>
-                <TherapistAssessmentsPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="mood-tracking"
-            element={
-              <TherapistRouteModeGuard allowedModes={['professional']}>
-                <TherapistMoodTrackingPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="resources"
-            element={
-              <TherapistRouteModeGuard allowedModes={['professional']}>
-                <TherapistResourcesPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="care-team"
-            element={
-              <TherapistRouteModeGuard allowedModes={['professional']}>
-                <TherapistCareTeamPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="analytics"
-            element={
-              <TherapistRouteModeGuard allowedModes={['practice']}>
-                <TherapistAnalyticsPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="profile"
-            element={
-              <TherapistRouteModeGuard allowedModes={['practice']}>
-                <TherapistProfilePage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="settings"
-            element={
-              <TherapistRouteModeGuard allowedModes={['practice']}>
-                <TherapistSettingsPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="help-support"
-            element={
-              <TherapistRouteModeGuard allowedModes={['practice']}>
-                <TherapistHelpSupportPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-        </Route>
-
-        <Route
-          path="/psychiatrist"
-          element={
-            <ProtectedRoute allowedRoles={['psychiatrist']}>
-              <PsychiatristDashboardLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<Navigate to="dashboard" replace />} />
-          <Route path="dashboard" element={<PsychiatristDashboardPage />} />
-          <Route
-            path="patients"
-            element={
-              <ProviderDocumentVerificationGuard redirectTo="/psychiatrist/document-verification">
-                <PsychiatristPatientsPage />
-              </ProviderDocumentVerificationGuard>
-            }
-          />
-          <Route path="document-verification" element={<ProviderDocumentVerificationPage />} />
-          <Route
-            path="consultations"
-            element={
-              <TherapistRouteModeGuard allowedModes={['professional']} redirectTo="/psychiatrist/dashboard">
-                <PsychiatristConsultationsPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="assessments"
-            element={
-              <TherapistRouteModeGuard allowedModes={['professional']} redirectTo="/psychiatrist/dashboard">
-                <PsychiatristAssessmentsPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="prescriptions"
-            element={
-              <TherapistRouteModeGuard allowedModes={['professional']} redirectTo="/psychiatrist/dashboard">
-                <PsychiatristPrescriptionsPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="drug-interactions"
-            element={
-              <TherapistRouteModeGuard allowedModes={['professional']} redirectTo="/psychiatrist/dashboard">
-                <PsychiatristDrugInteractionsPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="parameter-tracking"
-            element={
-              <TherapistRouteModeGuard allowedModes={['professional']} redirectTo="/psychiatrist/dashboard">
-                <PsychiatristParameterTrackingPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="medication-history"
-            element={
-              <TherapistRouteModeGuard allowedModes={['professional']} redirectTo="/psychiatrist/dashboard">
-                <PsychiatristMedicationHistoryPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="care-team"
-            element={
-              <TherapistRouteModeGuard allowedModes={['professional']} redirectTo="/psychiatrist/dashboard">
-                <PsychiatristCareTeamPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route path="messages" element={<PsychiatristMessagesPage />} />
-          <Route
-            path="reports"
-            element={
-              <TherapistRouteModeGuard allowedModes={['practice']} redirectTo="/psychiatrist/dashboard">
-                <PsychiatristReportsPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="consultation-analytics"
-            element={
-              <TherapistRouteModeGuard allowedModes={['practice']} redirectTo="/psychiatrist/dashboard">
-                <PsychiatristConsultationAnalyticsPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="prescription-analytics"
-            element={
-              <TherapistRouteModeGuard allowedModes={['practice']} redirectTo="/psychiatrist/dashboard">
-                <PsychiatristPrescriptionAnalyticsPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="medication-library"
-            element={
-              <TherapistRouteModeGuard allowedModes={['practice']} redirectTo="/psychiatrist/dashboard">
-                <PsychiatristMedicationLibraryPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="assessment-templates"
-            element={
-              <TherapistRouteModeGuard allowedModes={['practice']} redirectTo="/psychiatrist/dashboard">
-                <PsychiatristAssessmentTemplatesPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="earnings"
-            element={
-              <TherapistRouteModeGuard allowedModes={['practice']} redirectTo="/psychiatrist/dashboard">
-                <PsychiatristEarningsPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="settings"
-            element={
-              <TherapistRouteModeGuard allowedModes={['practice']} redirectTo="/psychiatrist/dashboard">
-                <PsychiatristSettingsPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route path="help-support" element={<PsychiatristHelpSupportPage />} />
-        </Route>
-
-        <Route
-          path="/psychologist"
-          element={
-            <ProtectedRoute allowedRoles={['psychologist']}>
-              <TherapistDashboardLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<Navigate to="dashboard" replace />} />
-          <Route path="dashboard" element={<PsychologistDashboardPage />} />
-          <Route
-            path="patients"
-            element={
-              <TherapistRouteModeGuard allowedModes={['professional', 'practice']} redirectTo="/psychologist/dashboard">
-                <ProviderDocumentVerificationGuard redirectTo="/psychologist/document-verification">
-                  <PsychologistPatientsPage />
-                </ProviderDocumentVerificationGuard>
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route path="document-verification" element={<ProviderDocumentVerificationPage />} />
-          <Route
-            path="assessments"
-            element={
-              <TherapistRouteModeGuard allowedModes={['professional']} redirectTo="/psychologist/dashboard">
-                <PsychologistAssessmentsPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="diagnostic-reports"
-            element={
-              <TherapistRouteModeGuard allowedModes={['professional']} redirectTo="/psychologist/dashboard">
-                <PsychologistDiagnosticReportsPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="cognitive-tests"
-            element={
-              <TherapistRouteModeGuard allowedModes={['professional']} redirectTo="/psychologist/dashboard">
-                <PsychologistCognitiveTestsPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="mood-analytics"
-            element={
-              <TherapistRouteModeGuard allowedModes={['professional']} redirectTo="/psychologist/dashboard">
-                <PsychologistMoodAnalyticsPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="risk-monitoring"
-            element={
-              <TherapistRouteModeGuard allowedModes={['professional']} redirectTo="/psychologist/dashboard">
-                <PsychologistRiskMonitoringPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="treatment-plans"
-            element={
-              <TherapistRouteModeGuard allowedModes={['professional']} redirectTo="/psychologist/dashboard">
-                <PsychologistTreatmentPlansPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="care-team"
-            element={
-              <TherapistRouteModeGuard allowedModes={['professional', 'practice']} redirectTo="/psychologist/dashboard">
-                <PsychologistCareTeamPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="ai-clinical-assistant"
-            element={
-              <TherapistRouteModeGuard allowedModes={['professional']} redirectTo="/psychologist/dashboard">
-                <PsychologistAiClinicalAssistantPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="research-insights"
-            element={
-              <TherapistRouteModeGuard allowedModes={['professional']} redirectTo="/psychologist/dashboard">
-                <PsychologistResearchInsightsPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="resources"
-            element={
-              <TherapistRouteModeGuard allowedModes={['professional']} redirectTo="/psychologist/dashboard">
-                <PsychologistResourcesPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-
-          <Route
-            path="personal-mood"
-            element={
-              <TherapistRouteModeGuard allowedModes={['practice']} redirectTo="/psychologist/dashboard">
-                <PsychologistPersonalMoodPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="self-assessments"
-            element={
-              <TherapistRouteModeGuard allowedModes={['practice']} redirectTo="/psychologist/dashboard">
-                <PsychologistSelfAssessmentsPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="self-cbt-exercises"
-            element={
-              <TherapistRouteModeGuard allowedModes={['practice']} redirectTo="/psychologist/dashboard">
-                <PsychologistSelfCbtExercisesPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="meditation"
-            element={
-              <TherapistRouteModeGuard allowedModes={['practice']} redirectTo="/psychologist/dashboard">
-                <PsychologistMeditationPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="journal"
-            element={
-              <TherapistRouteModeGuard allowedModes={['practice']} redirectTo="/psychologist/dashboard">
-                <PsychologistJournalPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="insights"
-            element={
-              <TherapistRouteModeGuard allowedModes={['practice']} redirectTo="/psychologist/dashboard">
-                <PsychologistInsightsPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="ai-chat"
-            element={
-              <TherapistRouteModeGuard allowedModes={['practice']} redirectTo="/psychologist/dashboard">
-                <PsychologistAiChatPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-
-          <Route path="reports" element={<Navigate to="/psychologist/diagnostic-reports" replace />} />
-          <Route path="tests" element={<Navigate to="/psychologist/cognitive-tests" replace />} />
-          <Route
-            path="schedule"
-            element={
-              <TherapistRouteModeGuard allowedModes={['professional']} redirectTo="/psychologist/dashboard">
-                <PsychologistSchedulePage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route
-            path="messages"
-            element={
-              <TherapistRouteModeGuard allowedModes={['professional']} redirectTo="/psychologist/dashboard">
-                <PsychologistMessagesPage />
-              </TherapistRouteModeGuard>
-            }
-          />
-          <Route path="profile" element={<PsychologistProfilePage />} />
-          <Route path="settings" element={<PsychologistSettingsPage />} />
+          <Route path="dashboard" element={<ProviderDashboard />} />
+          <Route path="patients" element={<PatientList />} />
+          <Route path="patient/:patientId" element={<PatientChartLayout />}>
+            <Route index element={<Navigate to="overview" replace />} />
+            <Route path="overview" element={<ChartOverview />} />
+            <Route path="notes" element={<SessionNotes />} />
+            <Route path="session-notes" element={<Navigate to="../notes" replace />} />
+            <Route path="assessments" element={<Assessments />} />
+            <Route path="cbt" element={<CBTModules />} />
+            <Route path="cbt-modules" element={<Navigate to="../cbt" replace />} />
+            <Route path="goals" element={<GoalsAndHabits />} />
+            <Route path="prescriptions" element={<Prescriptions />} />
+            <Route path="labs" element={<LabOrders />} />
+            <Route path="lab-orders" element={<Navigate to="../labs" replace />} />
+            <Route path="clinical-notes" element={<SessionNotes />} />
+          </Route>
+          <Route path="calendar" element={<ProviderDashboardHubPage />} />
+          <Route path="notes" element={<Navigate to="patient/123/notes" replace />} />
+          <Route path="assessments" element={<Navigate to="patient/123/assessments" replace />} />
+          <Route path="prescriptions" element={<Navigate to="patient/123/prescriptions" replace />} />
+          <Route path="labs" element={<Navigate to="patient/123/labs" replace />} />
+          <Route path="goals" element={<Navigate to="patient/123/goals" replace />} />
+          <Route path="earnings" element={<ProviderDashboardHubPage />} />
+          <Route path="messages" element={<ProviderDashboardHubPage />} />
+          <Route path="settings" element={<ProviderDashboardHubPage />} />
         </Route>
         <Route path="/auth/login" element={<LoginPage />} />
+        <Route path="/therapist/*" element={<Navigate to="/provider/dashboard" replace />} />
+        <Route path="/psychiatrist/*" element={<Navigate to="/provider/dashboard" replace />} />
+        <Route path="/psychologist/*" element={<Navigate to="/provider/dashboard" replace />} />
         <Route path="/auth/signup" element={<SignupPage />} />
         <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
@@ -657,6 +221,14 @@ function App() {
           element={
             <ProtectedRoute>
               <DashboardRedirect />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/video-session/:sessionId"
+          element={
+            <ProtectedRoute allowedRoles={['patient', 'therapist', 'psychiatrist', 'psychologist', 'coach']}>
+              <VideoSessionPage />
             </ProtectedRoute>
           }
         />

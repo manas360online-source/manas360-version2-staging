@@ -14,6 +14,7 @@ const dailyMoodPrediction_1 = require("./cron/dailyMoodPrediction");
 const chatRetention_job_1 = require("./jobs/chatRetention.job");
 const sso_service_1 = require("./services/sso.service");
 const sso_service_2 = require("./services/sso.service");
+const gps_routes_1 = require("./routes/gps.routes");
 const startServer = async () => {
     await (0, db_1.connectDatabase)();
     // ensure SSO tables exist
@@ -42,7 +43,11 @@ const startServer = async () => {
         }
     });
     // initialize socket.io (non-blocking)
-    void (0, socket_1.default)(server).then(() => console.log('Socket server initialized')).catch((err) => console.error('Socket init failed', err));
+    void (0, socket_1.default)(server).then((io) => {
+        console.log('Socket server initialized');
+        if (io)
+            (0, gps_routes_1.setSocketIO)(io);
+    }).catch((err) => console.error('Socket init failed', err));
     // start analytics rollup job
     void (0, analyticsRollup_job_1.startAnalyticsRollup)();
     (0, dailyMoodPrediction_1.startDailyMoodPredictionJob)();

@@ -24,6 +24,8 @@ import ssoRoutes from './sso.routes';
 import pricingRoutes from './pricing.routes';
 import patientJourneyRoutes from './patient-journey.routes';
 import freeScreeningRoutes from './free-screening.routes';
+import gpsRoutes from './gps.routes';
+import providerRoutes from './provider.routes';
 
 const router = Router();
 
@@ -53,6 +55,7 @@ router.use('/v1/therapist/dashboard', dashboardRoutes);
 router.use('/v1/therapists/dashboard', dashboardRoutes);
 router.use('/v1/psychiatrist', psychiatristRoutes);
 router.use('/v1/psychologist', psychologistRoutes);
+router.use('/v1/provider', providerRoutes);
 router.use('/v1/payments', paymentRoutes);
 router.use('/v1/sso', ssoRoutes);
 router.use('/v1/subscriptions', subscriptionRoutes);
@@ -68,6 +71,7 @@ router.use('/v1/landing', landingRoutes);
 router.use('/webhooks', webhookRoutes);
 router.use('/chat', chatRoutes);
 router.use('/v1', riskAnalyticsRoutes);
+router.use('/v1/gps', gpsRoutes);
 
 export default router;
 

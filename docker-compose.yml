@@ -38,6 +38,23 @@ services:
     volumes:
       - ./backend:/app
 
+  ai_engine:
+    build:
+      context: ./backend/ai_engine
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      AI_ENGINE_SECRET: ${AI_ENGINE_SECRET}
+      NODE_BACKEND_URL: http://backend:5000
+      AI_ENGINE_HOST: 0.0.0.0
+      AI_ENGINE_PORT: 8765
+    depends_on:
+      - backend
+    ports:
+      - "8765:8765"
+
   frontend:
     build:
       context: ./frontend

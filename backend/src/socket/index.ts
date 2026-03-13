@@ -403,6 +403,52 @@ export async function initSocket(server: http.Server) {
     });
     // ── End Direct Messaging Events ─────────────────────────────────────────
 
+    // ── Therapeutic GPS Events ───────────────────────────────────────────────
+    // The Python AI Engine pushes GPS updates to the Node backend via HTTP POST
+    // (see /v1/gps/internal/push). The socket handler here relays them to the
+    // specific therapist who is in the live session room.
+
+    /**
+     * gps:join – therapist client registers for GPS updates for a session.
+     * Payload: { sessionId: string, monitoringId: string }
+     */
+    socket.on('gps:join', async (payload: { sessionId: string; monitoringId: string }) => {
+      try {
+        if (user?.role !== 'therapist') {
+          return socket.emit('error', { code: 'GPS_FORBIDDEN', message: 'Only therapists can join GPS rooms' });
+        }
+        const gpsRoom = `gps:${payload.sessionId}`;
+        await socket.join(gpsRoom);
+        socket.emit('gps:joined', { sessionId: payload.sessionId, monitoringId: payload.monitoringId });
+      } catch (err) {
+        socket.emit('error', { code: 'GPS_JOIN_FAIL', message: String(err) });
+      }
+    });
+
+    /**
+     * gps:leave – therapist leaves the GPS room (session ended / tab closed).
+     */
+    socket.on('gps:leave', async (payload: { sessionId: string }) => {
+      await socket.leave(`gps:${payload.sessionId}`);
+      socket.emit('gps:left', { sessionId: payload.sessionId });
+    });
+
+    /**
+     * gps:push – internal event pushed by the AI Engine bridge (server-side only).
+     * This is NOT exposed to untrusted clients; validated by the internal API key.
+     * Payload: { sessionId, type: 'gps_update'|'crisis_alert', data: {...} }
+     */
+    socket.on('gps:push', (payload: { sessionId: string; type: string; data: unknown }) => {
+      // Only allow internal service sockets (identified by role='internal')
+      if (user?.role !== 'internal') return;
+      io.to(`gps:${payload.sessionId}`).emit('gps:update', {
+        type: payload.type,
+        data: payload.data,
+        timestamp: new Date().toISOString(),
+      });
+    });
+    // ── End Therapeutic GPS Events ───────────────────────────────────────────
+
     socket.on('disconnecting', () => {
       // clean up presence for direct messaging rooms
       for (const room of socket.rooms) {

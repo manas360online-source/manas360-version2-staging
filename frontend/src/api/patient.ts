@@ -324,7 +324,11 @@ export const patientApi = {
       async () => (await http.post('/v1/exercises/library', payload)).data,
     ),
   completeExercise: async (id: string) => (await http.patch(`/patient/exercises/${encodeURIComponent(id)}/complete`)).data,
-  getTherapyPlan: async () => (await http.get('/v1/therapy-plan')).data,
+  getTherapyPlan: async () =>
+    withFallbackChain([
+      async () => (await http.get('/v1/patients/me/therapy-plan')).data,
+      async () => (await http.get('/v1/therapy-plan')).data,
+    ]),
   completeTherapyPlanTask: async (id: string) => (await http.patch(`/v1/therapy-plan/tasks/${encodeURIComponent(id)}/complete`)).data,
   getPricing: async () =>
     withFallbackChain([

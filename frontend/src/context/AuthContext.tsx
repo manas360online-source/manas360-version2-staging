@@ -31,10 +31,10 @@ const normalizeRole = (value: unknown): AppRole | null => {
 
 export const getDefaultRouteForRole = (role: unknown): string => {
   const normalizedRole = normalizeRole(role);
-  if (normalizedRole === 'psychologist') return '/psychologist/dashboard';
+  if (normalizedRole === 'psychologist') return '/provider/dashboard';
   if (normalizedRole === 'admin') return '/admin/dashboard';
-  if (normalizedRole === 'psychiatrist') return '/psychiatrist/dashboard';
-  if (normalizedRole === 'therapist' || normalizedRole === 'coach') return '/therapist/analytics';
+  if (normalizedRole === 'psychiatrist') return '/provider/dashboard';
+  if (normalizedRole === 'therapist' || normalizedRole === 'coach') return '/provider/dashboard';
   return '/patient/dashboard';
 };
 
