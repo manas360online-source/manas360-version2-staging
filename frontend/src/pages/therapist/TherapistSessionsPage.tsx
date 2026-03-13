@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { therapistApi } from '../../api/therapist.api';
 import TherapistBadge from '../../components/therapist/dashboard/TherapistBadge';
 import TherapistCard from '../../components/therapist/dashboard/TherapistCard';
@@ -30,6 +31,7 @@ const formatDateTime = (value: string): string =>
   });
 
 export default function TherapistSessionsPage() {
+  const navigate = useNavigate();
   const [tab, setTab] = useState<'upcoming' | 'past'>('upcoming');
   const [rows, setRows] = useState<TherapistSessionRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -118,6 +120,19 @@ export default function TherapistSessionsPage() {
                           variant={row.status === 'completed' ? 'success' : row.status === 'pending' ? 'warning' : 'sage'}
                         />
                       ),
+                    },
+                    {
+                      key: 'action',
+                      header: '',
+                      render: (row) =>
+                        row.timing === 'upcoming' ? (
+                          <button
+                            onClick={() => navigate(`/therapist/sessions/${row.sessionId}/live`)}
+                            className="rounded-lg bg-sage-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sage-600"
+                          >
+                            Start Session
+                          </button>
+                        ) : null,
                     },
                   ]}
                   rows={filteredRows}

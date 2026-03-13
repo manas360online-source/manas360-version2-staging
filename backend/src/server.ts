@@ -9,6 +9,7 @@ import { startDailyMoodPredictionJob } from './cron/dailyMoodPrediction';
 import { startChatRetentionJob } from './jobs/chatRetention.job';
 import { ensureSsoTables } from './services/sso.service';
 import { createOrEnsureTenant, azureTemplate, googleTemplate, oktaTemplate } from './services/sso.service';
+import { setSocketIO } from './routes/gps.routes';
 
 const startServer = async (): Promise<void> => {
 	await connectDatabase();
@@ -41,7 +42,10 @@ const startServer = async (): Promise<void> => {
 	});
 
 	// initialize socket.io (non-blocking)
-	void initSocket(server).then(() => console.log('Socket server initialized')).catch((err) => console.error('Socket init failed', err));
+	void initSocket(server).then((io) => {
+		console.log('Socket server initialized');
+		if (io) setSocketIO(io);
+	}).catch((err) => console.error('Socket init failed', err));
 
 	// start analytics rollup job
 	void startAnalyticsRollup();

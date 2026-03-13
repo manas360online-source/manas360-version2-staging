@@ -5,6 +5,7 @@ import {
 	getMyMoodHistoryController,
 	getMyPatientAssessmentHistoryController,
 	getMyPatientProfileController,
+	getMyTherapyPlanController,
 	getMyTherapistMatchesController,
 } from '../controllers/patient.controller';
 import { bookMySessionController, getMySessionHistoryController } from '../controllers/session.controller';
@@ -28,6 +29,7 @@ router.get('/me/profile', requireAuth, requirePatientRole, asyncHandler(getMyPat
 router.post('/me/assessments', requireAuth, requirePatientRole, ...validateCreatePatientAssessmentRequest, asyncHandler(createPatientAssessmentController));
 router.get('/me/assessments', requireAuth, requirePatientRole, ...validatePatientAssessmentHistoryQuery, asyncHandler(getMyPatientAssessmentHistoryController));
 router.get('/me/mood-history', requireAuth, requirePatientRole, ...validatePatientMoodHistoryQuery, asyncHandler(getMyMoodHistoryController));
+router.get('/me/therapy-plan', requireAuth, requirePatientRole, asyncHandler(getMyTherapyPlanController));
 router.get('/me/therapist-matches', requireAuth, requirePatientRole, ...validateTherapistMatchQuery, asyncHandler(getMyTherapistMatchesController));
 router.post('/me/sessions/book', requireAuth, requirePatientRole, ...validateBookSessionRequest, asyncHandler(bookMySessionController));
 router.get('/me/sessions', requireAuth, requirePatientRole, ...validatePatientSessionHistoryQuery, asyncHandler(getMySessionHistoryController));

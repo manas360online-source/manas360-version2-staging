@@ -1266,17 +1266,23 @@ export default function SessionsPage() {
                 </div>
 
                 <div className="flex w-full flex-col gap-3 sm:flex-row md:w-auto">
-                  <button
-                    disabled={!isWithin5Minutes || needsPreSessionCheckin}
-                    className={`inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-sm font-bold transition-all ${
-                      isWithin5Minutes && !needsPreSessionCheckin
-                        ? 'bg-green-500 text-charcoal shadow-[0_0_20px_rgba(34,197,94,0.3)] hover:bg-green-400'
-                        : 'cursor-not-allowed bg-white/10 text-white/50'
-                    }`}
-                  >
-                    <Video className="h-4 w-4" />
-                    {needsPreSessionCheckin ? 'Complete Check-in First' : isWithin5Minutes ? 'Join Video Room' : 'Opens 5 mins prior'}
-                  </button>
+                  {isWithin5Minutes && !needsPreSessionCheckin ? (
+                    <Link
+                      to={`/video-session/${nextSession.id}`}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-green-500 px-6 py-3.5 text-sm font-bold text-charcoal shadow-[0_0_20px_rgba(34,197,94,0.3)] transition-all hover:bg-green-400"
+                    >
+                      <Video className="h-4 w-4" />
+                      Join Video Room
+                    </Link>
+                  ) : (
+                    <button
+                      disabled
+                      className="inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-xl bg-white/10 px-6 py-3.5 text-sm font-bold text-white/50"
+                    >
+                      <Video className="h-4 w-4" />
+                      {needsPreSessionCheckin ? 'Complete Check-in First' : 'Opens 5 mins prior'}
+                    </button>
+                  )}
                 </div>
               </div>
             </section>

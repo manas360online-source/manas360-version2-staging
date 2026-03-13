@@ -1,24 +1,68 @@
 
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { toast } from 'react-hot-toast';
+import { Link, useNavigate } from 'react-router-dom';
 import { patientApi } from '../../api/patient';
-import { CheckCircle2, PlayCircle, StickyNote, Activity, FileText, Calendar, UserPlus } from 'lucide-react';
+import { Sparkles, ClipboardCheck, UserPlus, Quote } from 'lucide-react';
 
-interface ActivityItem {
+type GoalItem = {
   id: string;
   title: string;
-  frequency: 'DAILY_RITUAL' | 'WEEKLY_MILESTONE' | 'ONE_TIME';
-  activityType: 'MOOD_CHECKIN' | 'EXERCISE' | 'AUDIO_THERAPY' | 'CLINICAL_ASSESSMENT' | 'READING_MATERIAL' | 'SESSION_BOOKING';
-  status: 'PENDING' | 'COMPLETED' | 'SKIPPED';
-  completedAt?: string;
-  estimatedMinutes?: number;
-}
+  category: string;
+  todayCheckInDone: boolean;
+  startDate: string;
+};
+
+type ExerciseItem = {
+  id: string;
+  sessionId: string;
+  type: string;
+  title: string;
+  status: 'New' | 'In Progress' | 'Completed';
+  completed: boolean;
+  assignedAt: string;
+  completedAt: string | null;
+  therapistFeedback?: string;
+};
+
+type FeedbackItem = {
+  id: string;
+  feedback: string;
+  providerName: string;
+  providerInitials: string;
+  source: 'session-note' | 'cbt-review';
+  createdAt: string;
+};
+
+type TherapyPlanPayload = {
+  dailyTasks: Array<Record<string, unknown>>;
+  goals: GoalItem[];
+  cbtExercises: ExerciseItem[];
+  recentFeedback: FeedbackItem[];
+};
+
+const formatDate = (value: string) =>
+  new Intl.DateTimeFormat('en-US', { month: 'short', day: '2-digit' }).format(new Date(value));
+
+const categoryClass = (category: string) => {
+  if (category === 'Sleep') return 'bg-[#E8F2FF] text-[#2B5EA7]';
+  if (category === 'Mindfulness') return 'bg-[#E9F7F1] text-[#2F7A5F]';
+  if (category === 'Nutrition') return 'bg-[#FFF4E5] text-[#A56A1F]';
+  return 'bg-[#F2F5F7] text-[#51606B]';
+};
+
+const exerciseStatusClass = (status: ExerciseItem['status']) => {
+  if (status === 'Completed') return 'bg-[#E9F7F1] text-[#2F7A5F]';
+  if (status === 'In Progress') return 'bg-[#FFF4E5] text-[#A56A1F]';
+  return 'bg-[#E8F2FF] text-[#2B5EA7]';
+};
 
 export default function TherapyPlanPage() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [connectionRequired, setConnectionRequired] = useState(false);
-  const [planData, setPlanData] = useState<any>(null);
+  const [planData, setPlanData] = useState<TherapyPlanPayload | null>(null);
   const [completingTaskIds, setCompletingTaskIds] = useState<string[]>([]);
 
   const loadPlan = async () => {
@@ -44,20 +88,21 @@ export default function TherapyPlanPage() {
     setError(null);
     setCompletingTaskIds((prev) => (prev.includes(taskId) ? prev : [...prev, taskId]));
 
-    setPlanData((prev: any) => {
-      if (!prev || !Array.isArray(prev.activities)) return prev;
+    setPlanData((prev) => {
+      if (!prev || !Array.isArray(prev.goals)) return prev;
       return {
         ...prev,
-        activities: prev.activities.map((task: any) =>
-          String(task.id) === taskId
-            ? { ...task, status: 'COMPLETED', completedAt: new Date().toISOString() }
-            : task,
+        goals: prev.goals.map((goal) =>
+          String(goal.id) === taskId
+            ? { ...goal, todayCheckInDone: true }
+            : goal,
         ),
       };
     });
 
     try {
       await patientApi.completeTherapyPlanTask(taskId);
+      toast.success('Great job staying consistent! 🔥');
       await loadPlan(); // Re-sync to get official adherence percentage
     } catch {
       setError('Unable to mark activity as complete.');
@@ -71,134 +116,21 @@ export default function TherapyPlanPage() {
     void loadPlan();
   }, []);
 
-  const activities: ActivityItem[] = Array.isArray(planData?.activities) ? planData.activities : [];
-  const plan = planData?.plan;
-  const hasPlan = Boolean(plan && Array.isArray(planData?.activities));
-
-  // Auto-complete MOOD_CHECKIN tasks when daily check-in is submitted from Dashboard
-  useEffect(() => {
-    const handler = async () => {
-      const checkinTasks = activities
-        .filter((a) => a.activityType === 'MOOD_CHECKIN' && a.status !== 'COMPLETED')
-        .map((a) => a.id);
-      if (checkinTasks.length === 0) return;
-      // Optimistic update
-      setPlanData((prev: any) => {
-        if (!prev || !Array.isArray(prev.activities)) return prev;
-        return {
-          ...prev,
-          activities: prev.activities.map((task: any) =>
-            task.activityType === 'MOOD_CHECKIN'
-              ? { ...task, status: 'COMPLETED', completedAt: new Date().toISOString() }
-              : task,
-          ),
-        };
-      });
-      try {
-        await Promise.all(checkinTasks.map((id) => patientApi.completeTherapyPlanTask(id)));
-        await loadPlan();
-      } catch {/* silently re-sync */
-        await loadPlan();
-      }
-    };
-    window.addEventListener('check-in-complete', handler as EventListener);
-    return () => window.removeEventListener('check-in-complete', handler as EventListener);
-  }, [activities]);
-
-  // Audio completion loop: mark AUDIO_THERAPY tasks done when SoundTherapyPage finishes a track
-  useEffect(() => {
-    const handler = async () => {
-      const audioTasks = activities
-        .filter((a) => a.activityType === 'AUDIO_THERAPY' && a.status !== 'COMPLETED')
-        .map((a) => a.id);
-      if (audioTasks.length === 0) return;
-      setPlanData((prev: any) => {
-        if (!prev || !Array.isArray(prev.activities)) return prev;
-        return {
-          ...prev,
-          activities: prev.activities.map((task: any) =>
-            task.activityType === 'AUDIO_THERAPY'
-              ? { ...task, status: 'COMPLETED', completedAt: new Date().toISOString() }
-              : task,
-          ),
-        };
-      });
-      try {
-        await Promise.all(audioTasks.map((id) => patientApi.completeTherapyPlanTask(id)));
-        await loadPlan();
-      } catch {
-        await loadPlan();
-      }
-    };
-    window.addEventListener('audio-complete', handler as EventListener);
-    return () => window.removeEventListener('audio-complete', handler as EventListener);
-  }, [activities]);
-
-  const dailyRituals = activities.filter((a) => a.frequency === 'DAILY_RITUAL');
-  const weeklyMilestones = activities.filter((a) => a.frequency === 'WEEKLY_MILESTONE');
-  const totalWeeks = Math.max(Number(plan?.totalWeeks || plan?.durationWeeks || 8), Number(plan?.weekNumber || 1), 4);
-  const weeks = Array.from({ length: totalWeeks }, (_, index) => index + 1);
-
-  const getActivityIcon = (type: string) => {
-    switch (type) {
-      case 'AUDIO_THERAPY': return <PlayCircle className="h-5 w-5 text-calm-sage" />;
-      case 'CLINICAL_ASSESSMENT': return <Activity className="h-5 w-5 text-calm-sage" />;
-      case 'READING_MATERIAL': return <FileText className="h-5 w-5 text-calm-sage" />;
-      case 'SESSION_BOOKING': return <Calendar className="h-5 w-5 text-calm-sage" />;
-      default: return <CheckCircle2 className="h-5 w-5 text-calm-sage" />;
-    }
-  };
-
-  const renderActivityCard = (task: ActivityItem) => {
-    const isDone = task.status === 'COMPLETED';
-    const isCompleting = completingTaskIds.includes(task.id);
-
-    return (
-      <div 
-        key={task.id} 
-        className={`group flex items-center justify-between rounded-[1.5rem] p-4 transition-all duration-300 ${isDone ? 'bg-white/65 shadow-wellness-sm' : 'bg-white/92 shadow-wellness-sm hover:shadow-wellness-md'}`}
-      >
-        <div className="flex items-center gap-4">
-          <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors ${isDone ? 'bg-wellness-aqua' : 'bg-wellness-card'}`}>
-            {getActivityIcon(task.activityType)}
-          </div>
-          <div>
-            <p className={`font-medium transition-all ${isDone ? 'text-charcoal/40 line-through' : 'text-charcoal'}`}>
-              {task.title}
-            </p>
-            {task.estimatedMinutes ? (
-              <p className={`mt-0.5 text-xs ${isDone ? 'text-charcoal/30' : 'text-charcoal/60'}`}>
-                {task.estimatedMinutes} mins
-              </p>
-            ) : null}
-          </div>
-        </div>
-
-        <div>
-          {!isDone ? (
-            <button
-              type="button"
-              onClick={() => void completeTask(task.id)}
-              disabled={isCompleting}
-              className="inline-flex h-10 items-center justify-center rounded-full bg-wellness-aqua px-4 text-xs font-semibold text-charcoal transition-all hover:bg-wellness-sky hover:text-white disabled:opacity-50"
-            >
-              {isCompleting ? 'Completing...' : 'Mark Done'}
-            </button>
-          ) : (
-            <div className="flex items-center gap-1.5 rounded-full bg-wellness-aqua px-3 py-1 text-xs font-semibold text-charcoal/80">
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              Done
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
+  const goals = useMemo(() => (Array.isArray(planData?.goals) ? planData.goals : []), [planData]);
+  const exercises = useMemo(() => (Array.isArray(planData?.cbtExercises) ? planData.cbtExercises : []), [planData]);
+  const recentFeedback = useMemo(() => (Array.isArray(planData?.recentFeedback) ? planData.recentFeedback : []), [planData]);
+  const featuredFeedback = recentFeedback[0] ?? null;
+  const hasPlan = goals.length > 0 || exercises.length > 0;
 
   if (loading) {
     return (
-      <div className="flex h-[400px] items-center justify-center">
-        <div className="text-sm font-medium text-charcoal/60">Loading your journey...</div>
+      <div className="mx-auto max-w-5xl space-y-6 pb-20 lg:pb-8">
+        <div className="h-40 animate-pulse rounded-[2rem] bg-[#EEF6F3]" />
+        <div className="h-32 animate-pulse rounded-[1.75rem] bg-white/80 shadow-wellness-sm" />
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div className="h-64 animate-pulse rounded-[1.75rem] bg-white/80 shadow-wellness-sm" />
+          <div className="h-64 animate-pulse rounded-[1.75rem] bg-white/80 shadow-wellness-sm" />
+        </div>
       </div>
     );
   }
@@ -234,111 +166,180 @@ export default function TherapyPlanPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8 pb-20 lg:pb-8">
-      
-      {/* 1. Journey Header */}
-      <section className="relative overflow-hidden rounded-[2rem] bg-gradient-wellness-hero p-8 shadow-wellness-md">
+    <div className="mx-auto max-w-5xl space-y-8 pb-20 lg:pb-8">
+      <section className="relative overflow-hidden rounded-[2rem] bg-[linear-gradient(135deg,#EFF9F5_0%,#F4FBFF_100%)] p-8 shadow-wellness-md">
         <div className="relative z-10">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-charcoal/50">
-            Guided Recovery Pathway
+            My Plan
           </p>
           <h1 className="mt-2 font-serif text-3xl font-semibold tracking-tight text-charcoal md:text-4xl">
-            {plan?.title || 'Therapy Plan'}
+            Calm progress, one task at a time
           </h1>
           <p className="mt-2 max-w-xl text-sm leading-relaxed text-charcoal/70">
-            Provider-guided activities and milestones for your recovery progress.
+            Your daily goals and therapist-assigned exercises are organized here so you can check in and keep momentum without friction.
           </p>
 
-          <div className="mt-8">
-            <div className="mb-3 flex items-center justify-between text-sm font-medium">
-              <span className="text-charcoal/80">Recovery Roadmap</span>
-              <span className="text-wellness-sky">Week {plan?.weekNumber || 1} of {totalWeeks}</span>
+          <div className="mt-8 grid gap-4 sm:grid-cols-3">
+            <div className="rounded-[1.4rem] bg-white/78 p-4 shadow-wellness-sm">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-charcoal/45">Daily Goals</p>
+              <p className="mt-2 text-2xl font-semibold text-charcoal">{goals.length}</p>
             </div>
-            <div className="flex flex-wrap items-center gap-3">
-              {weeks.map((week) => {
-                const completed = week < Number(plan?.weekNumber || 1);
-                const current = week === Number(plan?.weekNumber || 1);
-                return (
-                  <div key={week} className="flex items-center gap-3">
-                    <div className={`flex h-11 w-11 items-center justify-center rounded-full text-sm font-semibold transition ${completed ? 'bg-[#dff0ea] text-charcoal' : current ? 'bg-[#1E90FF] text-white shadow-wellness-sm' : 'bg-white/82 text-charcoal/55'}`}>
-                      {completed ? <CheckCircle2 className="h-4 w-4" /> : week}
-                    </div>
-                    {week < weeks.length ? <div className={`h-1.5 w-10 rounded-full ${completed ? 'bg-[#bfded3]' : 'bg-white/75'}`} /> : null}
-                  </div>
-                );
-              })}
+            <div className="rounded-[1.4rem] bg-white/78 p-4 shadow-wellness-sm">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-charcoal/45">Assigned Exercises</p>
+              <p className="mt-2 text-2xl font-semibold text-charcoal">{exercises.length}</p>
             </div>
-            <div className="mt-5 rounded-full bg-white/76 px-4 py-3 text-sm text-charcoal/72 shadow-wellness-sm">
-              <span className="font-semibold text-charcoal">Weekly momentum:</span> {plan?.adherencePercent || 0}% complete
+            <div className="rounded-[1.4rem] bg-white/78 p-4 shadow-wellness-sm">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-charcoal/45">Completed Today</p>
+              <p className="mt-2 text-2xl font-semibold text-charcoal">
+                {goals.filter((goal) => goal.todayCheckInDone).length + exercises.filter((exercise) => exercise.completed).length}
+              </p>
             </div>
           </div>
         </div>
-        
-        {/* Decorative background element */}
-        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-wellness-aqua blur-3xl" />
+
+        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-[#DDF3EC] blur-3xl" />
       </section>
 
-      {/* Error state */}
       {error && (
         <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
           {error}
         </div>
       )}
 
-      {/* 2. Provider Note (Sticky Note UI) */}
-      {plan?.providerNote && (
-        <section className="relative overflow-hidden rounded-[1.75rem] bg-[#fff9ee] p-6 shadow-wellness-sm">
-          <div className="absolute inset-y-0 left-0 w-1.5 bg-[#8ec9be]" />
-          <div className="pl-3">
-          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-charcoal/55"><StickyNote className="h-4 w-4 text-[#8ec9be]" /> Note from your provider</p>
-          <p className="mt-2 text-sm leading-relaxed text-charcoal/78">
-            {plan.providerNote}
-          </p>
-          </div>
-        </section>
-      )}
-
-      {/* 3. Action Items */}
-      <div className="grid gap-8 lg:grid-cols-2">
-        
-        {/* Daily Rituals */}
-        <section className="space-y-4">
+      <div className="flex flex-col gap-8 md:flex-row md:items-start">
+        <section className="space-y-4 md:w-1/2">
           <div className="flex items-center gap-2">
-            <h2 className="text-lg font-bold text-charcoal">Daily Rituals</h2>
-            <span className="flex h-5 items-center rounded-full bg-calm-sage/15 px-2 text-[10px] font-bold uppercase tracking-wider text-calm-sage">
-              Habit Builder
+            <h2 className="text-lg font-bold text-charcoal">Daily Goals</h2>
+            <span className="flex h-5 items-center rounded-full bg-[#E7F6F0] px-2 text-[10px] font-bold uppercase tracking-wider text-[#2F7A5F]">
+              Check In
             </span>
           </div>
-          {dailyRituals.length > 0 ? (
-            <div className="space-y-3">
-              {dailyRituals.map(renderActivityCard)}
+          {goals.length > 0 ? (
+            <div className="flex gap-4 overflow-x-auto pb-2">
+              {goals.map((goal) => {
+                const isCompleting = completingTaskIds.includes(goal.id);
+                return (
+                  <div key={goal.id} className="min-w-[260px] rounded-[1.6rem] bg-white/92 p-5 shadow-wellness-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${categoryClass(goal.category)}`}>
+                          {goal.category}
+                        </span>
+                        <h3 className="mt-3 text-base font-semibold text-charcoal">{goal.title}</h3>
+                      </div>
+                      <Sparkles className="h-5 w-5 text-[#77BFA3]" />
+                    </div>
+                    <p className="mt-3 text-xs text-charcoal/55">Started {formatDate(goal.startDate)}</p>
+                    <button
+                      type="button"
+                      onClick={() => void completeTask(goal.id)}
+                      disabled={goal.todayCheckInDone || isCompleting}
+                      className="mt-5 inline-flex min-h-[50px] w-full items-center justify-center rounded-full bg-[#D8F0E7] px-5 text-base font-semibold text-charcoal transition hover:bg-[#BFE4D6] disabled:cursor-not-allowed disabled:bg-[#EEF4F1] disabled:text-charcoal/40 md:min-h-[42px] md:px-4 md:text-sm"
+                    >
+                      {goal.todayCheckInDone ? 'Checked In' : isCompleting ? 'Saving...' : 'Check In'}
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <div className="rounded-[1.5rem] border border-dashed border-wellness-border p-8 text-center">
-              <p className="text-sm text-charcoal/50">No daily rituals assigned for this week.</p>
+              <p className="text-sm text-charcoal/50">No daily goals assigned right now.</p>
             </div>
           )}
         </section>
 
-        {/* Weekly Milestones */}
-        <section className="space-y-4">
+        <section className="space-y-4 md:w-1/2">
           <div className="flex items-center gap-2">
-            <h2 className="text-lg font-bold text-charcoal">Weekly Milestones</h2>
-            <span className="flex h-5 items-center rounded-full bg-blue-500/10 px-2 text-[10px] font-bold uppercase tracking-wider text-blue-600">
-              Deep Work
+            <h2 className="text-lg font-bold text-charcoal">Assigned Exercises</h2>
+            <span className="flex h-5 items-center rounded-full bg-[#E8F2FF] px-2 text-[10px] font-bold uppercase tracking-wider text-[#2B5EA7]">
+              CBT
             </span>
           </div>
-          {weeklyMilestones.length > 0 ? (
+          <div className="rounded-[1.6rem] border border-blue-100 bg-blue-50 p-5 shadow-wellness-sm">
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white text-sm font-bold text-[#2B5EA7] shadow-sm">
+                {featuredFeedback?.providerInitials || 'CT'}
+              </div>
+              <div className="min-w-0 flex-1 break-words">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#2B5EA7]">
+                  <Quote className="h-4 w-4" />
+                  Insights from your Care Team
+                </div>
+                {featuredFeedback ? (
+                  <>
+                    <p className="mt-3 text-sm font-semibold text-charcoal md:text-base">
+                      {featuredFeedback.providerName} says:
+                    </p>
+                    <p className="mt-2 text-sm leading-relaxed text-charcoal/80 md:text-base">
+                      &ldquo;{featuredFeedback.feedback}&rdquo;
+                    </p>
+                    {recentFeedback.length > 1 ? (
+                      <div className="mt-4 space-y-2 border-t border-blue-100 pt-3">
+                        {recentFeedback.slice(1).map((item) => (
+                          <div key={item.id} className="rounded-2xl bg-white/70 px-3 py-2">
+                            <p className="text-xs font-semibold text-charcoal/70">{item.providerName}</p>
+                            <p className="mt-1 text-xs leading-relaxed text-charcoal/65">&ldquo;{item.feedback}&rdquo;</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </>
+                ) : (
+                  <p className="mt-3 text-sm leading-relaxed text-charcoal/70 md:text-base">
+                    Your provider’s guidance and exercise feedback will appear here as your care team reviews your progress.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+          {exercises.length > 0 ? (
             <div className="space-y-3">
-              {weeklyMilestones.map(renderActivityCard)}
+              {exercises.map((exercise) => (
+                <button
+                  key={exercise.id}
+                  type="button"
+                  onClick={() => {
+                    if (!exercise.completed) {
+                      navigate(`/patient/cbt/${exercise.sessionId}`);
+                    }
+                  }}
+                  className="group flex w-full items-center justify-between rounded-[1.5rem] bg-white/92 p-4 text-left shadow-wellness-sm transition hover:shadow-wellness-md"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#ECF5FF] text-[#2B5EA7]">
+                      <ClipboardCheck className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-charcoal">{exercise.title}</p>
+                      <p className="mt-0.5 text-xs text-charcoal/55">{exercise.type} • Assigned {formatDate(exercise.assignedAt)}</p>
+                      {exercise.therapistFeedback ? (
+                        <p className="mt-1.5 max-w-xl text-xs leading-relaxed text-charcoal/65">
+                          Latest feedback: &ldquo;{exercise.therapistFeedback}&rdquo;
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${exerciseStatusClass(exercise.status)}`}>
+                      {exercise.status}
+                    </span>
+                    {!exercise.completed ? (
+                      <span className="inline-flex min-h-[44px] items-center rounded-full bg-[#E8F2FF] px-4 text-sm font-semibold text-[#2B5EA7] md:min-h-[34px] md:px-3 md:text-xs">
+                        Start Exercise
+                      </span>
+                    ) : null}
+                  </div>
+                </button>
+              ))}
             </div>
           ) : (
             <div className="rounded-[1.5rem] border border-dashed border-wellness-border p-8 text-center">
-              <p className="text-sm text-charcoal/50">No weekly milestones assigned for this week.</p>
+              <p className="text-sm text-charcoal/50">No CBT exercises assigned yet.</p>
             </div>
           )}
         </section>
-
       </div>
 
     </div>

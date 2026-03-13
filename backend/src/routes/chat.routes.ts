@@ -10,7 +10,7 @@ const router = Router();
 router.post(
 	'/message',
 	requireAuth,
-	requireRole(['patient', 'therapist', 'psychiatrist', 'coach', 'admin', 'superadmin']),
+	requireRole(['patient', 'therapist', 'psychologist', 'psychiatrist', 'coach', 'admin', 'superadmin']),
 	chatRateLimiter,
 	asyncHandler(postChatMessageController),
 );

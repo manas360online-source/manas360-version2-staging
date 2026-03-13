@@ -25,11 +25,11 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
 		const fallback = userRole === 'admin'
 			? '/admin-portal/login'
 			: userRole === 'psychologist'
-				? '/psychologist/dashboard'
+				? '/provider/dashboard'
 			: userRole === 'psychiatrist'
-				? '/psychiatrist/dashboard'
+				? '/provider/dashboard'
 				: userRole === 'therapist' || userRole === 'coach'
-				? '/therapist/analytics'
+				? '/provider/dashboard'
 				: '/patient/dashboard';
 
 		return <Navigate to={fallback} replace />;

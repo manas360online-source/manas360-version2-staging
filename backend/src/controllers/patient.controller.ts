@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express';
+import { prisma } from '../config/db';
 import { AppError } from '../middleware/error.middleware';
 import {
 	createPatientAssessment,
@@ -9,6 +10,65 @@ import {
 	getMyTherapistMatches,
 } from '../services/patient.service';
 import { sendSuccess } from '../utils/response';
+
+const cleanFeedbackText = (value: string | null | undefined): string => String(value || '').replace(/\s+/g, ' ').trim();
+
+const getProviderDisplayName = (provider?: {
+	firstName?: string | null;
+	lastName?: string | null;
+	name?: string | null;
+} | null): string => {
+	const firstName = String(provider?.firstName || '').trim();
+	const lastName = String(provider?.lastName || '').trim();
+	const fullName = `${firstName} ${lastName}`.trim();
+	if (fullName) return fullName;
+	const fallback = String(provider?.name || '').trim();
+	return fallback || 'Your provider';
+};
+
+const getProviderInitials = (providerName: string): string => {
+	const parts = providerName.split(/\s+/).filter(Boolean);
+	if (parts.length === 0) return 'CT';
+	if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+	return `${parts[0].charAt(0)}${parts[1].charAt(0)}`.toUpperCase();
+};
+
+const buildTherapistNoteFeedback = (note: {
+	plan?: string | null;
+	assessment?: string | null;
+	objective?: string | null;
+	subjective?: string | null;
+	assignedExercise?: string | null;
+}): string => {
+	const plan = cleanFeedbackText(note.plan);
+	const assessment = cleanFeedbackText(note.assessment);
+	const objective = cleanFeedbackText(note.objective);
+	const subjective = cleanFeedbackText(note.subjective);
+	const assignedExercise = cleanFeedbackText(note.assignedExercise);
+
+	if (plan) return plan;
+	if (assessment) return assessment;
+	if (objective) return objective;
+	if (assignedExercise) return `Assigned exercise: ${assignedExercise}`;
+	return subjective;
+};
+
+const mapGoalCategory = (title: string, activityType: string): string => {
+	const normalizedTitle = String(title || '').toLowerCase();
+	if (normalizedTitle.includes('sleep')) return 'Sleep';
+	if (normalizedTitle.includes('mind') || normalizedTitle.includes('meditat') || normalizedTitle.includes('breath')) return 'Mindfulness';
+	if (normalizedTitle.includes('nutrition') || normalizedTitle.includes('meal') || normalizedTitle.includes('water') || normalizedTitle.includes('hydrate')) return 'Nutrition';
+	if (normalizedTitle.includes('journal')) return 'Journaling';
+	if (String(activityType || '').toUpperCase() === 'EXERCISE') return 'Movement';
+	return 'Wellness';
+};
+
+const mapPatientSessionBadge = (status: string): 'New' | 'In Progress' | 'Completed' => {
+	const normalized = String(status || '').toUpperCase();
+	if (normalized === 'COMPLETED') return 'Completed';
+	if (normalized === 'IN_PROGRESS') return 'In Progress';
+	return 'New';
+};
 
 const getAuthUserId = (req: Request): string => {
 	const userId = req.auth?.userId;
@@ -82,5 +142,172 @@ export const getMyTherapistMatchesController = async (req: Request, res: Respons
 	const matches = await getMyTherapistMatches(userId, req.validatedTherapistMatchQuery);
 
 	sendSuccess(res, matches, 'Therapist matches fetched');
+};
+
+export const getMyTherapyPlanController = async (req: Request, res: Response): Promise<void> => {
+	const userId = getAuthUserId(req);
+
+	const patientProfile = await prisma.patientProfile.findUnique({
+		where: { userId },
+		select: { id: true },
+	});
+
+	if (!patientProfile) {
+		throw new AppError('Patient profile not found', 404);
+	}
+
+	const [goalActivities, cbtSessions, therapistNotes, careTeamAssignment] = await Promise.all([
+		prisma.therapyPlanActivity.findMany({
+			where: {
+				plan: {
+					patientId: patientProfile.id,
+					status: 'ACTIVE',
+				},
+			},
+			orderBy: [
+				{ createdAt: 'desc' },
+				{ orderIndex: 'asc' },
+			],
+			select: {
+				id: true,
+				title: true,
+				activityType: true,
+				status: true,
+				createdAt: true,
+				completedAt: true,
+			},
+		}),
+		prisma.patientSession.findMany({
+			where: { patientId: userId },
+			orderBy: { createdAt: 'desc' },
+			select: {
+				id: true,
+				status: true,
+				createdAt: true,
+				completedAt: true,
+				sessionNotes: true,
+				template: {
+					select: {
+						title: true,
+						category: true,
+					},
+				},
+			},
+		}),
+		prisma.therapistSessionNote.findMany({
+			where: {
+				patientId: patientProfile.id,
+				status: 'signed',
+			},
+			orderBy: { updatedAt: 'desc' },
+			take: 6,
+			select: {
+				id: true,
+				subjective: true,
+				objective: true,
+				assessment: true,
+				plan: true,
+				assignedExercise: true,
+				updatedAt: true,
+				therapist: {
+					select: {
+						firstName: true,
+						lastName: true,
+						name: true,
+					},
+				},
+			},
+		}),
+		prisma.careTeamAssignment.findFirst({
+			where: {
+				patientId: userId,
+				status: 'ACTIVE',
+			},
+			orderBy: { assignedAt: 'desc' },
+			select: {
+				provider: {
+					select: {
+						firstName: true,
+						lastName: true,
+						name: true,
+					},
+				},
+			},
+		}),
+	]);
+
+	const fallbackProviderName = getProviderDisplayName(careTeamAssignment?.provider);
+	const fallbackProviderInitials = getProviderInitials(fallbackProviderName);
+
+	const goals = goalActivities.map((goal) => ({
+		id: goal.id,
+		title: goal.title,
+		category: mapGoalCategory(goal.title, String(goal.activityType)),
+		todayCheckInDone: String(goal.status || '').toUpperCase() === 'COMPLETED',
+		startDate: goal.createdAt.toISOString(),
+	}));
+
+	const cbtExercises = cbtSessions.map((session) => ({
+		id: session.id,
+		sessionId: session.id,
+		type: String(session.template?.category || 'CBT Exercise'),
+		title: String(session.template?.title || 'CBT Exercise'),
+		status: mapPatientSessionBadge(String(session.status)),
+		completed: String(session.status || '').toUpperCase() === 'COMPLETED',
+		assignedAt: session.createdAt.toISOString(),
+		completedAt: session.completedAt ? session.completedAt.toISOString() : null,
+		therapistFeedback: cleanFeedbackText(session.sessionNotes),
+	}));
+
+	const recentFeedback = [
+		...therapistNotes
+			.map((note) => {
+				const feedback = buildTherapistNoteFeedback(note);
+				if (!feedback) return null;
+
+				const providerName = getProviderDisplayName(note.therapist);
+				return {
+					id: `note-${note.id}`,
+					feedback,
+					providerName,
+					providerInitials: getProviderInitials(providerName),
+					source: 'session-note' as const,
+					createdAt: note.updatedAt.toISOString(),
+				};
+			})
+			.filter((entry): entry is NonNullable<typeof entry> => Boolean(entry)),
+		...cbtSessions
+			.filter((session) => String(session.status || '').toUpperCase() === 'COMPLETED' && cleanFeedbackText(session.sessionNotes))
+			.map((session) => ({
+				id: `cbt-${session.id}`,
+				feedback: cleanFeedbackText(session.sessionNotes),
+				providerName: fallbackProviderName,
+				providerInitials: fallbackProviderInitials,
+				source: 'cbt-review' as const,
+				createdAt: (session.completedAt || session.createdAt).toISOString(),
+			})),
+	]
+		.sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+		.slice(0, 3);
+
+	const dailyTasks = [
+		...goals.map((goal) => ({
+			id: goal.id,
+			kind: 'goal' as const,
+			title: goal.title,
+			category: goal.category,
+			completed: goal.todayCheckInDone,
+		})),
+		...cbtExercises.map((exercise) => ({
+			id: exercise.id,
+			kind: 'cbt' as const,
+			title: exercise.title,
+			type: exercise.type,
+			completed: exercise.completed,
+			status: exercise.status,
+		})),
+	];
+
+	sendSuccess(res, { dailyTasks, goals, cbtExercises, recentFeedback }, 'Therapy plan fetched');
 };
 

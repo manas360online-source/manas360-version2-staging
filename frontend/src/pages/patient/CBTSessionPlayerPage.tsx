@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'react-hot-toast';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { cbtSessionPlayerApi } from '../../api/cbtSessionPlayer.api';
 import PlayerHeader from '../../components/session-player/PlayerHeader';
@@ -195,6 +196,7 @@ export default function CBTSessionPlayerPage() {
           );
           if (result.sessionComplete) {
             await saveNow('question-change');
+            toast.success('Exercise submitted. Your therapist will review this soon! ✨');
             navigate(`/patient/sessions/${sessionId}`);
             return;
           }

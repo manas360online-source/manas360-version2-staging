@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { toast } from 'react-hot-toast';
 import { http } from '../../lib/http';
 
 export default function ProfilePage() {
@@ -54,6 +55,7 @@ export default function ProfilePage() {
       const updated = res.data?.data ?? res.data;
       setProfile(updated);
       setSuccess('Settings updated successfully.');
+      toast.success('Profile updated successfully ✨');
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Failed to save settings. Please try again.');
     } finally {
