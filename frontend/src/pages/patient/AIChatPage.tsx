@@ -9,6 +9,8 @@ import { HeartPulse, Wind, Lock, AlertCircle, Send, Mic, Settings, Pause, Play, 
 
 type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
+type ThreadMessage = { role: 'user' | 'assistant' | 'system'; content: string };
+
 const riskBadgeClass = (level: RiskLevel | null): string => {
   if (level === 'CRITICAL') return 'border-red-300 bg-red-50 text-red-700';
   if (level === 'HIGH') return 'border-orange-300 bg-orange-50 text-orange-700';
@@ -42,7 +44,8 @@ const BreathingWidget = () => (
 export default function AIChatPage() {
   const { user } = useAuth();
   const [message, setMessage] = useState('');
-  const [thread, setThread] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
+  const [thread, setThread] = useState<ThreadMessage[]>([]);
+  const [assessmentContext, setAssessmentContext] = useState<{ type: string; score: number; severity: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [showCrisisAlert, setShowCrisisAlert] = useState(false);
   const [riskLevel, setRiskLevel] = useState<RiskLevel | null>(null);
@@ -117,6 +120,30 @@ export default function AIChatPage() {
     riskPollingEnabledRef.current = true;
     setRiskPollingEnabled(true);
     setRiskLevel(null);
+  }, [user?.id]);
+
+  // Load latest assessment for context-aware greeting
+  useEffect(() => {
+    (async () => {
+      try {
+        const history = await patientApi.getStructuredAssessmentHistory();
+        const rows = Array.isArray(history) ? history : (Array.isArray((history as any)?.data) ? (history as any).data : []);
+        if (rows.length === 0) return;
+        const latest = rows.sort((a: any, b: any) => new Date(b.createdAt ?? b.completedAt ?? 0).getTime() - new Date(a.createdAt ?? a.completedAt ?? 0).getTime())[0];
+        const score = Number(latest?.totalScore ?? latest?.score ?? 0);
+        const type = String(latest?.templateKey ?? latest?.type ?? 'PHQ-9').toUpperCase();
+        if (!score) return;
+        let severity = 'mild';
+        if (type.includes('PHQ')) {
+          severity = score >= 20 ? 'severe' : score >= 15 ? 'moderately severe' : score >= 10 ? 'moderate' : score >= 5 ? 'mild' : 'minimal';
+        } else if (type.includes('GAD')) {
+          severity = score >= 15 ? 'severe' : score >= 10 ? 'moderate' : score >= 5 ? 'mild' : 'minimal';
+        }
+        setAssessmentContext({ type, score, severity });
+      } catch {
+        // silently ignore; generic greeting will show
+      }
+    })();
   }, [user?.id]);
 
   const refreshRisk = async () => {
@@ -429,29 +456,43 @@ export default function AIChatPage() {
                  <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-teal-50">
                     <HeartPulse className="h-8 w-8 text-teal-400" />
                  </div>
-                 <h3 className="text-lg font-bold text-zinc-900">Good to see you.</h3>
-                 <p className="mt-1 text-sm text-zinc-500 max-w-xs">I have reviewed your active therapy plan and recent check-ins. How can I support you right now?</p>
+                 <h3 className="text-lg font-bold text-zinc-900">
+                   {assessmentContext ? `I saw your recent ${assessmentContext.type}.` : 'Good to see you.'}
+                 </h3>
+                 <p className="mt-1 text-sm text-zinc-500 max-w-xs leading-relaxed">
+                   {assessmentContext
+                     ? assessmentContext.severity === 'minimal' || assessmentContext.severity === 'mild'
+                       ? `Your score suggests ${assessmentContext.severity} symptoms. That's something to acknowledge — you're doing the right thing by checking in. How are you feeling today?`
+                       : `Your ${assessmentContext.severity} score of ${assessmentContext.score} tells me you've been having a tough time. I'm here. Want to try a quick grounding exercise together?`
+                     : `I have reviewed your active therapy plan and recent check-ins. How can I support you right now?`
+                   }
+                 </p>
               </div>
             )}
             
             {thread.map((m, i) => (
-              <div key={i} className={`flex w-full ${m.role === 'assistant' ? 'justify-start' : 'justify-end'}`}>
-                 <div className={`flex max-w-[85%] md:max-w-[75%] gap-3 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                    
+              <div key={i} className={`flex w-full ${m.role === 'system' ? 'justify-center' : m.role === 'assistant' ? 'justify-start' : 'justify-end'}`}>
+                {m.role === 'system' ? (
+                  // Grey system injection bubble
+                  <div className="inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-4 py-1.5 text-xs font-medium text-zinc-500">
+                    {m.content}
+                  </div>
+                ) : (
+                  <div className={`flex max-w-[85%] md:max-w-[75%] gap-3 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
                     {m.role === 'assistant' && (
                       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-teal-500 text-white shadow-sm mt-1">
                         <HeartPulse className="h-4 w-4" />
                       </div>
                     )}
-                    
                     <div className={`rounded-2xl px-5 py-3.5 text-[15px] leading-relaxed shadow-sm ${
-                      m.role === 'assistant' 
-                        ? 'rounded-tl-sm bg-zinc-50 border border-zinc-100 text-zinc-800' 
+                      m.role === 'assistant'
+                        ? 'rounded-tl-sm bg-zinc-50 border border-zinc-100 text-zinc-800'
                         : 'rounded-tr-sm bg-zinc-900 text-white'
                     }`}>
                       {renderMessageContent(m.content)}
                     </div>
-                 </div>
+                  </div>
+                )}
               </div>
             ))}
             

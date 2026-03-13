@@ -417,6 +417,8 @@ export default function SoundTherapyPage() {
       const rows = await loadCompletionRows();
       setLoggedCompletionIds(rows.map((entry) => String(entry.title || '')));
       setNotice(successMessage || 'Completed. +10 Wellness Points.');
+      // Notify TherapyPlanPage to mark AUDIO_THERAPY tasks as done
+      window.dispatchEvent(new CustomEvent('audio-complete', { detail: { title: item.title } }));
     } catch {
       setNotice('Completion could not be logged right now.');
     }
@@ -464,11 +466,12 @@ export default function SoundTherapyPage() {
     return (
       <article
         key={item.id}
-        className="group relative flex min-w-[250px] snap-start flex-col overflow-hidden rounded-[28px] border border-white/70 bg-white/90 shadow-soft-sm transition hover:-translate-y-1 hover:shadow-soft-md sm:min-w-[280px]"
+        className="group relative flex min-w-[250px] snap-start flex-col overflow-hidden rounded-[30px] bg-white/92 shadow-wellness-sm transition hover:-translate-y-1.5 hover:shadow-wellness-md sm:min-w-[286px]"
       >
         <div className={`relative aspect-[4/5] bg-gradient-to-br ${item.accent} p-5`}>
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.22))]" />
           <div className="flex items-start justify-between gap-3">
-            <div className="rounded-full bg-white/75 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-charcoal/75">
+            <div className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${item.kind === 'audio' ? 'bg-[#eaf4ff] text-[#1E90FF]' : 'bg-[#e8f5f2] text-charcoal/78'}`}>
               {item.badge}
             </div>
             <button
@@ -483,7 +486,7 @@ export default function SoundTherapyPage() {
           </div>
 
           <div className="mt-12">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/75 text-charcoal shadow-sm">
+            <div className="flex h-14 w-14 items-center justify-center rounded-[1.2rem] bg-white/78 text-charcoal shadow-wellness-sm">
               <Icon className="h-7 w-7" />
             </div>
             <p className="mt-10 text-[11px] font-semibold uppercase tracking-[0.16em] text-charcoal/55">{item.tagLine}</p>
@@ -501,7 +504,7 @@ export default function SoundTherapyPage() {
           <button
             type="button"
             onClick={() => (item.kind === 'audio' ? startAudio(item) : openExercise(item))}
-            className="inline-flex h-11 items-center justify-center rounded-full bg-charcoal px-5 text-sm font-semibold text-white transition hover:bg-black"
+            className={`${item.kind === 'audio' ? 'wellness-primary-btn' : 'wellness-secondary-btn'} h-11 px-5`}
           >
             {item.kind === 'audio' ? 'Play' : 'Open'}
           </button>
@@ -511,7 +514,7 @@ export default function SoundTherapyPage() {
   };
 
   if (loading) {
-    return <div className="rounded-[28px] border border-calm-sage/15 bg-white p-6">Loading Wellness Library...</div>;
+    return <div className="wellness-panel rounded-[28px] p-6">Loading Wellness Library...</div>;
   }
 
   return (
@@ -522,14 +525,14 @@ export default function SoundTherapyPage() {
         </div>
       ) : null}
 
-      <section className="relative overflow-hidden rounded-[34px] border border-[#d8e2dd] bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.94),_rgba(232,239,230,0.94)_40%,_rgba(247,243,234,0.95)_100%)] p-6 shadow-soft-sm sm:p-8">
+      <section className="relative overflow-hidden rounded-[34px] bg-gradient-wellness-hero p-6 shadow-wellness-md sm:p-8">
         <div className="absolute inset-y-0 right-0 w-[42%] bg-[radial-gradient(circle_at_center,_rgba(17,34,47,0.14),transparent_65%)]" />
         <div className="relative z-10 grid gap-6 lg:grid-cols-[1.15fr_0.85fr] lg:items-end">
           <div>
-            <p className="inline-flex rounded-full bg-white/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#557366]">
+            <p className="inline-flex rounded-full bg-white/88 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-charcoal/55 shadow-wellness-sm">
               Wellness Library
             </p>
-            <h1 className="mt-4 max-w-3xl text-3xl font-semibold tracking-tight text-charcoal sm:text-4xl">
+            <h1 className="mt-4 max-w-3xl font-serif text-3xl font-semibold tracking-tight text-charcoal sm:text-4xl">
               Your self-care hub for quick resets, guided CBT, and sound-based calm.
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-charcoal/70 sm:text-base">
@@ -537,7 +540,7 @@ export default function SoundTherapyPage() {
             </p>
           </div>
 
-          <div className="rounded-[30px] border border-white/70 bg-gradient-to-br from-[#1d2a42] via-[#263757] to-[#304b65] p-6 text-white shadow-[0_24px_80px_rgba(18,30,45,0.18)]">
+          <div className="rounded-[30px] border border-white/60 bg-gradient-to-br from-[#224153] via-[#2f5d6b] to-[#3a7086] p-6 text-white shadow-[0_24px_80px_rgba(18,30,45,0.18)]">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/70">{hero.eyebrow}</p>
             <div className="mt-4 flex items-start justify-between gap-4">
               <div>
@@ -563,8 +566,8 @@ export default function SoundTherapyPage() {
         </div>
       </section>
 
-      <section className="flex flex-wrap items-center gap-3 rounded-[26px] border border-ink-100 bg-white p-4 shadow-soft-sm sm:px-5">
-        <div className="mr-1 rounded-full bg-[#eef4f1] px-3 py-2 text-sm font-semibold text-[#557366]">
+      <section className="wellness-panel flex flex-wrap items-center gap-3 rounded-[26px] p-4 sm:px-5">
+        <div className="mr-1 rounded-full bg-white px-3 py-2 text-sm font-semibold text-charcoal/65 shadow-wellness-sm">
           Filter library
         </div>
         <div className="flex flex-1 gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -574,7 +577,7 @@ export default function SoundTherapyPage() {
               type="button"
               onClick={() => setActiveFilter(pill.value)}
               className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition ${
-                activeFilter === pill.value ? 'bg-charcoal text-white' : 'bg-[#f7f3ea] text-charcoal/70 hover:bg-[#efe9dc]'
+                activeFilter === pill.value ? 'bg-[#1E90FF] text-white shadow-wellness-sm' : 'bg-white text-charcoal/70 hover:bg-wellness-aqua'
               }`}
             >
               {pill.label}
@@ -588,17 +591,17 @@ export default function SoundTherapyPage() {
       </section>
 
       <section className="grid gap-4 sm:grid-cols-3">
-        <article className="rounded-[24px] border border-ink-100 bg-white p-5 shadow-soft-sm">
+        <article className="wellness-panel p-5">
           <p className="text-xs uppercase tracking-[0.14em] text-charcoal/50">Hero source</p>
           <p className="mt-3 text-lg font-semibold text-charcoal">Daily Check-in aware</p>
           <p className="mt-1 text-sm text-charcoal/62">Low sleep, low energy, and high-pressure tags can change what surfaces first.</p>
         </article>
-        <article className="rounded-[24px] border border-ink-100 bg-white p-5 shadow-soft-sm">
+        <article className="wellness-panel p-5">
           <p className="text-xs uppercase tracking-[0.14em] text-charcoal/50">Consumption model</p>
           <p className="mt-3 text-lg font-semibold text-charcoal">Browse while audio plays</p>
           <p className="mt-1 text-sm text-charcoal/62">Audio stays in a bottom-sheet player so patients can keep exploring the app.</p>
         </article>
-        <article className="rounded-[24px] border border-ink-100 bg-white p-5 shadow-soft-sm">
+        <article className="wellness-panel p-5">
           <p className="text-xs uppercase tracking-[0.14em] text-charcoal/50">Clinical loop</p>
           <p className="mt-3 text-lg font-semibold text-charcoal">Completion is logged</p>
           <p className="mt-1 text-sm text-charcoal/62">Finished sessions now feed the patient timeline and add wellness momentum.</p>
@@ -612,7 +615,7 @@ export default function SoundTherapyPage() {
           <section key={rowKey} className="space-y-4">
             <div className="flex items-end justify-between gap-4">
               <div>
-                <h2 className="text-2xl font-semibold text-charcoal">{rowLabels[rowKey].title}</h2>
+                <h2 className="font-serif text-2xl font-semibold text-charcoal">{rowLabels[rowKey].title}</h2>
                 <p className="mt-1 text-sm text-charcoal/62">{rowLabels[rowKey].subtitle}</p>
               </div>
               <div className="hidden items-center gap-2 text-charcoal/45 md:flex">
@@ -629,7 +632,7 @@ export default function SoundTherapyPage() {
       })}
 
       {playerItem ? (
-        <div className="fixed inset-x-4 bottom-4 z-40 mx-auto max-w-4xl rounded-[26px] border border-white/60 bg-[#14211fcc] p-4 text-white shadow-[0_24px_60px_rgba(0,0,0,0.28)] backdrop-blur-md">
+        <div className="fixed inset-x-4 bottom-4 z-40 mx-auto max-w-4xl rounded-[26px] border border-white/60 bg-[#14303acc] p-4 text-white shadow-[0_24px_60px_rgba(0,0,0,0.28)] backdrop-blur-md">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0 flex-1">
               <p className="text-xs uppercase tracking-[0.16em] text-white/60">Now playing</p>
@@ -681,7 +684,7 @@ export default function SoundTherapyPage() {
       {drawerItem ? (
         <div className="fixed inset-0 z-50 flex justify-end bg-charcoal/40 backdrop-blur-sm" onClick={closeDrawer}>
           <div
-            className="h-full w-full max-w-2xl overflow-y-auto bg-white p-6 shadow-2xl sm:p-8"
+            className="h-full w-full max-w-2xl overflow-y-auto bg-[#fcfefd] p-6 shadow-2xl sm:p-8"
             onClick={(event) => event.stopPropagation()}
             role="dialog"
             aria-modal="true"
@@ -698,7 +701,7 @@ export default function SoundTherapyPage() {
               </button>
             </div>
 
-            <div className="mt-8 rounded-[28px] border border-[#dbe6e1] bg-[#fcfcfa] p-6">
+            <div className="mt-8 rounded-[28px] bg-gradient-wellness-surface p-6 shadow-wellness-sm">
               <div className="mb-5 flex items-center justify-between text-sm text-charcoal/55">
                 <span>Prompt {drawerStep + 1} of {(drawerItem.prompts || []).length}</span>
                 <span>{drawerItem.durationMinutes} min</span>
@@ -707,7 +710,7 @@ export default function SoundTherapyPage() {
               <textarea
                 value={drawerInput}
                 onChange={(event) => setDrawerInput(event.target.value)}
-                className="mt-6 min-h-[180px] w-full rounded-[24px] border border-[#dbe6e1] bg-white px-4 py-4 text-sm text-charcoal outline-none transition focus:border-[#91b6a7]"
+                className="mt-6 min-h-[180px] w-full rounded-[24px] border border-wellness-border bg-white px-4 py-4 text-sm text-charcoal outline-none transition focus:border-[#1E90FF]"
                 placeholder="Write whatever comes up. Short answers are fine."
               />
               <div className="mt-6 flex items-center justify-between gap-3">
@@ -720,14 +723,14 @@ export default function SoundTherapyPage() {
                     setDrawerInput(drawerAnswers[drawerStep - 1] || '');
                   }}
                   disabled={drawerStep === 0}
-                  className="rounded-full bg-[#eef4f1] px-4 py-3 text-sm font-semibold text-charcoal disabled:opacity-40"
+                  className="rounded-full bg-wellness-aqua px-4 py-3 text-sm font-semibold text-charcoal disabled:opacity-40"
                 >
                   Back
                 </button>
                 <button
                   type="button"
                   onClick={() => void submitDrawerStep()}
-                  className="rounded-full bg-charcoal px-5 py-3 text-sm font-semibold text-white"
+                  className="wellness-primary-btn px-5 py-3"
                 >
                   {drawerStep === (drawerItem.prompts || []).length - 1 ? 'Complete exercise' : 'Next prompt'}
                 </button>

@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Clock } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { ChevronLeft, ChevronRight, Clock, Loader2 } from 'lucide-react';
+import { patientApi } from '../../api/patient';
 
 interface CalendarSelectionProps {
   onDateTimeSelect: (date: Date, time: string) => void;
@@ -9,16 +10,73 @@ interface CalendarSelectionProps {
 interface TimeSlot {
   startTime: string;
   endTime: string;
-  availableCount: number;
+  availableCount: number | null;
 }
 
 type SelectionStep = 'calendar' | 'time-slots';
+
+const SLOT_TEMPLATES: Array<{ startTime: string; endTime: string }> = [
+  { startTime: '09:00', endTime: '09:30' },
+  { startTime: '10:00', endTime: '10:30' },
+  { startTime: '14:00', endTime: '14:30' },
+  { startTime: '15:00', endTime: '15:30' },
+  { startTime: '18:00', endTime: '18:30' },
+];
+
+const toMinuteOfDay = (time: string): number => {
+  const [h, m] = time.split(':').map(Number);
+  return (h * 60) + (m || 0);
+};
 
 export default function CalendarSelection({ onDateTimeSelect, onCancel }: CalendarSelectionProps) {
   const [step, setStep] = useState<SelectionStep>('calendar');
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>(
+    SLOT_TEMPLATES.map((slot) => ({ ...slot, availableCount: null })),
+  );
+  const [timeSlotsLoading, setTimeSlotsLoading] = useState(false);
+  const [timeSlotsError, setTimeSlotsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!selectedDate || step !== 'time-slots') return;
+
+    const loadAvailability = async () => {
+      setTimeSlotsLoading(true);
+      setTimeSlotsError(null);
+      try {
+        const day = selectedDate.getDay();
+        const results = await Promise.all(
+          SLOT_TEMPLATES.map(async (slot) => {
+            const startMinute = toMinuteOfDay(slot.startTime);
+            const endMinute = toMinuteOfDay(slot.endTime);
+            const response = await patientApi.getAvailableProvidersForSmartMatch(
+              {
+                daysOfWeek: [day],
+                timeSlots: [{ startMinute, endMinute }],
+              },
+            );
+
+            const count = Number(response?.count ?? response?.providers?.length ?? 0);
+            return {
+              ...slot,
+              availableCount: Number.isFinite(count) ? count : 0,
+            };
+          }),
+        );
+
+        setTimeSlots(results);
+      } catch {
+        setTimeSlotsError('Could not check live availability right now. Please try another time or retry.');
+        setTimeSlots(SLOT_TEMPLATES.map((slot) => ({ ...slot, availableCount: null })));
+      } finally {
+        setTimeSlotsLoading(false);
+      }
+    };
+
+    void loadAvailability();
+  }, [selectedDate, step]);
 
   // Get calendar days for current month
   const getDaysInMonth = (date: Date) => {
@@ -56,6 +114,7 @@ export default function CalendarSelection({ onDateTimeSelect, onCancel }: Calend
       setSelectedDate(date);
       setStep('time-slots');
       setSelectedTime(null);
+      setTimeSlotsError(null);
     }
   };
 
@@ -66,15 +125,6 @@ export default function CalendarSelection({ onDateTimeSelect, onCancel }: Calend
   const handleNextMonth = () => {
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1));
   };
-
-  // Mock time slots
-  const timeSlots: TimeSlot[] = [
-    { startTime: '09:00', endTime: '09:30', availableCount: 3 },
-    { startTime: '10:00', endTime: '10:30', availableCount: 2 },
-    { startTime: '14:00', endTime: '14:30', availableCount: 5 },
-    { startTime: '15:00', endTime: '15:30', availableCount: 1 },
-    { startTime: '18:00', endTime: '18:30', availableCount: 4 },
-  ];
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -154,17 +204,34 @@ export default function CalendarSelection({ onDateTimeSelect, onCancel }: Calend
               </span>
             </p>
             <div className="space-y-2">
+              {timeSlotsLoading && (
+                <div className="flex items-center justify-center gap-2 rounded-lg border border-calm-sage/20 bg-calm-sage/5 px-4 py-3 text-sm text-charcoal/70">
+                  <Loader2 className="h-4 w-4 animate-spin text-teal-600" />
+                  Checking live provider availability...
+                </div>
+              )}
+
+              {timeSlotsError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {timeSlotsError}
+                </div>
+              )}
+
               {timeSlots.map((slot) => (
                 <button
                   key={slot.startTime}
                   onClick={() => {
+                    if (slot.availableCount === 0 || timeSlotsLoading) return;
                     setSelectedTime(slot.startTime);
                     onDateTimeSelect(selectedDate, slot.startTime);
                   }}
+                  disabled={slot.availableCount === 0 || timeSlotsLoading}
                   className={`w-full rounded-lg border px-4 py-3 text-left transition-all ${
                     selectedTime === slot.startTime
                       ? 'border-teal-500 bg-teal-50'
-                      : 'border-calm-sage/20 hover:border-teal-300 hover:bg-teal-50/30'
+                      : slot.availableCount === 0
+                        ? 'border-calm-sage/15 bg-calm-sage/5 opacity-60 cursor-not-allowed'
+                        : 'border-calm-sage/20 hover:border-teal-300 hover:bg-teal-50/30'
                   }`}
                 >
                   <div className="flex items-center justify-between">
@@ -175,11 +242,21 @@ export default function CalendarSelection({ onDateTimeSelect, onCancel }: Calend
                       </span>
                     </div>
                     <span className="text-xs text-charcoal/60">
-                      {slot.availableCount} provider{slot.availableCount !== 1 ? 's' : ''}
+                      {slot.availableCount == null
+                        ? 'Checking availability...'
+                        : slot.availableCount === 0
+                          ? 'No providers available'
+                          : `${slot.availableCount} provider${slot.availableCount !== 1 ? 's' : ''} available`}
                     </span>
                   </div>
                 </button>
               ))}
+
+              {!timeSlotsLoading && !timeSlotsError && timeSlots.every((slot) => (slot.availableCount ?? 0) === 0) && (
+                <p className="rounded-lg border border-calm-sage/20 bg-calm-sage/5 px-4 py-3 text-sm text-charcoal/70">
+                  No providers are available on this date for the shown time slots. Please choose another date.
+                </p>
+              )}
             </div>
           </div>
 

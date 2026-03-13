@@ -32,6 +32,26 @@ const getPatientProfile = async (userId: string) => {
   return created;
 };
 
+const getConnectedProvider = async (userId: string) => {
+  const assignment = await prisma.careTeamAssignment.findFirst({
+    where: {
+      patientId: userId,
+      status: 'ACTIVE',
+      revokedAt: null,
+      provider: {
+        isDeleted: false,
+        status: 'ACTIVE',
+      },
+    },
+    orderBy: { assignedAt: 'desc' },
+    select: {
+      providerId: true,
+    },
+  });
+
+  return assignment?.providerId || null;
+};
+
 const createDefaultPlan = async (patientProfileId: string, therapistId?: string) => {
   const now = new Date();
   const endDate = new Date();
@@ -88,7 +108,7 @@ const createDefaultPlan = async (patientProfileId: string, therapistId?: string)
   return plan;
 };
 
-const getOrCreateActivePlan = async (patientProfileId: string) => {
+const getOrCreateActivePlan = async (patientProfileId: string, providerId: string) => {
   let plan = await prisma.therapyPlan.findFirst({
     where: {
       patientId: patientProfileId,
@@ -103,7 +123,17 @@ const getOrCreateActivePlan = async (patientProfileId: string) => {
   });
 
   if (!plan) {
-    plan = await createDefaultPlan(patientProfileId);
+    plan = await createDefaultPlan(patientProfileId, providerId);
+  } else if (!plan.therapistId) {
+    plan = await prisma.therapyPlan.update({
+      where: { id: plan.id },
+      data: { therapistId: providerId },
+      include: {
+        activities: {
+          orderBy: { orderIndex: 'asc' },
+        },
+      },
+    });
   }
 
   return plan;
@@ -113,8 +143,19 @@ export const syncTreatmentPlanFromAssessment = async (
   userId: string,
   input: { assessmentType: string; score: number; severity: string },
 ) => {
+  const connectedProviderId = await getConnectedProvider(userId);
+  if (!connectedProviderId) {
+    return {
+      assessmentType: input.assessmentType,
+      score: input.score,
+      severity: input.severity,
+      synced: false,
+      reason: 'NO_CONNECTED_PROVIDER',
+    };
+  }
+
   const patientProfile = await getPatientProfile(userId);
-  const plan = await getOrCreateActivePlan(patientProfile.id);
+  const plan = await getOrCreateActivePlan(patientProfile.id, connectedProviderId);
 
   // In the real system, you might generate an activity or note here based on severity.
   // For now, we simulate syncing by logging the intent, since there is no `recommendation_snapshot` anymore.
@@ -138,8 +179,13 @@ export const syncTreatmentPlanFromAssessment = async (
 };
 
 export const getMyTreatmentPlan = async (userId: string) => {
+  const connectedProviderId = await getConnectedProvider(userId);
+  if (!connectedProviderId) {
+    throw new AppError('Therapy plan will be available once you are connected with a provider.', 404);
+  }
+
   const patientProfile = await getPatientProfile(userId);
-  const plan = await getOrCreateActivePlan(patientProfile.id);
+  const plan = await getOrCreateActivePlan(patientProfile.id, connectedProviderId);
 
   const completed = plan.activities.filter(a => a.status === 'COMPLETED').length;
   const adherencePercent = plan.activities.length ? Number(((completed / plan.activities.length) * 100).toFixed(1)) : 0;

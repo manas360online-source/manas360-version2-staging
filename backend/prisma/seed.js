@@ -13,6 +13,64 @@ const plusDays = (days) => {
   return date;
 };
 
+const providerTypeByRole = {
+  THERAPIST: 'THERAPIST',
+  PSYCHOLOGIST: 'PSYCHOLOGIST',
+  PSYCHIATRIST: 'PSYCHIATRIST',
+  COACH: 'COACH',
+};
+
+const providerProfileDefaults = {
+  THERAPIST: {
+    bio: 'Seeded therapist profile for QA and provider browse flows.',
+    specializations: ['CBT', 'Stress Recovery'],
+    languages: ['English', 'Hindi'],
+    yearsOfExperience: 6,
+    consultationFee: 69900,
+    averageRating: 4.7,
+    availability: [
+      { dayOfWeek: 1, startMinute: 600, endMinute: 1080, isAvailable: true },
+      { dayOfWeek: 3, startMinute: 600, endMinute: 1080, isAvailable: true },
+    ],
+  },
+  PSYCHOLOGIST: {
+    bio: 'Seeded psychologist profile for assessments and care-team testing.',
+    specializations: ['Clinical Psychology', 'Behavioral Assessment'],
+    languages: ['English', 'Tamil'],
+    yearsOfExperience: 8,
+    consultationFee: 99900,
+    averageRating: 4.8,
+    availability: [
+      { dayOfWeek: 2, startMinute: 660, endMinute: 1140, isAvailable: true },
+      { dayOfWeek: 4, startMinute: 660, endMinute: 1140, isAvailable: true },
+    ],
+  },
+  PSYCHIATRIST: {
+    bio: 'Seeded psychiatrist profile for medication-pathway and urgent support testing.',
+    specializations: ['Clinical Psychiatry', 'Medication Management'],
+    languages: ['English', 'Hindi'],
+    yearsOfExperience: 10,
+    consultationFee: 149900,
+    averageRating: 4.9,
+    availability: [
+      { dayOfWeek: 1, startMinute: 720, endMinute: 1020, isAvailable: true },
+      { dayOfWeek: 5, startMinute: 720, endMinute: 1020, isAvailable: true },
+    ],
+  },
+  COACH: {
+    bio: 'Seeded coach profile for wellness planning and habit-building flows.',
+    specializations: ['Wellness Coaching', 'Habit Building'],
+    languages: ['English'],
+    yearsOfExperience: 5,
+    consultationFee: 49900,
+    averageRating: 4.6,
+    availability: [
+      { dayOfWeek: 0, startMinute: 600, endMinute: 960, isAvailable: true },
+      { dayOfWeek: 6, startMinute: 600, endMinute: 960, isAvailable: true },
+    ],
+  },
+};
+
 const createUsersByRole = ({ role, count, predefined = [] }) => {
   const generated = [...predefined];
   const needed = Math.max(0, count - predefined.length);
@@ -32,6 +90,7 @@ const createUsersByRole = ({ role, count, predefined = [] }) => {
 
 async function upsertUser(userInput, passwordHash) {
   const { email, firstName, lastName, role } = userInput;
+  const providerType = providerTypeByRole[role] || null;
   return prisma.user.upsert({
     where: { email },
     update: {
@@ -39,10 +98,13 @@ async function upsertUser(userInput, passwordHash) {
       lastName,
       name: `${firstName} ${lastName}`,
       role,
+      providerType,
       provider: 'LOCAL',
       emailVerified: true,
       phoneVerified: false,
       isDeleted: false,
+      status: 'ACTIVE',
+      isTherapistVerified: Boolean(providerType),
       passwordHash,
       failedLoginAttempts: 0,
       lockUntil: null,
@@ -53,9 +115,12 @@ async function upsertUser(userInput, passwordHash) {
       lastName,
       name: `${firstName} ${lastName}`,
       role,
+      providerType,
       provider: 'LOCAL',
       emailVerified: true,
       phoneVerified: false,
+      status: 'ACTIVE',
+      isTherapistVerified: Boolean(providerType),
       passwordHash,
     },
   });
@@ -116,31 +181,37 @@ async function seed() {
   const usersByEmail = new Map(persistedUsers.map((user) => [String(user.email).toLowerCase(), user]));
   const patientUsers = patientsSeed.map((row) => usersByEmail.get(row.email.toLowerCase())).filter(Boolean);
   const therapistUsers = therapistsSeed.map((row) => usersByEmail.get(row.email.toLowerCase())).filter(Boolean);
+  const coachUsers = coachesSeed.map((row) => usersByEmail.get(row.email.toLowerCase())).filter(Boolean);
+  const psychiatristUsers = psychiatristsSeed.map((row) => usersByEmail.get(row.email.toLowerCase())).filter(Boolean);
   const psychologistUsers = psychologistsSeed.map((row) => usersByEmail.get(row.email.toLowerCase())).filter(Boolean);
+  const providerUsers = [...therapistUsers, ...coachUsers, ...psychiatristUsers, ...psychologistUsers].filter(Boolean);
 
-  // Ensure TherapistProfile rows exist for seeded therapists
-  for (const t of therapistUsers) {
-    const displayName = `${t.firstName} ${t.lastName}`.trim();
+  // Ensure TherapistProfile rows exist for all seeded provider roles
+  for (const provider of providerUsers) {
+    const displayName = `${provider.firstName} ${provider.lastName}`.trim();
+    const defaults = providerProfileDefaults[provider.role] || providerProfileDefaults.THERAPIST;
     await prisma.therapistProfile.upsert({
-      where: { userId: t.id },
+      where: { userId: provider.id },
       update: {
         displayName,
-        bio: null,
-        specializations: [],
-        languages: [],
-        yearsOfExperience: 0,
-        consultationFee: 0,
-        availability: [],
+        bio: defaults.bio,
+        specializations: defaults.specializations,
+        languages: defaults.languages,
+        yearsOfExperience: defaults.yearsOfExperience,
+        consultationFee: defaults.consultationFee,
+        averageRating: defaults.averageRating,
+        availability: defaults.availability,
       },
       create: {
-        userId: t.id,
+        userId: provider.id,
         displayName,
-        bio: null,
-        specializations: [],
-        languages: [],
-        yearsOfExperience: 0,
-        consultationFee: 0,
-        availability: [],
+        bio: defaults.bio,
+        specializations: defaults.specializations,
+        languages: defaults.languages,
+        yearsOfExperience: defaults.yearsOfExperience,
+        consultationFee: defaults.consultationFee,
+        averageRating: defaults.averageRating,
+        availability: defaults.availability,
       },
     }).catch(() => null);
   }
@@ -199,6 +270,44 @@ async function seed() {
         },
       },
     }).catch(() => null);
+  }
+
+  const featuredProviders = [
+    therapistUsers[0],
+    psychologistUsers[0],
+    psychiatristUsers[0],
+    coachUsers[0],
+  ].filter(Boolean);
+
+  for (const patient of patientUsers) {
+    for (const provider of featuredProviders) {
+      await prisma.careTeamAssignment.upsert({
+        where: {
+          patientId_providerId: {
+            patientId: patient.id,
+            providerId: provider.id,
+          },
+        },
+        update: {
+          status: 'ACTIVE',
+          revokedAt: null,
+          accessScope: {
+            role: String(provider.role).toLowerCase(),
+            permissions: ['read_patient', 'write_assessment', 'message_patient', 'book_session'],
+          },
+        },
+        create: {
+          patientId: patient.id,
+          providerId: provider.id,
+          assignedById: null,
+          status: 'ACTIVE',
+          accessScope: {
+            role: String(provider.role).toLowerCase(),
+            permissions: ['read_patient', 'write_assessment', 'message_patient', 'book_session'],
+          },
+        },
+      }).catch(() => null);
+    }
   }
 
   const planByEmail = {

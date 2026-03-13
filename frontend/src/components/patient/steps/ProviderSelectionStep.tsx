@@ -62,7 +62,9 @@ export default function ProviderSelectionStep({
           availabilityPrefs,
           providerType,
         );
-        setProviders(result.providers || []);
+        const nextProviders = Array.isArray(result?.providers) ? result.providers : [];
+        setProviders(nextProviders);
+        setSelectedIds((prev) => prev.filter((id) => nextProviders.some((provider) => provider.id === id)));
       } catch (err: any) {
         setError(err?.message || 'Failed to load available providers');
       } finally {
@@ -102,6 +104,9 @@ export default function ProviderSelectionStep({
   };
 
   const isValid = selectedIds.length > 0;
+  const providerTypeLabel = providerType && providerType !== 'ALL'
+    ? getProviderTypeLabel(providerType)
+    : 'Providers';
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -113,7 +118,11 @@ export default function ProviderSelectionStep({
           </div>
           <h3 className="text-lg font-semibold text-charcoal">Choose providers</h3>
         </div>
-        <p className="text-sm text-charcoal/60 ml-10">Select 1-3 providers you'd like to work with</p>
+        <p className="text-sm text-charcoal/60 ml-10">
+          {loading
+            ? `Checking available ${providerTypeLabel.toLowerCase()} for your selected time...`
+            : `${providers.length} ${providerTypeLabel.toLowerCase()} available. Select 1-3 providers you'd like to work with`}
+        </p>
       </div>
 
       {/* Error Message */}
@@ -184,7 +193,9 @@ export default function ProviderSelectionStep({
       {!loading && providers.length === 0 && !error && (
         <div className="flex flex-col items-center justify-center py-12 gap-4">
           <Users className="h-12 w-12 text-charcoal/20" />
-          <p className="text-sm text-charcoal/60">No providers available for your preferred times</p>
+          <p className="text-sm text-charcoal/60">
+            No {providerTypeLabel.toLowerCase()} available for your preferred times
+          </p>
           <div className="flex flex-col gap-2 w-full max-w-xs">
             <button
               onClick={onBack}

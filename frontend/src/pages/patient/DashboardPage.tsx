@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Area, AreaChart, ResponsiveContainer, Tooltip } from 'recharts';
+import { motion } from 'framer-motion';
 import { 
   CalendarDays, 
   MessageSquare, 
@@ -10,10 +11,14 @@ import {
   Search,
   CheckCircle2,
   Bell,
-  Activity
+  Activity,
+  SunMedium,
+  CloudSun,
+  MoonStar
 } from 'lucide-react';
 import { isOnboardingRequiredError, patientApi } from '../../api/patient';
 import { DashboardSkeletons } from '../../components/ui/Skeleton';
+import DailyCheckInModal from '../../components/patient/DailyCheckInModal';
 
 const moodEmojiMap: Record<number, string> = {
   1: '😢',
@@ -51,8 +56,8 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const [dashboard, setDashboard] = useState<any>(null);
   const [moodValue, setMoodValue] = useState<number | null>(null);
-  const [savingMood, setSavingMood] = useState(false);
-  const [moodJustSaved, setMoodJustSaved] = useState(false);
+  const [checkInOpen, setCheckInOpen] = useState(false);
+  const [checkInInitialMood, setCheckInInitialMood] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -95,6 +100,7 @@ export default function DashboardPage() {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
   const welcomeMessage = `${greeting}, ${userName}. Take a deep breath, you're doing great.`;
+  const TimeIcon = hour < 12 ? SunMedium : hour < 18 ? CloudSun : MoonStar;
 
   const normalizedMoodTrend = useMemo(() => {
     if (!moodTrend.length) return Array.from({length: 7}, (_, i) => ({ day: String(i), score: 3 }));
@@ -108,19 +114,28 @@ export default function DashboardPage() {
     const total = normalizedMoodTrend.reduce((sum: number, point: any) => sum + Number(point.score || 0), 0);
     return Number((total / normalizedMoodTrend.length).toFixed(1)) || 0;
   }, [normalizedMoodTrend]);
+  const quickPrompts = avgMood <= 3
+    ? ['I feel anxious today', 'Help me ground quickly']
+    : ['Reflect on today', 'Help me protect this momentum'];
 
-  const onSaveMood = async (val: number) => {
-    if (savingMood) return;
-    setSavingMood(true);
-    setMoodValue(val);
-    try {
-      await patientApi.addMoodLog({ mood: val });
-      setMoodJustSaved(true);
-      await fetchDashboardData();
-    } finally {
-      setSavingMood(false);
-    }
+  const openCheckIn = (val: number) => {
+    setCheckInInitialMood(val);
+    setCheckInOpen(true);
   };
+
+  const handleCheckInComplete = useCallback(() => {
+    setCheckInOpen(false);
+    void fetchDashboardData();
+  }, []);
+
+  // Listen for check-in-complete event (fired by DailyCheckInModal after save)
+  useEffect(() => {
+    const handler = () => {
+      void fetchDashboardData();
+    };
+    window.addEventListener('check-in-complete', handler);
+    return () => window.removeEventListener('check-in-complete', handler);
+  }, []);
 
   if (loading) return <DashboardSkeletons />;
   if (error) return <div className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800">{error}</div>;
@@ -129,45 +144,57 @@ export default function DashboardPage() {
   const moodChecked = Boolean(moodValue);
 
   return (
-    <div className="mx-auto w-full max-w-[1400px] pb-20 lg:pb-6 space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+    <>
+    {checkInOpen && (
+      <DailyCheckInModal
+        initialMood={checkInInitialMood}
+        onClose={() => setCheckInOpen(false)}
+        onComplete={handleCheckInComplete}
+      />
+    )}
+    <div className="mx-auto w-full max-w-[1400px] space-y-6 pb-20 lg:pb-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
       
       {/* 1. HERO SECTION */}
-      <section className="relative overflow-hidden rounded-3xl border border-sage-200/50 bg-[#F5F7F5] p-6 sm:p-8 shadow-soft-sm">
+      <section className="relative overflow-hidden rounded-[2rem] bg-gradient-wellness-hero p-6 shadow-wellness-md sm:p-8">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(133,167,154,0.16),transparent_42%),radial-gradient(circle_at_bottom_right,_rgba(30,144,255,0.12),transparent_36%)]" />
+        <div className="absolute -right-12 -top-10 h-40 w-40 rounded-full bg-white/55 blur-2xl" />
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="max-w-xl">
-            <h1 className="text-3xl sm:text-4xl font-semibold text-ink-800 tracking-tight">{welcomeMessage}</h1>
-            <p className="mt-3 text-ink-500 text-lg">How are you feeling right now?</p>
+            <div className="inline-flex items-center gap-2 rounded-full bg-white/85 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-charcoal/55 shadow-wellness-sm">
+              <TimeIcon className="h-4 w-4 text-wellness-sky" />
+              Daily Pulse
+            </div>
+            <h1 className="mt-4 max-w-2xl font-serif text-4xl font-semibold tracking-tight text-wellness-deep sm:text-5xl">{welcomeMessage}</h1>
+            <p className="mt-3 text-base text-charcoal/68 sm:text-lg">How are you feeling right now?</p>
             
             <div className="mt-4 flex flex-wrap items-center gap-3">
               {[1, 2, 3, 4, 5].map((value) => (
-                <button
+                <motion.button
                   key={value}
                   type="button"
-                  onClick={() => onSaveMood(value)}
-                  disabled={savingMood}
-                  className={`inline-flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-2xl text-2xl transition-all duration-300 hover:-translate-y-1 hover:shadow-md ${
+                  onClick={() => openCheckIn(value)}
+                  whileHover={{ y: -4, scale: 1.04 }}
+                  whileTap={{ scale: 0.96 }}
+                  className={`inline-flex h-14 w-14 items-center justify-center rounded-[1.35rem] text-[1.8rem] transition-all duration-300 sm:h-16 sm:w-16 sm:text-[2rem] ${
                     moodValue === value 
-                      ? 'bg-calm-sage/20 ring-2 ring-calm-sage/50 scale-105 shadow-soft-sm' 
-                      : 'bg-white hover:bg-calm-sage/5 border border-ink-100'
+                      ? 'bg-wellness-aqua ring-2 ring-wellness-sky/30 shadow-wellness-sm' 
+                      : 'bg-white/88 shadow-wellness-sm hover:bg-white'
                   }`}
                 >
-                  <span className={savingMood && moodValue === value ? 'animate-pulse' : ''}>{moodEmojiMap[value]}</span>
-                </button>
+                  <span>{moodEmojiMap[value]}</span>
+                </motion.button>
               ))}
               
-              {moodJustSaved && (
-                <Link
-                  to="/patient/mood"
-                  className="ml-2 inline-flex items-center gap-2 rounded-xl bg-charcoal px-4 py-2.5 text-sm font-medium text-white transition-all hover:bg-black animate-in zoom-in duration-300"
-                >
-                  Add a journal note <ArrowRight className="h-4 w-4" />
-                </Link>
-              )}
             </div>
+            <p className="mt-4 text-sm text-charcoal/55">Tap once to open the full Daily Check-in flow.</p>
           </div>
           
-          <div className="hidden md:block opacity-40">
-             <Sparkles className="h-32 w-32 text-sage-400 stroke-[1]" />
+          <div className="hidden md:block">
+            <div className="relative flex h-44 w-44 items-center justify-center rounded-full bg-white/72 shadow-wellness-md">
+              <div className="absolute inset-4 rounded-full bg-[linear-gradient(135deg,rgba(224,244,242,0.95),rgba(237,246,255,0.95))]" />
+              <TimeIcon className="relative h-20 w-20 text-wellness-sky stroke-[1.5]" />
+              <Sparkles className="absolute right-9 top-10 h-6 w-6 text-[#7fb6e8]" />
+            </div>
           </div>
         </div>
       </section>
@@ -176,7 +203,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* 2. UP NEXT CARD (Therapy & Appointments) */}
-        <section className="flex flex-col rounded-3xl border border-ink-100 bg-white p-6 shadow-soft-sm hover:shadow-soft-md transition-shadow">
+        <section className="wellness-panel flex flex-col p-6 transition-shadow hover:shadow-wellness-md">
           <div className="flex items-center gap-2 mb-4">
             <CalendarDays className="h-5 w-5 text-calm-sage" />
             <h2 className="text-lg font-semibold text-charcoal">Up Next</h2>
@@ -184,16 +211,16 @@ export default function DashboardPage() {
           
           <div className="flex-1 flex flex-col justify-center">
             {upcomingSession ? (
-              <div className="rounded-2xl bg-[#E8EFE6]/50 p-5 border border-calm-sage/10">
+              <div className="rounded-[1.75rem] bg-white/84 p-5 shadow-wellness-sm">
                 <p className="text-sm font-medium text-calm-sage uppercase tracking-wide">Upcoming Session</p>
                 <h3 className="mt-1 text-xl font-semibold text-charcoal">{upcomingSession.provider?.name || 'Dr. Sharma'}</h3>
                 <p className="mt-1 text-ink-600">{formatDateTime(upcomingSession.scheduledAt)}</p>
                 
                 <div className="mt-5 flex gap-3">
-                  <button disabled className="inline-flex flex-1 items-center justify-center rounded-xl bg-charcoal/40 px-4 py-2.5 text-sm font-semibold text-white cursor-not-allowed">
+                  <button disabled className="inline-flex flex-1 items-center justify-center rounded-full bg-charcoal/40 px-4 py-2.5 text-sm font-semibold text-white cursor-not-allowed">
                     Join Video
                   </button>
-                  <Link to="/patient/sessions" className="inline-flex items-center justify-center rounded-xl border border-ink-200 px-4 py-2.5 text-sm font-semibold text-charcoal hover:bg-ink-50">
+                  <Link to="/patient/sessions" className="wellness-secondary-btn min-h-[42px] px-4 py-2.5">
                     Manage
                   </Link>
                 </div>
@@ -205,7 +232,7 @@ export default function DashboardPage() {
                 </div>
                 <h3 className="text-lg font-semibold text-charcoal">Ready for your next step?</h3>
                 <p className="mt-2 text-sm text-ink-500 max-w-xs mx-auto">Book a session with a therapist or coach when you feel ready to talk.</p>
-                <Link to="/patient/sessions" className="mt-5 inline-flex items-center gap-2 rounded-xl bg-charcoal px-5 py-2.5 text-sm font-medium text-white transition hover:bg-black">
+                <Link to="/patient/sessions" className="wellness-primary-btn mt-5 gap-2 px-5 py-2.5">
                   Find a provider <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>
@@ -214,7 +241,7 @@ export default function DashboardPage() {
         </section>
 
         {/* 3. TODAY'S ACTION PLAN (Homework & Milestones) */}
-        <section className="flex flex-col rounded-3xl border border-ink-100 bg-white p-6 shadow-soft-sm hover:shadow-soft-md transition-shadow">
+        <section className="wellness-panel flex flex-col p-6 transition-shadow hover:shadow-wellness-md">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-5 w-5 text-calm-sage" />
@@ -226,9 +253,9 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex-1 space-y-3">
-            <Link to="/patient/mood" className={`group flex items-center justify-between rounded-2xl border p-4 transition-all ${moodChecked ? 'border-calm-sage/20 bg-calm-sage/5' : 'border-ink-100 bg-white hover:border-calm-sage/30 hover:bg-ink-50'}`}>
+            <Link to="/patient/mood" className={`group flex items-center justify-between rounded-[1.4rem] p-4 transition-all ${moodChecked ? 'bg-wellness-aqua shadow-wellness-sm' : 'bg-white/90 shadow-wellness-sm hover:bg-white'}`}>
               <div className="flex items-center gap-3">
-                <div className={`flex h-6 w-6 items-center justify-center rounded-full ${moodChecked ? 'bg-calm-sage text-white' : 'border-2 border-ink-200 group-hover:border-calm-sage/50'}`}>
+                <div className={`flex h-7 w-7 items-center justify-center rounded-full ${moodChecked ? 'bg-wellness-sky text-white' : 'border-2 border-wellness-border group-hover:border-wellness-sky/40'}`}>
                   {moodChecked && <Check className="h-3.5 w-3.5" />}
                 </div>
                 <span className={`font-medium ${moodChecked ? 'text-ink-400 line-through' : 'text-charcoal'}`}>Daily Check-in</span>
@@ -238,18 +265,18 @@ export default function DashboardPage() {
 
             {pendingExercises.length > 0 ? (
                pendingExercises.slice(0, 2).map((ex: any) => (
-                <Link key={ex.id} to="/patient/therapy-plan" className="group flex items-center justify-between rounded-2xl border border-ink-100 bg-white p-4 transition-all hover:border-calm-sage/30 hover:bg-ink-50">
+                <Link key={ex.id} to="/patient/therapy-plan" className="group flex items-center justify-between rounded-[1.4rem] bg-white/90 p-4 shadow-wellness-sm transition-all hover:bg-white">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-ink-200 group-hover:border-calm-sage/50" />
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-wellness-border group-hover:border-wellness-sky/35" />
                     <span className="font-medium text-charcoal">{ex.title || 'CBT Worksheet'} ({ex.duration || 5} min)</span>
                   </div>
                   <ArrowRight className="h-4 w-4 text-ink-300 group-hover:text-charcoal transition-colors" />
                 </Link>
                ))
             ) : (
-              <Link to="/patient/therapy-plan" className="group flex items-center justify-between rounded-2xl border border-ink-100 bg-white p-4 transition-all hover:border-calm-sage/30 hover:bg-ink-50">
+              <Link to="/patient/therapy-plan" className="group flex items-center justify-between rounded-[1.4rem] bg-white/90 p-4 shadow-wellness-sm transition-all hover:bg-white">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-ink-200 group-hover:border-calm-sage/50" />
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-wellness-border group-hover:border-wellness-sky/35" />
                   <span className="font-medium text-charcoal">5-Minute Evening Wind-down (Audio)</span>
                 </div>
                 <ArrowRight className="h-4 w-4 text-ink-300 group-hover:text-charcoal transition-colors" />
@@ -264,7 +291,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-6">
         
         {/* 4. AI NUDGE (Proactive Engagement) */}
-        <section className="md:col-span-1 rounded-3xl border border-ink-100 bg-gradient-to-b from-[#FAF8F5] to-white p-6 shadow-soft-sm hover:shadow-soft-md transition-shadow flex flex-col">
+        <section className="wellness-panel md:col-span-1 flex flex-col p-6 transition-shadow hover:shadow-wellness-md">
           <div className="flex items-center gap-3 mb-4">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-warm-terracotta/20">
               <Sparkles className="h-5 w-5 text-warm-terracotta" />
@@ -273,23 +300,34 @@ export default function DashboardPage() {
           </div>
           
           <div className="flex-1 relative">
-             <div className="rounded-2xl rounded-tl-none bg-white p-4 border border-ink-100 shadow-sm text-sm text-ink-700 leading-relaxed">
+             <div className="wellness-bubble rounded-tl-[0.6rem] text-charcoal/76">
                {avgMood <= 3 ? (
                  <>Hi {userName}! I noticed your mood score was a bit lower recently. I found a quick 3-minute grounding exercise for you to help reset. Want to try it together?</>
                ) : (
                  <>Hi {userName}! Your streak is looking great. Would you like to do a quick reflection exercise to capture this positive momentum?</>
                )}
              </div>
+             <div className="mt-4 flex flex-wrap gap-2">
+               {quickPrompts.map((prompt) => (
+                 <Link
+                   key={prompt}
+                   to="/patient/messages"
+                   className="rounded-full bg-wellness-aqua px-3.5 py-2 text-xs font-semibold text-charcoal/80 transition hover:bg-wellness-sky hover:text-white"
+                 >
+                   {prompt}
+                 </Link>
+               ))}
+             </div>
           </div>
           
-          <Link to="/patient/messages" className="mt-5 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-white border border-ink-200 px-4 py-2.5 text-sm font-medium text-charcoal hover:bg-ink-50 transition-colors">
+          <Link to="/patient/messages" className="wellness-secondary-btn mt-5 w-full gap-2 px-4 py-2.5">
             Chat with Dr. Meera <MessageSquare className="h-4 w-4" />
           </Link>
         </section>
 
         {/* 5. PROGRESS SNAPSHOT (Metrics & Chart) */}
-        <section className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 rounded-3xl border border-ink-100 bg-white p-6 shadow-soft-sm hover:shadow-soft-md transition-shadow">
-          <div className="flex flex-col border-b sm:border-b-0 sm:border-r border-ink-100 pb-4 sm:pb-0 sm:pr-6">
+        <section className="wellness-panel md:col-span-2 grid grid-cols-1 p-6 transition-shadow hover:shadow-wellness-md sm:grid-cols-2">
+          <div className="flex flex-col border-b border-white/70 pb-4 sm:border-b-0 sm:border-r sm:border-r-white/70 sm:pb-0 sm:pr-6">
             <div className="flex items-center gap-2 mb-4">
               <Activity className="h-5 w-5 text-calm-sage" />
               <h2 className="text-lg font-semibold text-charcoal">Progress Snapshot</h2>
@@ -337,11 +375,11 @@ export default function DashboardPage() {
                   <Area 
                     type="monotone" 
                     dataKey="score" 
-                    stroke="#4C7362" 
+                    stroke="#1E90FF" 
                     strokeWidth={3} 
                     fillOpacity={1} 
                     fill="url(#colorScore)" 
-                    dot={{ r: 4, fill: '#ffffff', stroke: '#4C7362', strokeWidth: 2 }}
+                    dot={{ r: 4, fill: '#ffffff', stroke: '#1E90FF', strokeWidth: 2 }}
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -353,8 +391,8 @@ export default function DashboardPage() {
 
       {/* 6. QUICK ALERTS & NOTIFICATIONS */}
       {recentActivity.length > 0 && (
-        <section className="rounded-2xl border border-ink-100 bg-white p-5 shadow-soft-sm flex items-center gap-4 hover:bg-ink-50 transition-colors">
-          <div className="h-10 w-10 shrink-0 flex items-center justify-center rounded-full bg-amber-50 relative">
+        <section className="wellness-panel flex items-center gap-4 p-5 transition-colors hover:shadow-wellness-md">
+          <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-50">
              <Bell className="h-5 w-5 text-amber-600" />
              <span className="absolute top-0 right-0 h-2.5 w-2.5 bg-red-500 rounded-full border-2 border-white"></span>
           </div>
@@ -362,12 +400,13 @@ export default function DashboardPage() {
              <p className="text-sm font-semibold text-charcoal truncate">You have {Math.min(recentActivity.length, 3)} new updates</p>
              <p className="text-xs text-ink-500 truncate mt-0.5">Clinical reports are ready for review. Check your messages for details.</p>
           </div>
-          <Link to="/patient/reports" className="shrink-0 px-4 py-2 rounded-xl bg-charcoal text-xs font-semibold text-white">
+          <Link to="/patient/reports" className="wellness-primary-btn shrink-0 min-h-[38px] px-4 py-2 text-xs">
             View Updates
           </Link>
         </section>
       )}
 
     </div>
+  </>
   );
 }

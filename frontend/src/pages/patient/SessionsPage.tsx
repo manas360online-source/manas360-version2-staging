@@ -50,8 +50,6 @@ const toLocalDateKey = (value: Date = new Date()): string => {
   return `${y}-${m}-${d}`;
 };
 
-const lockKey = (assessmentType: 'PHQ-9' | 'GAD-7', dayKey: string) => `patient-assessment-lock:${assessmentType}:${dayKey}`;
-
 const asArray = (value: unknown): any[] => {
   if (Array.isArray(value)) return value;
   if (value && typeof value === 'object') {
@@ -68,9 +66,11 @@ const asArray = (value: unknown): any[] => {
 
 const ASSESSMENT_DRAFT_STORAGE_KEY = 'patient-clinical-assessment-draft-v1';
 const ASSESSMENT_DRAFT_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+const RESUMABLE_ASSESSMENT_PHASES: ClinicalFlowPhase[] = ['intro', 'question', 'loading-next', 'next-phase', 'provider-list'];
 
 type AssessmentDraft = {
   savedAt: number;
+  dayKey: string;
   clinicalFlowPhase: ClinicalFlowPhase;
   clinicalStartWith: ClinicalAssessmentKey;
   assessmentOrder: ClinicalAssessmentKey[];
@@ -98,6 +98,8 @@ export default function SessionsPage() {
   const [hasCompletedCheckin, setHasCompletedCheckin] = useState(false);
   const [assessmentHistory, setAssessmentHistory] = useState<AssessmentHistoryEntry[]>([]);
   const [assessmentHistoryLoading, setAssessmentHistoryLoading] = useState(true);
+  const [assessmentDraft, setAssessmentDraft] = useState<AssessmentDraft | null>(null);
+  const [todaysAssessmentResults, setTodaysAssessmentResults] = useState<Array<{ type: string; score: number; severity: string }>>([]);
 
   const [isClinicalAssessmentOpen, setIsClinicalAssessmentOpen] = useState(false);
   const [clinicalFlowPhase, setClinicalFlowPhase] = useState<ClinicalFlowPhase>('intro');
@@ -178,6 +180,43 @@ export default function SessionsPage() {
         .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
         .slice(0, 12);
       setAssessmentHistory(merged);
+
+      // Check if user has completed both PHQ-9 and GAD-7 today
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+      const todayStructured = structured.filter(entry => {
+        const entryDate = new Date(entry.createdAt).toISOString().split('T')[0];
+        return entryDate === today;
+      });
+
+      const hasCompletedPHQ9Today = todayStructured.some(entry =>
+        String(entry.type).toLowerCase().includes('phq-9') ||
+        String(entry.type).toLowerCase().includes('phq9')
+      );
+      const hasCompletedGAD7Today = todayStructured.some(entry =>
+        String(entry.type).toLowerCase().includes('gad-7') ||
+        String(entry.type).toLowerCase().includes('gad7')
+      );
+
+      setHasCompletedCheckin(hasCompletedPHQ9Today && hasCompletedGAD7Today);
+
+      // Set today's assessment results for display
+      if (hasCompletedPHQ9Today && hasCompletedGAD7Today) {
+        const results = todayStructured
+          .filter(entry =>
+            String(entry.type).toLowerCase().includes('phq-9') ||
+            String(entry.type).toLowerCase().includes('phq9') ||
+            String(entry.type).toLowerCase().includes('gad-7') ||
+            String(entry.type).toLowerCase().includes('gad7')
+          )
+          .map(entry => ({
+            type: String(entry.type).toLowerCase().includes('phq-9') || String(entry.type).toLowerCase().includes('phq9') ? 'PHQ-9' : 'GAD-7',
+            score: entry.score,
+            severity: entry.level
+          }));
+        setTodaysAssessmentResults(results);
+      } else {
+        setTodaysAssessmentResults([]);
+      }
     } finally {
       setAssessmentHistoryLoading(false);
     }
@@ -185,11 +224,14 @@ export default function SessionsPage() {
 
   const clearAssessmentDraft = () => {
     sessionStorage.removeItem(ASSESSMENT_DRAFT_STORAGE_KEY);
+    localStorage.removeItem(ASSESSMENT_DRAFT_STORAGE_KEY);
+    setAssessmentDraft(null);
   };
 
   const saveAssessmentDraft = () => {
     const draft: AssessmentDraft = {
       savedAt: Date.now(),
+      dayKey: toLocalDateKey(),
       clinicalFlowPhase,
       clinicalStartWith,
       assessmentOrder,
@@ -202,11 +244,15 @@ export default function SessionsPage() {
       suggestedProviders,
       activeCarePathLabel,
     };
-    sessionStorage.setItem(ASSESSMENT_DRAFT_STORAGE_KEY, JSON.stringify(draft));
+    const serialized = JSON.stringify(draft);
+    sessionStorage.setItem(ASSESSMENT_DRAFT_STORAGE_KEY, serialized);
+    localStorage.setItem(ASSESSMENT_DRAFT_STORAGE_KEY, serialized);
+    setAssessmentDraft(draft);
   };
 
   const loadAssessmentDraft = (): AssessmentDraft | null => {
-    const raw = sessionStorage.getItem(ASSESSMENT_DRAFT_STORAGE_KEY);
+    const raw = localStorage.getItem(ASSESSMENT_DRAFT_STORAGE_KEY)
+      || sessionStorage.getItem(ASSESSMENT_DRAFT_STORAGE_KEY);
     if (!raw) return null;
     try {
       const parsed = JSON.parse(raw) as AssessmentDraft;
@@ -214,6 +260,17 @@ export default function SessionsPage() {
         clearAssessmentDraft();
         return null;
       }
+      if (parsed.dayKey !== toLocalDateKey()) {
+        clearAssessmentDraft();
+        return null;
+      }
+      if (!RESUMABLE_ASSESSMENT_PHASES.includes(parsed.clinicalFlowPhase)) {
+        clearAssessmentDraft();
+        return null;
+      }
+      const serialized = JSON.stringify(parsed);
+      sessionStorage.setItem(ASSESSMENT_DRAFT_STORAGE_KEY, serialized);
+      localStorage.setItem(ASSESSMENT_DRAFT_STORAGE_KEY, serialized);
       return parsed;
     } catch {
       clearAssessmentDraft();
@@ -221,9 +278,27 @@ export default function SessionsPage() {
     }
   };
 
+  const resetClinicalAssessmentState = () => {
+    setClinicalFlowPhase('intro');
+    setClinicalStartWith('PHQ-9');
+    setAssessmentOrder(['PHQ-9', 'GAD-7']);
+    setActiveAssessmentIndex(0);
+    setStructuredAttempt(null);
+    setStructuredAnswers({});
+    setCurrentStructuredQuestionIndex(0);
+    setClinicalFlowLoading(false);
+    setClinicalFlowError(null);
+    setClinicalJourney(null);
+    setClinicalResults([]);
+    setSuggestedProviders([]);
+    setActiveCarePathLabel('');
+    setBookingContext(null);
+  };
+
   const openClinicalAssessmentFlow = () => {
     const draft = loadAssessmentDraft();
     if (draft) {
+      setAssessmentDraft(draft);
       setClinicalFlowPhase(draft.clinicalFlowPhase);
       setClinicalStartWith(draft.clinicalStartWith);
       setAssessmentOrder(draft.assessmentOrder);
@@ -239,8 +314,8 @@ export default function SessionsPage() {
         setBookingContext({ fromAssessment: true });
       }
     } else {
-      setClinicalFlowPhase('intro');
-      setClinicalFlowError(null);
+      setAssessmentDraft(null);
+      resetClinicalAssessmentState();
     }
     setIsClinicalAssessmentOpen(true);
   };
@@ -262,6 +337,12 @@ export default function SessionsPage() {
   };
 
   const beginClinicalAssessment = async () => {
+    // Check if user has already completed both assessments today
+    if (hasCompletedCheckin) {
+      setClinicalFlowError('You have already completed today\'s assessment. You can view your results below.');
+      return;
+    }
+
     clearAssessmentDraft();
     const order: ClinicalAssessmentKey[] = [
       clinicalStartWith,
@@ -316,8 +397,8 @@ export default function SessionsPage() {
         },
       ]);
 
-      localStorage.setItem(lockKey(activeType, toLocalDateKey()), '1');
-      setHasCompletedCheckin(true);
+      // Note: We no longer set localStorage locks here - completion is determined from backend data
+      // setHasCompletedCheckin will be updated by loadAssessmentHistory()
 
       const hasNext = activeAssessmentIndex < assessmentOrder.length - 1;
       if (hasNext) {
@@ -330,7 +411,7 @@ export default function SessionsPage() {
         setClinicalFlowPhase('next-phase');
         setBookingContext({ fromAssessment: true });
         void fetchData();
-        void loadAssessmentHistory();
+        void loadAssessmentHistory(); // This will update hasCompletedCheckin based on backend data
       }
     } catch (error: any) {
       setClinicalFlowError(error?.message || 'Unable to submit assessment right now. Please try again.');
@@ -421,12 +502,38 @@ export default function SessionsPage() {
   useEffect(() => {
     void fetchData();
     void loadAssessmentHistory();
-
-    const todayKey = toLocalDateKey();
-    const phqDone = localStorage.getItem(lockKey('PHQ-9', todayKey)) === '1';
-    const gadDone = localStorage.getItem(lockKey('GAD-7', todayKey)) === '1';
-    setHasCompletedCheckin(phqDone || gadDone);
+    setAssessmentDraft(loadAssessmentDraft());
   }, []);
+
+  const assessmentResumeCopy = useMemo(() => {
+    if (!assessmentDraft) return null;
+
+    // Only show resume banner if user hasn't completed today's assessment
+    if (hasCompletedCheckin) return null;
+
+    switch (assessmentDraft.clinicalFlowPhase) {
+      case 'question':
+      case 'loading-next':
+        return {
+          title: 'Resume today\'s assessment',
+          detail: 'Your PHQ-9 + GAD-7 progress is saved. Continue from where you left off.',
+          button: 'Resume Assessment',
+        };
+      case 'next-phase':
+      case 'provider-list':
+        return {
+          title: 'Continue today\'s assessment',
+          detail: 'Your assessment is in progress. Complete it to see your results and booking options.',
+          button: 'Continue Assessment',
+        };
+      default:
+        return {
+          title: 'Continue today\'s assessment',
+          detail: 'Your assessment draft is available for today.',
+          button: 'Continue Assessment',
+        };
+    }
+  }, [assessmentDraft, hasCompletedCheckin]);
 
   const handleDownloadInvoice = async (sessionId: string) => {
     try {
@@ -449,6 +556,16 @@ export default function SessionsPage() {
       id,
       name,
     };
+  };
+
+  const getProviderMessageLink = (provider: any) => {
+    const normalized = normalizeProviderForBooking(provider);
+    if (!normalized) return '/patient/provider-messages';
+    const params = new URLSearchParams({
+      providerId: String(normalized.id),
+      providerName: String(normalized.name || 'Provider'),
+    });
+    return `/patient/provider-messages?${params.toString()}`;
   };
 
   const openBookingDrawer = async (
@@ -551,12 +668,19 @@ export default function SessionsPage() {
   const handlePrimaryBookSession = () => {
     setBookingFallbackError(null);
 
-    if (!hasPreviousConsultedProvider) {
+    // Check if user has connected providers - if not, force assessment first
+    if (myProviders.length === 0) {
+      const draft = loadAssessmentDraft();
       setBookingFallbackError('Please complete your PHQ-9 and GAD-7 assessment first. After that, booking will open.');
+      if (draft) {
+        openClinicalAssessmentFlow();
+        return;
+      }
       openClinicalAssessmentFlow();
       return;
     }
 
+    // User has connected providers, show them for booking
     setIsPreviousProvidersOpen(true);
   };
 
@@ -813,6 +937,12 @@ export default function SessionsPage() {
                                   {fee}<span className="text-xs font-normal text-charcoal/60">/session</span>
                                 </span>
                               ) : null}
+                              <Link
+                                to={getProviderMessageLink(provider)}
+                                className="inline-flex items-center gap-1.5 rounded-xl border border-calm-sage/20 bg-white px-3 py-2 text-xs font-semibold text-charcoal/80 transition hover:bg-calm-sage/5 hover:text-charcoal"
+                              >
+                                Message
+                              </Link>
                               <button
                                 type="button"
                                 onClick={() => void openBookingDrawer({ ...provider, name }, bookingContext)}
@@ -873,6 +1003,25 @@ export default function SessionsPage() {
         </div>
       )}
 
+      {assessmentResumeCopy && !isClinicalAssessmentOpen && (
+        <section className="rounded-2xl border border-teal-200 bg-teal-50/80 p-4 shadow-soft-sm">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm font-bold text-teal-900">{assessmentResumeCopy.title}</p>
+              <p className="mt-1 text-xs text-teal-800/80">{assessmentResumeCopy.detail}</p>
+            </div>
+            <button
+              type="button"
+              onClick={openClinicalAssessmentFlow}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-teal-600 px-4 py-2 text-xs font-semibold text-white hover:bg-teal-700"
+            >
+              <ClipboardList className="h-3.5 w-3.5" />
+              {assessmentResumeCopy.button}
+            </button>
+          </div>
+        </section>
+      )}
+
       {loading ? (
         <div className="flex h-[300px] items-center justify-center rounded-2xl border border-calm-sage/15 bg-white/50">
           <p className="animate-pulse text-sm text-charcoal/50">Loading your care hub...</p>
@@ -898,7 +1047,7 @@ export default function SessionsPage() {
                   onClick={openClinicalAssessmentFlow}
                   className="shrink-0 rounded-xl bg-amber-600 px-6 py-3.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-amber-700"
                 >
-                  Start PHQ-9 Assessment
+                  {assessmentResumeCopy ? assessmentResumeCopy.button : 'Start PHQ-9 Assessment'}
                 </button>
               </div>
             </section>
@@ -952,7 +1101,7 @@ export default function SessionsPage() {
                           Book Session
                         </button>
                         <Link
-                          to="/patient/provider-messages"
+                          to={getProviderMessageLink(provider)}
                           className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-calm-sage/20 bg-white px-3 py-2 text-xs font-semibold text-charcoal/80 transition hover:bg-calm-sage/5 hover:text-charcoal"
                         >
                           Message
@@ -962,7 +1111,7 @@ export default function SessionsPage() {
                           className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-teal-200 bg-teal-50 px-3 py-2 text-xs font-semibold text-teal-700 transition hover:bg-teal-100"
                         >
                           <ClipboardList className="h-3.5 w-3.5" />
-                          Update Clinical Scores
+                          {assessmentResumeCopy ? assessmentResumeCopy.button : 'Update Clinical Scores'}
                         </button>
                       </div>
                     </div>
@@ -995,9 +1144,48 @@ export default function SessionsPage() {
                   onClick={openClinicalAssessmentFlow}
                   className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-teal-200 bg-teal-100 px-4 py-2 text-xs font-semibold text-teal-800 transition hover:bg-teal-200"
                 >
-                  Take Assessment
+                  {assessmentResumeCopy ? assessmentResumeCopy.button : 'Take Assessment'}
                 </button>
               </div>
+
+              {todaysAssessmentResults.length > 0 && (
+                <div className="rounded-2xl border border-teal-200/60 bg-teal-50/80 p-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-100">
+                      <TrendingUp className="h-5 w-5 text-teal-600" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-teal-900">Today's Assessment Results</h4>
+                      <p className="text-xs text-teal-700/80">Completed {new Date().toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    {todaysAssessmentResults.map((result, index) => (
+                      <div key={`${result.type}-${index}`} className="flex items-center justify-between rounded-lg bg-white/80 p-3">
+                        <div>
+                          <p className="text-sm font-semibold text-charcoal">{result.type}</p>
+                          <p className="text-xs text-charcoal/60">Score: {result.score}</p>
+                        </div>
+                        <span className={`rounded-full px-2 py-1 text-xs font-semibold capitalize ${
+                          result.severity.includes('severe') ? 'bg-red-100 text-red-700' :
+                          result.severity.includes('moderate') ? 'bg-amber-100 text-amber-700' :
+                          'bg-green-100 text-green-700'
+                        }`}>
+                          {result.severity}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={openClinicalAssessmentFlow}
+                    className="mt-4 w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-teal-600 px-4 py-2 text-xs font-semibold text-white hover:bg-teal-700"
+                  >
+                    <ClipboardList className="h-3.5 w-3.5" />
+                    View Full Results
+                  </button>
+                </div>
+              )}
             </div>
           </section>
 
@@ -1010,7 +1198,7 @@ export default function SessionsPage() {
                 className="inline-flex items-center gap-1.5 rounded-xl bg-teal-600 px-4 py-2 text-xs font-semibold text-white hover:bg-teal-700"
               >
                 <ClipboardList className="h-3.5 w-3.5" />
-                + Take New Assessment
+                {assessmentResumeCopy ? assessmentResumeCopy.button : '+ Take New Assessment'}
               </button>
             </div>
 

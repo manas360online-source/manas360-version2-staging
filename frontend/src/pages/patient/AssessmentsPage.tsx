@@ -619,13 +619,17 @@ export default function AssessmentsPage() {
   return (
     <div className="mx-auto w-full max-w-[1400px] space-y-6 px-4 md:px-6 pb-20 lg:pb-6">
       {/* Header */}
-      <section className="space-y-2">
-        <h1 className="text-3xl md:text-4xl font-semibold text-charcoal">Mental Health Assessments</h1>
-        <p className="text-sm text-wellness-muted">Complete quick check-ins or detailed assessments</p>
+      <section className="relative overflow-hidden rounded-[2rem] bg-gradient-wellness-hero p-6 shadow-wellness-md md:p-8">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(133,167,154,0.14),transparent_40%),radial-gradient(circle_at_bottom_right,_rgba(30,144,255,0.08),transparent_34%)]" />
+        <div className="relative z-10 max-w-3xl">
+          <p className="inline-flex rounded-full bg-white/86 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-charcoal/50 shadow-wellness-sm">Clinical check-ins</p>
+          <h1 className="mt-4 font-serif text-3xl font-semibold text-charcoal md:text-5xl">Mental Health Assessments</h1>
+          <p className="mt-3 text-sm text-wellness-muted md:text-base">Complete quick daily reflections or structured PHQ-9 and GAD-7 screening in a calmer one-question-at-a-time flow.</p>
+        </div>
       </section>
 
       {!subscriptionLoading && !hasPremiumAssessmentAccess && (
-        <section className="rounded-2xl border border-indigo-200 bg-indigo-50/60 p-4 shadow-soft-sm">
+        <section className="rounded-[1.75rem] border border-indigo-200 bg-indigo-50/70 p-4 shadow-wellness-sm">
           <p className="text-sm font-semibold text-indigo-900">Advanced assessments are part of Platform Access.</p>
           <p className="mt-1 text-xs text-indigo-800">Upgrade to unlock PHQ-9 and GAD-7. Daily checks remain available.</p>
           <Link
@@ -637,17 +641,17 @@ export default function AssessmentsPage() {
         </section>
       )}
 
-      <section className="grid grid-cols-1 gap-3 md:grid-cols-2">
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <button
           type="button"
           onClick={() => setMode('daily')}
-          className={`rounded-2xl border p-4 text-left transition ${
+          className={`rounded-[1.75rem] p-5 text-left transition ${
             mode === 'daily'
-              ? 'border-calm-sage bg-gradient-to-br from-[#edf4ec] to-[#e4eee3] shadow-soft-sm'
-              : 'border-calm-sage/15 bg-white/90 hover:bg-calm-sage/5'
+              ? 'bg-wellness-aqua shadow-wellness-sm'
+              : 'bg-white/92 shadow-wellness-sm hover:bg-white'
           }`}
         >
-          <p className="flex items-center gap-2 text-lg font-semibold">
+          <p className="flex items-center gap-2 text-lg font-semibold text-charcoal">
             <Calendar className="h-5 w-5" />
             Daily Assessment
           </p>
@@ -661,13 +665,13 @@ export default function AssessmentsPage() {
               setMode('clinical');
             }
           }}
-          className={`rounded-2xl border p-4 text-left transition ${
+          className={`rounded-[1.75rem] p-5 text-left transition ${
             mode === 'clinical'
-              ? 'border-calm-sage bg-gradient-to-br from-[#edf4ec] to-[#e4eee3] shadow-soft-sm'
-              : 'border-calm-sage/15 bg-white/90 hover:bg-calm-sage/5'
+              ? 'bg-wellness-aqua shadow-wellness-sm'
+              : 'bg-white/92 shadow-wellness-sm hover:bg-white'
           }`}
         >
-          <p className="text-lg font-semibold">Clinical Assessments</p>
+          <p className="text-lg font-semibold text-charcoal">Clinical Assessments</p>
           <p className="mt-2 text-base text-charcoal/70">
             PHQ-9 and GAD-7 scoring workflows.
             {!hasPremiumAssessmentAccess ? ' (Platform Access required)' : ''}
@@ -675,10 +679,10 @@ export default function AssessmentsPage() {
         </button>
       </section>
 
-      <section className="rounded-3xl border border-calm-sage/15 bg-white/90 p-4 md:p-5 shadow-soft-sm">
+      <section className="wellness-panel p-4 md:p-6">
         {mode === 'daily' ? (
           <>
-            <h2 className="text-2xl font-semibold">Daily Assessment</h2>
+            <h2 className="font-serif text-2xl font-semibold text-charcoal">Daily Assessment</h2>
             <p className="mt-2 text-base text-charcoal/70">Track your daily wellbeing across key dimensions (0=Low, 10=High).</p>
 
             <div className="mt-4">
@@ -689,8 +693,9 @@ export default function AssessmentsPage() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-calm-sage/15 bg-gradient-to-b from-white to-calm-sage/5 p-4">
-                <p className="text-lg font-medium text-charcoal">{dailyCheckQuestions[currentDailyIndex].label}</p>
+              <div className="rounded-[1.75rem] bg-white/92 p-5 shadow-wellness-sm">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-charcoal/45">One question at a time</p>
+                <p className="mt-2 text-xl font-medium text-charcoal">{dailyCheckQuestions[currentDailyIndex].label}</p>
                 <input
                   type="range"
                   min={0}
@@ -713,12 +718,12 @@ export default function AssessmentsPage() {
                 </div>
               </div>
 
-              <div className="mt-4 flex items-center justify-between">
+                <div className="mt-4 flex items-center justify-between">
                 <button
                   type="button"
                   onClick={() => setCurrentDailyIndex((prev) => Math.max(prev - 1, 0))}
                   disabled={currentDailyIndex === 0}
-                  className={`rounded-full px-4 py-2 text-base font-medium transition ${currentDailyIndex === 0 ? 'bg-wellness-surface text-wellness-muted cursor-not-allowed' : 'bg-white border border-calm-sage/25 text-charcoal hover:bg-calm-sage/5'}`}
+                  className={`rounded-full px-4 py-2 text-base font-medium transition ${currentDailyIndex === 0 ? 'bg-wellness-surface text-wellness-muted cursor-not-allowed' : 'bg-white text-charcoal shadow-wellness-sm hover:bg-wellness-aqua'}`}
                 >
                   Previous
                 </button>
@@ -728,7 +733,7 @@ export default function AssessmentsPage() {
                     type="button"
                     onClick={() => setCurrentDailyIndex((prev) => Math.min(prev + 1, dailyCheckQuestions.length - 1))}
                     disabled={currentDailyIndex >= dailyCheckQuestions.length - 1}
-                    className={`rounded-full px-4 py-2 text-base font-medium transition ${currentDailyIndex >= dailyCheckQuestions.length - 1 ? 'bg-wellness-surface text-wellness-muted cursor-not-allowed' : 'text-white'}`}
+                    className={`rounded-full px-4 py-2 text-base font-medium transition ${currentDailyIndex >= dailyCheckQuestions.length - 1 ? 'bg-wellness-surface text-wellness-muted cursor-not-allowed' : 'bg-[#1E90FF] text-white shadow-wellness-sm'}`}
                     style={currentDailyIndex >= dailyCheckQuestions.length - 1 ? undefined : { backgroundColor: theme.colors.brandTopbar }}
                   >
                     Next
@@ -738,7 +743,7 @@ export default function AssessmentsPage() {
                     type="button"
                     onClick={onSubmitDailyCheck}
                     disabled={loading || submissionLocks.daily}
-                    className="inline-flex min-h-[40px] items-center rounded-full bg-charcoal px-4 text-base font-medium text-cream disabled:opacity-60"
+                    className="wellness-primary-btn min-h-[40px] px-4 text-base disabled:opacity-60"
                   >
                     {loading ? 'Saving...' : submissionLocks.daily ? 'Completed Today' : 'Submit Daily Check'}
                   </button>
@@ -748,10 +753,10 @@ export default function AssessmentsPage() {
           </>
         ) : hasPremiumAssessmentAccess ? (
           <>
-            <h2 className="text-2xl font-semibold">Clinical Assessments</h2>
+            <h2 className="font-serif text-2xl font-semibold text-charcoal">Clinical Assessments</h2>
             <p className="mt-2 text-base text-charcoal/70">Choose a clinical tool. PHQ-9 and GAD-7 now use the full structured questionnaires.</p>
 
-            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-2">
               {clinicalCards.map((item) => (
                 <button
                   key={item.key}
@@ -760,30 +765,31 @@ export default function AssessmentsPage() {
                     setSelectedClinical(item.key);
                     setScore(Math.min(score, item.max));
                   }}
-                  className={`rounded-2xl border p-4 text-left transition ${
+                  className={`rounded-[1.5rem] p-5 text-left transition ${
                     selectedClinical === item.key
-                      ? 'border-calm-sage bg-gradient-to-br from-[#edf4ec] to-[#e4eee3]'
-                      : 'border-calm-sage/15 bg-white/85 hover:bg-calm-sage/5'
+                      ? 'bg-wellness-aqua shadow-wellness-sm'
+                      : 'bg-white/88 shadow-wellness-sm hover:bg-white'
                   }`}
                 >
-                  <p className="text-lg font-semibold">{item.key}</p>
+                  <p className="text-lg font-semibold text-charcoal">{item.key}</p>
                   <p className="mt-2 text-sm text-charcoal/70">{item.description}</p>
                 </button>
               ))}
             </div>
 
             {selectedClinical === 'PHQ-9' || selectedClinical === 'GAD-7' ? (
-              <div className="mt-4 rounded-2xl border border-calm-sage/15 bg-gradient-to-b from-calm-sage/5 to-white p-4">
+              <div className="mt-4 rounded-[1.75rem] bg-white/88 p-5 shadow-wellness-sm">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-lg font-semibold text-charcoal">{structuredAttempt?.template?.title || `${selectedClinical} Questionnaire`}</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-charcoal/45">Guided screen</p>
+                    <p className="mt-2 text-xl font-semibold text-charcoal">{structuredAttempt?.template?.title || `${selectedClinical} Questionnaire`}</p>
                     <p className="mt-2 text-sm text-charcoal/70">Please answer all questions based on your experience over the last 2 weeks.</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => void startStructuredAssessment(selectedClinical)}
                     disabled={structuredLoading || loading || selectedClinicalLocked}
-                    className="inline-flex min-h-[36px] items-center rounded-lg border border-calm-sage/25 px-3 text-sm font-semibold text-charcoal/80 disabled:opacity-60"
+                    className="wellness-secondary-btn min-h-[36px] px-3 text-sm disabled:opacity-60"
                   >
                     {structuredLoading ? 'Loading...' : selectedClinicalLocked ? 'Completed Today' : `Restart ${selectedClinical}`}
                   </button>
@@ -792,26 +798,26 @@ export default function AssessmentsPage() {
                 <div className="mt-4 space-y-4">
                   {structuredAttempt?.questions?.length ? (
                     <>
-                      <div className="flex items-center justify-between rounded-xl border border-calm-sage/10 bg-white/80 px-3 py-2 text-sm text-charcoal/70">
+                      <div className="flex items-center justify-between rounded-2xl bg-wellness-card px-4 py-3 text-sm text-charcoal/70">
                         <span>Question {Math.min(currentStructuredQuestionIndex + 1, structuredAttempt.questions.length)} of {structuredAttempt.questions.length}</span>
                         <span>{Object.keys(structuredAnswers).length} answered</span>
                       </div>
 
                       {structuredAttempt.questions[currentStructuredQuestionIndex] ? (
-                        <div className="rounded-xl border border-calm-sage/10 bg-white p-4">
-                          <p className="text-lg font-medium text-charcoal">
+                        <div className="rounded-[1.5rem] bg-gradient-wellness-surface p-5 shadow-wellness-sm">
+                          <p className="text-xl font-medium text-charcoal">
                             Q{structuredAttempt.questions[currentStructuredQuestionIndex].position}. {structuredAttempt.questions[currentStructuredQuestionIndex].prompt}
                           </p>
-                          <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                          <div className="mt-4 grid gap-3">
                             {structuredAttempt.questions[currentStructuredQuestionIndex].options.map((option) => (
                               <button
                                 key={`${structuredAttempt.questions[currentStructuredQuestionIndex].questionId}-${option.optionIndex}`}
                                 type="button"
                                 disabled={loading || structuredLoading || selectedClinicalLocked}
                                 onClick={() => void onStructuredOptionSelect(structuredAttempt.questions[currentStructuredQuestionIndex], option.optionIndex)}
-                                className={`rounded-xl border px-3 py-2.5 text-left text-base transition ${structuredAnswers[structuredAttempt.questions[currentStructuredQuestionIndex].questionId] === option.optionIndex ? 'border-calm-sage bg-calm-sage/10 text-charcoal shadow-soft-sm' : 'border-calm-sage/10 bg-white text-charcoal/80 hover:bg-calm-sage/5'} disabled:opacity-60`}
+                                className={`rounded-full px-5 py-4 text-left text-base transition ${structuredAnswers[structuredAttempt.questions[currentStructuredQuestionIndex].questionId] === option.optionIndex ? 'bg-[#1E90FF] text-white shadow-wellness-sm' : 'bg-white text-charcoal/82 shadow-wellness-sm hover:bg-wellness-aqua'} disabled:opacity-60`}
                               >
-                                <span className="block font-medium text-charcoal">{option.label}</span>
+                                <span className={`block font-medium ${structuredAnswers[structuredAttempt.questions[currentStructuredQuestionIndex].questionId] === option.optionIndex ? 'text-white' : 'text-charcoal'}`}>{option.label}</span>
                               </button>
                             ))}
                           </div>
@@ -823,7 +829,7 @@ export default function AssessmentsPage() {
                           type="button"
                           onClick={() => setCurrentStructuredQuestionIndex((prev) => Math.max(0, prev - 1))}
                           disabled={loading || structuredLoading || currentStructuredQuestionIndex === 0 || selectedClinicalLocked}
-                          className="inline-flex min-h-[36px] items-center rounded-lg border border-calm-sage/25 px-3 text-sm font-semibold text-charcoal/80 disabled:opacity-60"
+                          className="wellness-secondary-btn min-h-[36px] px-3 text-sm disabled:opacity-60"
                         >
                           Previous
                         </button>
@@ -852,7 +858,7 @@ export default function AssessmentsPage() {
             </div>
           </>
         ) : (
-          <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-4">
+          <div className="rounded-[1.5rem] border border-indigo-200 bg-indigo-50/60 p-4">
             <h2 className="text-base font-semibold text-indigo-900">Clinical Assessments Locked</h2>
             <p className="mt-1 text-sm text-indigo-800">
               Activate Platform Access to unlock PHQ-9 and GAD-7 clinical reports.
@@ -871,7 +877,7 @@ export default function AssessmentsPage() {
           <button
             type="button"
             onClick={loadMoodHistory}
-            className="inline-flex min-h-[40px] items-center rounded-full border border-calm-sage/25 px-4 text-sm font-medium text-charcoal/75"
+            className="wellness-secondary-btn min-h-[40px] px-4 text-sm"
           >
             Refresh Trend Data
           </button>
@@ -881,7 +887,7 @@ export default function AssessmentsPage() {
       </section>
 
       {resultCard ? (
-        <section className="rounded-2xl border border-calm-sage/15 bg-white/85 p-5 shadow-soft-sm">
+        <section className="wellness-panel p-5">
           <h2 className="text-lg font-semibold">Assessment Result</h2>
           <p className="mt-2 text-xl font-medium text-charcoal">{primaryResultInsight}</p>
           <p className="mt-2 text-sm text-charcoal/70">
@@ -892,7 +898,7 @@ export default function AssessmentsPage() {
       ) : null}
 
       {resultCard && clinicalPairCompletedToday && (resultCard.type === 'PHQ-9' || resultCard.type === 'GAD-7') ? (
-        <section className="rounded-2xl border border-calm-sage/15 bg-white/90 p-5 shadow-soft-sm">
+        <section className="wellness-panel p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-calm-sage">Recommended Next Step</p>
           <h3 className="mt-2 text-xl font-semibold text-charcoal">Choose your care path</h3>
           <p className="mt-1 text-sm text-charcoal/70">{primaryResultInsight}</p>
@@ -901,7 +907,7 @@ export default function AssessmentsPage() {
             <button
               type="button"
               onClick={() => void startCarePath('recommended')}
-              className="rounded-xl border border-calm-sage/25 bg-white p-3 text-left hover:border-calm-sage/45"
+              className="rounded-[1.4rem] bg-white p-4 text-left shadow-wellness-sm hover:bg-wellness-card"
             >
               <p className="text-xs font-semibold uppercase tracking-wide text-calm-sage">Recommended Care</p>
               <p className="mt-1 text-sm font-medium text-charcoal">Best match from your assessment</p>
@@ -909,7 +915,7 @@ export default function AssessmentsPage() {
             <button
               type="button"
               onClick={() => void startCarePath('direct')}
-              className="rounded-xl border border-calm-sage/25 bg-white p-3 text-left hover:border-calm-sage/45"
+              className="rounded-[1.4rem] bg-white p-4 text-left shadow-wellness-sm hover:bg-wellness-card"
             >
               <p className="text-xs font-semibold uppercase tracking-wide text-calm-sage">Direct Selection</p>
               <p className="mt-1 text-sm font-medium text-charcoal">Choose any provider category and fee</p>
@@ -917,7 +923,7 @@ export default function AssessmentsPage() {
             <button
               type="button"
               onClick={() => void startCarePath('urgent')}
-              className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-left hover:border-rose-300"
+              className="rounded-[1.4rem] border border-rose-200 bg-rose-50 p-4 text-left"
             >
               <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">Urgent Care</p>
               <p className="mt-1 text-sm font-medium text-rose-900">Priority psychiatrist pathway</p>
@@ -926,7 +932,7 @@ export default function AssessmentsPage() {
         </section>
       ) : null}
 
-      <section className="rounded-2xl border border-calm-sage/15 bg-white/85 p-5 shadow-soft-sm">
+      <section className="wellness-panel p-5">
         <h2 className="text-base font-semibold">Progress Analytics</h2>
         <p className="mt-1 text-sm text-charcoal/65">Mood trend over recent entries for clinical context</p>
 
@@ -941,7 +947,7 @@ export default function AssessmentsPage() {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-calm-sage/15 bg-white/85 p-5 shadow-soft-sm">
+      <section className="wellness-panel p-5">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="flex items-center gap-2 text-base font-semibold">
             <TrendingUp className="h-5 w-5 text-calm-sage" />
@@ -950,16 +956,16 @@ export default function AssessmentsPage() {
           <span className="text-sm text-charcoal/60">{historySummary.total} assessments</span>
         </div>
 
-        <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div className="rounded-xl border border-calm-sage/10 bg-calm-sage/5 p-3">
+          <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="rounded-[1.25rem] bg-white/88 p-3 shadow-wellness-sm">
             <p className="text-xs uppercase tracking-wide text-charcoal/60">Average Score</p>
             <p className="mt-1 text-lg font-semibold text-charcoal">{historySummary.averageScore}</p>
           </div>
-          <div className="rounded-xl border border-calm-sage/10 bg-calm-sage/5 p-3">
+          <div className="rounded-[1.25rem] bg-white/88 p-3 shadow-wellness-sm">
             <p className="text-xs uppercase tracking-wide text-charcoal/60">Severe Flags</p>
             <p className="mt-1 text-lg font-semibold text-charcoal">{historySummary.severeCount}</p>
           </div>
-          <div className="rounded-xl border border-calm-sage/10 bg-calm-sage/5 p-3">
+          <div className="rounded-[1.25rem] bg-white/88 p-3 shadow-wellness-sm">
             <p className="text-xs uppercase tracking-wide text-charcoal/60">Latest Assessment</p>
             <p className="mt-1 text-sm font-semibold text-charcoal">{historySummary.latestDate}</p>
           </div>
@@ -970,7 +976,7 @@ export default function AssessmentsPage() {
         ) : (
           <div className="space-y-3 max-h-96 overflow-y-auto">
             {historyRows.slice(0, 20).map((entry) => (
-              <div key={entry.key} className="rounded-lg border border-calm-sage/10 bg-calm-sage/5 p-3">
+              <div key={entry.key} className="rounded-[1.25rem] bg-white/88 p-3 shadow-wellness-sm">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <p className="text-sm font-medium text-charcoal">{entry.type}</p>
@@ -997,7 +1003,7 @@ export default function AssessmentsPage() {
         <button
           type="button"
           onClick={loadAssessmentHistory}
-          className="mt-4 w-full rounded-lg border border-calm-sage/25 px-4 py-2 text-sm font-medium text-charcoal/75 hover:bg-calm-sage/5 transition"
+          className="wellness-secondary-btn mt-4 w-full px-4 py-2 text-sm"
         >
           Refresh History
         </button>

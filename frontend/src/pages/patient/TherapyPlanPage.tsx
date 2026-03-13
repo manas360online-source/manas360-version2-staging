@@ -1,7 +1,8 @@
 
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { patientApi } from '../../api/patient';
-import { CheckCircle2, PlayCircle, StickyNote, Activity, FileText, Calendar, Library } from 'lucide-react';
+import { CheckCircle2, PlayCircle, StickyNote, Activity, FileText, Calendar, UserPlus } from 'lucide-react';
 
 interface ActivityItem {
   id: string;
@@ -16,6 +17,7 @@ interface ActivityItem {
 export default function TherapyPlanPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [connectionRequired, setConnectionRequired] = useState(false);
   const [planData, setPlanData] = useState<any>(null);
   const [completingTaskIds, setCompletingTaskIds] = useState<string[]>([]);
 
@@ -25,8 +27,13 @@ export default function TherapyPlanPage() {
     try {
       const response = await patientApi.getTherapyPlan();
       setPlanData((response as any)?.data ?? response ?? null);
+      setConnectionRequired(false);
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Unable to load your Guided Recovery Journey.');
+      const status = Number(err?.response?.status || 0);
+      const message = String(err?.response?.data?.message || err?.message || '');
+      const requiresProvider = status === 404 && message.toLowerCase().includes('connected with a provider');
+      setConnectionRequired(requiresProvider);
+      setError(requiresProvider ? null : (message || 'Unable to load your Guided Recovery Journey.'));
       setPlanData(null);
     } finally {
       setLoading(false);
@@ -66,9 +73,71 @@ export default function TherapyPlanPage() {
 
   const activities: ActivityItem[] = Array.isArray(planData?.activities) ? planData.activities : [];
   const plan = planData?.plan;
+  const hasPlan = Boolean(plan && Array.isArray(planData?.activities));
+
+  // Auto-complete MOOD_CHECKIN tasks when daily check-in is submitted from Dashboard
+  useEffect(() => {
+    const handler = async () => {
+      const checkinTasks = activities
+        .filter((a) => a.activityType === 'MOOD_CHECKIN' && a.status !== 'COMPLETED')
+        .map((a) => a.id);
+      if (checkinTasks.length === 0) return;
+      // Optimistic update
+      setPlanData((prev: any) => {
+        if (!prev || !Array.isArray(prev.activities)) return prev;
+        return {
+          ...prev,
+          activities: prev.activities.map((task: any) =>
+            task.activityType === 'MOOD_CHECKIN'
+              ? { ...task, status: 'COMPLETED', completedAt: new Date().toISOString() }
+              : task,
+          ),
+        };
+      });
+      try {
+        await Promise.all(checkinTasks.map((id) => patientApi.completeTherapyPlanTask(id)));
+        await loadPlan();
+      } catch {/* silently re-sync */
+        await loadPlan();
+      }
+    };
+    window.addEventListener('check-in-complete', handler as EventListener);
+    return () => window.removeEventListener('check-in-complete', handler as EventListener);
+  }, [activities]);
+
+  // Audio completion loop: mark AUDIO_THERAPY tasks done when SoundTherapyPage finishes a track
+  useEffect(() => {
+    const handler = async () => {
+      const audioTasks = activities
+        .filter((a) => a.activityType === 'AUDIO_THERAPY' && a.status !== 'COMPLETED')
+        .map((a) => a.id);
+      if (audioTasks.length === 0) return;
+      setPlanData((prev: any) => {
+        if (!prev || !Array.isArray(prev.activities)) return prev;
+        return {
+          ...prev,
+          activities: prev.activities.map((task: any) =>
+            task.activityType === 'AUDIO_THERAPY'
+              ? { ...task, status: 'COMPLETED', completedAt: new Date().toISOString() }
+              : task,
+          ),
+        };
+      });
+      try {
+        await Promise.all(audioTasks.map((id) => patientApi.completeTherapyPlanTask(id)));
+        await loadPlan();
+      } catch {
+        await loadPlan();
+      }
+    };
+    window.addEventListener('audio-complete', handler as EventListener);
+    return () => window.removeEventListener('audio-complete', handler as EventListener);
+  }, [activities]);
 
   const dailyRituals = activities.filter((a) => a.frequency === 'DAILY_RITUAL');
   const weeklyMilestones = activities.filter((a) => a.frequency === 'WEEKLY_MILESTONE');
+  const totalWeeks = Math.max(Number(plan?.totalWeeks || plan?.durationWeeks || 8), Number(plan?.weekNumber || 1), 4);
+  const weeks = Array.from({ length: totalWeeks }, (_, index) => index + 1);
 
   const getActivityIcon = (type: string) => {
     switch (type) {
@@ -87,10 +156,10 @@ export default function TherapyPlanPage() {
     return (
       <div 
         key={task.id} 
-        className={`group flex items-center justify-between rounded-xl border p-4 transition-all duration-300 ${isDone ? 'border-calm-sage/10 bg-white/40' : 'border-calm-sage/15 bg-white/90 shadow-soft-sm hover:shadow-soft-md'}`}
+        className={`group flex items-center justify-between rounded-[1.5rem] p-4 transition-all duration-300 ${isDone ? 'bg-white/65 shadow-wellness-sm' : 'bg-white/92 shadow-wellness-sm hover:shadow-wellness-md'}`}
       >
         <div className="flex items-center gap-4">
-          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors ${isDone ? 'bg-calm-sage/10' : 'bg-calm-sage/15'}`}>
+          <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors ${isDone ? 'bg-wellness-aqua' : 'bg-wellness-card'}`}>
             {getActivityIcon(task.activityType)}
           </div>
           <div>
@@ -111,12 +180,12 @@ export default function TherapyPlanPage() {
               type="button"
               onClick={() => void completeTask(task.id)}
               disabled={isCompleting}
-              className="inline-flex h-9 items-center justify-center rounded-full bg-calm-sage/10 px-4 text-xs font-semibold text-calm-sage transition-all hover:bg-calm-sage hover:text-white disabled:opacity-50"
+              className="inline-flex h-10 items-center justify-center rounded-full bg-wellness-aqua px-4 text-xs font-semibold text-charcoal transition-all hover:bg-wellness-sky hover:text-white disabled:opacity-50"
             >
               {isCompleting ? 'Completing...' : 'Mark Done'}
             </button>
           ) : (
-            <div className="flex items-center gap-1.5 rounded-full bg-calm-sage/10 px-3 py-1 text-xs font-semibold text-calm-sage">
+            <div className="flex items-center gap-1.5 rounded-full bg-wellness-aqua px-3 py-1 text-xs font-semibold text-charcoal/80">
               <CheckCircle2 className="h-3.5 w-3.5" />
               Done
             </div>
@@ -134,57 +203,98 @@ export default function TherapyPlanPage() {
     );
   }
 
+  if (!hasPlan && connectionRequired) {
+    return (
+      <div className="mx-auto max-w-3xl pb-20 pt-6 lg:pb-8">
+        <div className="wellness-panel p-8 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-wellness-mist text-wellness-sky">
+            <UserPlus className="h-6 w-6" />
+          </div>
+          <h1 className="text-2xl font-serif font-semibold text-charcoal">Therapy Plan Unlocks After Provider Connection</h1>
+          <p className="mx-auto mt-3 max-w-xl text-sm text-charcoal/70">
+            Your therapy plan is created only after you connect with a provider. Book or request a provider first, then your provider will create and manage your plan here.
+          </p>
+          <div className="mt-6 flex items-center justify-center gap-3">
+            <Link
+              to="/patient/sessions"
+              className="wellness-primary-btn inline-flex items-center justify-center px-5 py-2.5 text-sm"
+            >
+              Connect With A Provider
+            </Link>
+            <Link
+              to="/patient/provider-messages"
+              className="wellness-secondary-btn inline-flex items-center justify-center px-5 py-2.5 text-sm"
+            >
+              Open Provider Messages
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-4xl space-y-8 pb-20 lg:pb-8">
       
       {/* 1. Journey Header */}
-      <section className="relative overflow-hidden rounded-3xl border border-calm-sage/15 bg-gradient-to-br from-white to-calm-sage/5 p-8 shadow-soft-sm">
+      <section className="relative overflow-hidden rounded-[2rem] bg-gradient-wellness-hero p-8 shadow-wellness-md">
         <div className="relative z-10">
-          <p className="text-xs font-bold uppercase tracking-[0.1em] text-calm-sage">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-charcoal/50">
             Guided Recovery Pathway
           </p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight text-charcoal md:text-4xl">
-            {plan?.title || 'Understanding Your Triggers'}
+          <h1 className="mt-2 font-serif text-3xl font-semibold tracking-tight text-charcoal md:text-4xl">
+            {plan?.title || 'Therapy Plan'}
           </h1>
           <p className="mt-2 max-w-xl text-sm leading-relaxed text-charcoal/70">
-            Welcome to week {plan?.weekNumber || 1}. We'll focus on identifying patterns in your daily life and building emotional resilience through structured practice.
+            Provider-guided activities and milestones for your recovery progress.
           </p>
 
           <div className="mt-8">
-            <div className="mb-2 flex items-center justify-between text-sm font-medium">
-              <span className="text-charcoal/80">Weekly Momentum</span>
-              <span className="text-calm-sage">{plan?.adherencePercent || 0}% Complete</span>
+            <div className="mb-3 flex items-center justify-between text-sm font-medium">
+              <span className="text-charcoal/80">Recovery Roadmap</span>
+              <span className="text-wellness-sky">Week {plan?.weekNumber || 1} of {totalWeeks}</span>
             </div>
-            <div className="h-2 w-full overflow-hidden rounded-full bg-calm-sage/15">
-              <div 
-                className="h-full bg-calm-sage transition-all duration-1000 ease-out"
-                style={{ width: `${plan?.adherencePercent || 0}%` }}
-              />
+            <div className="flex flex-wrap items-center gap-3">
+              {weeks.map((week) => {
+                const completed = week < Number(plan?.weekNumber || 1);
+                const current = week === Number(plan?.weekNumber || 1);
+                return (
+                  <div key={week} className="flex items-center gap-3">
+                    <div className={`flex h-11 w-11 items-center justify-center rounded-full text-sm font-semibold transition ${completed ? 'bg-[#dff0ea] text-charcoal' : current ? 'bg-[#1E90FF] text-white shadow-wellness-sm' : 'bg-white/82 text-charcoal/55'}`}>
+                      {completed ? <CheckCircle2 className="h-4 w-4" /> : week}
+                    </div>
+                    {week < weeks.length ? <div className={`h-1.5 w-10 rounded-full ${completed ? 'bg-[#bfded3]' : 'bg-white/75'}`} /> : null}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-5 rounded-full bg-white/76 px-4 py-3 text-sm text-charcoal/72 shadow-wellness-sm">
+              <span className="font-semibold text-charcoal">Weekly momentum:</span> {plan?.adherencePercent || 0}% complete
             </div>
           </div>
         </div>
         
         {/* Decorative background element */}
-        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-calm-sage/10 blur-3xl" />
+        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-wellness-aqua blur-3xl" />
       </section>
 
       {/* Error state */}
       {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
           {error}
         </div>
       )}
 
       {/* 2. Provider Note (Sticky Note UI) */}
-      {(plan?.providerNote || true) && (
-        <section className="relative rotate-1 transform rounded-xl border border-amber-200/60 bg-gradient-to-br from-amber-50 to-amber-100/50 p-6 shadow-sm transition-transform hover:rotate-0">
-          <div className="absolute -left-1 -top-1">
-            <StickyNote className="h-6 w-6 text-amber-500/30" />
-          </div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-amber-800/60">Note from your provider</p>
-          <p className="mt-2 text-sm leading-relaxed text-amber-900/80">
-            {plan?.providerNote || "I've focused this week's plan entirely on grounding. When things feel overwhelming, just start with the 5-minute audio ritual. You've got this."}
+      {plan?.providerNote && (
+        <section className="relative overflow-hidden rounded-[1.75rem] bg-[#fff9ee] p-6 shadow-wellness-sm">
+          <div className="absolute inset-y-0 left-0 w-1.5 bg-[#8ec9be]" />
+          <div className="pl-3">
+          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-charcoal/55"><StickyNote className="h-4 w-4 text-[#8ec9be]" /> Note from your provider</p>
+          <p className="mt-2 text-sm leading-relaxed text-charcoal/78">
+            {plan.providerNote}
           </p>
+          </div>
         </section>
       )}
 
@@ -204,7 +314,7 @@ export default function TherapyPlanPage() {
               {dailyRituals.map(renderActivityCard)}
             </div>
           ) : (
-            <div className="rounded-xl border border-dashed border-calm-sage/30 p-8 text-center">
+            <div className="rounded-[1.5rem] border border-dashed border-wellness-border p-8 text-center">
               <p className="text-sm text-charcoal/50">No daily rituals assigned for this week.</p>
             </div>
           )}
@@ -223,34 +333,13 @@ export default function TherapyPlanPage() {
               {weeklyMilestones.map(renderActivityCard)}
             </div>
           ) : (
-            <div className="rounded-xl border border-dashed border-calm-sage/30 p-8 text-center">
+            <div className="rounded-[1.5rem] border border-dashed border-wellness-border p-8 text-center">
               <p className="text-sm text-charcoal/50">No weekly milestones assigned for this week.</p>
             </div>
           )}
         </section>
 
       </div>
-
-      {/* 4. Explore More / Wellness Library Stub */}
-      <section className="mt-8 rounded-2xl border border-calm-sage/15 bg-white p-6 shadow-soft-sm">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-base font-bold text-charcoal">Wellness Library</h2>
-            <p className="mt-1 text-sm text-charcoal/60">Explore unassigned content to further your journey.</p>
-          </div>
-          <Library className="h-8 w-8 text-calm-sage/40" />
-        </div>
-        <div className="mt-6 flex gap-3 overflow-x-auto pb-2">
-          {/* Mock Carousel Items */}
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="min-w-[200px] shrink-0 cursor-pointer rounded-xl border border-calm-sage/15 p-4 transition-all hover:bg-calm-sage/5 hover:shadow-soft-sm">
-              <div className="mb-3 h-24 w-full rounded-lg bg-calm-sage/10 object-cover" />
-              <p className="text-xs font-semibold text-calm-sage">MEDITATION</p>
-              <p className="mt-1 text-sm font-medium text-charcoal">Evening Wind Down</p>
-            </div>
-          ))}
-        </div>
-      </section>
 
     </div>
   );

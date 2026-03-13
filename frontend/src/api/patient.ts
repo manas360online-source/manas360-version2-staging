@@ -444,7 +444,11 @@ export const patientApi = {
     if (providerType && providerType !== 'ALL') {
       query.append('providerType', providerType);
     }
-    return (await http.get(`/v1/patient/providers/smart-match?${query}`)).data;
+    const response = (await http.get(`/v1/patient/providers/smart-match?${query}`)).data;
+    const payload = response?.data ?? response;
+    const providers = Array.isArray(payload?.providers) ? payload.providers : [];
+    const count = Number(payload?.count ?? providers.length ?? 0);
+    return { providers, count };
   },
 
   createAppointmentRequest: async (payload: {

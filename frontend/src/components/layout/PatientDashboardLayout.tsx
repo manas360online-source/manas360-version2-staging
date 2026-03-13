@@ -150,7 +150,7 @@ export default function PatientDashboardLayout() {
 
   const renderNavSection = (heading: string, items: NavItem[]) => (
     <div>
-      <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-400">{heading}</p>
+      <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-charcoal/45">{heading}</p>
       <div className="space-y-1">
         {items.map((item) => {
           const Icon = item.icon;
@@ -161,22 +161,22 @@ export default function PatientDashboardLayout() {
               key={`${heading}-${item.to}-${item.label}`}
               to={item.to}
               onClick={() => setMobileSidebarOpen(false)}
-              className={`flex min-h-[48px] items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] transition ${
+              className={`flex min-h-[50px] items-center gap-3 rounded-2xl px-3.5 py-3 text-[15px] transition ${
                 active
-                  ? 'bg-[#E8EFE6] font-semibold text-sage-700 shadow-[inset_0_0_0_1px_rgba(76,115,98,0.15)]'
-                  : 'text-ink-600 hover:bg-surface-hover hover:text-ink-700'
+                  ? 'bg-wellness-aqua font-semibold text-wellness-deep shadow-[0_10px_26px_rgba(30,75,63,0.08)]'
+                  : 'text-charcoal/72 hover:bg-white/85 hover:text-charcoal'
               }`}
             >
-              <Icon className={`h-[19px] w-[19px] ${active ? 'text-sage-500' : 'text-ink-400'}`} />
+              <Icon className={`h-[19px] w-[19px] ${active ? 'text-wellness-sky' : 'text-charcoal/42'}`} />
               <span>{item.label}</span>
               {item.badge && (
                 <span
                   className={`ml-auto rounded-full px-2 py-0.5 text-[11px] font-semibold ${
                     item.badge === 'AI'
-                      ? 'bg-calm-sage text-white'
+                      ? 'bg-wellness-sky text-white'
                       : item.badge === 'Premium'
                         ? 'bg-warm-terracotta/15 text-warm-terracotta'
-                        : 'bg-calm-sage/15 text-calm-sage'
+                        : 'bg-wellness-aqua text-charcoal/75'
                   }`}
                 >
                   {item.badge}
@@ -201,23 +201,26 @@ export default function PatientDashboardLayout() {
 
       <div className="mx-auto flex w-full max-w-[1600px] items-start">
         <aside
-          className={`fixed left-0 top-0 z-50 flex h-full w-72 flex-col border-r border-calm-sage/15 bg-[#F5F3F0]/95 backdrop-blur-sm transition-transform duration-300 lg:sticky lg:top-0 lg:self-start lg:z-20 lg:h-screen lg:translate-x-0 ${
+          className={`fixed left-0 top-0 z-50 flex h-full w-72 flex-col border-r border-white/60 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(242,248,247,0.98))] backdrop-blur-md transition-transform duration-300 lg:sticky lg:top-0 lg:self-start lg:z-20 lg:h-screen lg:translate-x-0 ${
             mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
-          <div className="flex h-16 items-center justify-between border-b border-calm-sage/15 px-5">
-            <Link to="/patient/dashboard" className="inline-flex items-center gap-2 font-display text-lg font-bold text-sage-800">
+          <div className="flex h-20 items-center justify-between border-b border-white/70 px-5">
+            <Link to="/patient/dashboard" className="inline-flex items-center gap-3 font-display text-lg font-bold text-charcoal">
               <img
                 src="/Untitled.png"
                 alt="MANAS360 logo"
-                className="h-8 w-8 rounded-lg object-cover"
+                className="h-10 w-10 rounded-2xl object-cover shadow-wellness-sm"
               />
-              MANAS360
+              <div>
+                <p className="text-lg leading-none tracking-tight">MANAS360</p>
+                <p className="mt-1 text-[11px] font-medium uppercase tracking-[0.16em] text-charcoal/45">Professional Wellness</p>
+              </div>
             </Link>
 
             <button
               type="button"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-charcoal/60 hover:bg-calm-sage/10 lg:hidden"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-charcoal/60 hover:bg-wellness-aqua lg:hidden"
               onClick={() => setMobileSidebarOpen(false)}
               aria-label="Close sidebar"
             >
@@ -232,8 +235,8 @@ export default function PatientDashboardLayout() {
             {renderNavSection('Support', supportNavItems)}
           </nav>
 
-          <div className="border-t border-calm-sage/15 p-4">
-            <div className="flex items-center gap-3 rounded-xl bg-white/80 p-2.5">
+          <div className="border-t border-white/70 p-4">
+            <div className="wellness-panel-muted flex items-center gap-3 p-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-warm-terracotta/25 text-xs font-semibold text-warm-terracotta">
                 {initials}
               </div>
@@ -245,7 +248,7 @@ export default function PatientDashboardLayout() {
             <button
               type="button"
               onClick={() => void handleLogout()}
-              className="mt-2 inline-flex min-h-[40px] w-full items-center justify-center gap-2 rounded-xl border border-calm-sage/20 bg-white px-3 text-sm font-medium text-charcoal/80 transition hover:bg-calm-sage/10"
+              className="mt-3 inline-flex min-h-[42px] w-full items-center justify-center gap-2 rounded-2xl border border-white/80 bg-white/90 px-3 text-sm font-medium text-charcoal/80 transition hover:bg-wellness-aqua"
             >
               <LogOut className="h-4 w-4" />
               Logout
@@ -254,11 +257,11 @@ export default function PatientDashboardLayout() {
         </aside>
 
         <div className="flex min-h-screen w-full flex-1 flex-col lg:ml-0">
-          <header className="sticky top-0 z-30 flex h-16 items-center border-b border-white/20 bg-white/60 px-3 backdrop-blur-xl sm:px-4 lg:px-6 shadow-[0_4px_30px_rgba(0,0,0,0.03)] supports-[backdrop-filter]:bg-white/40">
+          <header className="sticky top-0 z-30 flex h-20 items-center border-b border-white/70 bg-white/86 px-3 backdrop-blur-xl sm:px-4 lg:px-6 shadow-[0_10px_40px_rgba(26,69,58,0.04)] supports-[backdrop-filter]:bg-white/78">
             <div className="flex items-center gap-2 sm:gap-3">
               <button
                 type="button"
-                className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-charcoal/70 transition-colors hover:bg-calm-sage/15 active:bg-calm-sage/25 lg:hidden"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-2xl text-charcoal/70 transition-colors hover:bg-wellness-aqua active:bg-wellness-aqua lg:hidden"
                 onClick={() => setMobileSidebarOpen(true)}
                 aria-label="Open sidebar"
               >
@@ -266,8 +269,10 @@ export default function PatientDashboardLayout() {
               </button>
 
               <div className="flex items-center gap-2">
-                <p className="font-display text-xl font-semibold leading-none text-ink-800 tracking-tight">{pageTitle}</p>
-                <p className="-mt-0.5 hidden text-xs leading-none text-ink-400 sm:block tracking-wide">{todayLabel}</p>
+                <div>
+                  <p className="font-display text-xl font-semibold leading-none tracking-tight text-charcoal">{pageTitle}</p>
+                  <p className="mt-1 hidden text-xs leading-none tracking-[0.12em] text-charcoal/45 sm:block">{todayLabel}</p>
+                </div>
               </div>
             </div>
 
@@ -275,7 +280,7 @@ export default function PatientDashboardLayout() {
                 <button
                   type="button"
                   onClick={() => navigate('/crisis')}
-                  className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-100"
+                  className="inline-flex min-h-[40px] items-center gap-1.5 rounded-full bg-red-50 px-4 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-100"
                 >
                   <LifeBuoy className="h-4 w-4" />
                   <span className="hidden sm:inline">Crisis Support</span>
@@ -284,7 +289,7 @@ export default function PatientDashboardLayout() {
 
                 <Link
                   to="/patient/notifications"
-                  className="relative inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-500 transition hover:bg-ink-50"
+                  className="relative inline-flex h-10 w-10 items-center justify-center rounded-2xl text-charcoal/55 transition hover:bg-wellness-aqua"
                   aria-label="Open notifications"
                 >
                   <Bell className="h-4 w-4" />
@@ -298,7 +303,7 @@ export default function PatientDashboardLayout() {
                 <button
                   type="button"
                   onClick={() => void handleLogout()}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-charcoal/60 transition hover:bg-calm-sage/10"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-2xl text-charcoal/60 transition hover:bg-wellness-aqua"
                   aria-label="Logout"
                   title="Logout"
                 >
@@ -308,7 +313,7 @@ export default function PatientDashboardLayout() {
                 <button
                   type="button"
                   onClick={() => setProfileMenuOpen(true)}
-                  className="inline-flex items-center gap-2 rounded-lg p-1 pr-2 transition hover:bg-calm-sage/10"
+                  className="inline-flex items-center gap-2 rounded-2xl p-1 pr-2 transition hover:bg-wellness-aqua"
                   aria-label="Open profile menu"
                 >
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-warm-terracotta/25 text-xs font-semibold text-warm-terracotta">
@@ -318,15 +323,15 @@ export default function PatientDashboardLayout() {
             </div>
           </header>
 
-          <main className="w-full flex-1 px-3 py-4 sm:px-4 sm:py-4 lg:px-6 lg:py-6">
-            <div className="patient-content-shell">
+          <main className="w-full flex-1 px-3 py-4 sm:px-4 sm:py-5 lg:px-6 lg:py-7">
+            <div className="wellness-page-shell rounded-[2rem] p-3 sm:p-4 lg:p-5">
               <Outlet />
             </div>
           </main>
         </div>
       </div>
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-calm-sage/20 bg-[#FAFAF8]/95 px-2 py-1.5 backdrop-blur-md lg:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/80 bg-white/92 px-2 py-2 backdrop-blur-md lg:hidden">
         <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
           {bottomNavItems.map((item) => {
             const Icon = item.icon;
@@ -335,8 +340,8 @@ export default function PatientDashboardLayout() {
               <Link
                 key={item.to}
                 to={item.to}
-                className={`inline-flex min-h-[46px] flex-col items-center justify-center rounded-lg px-1 text-[11px] font-medium ${
-                  active ? 'bg-calm-sage/20 text-charcoal' : 'text-charcoal/70 hover:bg-white/60'
+                className={`inline-flex min-h-[50px] flex-col items-center justify-center rounded-2xl px-1 text-[11px] font-medium ${
+                  active ? 'bg-wellness-aqua text-charcoal shadow-wellness-sm' : 'text-charcoal/70 hover:bg-wellness-card'
                 }`}
               >
                 <Icon className="mb-0.5 h-4 w-4" />
@@ -353,13 +358,13 @@ export default function PatientDashboardLayout() {
           onClick={() => setProfileMenuOpen(false)}
         >
           <div
-            className="w-full max-w-xs rounded-2xl border border-calm-sage/20 bg-[#F5F3F0]/95 p-3 shadow-soft-sm"
+            className="w-full max-w-xs rounded-[2rem] border border-white/80 bg-white/96 p-3 shadow-wellness-md"
             onClick={(event) => event.stopPropagation()}
             role="dialog"
             aria-modal="true"
             aria-label="Profile menu"
           >
-            <div className="mb-2 flex items-center gap-3 rounded-xl bg-white/85 px-3 py-2.5">
+            <div className="mb-2 flex items-center gap-3 rounded-2xl bg-wellness-card px-3 py-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-warm-terracotta/25 text-xs font-semibold text-warm-terracotta">
                 {initials}
               </div>
@@ -376,7 +381,7 @@ export default function PatientDashboardLayout() {
                   setProfileMenuOpen(false);
                   navigate('/patient/profile');
                 }}
-                className="flex min-h-[42px] w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-charcoal/80 transition hover:bg-calm-sage/10 hover:text-charcoal"
+                className="flex min-h-[44px] w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm text-charcoal/80 transition hover:bg-wellness-card hover:text-charcoal"
               >
                 <User className="h-[18px] w-[18px] text-charcoal/50" />
                 <span>My Profile</span>
@@ -388,7 +393,7 @@ export default function PatientDashboardLayout() {
                   setProfileMenuOpen(false);
                   navigate('/patient/settings');
                 }}
-                className="flex min-h-[42px] w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-charcoal/80 transition hover:bg-calm-sage/10 hover:text-charcoal"
+                className="flex min-h-[44px] w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm text-charcoal/80 transition hover:bg-wellness-card hover:text-charcoal"
               >
                 <Settings2 className="h-[18px] w-[18px] text-charcoal/50" />
                 <span>Settings</span>
@@ -400,7 +405,7 @@ export default function PatientDashboardLayout() {
                   setProfileMenuOpen(false);
                   navigate('/patient/support');
                 }}
-                className="flex min-h-[42px] w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-charcoal/80 transition hover:bg-calm-sage/10 hover:text-charcoal"
+                className="flex min-h-[44px] w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm text-charcoal/80 transition hover:bg-wellness-card hover:text-charcoal"
               >
                 <LifeBuoy className="h-[18px] w-[18px] text-charcoal/50" />
                 <span>Help & Support</span>
@@ -412,7 +417,7 @@ export default function PatientDashboardLayout() {
                   setProfileMenuOpen(false);
                   void handleLogout();
                 }}
-                className="flex min-h-[42px] w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-charcoal/80 transition hover:bg-calm-sage/10 hover:text-charcoal"
+                className="flex min-h-[44px] w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm text-charcoal/80 transition hover:bg-wellness-card hover:text-charcoal"
               >
                 <LogOut className="h-[18px] w-[18px] text-charcoal/50" />
                 <span>Logout</span>

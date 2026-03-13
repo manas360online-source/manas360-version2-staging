@@ -16,6 +16,26 @@ interface SlideOverBookingDrawerProps {
   onBookingSuccess: () => void;
 }
 
+type ProviderTimeSlot = {
+  value: string;
+  label: string;
+  isAvailable: boolean;
+};
+
+const SLOT_VALUES = ['09:00', '10:30', '14:00', '16:00', '17:30'];
+
+const toMinuteOfDay = (value: string): number => {
+  const [h, m] = value.split(':').map(Number);
+  return (h * 60) + (m || 0);
+};
+
+const toDisplayTime = (value: string): string => {
+  const [h, m] = value.split(':').map(Number);
+  const period = h >= 12 ? 'PM' : 'AM';
+  const normalizedHour = h % 12 === 0 ? 12 : h % 12;
+  return `${String(normalizedHour).padStart(2, '0')}:${String(m).padStart(2, '0')} ${period}`;
+};
+
 export default function SlideOverBookingDrawer({
   isOpen,
   onClose,
@@ -25,6 +45,10 @@ export default function SlideOverBookingDrawer({
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  const [providerTimeSlots, setProviderTimeSlots] = useState<ProviderTimeSlot[]>(
+    SLOT_VALUES.map((value) => ({ value, label: toDisplayTime(value), isAvailable: true })),
+  );
+  const [availabilityLoading, setAvailabilityLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,9 +58,58 @@ export default function SlideOverBookingDrawer({
       setStep(1);
       setSelectedDate(null);
       setSelectedTime(null);
+      setProviderTimeSlots(SLOT_VALUES.map((value) => ({ value, label: toDisplayTime(value), isAvailable: true })));
       setError(null);
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || !provider || !selectedDate) return;
+
+    const checkProviderAvailability = async () => {
+      setAvailabilityLoading(true);
+      try {
+        const providerType = String(provider.role || '').toUpperCase();
+        const supportedProviderType = ['THERAPIST', 'PSYCHOLOGIST', 'PSYCHIATRIST', 'COACH'].includes(providerType)
+          ? providerType
+          : undefined;
+
+        const checkedSlots = await Promise.all(
+          SLOT_VALUES.map(async (value) => {
+            const startMinute = toMinuteOfDay(value);
+            const response = await patientApi.getAvailableProvidersForSmartMatch(
+              {
+                daysOfWeek: [selectedDate.getDay()],
+                timeSlots: [{ startMinute, endMinute: startMinute + 30 }],
+              },
+              supportedProviderType,
+            );
+
+            const providers = Array.isArray(response?.providers) ? response.providers : [];
+            const matched = providers.some((entry: any) => String(entry?.id) === String(provider.id));
+            return {
+              value,
+              label: toDisplayTime(value),
+              isAvailable: matched,
+            };
+          }),
+        );
+
+        setProviderTimeSlots(checkedSlots);
+        setSelectedTime((prev) => {
+          if (!prev) return prev;
+          const stillAvailable = checkedSlots.some((slot) => slot.value === prev && slot.isAvailable);
+          return stillAvailable ? prev : null;
+        });
+      } catch {
+        setProviderTimeSlots(SLOT_VALUES.map((value) => ({ value, label: toDisplayTime(value), isAvailable: true })));
+      } finally {
+        setAvailabilityLoading(false);
+      }
+    };
+
+    void checkProviderAvailability();
+  }, [isOpen, provider, selectedDate]);
 
   // Lock body scroll when drawer is open
   useEffect(() => {
@@ -52,15 +125,12 @@ export default function SlideOverBookingDrawer({
 
   if (!isOpen || !provider) return null;
 
-  // Mock available dates (next 7 days starting tomorrow)
+  // Available booking dates (next 7 days starting tomorrow)
   const availableDates = Array.from({ length: 7 }).map((_, i) => {
     const d = new Date();
     d.setDate(d.getDate() + i + 1);
     return d;
   });
-
-  // Mock available times
-  const availableTimes = ['09:00 AM', '10:30 AM', '02:00 PM', '04:00 PM', '05:30 PM'];
 
   const handleConfirmBooking = async () => {
     if (!selectedDate || !selectedTime) return;
@@ -69,11 +139,8 @@ export default function SlideOverBookingDrawer({
     setError(null);
     
     try {
-      // Create a JS Date composed of selectedDate + selectedTime
-      const [time, modifier] = selectedTime.split(' ');
-      let [hours, minutes] = time.split(':').map(Number);
-      if (hours === 12) hours = 0;
-      if (modifier === 'PM') hours += 12;
+      // Create a JS Date composed of selectedDate + selectedTime (24-hour HH:mm)
+      const [hours, minutes] = selectedTime.split(':').map(Number);
       
       const scheduledAt = new Date(selectedDate);
       scheduledAt.setHours(hours, minutes, 0, 0);
@@ -170,21 +237,35 @@ export default function SlideOverBookingDrawer({
                     <Clock className="mr-2 inline h-4 w-4" />
                     Select a Time
                   </h3>
+                  {availabilityLoading ? (
+                    <p className="mb-3 text-xs text-charcoal/60">Checking live availability for this provider...</p>
+                  ) : null}
                   <div className="grid grid-cols-3 gap-2">
-                    {availableTimes.map((time) => (
+                    {providerTimeSlots.map((slot) => (
                       <button
-                        key={time}
-                        onClick={() => setSelectedTime(time)}
+                        key={slot.value}
+                        onClick={() => {
+                          if (!slot.isAvailable || availabilityLoading) return;
+                          setSelectedTime(slot.value);
+                        }}
+                        disabled={!slot.isAvailable || availabilityLoading}
                         className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                          selectedTime === time
+                          selectedTime === slot.value
                             ? 'border-teal-500 bg-teal-50 text-teal-700'
-                            : 'border-calm-sage/20 text-charcoal/70 hover:border-teal-300 hover:bg-teal-50/50'
+                            : !slot.isAvailable
+                              ? 'border-calm-sage/15 bg-calm-sage/5 text-charcoal/35 cursor-not-allowed'
+                              : 'border-calm-sage/20 text-charcoal/70 hover:border-teal-300 hover:bg-teal-50/50'
                         }`}
                       >
-                        {time}
+                        {slot.label}
                       </button>
                     ))}
                   </div>
+                  {!availabilityLoading && providerTimeSlots.every((slot) => !slot.isAvailable) ? (
+                    <p className="mt-3 rounded-lg border border-calm-sage/20 bg-calm-sage/5 px-3 py-2 text-xs text-charcoal/65">
+                      This provider has no available slots for the selected date. Please choose another date.
+                    </p>
+                  ) : null}
                 </div>
               )}
             </div>
@@ -208,7 +289,7 @@ export default function SlideOverBookingDrawer({
                   </div>
                   <div className="flex justify-between">
                     <span className="text-charcoal/60">Time</span>
-                    <span className="font-medium text-charcoal">{selectedTime}</span>
+                    <span className="font-medium text-charcoal">{selectedTime ? toDisplayTime(selectedTime) : '-'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-charcoal/60">Duration</span>

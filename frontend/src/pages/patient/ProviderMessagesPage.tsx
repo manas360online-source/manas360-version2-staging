@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { io, Socket } from 'socket.io-client';
 import { Send, ArrowLeft, MessageSquare, Clock, Check, CheckCheck } from 'lucide-react';
 import { patientApi } from '../../api/patient';
@@ -56,6 +56,8 @@ function formatTime(dateStr?: string): string {
 
 // ── Component ──────────────────────────────────────────────────────
 export default function ProviderMessagesPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [activeConv, setActiveConv] = useState<ConversationSummary | null>(null);
   const [messages, setMessages] = useState<DirectMessage[]>([]);
@@ -72,6 +74,16 @@ export default function ProviderMessagesPage() {
   const socketRef = useRef<Socket | null>(null);
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeConvIdRef = useRef<string | null>(null);
+
+  const getSortedConversations = (items: ConversationSummary[]) => {
+    return [...items].sort((a, b) => {
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      if (a.isSupport && !b.isSupport) return 1;
+      if (!a.isSupport && b.isSupport) return -1;
+      return new Date(b.lastMessageAt ?? 0).getTime() - new Date(a.lastMessageAt ?? 0).getTime();
+    });
+  };
 
   // ── Socket setup ────────────────────────────────────────────────
   useEffect(() => {
@@ -146,13 +158,7 @@ export default function ProviderMessagesPage() {
       const res = await patientApi.getConversations();
       const raw = (res as any)?.data ?? res;
       const data: ConversationSummary[] = Array.isArray(raw) ? raw : [];
-      const sorted = [...data].sort((a, b) => {
-        if (a.isPinned && !b.isPinned) return -1;
-        if (!a.isPinned && b.isPinned) return 1;
-        if (a.isSupport && !b.isSupport) return 1;
-        if (!a.isSupport && b.isSupport) return -1;
-        return new Date(b.lastMessageAt ?? 0).getTime() - new Date(a.lastMessageAt ?? 0).getTime();
-      });
+      const sorted = getSortedConversations(data);
       setConversations(sorted);
       sorted.forEach((c) => {
         if (!c.isSupport && c.providerId) {
@@ -193,6 +199,44 @@ export default function ProviderMessagesPage() {
       setMsgLoading(false);
     }
   }, []);
+
+  // If navigated with ?providerId=..., open existing conversation or create one and open it.
+  useEffect(() => {
+    const providerId = new URLSearchParams(location.search).get('providerId');
+    if (!providerId || loading) return;
+
+    let cancelled = false;
+    const openOrCreateConversation = async () => {
+      let target = conversations.find((conv) => String(conv.providerId || '') === String(providerId));
+
+      if (!target) {
+        try {
+          await patientApi.startConversation({ providerId: String(providerId) });
+          const refreshed = await patientApi.getConversations();
+          const refreshedRaw = (refreshed as any)?.data ?? refreshed;
+          const refreshedData: ConversationSummary[] = Array.isArray(refreshedRaw) ? refreshedRaw : [];
+          const refreshedSorted = getSortedConversations(refreshedData);
+          if (!cancelled) setConversations(refreshedSorted);
+          target = refreshedSorted.find((conv) => String(conv.providerId || '') === String(providerId));
+        } catch {
+          // If conversation creation fails, keep the page usable and let the user open manually.
+        }
+      }
+
+      if (!cancelled && target) {
+        await openConversation(target);
+      }
+
+      if (!cancelled) {
+        navigate('/patient/provider-messages', { replace: true });
+      }
+    };
+
+    void openOrCreateConversation();
+    return () => {
+      cancelled = true;
+    };
+  }, [location.search, loading, conversations, navigate, openConversation]);
 
   // ── Auto-scroll ───────────────────────────────────────────────
   useEffect(() => {
@@ -518,9 +562,8 @@ export default function ProviderMessagesPage() {
 
                         if (isSystem) {
                           return (
-                            <div key={msg.id} className="my-3 flex items-center gap-3">
-                              <div className="h-px flex-1 bg-calm-sage/15" />
-                              <div className="flex items-center gap-1.5 rounded-full border border-calm-sage/15 bg-calm-sage/5 px-3 py-1">
+                            <div key={msg.id} className="my-3 flex justify-center">
+                              <div className="inline-flex max-w-[90%] items-center gap-1.5 rounded-full bg-zinc-100 px-4 py-1.5 text-xs font-medium text-zinc-600">
                                 <span className="text-xs">
                                   {msg.messageType === 'SYSTEM_PHQ9'
                                     ? '📋'
@@ -528,9 +571,8 @@ export default function ProviderMessagesPage() {
                                     ? '✅'
                                     : 'ℹ️'}
                                 </span>
-                                <p className="text-[11px] text-charcoal/60">{msg.content}</p>
+                                <p className="text-[11px] text-zinc-600">{msg.content}</p>
                               </div>
-                              <div className="h-px flex-1 bg-calm-sage/15" />
                             </div>
                           );
                         }

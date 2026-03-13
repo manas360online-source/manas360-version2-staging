@@ -43,6 +43,7 @@ const NotificationsPage = lazy(() => import('./pages/patient/NotificationsPage')
 const SoundTherapyPage = lazy(() => import('./pages/patient/SoundTherapyPage'));
 const ProviderMessagesPage = lazy(() => import('./pages/patient/ProviderMessagesPage'));
 const PatientOnboardingPage = lazy(() => import('./pages/patient/PatientOnboardingPage'));
+const DailyCheckInPage = lazy(() => import('./pages/patient/DailyCheckInPage'));
 const AdminPortalLoginPage = lazy(() => import('./pages/admin/AdminPortalLoginPage'));
 const AdminDashboardPage = lazy(() => import('./pages/admin/Dashboard'));
 const AdminShellLayout = lazy(() => import('./components/admin/AdminShellLayout'));
@@ -855,6 +856,7 @@ function App() {
           <Route path="reports" element={<ReportsPage />} />
           <Route path="notifications" element={<NotificationsPage />} />
           <Route path="pricing" element={<PricingPage />} />
+          <Route path="check-in" element={<DailyCheckInPage />} />
           </Route>
         <Route path="/providers/:id" element={<Navigate to="/patient/sessions" replace />} />
         <Route path="/book/:providerId" element={<Navigate to="/patient/sessions" replace />} />
