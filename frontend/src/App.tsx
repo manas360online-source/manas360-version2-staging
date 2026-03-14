@@ -79,7 +79,10 @@ const CorporateHelpPage = lazy(() => import('./pages/corporate/CorporateHelpPage
 const SSOSettingsPage = lazy(() => import('./pages/corporate/SSOSettingsPage'));
 const CorporateDashboardPage = lazy(() => import('./pages/corporate/CorporateDashboardPage'));
 const CorporateOnboardingPage = lazy(() => import('./pages/corporate/CorporateOnboardingPage'));
-const ProviderDashboardHubPage = lazy(() => import('./pages/provider/ProviderDashboardHubPage'));
+const ProviderCalendarPage = lazy(() => import('./pages/provider/Calendar'));
+const ProviderInboxPage = lazy(() => import('./pages/provider/Messages'));
+const ProviderEarningsPage = lazy(() => import('./pages/provider/Earnings'));
+const ProviderSettingsPage = lazy(() => import('./pages/provider/Settings'));
 const ProviderDashboard = lazy(() => import('./pages/provider/Dashboard/ProviderDashboard'));
 const HubLayout = lazy(() => import('./components/layout/HubLayout'));
 const PatientList = lazy(() => import('./pages/provider/Patients/PatientList'));
@@ -88,6 +91,7 @@ const ChartOverview = lazy(() => import('./pages/provider/Patients/Tabs/ChartOve
 const SessionNotes = lazy(() => import('./pages/provider/Patients/Tabs/SessionNotes'));
 const Assessments = lazy(() => import('./pages/provider/Patients/Tabs/Assessments'));
 const CBTModules = lazy(() => import('./pages/provider/Patients/Tabs/CBTModules'));
+const PlanStudio = lazy(() => import('./pages/provider/Patients/Tabs/PlanStudio'));
 const Prescriptions = lazy(() => import('./pages/provider/Patients/Tabs/Prescriptions'));
 const LabOrders = lazy(() => import('./pages/provider/Patients/Tabs/LabOrders'));
 const GoalsAndHabits = lazy(() => import('./pages/provider/Patients/Tabs/GoalsAndHabits'));
@@ -191,21 +195,22 @@ function App() {
             <Route path="assessments" element={<Assessments />} />
             <Route path="cbt" element={<CBTModules />} />
             <Route path="cbt-modules" element={<Navigate to="../cbt" replace />} />
+            <Route path="plan-builder" element={<PlanStudio />} />
             <Route path="goals" element={<GoalsAndHabits />} />
             <Route path="prescriptions" element={<Prescriptions />} />
             <Route path="labs" element={<LabOrders />} />
             <Route path="lab-orders" element={<Navigate to="../labs" replace />} />
             <Route path="clinical-notes" element={<SessionNotes />} />
           </Route>
-          <Route path="calendar" element={<ProviderDashboardHubPage />} />
+          <Route path="calendar" element={<ProviderCalendarPage />} />
           <Route path="notes" element={<Navigate to="patient/123/notes" replace />} />
           <Route path="assessments" element={<Navigate to="patient/123/assessments" replace />} />
           <Route path="prescriptions" element={<Navigate to="patient/123/prescriptions" replace />} />
           <Route path="labs" element={<Navigate to="patient/123/labs" replace />} />
           <Route path="goals" element={<Navigate to="patient/123/goals" replace />} />
-          <Route path="earnings" element={<ProviderDashboardHubPage />} />
-          <Route path="messages" element={<ProviderDashboardHubPage />} />
-          <Route path="settings" element={<ProviderDashboardHubPage />} />
+          <Route path="earnings" element={<ProviderEarningsPage />} />
+          <Route path="messages" element={<ProviderInboxPage />} />
+          <Route path="settings" element={<ProviderSettingsPage />} />
         </Route>
         <Route path="/auth/login" element={<LoginPage />} />
         <Route path="/therapist/*" element={<Navigate to="/provider/dashboard" replace />} />

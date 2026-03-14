@@ -951,11 +951,14 @@ model TherapySession {
   meetingRoomName    String?       @map("meeting_room_name")
   dateTime           DateTime
   durationMinutes    Int           @default(50)
+  isLocked           Boolean       @default(true)
   sessionFeeMinor    BigInt        @default(0)
   paymentStatus      String        @default("UNPAID")
   agoraChannel       String?
   agoraToken         String?
   status             BookingStatus @default(PENDING)
+  transcript         String?
+  audioRecordingUrl  String?       @map("audio_recording_url")
 
   // Encrypted therapist note (optional)
   noteEncryptedContent     String?
@@ -2004,6 +2007,9 @@ model TherapyPlanActivity {
 
   estimatedMinutes Int? @default(5)
   orderIndex       Int  @default(0)
+  weekNumber       Int  @default(1)
+  isPublished      Boolean @default(false)
+  category         String?
 
   status      String    @default("PENDING")
   completedAt DateTime?
@@ -2019,18 +2025,18 @@ model TherapyPlanActivity {
 
 model Prescription {
   id               String   @id @default(uuid())
-  patientId        String
-  providerId       String
-  drugName         String
+  patientId        String   @map("patient_id")
+  providerId       String   @map("provider_id")
+  drugName         String   @map("drug_name")
   dosage           String
   instructions     String
-  prescribedDate   DateTime @default(now())
-  refillsRemaining Int      @default(0)
+  prescribedDate   DateTime @default(now()) @map("prescribed_date")
+  refillsRemaining Int      @default(0) @map("refills_remaining")
   status           String   @default("ACTIVE")
-  adherenceRate    Int      @default(0)
+  adherenceRate    Int      @default(0) @map("adherence_rate")
   warnings         String[] @default([])
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
 
   patient  User @relation("PrescriptionPatient", fields: [patientId], references: [id], onDelete: Cascade)
   provider User @relation("PrescriptionProvider", fields: [providerId], references: [id], onDelete: Cascade)
@@ -2042,16 +2048,16 @@ model Prescription {
 
 model LabOrder {
   id                String   @id @default(uuid())
-  patientId         String
-  providerId        String
-  testName          String
-  dateOrdered       DateTime @default(now())
+  patientId         String   @map("patient_id")
+  providerId        String   @map("provider_id")
+  testName          String   @map("test_name")
+  dateOrdered       DateTime @default(now()) @map("date_ordered")
   status            String   @default("PENDING")
-  orderingPhysician String
+  orderingPhysician String   @map("ordering_physician")
   interpretation    String
   biomarkers        Json
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
 
   patient  User @relation("LabOrderPatient", fields: [patientId], references: [id], onDelete: Cascade)
   provider User @relation("LabOrderProvider", fields: [providerId], references: [id], onDelete: Cascade)
@@ -2063,15 +2069,15 @@ model LabOrder {
 
 model Goal {
   id          String   @id @default(uuid())
-  patientId   String
-  providerId  String
+  patientId   String   @map("patient_id")
+  providerId  String   @map("provider_id")
   title       String
   category    String?
   status      String   @default("IN_PROGRESS")
-  startDate   DateTime @default(now())
-  completedAt DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  startDate   DateTime @default(now()) @map("start_date")
+  completedAt DateTime? @map("completed_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   patient  User @relation("GoalPatient", fields: [patientId], references: [id], onDelete: Cascade)
   provider User @relation("GoalProvider", fields: [providerId], references: [id], onDelete: Cascade)

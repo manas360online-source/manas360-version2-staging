@@ -100,6 +100,7 @@ interface TherapistSessionHistoryQuery {
 
 interface TherapistSessionStatusPayload {
 	status: 'confirmed' | 'cancelled' | 'completed';
+	recordingUrl?: string;
 }
 
 interface TherapistSessionNotePayload {

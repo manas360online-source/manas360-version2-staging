@@ -1,5 +1,6 @@
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/error.middleware';
+import { generateSummary } from './ai.service';
 
 const db = prisma as any;
 
@@ -210,6 +211,97 @@ export const upsertTherapistStructuredSessionNote = async (
   return {
     id: String(updated.id),
     sessionId: String(updated.sessionId),
+    status: String(updated.status),
+    updatedAt: updated.updatedAt,
+  };
+};
+
+export const generateTherapistAiSessionNote = async (userId: string, sessionId: string) => {
+  await assertTherapist(userId);
+
+  const session = await db.therapySession.findFirst({
+    where: { id: sessionId, therapistProfileId: userId },
+    select: {
+      id: true,
+      patientProfileId: true,
+      transcript: true,
+    },
+  });
+
+  if (!session) {
+    throw new AppError('Session not found', 404);
+  }
+
+  const transcript = String(session.transcript || '').trim();
+  if (!transcript) {
+    throw new AppError('No transcript found for this session', 400);
+  }
+
+  const summary = await generateSummary(transcript);
+
+  const existingNote = await db.therapistSessionNote.findUnique({
+    where: { sessionId },
+    select: { history: true },
+  });
+
+  const history = Array.isArray(existingNote?.history) ? existingNote.history : [];
+  const nextHistory = [
+    ...history,
+    {
+      at: new Date().toISOString(),
+      event: 'ai_clinical_summary_generated',
+      moodAnalysis: {
+        emotionalTone: summary.moodSentiment.primaryEmotionalState,
+        energyLevel: `Volatility ${summary.moodSentiment.emotionalVolatilityScore}/10`,
+        riskSignals: `Anxiety ${summary.moodSentiment.anxietyLevelScore}/10`,
+      },
+      moodSentiment: summary.moodSentiment,
+      actionItems: summary.actionItems,
+    },
+  ];
+
+  const updated = await db.therapistSessionNote.upsert({
+    where: { sessionId },
+    create: {
+      sessionId,
+      therapistId: userId,
+      patientId: String(session.patientProfileId),
+      sessionType: 'Therapy Session',
+      subjective: summary.soapNote.subjective,
+      objective: summary.soapNote.objective,
+      assessment: summary.soapNote.assessment,
+      plan: summary.soapNote.plan,
+      status: 'draft',
+      history: nextHistory,
+    },
+    update: {
+      subjective: summary.soapNote.subjective,
+      objective: summary.soapNote.objective,
+      assessment: summary.soapNote.assessment,
+      plan: summary.soapNote.plan,
+      history: nextHistory,
+    },
+  });
+
+  await db.therapySession.update({
+    where: { id: sessionId },
+    data: {
+      noteUpdatedAt: new Date(),
+      noteUpdatedByTherapistId: userId,
+    },
+  });
+
+  return {
+    sessionId,
+    noteId: String(updated.id),
+    moodAnalysis: {
+      emotionalTone: summary.moodSentiment.primaryEmotionalState,
+      energyLevel: `Volatility ${summary.moodSentiment.emotionalVolatilityScore}/10`,
+      riskSignals: `Anxiety ${summary.moodSentiment.anxietyLevelScore}/10`,
+    },
+    moodSentiment: summary.moodSentiment,
+    soapNote: summary.soapNote,
+    actionItems: summary.actionItems,
     status: String(updated.status),
     updatedAt: updated.updatedAt,
   };

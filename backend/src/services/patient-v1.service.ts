@@ -35,6 +35,14 @@ const DEFAULT_SESSION_FEE_MINOR = 150000;
 const DEFAULT_DURATION_MINUTES = 50;
 const PAYMENT_DEADLINE_HOURS = 12;
 const PROVIDER_ROLES = ['THERAPIST', 'PSYCHOLOGIST', 'PSYCHIATRIST', 'COACH'] as const;
+const SLOT_INTERVAL_MINUTES = 60;
+
+type AvailabilitySlot = {
+	dayOfWeek: number;
+	startMinute: number;
+	endMinute: number;
+	isAvailable: boolean;
+};
 
 const normalizeProviderRole = (role: string | null | undefined): 'THERAPIST' | 'PSYCHOLOGIST' | 'PSYCHIATRIST' | 'COACH' | null => {
 	const normalized = String(role || '').trim().toUpperCase();
@@ -71,6 +79,77 @@ const normalizePagination = (page = 1, limit = 10) => {
 	const safePage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
 	const safeLimit = Number.isFinite(limit) && limit > 0 ? Math.min(50, Math.floor(limit)) : 10;
 	return { page: safePage, limit: safeLimit, skip: (safePage - 1) * safeLimit };
+};
+
+const normalizeAvailabilitySlots = (value: unknown): AvailabilitySlot[] => {
+	if (!Array.isArray(value)) return [];
+
+	return value
+		.map((entry) => {
+			const slot = entry as Record<string, unknown>;
+			const dayOfWeek = Number(slot.dayOfWeek);
+			const startMinute = Number(slot.startMinute);
+			const endMinute = Number(slot.endMinute);
+			const isAvailable = Boolean(slot.isAvailable);
+
+			if (
+				!Number.isInteger(dayOfWeek)
+				|| dayOfWeek < 0
+				|| dayOfWeek > 6
+				|| !Number.isFinite(startMinute)
+				|| !Number.isFinite(endMinute)
+			) {
+				return null;
+			}
+
+			return {
+				dayOfWeek,
+				startMinute: Math.max(0, Math.min(24 * 60, Math.floor(startMinute))),
+				endMinute: Math.max(0, Math.min(24 * 60, Math.floor(endMinute))),
+				isAvailable,
+			};
+		})
+		.filter((slot): slot is AvailabilitySlot => slot !== null && slot.endMinute > slot.startMinute);
+};
+
+const buildAvailableSlotsFromAvailability = (
+	availability: AvailabilitySlot[],
+	blocked: Set<string>,
+	now: Date,
+	durationMinutes = DEFAULT_DURATION_MINUTES,
+): string[] => {
+	const availableSlots: string[] = [];
+
+	for (let dayOffset = 0; dayOffset < 7; dayOffset += 1) {
+		const currentDay = new Date(now);
+		currentDay.setDate(now.getDate() + dayOffset);
+		currentDay.setSeconds(0, 0);
+		const daySlots = availability.filter((slot) => slot.isAvailable && slot.dayOfWeek === currentDay.getDay());
+
+		for (const daySlot of daySlots) {
+			for (
+				let minuteOfDay = daySlot.startMinute;
+				minuteOfDay + durationMinutes <= daySlot.endMinute;
+				minuteOfDay += SLOT_INTERVAL_MINUTES
+			) {
+				const slot = new Date(currentDay);
+				slot.setHours(Math.floor(minuteOfDay / 60), minuteOfDay % 60, 0, 0);
+				if (slot <= now) continue;
+				if (!blocked.has(slot.toISOString())) availableSlots.push(slot.toISOString());
+			}
+		}
+	}
+
+	return availableSlots;
+};
+
+const isWithinProviderAvailability = (scheduledAt: Date, availability: AvailabilitySlot[], durationMinutes: number): boolean => {
+	const daySlot = availability.find((slot) => slot.isAvailable && slot.dayOfWeek === scheduledAt.getDay());
+	if (!daySlot) return false;
+
+	const startMinute = scheduledAt.getHours() * 60 + scheduledAt.getMinutes();
+	const endMinute = startMinute + durationMinutes;
+	return startMinute >= daySlot.startMinute && endMinute <= daySlot.endMinute;
 };
 
 const mapMoodRow = (row: { id: string; mood: number; note?: string | null; created_at: Date | string }) => {
@@ -837,8 +916,6 @@ export const listProviders = async (filters: ProviderFilters) => {
 	};
 };
 
-const slotCandidateMinutes = [10 * 60, 12 * 60, 16 * 60, 18 * 60];
-
 export const getProviderById = async (providerId: string) => {
 	const therapist = await db.user.findUnique({
 		where: { id: providerId },
@@ -853,20 +930,9 @@ export const getProviderById = async (providerId: string) => {
 		where: { therapistProfileId: providerId, dateTime: { gte: now, lte: end }, status: { in: ['PENDING', 'CONFIRMED'] } },
 		select: { dateTime: true },
 	});
-	const blocked = new Set(existing.map((s: any) => new Date(s.dateTime).toISOString()));
-	const availableSlots: string[] = [];
-
-	for (let day = 0; day < 7; day += 1) {
-		const d = new Date(now);
-		d.setDate(now.getDate() + day);
-		d.setSeconds(0, 0);
-		for (const minuteOfDay of slotCandidateMinutes) {
-			const slot = new Date(d);
-			slot.setHours(Math.floor(minuteOfDay / 60), minuteOfDay % 60, 0, 0);
-			if (slot <= now) continue;
-			if (!blocked.has(slot.toISOString())) availableSlots.push(slot.toISOString());
-		}
-	}
+	const blocked: Set<string> = new Set(existing.map((s: any) => new Date(s.dateTime).toISOString()));
+	const availability = normalizeAvailabilitySlots(therapist.therapistProfile?.availability);
+	const availableSlots = buildAvailableSlotsFromAvailability(availability, blocked, now);
 
 	return {
 		...profile,
@@ -898,13 +964,29 @@ export const initiateSessionBooking = async (
 	},
 ) => {
 	await getPatientProfile(userId);
-	const provider = await db.user.findUnique({ where: { id: input.providerId }, select: { id: true, role: true, isDeleted: true } });
+	const provider = await db.user.findUnique({
+		where: { id: input.providerId },
+		select: {
+			id: true,
+			role: true,
+			isDeleted: true,
+			therapistProfile: {
+				select: {
+					availability: true,
+				},
+			},
+		},
+	});
 	if (!provider || provider.isDeleted || !normalizeProviderRole(String(provider.role))) throw new AppError('Provider not found', 404);
 
 	const scheduledAt = new Date(input.scheduledAt);
 	if (Number.isNaN(scheduledAt.getTime()) || scheduledAt <= new Date()) throw new AppError('scheduledAt must be a future datetime', 422);
 	assertPaymentDeadlineWindow(scheduledAt);
 	const duration = input.durationMinutes && input.durationMinutes > 0 ? Math.min(180, Math.floor(input.durationMinutes)) : DEFAULT_DURATION_MINUTES;
+	const availability = normalizeAvailabilitySlots(provider.therapistProfile?.availability);
+	if (!isWithinProviderAvailability(scheduledAt, availability, duration)) {
+		throw new AppError('Selected slot is outside provider working hours', 409);
+	}
 	const quote = await getSessionQuote({
 		providerType: input.providerType || roleToProviderType(provider.role),
 		durationMinutes: duration,
@@ -979,6 +1061,21 @@ export const verifySessionPaymentAndCreateSession = async (
 	}
 
 	const patientProfile = await getPatientProfile(userId);
+	const provider = await db.user.findUnique({
+		where: { id: intent.providerId },
+		select: {
+			id: true,
+			therapistProfile: {
+				select: {
+					availability: true,
+				},
+			},
+		},
+	});
+	const availability = normalizeAvailabilitySlots(provider?.therapistProfile?.availability);
+	if (!isWithinProviderAvailability(new Date(intent.scheduledAt), availability, Number(intent.durationMinute) || DEFAULT_DURATION_MINUTES)) {
+		throw new AppError('Selected slot is outside provider working hours', 409);
+	}
 	const conflict = await db.therapySession.findFirst({
 		where: { therapistProfileId: intent.providerId, dateTime: intent.scheduledAt, status: { in: ['PENDING', 'CONFIRMED'] } },
 		select: { id: true },
@@ -1233,6 +1330,7 @@ export const getUpcomingSessions = async (userId: string) => {
 			bookingReferenceId: true,
 			dateTime: true,
 			status: true,
+			isLocked: true,
 			durationMinutes: true,
 			sessionFeeMinor: true,
 			agoraChannel: true,
@@ -1245,6 +1343,7 @@ export const getUpcomingSessions = async (userId: string) => {
 		booking_reference: s.bookingReferenceId,
 		scheduled_at: s.dateTime,
 		status: String(s.status).toLowerCase(),
+		is_locked: Boolean(s.isLocked),
 		duration_minutes: s.durationMinutes,
 		session_fee: Number(s.sessionFeeMinor),
 		agora_channel: s.agoraChannel,
@@ -1263,6 +1362,7 @@ export const getSessionHistory = async (userId: string) => {
 			bookingReferenceId: true,
 			dateTime: true,
 			status: true,
+			isLocked: true,
 			durationMinutes: true,
 			sessionFeeMinor: true,
 			paymentStatus: true,
@@ -1274,6 +1374,7 @@ export const getSessionHistory = async (userId: string) => {
 		booking_reference: s.bookingReferenceId,
 		scheduled_at: s.dateTime,
 		status: String(s.status).toLowerCase(),
+		is_locked: Boolean(s.isLocked),
 		duration_minutes: s.durationMinutes,
 		session_fee: Number(s.sessionFeeMinor),
 		payment_status: s.paymentStatus,

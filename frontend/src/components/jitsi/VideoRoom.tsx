@@ -29,17 +29,43 @@ const loadJitsiScript = (domain: string): Promise<void> => {
 export default function VideoRoom({ sessionId, roomName, displayName, jitsiJwt, className, onEndCall }: VideoRoomProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const managerRef = useRef<JitsiSessionManager | null>(null);
+  const jitsiApiRef = useRef<{ dispose: () => void; addEventListeners?: (listeners: Record<string, () => void>) => void } | null>(null);
+  const initGenerationRef = useRef(0);
+  const leftEventHandledRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
+
+  const disposeActiveRoom = () => {
+    const manager = managerRef.current;
+    if (jitsiApiRef.current) {
+      try {
+        jitsiApiRef.current.dispose();
+      } catch {
+        // ignore already-disposed API errors during teardown
+      }
+      jitsiApiRef.current = null;
+    }
+
+    if (manager) {
+      manager.destroy();
+      managerRef.current = null;
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
+    const generation = ++initGenerationRef.current;
+    leftEventHandledRef.current = false;
 
     const mountRoom = async () => {
       try {
+        // Never initialize a second iframe if one is already active.
+        if (jitsiApiRef.current) return;
+
         const domain = import.meta.env.VITE_JITSI_DOMAIN || 'meet.jit.si';
         await loadJitsiScript(domain);
-        if (cancelled) return;
+        if (cancelled || generation !== initGenerationRef.current) return;
         if (!containerRef.current) throw new Error('Video container not mounted');
+        if (jitsiApiRef.current) return;
 
         const manager = new JitsiSessionManager({
           domain,
@@ -53,6 +79,23 @@ export default function VideoRoom({ sessionId, roomName, displayName, jitsiJwt, 
 
         managerRef.current = manager;
         await manager.init();
+        if (cancelled || generation !== initGenerationRef.current) {
+          manager.destroy();
+          managerRef.current = null;
+          return;
+        }
+
+        const api = manager.getApi() as { dispose: () => void; addEventListeners?: (listeners: Record<string, () => void>) => void } | null;
+        jitsiApiRef.current = api;
+
+        api?.addEventListeners?.({
+          videoConferenceLeft: () => {
+            if (leftEventHandledRef.current) return;
+            leftEventHandledRef.current = true;
+            disposeActiveRoom();
+            onEndCall?.();
+          },
+        });
       } catch (mountError: any) {
         if (!cancelled) {
           setError(String(mountError?.message || 'Unable to start video room'));
@@ -64,12 +107,10 @@ export default function VideoRoom({ sessionId, roomName, displayName, jitsiJwt, 
 
     return () => {
       cancelled = true;
-      if (managerRef.current) {
-        managerRef.current.destroy();
-        managerRef.current = null;
-      }
+      disposeActiveRoom();
     };
-  }, [displayName, jitsiJwt, roomName, sessionId]);
+    // Do not include displayName: auth/user refresh can change it and force unnecessary iframe remounts.
+  }, [jitsiJwt, roomName, sessionId]);
 
   if (error) {
     return (

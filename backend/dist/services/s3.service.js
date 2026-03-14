@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getSignedTherapistDocumentUrl = exports.uploadTherapistDocumentToS3 = exports.getSignedProfilePhotoUrl = exports.deleteFileFromS3 = exports.uploadProfilePhotoToS3 = exports.s3Client = void 0;
+exports.uploadSessionAudioToS3 = exports.getSignedTherapistDocumentUrl = exports.uploadTherapistDocumentToS3 = exports.getSignedProfilePhotoUrl = exports.deleteFileFromS3 = exports.uploadProfilePhotoToS3 = exports.s3Client = void 0;
 const crypto_1 = require("crypto");
 const client_s3_1 = require("@aws-sdk/client-s3");
 const s3_request_presigner_1 = require("@aws-sdk/s3-request-presigner");
@@ -106,3 +106,21 @@ const getSignedTherapistDocumentUrl = async (objectKey) => {
     }), { expiresIn: env_1.env.therapistDocumentSignedUrlTtlSeconds });
 };
 exports.getSignedTherapistDocumentUrl = getSignedTherapistDocumentUrl;
+const uploadSessionAudioToS3 = async (params) => {
+    assertS3Configured();
+    const safeExtension = String(params.fileExtension || 'wav').replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'wav';
+    const uniqueName = `${Date.now()}-${(0, crypto_1.randomUUID)()}.${safeExtension}`;
+    const objectKey = `sessions/${params.sessionId}/audio/${uniqueName}`;
+    await exports.s3Client.send(new client_s3_1.PutObjectCommand({
+        Bucket: env_1.env.awsS3Bucket,
+        Key: objectKey,
+        Body: params.buffer,
+        ContentType: params.mimeType,
+        ServerSideEncryption: 'AES256',
+    }));
+    return {
+        objectKey,
+        objectUrl: buildObjectUrl(env_1.env.awsS3Bucket, objectKey),
+    };
+};
+exports.uploadSessionAudioToS3 = uploadSessionAudioToS3;

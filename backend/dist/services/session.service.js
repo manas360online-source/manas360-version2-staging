@@ -8,6 +8,7 @@ const notification_service_1 = require("./notification.service");
 const pagination_1 = require("../utils/pagination");
 const encryption_1 = require("../utils/encryption");
 const analytics_service_1 = require("./analytics.service");
+const aiService_1 = require("./aiService");
 const redis_1 = require("redis");
 const env_1 = require("../config/env");
 const db = db_1.prisma;
@@ -18,6 +19,54 @@ const buildBookingReferenceId = () => {
     const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const randomPart = (0, crypto_1.randomBytes)(4).toString('hex').toUpperCase();
     return `${prefix}-${datePart}-${randomPart}`;
+};
+const deriveRecordingFileName = (recordingUrl) => {
+    try {
+        const parsedUrl = new URL(recordingUrl);
+        const candidate = parsedUrl.pathname.split('/').filter(Boolean).pop();
+        if (candidate && candidate.length > 0)
+            return candidate;
+    }
+    catch {
+        // Keep fallback below when URL parsing fails.
+    }
+    return 'session-recording.webm';
+};
+const fetchRecordingAudio = async (recordingUrl) => {
+    const response = await fetch(recordingUrl);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch recording (${response.status})`);
+    }
+    const fileName = deriveRecordingFileName(recordingUrl);
+    const mimeType = String(response.headers.get('content-type') || 'audio/webm');
+    const arrayBuffer = await response.arrayBuffer();
+    return {
+        buffer: Buffer.from(arrayBuffer),
+        fileName,
+        mimeType,
+    };
+};
+const triggerSessionTranscription = async (sessionId, recordingUrl) => {
+    if (!recordingUrl)
+        return;
+    try {
+        const audio = await fetchRecordingAudio(recordingUrl);
+        const transcriptResult = await (0, aiService_1.transcribeSession)(audio.buffer, audio.fileName, audio.mimeType);
+        const transcriptText = transcriptResult.transcriptWithTimestamps || transcriptResult.transcript;
+        if (!transcriptText)
+            return;
+        await db_1.prisma.therapySession.update({
+            where: { id: sessionId },
+            data: { transcript: transcriptText },
+        });
+    }
+    catch (error) {
+        console.error('[session] transcription_failed', {
+            sessionId,
+            errorType: error?.name || 'UnknownError',
+            error: error?.message || String(error),
+        });
+    }
 };
 const ensurePatientProfile = async (userId) => {
     const patientProfile = await db.patientProfile.findUnique({ where: { userId }, select: { id: true } });
@@ -142,7 +191,7 @@ const getMySessionHistory = async (userId, query) => {
         db_1.prisma.therapySession.count({ where: prismaFilter }),
         db_1.prisma.therapySession.findMany({
             where: prismaFilter,
-            select: { id: true, bookingReferenceId: true, therapistProfileId: true, dateTime: true, status: true, createdAt: true },
+            select: { id: true, bookingReferenceId: true, therapistProfileId: true, dateTime: true, status: true, isLocked: true, createdAt: true },
             orderBy: { dateTime: 'desc' },
             skip: pagination.skip,
             take: pagination.limit,
@@ -164,6 +213,7 @@ const getMySessionHistory = async (userId, query) => {
             bookingReferenceId: session.bookingReferenceId,
             dateTime: sessionDate,
             status: String(session.status).toLowerCase(),
+            isLocked: Boolean(session.isLocked),
             timing: sessionDate < now ? 'past' : 'upcoming',
             therapist: {
                 id: String(session.therapistProfileId),
@@ -484,6 +534,9 @@ const updateMyTherapistSessionStatus = async (userId, sessionId, payload) => {
     }
     catch (e) {
         // ignore
+    }
+    if (payload.status === 'completed') {
+        void triggerSessionTranscription(String(updated.id), payload.recordingUrl);
     }
     return {
         sessionId: String(updated.id),

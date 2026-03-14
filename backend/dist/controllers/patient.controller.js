@@ -61,6 +61,16 @@ const mapPatientSessionBadge = (status) => {
         return 'In Progress';
     return 'New';
 };
+const getCurrentTreatmentWeek = (startDate) => {
+    const millisPerWeek = 7 * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    const diff = Math.max(0, now - startDate.getTime());
+    return Math.floor(diff / millisPerWeek) + 1;
+};
+const isExerciseActivityType = (activityType) => {
+    const normalized = String(activityType || '').toUpperCase();
+    return ['EXERCISE', 'AUDIO_THERAPY', 'CLINICAL_ASSESSMENT', 'READING_MATERIAL'].includes(normalized);
+};
 const getAuthUserId = (req) => {
     const userId = req.auth?.userId;
     if (!userId) {
@@ -119,6 +129,11 @@ const getMyTherapistMatchesController = async (req, res) => {
 exports.getMyTherapistMatchesController = getMyTherapistMatchesController;
 const getMyTherapyPlanController = async (req, res) => {
     const userId = getAuthUserId(req);
+    const weekQueryRaw = req.query.week;
+    const weekQuery = weekQueryRaw !== undefined ? Number(weekQueryRaw) : undefined;
+    if (weekQueryRaw !== undefined && (!Number.isInteger(weekQuery) || Number(weekQuery) <= 0)) {
+        throw new error_middleware_1.AppError('week must be a positive integer', 422);
+    }
     const patientProfile = await db_1.prisma.patientProfile.findUnique({
         where: { userId },
         select: { id: true },
@@ -126,17 +141,38 @@ const getMyTherapyPlanController = async (req, res) => {
     if (!patientProfile) {
         throw new error_middleware_1.AppError('Patient profile not found', 404);
     }
+    const activePlan = await db_1.prisma.therapyPlan.findFirst({
+        where: {
+            patientId: patientProfile.id,
+            status: 'ACTIVE',
+        },
+        orderBy: { updatedAt: 'desc' },
+        select: {
+            id: true,
+            startDate: true,
+            endDate: true,
+        },
+    });
+    const currentWeek = activePlan?.startDate ? getCurrentTreatmentWeek(activePlan.startDate) : 1;
+    const selectedWeek = weekQuery ?? currentWeek;
+    const planFilter = activePlan
+        ? { id: activePlan.id }
+        : {
+            patientId: patientProfile.id,
+            status: 'ACTIVE',
+        };
     const [goalActivities, cbtSessions, therapistNotes, careTeamAssignment] = await Promise.all([
         db_1.prisma.therapyPlanActivity.findMany({
             where: {
                 plan: {
-                    patientId: patientProfile.id,
-                    status: 'ACTIVE',
+                    ...planFilter,
                 },
+                weekNumber: selectedWeek,
+                isPublished: true,
             },
             orderBy: [
-                { createdAt: 'desc' },
                 { orderIndex: 'asc' },
+                { createdAt: 'asc' },
             ],
             select: {
                 id: true,
@@ -145,6 +181,8 @@ const getMyTherapyPlanController = async (req, res) => {
                 status: true,
                 createdAt: true,
                 completedAt: true,
+                category: true,
+                weekNumber: true,
             },
         }),
         db_1.prisma.patientSession.findMany({
@@ -207,23 +245,26 @@ const getMyTherapyPlanController = async (req, res) => {
     ]);
     const fallbackProviderName = getProviderDisplayName(careTeamAssignment?.provider);
     const fallbackProviderInitials = getProviderInitials(fallbackProviderName);
-    const goals = goalActivities.map((goal) => ({
+    const providerAssignedGoals = goalActivities.filter((activity) => !isExerciseActivityType(String(activity.activityType)));
+    const providerAssignedExercises = goalActivities.filter((activity) => isExerciseActivityType(String(activity.activityType)));
+    const goals = providerAssignedGoals.map((goal) => ({
         id: goal.id,
         title: goal.title,
-        category: mapGoalCategory(goal.title, String(goal.activityType)),
+        category: String(goal.category || mapGoalCategory(goal.title, String(goal.activityType))),
         todayCheckInDone: String(goal.status || '').toUpperCase() === 'COMPLETED',
         startDate: goal.createdAt.toISOString(),
+        weekNumber: goal.weekNumber,
     }));
-    const cbtExercises = cbtSessions.map((session) => ({
-        id: session.id,
-        sessionId: session.id,
-        type: String(session.template?.category || 'CBT Exercise'),
-        title: String(session.template?.title || 'CBT Exercise'),
-        status: mapPatientSessionBadge(String(session.status)),
-        completed: String(session.status || '').toUpperCase() === 'COMPLETED',
-        assignedAt: session.createdAt.toISOString(),
-        completedAt: session.completedAt ? session.completedAt.toISOString() : null,
-        therapistFeedback: cleanFeedbackText(session.sessionNotes),
+    const cbtExercises = providerAssignedExercises.map((activity) => ({
+        id: activity.id,
+        sessionId: '',
+        type: String(activity.activityType || 'CBT Exercise'),
+        title: activity.title,
+        status: mapPatientSessionBadge(String(activity.status)),
+        completed: String(activity.status || '').toUpperCase() === 'COMPLETED',
+        assignedAt: activity.createdAt.toISOString(),
+        completedAt: activity.completedAt ? activity.completedAt.toISOString() : null,
+        weekNumber: activity.weekNumber,
     }));
     const recentFeedback = [
         ...therapistNotes
@@ -262,6 +303,7 @@ const getMyTherapyPlanController = async (req, res) => {
             title: goal.title,
             category: goal.category,
             completed: goal.todayCheckInDone,
+            weekNumber: goal.weekNumber,
         })),
         ...cbtExercises.map((exercise) => ({
             id: exercise.id,
@@ -270,8 +312,21 @@ const getMyTherapyPlanController = async (req, res) => {
             type: exercise.type,
             completed: exercise.completed,
             status: exercise.status,
+            weekNumber: exercise.weekNumber,
         })),
     ];
-    (0, response_1.sendSuccess)(res, { dailyTasks, goals, cbtExercises, recentFeedback }, 'Therapy plan fetched');
+    const maxAssignedWeek = goalActivities.reduce((maxWeek, activity) => Math.max(maxWeek, Number(activity.weekNumber || 1)), 1);
+    const totalWeeks = Math.max(maxAssignedWeek, currentWeek);
+    (0, response_1.sendSuccess)(res, {
+        dailyTasks,
+        goals,
+        cbtExercises,
+        recentFeedback,
+        weekContext: {
+            selectedWeek,
+            currentWeek,
+            totalWeeks,
+        },
+    }, 'Therapy plan fetched');
 };
 exports.getMyTherapyPlanController = getMyTherapyPlanController;

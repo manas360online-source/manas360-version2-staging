@@ -296,6 +296,11 @@ export const patientApi = {
     carrier?: string;
     emergencyContact?: { name: string; relation: string; phone: string };
   }) => (await http.post('/v1/patients/profile', payload)).data,
+  getMyProfile: async () =>
+    withFallbackChain([
+      async () => (await http.get('/v1/patients/me/profile')).data,
+      async () => (await http.get('/patient/me/profile')).data,
+    ]),
   getSubscription: async () => {
     const response = await http.get('/patient/subscription');
     return unwrapPayload(response.data);
@@ -324,10 +329,10 @@ export const patientApi = {
       async () => (await http.post('/v1/exercises/library', payload)).data,
     ),
   completeExercise: async (id: string) => (await http.patch(`/patient/exercises/${encodeURIComponent(id)}/complete`)).data,
-  getTherapyPlan: async () =>
+  getTherapyPlan: async (week?: number) =>
     withFallbackChain([
-      async () => (await http.get('/v1/patients/me/therapy-plan')).data,
-      async () => (await http.get('/v1/therapy-plan')).data,
+      async () => (await http.get('/v1/patients/me/therapy-plan', { params: week ? { week } : undefined })).data,
+      async () => (await http.get('/v1/therapy-plan', { params: week ? { week } : undefined })).data,
     ]),
   completeTherapyPlanTask: async (id: string) => (await http.patch(`/v1/therapy-plan/tasks/${encodeURIComponent(id)}/complete`)).data,
   getPricing: async () =>

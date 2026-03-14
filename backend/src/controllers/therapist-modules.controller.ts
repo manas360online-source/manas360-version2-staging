@@ -4,6 +4,7 @@ import { sendSuccess } from '../utils/response';
 import {
   listTherapistStructuredSessionNotes,
   upsertTherapistStructuredSessionNote,
+  generateTherapistAiSessionNote,
   listTherapistExercises,
   createTherapistExercise,
   updateTherapistExercise,
@@ -41,6 +42,14 @@ export const putMyTherapistStructuredSessionNoteController = async (req: Request
 
   const data = await upsertTherapistStructuredSessionNote(authUserId(req), sessionId, req.body || {});
   sendSuccess(res, data, 'Therapist structured session note saved');
+};
+
+export const postGenerateAiSessionNoteController = async (req: Request, res: Response): Promise<void> => {
+  const sessionId = String(req.params.sessionId || '').trim();
+  if (!sessionId) throw new AppError('sessionId is required', 400);
+
+  const data = await generateTherapistAiSessionNote(authUserId(req), sessionId);
+  sendSuccess(res, data, 'AI clinical note generated');
 };
 
 export const getMyTherapistExercisesController = async (req: Request, res: Response): Promise<void> => {

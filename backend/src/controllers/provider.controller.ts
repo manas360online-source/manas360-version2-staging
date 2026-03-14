@@ -4,6 +4,12 @@ import { prisma } from '../config/db';
 import { sendSuccess } from '../utils/response';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
+import {
+	getConversationMessages as getDirectConversationMessages,
+	getOrCreateConversation,
+	getProviderConversations,
+	sendDirectMessage,
+} from '../services/messaging.service';
 
 type ProviderRole = 'THERAPIST' | 'PSYCHOLOGIST' | 'PSYCHIATRIST' | 'COACH';
 
@@ -67,6 +73,42 @@ const formatRate = (numerator: number, denominator: number): string => {
 	if (!denominator) return '0%';
 	return `${Math.round((numerator / denominator) * 100)}%`;
 };
+const toMinorUnits = (value: unknown): number => {
+	if (typeof value === 'bigint') return Number(value);
+	if (typeof value === 'number') return value;
+	if (typeof value === 'string' && value.trim()) return Number(value);
+	return 0;
+};
+
+const minuteToTime = (minute: number): string => {
+	const hours = Math.floor(minute / 60)
+		.toString()
+		.padStart(2, '0');
+	const mins = (minute % 60).toString().padStart(2, '0');
+	return `${hours}:${mins}`;
+};
+
+const timeToMinute = (value: string): number => {
+	const [hoursRaw, minutesRaw] = String(value || '00:00').split(':');
+	const hours = Number.parseInt(hoursRaw || '0', 10);
+	const minutes = Number.parseInt(minutesRaw || '0', 10);
+	return Math.max(0, Math.min(23, hours)) * 60 + Math.max(0, Math.min(59, minutes));
+};
+
+const normalizeSpecializations = (values: string[]): string[] => {
+	const normalized = values
+		.map((value) => String(value || '').trim())
+		.filter(Boolean);
+	return Array.from(new Set(normalized));
+};
+
+const buildDefaultAvailabilityGrid = () =>
+	Array.from({ length: 7 }, (_, index) => ({
+		dayOfWeek: index,
+		startTime: '09:00',
+		endTime: '17:00',
+		isAvailable: false,
+	}));
 
 const getProviderRole = async (providerId: string): Promise<ProviderRole> => {
 	const user = await prisma.user.findUnique({
@@ -322,7 +364,6 @@ const ensureProviderPatientAccess = async (providerId: string, patientId: string
 export const getProviderDashboardController = async (req: Request, res: Response): Promise<void> => {
 	const providerId = authUserId(req);
 	const role = await getProviderRole(providerId);
-
 	const { startOfDay, endOfDay, startOfMonth } = getDateBounds();
 	const sevenDaysAgo = new Date();
 	sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -535,6 +576,113 @@ export const getProviderDashboardController = async (req: Request, res: Response
 	sendSuccess(res, responseData, 'Provider dashboard fetched');
 };
 
+export const getProviderEarnings = async (req: Request, res: Response): Promise<void> => {
+	const providerId = authUserId(req);
+	await getProviderRole(providerId);
+
+	const now = new Date();
+	const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+	monthStart.setHours(0, 0, 0, 0);
+
+	const sixMonthsStart = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+	sixMonthsStart.setHours(0, 0, 0, 0);
+
+	const [therapistProfile, wallet, sessions] = await Promise.all([
+		prisma.therapistProfile.findUnique({
+			where: { userId: providerId },
+			select: { consultationFee: true },
+		}),
+		prisma.providerWallet.findUnique({
+			where: { providerId },
+			select: { pendingBalanceMinor: true },
+		}),
+		prisma.therapySession.findMany({
+			where: {
+				therapistProfileId: providerId,
+				status: { in: ['CONFIRMED', 'COMPLETED'] },
+				dateTime: { gte: sixMonthsStart },
+			},
+			orderBy: { dateTime: 'desc' },
+			select: {
+				id: true,
+				bookingReferenceId: true,
+				dateTime: true,
+				status: true,
+				sessionFeeMinor: true,
+				patientProfile: {
+					select: {
+						user: {
+							select: {
+								firstName: true,
+								lastName: true,
+								name: true,
+							},
+						},
+					},
+				},
+			},
+		}),
+	]);
+
+	const providerRateMinor = Math.max(0, toMinorUnits(therapistProfile?.consultationFee));
+	const toSessionAmountMinor = (sessionFeeMinor: unknown): number => {
+		const storedAmount = toMinorUnits(sessionFeeMinor);
+		return storedAmount > 0 ? storedAmount : providerRateMinor;
+	};
+
+	const totalRevenueMinor = sessions.reduce((sum, session) => sum + toSessionAmountMinor(session.sessionFeeMinor), 0);
+	const pendingPayoutsMinor = Math.max(0, toMinorUnits(wallet?.pendingBalanceMinor));
+	const sessionsThisMonth = sessions.filter((session) => new Date(session.dateTime) >= monthStart).length;
+
+	const monthBuckets = Array.from({ length: 6 }, (_, index) => {
+		const date = new Date(now.getFullYear(), now.getMonth() - (5 - index), 1);
+		return {
+			key: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`,
+			label: date.toLocaleDateString('en-US', { month: 'short' }),
+			amountMinor: 0,
+			sessions: 0,
+		};
+	});
+
+	const monthBucketMap = new Map(monthBuckets.map((bucket) => [bucket.key, bucket]));
+	for (const session of sessions) {
+		const sessionDate = new Date(session.dateTime);
+		const key = `${sessionDate.getFullYear()}-${String(sessionDate.getMonth() + 1).padStart(2, '0')}`;
+		const bucket = monthBucketMap.get(key);
+		if (!bucket) continue;
+		bucket.amountMinor += toSessionAmountMinor(session.sessionFeeMinor);
+		bucket.sessions += 1;
+	}
+
+	const recentTransactions = sessions.slice(0, 10).map((session) => ({
+		id: session.id,
+		bookingReferenceId: session.bookingReferenceId,
+		date: session.dateTime,
+		patientName: toPatientName(
+			session.patientProfile.user.firstName,
+			session.patientProfile.user.lastName,
+			session.patientProfile.user.name,
+		),
+		amountMinor: toSessionAmountMinor(session.sessionFeeMinor),
+		status: String(session.status),
+	}));
+
+	sendSuccess(
+		res,
+		{
+			summary: {
+				totalEarningsMinor: totalRevenueMinor,
+				pendingPayoutsMinor,
+				sessionsThisMonth,
+				sessionRateMinor: providerRateMinor,
+			},
+			monthlyTrend: monthBuckets,
+			recentTransactions,
+		},
+		'Provider earnings fetched',
+	);
+};
+
 export const getProviderPatients = async (req: Request, res: Response): Promise<void> => {
 	const providerId = authUserId(req);
 	await getProviderRole(providerId);
@@ -617,6 +765,223 @@ export const getProviderPatients = async (req: Request, res: Response): Promise<
 		.sort((a, b) => a.name.localeCompare(b.name));
 
 	sendSuccess(res, patients, 'Provider patients fetched');
+};
+
+export const getProviderCalendarSessions = async (req: Request, res: Response): Promise<void> => {
+	const providerId = authUserId(req);
+	await getProviderRole(providerId);
+
+	const sessions = await prisma.therapySession.findMany({
+		where: { therapistProfileId: providerId },
+		orderBy: { dateTime: 'asc' },
+		select: {
+			id: true,
+			bookingReferenceId: true,
+			dateTime: true,
+			durationMinutes: true,
+			status: true,
+			patientProfile: {
+				select: {
+					userId: true,
+					user: {
+						select: {
+							firstName: true,
+							lastName: true,
+							name: true,
+						},
+					},
+				},
+			},
+		},
+	});
+
+	const now = new Date();
+	const responseData = sessions.map((session) => {
+		const rawStatus = String(session.status || '').toUpperCase();
+		const sessionDate = new Date(session.dateTime);
+		let status: 'Upcoming' | 'Completed' | 'Cancelled' = 'Upcoming';
+
+		if (rawStatus === 'CANCELLED') {
+			status = 'Cancelled';
+		} else if (rawStatus === 'COMPLETED' || sessionDate.getTime() < now.getTime()) {
+			status = 'Completed';
+		}
+
+		return {
+			id: session.id,
+			bookingReferenceId: session.bookingReferenceId,
+			dateTime: session.dateTime.toISOString(),
+			durationMinutes: session.durationMinutes,
+			status,
+			patientId: String(session.patientProfile.userId),
+			patientName: toPatientName(
+				session.patientProfile.user.firstName,
+				session.patientProfile.user.lastName,
+				session.patientProfile.user.name,
+			),
+		};
+	});
+
+	sendSuccess(res, responseData, 'Provider calendar sessions fetched');
+};
+
+export const getProviderSettings = async (req: Request, res: Response): Promise<void> => {
+	const providerId = authUserId(req);
+	await getProviderRole(providerId);
+
+	const provider = await prisma.user.findUnique({
+		where: { id: providerId },
+		select: {
+			id: true,
+			firstName: true,
+			lastName: true,
+			name: true,
+			email: true,
+			profileImageUrl: true,
+			therapistProfile: {
+				select: {
+					bio: true,
+					specializations: true,
+					availability: true,
+				},
+			},
+		},
+	});
+
+	if (!provider) {
+		throw new AppError('Provider not found', 404);
+	}
+
+	const defaultGrid = buildDefaultAvailabilityGrid();
+	const storedAvailability = Array.isArray(provider.therapistProfile?.availability)
+		? (provider.therapistProfile?.availability as Array<Record<string, unknown>>)
+		: [];
+	const availabilityByDay = new Map<number, { startTime: string; endTime: string; isAvailable: boolean }>();
+	for (const slot of storedAvailability) {
+		const dayOfWeek = Number(slot.dayOfWeek);
+		if (!Number.isInteger(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6 || availabilityByDay.has(dayOfWeek)) continue;
+		availabilityByDay.set(dayOfWeek, {
+			startTime: minuteToTime(Number(slot.startMinute ?? 540)),
+			endTime: minuteToTime(Number(slot.endMinute ?? 1020)),
+			isAvailable: Boolean(slot.isAvailable),
+		});
+	}
+
+	const availabilitySlots = defaultGrid.map((day) => ({
+		dayOfWeek: day.dayOfWeek,
+		startTime: availabilityByDay.get(day.dayOfWeek)?.startTime || day.startTime,
+		endTime: availabilityByDay.get(day.dayOfWeek)?.endTime || day.endTime,
+		isAvailable: availabilityByDay.get(day.dayOfWeek)?.isAvailable || false,
+	}));
+
+	sendSuccess(
+		res,
+		{
+			providerId: provider.id,
+			displayName: toPatientName(provider.firstName, provider.lastName, provider.name),
+			email: provider.email,
+			bio: provider.therapistProfile?.bio || '',
+			specializations: provider.therapistProfile?.specializations || [],
+			profileImageUrl: provider.profileImageUrl || '',
+			availabilitySlots,
+		},
+		'Provider settings fetched',
+	);
+};
+
+export const updateProviderSettings = async (req: Request, res: Response): Promise<void> => {
+	const providerId = authUserId(req);
+	await getProviderRole(providerId);
+
+	const bio = String(req.body?.bio || '').trim();
+	const profileImageUrl = String(req.body?.profileImageUrl || '').trim();
+	const specializations = normalizeSpecializations(
+		Array.isArray(req.body?.specializations)
+			? req.body.specializations.map((value: unknown) => String(value || ''))
+			: String(req.body?.specializations || '')
+				.split(',')
+				.map((value) => value.trim()),
+	);
+	const rawAvailability = Array.isArray(req.body?.availabilitySlots) ? req.body.availabilitySlots : [];
+
+	if (!bio) {
+		throw new AppError('Bio is required', 400);
+	}
+	if (bio.length > 2000) {
+		throw new AppError('Bio max length is 2000 characters', 400);
+	}
+	if (!specializations.length) {
+		throw new AppError('At least one specialty is required', 400);
+	}
+
+	const availabilitySlots = buildDefaultAvailabilityGrid().map((defaultDay) => {
+		const incoming = rawAvailability.find((entry: any) => Number(entry?.dayOfWeek) === defaultDay.dayOfWeek) as Record<string, unknown> | undefined;
+		const startTime = String(incoming?.startTime || defaultDay.startTime);
+		const endTime = String(incoming?.endTime || defaultDay.endTime);
+		const startMinute = timeToMinute(startTime);
+		const endMinute = timeToMinute(endTime);
+		const isAvailable = Boolean(incoming?.isAvailable);
+		if (isAvailable && endMinute <= startMinute) {
+			throw new AppError(`End time must be after start time for day ${defaultDay.dayOfWeek}`, 400);
+		}
+		return {
+			dayOfWeek: defaultDay.dayOfWeek,
+			startMinute,
+			endMinute,
+			isAvailable,
+		};
+	});
+
+	const user = await prisma.user.findUnique({
+		where: { id: providerId },
+		select: { id: true, name: true, firstName: true, lastName: true },
+	});
+	if (!user) {
+		throw new AppError('Provider not found', 404);
+	}
+	const displayName = String(user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim()).trim() || 'Provider';
+
+	const [, profile] = await prisma.$transaction([
+		prisma.user.update({
+			where: { id: providerId },
+			data: { profileImageUrl: profileImageUrl || null },
+		}),
+		prisma.therapistProfile.upsert({
+			where: { userId: providerId },
+			update: {
+				displayName,
+				bio,
+				specializations,
+				availability: availabilitySlots,
+			},
+			create: {
+				userId: providerId,
+				displayName,
+				bio,
+				specializations,
+				languages: [],
+				yearsOfExperience: 0,
+				consultationFee: 0,
+				availability: availabilitySlots,
+			},
+		}),
+	]);
+
+	const responseData = {
+		providerId,
+		displayName,
+		bio: profile.bio || '',
+		specializations: profile.specializations || [],
+		profileImageUrl: profileImageUrl || '',
+		availabilitySlots: availabilitySlots.map((slot) => ({
+			dayOfWeek: slot.dayOfWeek,
+			startTime: minuteToTime(slot.startMinute),
+			endTime: minuteToTime(slot.endMinute),
+			isAvailable: slot.isAvailable,
+		})),
+	};
+
+	sendSuccess(res, responseData, 'Provider settings updated');
 };
 
 export const getPatientOverview = async (req: Request, res: Response): Promise<void> => {
@@ -1317,39 +1682,77 @@ export const reviewCBTModule = async (req: Request, res: Response): Promise<void
 		throw new AppError('CBT module not found', 404);
 	}
 
-	const updated = await prisma.patientSession.update({
-		where: { id: moduleId },
-		data: {
-			sessionNotes: feedback,
-			status: 'COMPLETED',
-			completedAt: new Date(),
-		},
-		select: {
-			id: true,
-			status: true,
-			createdAt: true,
-			completedAt: true,
-			sessionNotes: true,
-			template: {
-				select: {
-					title: true,
-					category: true,
-				},
+	const updated = await prisma.$transaction(async (tx) => {
+		const reviewedSession = await tx.patientSession.update({
+			where: { id: moduleId },
+			data: {
+				sessionNotes: feedback,
+				status: 'COMPLETED',
+				completedAt: new Date(),
 			},
-			responses: {
-				orderBy: { answeredAt: 'asc' },
-				select: {
-					id: true,
-					answeredAt: true,
-					responseData: true,
-					question: {
-						select: {
-							prompt: true,
+			select: {
+				id: true,
+				status: true,
+				createdAt: true,
+				completedAt: true,
+				sessionNotes: true,
+				template: {
+					select: {
+						title: true,
+						category: true,
+					},
+				},
+				responses: {
+					orderBy: { answeredAt: 'asc' },
+					select: {
+						id: true,
+						answeredAt: true,
+						responseData: true,
+						question: {
+							select: {
+								prompt: true,
+							},
 						},
 					},
 				},
 			},
-		},
+		});
+
+		const moduleName = String(reviewedSession.template?.title || reviewedSession.template?.category || 'CBT').replace(/\s+exercise$/i, '');
+		const messageText = `I have reviewed your ${moduleName} exercise. Check the feedback in your plan!`;
+
+		const conversation = await tx.directConversation.upsert({
+			where: {
+				patientId_providerId: {
+					patientId,
+					providerId,
+				},
+			},
+			create: {
+				patientId,
+				providerId,
+				isSupport: false,
+				lastMessageAt: new Date(),
+				lastMessageText: messageText,
+			},
+			update: {
+				lastMessageAt: new Date(),
+				lastMessageText: messageText,
+			},
+			select: { id: true },
+		});
+
+		await tx.directMessage.create({
+			data: {
+				conversationId: conversation.id,
+				senderId: providerId,
+				senderRole: 'provider',
+				content: messageText,
+				messageType: 'TEXT',
+			},
+		});
+
+		return reviewedSession;
 	});
 
 	const responseData = {
@@ -1369,6 +1772,70 @@ export const reviewCBTModule = async (req: Request, res: Response): Promise<void
 	};
 
 	sendSuccess(res, responseData, 'CBT module reviewed');
+};
+
+export const getConversations = async (req: Request, res: Response): Promise<void> => {
+	const providerId = authUserId(req);
+	await getProviderRole(providerId);
+
+	const conversations = await getProviderConversations(providerId);
+	sendSuccess(res, conversations, 'Provider conversations fetched');
+};
+
+export const getConversationMessages = async (req: Request, res: Response): Promise<void> => {
+	const providerId = authUserId(req);
+	await getProviderRole(providerId);
+
+	const conversationId = String(req.params.conversationId || '').trim();
+	const before = typeof req.query.before === 'string' ? req.query.before : undefined;
+
+	if (!conversationId) {
+		throw new AppError('Conversation id is required', 400);
+	}
+
+	const conversation = await prisma.directConversation.findFirst({
+		where: {
+			id: conversationId,
+			providerId,
+		},
+		select: { id: true },
+	});
+
+	if (!conversation) {
+		throw new AppError('Conversation not found', 404);
+	}
+
+	const messages = await getDirectConversationMessages(conversationId, providerId, 60, before);
+	sendSuccess(res, messages, 'Conversation messages fetched');
+};
+
+export const sendMessage = async (req: Request, res: Response): Promise<void> => {
+	const providerId = authUserId(req);
+	await getProviderRole(providerId);
+
+	const conversationId = String(req.body?.conversationId || '').trim();
+	const content = String(req.body?.content || '').trim();
+	const patientId = String(req.body?.patientId || '').trim();
+
+	if (!content) {
+		throw new AppError('Message content is required', 400);
+	}
+	if (content.length > 4000) {
+		throw new AppError('Message too long (max 4000 characters)', 400);
+	}
+
+	let resolvedConversationId = conversationId;
+	if (!resolvedConversationId) {
+		if (!patientId) {
+			throw new AppError('Conversation id or patient id is required', 400);
+		}
+		await ensureProviderPatientAccess(providerId, patientId);
+		const conversation = await getOrCreateConversation(patientId, providerId);
+		resolvedConversationId = conversation.id;
+	}
+
+	const message = await sendDirectMessage(resolvedConversationId, providerId, 'provider', content);
+	sendSuccess(res, message, 'Message sent', 201);
 };
 
 export const getPatientPrescriptions = async (req: Request, res: Response): Promise<void> => {
@@ -1456,6 +1923,301 @@ export const getPatientLabs = async (req: Request, res: Response): Promise<void>
 	});
 
 	sendSuccess(res, responseData, 'Patient lab orders fetched');
+};
+
+export const saveWeeklyPlan = async (req: Request, res: Response): Promise<void> => {
+	const providerId = authUserId(req);
+	await getProviderRole(providerId);
+	const patientId = String(req.params.patientId || '').trim();
+
+	if (!patientId) {
+		throw new AppError('Patient id is required', 400);
+	}
+
+	const inputWeekNumber = Number(req.body?.weekNumber);
+	if (!Number.isInteger(inputWeekNumber) || inputWeekNumber < 1) {
+		throw new AppError('weekNumber must be a positive integer', 400);
+	}
+
+	const activitiesInput = Array.isArray(req.body?.activities) ? req.body.activities : null;
+	if (!activitiesInput) {
+		throw new AppError('activities must be an array', 400);
+	}
+
+	const allowedFrequencies = ['DAILY_RITUAL', 'WEEKLY_MILESTONE', 'ONE_TIME'];
+	const allowedActivityTypes = ['MOOD_CHECKIN', 'EXERCISE', 'AUDIO_THERAPY', 'CLINICAL_ASSESSMENT', 'READING_MATERIAL', 'SESSION_BOOKING'];
+
+	const { patientProfileId } = await ensureProviderPatientAccess(providerId, patientId);
+
+	let plan = await prisma.therapyPlan.findFirst({
+		where: {
+			patientId: patientProfileId,
+			therapistId: providerId,
+			status: 'ACTIVE',
+		},
+		orderBy: { createdAt: 'desc' },
+		select: { id: true },
+	});
+
+	if (!plan) {
+		const now = new Date();
+		const endDate = new Date(now);
+		endDate.setDate(endDate.getDate() + 30);
+
+		plan = await prisma.therapyPlan.create({
+			data: {
+				patientId: patientProfileId,
+				therapistId: providerId,
+				title: 'Provider Assigned Plan',
+				providerNote: 'Auto-created from weekly plan studio.',
+				startDate: now,
+				endDate,
+				status: 'ACTIVE',
+			},
+			select: { id: true },
+		});
+	}
+
+	const normalizedActivities = activitiesInput.map((item: any, index: number) => {
+		const title = String(item?.title || '').trim();
+		if (!title) {
+			throw new AppError(`activities[${index}].title is required`, 400);
+		}
+
+		const frequency = String(item?.frequency || 'ONE_TIME').toUpperCase();
+		const activityType = String(item?.activityType || 'EXERCISE').toUpperCase();
+
+		return {
+			id: item?.id ? String(item.id).trim() : '',
+			planId: plan!.id,
+			title,
+			frequency: allowedFrequencies.includes(frequency) ? frequency : 'ONE_TIME',
+			activityType: allowedActivityTypes.includes(activityType) ? activityType : 'EXERCISE',
+			referenceId: item?.referenceId ? String(item.referenceId) : null,
+			estimatedMinutes: Number.isFinite(Number(item?.estimatedMinutes)) ? Number(item.estimatedMinutes) : 10,
+			orderIndex: Number.isInteger(Number(item?.orderIndex)) ? Number(item.orderIndex) : index,
+			weekNumber: inputWeekNumber,
+			category: item?.category ? String(item.category).trim() || null : null,
+			status: 'PENDING',
+			isPublished: false,
+		};
+	});
+
+	const result = await prisma.$transaction(async (tx) => {
+		const existingWeekActivities = await tx.therapyPlanActivity.findMany({
+			where: {
+				planId: plan!.id,
+				weekNumber: inputWeekNumber,
+			},
+			select: {
+				id: true,
+			},
+		});
+
+		const existingIds = new Set(existingWeekActivities.map((activity) => activity.id));
+		const retainedIds: string[] = [];
+		let createdCount = 0;
+		let updatedCount = 0;
+
+		for (const activity of normalizedActivities) {
+			const payload = {
+				planId: activity.planId,
+				title: activity.title,
+				frequency: activity.frequency as any,
+				activityType: activity.activityType as any,
+				referenceId: activity.referenceId,
+				estimatedMinutes: activity.estimatedMinutes,
+				orderIndex: activity.orderIndex,
+				weekNumber: activity.weekNumber,
+				category: activity.category,
+				status: activity.status,
+				isPublished: activity.isPublished,
+			};
+
+			if (activity.id && existingIds.has(activity.id)) {
+				await tx.therapyPlanActivity.update({
+					where: { id: activity.id },
+					data: payload,
+				});
+				retainedIds.push(activity.id);
+				updatedCount += 1;
+				continue;
+			}
+
+			const created = await tx.therapyPlanActivity.create({
+				data: payload,
+				select: { id: true },
+			});
+			retainedIds.push(created.id);
+			createdCount += 1;
+		}
+
+		const deleted = await tx.therapyPlanActivity.deleteMany({
+			where: {
+				planId: plan!.id,
+				weekNumber: inputWeekNumber,
+				status: 'PENDING',
+				id: retainedIds.length > 0 ? { notIn: retainedIds } : undefined,
+			},
+		});
+
+		return {
+			deletedCount: deleted.count,
+			insertedCount: createdCount,
+			updatedCount,
+		};
+	});
+
+	sendSuccess(res, {
+		planId: plan.id,
+		patientId,
+		weekNumber: inputWeekNumber,
+		deletedCount: result.deletedCount,
+		insertedCount: result.insertedCount,
+		updatedCount: result.updatedCount,
+	}, 'Weekly plan saved');
+};
+
+export const updateWeeklyPlan = saveWeeklyPlan;
+
+export const publishWeeklyPlan = async (req: Request, res: Response): Promise<void> => {
+	const providerId = authUserId(req);
+	await getProviderRole(providerId);
+	const patientId = String(req.params.patientId || '').trim();
+
+	if (!patientId) {
+		throw new AppError('Patient id is required', 400);
+	}
+
+	const inputWeekNumber = Number(req.body?.weekNumber);
+	if (!Number.isInteger(inputWeekNumber) || inputWeekNumber < 1) {
+		throw new AppError('weekNumber must be a positive integer', 400);
+	}
+
+	const { patientProfileId } = await ensureProviderPatientAccess(providerId, patientId);
+
+	const plan = await prisma.therapyPlan.findFirst({
+		where: {
+			patientId: patientProfileId,
+			therapistId: providerId,
+			status: 'ACTIVE',
+		},
+		orderBy: { createdAt: 'desc' },
+		select: { id: true },
+	});
+
+	if (!plan) {
+		throw new AppError('No active plan found for this patient', 404);
+	}
+
+	const updated = await prisma.therapyPlanActivity.updateMany({
+		where: {
+			planId: plan.id,
+			weekNumber: inputWeekNumber,
+		},
+		data: {
+			isPublished: true,
+		},
+	});
+
+	sendSuccess(res, {
+		planId: plan.id,
+		patientId,
+		weekNumber: inputWeekNumber,
+		publishedCount: updated.count,
+	}, 'Weekly plan published');
+};
+
+export const scheduleNextSession = async (req: Request, res: Response): Promise<void> => {
+	const providerId = authUserId(req);
+	await getProviderRole(providerId);
+	const patientId = String(req.params.patientId || '').trim();
+
+	if (!patientId) {
+		throw new AppError('Patient id is required', 400);
+	}
+
+	const startTimeRaw = String(req.body?.startTime || '').trim();
+	if (!startTimeRaw) {
+		throw new AppError('startTime is required', 400);
+	}
+
+	const startTime = new Date(startTimeRaw);
+	if (Number.isNaN(startTime.getTime())) {
+		throw new AppError('Invalid startTime format', 400);
+	}
+
+	const duration = Number(req.body?.duration);
+	if (!Number.isInteger(duration) || duration <= 0) {
+		throw new AppError('duration must be a positive integer (minutes)', 400);
+	}
+
+	const endTime = new Date(startTime.getTime() + (duration * 60 * 1000));
+	const { patientProfileId } = await ensureProviderPatientAccess(providerId, patientId);
+
+	type OverlapRow = { id: string };
+	const overlappingSessions = await prisma.$queryRaw<OverlapRow[]>`
+		SELECT "id"
+		FROM "therapy_sessions"
+		WHERE "therapistProfileId" = ${providerId}
+		  AND "status" IN ('PENDING', 'CONFIRMED')
+		  AND "cancelledAt" IS NULL
+		  AND "dateTime" < ${endTime}
+		  AND ("dateTime" + (COALESCE("durationMinutes", 50) * INTERVAL '1 minute')) > ${startTime}
+		LIMIT 1
+	`;
+
+	if (overlappingSessions.length > 0) {
+		throw new AppError('Provider already has a session scheduled at this time', 409);
+	}
+
+	const createdSession = await prisma.therapySession.create({
+		data: {
+			bookingReferenceId: `LOCK-${Date.now()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`,
+			patientProfileId,
+			therapistProfileId: providerId,
+			dateTime: startTime,
+			durationMinutes: duration,
+			status: 'CONFIRMED',
+			isLocked: true,
+		},
+		select: {
+			id: true,
+			bookingReferenceId: true,
+			dateTime: true,
+			durationMinutes: true,
+			status: true,
+			isLocked: true,
+		},
+	});
+
+	await prisma.notification.create({
+		data: {
+			userId: patientId,
+			type: 'SESSION_SCHEDULED',
+			title: 'New Session Scheduled',
+			message: `Your provider scheduled a new session on ${formatSessionDate(createdSession.dateTime) || createdSession.dateTime.toISOString()}.`,
+			payload: {
+				event: 'NEW_SESSION_SCHEDULED',
+				sessionId: createdSession.id,
+				startTime: createdSession.dateTime.toISOString(),
+				durationMinutes: createdSession.durationMinutes,
+				isLocked: createdSession.isLocked,
+			},
+			sentAt: new Date(),
+		},
+	});
+
+	sendSuccess(res, {
+		sessionId: createdSession.id,
+		bookingReferenceId: createdSession.bookingReferenceId,
+		patientId,
+		startTime: createdSession.dateTime.toISOString(),
+		durationMinutes: createdSession.durationMinutes,
+		status: createdSession.status,
+		isLocked: createdSession.isLocked,
+		event: 'NEW_SESSION_SCHEDULED',
+	}, 'Session scheduled and locked');
 };
 
 export const assignPatientItem = async (req: Request, res: Response): Promise<void> => {

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { ProviderSidebar } from './ProviderSidebar';
 import { useAuth } from '../../context/AuthContext';
+import PersistentVideoLayout from './PersistentVideoLayout';
 
 export const HubLayout = () => {
   const { user, logout } = useAuth();
@@ -57,7 +58,9 @@ export const HubLayout = () => {
         </header>
 
         <main className="flex-1 p-6 overflow-y-auto">
-          <Outlet />
+          <PersistentVideoLayout>
+            <Outlet />
+          </PersistentVideoLayout>
         </main>
       </div>
     </div>

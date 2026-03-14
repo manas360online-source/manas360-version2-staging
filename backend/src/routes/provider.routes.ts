@@ -3,18 +3,28 @@ import {
 	assignPatientItem,
 	createPatientNote,
 	generateMeetingLink,
+	getProviderCalendarSessions,
+	getProviderEarnings,
+	getProviderSettings,
 	getPatientAssessments,
 	getPatientCBTModules,
 	getPatientGoals,
 	getPatientLabs,
 	getPatientNotes,
 	getPatientOverview,
+	getConversationMessages,
+	getConversations,
 	getPatientPrescriptions,
 	getProviderDashboardController,
 	getProviderPatients,
+	publishWeeklyPlan,
 	reviewCBTModule,
+	scheduleNextSession,
+	saveWeeklyPlan,
+	sendMessage,
 	sendGoalMessage,
 	updatePatientNote,
+	updateProviderSettings,
 } from '../controllers/provider.controller';
 import { requireAuth } from '../middleware/auth.middleware';
 import { requireRole } from '../middleware/rbac.middleware';
@@ -29,13 +39,24 @@ router.get(
 	asyncHandler(getProviderDashboardController),
 );
 
+router.get('/calendar', requireAuth, asyncHandler(getProviderCalendarSessions));
 router.get('/patients', requireAuth, asyncHandler(getProviderPatients));
+router.get('/earnings', requireAuth, asyncHandler(getProviderEarnings));
+router.get('/settings', requireAuth, asyncHandler(getProviderSettings));
+router.put('/settings', requireAuth, asyncHandler(updateProviderSettings));
+router.get('/messages/conversations', requireAuth, asyncHandler(getConversations));
+router.get('/messages/:conversationId', requireAuth, asyncHandler(getConversationMessages));
+router.post('/messages', requireAuth, asyncHandler(sendMessage));
 
 router.get('/patient/:patientId/overview', requireAuth, asyncHandler(getPatientOverview));
 
 router.get('/patient/:patientId/assessments', requireAuth, asyncHandler(getPatientAssessments));
 
 router.post('/patient/:patientId/assign', requireAuth, asyncHandler(assignPatientItem));
+
+router.post('/patient/:patientId/weekly-plan', requireAuth, asyncHandler(saveWeeklyPlan));
+router.post('/patient/:patientId/weekly-plan/publish', requireAuth, asyncHandler(publishWeeklyPlan));
+router.post('/patient/:patientId/sessions/schedule', requireAuth, asyncHandler(scheduleNextSession));
 
 router.get('/patient/:patientId/cbt', requireAuth, asyncHandler(getPatientCBTModules));
 

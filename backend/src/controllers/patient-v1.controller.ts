@@ -423,7 +423,12 @@ export const getJourneyRecommendationController = async (req: Request, res: Resp
 };
 
 export const getMyTreatmentPlanController = async (req: Request, res: Response): Promise<void> => {
-	const data = await getMyTreatmentPlan(authUserId(req));
+	const weekRaw = req.query.week;
+	const week = weekRaw !== undefined ? Number(weekRaw) : undefined;
+	if (weekRaw !== undefined && (!Number.isInteger(week) || Number(week) <= 0)) {
+		throw new AppError('week must be a positive integer', 422);
+	}
+	const data = await getMyTreatmentPlan(authUserId(req), week);
 	sendSuccess(res, data, 'Treatment plan fetched');
 };
 

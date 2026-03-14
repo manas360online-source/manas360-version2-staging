@@ -166,6 +166,149 @@ export interface AssignPatientItemResponse {
   createdAt: string;
 }
 
+export interface WeeklyPlanActivityPayload {
+  title: string;
+  frequency?: 'DAILY_RITUAL' | 'WEEKLY_MILESTONE' | 'ONE_TIME';
+  activityType?: 'MOOD_CHECKIN' | 'EXERCISE' | 'AUDIO_THERAPY' | 'CLINICAL_ASSESSMENT' | 'READING_MATERIAL' | 'SESSION_BOOKING';
+  referenceId?: string;
+  estimatedMinutes?: number;
+  orderIndex?: number;
+  category?: string;
+}
+
+export interface UpdateWeeklyPlanPayload {
+  weekNumber: number;
+  activities: WeeklyPlanActivityPayload[];
+}
+
+export interface UpdateWeeklyPlanResponse {
+  planId: string;
+  patientId: string;
+  weekNumber: number;
+  deletedCount: number;
+  insertedCount: number;
+  updatedCount?: number;
+}
+
+export interface PublishWeeklyPlanPayload {
+  weekNumber: number;
+}
+
+export interface PublishWeeklyPlanResponse {
+  planId: string;
+  patientId: string;
+  weekNumber: number;
+  publishedCount: number;
+}
+
+export interface ScheduleNextSessionPayload {
+  startTime: string;
+  duration: number;
+}
+
+export interface ScheduleNextSessionResponse {
+  sessionId: string;
+  bookingReferenceId: string;
+  patientId: string;
+  startTime: string;
+  durationMinutes: number;
+  status: 'CONFIRMED' | 'PENDING' | 'CANCELLED' | 'COMPLETED' | string;
+  isLocked: boolean;
+  event: 'NEW_SESSION_SCHEDULED' | string;
+}
+
+export interface ProviderConversationSummary {
+  id: string;
+  patientId: string;
+  patientName: string;
+  patientEmail?: string | null;
+  patientAvatar?: string | null;
+  lastMessage?: string | null;
+  lastMessageAt?: string | null;
+  unreadCount: number;
+  hasSessionHistory: boolean;
+  hasMessageHistory: boolean;
+}
+
+export interface ProviderDirectMessage {
+  id: string;
+  role: 'patient' | 'provider' | 'system';
+  content: string;
+  messageType: 'TEXT' | 'SYSTEM' | 'ASSESSMENT' | 'SESSION_SUMMARY' | string;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+  readAt?: string | null;
+}
+
+export interface SendProviderMessagePayload {
+  conversationId?: string;
+  patientId?: string;
+  content: string;
+}
+
+export interface ProviderEarningsSummary {
+  totalEarningsMinor: number;
+  pendingPayoutsMinor: number;
+  sessionsThisMonth: number;
+  sessionRateMinor: number;
+}
+
+export interface ProviderMonthlyTrendItem {
+  key: string;
+  label: string;
+  amountMinor: number;
+  sessions: number;
+}
+
+export interface ProviderRecentTransaction {
+  id: string;
+  bookingReferenceId: string;
+  date: string;
+  patientName: string;
+  amountMinor: number;
+  status: string;
+}
+
+export interface ProviderEarningsResponse {
+  summary: ProviderEarningsSummary;
+  monthlyTrend: ProviderMonthlyTrendItem[];
+  recentTransactions: ProviderRecentTransaction[];
+}
+
+export interface ProviderCalendarSession {
+  id: string;
+  bookingReferenceId: string;
+  dateTime: string;
+  durationMinutes: number;
+  status: 'Upcoming' | 'Completed' | 'Cancelled';
+  patientId: string;
+  patientName: string;
+}
+
+export interface ProviderAvailabilitySlot {
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  isAvailable: boolean;
+}
+
+export interface ProviderSettingsResponse {
+  providerId: string;
+  displayName: string;
+  email: string;
+  bio: string;
+  specializations: string[];
+  profileImageUrl: string;
+  availabilitySlots: ProviderAvailabilitySlot[];
+}
+
+export interface UpdateProviderSettingsPayload {
+  bio: string;
+  specializations: string[];
+  profileImageUrl: string;
+  availabilitySlots: ProviderAvailabilitySlot[];
+}
+
 export type NoteStatus = 'Draft' | 'Signed';
 
 export interface NoteData {
@@ -215,6 +358,43 @@ export const fetchProviderPatients = async (): Promise<PatientListItem[]> => {
   return unwrap<PatientListItem[]>(response.data);
 };
 
+export const fetchProviderEarnings = async (): Promise<ProviderEarningsResponse> => {
+	const response = await http.get<Envelope<ProviderEarningsResponse>>('/v1/provider/earnings');
+	return unwrap<ProviderEarningsResponse>(response.data);
+};
+
+export const fetchProviderCalendarSessions = async (): Promise<ProviderCalendarSession[]> => {
+  const response = await http.get<Envelope<ProviderCalendarSession[]>>('/v1/provider/calendar');
+  return unwrap<ProviderCalendarSession[]>(response.data);
+};
+
+export const fetchProviderSettings = async (): Promise<ProviderSettingsResponse> => {
+  const response = await http.get<Envelope<ProviderSettingsResponse>>('/v1/provider/settings');
+  return unwrap<ProviderSettingsResponse>(response.data);
+};
+
+export const updateProviderSettings = async (
+  payload: UpdateProviderSettingsPayload,
+): Promise<ProviderSettingsResponse> => {
+  const response = await http.put<Envelope<ProviderSettingsResponse>>('/v1/provider/settings', payload);
+  return unwrap<ProviderSettingsResponse>(response.data);
+};
+
+export const fetchProviderConversations = async (): Promise<ProviderConversationSummary[]> => {
+  const response = await http.get<Envelope<ProviderConversationSummary[]>>('/v1/provider/messages/conversations');
+  return unwrap<ProviderConversationSummary[]>(response.data);
+};
+
+export const fetchProviderMessages = async (conversationId: string): Promise<ProviderDirectMessage[]> => {
+  const response = await http.get<Envelope<ProviderDirectMessage[]>>(`/v1/provider/messages/${conversationId}`);
+  return unwrap<ProviderDirectMessage[]>(response.data);
+};
+
+export const sendProviderMessage = async (payload: SendProviderMessagePayload): Promise<ProviderDirectMessage> => {
+  const response = await http.post<Envelope<ProviderDirectMessage>>('/v1/provider/messages', payload);
+  return unwrap<ProviderDirectMessage>(response.data);
+};
+
 export const fetchPatientOverview = async (patientId: string): Promise<PatientOverviewData> => {
   const response = await http.get<Envelope<PatientOverviewData>>(`/v1/provider/patient/${patientId}/overview`);
   return unwrap<PatientOverviewData>(response.data);
@@ -231,6 +411,30 @@ export const assignPatientItem = async (
 ): Promise<AssignPatientItemResponse> => {
   const response = await http.post<Envelope<AssignPatientItemResponse>>(`/v1/provider/patient/${patientId}/assign`, payload);
   return unwrap<AssignPatientItemResponse>(response.data);
+};
+
+export const updatePatientWeeklyPlan = async (
+  patientId: string,
+  payload: UpdateWeeklyPlanPayload,
+): Promise<UpdateWeeklyPlanResponse> => {
+  const response = await http.post<Envelope<UpdateWeeklyPlanResponse>>(`/v1/provider/patient/${patientId}/weekly-plan`, payload);
+  return unwrap<UpdateWeeklyPlanResponse>(response.data);
+};
+
+export const publishPatientWeeklyPlan = async (
+  patientId: string,
+  payload: PublishWeeklyPlanPayload,
+): Promise<PublishWeeklyPlanResponse> => {
+  const response = await http.post<Envelope<PublishWeeklyPlanResponse>>(`/v1/provider/patient/${patientId}/weekly-plan/publish`, payload);
+  return unwrap<PublishWeeklyPlanResponse>(response.data);
+};
+
+export const scheduleNextSession = async (
+  patientId: string,
+  payload: ScheduleNextSessionPayload,
+): Promise<ScheduleNextSessionResponse> => {
+  const response = await http.post<Envelope<ScheduleNextSessionResponse>>(`/v1/provider/patient/${patientId}/sessions/schedule`, payload);
+  return unwrap<ScheduleNextSessionResponse>(response.data);
 };
 
 export const fetchPatientCBTModules = async (patientId: string): Promise<CBTModuleData[]> => {

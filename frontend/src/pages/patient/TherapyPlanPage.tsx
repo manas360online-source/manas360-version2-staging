@@ -1,8 +1,10 @@
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { Link, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { patientApi } from '../../api/patient';
+import { useAuth } from '../../context/AuthContext';
 import { Sparkles, ClipboardCheck, UserPlus, Quote } from 'lucide-react';
 
 type GoalItem = {
@@ -11,17 +13,19 @@ type GoalItem = {
   category: string;
   todayCheckInDone: boolean;
   startDate: string;
+  weekNumber?: number;
 };
 
 type ExerciseItem = {
   id: string;
-  sessionId: string;
+  sessionId?: string;
   type: string;
   title: string;
   status: 'New' | 'In Progress' | 'Completed';
   completed: boolean;
   assignedAt: string;
   completedAt: string | null;
+  weekNumber?: number;
   therapistFeedback?: string;
 };
 
@@ -39,6 +43,22 @@ type TherapyPlanPayload = {
   goals: GoalItem[];
   cbtExercises: ExerciseItem[];
   recentFeedback: FeedbackItem[];
+  weekContext?: {
+    selectedWeek: number;
+    currentWeek: number;
+    totalWeeks: number;
+  };
+};
+
+const asPayload = <T,>(value: any): T => (value?.data ?? value) as T;
+
+const getWeekFromDate = (dateLike: string | Date | null | undefined): number | null => {
+  if (!dateLike) return null;
+  const date = new Date(dateLike);
+  if (Number.isNaN(date.getTime())) return null;
+  const millisPerWeek = 7 * 24 * 60 * 60 * 1000;
+  const diff = Math.max(0, Date.now() - date.getTime());
+  return Math.floor(diff / millisPerWeek) + 1;
 };
 
 const formatDate = (value: string) =>
@@ -59,68 +79,73 @@ const exerciseStatusClass = (status: ExerciseItem['status']) => {
 
 export default function TherapyPlanPage() {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [connectionRequired, setConnectionRequired] = useState(false);
-  const [planData, setPlanData] = useState<TherapyPlanPayload | null>(null);
+  const { user } = useAuth();
+  const [actionError, setActionError] = useState<string | null>(null);
   const [completingTaskIds, setCompletingTaskIds] = useState<string[]>([]);
 
-  const loadPlan = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await patientApi.getTherapyPlan();
-      setPlanData((response as any)?.data ?? response ?? null);
-      setConnectionRequired(false);
-    } catch (err: any) {
-      const status = Number(err?.response?.status || 0);
-      const message = String(err?.response?.data?.message || err?.message || '');
-      const requiresProvider = status === 404 && message.toLowerCase().includes('connected with a provider');
-      setConnectionRequired(requiresProvider);
-      setError(requiresProvider ? null : (message || 'Unable to load your Guided Recovery Journey.'));
-      setPlanData(null);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const profileQuery = useQuery(['patient-profile-for-week'], async () => {
+    const response = await patientApi.getMyProfile();
+    return asPayload<{ createdAt?: string } | null>(response);
+  }, {
+    retry: false,
+  });
+
+  const weekFromProfile = getWeekFromDate(profileQuery.data?.createdAt);
+  const weekFromSignup = getWeekFromDate((user as any)?.createdAt);
+  const derivedCurrentWeek = Math.max(1, Number(weekFromProfile || weekFromSignup || 1));
+
+  const therapyPlanQuery = useQuery(['patient-therapy-plan', derivedCurrentWeek], async () => {
+    const response = await patientApi.getTherapyPlan(derivedCurrentWeek);
+    return asPayload<TherapyPlanPayload | null>(response);
+  }, {
+    retry: false,
+    enabled: derivedCurrentWeek > 0,
+  });
+
+  const planData = therapyPlanQuery.data ?? null;
+  const queryError = therapyPlanQuery.error as any;
+  const queryStatus = Number(queryError?.response?.status || 0);
+  const queryMessage = String(queryError?.response?.data?.message || queryError?.message || '');
+  const connectionRequired = queryStatus === 404 && queryMessage.toLowerCase().includes('connected with a provider');
+  const error = actionError || (connectionRequired ? null : (queryMessage || null));
+  const loading = therapyPlanQuery.isLoading || (therapyPlanQuery.isFetching && !therapyPlanQuery.data);
 
   const completeTask = async (taskId: string) => {
-    setError(null);
+    setActionError(null);
     setCompletingTaskIds((prev) => (prev.includes(taskId) ? prev : [...prev, taskId]));
-
-    setPlanData((prev) => {
-      if (!prev || !Array.isArray(prev.goals)) return prev;
-      return {
-        ...prev,
-        goals: prev.goals.map((goal) =>
-          String(goal.id) === taskId
-            ? { ...goal, todayCheckInDone: true }
-            : goal,
-        ),
-      };
-    });
 
     try {
       await patientApi.completeTherapyPlanTask(taskId);
       toast.success('Great job staying consistent! 🔥');
-      await loadPlan(); // Re-sync to get official adherence percentage
+      await therapyPlanQuery.refetch();
     } catch {
-      setError('Unable to mark activity as complete.');
-      await loadPlan();
+      setActionError('Unable to mark activity as complete.');
+      await therapyPlanQuery.refetch();
     } finally {
       setCompletingTaskIds((prev) => prev.filter((id) => id !== taskId));
     }
   };
 
-  useEffect(() => {
-    void loadPlan();
-  }, []);
-
-  const goals = useMemo(() => (Array.isArray(planData?.goals) ? planData.goals : []), [planData]);
-  const exercises = useMemo(() => (Array.isArray(planData?.cbtExercises) ? planData.cbtExercises : []), [planData]);
+  const activeWeek = Number(planData?.weekContext?.selectedWeek || derivedCurrentWeek || planData?.weekContext?.currentWeek || 1);
+  const currentWeek = Number(planData?.weekContext?.currentWeek || derivedCurrentWeek || activeWeek);
+  const totalWeeks = Number(planData?.weekContext?.totalWeeks || currentWeek);
+  const nextWeek = currentWeek + 1;
+  const goals = useMemo(
+    () => (Array.isArray(planData?.goals) ? planData.goals.filter((goal) => Number(goal.weekNumber || activeWeek) === activeWeek) : []),
+    [planData, activeWeek],
+  );
+  const exercises = useMemo(
+    () => (Array.isArray(planData?.cbtExercises)
+      ? planData.cbtExercises.filter((exercise) => Number(exercise.weekNumber || activeWeek) === activeWeek)
+      : []),
+    [planData, activeWeek],
+  );
   const recentFeedback = useMemo(() => (Array.isArray(planData?.recentFeedback) ? planData.recentFeedback : []), [planData]);
   const featuredFeedback = recentFeedback[0] ?? null;
   const hasPlan = goals.length > 0 || exercises.length > 0;
+  const totalWeeklyTasks = goals.length + exercises.length;
+  const completedWeeklyTasks = goals.filter((goal) => goal.todayCheckInDone).length + exercises.filter((exercise) => exercise.completed).length;
+  const weeklyProgressPercent = totalWeeklyTasks > 0 ? Math.round((completedWeeklyTasks / totalWeeklyTasks) * 100) : 0;
 
   if (loading) {
     return (
@@ -178,6 +203,30 @@ export default function TherapyPlanPage() {
           <p className="mt-2 max-w-xl text-sm leading-relaxed text-charcoal/70">
             Your daily goals and therapist-assigned exercises are organized here so you can check in and keep momentum without friction.
           </p>
+          <p className="mt-4 inline-flex rounded-full bg-white/75 px-4 py-2 text-sm font-semibold text-charcoal/80">
+            You are in Week {activeWeek} of your journey{totalWeeks > 0 ? ` (${Math.min(activeWeek, totalWeeks)}/${totalWeeks})` : ''}
+          </p>
+
+          <div className="mt-5 rounded-2xl bg-white/80 p-4 shadow-wellness-sm">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm font-semibold text-charcoal">{completedWeeklyTasks} of {totalWeeklyTasks} tasks completed this week</p>
+              <span className="text-xs font-bold text-charcoal/55">{weeklyProgressPercent}%</span>
+            </div>
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#E5ECE9]">
+              <div
+                className="h-full rounded-full bg-[linear-gradient(90deg,#79C7A2_0%,#5DAE8B_100%)] transition-all duration-500"
+                style={{ width: `${weeklyProgressPercent}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="relative mt-4 overflow-hidden rounded-2xl border border-[#E4EAF4] bg-white/75 p-4">
+            <div className="absolute inset-0 bg-white/35 backdrop-blur-[2px]" />
+            <div className="relative z-10">
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-charcoal/45">Next Week Preview</p>
+              <p className="mt-1 text-sm font-semibold text-charcoal/80">Week {nextWeek} is being prepared by your provider</p>
+            </div>
+          </div>
 
           <div className="mt-8 grid gap-4 sm:grid-cols-3">
             <div className="rounded-[1.4rem] bg-white/78 p-4 shadow-wellness-sm">
@@ -205,6 +254,12 @@ export default function TherapyPlanPage() {
           {error}
         </div>
       )}
+
+      {!hasPlan && !connectionRequired ? (
+        <div className="rounded-[1.6rem] border border-dashed border-wellness-border bg-white/70 p-6 text-center">
+          <p className="text-sm font-medium text-charcoal/70">Your provider is currently preparing your next steps. Check back soon! ✨</p>
+        </div>
+      ) : null}
 
       <div className="flex flex-col gap-8 md:flex-row md:items-start">
         <section className="space-y-4 md:w-1/2">
@@ -300,7 +355,7 @@ export default function TherapyPlanPage() {
                   key={exercise.id}
                   type="button"
                   onClick={() => {
-                    if (!exercise.completed) {
+                    if (!exercise.completed && exercise.sessionId) {
                       navigate(`/patient/cbt/${exercise.sessionId}`);
                     }
                   }}

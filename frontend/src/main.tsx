@@ -8,6 +8,7 @@ import App from './App'
 import './index.css'
 import { store } from './store'
 import { ErrorBoundary } from './components/ui/ErrorBoundary'
+import { VideoSessionProvider } from './context/VideoSessionContext'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
@@ -15,14 +16,16 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <QueryClientProvider client={new QueryClient()}>
         <Provider store={store}>
           <ErrorBoundary>
-            <RouterProvider
-              router={createHashRouter([
-                // Parent route must accept nested routes — use a trailing /*
-                { path: '/*', element: <App /> },
-              ])}
-              // Opt into v7 behavior to avoid future warnings
-              future={{ v7_startTransition: true }}
-            />
+            <VideoSessionProvider>
+              <RouterProvider
+                router={createHashRouter([
+                  // Parent route must accept nested routes — use a trailing /*
+                  { path: '/*', element: <App /> },
+                ])}
+                // Opt into v7 behavior to avoid future warnings
+                future={{ v7_startTransition: true }}
+              />
+            </VideoSessionProvider>
           </ErrorBoundary>
         </Provider>
       </QueryClientProvider>

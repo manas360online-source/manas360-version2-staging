@@ -116,6 +116,11 @@ export interface UploadedTherapistDocument {
 	objectUrl: string;
 }
 
+export interface UploadedSessionAudio {
+	objectKey: string;
+	objectUrl: string;
+}
+
 export const uploadTherapistDocumentToS3 = async (params: {
 	therapistUserId: string;
 	documentType: 'license' | 'degree' | 'certificate';
@@ -155,5 +160,33 @@ export const getSignedTherapistDocumentUrl = async (objectKey: string): Promise<
 		}),
 		{ expiresIn: env.therapistDocumentSignedUrlTtlSeconds },
 	);
+};
+
+export const uploadSessionAudioToS3 = async (params: {
+	sessionId: string;
+	buffer: Buffer;
+	mimeType: string;
+	fileExtension?: string;
+}): Promise<UploadedSessionAudio> => {
+	assertS3Configured();
+
+	const safeExtension = String(params.fileExtension || 'wav').replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'wav';
+	const uniqueName = `${Date.now()}-${randomUUID()}.${safeExtension}`;
+	const objectKey = `sessions/${params.sessionId}/audio/${uniqueName}`;
+
+	await s3Client.send(
+		new PutObjectCommand({
+			Bucket: env.awsS3Bucket,
+			Key: objectKey,
+			Body: params.buffer,
+			ContentType: params.mimeType,
+			ServerSideEncryption: 'AES256',
+		}),
+	);
+
+	return {
+		objectKey,
+		objectUrl: buildObjectUrl(env.awsS3Bucket, objectKey),
+	};
 };
 

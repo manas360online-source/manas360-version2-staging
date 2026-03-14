@@ -425,6 +425,10 @@ export const validateTherapistSessionHistoryQuery: RequestHandler[] = [
 const extractValidatedTherapistSessionStatusPayload = (req: Request, _res: Response, next: NextFunction): void => {
 	req.validatedTherapistSessionStatusPayload = {
 		status: req.body.status as 'confirmed' | 'cancelled' | 'completed',
+		recordingUrl:
+			typeof req.body.recordingUrl === 'string' && req.body.recordingUrl.trim().length > 0
+				? req.body.recordingUrl.trim()
+				: undefined,
 	};
 
 	next();
@@ -432,6 +436,7 @@ const extractValidatedTherapistSessionStatusPayload = (req: Request, _res: Respo
 
 export const validateUpdateTherapistSessionStatusRequest: RequestHandler[] = [
 	body('status').isIn(['confirmed', 'cancelled', 'completed']).withMessage('status must be confirmed, cancelled, or completed'),
+	body('recordingUrl').optional().isString().isLength({ max: 2000 }).withMessage('recordingUrl must be a valid string up to 2000 characters'),
 	(req, _res, next) => applyValidationResult(req, next),
 	extractValidatedTherapistSessionStatusPayload,
 ];

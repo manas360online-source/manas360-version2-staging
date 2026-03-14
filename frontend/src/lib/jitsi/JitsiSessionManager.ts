@@ -107,6 +107,7 @@ export class JitsiSessionManager {
         startWithAudioMuted: false,
         startWithVideoMuted: false,
         disableDeepLinking: true,
+        disableAudioOutputSelect: true,
       },
       interfaceConfigOverwrite: {
         SHOW_JITSI_WATERMARK: false,
@@ -131,8 +132,17 @@ export class JitsiSessionManager {
     this.audioExtractor = null;
     this.aiClient?.disconnect();
     this.aiClient = null;
-    this.api?.dispose();
+    try {
+      this.api?.dispose();
+    } catch {
+      // ignore dispose errors from stale/previously destroyed iframe instances
+    }
     this.api = null;
+  }
+
+  /** Returns the active Jitsi External API instance (if initialized). */
+  getApi(): JitsiAPI | null {
+    return this.api;
   }
 
   // ─── Private ────────────────────────────────────────────────────────────────

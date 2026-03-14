@@ -40,6 +40,19 @@ export interface ConversationListItem {
   isPinned: boolean;
 }
 
+export interface ProviderConversationListItem {
+  id: string;
+  patientId: string;
+  patientName: string;
+  patientEmail?: string | null;
+  patientAvatar?: string | null;
+  lastMessage?: string | null;
+  lastMessageAt?: Date | null;
+  unreadCount: number;
+  hasSessionHistory: boolean;
+  hasMessageHistory: boolean;
+}
+
 /**
  * All conversations for a patient, enriched with provider info + unread counts.
  * The patient's primary therapist (first active CareTeamAssignment) is marked
@@ -91,6 +104,103 @@ export async function getPatientConversations(patientId: string): Promise<Conver
       isPinned: c.provider.id === primaryProviderId,
     };
   });
+}
+
+/**
+ * All conversations for a provider, seeded from either historical sessions or
+ * direct-message history so the provider inbox can always address past patients.
+ */
+export async function getProviderConversations(providerId: string): Promise<ProviderConversationListItem[]> {
+  const [messageConversations, sessionHistory] = await Promise.all([
+    prisma.directConversation.findMany({
+      where: { providerId },
+      select: {
+        id: true,
+        patientId: true,
+      },
+    }),
+    prisma.therapySession.findMany({
+      where: {
+        therapistProfileId: providerId,
+        patientProfile: {
+          userId: {
+            not: '',
+          },
+        },
+      },
+      distinct: ['patientProfileId'],
+      select: {
+        patientProfile: {
+          select: {
+            userId: true,
+          },
+        },
+      },
+    }),
+  ]);
+
+  const sessionPatientIds = sessionHistory
+    .map((entry) => entry.patientProfile?.userId)
+    .filter((value): value is string => Boolean(value));
+  const messagePatientIds = messageConversations.map((entry) => entry.patientId);
+  const patientIds = Array.from(new Set([...messagePatientIds, ...sessionPatientIds]));
+
+  if (!patientIds.length) {
+    return [];
+  }
+
+  await Promise.all(patientIds.map((patientId) => getOrCreateConversation(patientId, providerId)));
+
+  const sessionPatientSet = new Set(sessionPatientIds);
+  const messagePatientSet = new Set(messagePatientIds);
+
+  const conversations = await prisma.directConversation.findMany({
+    where: {
+      providerId,
+      patientId: { in: patientIds },
+    },
+    include: {
+      patient: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          name: true,
+          email: true,
+          profileImageUrl: true,
+        },
+      },
+      messages: {
+        where: {
+          senderRole: 'patient',
+          readAt: null,
+        },
+        select: { id: true },
+      },
+    },
+  });
+
+  return conversations
+    .map((conversation) => ({
+      id: conversation.id,
+      patientId: conversation.patient.id,
+      patientName:
+        [conversation.patient.firstName, conversation.patient.lastName].filter(Boolean).join(' ') ||
+        conversation.patient.name ||
+        'Patient',
+      patientEmail: conversation.patient.email,
+      patientAvatar: conversation.patient.profileImageUrl,
+      lastMessage: conversation.lastMessageText,
+      lastMessageAt: conversation.lastMessageAt,
+      unreadCount: conversation.messages.length,
+      hasSessionHistory: sessionPatientSet.has(conversation.patientId),
+      hasMessageHistory: messagePatientSet.has(conversation.patientId),
+    }))
+    .sort((left, right) => {
+      const leftTs = left.lastMessageAt ? new Date(left.lastMessageAt).getTime() : 0;
+      const rightTs = right.lastMessageAt ? new Date(right.lastMessageAt).getTime() : 0;
+      return rightTs - leftTs;
+    });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

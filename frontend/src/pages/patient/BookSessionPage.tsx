@@ -2,6 +2,18 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { patientApi } from '../../api/patient';
 
+const formatSlotLabel = (value: string): string => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString([], {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+};
+
 const isSubscriptionActive = (subscription: any): boolean => {
   if (!subscription) return false;
   const status = String(subscription?.status || '').toLowerCase();
@@ -37,6 +49,11 @@ export default function BookSessionPage() {
   const [preferredWindow, setPreferredWindow] = useState('Evenings (6-9 PM)');
   const [hasPlatformAccess, setHasPlatformAccess] = useState(false);
   const [checkingAccess, setCheckingAccess] = useState(true);
+  const availableSlots = useMemo(() => (
+    Array.isArray(provider?.available_slots)
+      ? provider.available_slots.map((value: unknown) => String(value)).filter(Boolean)
+      : []
+  ), [provider]);
 
   const inferProviderType = (): string => {
     const providerRole = String(provider?.role || '').toLowerCase();
@@ -60,7 +77,8 @@ export default function BookSessionPage() {
         ]);
         const p = providerRes.data ?? providerRes;
         setProvider(p);
-        if (p.available_slots?.[0]) setSlot(String(p.available_slots[0]));
+        const nextSlot = Array.isArray(p.available_slots) ? String(p.available_slots[0] || '') : '';
+        setSlot(nextSlot);
 
         const subscription = subscriptionRes ? ((subscriptionRes as any).data ?? subscriptionRes) : null;
         setHasPlatformAccess(isSubscriptionActive(subscription));
@@ -69,6 +87,17 @@ export default function BookSessionPage() {
       }
     })();
   }, [providerId]);
+
+  useEffect(() => {
+    if (!availableSlots.length) {
+      if (slot) setSlot('');
+      return;
+    }
+
+    if (!availableSlots.includes(slot)) {
+      setSlot(availableSlots[0]);
+    }
+  }, [availableSlots, slot]);
 
   const baseAmountMinor = useMemo(() => Number(provider?.session_rate || 150000), [provider]);
   const amountMinor = useMemo(
@@ -80,6 +109,10 @@ export default function BookSessionPage() {
 
   const onDevMarkAsPaid = async () => {
     if (!providerId || !slot) return;
+    if (!availableSlots.includes(slot)) {
+      setError('Select an available provider slot before continuing.');
+      return;
+    }
     if (!hasPlatformAccess) {
       navigate('/patient/pricing');
       return;
@@ -114,6 +147,10 @@ export default function BookSessionPage() {
 
   const onBook = async () => {
     if (!providerId || !slot) return;
+    if (!availableSlots.includes(slot)) {
+      setError('Select an available provider slot before continuing.');
+      return;
+    }
     if (!hasPlatformAccess) {
       setError('Platform Access is required before booking a paid session.');
       navigate('/patient/pricing');
@@ -217,10 +254,24 @@ export default function BookSessionPage() {
       <p>Provider: {provider.name}</p>
       <label className="block">
         <span className="mb-1 block text-sm">Select Slot</span>
-        <select value={slot} onChange={(e) => setSlot(e.target.value)} className="w-full rounded border p-2">
-          {(provider.available_slots || []).map((s: string) => <option key={s} value={s}>{new Date(s).toLocaleString()}</option>)}
+        <select
+          value={slot}
+          onChange={(e) => setSlot(e.target.value)}
+          disabled={!availableSlots.length}
+          className="w-full rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100"
+        >
+          {availableSlots.length === 0 ? (
+            <option value="">No active booking hours available</option>
+          ) : (
+            availableSlots.map((s: string) => <option key={s} value={s}>{formatSlotLabel(s)}</option>)
+          )}
         </select>
       </label>
+      {availableSlots.length === 0 && (
+        <p className="text-sm text-amber-700">
+          This provider has not opened any bookable hours in the next 7 days yet.
+        </p>
+      )}
       <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-3">
         <p className="text-sm font-medium text-indigo-900">Premium Scheduling</p>
         <div className="mt-2 flex flex-wrap items-center gap-3">
@@ -250,10 +301,10 @@ export default function BookSessionPage() {
       <p className="text-sm">Base Fee: ₹{(baseAmountMinor / 100).toFixed(0)}</p>
       <p className="text-sm font-semibold text-indigo-800">Final Session Fee: ₹{(amountMinor / 100).toFixed(0)}{preferredTime ? ` (${preferredWindow})` : ''}</p>
       <div className="flex flex-col sm:flex-row gap-4 justify-center">
-        <button disabled={loading || !slot || !hasPlatformAccess || checkingAccess} onClick={onBook} className="responsive-action-btn rounded-xl bg-slate-900 text-white disabled:opacity-60">{loading ? 'Processing...' : 'Proceed to Pay'}</button>
+        <button disabled={loading || !slot || !hasPlatformAccess || checkingAccess || !availableSlots.length} onClick={onBook} className="responsive-action-btn rounded-xl bg-slate-900 text-white disabled:opacity-60">{loading ? 'Processing...' : 'Proceed to Pay'}</button>
         {canUseDevPaidFlow && (
           <button
-            disabled={loading || !slot || !hasPlatformAccess || checkingAccess}
+            disabled={loading || !slot || !hasPlatformAccess || checkingAccess || !availableSlots.length}
             onClick={onDevMarkAsPaid}
             className="responsive-action-btn rounded-xl bg-emerald-700 text-white disabled:opacity-60"
           >

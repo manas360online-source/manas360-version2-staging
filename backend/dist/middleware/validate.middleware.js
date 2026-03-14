@@ -383,11 +383,15 @@ exports.validateTherapistSessionHistoryQuery = [
 const extractValidatedTherapistSessionStatusPayload = (req, _res, next) => {
     req.validatedTherapistSessionStatusPayload = {
         status: req.body.status,
+        recordingUrl: typeof req.body.recordingUrl === 'string' && req.body.recordingUrl.trim().length > 0
+            ? req.body.recordingUrl.trim()
+            : undefined,
     };
     next();
 };
 exports.validateUpdateTherapistSessionStatusRequest = [
     (0, express_validator_1.body)('status').isIn(['confirmed', 'cancelled', 'completed']).withMessage('status must be confirmed, cancelled, or completed'),
+    (0, express_validator_1.body)('recordingUrl').optional().isString().isLength({ max: 2000 }).withMessage('recordingUrl must be a valid string up to 2000 characters'),
     (req, _res, next) => applyValidationResult(req, next),
     extractValidatedTherapistSessionStatusPayload,
 ];

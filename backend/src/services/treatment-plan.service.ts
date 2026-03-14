@@ -139,6 +139,12 @@ const getOrCreateActivePlan = async (patientProfileId: string, providerId: strin
   return plan;
 };
 
+const getCurrentTreatmentWeek = (startDate: Date): number => {
+  const millisPerWeek = 7 * 24 * 60 * 60 * 1000;
+  const diff = Math.max(0, Date.now() - startDate.getTime());
+  return Math.floor(diff / millisPerWeek) + 1;
+};
+
 export const syncTreatmentPlanFromAssessment = async (
   userId: string,
   input: { assessmentType: string; score: number; severity: string },
@@ -178,7 +184,7 @@ export const syncTreatmentPlanFromAssessment = async (
   };
 };
 
-export const getMyTreatmentPlan = async (userId: string) => {
+export const getMyTreatmentPlan = async (userId: string, weekNumber?: number) => {
   const connectedProviderId = await getConnectedProvider(userId);
   if (!connectedProviderId) {
     throw new AppError('Therapy plan will be available once you are connected with a provider.', 404);
@@ -186,9 +192,16 @@ export const getMyTreatmentPlan = async (userId: string) => {
 
   const patientProfile = await getPatientProfile(userId);
   const plan = await getOrCreateActivePlan(patientProfile.id, connectedProviderId);
+  const currentWeek = getCurrentTreatmentWeek(plan.startDate);
+  const selectedWeek = weekNumber && Number.isInteger(weekNumber) && weekNumber > 0 ? weekNumber : currentWeek;
+  const filteredActivities = plan.activities.filter(
+    (item) => Number(item.weekNumber || 1) === selectedWeek && item.isPublished,
+  );
 
-  const completed = plan.activities.filter(a => a.status === 'COMPLETED').length;
-  const adherencePercent = plan.activities.length ? Number(((completed / plan.activities.length) * 100).toFixed(1)) : 0;
+  const completed = filteredActivities.filter(a => a.status === 'COMPLETED').length;
+  const adherencePercent = filteredActivities.length ? Number(((completed / filteredActivities.length) * 100).toFixed(1)) : 0;
+  const maxAssignedWeek = plan.activities.reduce((max, item) => Math.max(max, Number(item.weekNumber || 1)), 1);
+  const totalWeeks = Math.max(maxAssignedWeek, currentWeek);
 
   // We map cleanly to the format the frontend expects, which has the new properties.
   return {
@@ -199,16 +212,19 @@ export const getMyTreatmentPlan = async (userId: string) => {
       providerNote: plan.providerNote,
       startDate: plan.startDate,
       endDate: plan.endDate,
-      weekNumber: 1, // Optional: Calculate dynamically 
-      totalWeeks: 8,
+      weekNumber: selectedWeek,
+      totalWeeks,
+      currentWeek,
       adherencePercent,
       updatedAt: plan.updatedAt,
     },
-    activities: plan.activities.map((item) => ({
+    activities: filteredActivities.map((item) => ({
       id: item.id,
       title: item.title,
       frequency: item.frequency,
       activityType: item.activityType,
+      category: item.category,
+      weekNumber: item.weekNumber,
       status: item.status,
       completedAt: item.completedAt,
       estimatedMinutes: item.estimatedMinutes,

@@ -611,6 +611,8 @@ export default function SessionsPage() {
   };
 
   const nextSession = upcoming[0];
+  const nextSessionProviderName = nextSession?.provider?.name || 'your provider';
+  const isLockedSession = Boolean(nextSession?.isLocked ?? nextSession?.is_locked);
 
   const previousConsultedProviders = useMemo(() => {
     const providerMap = new Map<string, any>();
@@ -693,12 +695,12 @@ export default function SessionsPage() {
     setIsSmartMatchOpen(true);
   };
 
-  const isWithin5Minutes = useMemo(() => {
+  const isWithin10Minutes = useMemo(() => {
     if (!nextSession) return false;
     const now = new Date().getTime();
     const scheduledAt = new Date(nextSession.scheduled_at || nextSession.scheduledAt).getTime();
     const diffMins = (scheduledAt - now) / 1000 / 60;
-    return diffMins > -60 && diffMins <= 5;
+    return diffMins > -60 && diffMins <= 10;
   }, [nextSession]);
 
   const hasUrgentSession = nextSession != null;
@@ -1265,8 +1267,16 @@ export default function SessionsPage() {
                   </div>
                 </div>
 
+                {isLockedSession ? (
+                  <div className="w-full md:w-auto">
+                    <span className="inline-flex items-center rounded-full bg-green-500 px-3 py-1 text-xs font-bold text-white shadow-sm">
+                      Confirmed by Dr. {nextSessionProviderName}
+                    </span>
+                  </div>
+                ) : null}
+
                 <div className="flex w-full flex-col gap-3 sm:flex-row md:w-auto">
-                  {isWithin5Minutes && !needsPreSessionCheckin ? (
+                  {isWithin10Minutes && !needsPreSessionCheckin ? (
                     <Link
                       to={`/video-session/${nextSession.id}`}
                       className="inline-flex items-center justify-center gap-2 rounded-xl bg-green-500 px-6 py-3.5 text-sm font-bold text-charcoal shadow-[0_0_20px_rgba(34,197,94,0.3)] transition-all hover:bg-green-400"
@@ -1280,10 +1290,16 @@ export default function SessionsPage() {
                       className="inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-xl bg-white/10 px-6 py-3.5 text-sm font-bold text-white/50"
                     >
                       <Video className="h-4 w-4" />
-                      {needsPreSessionCheckin ? 'Complete Check-in First' : 'Opens 5 mins prior'}
+                      {needsPreSessionCheckin ? 'Complete Check-in First' : 'Opens 10 mins prior'}
                     </button>
                   )}
                 </div>
+
+                {isLockedSession ? (
+                  <p className="w-full text-xs text-white/80 md:mt-1">
+                    This session time is fixed to ensure clinical consistency. Please contact support for emergency cancellations.
+                  </p>
+                ) : null}
               </div>
             </section>
           ) : null}

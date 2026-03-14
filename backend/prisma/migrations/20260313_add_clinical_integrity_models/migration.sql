@@ -17,6 +17,38 @@ CREATE TABLE IF NOT EXISTS "prescriptions" (
   CONSTRAINT "prescriptions_provider_id_fkey" FOREIGN KEY ("provider_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
+-- Backward-compatible normalization for environments with a legacy prescriptions table.
+ALTER TABLE "prescriptions" ADD COLUMN IF NOT EXISTS "provider_id" TEXT;
+ALTER TABLE "prescriptions" ADD COLUMN IF NOT EXISTS "dosage" TEXT;
+ALTER TABLE "prescriptions" ADD COLUMN IF NOT EXISTS "prescribed_date" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE "prescriptions" ADD COLUMN IF NOT EXISTS "refills_remaining" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "prescriptions" ADD COLUMN IF NOT EXISTS "status" TEXT NOT NULL DEFAULT 'ACTIVE';
+ALTER TABLE "prescriptions" ADD COLUMN IF NOT EXISTS "adherence_rate" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "prescriptions" ADD COLUMN IF NOT EXISTS "warnings" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];
+
+UPDATE "prescriptions"
+SET "provider_id" = "psychiatrist_id"
+WHERE "provider_id" IS NULL AND "psychiatrist_id" IS NOT NULL;
+
+UPDATE "prescriptions"
+SET "dosage" = COALESCE("starting_dose", "target_dose", "max_dose", 'N/A')
+WHERE "dosage" IS NULL;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM information_schema.table_constraints
+    WHERE table_schema = 'public'
+      AND table_name = 'prescriptions'
+      AND constraint_name = 'prescriptions_provider_id_fkey'
+  ) THEN
+    ALTER TABLE "prescriptions"
+    ADD CONSTRAINT "prescriptions_provider_id_fkey"
+    FOREIGN KEY ("provider_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS "prescriptions_patient_id_status_idx" ON "prescriptions" ("patient_id", "status");
 CREATE INDEX IF NOT EXISTS "prescriptions_provider_id_status_idx" ON "prescriptions" ("provider_id", "status");
 
