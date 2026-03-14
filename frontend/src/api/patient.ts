@@ -361,6 +361,16 @@ export const patientApi = {
         async () => (await http.get('/v1/patient/reports')).data,
         async () => (await http.get('/patient/reports')).data,
       ]),
+    getSharedReportMeta: async (id: string) =>
+      withFallbackChain([
+        async () => (await http.get(`/v1/patient/reports/shared/${encodeURIComponent(id)}`)).data,
+        async () => (await http.get(`/patient/reports/shared/${encodeURIComponent(id)}`)).data,
+      ]),
+    downloadSharedReport: async (id: string) =>
+      withFallbackChain([
+        async () => (await http.get(`/v1/patient/reports/shared/${encodeURIComponent(id)}/download`, { responseType: 'blob' })).data,
+        async () => (await http.get(`/patient/reports/shared/${encodeURIComponent(id)}/download`, { responseType: 'blob' })).data,
+      ]),
     generateCompleteHealthSummary: async () =>
       withFallbackChain([
         async () => (await http.post('/v1/patient/reports/health-summary', {}, { responseType: 'blob' })).data,

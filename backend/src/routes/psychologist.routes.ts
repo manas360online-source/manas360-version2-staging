@@ -10,6 +10,9 @@ import {
   postMyPsychologistAssessmentController,
   getMyPsychologistReportsController,
   postMyPsychologistReportController,
+  postCloneMyPsychologistReportController,
+  getMyPsychologistPatientReportsController,
+  postShareMyPsychologistPatientReportController,
   putMyPsychologistReportController,
   getMyPsychologistTestsController,
   getMyPsychologistScheduleController,
@@ -31,6 +34,9 @@ router.post('/me/assessments', requireAuth, requireRole('psychologist'), asyncHa
 router.get('/me/reports', requireAuth, requireRole('psychologist'), asyncHandler(getMyPsychologistReportsController));
 router.post('/me/reports', requireAuth, requireRole('psychologist'), asyncHandler(postMyPsychologistReportController));
 router.put('/me/reports/:id', requireAuth, requireRole('psychologist'), asyncHandler(putMyPsychologistReportController));
+router.post('/me/reports/:id/clone-for-patient', requireAuth, requireRole('psychologist'), asyncHandler(postCloneMyPsychologistReportController));
+router.get('/me/patient-reports', requireAuth, requireRole('psychologist'), asyncHandler(getMyPsychologistPatientReportsController));
+router.post('/me/patient-reports/:id/share', requireAuth, requireRole('psychologist'), asyncHandler(postShareMyPsychologistPatientReportController));
 
 router.get('/me/tests', requireAuth, requireRole('psychologist'), asyncHandler(getMyPsychologistTestsController));
 router.get('/me/schedule', requireAuth, requireRole('psychologist'), asyncHandler(getMyPsychologistScheduleController));

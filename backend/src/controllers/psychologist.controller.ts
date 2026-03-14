@@ -17,6 +17,11 @@ import {
   updatePsychologistReport,
   upsertPsychologistSettings,
 } from '../services/psychologist.service';
+import {
+  cloneProviderReportToPatientReport,
+  listProviderPatientReportClones,
+  shareProviderPatientReportClone,
+} from '../services/patient-shared-report.service';
 
 const authUserId = (req: Request): string => {
   const userId = req.auth?.userId;
@@ -68,6 +73,26 @@ export const putMyPsychologistReportController = async (req: Request, res: Respo
   if (!reportId) throw new AppError('id is required', 400);
   const data = await updatePsychologistReport(authUserId(req), reportId, req.body || {});
   sendSuccess(res, data, 'Psychologist report updated');
+};
+
+export const postCloneMyPsychologistReportController = async (req: Request, res: Response): Promise<void> => {
+  const reportId = String(req.params.id || '').trim();
+  if (!reportId) throw new AppError('id is required', 400);
+  const data = await cloneProviderReportToPatientReport(authUserId(req), reportId);
+  sendSuccess(res, data, 'Patient-facing report clone created', 201);
+};
+
+export const getMyPsychologistPatientReportsController = async (req: Request, res: Response): Promise<void> => {
+  const patientId = typeof req.query.patientId === 'string' ? req.query.patientId : undefined;
+  const data = await listProviderPatientReportClones(authUserId(req), patientId);
+  sendSuccess(res, data, 'Patient-facing report clones fetched');
+};
+
+export const postShareMyPsychologistPatientReportController = async (req: Request, res: Response): Promise<void> => {
+  const patientReportId = String(req.params.id || '').trim();
+  if (!patientReportId) throw new AppError('id is required', 400);
+  const data = await shareProviderPatientReportClone(authUserId(req), patientReportId);
+  sendSuccess(res, data, 'Patient-facing report shared');
 };
 
 export const getMyPsychologistTestsController = async (req: Request, res: Response): Promise<void> => {

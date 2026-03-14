@@ -55,6 +55,10 @@ import {
 	completeTreatmentPlanTask,
 	getMyTreatmentPlan,
 } from '../services/treatment-plan.service';
+import {
+	getPatientSharedReportDownloadPayload,
+	getPatientSharedReportMeta,
+} from '../services/patient-shared-report.service';
 
 const renderPdfBuffer = async (write: (doc: any) => void): Promise<Buffer> =>
 	new Promise((resolve, reject) => {
@@ -113,6 +117,28 @@ export const getPatientInsightsController = async (req: Request, res: Response):
 export const getPatientReportsController = async (req: Request, res: Response): Promise<void> => {
 	const data = await getPatientReports(authUserId(req));
 	sendSuccess(res, data, 'Patient reports fetched');
+};
+
+export const getPatientSharedReportMetaController = async (req: Request, res: Response): Promise<void> => {
+	const reportId = String(req.params.id || '').trim();
+	if (!reportId) throw new AppError('report id is required', 422);
+	const data = await getPatientSharedReportMeta(authUserId(req), reportId);
+	sendSuccess(res, data, 'Shared report fetched');
+};
+
+export const downloadPatientSharedReportController = async (req: Request, res: Response): Promise<void> => {
+	const reportId = String(req.params.id || '').trim();
+	if (!reportId) throw new AppError('report id is required', 422);
+
+	const payload = await getPatientSharedReportDownloadPayload(authUserId(req), reportId);
+	if (payload.mode === 'redirect') {
+		res.redirect(payload.signedUrl);
+		return;
+	}
+
+	res.setHeader('Content-Type', 'application/pdf');
+	res.setHeader('Content-Disposition', `attachment; filename="${payload.fileName}"`);
+	res.status(200).send(payload.buffer);
 };
 
 export const generateCompleteHealthSummaryController = async (req: Request, res: Response): Promise<void> => {

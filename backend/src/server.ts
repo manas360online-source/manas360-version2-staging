@@ -7,6 +7,7 @@ import { startAnalyticsRollup } from './jobs/analyticsRollup.job';
 import './jobs/admin-analytics-export.worker';
 import { startDailyMoodPredictionJob } from './cron/dailyMoodPrediction';
 import { startChatRetentionJob } from './jobs/chatRetention.job';
+import { startPatientSharedReportCleanupJob } from './jobs/patientSharedReportCleanup.job';
 import { ensureSsoTables } from './services/sso.service';
 import { createOrEnsureTenant, azureTemplate, googleTemplate, oktaTemplate } from './services/sso.service';
 import { setSocketIO } from './routes/gps.routes';
@@ -51,6 +52,7 @@ const startServer = async (): Promise<void> => {
 	void startAnalyticsRollup();
 	startDailyMoodPredictionJob();
 	startChatRetentionJob();
+	startPatientSharedReportCleanupJob();
 
 	const shutdown = async (signal: string): Promise<void> => {
 		console.log(`${signal} received. Shutting down gracefully...`);

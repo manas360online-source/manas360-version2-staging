@@ -24,6 +24,8 @@ import {
 	getPatientMoodTodayController,
 	getPatientProgressController,
 	getPatientReportsController,
+	getPatientSharedReportMetaController,
+	downloadPatientSharedReportController,
 	generateCompleteHealthSummaryController,
 	getPatientRecordSecureUrlController,
 	createPatientRecordShareLinkController,
@@ -72,6 +74,8 @@ const router = Router();
 router.get('/patient/dashboard', requireAuth, requireRole('patient'), asyncHandler(getPatientDashboardController));
 router.get('/patient/insights', requireAuth, requireRole('patient'), asyncHandler(getPatientInsightsController));
 router.get('/patient/reports', requireAuth, requireRole('patient'), asyncHandler(getPatientReportsController));
+router.get('/patient/reports/shared/:id', requireAuth, requireRole('patient'), asyncHandler(getPatientSharedReportMetaController));
+router.get('/patient/reports/shared/:id/download', requireAuth, requireRole('patient'), asyncHandler(downloadPatientSharedReportController));
 router.post('/patient/reports/health-summary', requireAuth, requireRole('patient'), asyncHandler(generateCompleteHealthSummaryController));
 router.get('/patient/records/:id/url', requireAuth, requireRole('patient'), asyncHandler(getPatientRecordSecureUrlController));
 router.post('/patient/records/:id/share', requireAuth, requireRole('patient'), asyncHandler(createPatientRecordShareLinkController));

@@ -5,9 +5,11 @@ import TherapistButton from '../../components/therapist/dashboard/TherapistButto
 import TherapistCard from '../../components/therapist/dashboard/TherapistCard';
 import { TherapistErrorState, TherapistLoadingState } from '../../components/therapist/dashboard/TherapistDataState';
 import TherapistPageShell from '../../components/therapist/dashboard/TherapistPageShell';
+import ProviderReportEditor from '../../components/psychologist/ProviderReportEditor';
 
 export default function PsychologistReportsPage() {
   const [rows, setRows] = useState<any[]>([]);
+  const [clones, setClones] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -15,8 +17,12 @@ export default function PsychologistReportsPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await psychologistApi.getReports();
+      const [res, cloned] = await Promise.all([
+        psychologistApi.getReports(),
+        psychologistApi.getPatientReportClones(),
+      ]);
       setRows(res.items || []);
+      setClones(cloned.items || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load reports');
     } finally {
@@ -59,6 +65,8 @@ export default function PsychologistReportsPage() {
             </div>
           ))}
         </div>
+
+        <ProviderReportEditor reports={rows} clones={clones} onReload={load} />
       </TherapistCard>
     </TherapistPageShell>
   );
