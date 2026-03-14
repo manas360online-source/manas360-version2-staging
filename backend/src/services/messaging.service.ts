@@ -19,6 +19,21 @@ export type SenderRole = 'patient' | 'provider' | 'system';
  * Return or create a conversation between a patient and a provider.
  */
 export async function getOrCreateConversation(patientId: string, providerId: string, isSupport = false) {
+  // Validate that both patient and provider exist
+  const [patient, provider] = await Promise.all([
+    prisma.user.findUnique({ where: { id: patientId }, select: { id: true, role: true } }),
+    prisma.user.findUnique({ where: { id: providerId }, select: { id: true, role: true } }),
+  ]);
+
+  if (!patient) throw new Error('Patient not found');
+  if (!provider) throw new Error('Provider not found');
+
+  // Only allow conversations with actual providers
+  const providerRoles = ['THERAPIST', 'PSYCHIATRIST', 'PSYCHOLOGIST', 'COACH'];
+  if (!providerRoles.includes(String(provider.role).toUpperCase())) {
+    throw new Error('Invalid provider role for messaging');
+  }
+
   const existing = await prisma.directConversation.findUnique({
     where: { patientId_providerId: { patientId, providerId } },
   });

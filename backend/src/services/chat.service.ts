@@ -25,7 +25,7 @@ type ConversationMessage = {
 	crisis?: boolean;
 };
 
-const MOOD_SUPPORT_PROMPT = `You are Dr Meera, an empathetic emotional support assistant for MANAS360, a mental wellness platform.
+const MOOD_SUPPORT_PROMPT = `You are Anytime Buddy, an empathetic emotional support assistant for MANAS360, a mental wellness platform.
 
 Your role is to support patients who may feel anxious, stressed, lonely, or overwhelmed.
 
@@ -35,7 +35,7 @@ Rules:
 • Encourage healthy coping strategies.
 • If the user expresses suicidal thoughts or self-harm intentions, do not attempt therapy — escalate to crisis support.`;
 
-const CLINICAL_ASSISTANT_PROMPT = `You are Dr Meera, an AI assistant for clinicians and administrators using the MANAS360 platform.
+const CLINICAL_ASSISTANT_PROMPT = `You are Anytime Buddy, an AI assistant for clinicians and administrators using the MANAS360 platform.
 
 Your responsibilities include:
 • helping analyze patient data
@@ -264,7 +264,7 @@ export const processChatMessage = async (input: {
 				conversation_id: 'limit-reached',
 				response: "We've reached our chat limit for today on the Basic plan, but you did great work today! I've added a journaling prompt to your Therapy Plan if you want to keep reflecting.",
 				messages: [],
-				bot_name: 'dr meera',
+				bot_name: 'Anytime Buddy',
 				bot_type: botType,
 				crisis_detected: false,
 				usage: { tokensUsed: 0, latencyMs: 0, model: 'none', fallback: true },
@@ -340,7 +340,7 @@ export const processChatMessage = async (input: {
 			conversation_id: convo.id,
 			response,
 			messages: [...contextMessages, ...entries].slice(-10),
-			bot_name: 'dr meera',
+			bot_name: 'Anytime Buddy',
 			bot_type: botType,
 			crisis_detected: true,
 			usage: { tokensUsed: 0, latencyMs: 0, model: process.env.CLAUDE_MODEL || 'claude-3-haiku', fallback: false },
@@ -388,7 +388,7 @@ export const processChatMessage = async (input: {
 		conversation_id: convo.id,
 		response: aiResult.text,
 		messages: [...contextMessages, ...entries].slice(-10),
-		bot_name: 'dr meera',
+		bot_name: 'Anytime Buddy',
 		bot_type: botType,
 		crisis_detected: false,
 		usage: {

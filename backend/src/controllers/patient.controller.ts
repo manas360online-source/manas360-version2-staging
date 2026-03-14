@@ -196,7 +196,8 @@ export const getMyTherapyPlanController = async (req: Request, res: Response): P
 				status: 'ACTIVE' as const,
 		  };
 
-	const [goalActivities, cbtSessions, therapistNotes, careTeamAssignment] = await Promise.all([
+	try {
+		const [goalActivities, cbtSessions, therapistNotes, careTeamAssignment] = await Promise.all([
 		prisma.therapyPlanActivity.findMany({
 			where: {
 				plan: {
@@ -374,5 +375,9 @@ export const getMyTherapyPlanController = async (req: Request, res: Response): P
 		},
 		'Therapy plan fetched',
 	);
+	} catch (error) {
+		console.error('Error in getMyTherapyPlanController:', error);
+		throw error;
+	}
 };
 

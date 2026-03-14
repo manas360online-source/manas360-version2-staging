@@ -64,11 +64,11 @@ const helpArticles: HelpArticle[] = [
     keywords: ['privacy', 'encrypted', 'security', 'PHQ-9', 'compliance'],
   },
   {
-    id: 'dr-meera-basics',
-    title: 'Using Dr. Meera (AI) Safely',
+    id: 'anytime-buddy-basics',
+    title: 'Using Anytime Buddy (AI) Safely',
     summary: 'How AI suggestions work, chat limits, and how to reset a conversation.',
     category: 'ai',
-    keywords: ['ai', 'dr meera', 'chat', 'limits', 'reset'],
+    keywords: ['ai', 'anytime buddy', 'chat', 'limits', 'reset'],
   },
 ];
 
@@ -102,7 +102,7 @@ const categoryCards: Array<{
   },
   {
     id: 'ai',
-    title: 'Using Dr. Meera (AI)',
+    title: 'Using Anytime Buddy (AI)',
     subtitle: 'How AI support works inside your care journey.',
     bullets: ['How AI uses your data', 'Chat limits', 'How to reset a conversation'],
     icon: Bot,

@@ -419,6 +419,7 @@ function App() {
           <Route path="mood" element={<MoodTrackerPage />} />
           <Route path="sound-therapy" element={<SoundTherapyPage />} />
           <Route path="provider-messages" element={<ProviderMessagesPage />} />
+          <Route path="provider-messages/:providerId" element={<ProviderMessagesPage />} />
           <Route path="messages" element={<AIChatPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="settings" element={<SettingsPage />} />

@@ -36,7 +36,7 @@ export default function PsychologistAiClinicalAssistantPage() {
   return (
     <TherapistPageShell title="AI Clinical Assistant" subtitle="Interpret assessments, draft reports, and suggest treatment options.">
       <TherapistCard className="p-4">
-        <h3 className="font-semibold text-ink-800">Dr Meera Clinical Co-Pilot</h3>
+        <h3 className="font-semibold text-ink-800">Anytime Buddy Clinical Co-Pilot</h3>
         <p className="text-sm text-ink-500 mt-1">Use AI to summarize assessment outcomes and generate draft clinical notes.</p>
         <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} className="mt-3 w-full rounded-lg border border-ink-100 p-3 text-sm" rows={6} placeholder="Ask: Summarize PHQ-9 and GAD-7 trends for patient Rahul..." />
         <div className="mt-3 flex gap-2">

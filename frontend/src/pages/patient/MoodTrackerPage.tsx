@@ -202,7 +202,7 @@ export default function MoodTrackerPage() {
               A gentle micro-journal that captures how today feels, why it feels that way, and what your patterns are teaching you.
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-charcoal/70 sm:text-base">
-              Three quick screens. One clean signal for you, your therapy plan, and Dr. Meera.
+              Three quick screens. One clean signal for you, your therapy plan, and Anytime Buddy.
             </p>
 
             <div className="mt-6 flex flex-wrap gap-3">
@@ -478,7 +478,7 @@ export default function MoodTrackerPage() {
 
                 <div className="mt-6 rounded-[24px] border border-[#d9e5df] bg-white p-5">
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#557366]">Immediate next step</p>
-                  <p className="mt-2 text-base font-medium text-charcoal">Based on this check-in, Dr. Meera has a quick audio reset ready.</p>
+                  <p className="mt-2 text-base font-medium text-charcoal">Based on this check-in, Anytime Buddy has a quick audio reset ready.</p>
                   <p className="mt-1 text-sm text-charcoal/65">{successState.ctaTitle}</p>
                   <div className="mt-5 flex flex-col gap-3 sm:flex-row">
                     <Link to="/patient/sound-therapy" className="inline-flex min-h-[46px] items-center justify-center rounded-full bg-[#18322d] px-5 text-sm font-semibold text-white transition hover:opacity-95">

@@ -408,47 +408,53 @@ const buildJourneyRecommendation = (input: { type: string; score: number; answer
 };
 
 const toProviderListItem = async (user: any) => {
-	// 1. Ensure TherapistProfile exists, or fetch it if omitted
-	const profile = user.therapistProfile || await db.therapistProfile.findUnique({ where: { userId: user.id } }).catch(() => null);
+	try {
+		// 1. Ensure TherapistProfile exists, or fetch it if omitted
+		const profile = user.therapistProfile || await db.therapistProfile.findUnique({ where: { userId: user.id } }).catch(() => null);
 
-	// 2. Base specializations based on actual session templates or profile
-	const categories = await db.cBTSessionTemplate.findMany({
-		where: { therapistId: user.id, status: 'PUBLISHED' },
-		select: { category: true },
-		take: 10,
-	});
-	
-	const templateSpecializations = [...new Set(categories.map((c: any) => String(c.category || '').trim()).filter(Boolean))];
-	const profileSpecializations = Array.isArray(profile?.specializations) ? profile.specializations : [];
-	const allSpecializations = [...new Set([...templateSpecializations, ...profileSpecializations])];
+		// 2. Base specializations based on actual session templates or profile
+		const categories = await db.cBTSessionTemplate.findMany({
+			where: { therapistId: user.id, status: 'PUBLISHED' },
+			select: { category: true },
+			take: 10,
+		});
+		
+		const templateSpecializations = [...new Set(categories.map((c: any) => String(c.category || '').trim()).filter(Boolean))];
+		const profileSpecializations = Array.isArray(profile?.specializations) ? profile.specializations : [];
+		const allSpecializations = [...new Set([...templateSpecializations, ...profileSpecializations])];
 
-	// 3. Aggregate Stats
-	const completedSessions = await db.therapySession.count({ where: { therapistProfileId: user.id, status: 'COMPLETED' } });
-	const providerType = roleToProviderType(user.role);
-	
-	// Default fallbacks
-	const fallbackSpecialization = providerType === 'psychiatrist'
-		? 'Medication & Clinical Psychiatry'
-		: providerType === 'clinical-psychologist'
-			? 'Clinical Psychology'
-			: normalizeProviderRole(user.role) === 'COACH'
-				? 'Wellness Coaching'
-				: 'General Wellness Therapy';
+		// 3. Aggregate Stats
+		const therapistProfile = profile || await db.therapistProfile.findUnique({ where: { userId: user.id } }).catch(() => null);
+		const completedSessions = therapistProfile ? await db.therapySession.count({ where: { therapistProfileId: therapistProfile.id, status: 'COMPLETED' } }) : 0;
+		const providerType = roleToProviderType(user.role);
+		
+		// Default fallbacks
+		const fallbackSpecialization = providerType === 'psychiatrist'
+			? 'Medication & Clinical Psychiatry'
+			: providerType === 'clinical-psychologist'
+				? 'Clinical Psychology'
+				: normalizeProviderRole(user.role) === 'COACH'
+					? 'Wellness Coaching'
+					: 'General Wellness Therapy';
 
-	return {
-		id: user.id,
-		name: String(profile?.displayName || user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Provider'),
-		role: roleLabel(user.role),
-		providerType,
-		specialization: allSpecializations[0] || fallbackSpecialization,
-		specializations: allSpecializations.length ? allSpecializations : [fallbackSpecialization],
-		experience_years: profile?.yearsOfExperience || 1,
-		session_rate: profile?.consultationFee || defaultFeeByRoleMinor(user.role),
-		bio: profile?.bio || 'Experienced mental wellness professional dedicated to holistic care and evidence-based practices.',
-		languages: Array.isArray(profile?.languages) && profile.languages.length > 0 ? profile.languages : ['English'],
-		rating_avg: profile?.averageRating && profile.averageRating > 0 ? profile.averageRating : (completedSessions > 0 ? 4.8 : 4.5),
-		is_active: !user.isDeleted && user.status === 'ACTIVE',
-	};
+		return {
+			id: user.id,
+			name: String(profile?.displayName || user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Provider'),
+			role: roleLabel(user.role),
+			providerType,
+			specialization: allSpecializations[0] || fallbackSpecialization,
+			specializations: allSpecializations.length ? allSpecializations : [fallbackSpecialization],
+			experience_years: profile?.yearsOfExperience || 1,
+			session_rate: profile?.consultationFee || defaultFeeByRoleMinor(user.role),
+			bio: profile?.bio || 'Experienced mental wellness professional dedicated to holistic care and evidence-based practices.',
+			languages: Array.isArray(profile?.languages) && profile.languages.length > 0 ? profile.languages : ['English'],
+			rating_avg: profile?.averageRating && profile.averageRating > 0 ? profile.averageRating : (completedSessions > 0 ? 4.8 : 4.5),
+			is_active: !user.isDeleted && user.status === 'ACTIVE',
+		};
+	} catch (error) {
+		console.error('Error in toProviderListItem:', error);
+		throw error;
+	}
 };
 
 export const getPatientDashboard = async (userId: string) => {
@@ -2205,13 +2211,14 @@ export const getMyCareTeamProviders = async (userId: string) => {
 		providerMeta.set(String(user.id), await toProviderListItem(user));
 	}
 
-	return providerIds.map((providerId: string) => {
+	return providerIds.map((therapistProfileId: string) => {
 		const providerSessions = sessions
-			.filter((s: any) => String(s.therapistProfileId) === providerId)
+			.filter((s: any) => String(s.therapistProfileId) === therapistProfileId)
 			.sort((a: any, b: any) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
 		const nextSession = providerSessions.find((s: any) => new Date(s.dateTime) >= now);
 		const latest = providerSessions[providerSessions.length - 1];
-		const meta = providerMeta.get(providerId);
+		const userId = therapistProfileId;
+		const meta = userId ? providerMeta.get(String(userId)) : null;
 
 		const providerName = String(latest?.therapistProfile?.name || `${latest?.therapistProfile?.firstName || ''} ${latest?.therapistProfile?.lastName || ''}`.trim() || 'Provider');
 		let latestPhq9Assessment: string | null = null;
@@ -2221,7 +2228,7 @@ export const getMyCareTeamProviders = async (userId: string) => {
 		}
 
 		return {
-			id: providerId,
+			id: userId,
 			name: providerName,
 			role: roleLabel(latest?.therapistProfile?.role || meta?.role),
 			nextSession: nextSession

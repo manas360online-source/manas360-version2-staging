@@ -545,7 +545,7 @@ export default function SessionsPage() {
 
   const normalizeProviderForBooking = (provider: any) => {
     if (!provider) return null;
-    const id = provider.id || provider.userId || provider.providerId;
+    const id = provider.providerId || provider.userId || provider?.user?.id || provider.id;
     if (!id) return null;
     const name = provider.name
       || provider.displayName
@@ -561,11 +561,11 @@ export default function SessionsPage() {
   const getProviderMessageLink = (provider: any) => {
     const normalized = normalizeProviderForBooking(provider);
     if (!normalized) return '/patient/provider-messages';
+    const providerId = encodeURIComponent(String(normalized.id));
     const params = new URLSearchParams({
-      providerId: String(normalized.id),
       providerName: String(normalized.name || 'Provider'),
     });
-    return `/patient/provider-messages?${params.toString()}`;
+    return `/patient/provider-messages/${providerId}?${params.toString()}`;
   };
 
   const openBookingDrawer = async (

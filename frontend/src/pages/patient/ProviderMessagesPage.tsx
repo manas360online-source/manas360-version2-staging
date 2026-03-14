@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { io, Socket } from 'socket.io-client';
 import { Send, ArrowLeft, MessageSquare, Clock, Check, CheckCheck } from 'lucide-react';
 import { patientApi } from '../../api/patient';
@@ -15,6 +15,23 @@ type ConversationSummary = {
   unreadCount: number;
   isPinned: boolean;
   isSupport: boolean;
+};
+
+const normalizeConversation = (raw: any): ConversationSummary => {
+  const providerId = String(
+    raw?.providerId || raw?.provider_id || raw?.providerUserId || raw?.provider?.id || '',
+  ).trim();
+  return {
+    id: String(raw?.id || raw?.conversationId || ''),
+    providerId: providerId || undefined,
+    providerName: String(raw?.providerName || raw?.provider_name || raw?.provider?.name || 'Provider'),
+    providerRole: String(raw?.providerRole || raw?.provider_role || ''),
+    lastMessage: raw?.lastMessage || raw?.last_message || '',
+    lastMessageAt: raw?.lastMessageAt || raw?.last_message_at || '',
+    unreadCount: Number(raw?.unreadCount || raw?.unread_count || 0),
+    isPinned: Boolean(raw?.isPinned),
+    isSupport: Boolean(raw?.isSupport),
+  };
 };
 
 type DirectMessage = {
@@ -58,6 +75,7 @@ function formatTime(dateStr?: string): string {
 export default function ProviderMessagesPage() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { providerId: providerIdFromPath } = useParams<{ providerId?: string }>();
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [activeConv, setActiveConv] = useState<ConversationSummary | null>(null);
   const [messages, setMessages] = useState<DirectMessage[]>([]);
@@ -66,6 +84,7 @@ export default function ProviderMessagesPage() {
   const [msgLoading, setMsgLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [authRequired, setAuthRequired] = useState(false);
   const [typing, setTyping] = useState(false);
   const [onlineStatus, setOnlineStatus] = useState<Record<string, boolean>>({});
   const [readReceipts, setReadReceipts] = useState<Record<string, boolean>>({});
@@ -153,11 +172,15 @@ export default function ProviderMessagesPage() {
 
   // ── Load conversations ─────────────────────────────────────────
   const loadConversations = useCallback(async () => {
+    if (authRequired) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const res = await patientApi.getConversations();
       const raw = (res as any)?.data ?? res;
-      const data: ConversationSummary[] = Array.isArray(raw) ? raw : [];
+      const data: ConversationSummary[] = Array.isArray(raw) ? raw.map(normalizeConversation) : [];
       const sorted = getSortedConversations(data);
       setConversations(sorted);
       sorted.forEach((c) => {
@@ -165,12 +188,19 @@ export default function ProviderMessagesPage() {
           socketRef.current?.emit('check_presence', { userId: c.providerId });
         }
       });
-    } catch {
+    } catch (requestError: any) {
+      const status = Number(requestError?.response?.status || 0);
+      if (status === 401 || status === 403) {
+        setAuthRequired(true);
+        setError('Your session has expired. Please log in again to continue messaging.');
+        setConversations([]);
+        return;
+      }
       setConversations([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [authRequired]);
 
   useEffect(() => {
     void loadConversations();
@@ -200,31 +230,54 @@ export default function ProviderMessagesPage() {
     }
   }, []);
 
-  // If navigated with ?providerId=..., open existing conversation or create one and open it.
+  // If navigated with provider id, fetch/create thread and open by conversation id.
   useEffect(() => {
-    const providerId = new URLSearchParams(location.search).get('providerId');
+    if (authRequired) return;
+    const providerId = String(providerIdFromPath || new URLSearchParams(location.search).get('providerId') || '').trim();
     if (!providerId || loading) return;
 
     let cancelled = false;
     const openOrCreateConversation = async () => {
-      let target = conversations.find((conv) => String(conv.providerId || '') === String(providerId));
+      try {
+        const startRes = await patientApi.startConversation({ providerId: String(providerId) });
+        const startPayload = (startRes as any)?.data ?? startRes;
+        const conversationId = String(startPayload?.conversationId || '').trim();
 
-      if (!target) {
-        try {
-          await patientApi.startConversation({ providerId: String(providerId) });
-          const refreshed = await patientApi.getConversations();
-          const refreshedRaw = (refreshed as any)?.data ?? refreshed;
-          const refreshedData: ConversationSummary[] = Array.isArray(refreshedRaw) ? refreshedRaw : [];
-          const refreshedSorted = getSortedConversations(refreshedData);
-          if (!cancelled) setConversations(refreshedSorted);
-          target = refreshedSorted.find((conv) => String(conv.providerId || '') === String(providerId));
-        } catch {
-          // If conversation creation fails, keep the page usable and let the user open manually.
+        const refreshed = await patientApi.getConversations();
+        const refreshedRaw = (refreshed as any)?.data ?? refreshed;
+        const refreshedData: ConversationSummary[] = Array.isArray(refreshedRaw)
+          ? refreshedRaw.map(normalizeConversation)
+          : [];
+        const refreshedSorted = getSortedConversations(refreshedData);
+        if (!cancelled) setConversations(refreshedSorted);
+
+        let target = refreshedSorted.find((conv) => String(conv.id) === conversationId);
+        if (!target && conversationId) {
+          const providerName = String(new URLSearchParams(location.search).get('providerName') || 'Provider');
+          target = {
+            id: conversationId,
+            providerId,
+            providerName,
+            providerRole: '',
+            lastMessage: '',
+            lastMessageAt: '',
+            unreadCount: 0,
+            isPinned: false,
+            isSupport: false,
+          };
         }
-      }
 
-      if (!cancelled && target) {
-        await openConversation(target);
+        if (!cancelled && target) {
+          await openConversation(target);
+        }
+      } catch (requestError: any) {
+        const status = Number(requestError?.response?.status || 0);
+        if (status === 401 || status === 403) {
+          setAuthRequired(true);
+          setError('Your session has expired. Please log in again to continue messaging.');
+          return;
+        }
+        // Keep page usable even when direct start fails.
       }
 
       if (!cancelled) {
@@ -236,7 +289,7 @@ export default function ProviderMessagesPage() {
     return () => {
       cancelled = true;
     };
-  }, [location.search, loading, conversations, navigate, openConversation]);
+  }, [authRequired, location.search, loading, navigate, openConversation, providerIdFromPath]);
 
   // ── Auto-scroll ───────────────────────────────────────────────
   useEffect(() => {
@@ -320,6 +373,22 @@ export default function ProviderMessagesPage() {
     };
 
     // ── Render ─────────────────────────────────────────────────────
+    if (authRequired) {
+      return (
+        <div className="mx-auto mt-8 w-full max-w-2xl rounded-2xl border border-amber-200 bg-amber-50 p-6">
+          <h2 className="text-lg font-semibold text-amber-900">Session expired</h2>
+          <p className="mt-2 text-sm text-amber-800">Please log in again to continue messaging your providers.</p>
+          <button
+            type="button"
+            onClick={() => navigate('/auth/login')}
+            className="mt-4 inline-flex items-center rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700"
+          >
+            Go to Login
+          </button>
+        </div>
+      );
+    }
+
     return (
       <div className="mx-auto flex h-[calc(100vh-8rem)] w-full max-w-[1400px] flex-col pb-20 lg:h-[calc(100vh-5rem)] lg:pb-0">
         {/* Page header */}
@@ -344,7 +413,7 @@ export default function ProviderMessagesPage() {
             className="inline-flex items-center gap-2 rounded-xl border border-calm-sage/25 px-3 py-2 text-sm font-medium text-charcoal/70 transition hover:bg-calm-sage/10"
           >
             <MessageSquare className="h-4 w-4" />
-            AI Support (Dr. Meera)
+            AI Support (Anytime Buddy)
           </Link>
         </section>
 

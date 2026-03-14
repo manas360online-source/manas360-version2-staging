@@ -420,7 +420,7 @@ export default function ProgressPage() {
               </section>
 
               <section className="rounded-2xl border border-calm-sage/25 bg-gradient-to-r from-[#edf4f1] to-[#f8f5ee] p-5 shadow-soft-sm">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-calm-sage">Dr. Meera Insight</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-calm-sage">Anytime Buddy Insight</p>
                 <p className="mt-2 text-sm leading-6 text-charcoal/78">{aiMoodInsight}</p>
               </section>
             </>

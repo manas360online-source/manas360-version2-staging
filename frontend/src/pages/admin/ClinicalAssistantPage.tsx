@@ -8,7 +8,7 @@ export default function ClinicalAssistantPage() {
 	const [message, setMessage] = useState('');
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
-	const [botName, setBotName] = useState("Dr. Meera 'Ai · Clinical Assistant");
+	const [botName, setBotName] = useState('Anytime Buddy AI · Clinical Assistant');
 	const [responseStyle, setResponseStyle] = useState<'concise' | 'detailed'>('concise');
 	const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
 	const [speechLang, setSpeechLang] = useState('en-IN');
@@ -37,7 +37,7 @@ export default function ClinicalAssistantPage() {
 		try {
 			const res = await chatApi.sendMessage({ message: text, bot_type: 'clinical_ai', response_style: responseStyle });
 			const payload: any = (res as any)?.data ?? res;
-			setBotName(`${payload?.bot_name || "Dr. Meera 'Ai"} · Clinical Assistant`);
+			setBotName(`${payload?.bot_name || 'Anytime Buddy AI'} · Clinical Assistant`);
 			const messages = Array.isArray(payload?.messages) ? payload.messages : [];
 			if (!messages.length) {
 				setThread((prev) => [...prev, { role: 'assistant', content: String(payload?.response || CHAT_FALLBACK_MESSAGE) }]);
@@ -95,7 +95,7 @@ export default function ClinicalAssistantPage() {
 						<span>{item.content}</span>
 					</div>
 				))}
-				{loading ? <p className="text-xs text-slate-500">Dr. Meera 'Ai is typing...</p> : null}
+				{loading ? <p className="text-xs text-slate-500">Anytime Buddy AI is typing...</p> : null}
 			</div>
 
 			<div className="mt-3 space-y-2">
@@ -144,7 +144,7 @@ export default function ClinicalAssistantPage() {
 							void send();
 						}
 					}}
-					placeholder="Ask Dr. Meera 'Ai..."
+					placeholder="Ask Anytime Buddy AI..."
 					className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm"
 				/>
 				<button

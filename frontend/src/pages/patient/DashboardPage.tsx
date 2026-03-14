@@ -296,7 +296,7 @@ export default function DashboardPage() {
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-warm-terracotta/20">
               <Sparkles className="h-5 w-5 text-warm-terracotta" />
             </div>
-            <h2 className="text-lg font-semibold text-charcoal">Dr. Meera</h2>
+            <h2 className="text-lg font-semibold text-charcoal">Anytime Buddy</h2>
           </div>
           
           <div className="flex-1 relative">
@@ -321,7 +321,7 @@ export default function DashboardPage() {
           </div>
           
           <Link to="/patient/messages" className="wellness-secondary-btn mt-5 w-full gap-2 px-4 py-2.5">
-            Chat with Dr. Meera <MessageSquare className="h-4 w-4" />
+            Chat with Anytime Buddy <MessageSquare className="h-4 w-4" />
           </Link>
         </section>
 

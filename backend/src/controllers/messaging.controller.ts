@@ -10,7 +10,7 @@ import { prisma } from '../config/db';
 
 // ─── GET /patient/messages/conversations ────────────────────────────────────
 export async function getConversationsController(req: Request, res: Response) {
-  const patientId = (req as any).user?.id;
+  const patientId = req.auth?.userId;
   if (!patientId) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
   try {
@@ -28,7 +28,7 @@ export async function getConversationsController(req: Request, res: Response) {
 
 // ─── GET /patient/messages/:conversationId ───────────────────────────────────
 export async function getMessagesController(req: Request, res: Response) {
-  const patientId = (req as any).user?.id;
+  const patientId = req.auth?.userId;
     const conversationId = req.params.conversationId as string;
   const before = req.query.before as string | undefined;
 
@@ -54,7 +54,7 @@ export async function getMessagesController(req: Request, res: Response) {
 
 // ─── POST /patient/messages ──────────────────────────────────────────────────
 export async function sendMessageController(req: Request, res: Response) {
-  const patientId = (req as any).user?.id;
+  const patientId = req.auth?.userId;
   if (!patientId) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
   const { conversationId, content } = req.body as { conversationId?: string; content?: string };
@@ -81,7 +81,7 @@ export async function sendMessageController(req: Request, res: Response) {
 
 // ─── POST /patient/messages/:conversationId/read ─────────────────────────────
 export async function markMessagesReadController(req: Request, res: Response) {
-  const patientId = (req as any).user?.id;
+  const patientId = req.auth?.userId;
     const conversationId = req.params.conversationId as string;
   if (!patientId) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
@@ -98,7 +98,7 @@ export async function markMessagesReadController(req: Request, res: Response) {
 // Creates or fetches the conversation for a given provider, used by the
 // Care Team page to deep-link into a new thread.
 export async function startConversationController(req: Request, res: Response) {
-  const patientId = (req as any).user?.id;
+  const patientId = req.auth?.userId;
   if (!patientId) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
   const { providerId } = req.body as { providerId?: string };
@@ -108,7 +108,7 @@ export async function startConversationController(req: Request, res: Response) {
     const conv = await getOrCreateConversation(patientId, providerId);
     return res.json({ success: true, data: { conversationId: conv.id } });
   } catch (err: any) {
-    console.error('startConversationController error', err);
+    console.error('startConversationController error:', err);
     return res.status(500).json({ success: false, message: 'Unable to start conversation.' });
   }
 }

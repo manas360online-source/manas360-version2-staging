@@ -357,9 +357,9 @@ export default function AIChatPage() {
     voiceStatus === 'listening'
       ? { label: 'Listening...', className: 'bg-teal-100 text-teal-800 border-teal-200' }
       : voiceStatus === 'processing'
-        ? { label: 'Meera is thinking...', className: 'bg-amber-100 text-amber-800 border-amber-200' }
+        ? { label: 'Anytime Buddy is thinking...', className: 'bg-amber-100 text-amber-800 border-amber-200' }
         : voiceStatus === 'speaking'
-          ? { label: 'Meera is speaking', className: 'bg-sky-100 text-sky-800 border-sky-200' }
+          ? { label: 'Anytime Buddy is speaking', className: 'bg-sky-100 text-sky-800 border-sky-200' }
           : voiceStatus === 'paused'
             ? { label: 'Paused', className: 'bg-zinc-100 text-zinc-700 border-zinc-200' }
             : { label: 'Ready', className: 'bg-zinc-100 text-zinc-700 border-zinc-200' };
@@ -389,7 +389,7 @@ export default function AIChatPage() {
                 <HeartPulse className="h-7 w-7 text-white" />
              </div>
              <div>
-               <h1 className="text-2xl font-bold tracking-tight text-zinc-900 md:text-3xl">Dr. Meera</h1>
+               <h1 className="text-2xl font-bold tracking-tight text-zinc-900 md:text-3xl">Anytime Buddy</h1>
                <p className="text-sm font-medium text-teal-700/80">Your Personal Wellness Companion</p>
              </div>
           </div>
@@ -415,7 +415,7 @@ export default function AIChatPage() {
               </div>
               <div className="flex-1">
                 <h3 className="text-base font-bold text-amber-900">Premium Limit Reached</h3>
-                <p className="text-sm text-amber-800/80 mt-0.5">You've reached your free daily message limit. You did great work today! Upgrade to Premium for 24/7 unlimited access to Dr. Meera.</p>
+                <p className="text-sm text-amber-800/80 mt-0.5">You've reached your free daily message limit. You did great work today! Upgrade to Premium for 24/7 unlimited access to Anytime Buddy.</p>
               </div>
               <Link to="/patient/pricing" className="shrink-0 rounded-xl bg-amber-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-amber-700 transition">
                 View Plans
@@ -548,7 +548,7 @@ export default function AIChatPage() {
                       value={message}
                       onChange={(e) => setMessage(e.target.value)}
                       disabled={loading || isLimitReached || cooldownRemaining > 0}
-                      placeholder={isLimitReached ? "Chat limits reached. Upgrade to continue." : "Type your message to Meera..."}
+                      placeholder={isLimitReached ? "Chat limits reached. Upgrade to continue." : "Type your message to Anytime Buddy..."}
                       className="min-h-[52px] max-h-32 w-full resize-none rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3.5 text-[15px] focus:border-teal-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-teal-500/10 disabled:opacity-60"
                       rows={1}
                       onKeyDown={(event) => {

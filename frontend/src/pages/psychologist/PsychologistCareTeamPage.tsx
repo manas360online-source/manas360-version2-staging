@@ -34,7 +34,20 @@ export default function PsychologistCareTeamPage() {
   }, [selectedPatientId]);
 
   const filteredMembers = useMemo(() => {
-    return members.filter((m) => String(m.name || '').toLowerCase().includes(search.toLowerCase()) || String(m.role || '').toLowerCase().includes(search.toLowerCase()));
+    const dedupedMembers = members.reduce<any[]>((acc, member) => {
+      const uniqueId = String(member?.id || member?.assignmentId || '').trim();
+      if (!uniqueId) {
+        acc.push(member);
+        return acc;
+      }
+      const exists = acc.some((item) => String(item?.id || item?.assignmentId || '').trim() === uniqueId);
+      if (!exists) {
+        acc.push(member);
+      }
+      return acc;
+    }, []);
+
+    return dedupedMembers.filter((m) => String(m.name || '').toLowerCase().includes(search.toLowerCase()) || String(m.role || '').toLowerCase().includes(search.toLowerCase()));
   }, [members, search]);
 
   return (

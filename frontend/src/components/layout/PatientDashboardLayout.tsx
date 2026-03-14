@@ -27,7 +27,7 @@ const mainNavItems = [
 ];
 
 const selfCareNavItems = [
-  { to: '/patient/messages', label: 'Dr. Meera (AI)', icon: MessageSquare, badge: 'AI' },
+  { to: '/patient/messages', label: 'Anytime Buddy (AI)', icon: MessageSquare, badge: 'AI' },
   { to: '/patient/mood', label: 'Daily Check-in', icon: HeartPulse },
   { to: '/patient/sound-therapy', label: 'Wellness Library', icon: Sparkles },
 ];

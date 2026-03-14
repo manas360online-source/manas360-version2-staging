@@ -161,172 +161,178 @@ const getMyTherapyPlanController = async (req, res) => {
             patientId: patientProfile.id,
             status: 'ACTIVE',
         };
-    const [goalActivities, cbtSessions, therapistNotes, careTeamAssignment] = await Promise.all([
-        db_1.prisma.therapyPlanActivity.findMany({
-            where: {
-                plan: {
-                    ...planFilter,
+    try {
+        const [goalActivities, cbtSessions, therapistNotes, careTeamAssignment] = await Promise.all([
+            db_1.prisma.therapyPlanActivity.findMany({
+                where: {
+                    plan: {
+                        ...planFilter,
+                    },
+                    weekNumber: selectedWeek,
+                    isPublished: true,
                 },
-                weekNumber: selectedWeek,
-                isPublished: true,
-            },
-            orderBy: [
-                { orderIndex: 'asc' },
-                { createdAt: 'asc' },
-            ],
-            select: {
-                id: true,
-                title: true,
-                activityType: true,
-                status: true,
-                createdAt: true,
-                completedAt: true,
-                category: true,
-                weekNumber: true,
-            },
-        }),
-        db_1.prisma.patientSession.findMany({
-            where: { patientId: userId },
-            orderBy: { createdAt: 'desc' },
-            select: {
-                id: true,
-                status: true,
-                createdAt: true,
-                completedAt: true,
-                sessionNotes: true,
-                template: {
-                    select: {
-                        title: true,
-                        category: true,
+                orderBy: [
+                    { orderIndex: 'asc' },
+                    { createdAt: 'asc' },
+                ],
+                select: {
+                    id: true,
+                    title: true,
+                    activityType: true,
+                    status: true,
+                    createdAt: true,
+                    completedAt: true,
+                    category: true,
+                    weekNumber: true,
+                },
+            }),
+            db_1.prisma.patientSession.findMany({
+                where: { patientId: userId },
+                orderBy: { createdAt: 'desc' },
+                select: {
+                    id: true,
+                    status: true,
+                    createdAt: true,
+                    completedAt: true,
+                    sessionNotes: true,
+                    template: {
+                        select: {
+                            title: true,
+                            category: true,
+                        },
                     },
                 },
-            },
-        }),
-        db_1.prisma.therapistSessionNote.findMany({
-            where: {
-                patientId: patientProfile.id,
-                status: 'signed',
-            },
-            orderBy: { updatedAt: 'desc' },
-            take: 6,
-            select: {
-                id: true,
-                subjective: true,
-                objective: true,
-                assessment: true,
-                plan: true,
-                assignedExercise: true,
-                updatedAt: true,
-                therapist: {
-                    select: {
-                        firstName: true,
-                        lastName: true,
-                        name: true,
+            }),
+            db_1.prisma.therapistSessionNote.findMany({
+                where: {
+                    patientId: patientProfile.id,
+                    status: 'signed',
+                },
+                orderBy: { updatedAt: 'desc' },
+                take: 6,
+                select: {
+                    id: true,
+                    subjective: true,
+                    objective: true,
+                    assessment: true,
+                    plan: true,
+                    assignedExercise: true,
+                    updatedAt: true,
+                    therapist: {
+                        select: {
+                            firstName: true,
+                            lastName: true,
+                            name: true,
+                        },
                     },
                 },
-            },
-        }),
-        db_1.prisma.careTeamAssignment.findFirst({
-            where: {
-                patientId: userId,
-                status: 'ACTIVE',
-            },
-            orderBy: { assignedAt: 'desc' },
-            select: {
-                provider: {
-                    select: {
-                        firstName: true,
-                        lastName: true,
-                        name: true,
+            }),
+            db_1.prisma.careTeamAssignment.findFirst({
+                where: {
+                    patientId: userId,
+                    status: 'ACTIVE',
+                },
+                orderBy: { assignedAt: 'desc' },
+                select: {
+                    provider: {
+                        select: {
+                            firstName: true,
+                            lastName: true,
+                            name: true,
+                        },
                     },
                 },
-            },
-        }),
-    ]);
-    const fallbackProviderName = getProviderDisplayName(careTeamAssignment?.provider);
-    const fallbackProviderInitials = getProviderInitials(fallbackProviderName);
-    const providerAssignedGoals = goalActivities.filter((activity) => !isExerciseActivityType(String(activity.activityType)));
-    const providerAssignedExercises = goalActivities.filter((activity) => isExerciseActivityType(String(activity.activityType)));
-    const goals = providerAssignedGoals.map((goal) => ({
-        id: goal.id,
-        title: goal.title,
-        category: String(goal.category || mapGoalCategory(goal.title, String(goal.activityType))),
-        todayCheckInDone: String(goal.status || '').toUpperCase() === 'COMPLETED',
-        startDate: goal.createdAt.toISOString(),
-        weekNumber: goal.weekNumber,
-    }));
-    const cbtExercises = providerAssignedExercises.map((activity) => ({
-        id: activity.id,
-        sessionId: '',
-        type: String(activity.activityType || 'CBT Exercise'),
-        title: activity.title,
-        status: mapPatientSessionBadge(String(activity.status)),
-        completed: String(activity.status || '').toUpperCase() === 'COMPLETED',
-        assignedAt: activity.createdAt.toISOString(),
-        completedAt: activity.completedAt ? activity.completedAt.toISOString() : null,
-        weekNumber: activity.weekNumber,
-    }));
-    const recentFeedback = [
-        ...therapistNotes
-            .map((note) => {
-            const feedback = buildTherapistNoteFeedback(note);
-            if (!feedback)
-                return null;
-            const providerName = getProviderDisplayName(note.therapist);
-            return {
-                id: `note-${note.id}`,
-                feedback,
-                providerName,
-                providerInitials: getProviderInitials(providerName),
-                source: 'session-note',
-                createdAt: note.updatedAt.toISOString(),
-            };
-        })
-            .filter((entry) => Boolean(entry)),
-        ...cbtSessions
-            .filter((session) => String(session.status || '').toUpperCase() === 'COMPLETED' && cleanFeedbackText(session.sessionNotes))
-            .map((session) => ({
-            id: `cbt-${session.id}`,
-            feedback: cleanFeedbackText(session.sessionNotes),
-            providerName: fallbackProviderName,
-            providerInitials: fallbackProviderInitials,
-            source: 'cbt-review',
-            createdAt: (session.completedAt || session.createdAt).toISOString(),
-        })),
-    ]
-        .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
-        .slice(0, 3);
-    const dailyTasks = [
-        ...goals.map((goal) => ({
+            }),
+        ]);
+        const fallbackProviderName = getProviderDisplayName(careTeamAssignment?.provider);
+        const fallbackProviderInitials = getProviderInitials(fallbackProviderName);
+        const providerAssignedGoals = goalActivities.filter((activity) => !isExerciseActivityType(String(activity.activityType)));
+        const providerAssignedExercises = goalActivities.filter((activity) => isExerciseActivityType(String(activity.activityType)));
+        const goals = providerAssignedGoals.map((goal) => ({
             id: goal.id,
-            kind: 'goal',
             title: goal.title,
-            category: goal.category,
-            completed: goal.todayCheckInDone,
+            category: String(goal.category || mapGoalCategory(goal.title, String(goal.activityType))),
+            todayCheckInDone: String(goal.status || '').toUpperCase() === 'COMPLETED',
+            startDate: goal.createdAt.toISOString(),
             weekNumber: goal.weekNumber,
-        })),
-        ...cbtExercises.map((exercise) => ({
-            id: exercise.id,
-            kind: 'cbt',
-            title: exercise.title,
-            type: exercise.type,
-            completed: exercise.completed,
-            status: exercise.status,
-            weekNumber: exercise.weekNumber,
-        })),
-    ];
-    const maxAssignedWeek = goalActivities.reduce((maxWeek, activity) => Math.max(maxWeek, Number(activity.weekNumber || 1)), 1);
-    const totalWeeks = Math.max(maxAssignedWeek, currentWeek);
-    (0, response_1.sendSuccess)(res, {
-        dailyTasks,
-        goals,
-        cbtExercises,
-        recentFeedback,
-        weekContext: {
-            selectedWeek,
-            currentWeek,
-            totalWeeks,
-        },
-    }, 'Therapy plan fetched');
+        }));
+        const cbtExercises = providerAssignedExercises.map((activity) => ({
+            id: activity.id,
+            sessionId: '',
+            type: String(activity.activityType || 'CBT Exercise'),
+            title: activity.title,
+            status: mapPatientSessionBadge(String(activity.status)),
+            completed: String(activity.status || '').toUpperCase() === 'COMPLETED',
+            assignedAt: activity.createdAt.toISOString(),
+            completedAt: activity.completedAt ? activity.completedAt.toISOString() : null,
+            weekNumber: activity.weekNumber,
+        }));
+        const recentFeedback = [
+            ...therapistNotes
+                .map((note) => {
+                const feedback = buildTherapistNoteFeedback(note);
+                if (!feedback)
+                    return null;
+                const providerName = getProviderDisplayName(note.therapist);
+                return {
+                    id: `note-${note.id}`,
+                    feedback,
+                    providerName,
+                    providerInitials: getProviderInitials(providerName),
+                    source: 'session-note',
+                    createdAt: note.updatedAt.toISOString(),
+                };
+            })
+                .filter((entry) => Boolean(entry)),
+            ...cbtSessions
+                .filter((session) => String(session.status || '').toUpperCase() === 'COMPLETED' && cleanFeedbackText(session.sessionNotes))
+                .map((session) => ({
+                id: `cbt-${session.id}`,
+                feedback: cleanFeedbackText(session.sessionNotes),
+                providerName: fallbackProviderName,
+                providerInitials: fallbackProviderInitials,
+                source: 'cbt-review',
+                createdAt: (session.completedAt || session.createdAt).toISOString(),
+            })),
+        ]
+            .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+            .slice(0, 3);
+        const dailyTasks = [
+            ...goals.map((goal) => ({
+                id: goal.id,
+                kind: 'goal',
+                title: goal.title,
+                category: goal.category,
+                completed: goal.todayCheckInDone,
+                weekNumber: goal.weekNumber,
+            })),
+            ...cbtExercises.map((exercise) => ({
+                id: exercise.id,
+                kind: 'cbt',
+                title: exercise.title,
+                type: exercise.type,
+                completed: exercise.completed,
+                status: exercise.status,
+                weekNumber: exercise.weekNumber,
+            })),
+        ];
+        const maxAssignedWeek = goalActivities.reduce((maxWeek, activity) => Math.max(maxWeek, Number(activity.weekNumber || 1)), 1);
+        const totalWeeks = Math.max(maxAssignedWeek, currentWeek);
+        (0, response_1.sendSuccess)(res, {
+            dailyTasks,
+            goals,
+            cbtExercises,
+            recentFeedback,
+            weekContext: {
+                selectedWeek,
+                currentWeek,
+                totalWeeks,
+            },
+        }, 'Therapy plan fetched');
+    }
+    catch (error) {
+        console.error('Error in getMyTherapyPlanController:', error);
+        throw error;
+    }
 };
 exports.getMyTherapyPlanController = getMyTherapyPlanController;

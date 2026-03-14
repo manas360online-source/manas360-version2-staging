@@ -3,6 +3,8 @@ const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
+console.log('Seed script starting...');
+
 const DEMO_PASSWORD = 'Manas@123';
 
 async function upsertUser({ email, role, firstName, lastName }, passwordHash) {
@@ -163,20 +165,30 @@ async function ensureSubscription(userId) {
 }
 
 async function run() {
+  console.log('Starting seed script...');
   const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 12);
+  console.log('Password hashed');
 
+  console.log('Creating patient user...');
   const patient = await upsertUser(
     { email: 'patient@manas360.local', role: 'PATIENT', firstName: 'Priya', lastName: 'Kumar' },
     passwordHash,
   );
+  console.log('Patient created:', patient);
+
+  console.log('Creating admin user...');
   const admin = await upsertUser(
     { email: 'admin@manas360.local', role: 'ADMIN', firstName: 'Admin', lastName: 'User' },
     passwordHash,
   );
+  console.log('Admin created:', admin);
+
+  console.log('Creating therapist user...');
   const therapist = await upsertUser(
     { email: 'therapist@manas360.local', role: 'THERAPIST', firstName: 'Rohan', lastName: 'Sharma' },
     passwordHash,
   );
+  console.log('Therapist created:', therapist);
 
   const patientProfile = await ensurePatientProfile(patient.id);
   await ensureTherapistProfile(therapist.id, 'Rohan', 'Sharma');
