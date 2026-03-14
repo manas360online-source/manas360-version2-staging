@@ -38,9 +38,11 @@ const PricingPage = lazy(() => import('./pages/patient/PricingPage'));
 const PatientTimelinePage = lazy(() => import('./pages/patient/PatientTimelinePage'));
 const MoodTrackerPage = lazy(() => import('./pages/patient/MoodTrackerPage'));
 const ReportsPage = lazy(() => import('./pages/patient/ReportsPage'));
+const PatientReportDownloadPage = lazy(() => import('./pages/patient/PatientReportDownloadPage'));
 const NotificationsPage = lazy(() => import('./pages/patient/NotificationsPage'));
 const SoundTherapyPage = lazy(() => import('./pages/patient/SoundTherapyPage'));
 const ProviderMessagesPage = lazy(() => import('./pages/patient/ProviderMessagesPage'));
+const CBTPage = lazy(() => import('./pages/patient/CBTPage'));
 const PatientOnboardingPage = lazy(() => import('./pages/patient/PatientOnboardingPage'));
 const DailyCheckInPage = lazy(() => import('./pages/patient/DailyCheckInPage'));
 const VideoSessionPage = lazy(() => import('./pages/shared/VideoSessionPage'));
@@ -414,6 +416,8 @@ function App() {
           <Route path="sessions" element={<SessionsPage />} />
           <Route path="sessions/:id" element={<PatientSessionDetailPage />} />
           <Route path="cbt/:sessionId" element={<CBTSessionPlayerPage />} />
+          <Route path="cbt-section" element={<CBTPage />} />
+          <Route path="cbt-section/:sessionId" element={<CBTSessionPlayerPage />} />
           <Route path="exercises" element={<ExercisesPage />} />
           <Route path="sessions/:id/live" element={<LiveSessionPage />} />
           <Route path="mood" element={<MoodTrackerPage />} />
@@ -432,6 +436,7 @@ function App() {
           <Route path="insights" element={<Navigate to="/patient/progress?tab=mood" replace />} />
           <Route path="progress" element={<ProgressPage />} />
           <Route path="reports" element={<ReportsPage />} />
+          <Route path="reports/shared/:id" element={<PatientReportDownloadPage />} />
           <Route path="notifications" element={<NotificationsPage />} />
           <Route path="pricing" element={<PricingPage />} />
           <Route path="check-in" element={<DailyCheckInPage />} />

@@ -44,6 +44,18 @@ export type PsychologistReportItem = {
   updated_at?: string | null;
 };
 
+export type PsychologistPatientReportCloneItem = {
+  id: string;
+  source_report_id: string;
+  patient_id: string;
+  title: string;
+  status?: string | null;
+  shared_timestamp?: string | null;
+  expires_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
 export type PsychologistPatientOverview = {
   patient: {
     id: string;
@@ -95,6 +107,18 @@ export const psychologistApi = {
   getReports: async (params?: { patientId?: string }): Promise<{ items: PsychologistReportItem[] }> => {
     const res = await http.get('/v1/psychologist/me/reports', { params });
     return unwrap<{ items: PsychologistReportItem[] }>(res.data);
+  },
+  cloneReportForPatient: async (reportId: string): Promise<{ id: string; status: string }> => {
+    const res = await http.post(`/v1/psychologist/me/reports/${encodeURIComponent(reportId)}/clone-for-patient`);
+    return unwrap<{ id: string; status: string }>(res.data);
+  },
+  getPatientReportClones: async (params?: { patientId?: string }): Promise<{ items: PsychologistPatientReportCloneItem[] }> => {
+    const res = await http.get('/v1/psychologist/me/patient-reports', { params });
+    return unwrap<{ items: PsychologistPatientReportCloneItem[] }>(res.data);
+  },
+  sharePatientReportClone: async (cloneId: string): Promise<{ id: string; status: string; sharePath: string; expiresAt: string }> => {
+    const res = await http.post(`/v1/psychologist/me/patient-reports/${encodeURIComponent(cloneId)}/share`);
+    return unwrap<{ id: string; status: string; sharePath: string; expiresAt: string }>(res.data);
   },
   getTests: async (params?: { patientId?: string }): Promise<{ items: Array<any> }> => {
     const res = await http.get('/v1/psychologist/me/tests', { params });

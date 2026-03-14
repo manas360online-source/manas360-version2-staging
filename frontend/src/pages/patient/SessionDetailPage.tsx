@@ -115,10 +115,10 @@ export default function SessionDetailPage() {
         </div>
         <div className="mt-4">
           <Link
-            to={`/patient/cbt/${session.id}`}
+            to={`/patient/cbt-section/${session.id}`}
             className="inline-flex min-h-[40px] items-center rounded-full bg-charcoal px-4 text-sm font-medium text-cream"
           >
-            Open CBT Session Player
+            Open CBT Section
           </Link>
         </div>
       </section>

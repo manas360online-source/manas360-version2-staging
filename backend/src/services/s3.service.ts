@@ -162,6 +162,19 @@ export const getSignedTherapistDocumentUrl = async (objectKey: string): Promise<
 	);
 };
 
+export const getSignedS3ObjectUrl = async (objectKey: string, expiresInSeconds = env.exportSignedUrlTtlSeconds): Promise<string> => {
+	assertS3Configured();
+
+	return getSignedUrl(
+		s3Client,
+		new GetObjectCommand({
+			Bucket: env.awsS3Bucket,
+			Key: objectKey,
+		}),
+		{ expiresIn: expiresInSeconds },
+	);
+};
+
 export const uploadSessionAudioToS3 = async (params: {
 	sessionId: string;
 	buffer: Buffer;

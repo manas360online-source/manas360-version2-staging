@@ -98,6 +98,7 @@ export default function PatientDashboardLayout() {
     '/patient/dashboard': 'Dashboard',
     '/patient/therapy-plan': 'My Therapy Plan',
     '/patient/sessions': 'Sessions',
+    '/patient/cbt-section': 'CBT Section',
     '/patient/care-team': 'Care Team',
     '/patient/assessments': 'Clinical Assessments',
     '/patient/messages': 'AI Support',

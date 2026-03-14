@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   patientApi,
   type StructuredAssessmentQuestion,
@@ -85,6 +85,7 @@ type AssessmentDraft = {
 };
 
 export default function SessionsPage() {
+  const navigate = useNavigate();
   const [upcoming, setUpcoming] = useState<any[]>([]);
   const [history, setHistory] = useState<any[]>([]);
   const [myProviders, setMyProviders] = useState<any[]>([]);
@@ -535,6 +536,31 @@ export default function SessionsPage() {
     }
   }, [assessmentDraft, hasCompletedCheckin]);
 
+  const hasAttendedAssessment = useMemo(() => {
+    return assessmentHistory.some((entry) => {
+      const type = String(entry.type || '').toLowerCase();
+      return type.includes('phq-9') || type.includes('phq9') || type.includes('gad-7') || type.includes('gad7');
+    });
+  }, [assessmentHistory]);
+
+  const isConsultingPatient = useMemo(() => {
+    return myProviders.length > 0 || history.length > 0;
+  }, [myProviders.length, history.length]);
+
+  const isAssessmentComplete = hasCompletedCheckin || hasAttendedAssessment;
+
+  const assessmentPrimaryCtaLabel = hasAttendedAssessment
+    ? 'Show Result'
+    : (assessmentResumeCopy ? assessmentResumeCopy.button : 'Attend Assessment');
+
+  const onAssessmentPrimaryAction = () => {
+    if (hasAttendedAssessment) {
+      navigate('/patient/progress?tab=clinical');
+      return;
+    }
+    openClinicalAssessmentFlow();
+  };
+
   const handleDownloadInvoice = async (sessionId: string) => {
     try {
       await patientApi.downloadInvoicePdf(sessionId);
@@ -669,6 +695,15 @@ export default function SessionsPage() {
 
   const handlePrimaryBookSession = () => {
     setBookingFallbackError(null);
+
+    if (isConsultingPatient && isAssessmentComplete) {
+      setSmartMatchPreferences({
+        initialProviderType: 'ALL',
+        lockProviderType: false,
+      });
+      setIsSmartMatchOpen(true);
+      return;
+    }
 
     // Check if user has connected providers - if not, force assessment first
     if (myProviders.length === 0) {
@@ -1014,11 +1049,11 @@ export default function SessionsPage() {
             </div>
             <button
               type="button"
-              onClick={openClinicalAssessmentFlow}
+              onClick={onAssessmentPrimaryAction}
               className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-teal-600 px-4 py-2 text-xs font-semibold text-white hover:bg-teal-700"
             >
               <ClipboardList className="h-3.5 w-3.5" />
-              {assessmentResumeCopy.button}
+              {assessmentPrimaryCtaLabel}
             </button>
           </div>
         </section>
@@ -1030,6 +1065,59 @@ export default function SessionsPage() {
         </div>
       ) : (
         <>
+          {hasUrgentSession ? (
+            <section className="relative overflow-hidden rounded-3xl border border-calm-sage/15 bg-charcoal p-1 shadow-lg">
+              <div className="absolute inset-0 bg-gradient-to-r from-teal-900/40 to-transparent" />
+              <div className="relative flex flex-col items-center justify-between gap-6 rounded-[20px] bg-charcoal/90 p-6 backdrop-blur-xl md:flex-row md:p-8">
+                <div className="flex w-full items-center gap-5 md:w-auto">
+                  <div className="relative">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-teal-800 text-xl font-bold text-teal-100">
+                      {(nextSession.provider?.name || 'T').charAt(0)}
+                    </div>
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-semibold uppercase tracking-wider text-teal-300">Next Appointment</h2>
+                    <p className="mt-1 text-2xl font-bold text-white">{nextSession.provider?.name || 'Assigned Therapist'}</p>
+                  </div>
+                </div>
+
+                {isLockedSession ? (
+                  <div className="w-full md:w-auto">
+                    <span className="inline-flex items-center rounded-full bg-green-500 px-3 py-1 text-xs font-bold text-white shadow-sm">
+                      Confirmed by Dr. {nextSessionProviderName}
+                    </span>
+                  </div>
+                ) : null}
+
+                <div className="flex w-full flex-col gap-3 sm:flex-row md:w-auto">
+                  {isWithin10Minutes && !needsPreSessionCheckin ? (
+                    <Link
+                      to={`/video-session/${nextSession.id}`}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-green-500 px-6 py-3.5 text-sm font-bold text-charcoal shadow-[0_0_20px_rgba(34,197,94,0.3)] transition-all hover:bg-green-400"
+                    >
+                      <Video className="h-4 w-4" />
+                      Join Video Room
+                    </Link>
+                  ) : (
+                    <button
+                      disabled
+                      className="inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-xl bg-white/10 px-6 py-3.5 text-sm font-bold text-white/50"
+                    >
+                      <Video className="h-4 w-4" />
+                      {needsPreSessionCheckin ? 'Complete Check-in First' : 'Opens 10 mins prior'}
+                    </button>
+                  )}
+                </div>
+
+                {isLockedSession ? (
+                  <p className="w-full text-xs text-white/80 md:mt-1">
+                    This session time is fixed to ensure clinical consistency. Please contact support for emergency cancellations.
+                  </p>
+                ) : null}
+              </div>
+            </section>
+          ) : null}
+
           {needsPreSessionCheckin && (
             <section className="relative mb-4 overflow-hidden rounded-[20px] border-2 border-amber-200/60 bg-[#FFFAF0] p-6 shadow-sm">
               <div className="flex flex-col items-center justify-between gap-6 md:flex-row">
@@ -1046,10 +1134,10 @@ export default function SessionsPage() {
                   </div>
                 </div>
                 <button
-                  onClick={openClinicalAssessmentFlow}
+                  onClick={onAssessmentPrimaryAction}
                   className="shrink-0 rounded-xl bg-amber-600 px-6 py-3.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-amber-700"
                 >
-                  {assessmentResumeCopy ? assessmentResumeCopy.button : 'Start PHQ-9 Assessment'}
+                  {assessmentPrimaryCtaLabel}
                 </button>
               </div>
             </section>
@@ -1109,11 +1197,11 @@ export default function SessionsPage() {
                           Message
                         </Link>
                         <button
-                          onClick={openClinicalAssessmentFlow}
+                          onClick={onAssessmentPrimaryAction}
                           className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-teal-200 bg-teal-50 px-3 py-2 text-xs font-semibold text-teal-700 transition hover:bg-teal-100"
                         >
                           <ClipboardList className="h-3.5 w-3.5" />
-                          {assessmentResumeCopy ? assessmentResumeCopy.button : 'Update Clinical Scores'}
+                          {assessmentPrimaryCtaLabel}
                         </button>
                       </div>
                     </div>
@@ -1143,10 +1231,10 @@ export default function SessionsPage() {
                 </p>
                 <button
                   type="button"
-                  onClick={openClinicalAssessmentFlow}
+                  onClick={onAssessmentPrimaryAction}
                   className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-teal-200 bg-teal-100 px-4 py-2 text-xs font-semibold text-teal-800 transition hover:bg-teal-200"
                 >
-                  {assessmentResumeCopy ? assessmentResumeCopy.button : 'Take Assessment'}
+                  {assessmentPrimaryCtaLabel}
                 </button>
               </div>
 
@@ -1180,11 +1268,11 @@ export default function SessionsPage() {
                   </div>
                   <button
                     type="button"
-                    onClick={openClinicalAssessmentFlow}
+                    onClick={onAssessmentPrimaryAction}
                     className="mt-4 w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-teal-600 px-4 py-2 text-xs font-semibold text-white hover:bg-teal-700"
                   >
                     <ClipboardList className="h-3.5 w-3.5" />
-                    View Full Results
+                    Show Result
                   </button>
                 </div>
               )}
@@ -1196,11 +1284,11 @@ export default function SessionsPage() {
               <h3 className="text-lg font-bold text-charcoal">Assessment History</h3>
               <button
                 type="button"
-                onClick={openClinicalAssessmentFlow}
+                onClick={onAssessmentPrimaryAction}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-teal-600 px-4 py-2 text-xs font-semibold text-white hover:bg-teal-700"
               >
                 <ClipboardList className="h-3.5 w-3.5" />
-                {assessmentResumeCopy ? assessmentResumeCopy.button : '+ Take New Assessment'}
+                {assessmentPrimaryCtaLabel}
               </button>
             </div>
 
@@ -1250,59 +1338,6 @@ export default function SessionsPage() {
               </div>
             ) : null}
           </section>
-
-          {hasUrgentSession ? (
-            <section className="relative overflow-hidden rounded-3xl border border-calm-sage/15 bg-charcoal p-1 shadow-lg">
-              <div className="absolute inset-0 bg-gradient-to-r from-teal-900/40 to-transparent" />
-              <div className="relative flex flex-col items-center justify-between gap-6 rounded-[20px] bg-charcoal/90 p-6 backdrop-blur-xl md:flex-row md:p-8">
-                <div className="flex w-full items-center gap-5 md:w-auto">
-                  <div className="relative">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-teal-800 text-xl font-bold text-teal-100">
-                      {(nextSession.provider?.name || 'T').charAt(0)}
-                    </div>
-                  </div>
-                  <div>
-                    <h2 className="text-sm font-semibold uppercase tracking-wider text-teal-300">Next Appointment</h2>
-                    <p className="mt-1 text-2xl font-bold text-white">{nextSession.provider?.name || 'Assigned Therapist'}</p>
-                  </div>
-                </div>
-
-                {isLockedSession ? (
-                  <div className="w-full md:w-auto">
-                    <span className="inline-flex items-center rounded-full bg-green-500 px-3 py-1 text-xs font-bold text-white shadow-sm">
-                      Confirmed by Dr. {nextSessionProviderName}
-                    </span>
-                  </div>
-                ) : null}
-
-                <div className="flex w-full flex-col gap-3 sm:flex-row md:w-auto">
-                  {isWithin10Minutes && !needsPreSessionCheckin ? (
-                    <Link
-                      to={`/video-session/${nextSession.id}`}
-                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-green-500 px-6 py-3.5 text-sm font-bold text-charcoal shadow-[0_0_20px_rgba(34,197,94,0.3)] transition-all hover:bg-green-400"
-                    >
-                      <Video className="h-4 w-4" />
-                      Join Video Room
-                    </Link>
-                  ) : (
-                    <button
-                      disabled
-                      className="inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-xl bg-white/10 px-6 py-3.5 text-sm font-bold text-white/50"
-                    >
-                      <Video className="h-4 w-4" />
-                      {needsPreSessionCheckin ? 'Complete Check-in First' : 'Opens 10 mins prior'}
-                    </button>
-                  )}
-                </div>
-
-                {isLockedSession ? (
-                  <p className="w-full text-xs text-white/80 md:mt-1">
-                    This session time is fixed to ensure clinical consistency. Please contact support for emergency cancellations.
-                  </p>
-                ) : null}
-              </div>
-            </section>
-          ) : null}
 
           <section className="space-y-4 pt-6">
             <h3 className="text-lg font-bold text-charcoal">Session History & Notes</h3>
