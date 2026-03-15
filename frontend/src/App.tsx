@@ -2,6 +2,7 @@ import { useState, Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { GlobalFallbackLoader } from './components/ui/FallbackLoader';
+import ScrollToTop from './components/common/ScrollToTop';
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 import { AuthProvider, getPostLoginRoute, useAuth } from './context/AuthContext';
 import { Assessment } from './pages/Assessment'
@@ -26,17 +27,14 @@ const AIChatPage = lazy(() => import('./pages/patient/AIChatPage'));
 const ProfilePage = lazy(() => import('./pages/patient/ProfilePage'));
 const SettingsPage = lazy(() => import('./pages/patient/SettingsPage'));
 const LiveSessionPage = lazy(() => import('./pages/patient/LiveSessionPage'));
-const AssessmentsPage = lazy(() => import('./pages/patient/AssessmentsPage'));
 const DocumentsPage = lazy(() => import('./pages/patient/DocumentsPage'));
 const ProgressPage = lazy(() => import('./pages/patient/ProgressPage'));
 const SupportPage = lazy(() => import('./pages/patient/SupportPage'));
 const CBTSessionPlayerPage = lazy(() => import('./pages/patient/CBTSessionPlayerPage'));
+const CbtAssignmentPlayerPage = lazy(() => import('./pages/patient/CbtAssignmentPlayerPage'));
 const TherapyPlanPage = lazy(() => import('./pages/patient/TherapyPlanPage'));
-const ExercisesPage = lazy(() => import('./pages/patient/ExercisesPage'));
-
 const PricingPage = lazy(() => import('./pages/patient/PricingPage'));
 const PatientTimelinePage = lazy(() => import('./pages/patient/PatientTimelinePage'));
-const MoodTrackerPage = lazy(() => import('./pages/patient/MoodTrackerPage'));
 const ReportsPage = lazy(() => import('./pages/patient/ReportsPage'));
 const PatientReportDownloadPage = lazy(() => import('./pages/patient/PatientReportDownloadPage'));
 const NotificationsPage = lazy(() => import('./pages/patient/NotificationsPage'));
@@ -57,6 +55,7 @@ const AdminCompanySubscriptionsPage = lazy(() => import('./pages/admin/CompanySu
 const AdminCompanyReportsPage = lazy(() => import('./pages/admin/CompanyReports'));
 const AdminPlatformHealthPage = lazy(() => import('./pages/admin/PlatformHealth'));
 const AdminVerificationPage = lazy(() => import('./pages/admin/Verification'));
+const AdminPendingProvidersPage = lazy(() => import('./pages/admin/PendingProviders'));
 const AdminRevenuePage = lazy(() => import('./pages/admin/Revenue'));
 const AdminSettingsPage = lazy(() => import('./pages/admin/Settings'));
 const AdminPricingManagementPage = lazy(() => import('./pages/admin/PricingManagement'));
@@ -86,6 +85,9 @@ const ProviderInboxPage = lazy(() => import('./pages/provider/Messages'));
 const ProviderEarningsPage = lazy(() => import('./pages/provider/Earnings'));
 const ProviderSettingsPage = lazy(() => import('./pages/provider/Settings'));
 const ProviderDashboard = lazy(() => import('./pages/provider/Dashboard/ProviderDashboard'));
+const CbtToolsPage = lazy(() => import('./pages/provider/CbtToolsPage'));
+const ProviderOnboardingPage = lazy(() => import('./pages/provider/ProviderOnboardingPage'));
+const ProviderVerificationPendingPage = lazy(() => import('./pages/provider/ProviderVerificationPendingPage'));
 const HubLayout = lazy(() => import('./components/layout/HubLayout'));
 const PatientList = lazy(() => import('./pages/provider/Patients/PatientList'));
 const PatientChartLayout = lazy(() => import('./components/layout/PatientChartLayout'));
@@ -154,6 +156,7 @@ function App() {
         }}
       />
       <Suspense fallback={<GlobalFallbackLoader />}>
+        <ScrollToTop />
         <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/assessment" element={<Assessment onSubmit={handleAssessmentSubmit} />} />
@@ -205,6 +208,7 @@ function App() {
             <Route path="clinical-notes" element={<SessionNotes />} />
           </Route>
           <Route path="calendar" element={<ProviderCalendarPage />} />
+          <Route path="cbt-tools" element={<CbtToolsPage />} />
           <Route path="notes" element={<Navigate to="patient/123/notes" replace />} />
           <Route path="assessments" element={<Navigate to="patient/123/assessments" replace />} />
           <Route path="prescriptions" element={<Navigate to="patient/123/prescriptions" replace />} />
@@ -214,6 +218,23 @@ function App() {
           <Route path="messages" element={<ProviderInboxPage />} />
           <Route path="settings" element={<ProviderSettingsPage />} />
         </Route>
+        <Route
+          path="/onboarding/provider-setup"
+          element={
+            <ProtectedRoute allowedRoles={['therapist', 'psychiatrist', 'psychologist', 'coach']}>
+              <ProviderOnboardingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/provider/onboarding" element={<Navigate to="/onboarding/provider-setup" replace />} />
+        <Route
+          path="/provider/verification-pending"
+          element={
+            <ProtectedRoute allowedRoles={['therapist', 'psychiatrist', 'psychologist', 'coach']}>
+              <ProviderVerificationPendingPage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/auth/login" element={<LoginPage />} />
         <Route path="/therapist/*" element={<Navigate to="/provider/dashboard" replace />} />
         <Route path="/psychiatrist/*" element={<Navigate to="/provider/dashboard" replace />} />
@@ -254,6 +275,7 @@ function App() {
 
           <Route path="user-approvals" element={<AdminSectionPage title="User Approvals" description="Approve, reject, and monitor pending user onboarding requests." bullets={['Pending approval queue', 'KYC validation status', 'Approval SLA tracking', 'Escalation workflow']} />} />
           <Route path="therapist-verification" element={<AdminVerificationPage />} />
+          <Route path="pending-providers" element={<AdminPendingProvidersPage />} />
           <Route path="users" element={<AdminUsersPage />} />
           <Route path="roles" element={<AdminRolesPage />} />
 
@@ -416,18 +438,19 @@ function App() {
           <Route path="sessions" element={<SessionsPage />} />
           <Route path="sessions/:id" element={<PatientSessionDetailPage />} />
           <Route path="cbt/:sessionId" element={<CBTSessionPlayerPage />} />
+          <Route path="cbt-assignment/:assignmentId" element={<CbtAssignmentPlayerPage />} />
           <Route path="cbt-section" element={<CBTPage />} />
           <Route path="cbt-section/:sessionId" element={<CBTSessionPlayerPage />} />
-          <Route path="exercises" element={<ExercisesPage />} />
+          <Route path="exercises" element={<Navigate to="/patient/check-in?tab=cbt-practice" replace />} />
           <Route path="sessions/:id/live" element={<LiveSessionPage />} />
-          <Route path="mood" element={<MoodTrackerPage />} />
+          <Route path="mood" element={<Navigate to="/patient/check-in?tab=daily-mood" replace />} />
           <Route path="sound-therapy" element={<SoundTherapyPage />} />
           <Route path="provider-messages" element={<ProviderMessagesPage />} />
           <Route path="provider-messages/:providerId" element={<ProviderMessagesPage />} />
           <Route path="messages" element={<AIChatPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="settings" element={<SettingsPage />} />
-          <Route path="assessments" element={<AssessmentsPage />} />
+          <Route path="assessments" element={<Navigate to="/patient/care-team" replace />} />
           <Route path="assessment-reports" element={<Navigate to="/patient/progress?tab=clinical" replace />} />
           <Route path="billing" element={<Navigate to="/patient/settings?section=billing" replace />} />
           <Route path="documents" element={<DocumentsPage />} />

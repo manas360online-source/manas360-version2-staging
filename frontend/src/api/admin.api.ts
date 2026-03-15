@@ -49,6 +49,7 @@ export type AdminUser = {
 	role: AdminUserRole;
 	isTherapistVerified?: boolean;
 	therapistVerifiedAt?: string | null;
+	onboardingStatus?: 'PENDING' | 'COMPLETED' | 'REJECTED' | null;
 	createdAt: string;
 	updatedAt: string;
 };
@@ -328,7 +329,11 @@ export const getAdminSubscriptions = async (params?: {
 };
 
 export const verifyAdminTherapist = async (therapistId: string): Promise<ApiEnvelope<unknown>> => {
-	return (await client.patch<ApiEnvelope<unknown>>(`/v1/admin/therapists/${encodeURIComponent(therapistId)}/verify`)).data;
+	return (await client.post<ApiEnvelope<unknown>>(`/v1/admin/verify-provider/${encodeURIComponent(therapistId)}`)).data;
+};
+
+export const approveProvider = async (providerUserId: string): Promise<ApiEnvelope<unknown>> => {
+	return (await client.post<ApiEnvelope<unknown>>(`/v1/admin/approve-provider/${encodeURIComponent(providerUserId)}`)).data;
 };
 
 export const getAdminModuleSummary = async (module: string): Promise<ApiEnvelope<AdminModuleSummary>> => {

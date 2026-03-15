@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Area, AreaChart, ResponsiveContainer, Tooltip } from 'recharts';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { 
   CalendarDays, 
   MessageSquare, 
@@ -17,8 +17,11 @@ import {
   MoonStar
 } from 'lucide-react';
 import { isOnboardingRequiredError, patientApi } from '../../api/patient';
+import type { ActiveCbtAssignment } from '../../api/patient';
 import { DashboardSkeletons } from '../../components/ui/Skeleton';
-import DailyCheckInModal from '../../components/patient/DailyCheckInModal';
+import DashboardCard from '../../components/ui/DashboardCard';
+import PageTransition from '../../components/common/PageTransition';
+import { useTherapyData } from '../../hooks/useTherapyData';
 
 const moodEmojiMap: Record<number, string> = {
   1: '😢',
@@ -26,6 +29,15 @@ const moodEmojiMap: Record<number, string> = {
   3: '😐',
   4: '🙂',
   5: '😊',
+};
+
+const enterVariant = {
+  hidden: { opacity: 0, y: 20 },
+  visible: (delay: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.4, delay },
+  }),
 };
 
 const formatDateTime = (value?: string | Date) => {
@@ -56,10 +68,12 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const [dashboard, setDashboard] = useState<any>(null);
   const [moodValue, setMoodValue] = useState<number | null>(null);
-  const [checkInOpen, setCheckInOpen] = useState(false);
-  const [checkInInitialMood, setCheckInInitialMood] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeAssignments, setActiveAssignments] = useState<ActiveCbtAssignment[]>([]);
+
+  // Use shared therapy data hook for streak synchronization
+  const { streak } = useTherapyData();
 
   const fetchDashboardData = async () => {
     const dashboardRes = await patientApi.getDashboardV2();
@@ -71,6 +85,14 @@ export default function DashboardPage() {
     const todaysMood = dashboardData?.moodTrend?.find((m: any) => isSameLocalDay(m.date, todayStr));
     if (todaysMood) {
       setMoodValue(todaysMood.score);
+    }
+
+    try {
+      const assignments = await patientApi.getActiveCbtAssignments();
+      setActiveAssignments(Array.isArray(assignments) ? assignments : []);
+    } catch (err) {
+      console.warn('Failed to load CBT assignments:', err);
+      setActiveAssignments([]);
     }
   };
 
@@ -94,7 +116,6 @@ export default function DashboardPage() {
   const userName = dashboard?.user?.name?.split(' ')[0] || 'there';
   const upcomingSession = dashboard?.upcomingSession || null;
   const moodTrend = Array.isArray(dashboard?.moodTrend) ? dashboard.moodTrend : [];
-  const exercises = Array.isArray(dashboard?.exercises) ? dashboard.exercises : [];
   const recentActivity = Array.isArray(dashboard?.recentActivity) ? dashboard.recentActivity : [];
 
   const hour = new Date().getHours();
@@ -118,41 +139,15 @@ export default function DashboardPage() {
     ? ['I feel anxious today', 'Help me ground quickly']
     : ['Reflect on today', 'Help me protect this momentum'];
 
-  const openCheckIn = (val: number) => {
-    setCheckInInitialMood(val);
-    setCheckInOpen(true);
-  };
-
-  const handleCheckInComplete = useCallback(() => {
-    setCheckInOpen(false);
-    void fetchDashboardData();
-  }, []);
-
-  // Listen for check-in-complete event (fired by DailyCheckInModal after save)
-  useEffect(() => {
-    const handler = () => {
-      void fetchDashboardData();
-    };
-    window.addEventListener('check-in-complete', handler);
-    return () => window.removeEventListener('check-in-complete', handler);
-  }, []);
-
   if (loading) return <DashboardSkeletons />;
   if (error) return <div className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800">{error}</div>;
 
-  const pendingExercises = exercises.filter((item: any) => String(item?.status || '').toUpperCase() !== 'COMPLETED');
   const moodChecked = Boolean(moodValue);
+  const actionPlanTasksRemaining = activeAssignments.length + (moodChecked ? 0 : 1);
 
   return (
-    <>
-    {checkInOpen && (
-      <DailyCheckInModal
-        initialMood={checkInInitialMood}
-        onClose={() => setCheckInOpen(false)}
-        onComplete={handleCheckInComplete}
-      />
-    )}
-    <div className="mx-auto w-full max-w-[1400px] space-y-6 pb-20 lg:pb-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+    <PageTransition>
+      <div className="mx-auto w-full max-w-[1400px] space-y-6 pb-20 lg:pb-6">
       
       {/* 1. HERO SECTION */}
       <section className="relative overflow-hidden rounded-[2rem] bg-gradient-wellness-hero p-6 shadow-wellness-md sm:p-8">
@@ -172,7 +167,7 @@ export default function DashboardPage() {
                 <motion.button
                   key={value}
                   type="button"
-                  onClick={() => openCheckIn(value)}
+                  onClick={() => navigate(`/patient/daily-checkin?initialMood=${value * 2}`)}
                   whileHover={{ y: -4, scale: 1.04 }}
                   whileTap={{ scale: 0.96 }}
                   className={`inline-flex h-14 w-14 items-center justify-center rounded-[1.35rem] text-[1.8rem] transition-all duration-300 sm:h-16 sm:w-16 sm:text-[2rem] ${
@@ -200,10 +195,10 @@ export default function DashboardPage() {
       </section>
 
       {/* MID ROW: Up Next & Action Plan */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <motion.div className="grid grid-cols-1 gap-6 lg:grid-cols-2" variants={enterVariant} initial="hidden" animate="visible" custom={0.1}>
         
         {/* 2. UP NEXT CARD (Therapy & Appointments) */}
-        <section className="wellness-panel flex flex-col p-6 transition-shadow hover:shadow-wellness-md">
+        <DashboardCard as="section" className="flex flex-col transition-shadow hover:shadow-wellness-md">
           <div className="flex items-center gap-2 mb-4">
             <CalendarDays className="h-5 w-5 text-calm-sage" />
             <h2 className="text-lg font-semibold text-charcoal">Up Next</h2>
@@ -238,22 +233,22 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
-        </section>
+        </DashboardCard>
 
         {/* 3. TODAY'S ACTION PLAN (Homework & Milestones) */}
-        <section className="wellness-panel flex flex-col p-6 transition-shadow hover:shadow-wellness-md">
+        <DashboardCard as="section" className="flex flex-col transition-shadow hover:shadow-wellness-md">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-5 w-5 text-calm-sage" />
-              <h2 className="text-lg font-semibold text-charcoal">Today's Action Plan</h2>
+              <h2 className="text-lg font-semibold text-charcoal">Your Action Plan</h2>
             </div>
             <span className="text-sm font-medium text-ink-400">
-              {pendingExercises.length} tasks remaining
+              {actionPlanTasksRemaining} tasks remaining
             </span>
           </div>
 
           <div className="flex-1 space-y-3">
-            <Link to="/patient/mood" className={`group flex items-center justify-between rounded-[1.4rem] p-4 transition-all ${moodChecked ? 'bg-wellness-aqua shadow-wellness-sm' : 'bg-white/90 shadow-wellness-sm hover:bg-white'}`}>
+            <Link to="/patient/check-in?tab=daily-mood" className={`group flex items-center justify-between rounded-[1.4rem] p-4 transition-all ${moodChecked ? 'bg-wellness-aqua shadow-wellness-sm' : 'bg-white/90 shadow-wellness-sm hover:bg-white'}`}>
               <div className="flex items-center gap-3">
                 <div className={`flex h-7 w-7 items-center justify-center rounded-full ${moodChecked ? 'bg-wellness-sky text-white' : 'border-2 border-wellness-border group-hover:border-wellness-sky/40'}`}>
                   {moodChecked && <Check className="h-3.5 w-3.5" />}
@@ -263,35 +258,43 @@ export default function DashboardPage() {
               <ArrowRight className="h-4 w-4 text-ink-300 group-hover:text-charcoal transition-colors" />
             </Link>
 
-            {pendingExercises.length > 0 ? (
-               pendingExercises.slice(0, 2).map((ex: any) => (
-                <Link key={ex.id} to="/patient/therapy-plan" className="group flex items-center justify-between rounded-[1.4rem] bg-white/90 p-4 shadow-wellness-sm transition-all hover:bg-white">
+            {activeAssignments.length > 0 ? (
+               activeAssignments.slice(0, 3).map((assignment) => (
+                <Link
+                  key={assignment.id}
+                  to={`/patient/cbt-assignment/${assignment.id}`}
+                  className="group flex items-center justify-between rounded-[1.4rem] bg-white/90 p-4 shadow-wellness-sm transition-all hover:bg-white"
+                >
                   <div className="flex items-center gap-3">
                     <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-wellness-border group-hover:border-wellness-sky/35" />
-                    <span className="font-medium text-charcoal">{ex.title || 'CBT Worksheet'} ({ex.duration || 5} min)</span>
+                    <div>
+                      <p className="font-medium text-charcoal">{assignment.title}</p>
+                      <p className="text-xs text-ink-500">Interactive CBT Task • Start Practice</p>
+                    </div>
                   </div>
-                  <ArrowRight className="h-4 w-4 text-ink-300 group-hover:text-charcoal transition-colors" />
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-calm-sage">
+                    Start Practice <ArrowRight className="h-4 w-4 text-calm-sage transition-colors" />
+                  </span>
                 </Link>
                ))
             ) : (
-              <Link to="/patient/therapy-plan" className="group flex items-center justify-between rounded-[1.4rem] bg-white/90 p-4 shadow-wellness-sm transition-all hover:bg-white">
+              <div className="rounded-[1.4rem] bg-white/90 p-4 shadow-wellness-sm">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-wellness-border group-hover:border-wellness-sky/35" />
-                  <span className="font-medium text-charcoal">5-Minute Evening Wind-down (Audio)</span>
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-wellness-border" />
+                  <span className="font-medium text-charcoal">No interactive tasks assigned yet</span>
                 </div>
-                <ArrowRight className="h-4 w-4 text-ink-300 group-hover:text-charcoal transition-colors" />
-              </Link>
+              </div>
             )}
           </div>
-        </section>
+        </DashboardCard>
 
-      </div>
+      </motion.div>
 
       {/* BOTTOM ROW: Progress & AI Nudge */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-6">
+      <motion.div className="grid grid-cols-1 gap-6 md:grid-cols-3 lg:grid-cols-3" variants={enterVariant} initial="hidden" animate="visible" custom={0.2}>
         
         {/* 4. AI NUDGE (Proactive Engagement) */}
-        <section className="wellness-panel md:col-span-1 flex flex-col p-6 transition-shadow hover:shadow-wellness-md">
+        <DashboardCard as="section" className="md:col-span-1 flex flex-col transition-shadow hover:shadow-wellness-md">
           <div className="flex items-center gap-3 mb-4">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-warm-terracotta/20">
               <Sparkles className="h-5 w-5 text-warm-terracotta" />
@@ -323,10 +326,10 @@ export default function DashboardPage() {
           <Link to="/patient/messages" className="wellness-secondary-btn mt-5 w-full gap-2 px-4 py-2.5">
             Chat with Anytime Buddy <MessageSquare className="h-4 w-4" />
           </Link>
-        </section>
+        </DashboardCard>
 
         {/* 5. PROGRESS SNAPSHOT (Metrics & Chart) */}
-        <section className="wellness-panel md:col-span-2 grid grid-cols-1 p-6 transition-shadow hover:shadow-wellness-md sm:grid-cols-2">
+        <DashboardCard as="section" className="md:col-span-2 grid grid-cols-1 transition-shadow hover:shadow-wellness-md sm:grid-cols-2">
           <div className="flex flex-col border-b border-white/70 pb-4 sm:border-b-0 sm:border-r sm:border-r-white/70 sm:pb-0 sm:pr-6">
             <div className="flex items-center gap-2 mb-4">
               <Activity className="h-5 w-5 text-calm-sage" />
@@ -337,7 +340,7 @@ export default function DashboardPage() {
               <div>
                 <p className="text-xs uppercase tracking-wider text-charcoal/50 font-semibold mb-1">Streak</p>
                 <p className="text-3xl font-display font-bold text-charcoal flex items-center gap-2">
-                  <span className="text-warm-terracotta">🔥</span> {dashboard?.streak || 0}
+                  <span className="text-warm-terracotta">🔥</span> {streak}
                 </p>
                 <p className="text-xs text-ink-400 mt-1">Days active</p>
               </div>
@@ -385,13 +388,21 @@ export default function DashboardPage() {
               </ResponsiveContainer>
             </div>
           </div>
-        </section>
+        </DashboardCard>
         
-      </div>
+      </motion.div>
 
       {/* 6. QUICK ALERTS & NOTIFICATIONS */}
+      <AnimatePresence>
       {recentActivity.length > 0 && (
-        <section className="wellness-panel flex items-center gap-4 p-5 transition-colors hover:shadow-wellness-md">
+        <motion.div
+          variants={enterVariant}
+          initial="hidden"
+          animate="visible"
+          exit={{ opacity: 0, y: -10, transition: { duration: 0.25 } }}
+          custom={0.3}
+        >
+        <DashboardCard as="section" className="flex items-center gap-4 p-5 transition-colors hover:shadow-wellness-md">
           <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-50">
              <Bell className="h-5 w-5 text-amber-600" />
              <span className="absolute top-0 right-0 h-2.5 w-2.5 bg-red-500 rounded-full border-2 border-white"></span>
@@ -403,10 +414,12 @@ export default function DashboardPage() {
           <Link to="/patient/reports" className="wellness-primary-btn shrink-0 min-h-[38px] px-4 py-2 text-xs">
             View Updates
           </Link>
-        </section>
+        </DashboardCard>
+        </motion.div>
       )}
+      </AnimatePresence>
 
-    </div>
-  </>
+      </div>
+    </PageTransition>
   );
 }

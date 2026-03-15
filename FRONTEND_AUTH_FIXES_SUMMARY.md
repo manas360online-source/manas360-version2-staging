@@ -61,10 +61,12 @@
 - Error response: `401 Unauthorized` with error message
 
 ## Known Working Credentials (from seed)
-- Password: `Manas@123` for most seeded users (therapists, patients)
+- Password: `Demo@12345` for most seeded users (therapists, patients)
 - Emails: 
-  - `therapist1@manas360.local` / `Manas@123`
-  - `patient1@manas360.local` / `Manas@123`
+  - `therapist@demo.com` / `Demo@12345`
+  - `patient@demo.com` / `Demo@12345`
+  - `therapist1@demo.com` / `Demo@12345`
+  - `patient1@demo.com` / `Demo@12345`
   - etc.
 
 ## Next Steps for Testing

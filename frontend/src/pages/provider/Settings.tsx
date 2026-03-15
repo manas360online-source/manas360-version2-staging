@@ -10,6 +10,11 @@ import {
 
 const weekdayLabels = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
+const LANGUAGES = [
+  'English', 'Hindi', 'Tamil', 'Telugu', 'Kannada',
+  'Malayalam', 'Marathi', 'Bengali', 'Gujarati', 'Punjabi',
+];
+
 const createFallbackState = (): ProviderSettingsResponse => ({
   providerId: '',
   displayName: '',
@@ -23,6 +28,9 @@ const createFallbackState = (): ProviderSettingsResponse => ({
     endTime: '17:00',
     isAvailable: false,
   })),
+  languages: [],
+  consultationFee: 0,
+  tagline: '',
 });
 
 export default function Settings() {
@@ -36,6 +44,9 @@ export default function Settings() {
   const [profileImageUrl, setProfileImageUrl] = useState('');
   const [specialtiesInput, setSpecialtiesInput] = useState('');
   const [availabilitySlots, setAvailabilitySlots] = useState<ProviderAvailabilitySlot[]>(createFallbackState().availabilitySlots);
+  const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
+  const [consultationFee, setConsultationFee] = useState<number>(0);
+  const [tagline, setTagline] = useState('');
 
   useEffect(() => {
     if (!settingsQuery.data) return;
@@ -43,6 +54,9 @@ export default function Settings() {
     setProfileImageUrl(settingsQuery.data.profileImageUrl || '');
     setSpecialtiesInput((settingsQuery.data.specializations || []).join(', '));
     setAvailabilitySlots(settingsQuery.data.availabilitySlots || createFallbackState().availabilitySlots);
+    setSelectedLanguages(settingsQuery.data.languages || []);
+    setConsultationFee(settingsQuery.data.consultationFee ?? 0);
+    setTagline(settingsQuery.data.tagline || '');
   }, [settingsQuery.data]);
 
   const settings = settingsQuery.data ?? createFallbackState();
@@ -51,6 +65,12 @@ export default function Settings() {
     [specialtiesInput],
   );
   const enabledDayCount = availabilitySlots.filter((slot) => slot.isAvailable).length;
+
+  const toggleLanguage = (lang: string) => {
+    setSelectedLanguages((prev) =>
+      prev.includes(lang) ? (prev.length > 1 ? prev.filter((l) => l !== lang) : prev) : [...prev, lang],
+    );
+  };
 
   const updateMutation = useMutation({
     mutationFn: updateProviderSettings,
@@ -75,6 +95,9 @@ export default function Settings() {
       profileImageUrl,
       specializations: specialties,
       availabilitySlots,
+      languages: selectedLanguages,
+      consultationFee,
+      tagline,
     });
   };
 
@@ -103,6 +126,7 @@ export default function Settings() {
           </p>
         </section>
       ) : (
+        <div className="space-y-6">
         <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
           <section className="rounded-[24px] border border-[#DCE5D9] bg-white p-6 shadow-sm">
             <div className="flex items-start justify-between gap-4">
@@ -237,6 +261,106 @@ export default function Settings() {
               </div>
             </div>
           </section>
+        </div>
+
+        {/* Languages section */}
+        <section className="rounded-[24px] border border-[#DCE5D9] bg-white p-6 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#6B7B68]">Languages</p>
+          <h2 className="mt-2 text-xl font-semibold text-[#23313A]">Session languages</h2>
+          <p className="mt-1 text-sm text-slate-500">Select all languages you can conduct sessions in.</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {LANGUAGES.map((lang) => (
+              <button
+                key={lang}
+                type="button"
+                onClick={() => toggleLanguage(lang)}
+                className={`rounded-full border px-4 py-1.5 text-sm font-medium transition ${
+                  selectedLanguages.includes(lang)
+                    ? 'border-[#285947] bg-[#285947] text-white'
+                    : 'border-[#DCE5D9] text-slate-600 hover:border-[#285947]'
+                }`}
+              >
+                {lang}
+              </button>
+            ))}
+          </div>
+          <p className="mt-3 text-xs text-slate-500">
+            Selected: {selectedLanguages.length > 0 ? selectedLanguages.join(', ') : 'None'}
+          </p>
+        </section>
+
+        {/* Pricing & Tagline section */}
+        <section className="rounded-[24px] border border-[#DCE5D9] bg-white p-6 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#6B7B68]">Pricing</p>
+          <h2 className="mt-2 text-xl font-semibold text-[#23313A]">Session rate & tagline</h2>
+          <div className="mt-5 grid gap-5 md:grid-cols-2">
+            <label className="grid gap-2">
+              <span className="text-sm font-medium text-[#23313A]">Session Rate (INR)</span>
+              <div className="flex items-center rounded-2xl border border-[#DCE5D9] px-4 py-3 focus-within:border-[#6B7B68]">
+                <span className="mr-1 text-sm text-slate-500">₹</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={consultationFee}
+                  onChange={(e) => setConsultationFee(Number(e.target.value))}
+                  placeholder="1500"
+                  className="flex-1 bg-transparent text-sm text-[#23313A] outline-none"
+                />
+              </div>
+            </label>
+            <label className="grid gap-2">
+              <span className="text-sm font-medium text-[#23313A]">Professional Tagline</span>
+              <input
+                value={tagline}
+                onChange={(e) => setTagline(e.target.value)}
+                placeholder="e.g. Compassionate trauma-informed therapist"
+                maxLength={120}
+                className="rounded-2xl border border-[#DCE5D9] px-4 py-3 text-sm text-[#23313A] outline-none transition focus:border-[#6B7B68]"
+              />
+              <p className="text-xs text-slate-500">{tagline.length}/120</p>
+            </label>
+          </div>
+          <div className="mt-5 flex justify-end">
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={updateMutation.isPending}
+              className="rounded-full bg-[#23313A] px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-[#172027] disabled:opacity-60"
+            >
+              {updateMutation.isPending ? 'Saving...' : 'Save all settings'}
+            </button>
+          </div>
+        </section>
+
+        {/* Read-only Verified Credentials section */}
+        <section className="rounded-[24px] border border-amber-200 bg-amber-50 p-6">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-200 text-amber-800">
+              🔒
+            </div>
+            <div className="flex-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">Verified Credentials</p>
+              <h2 className="mt-1 text-xl font-semibold text-[#23313A]">Registration & Qualifications</h2>
+              <p className="mt-1 text-sm text-amber-800">
+                These details were verified during onboarding and are read-only. To change verified credentials, please contact support.
+              </p>
+            </div>
+          </div>
+          <div className="mt-5 grid gap-4 md:grid-cols-2">
+            {[
+              { label: 'Registration Type', value: settings.registrationType },
+              { label: 'Registration Number', value: settings.registrationNum },
+              { label: 'Highest Qualification', value: settings.highestQual },
+              { label: 'RCI License', value: settings.licenseRci },
+              { label: 'NMC License', value: settings.licenseNmc },
+            ].map(({ label, value }) => (
+              <div key={label} className="rounded-2xl border border-amber-200 bg-white/70 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-700">{label}</p>
+                <p className="mt-1 text-sm font-medium text-[#23313A]">{value || <span className="italic text-slate-400">Not on file</span>}</p>
+              </div>
+            ))}
+          </div>
+        </section>
         </div>
       )}
     </div>

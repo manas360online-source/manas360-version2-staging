@@ -6,6 +6,7 @@ import {
 	meController,
 	mfaSetupController,
 	mfaVerifyController,
+	providerRegisterController,
 	registerController,
 	refreshTokenController,
 	requestPasswordResetController,
@@ -24,6 +25,7 @@ import { asyncHandler } from '../middleware/validate.middleware';
 const router = Router();
 
 router.post('/register', authRateLimiter, asyncHandler(registerController));
+router.post('/provider-register', requireAuth, authRateLimiter, asyncHandler(providerRegisterController));
 router.post('/signup/email', authRateLimiter, asyncHandler(signupWithEmailController));
 router.post('/verify/email-otp', authRateLimiter, asyncHandler(verifyEmailOtpController));
 router.post('/signup/phone', authRateLimiter, asyncHandler(signupWithPhoneController));

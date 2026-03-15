@@ -1,7 +1,15 @@
 import { Brain, CheckCircle2, Info, Minimize2, Sparkles, StickyNote, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { createPatientNote, fetchPatientOverview, type PatientOverviewData, updatePatientNote } from '../../api/provider';
+import {
+  createPatientNote,
+  fetchCbtAssignmentTemplates,
+  fetchPatientOverview,
+  quickAssignCbtTemplate,
+  type CbtAssignmentTemplateOption,
+  type PatientOverviewData,
+  updatePatientNote,
+} from '../../api/provider';
 import { therapistApi, type AiClinicalSummary } from '../../api/therapist.api';
 import { generateMeetingLink, type MeetingLinkResponse } from '../../api/videoSession';
 import VideoRoom from '../../components/jitsi/VideoRoom';
@@ -40,6 +48,10 @@ export default function VideoSessionPage() {
   const [showSavedIndicator, setShowSavedIndicator] = useState(false);
   const [isGeneratingAiDraft, setIsGeneratingAiDraft] = useState(false);
   const [aiInsights, setAiInsights] = useState<AiClinicalSummary | null>(null);
+  const [cbtTemplateOptions, setCbtTemplateOptions] = useState<CbtAssignmentTemplateOption[]>([]);
+  const [selectedTemplateType, setSelectedTemplateType] = useState('');
+  const [isAssigningCbtTemplate, setIsAssigningCbtTemplate] = useState(false);
+  const [quickAssignFeedback, setQuickAssignFeedback] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<WorkspaceTab>('patient-info');
   const [isOverviewOverlayOpen, setIsOverviewOverlayOpen] = useState(false);
 
@@ -158,6 +170,35 @@ export default function VideoSessionPage() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    if (hasAuthError || !isProvider) {
+      return () => {
+        active = false;
+      };
+    }
+
+    const loadTemplateOptions = async () => {
+      try {
+        const templates = await fetchCbtAssignmentTemplates();
+        if (!active) return;
+        const options = Array.isArray(templates) ? templates : [];
+        setCbtTemplateOptions(options);
+        setSelectedTemplateType((current) => current || options[0]?.templateType || '');
+      } catch {
+        if (!active) return;
+        setCbtTemplateOptions([]);
+      }
+    };
+
+    void loadTemplateOptions();
+
+    return () => {
+      active = false;
+    };
+  }, [hasAuthError, isProvider]);
 
   const autosaveNotes = useCallback(async () => {
     if (hasAuthError) return;
@@ -295,6 +336,32 @@ export default function VideoSessionPage() {
     }
   };
 
+  const handleQuickAssignTemplate = async () => {
+    if (hasAuthError) return;
+    if (!meetingData?.patientId) {
+      setQuickAssignFeedback('Unable to identify patient for assignment.');
+      return;
+    }
+    if (!selectedTemplateType || isAssigningCbtTemplate) {
+      return;
+    }
+
+    setIsAssigningCbtTemplate(true);
+    setQuickAssignFeedback(null);
+    try {
+      const result = await quickAssignCbtTemplate(meetingData.patientId, selectedTemplateType);
+      setQuickAssignFeedback(`Assigned: ${result.title} to the patient Daily Check-in Hub.`);
+    } catch (requestError: any) {
+      if (requestError?.response?.status === 401) {
+        setHasAuthError(true);
+        return;
+      }
+      setQuickAssignFeedback(String(requestError?.response?.data?.message || requestError?.message || 'Failed to assign template.'));
+    } finally {
+      setIsAssigningCbtTemplate(false);
+    }
+  };
+
   const handleOpenDashboardInPip = () => {
     setIsMinimized(true);
     navigate('/provider/dashboard');
@@ -420,6 +487,42 @@ export default function VideoSessionPage() {
               <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
                 <Info className="h-3.5 w-3.5" />
                 Live patient context for quick reference.
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-[180px] flex-1">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Session Protocol Tips</p>
+                    <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-slate-700">
+                      <li>Reflect and validate first before reframing.</li>
+                      <li>Anchor one practical CBT task before ending session.</li>
+                    </ul>
+                  </div>
+                  <div className="w-full max-w-[240px] space-y-2">
+                    <label className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Quick Assign</label>
+                    <select
+                      value={selectedTemplateType}
+                      onChange={(event) => setSelectedTemplateType(event.target.value)}
+                      className="w-full rounded-md border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-700"
+                    >
+                      {cbtTemplateOptions.map((template) => (
+                        <option key={template.templateType} value={template.templateType}>
+                          {template.title}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => void handleQuickAssignTemplate()}
+                      disabled={!selectedTemplateType || isAssigningCbtTemplate}
+                      className="w-full rounded-md bg-slate-900 px-2.5 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {isAssigningCbtTemplate ? 'Assigning...' : 'Quick Assign'}
+                    </button>
+                  </div>
+                </div>
+                {quickAssignFeedback ? (
+                  <p className="mt-2 text-[11px] text-slate-600">{quickAssignFeedback}</p>
+                ) : null}
               </div>
               <div className="space-y-2 rounded-xl border border-slate-200 p-3 text-xs text-slate-700">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Clinical Summary</p>

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { patientApi, type StructuredAssessmentQuestion, type StructuredAssessmentStartResponse } from '../../api/patient';
 import { parseJourneyPayload, type JourneyPayload } from '../../utils/journey';
 import { theme } from '../../theme/theme';
-import { Calendar, TrendingUp } from 'lucide-react';
+import { TrendingUp } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 type AssessmentMode = 'daily' | 'clinical';
@@ -98,7 +98,7 @@ export default function AssessmentsPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const todayKey = useMemo(() => toLocalDateKey(), []);
-  const [mode, setMode] = useState<AssessmentMode>('daily');
+  const [mode, setMode] = useState<AssessmentMode>('clinical');
   const [selectedClinical, setSelectedClinical] = useState<ClinicalAssessmentKey>('PHQ-9');
   const [score, setScore] = useState(10);
   // quickAnswers removed
@@ -247,6 +247,29 @@ export default function AssessmentsPage() {
       setMode('clinical');
     }
   }, [location.search, mode]);
+
+  useEffect(() => {
+    if (!hasPremiumAssessmentAccess) return;
+    if (structuredLoading || loading) return;
+    if (structuredAttempt?.questions?.length) return;
+
+    const preferred: ClinicalAssessmentKey = submissionLocks['PHQ-9'] ? 'GAD-7' : 'PHQ-9';
+    if (submissionLocks['PHQ-9'] && submissionLocks['GAD-7']) return;
+
+    if (selectedClinical !== preferred) {
+      setSelectedClinical(preferred);
+      return;
+    }
+
+    void startStructuredAssessment(preferred);
+  }, [
+    hasPremiumAssessmentAccess,
+    loading,
+    structuredAttempt,
+    structuredLoading,
+    selectedClinical,
+    submissionLocks,
+  ]);
 
   useEffect(() => {
     (async () => {
@@ -641,42 +664,11 @@ export default function AssessmentsPage() {
         </section>
       )}
 
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <button
-          type="button"
-          onClick={() => setMode('daily')}
-          className={`rounded-[1.75rem] p-5 text-left transition ${
-            mode === 'daily'
-              ? 'bg-wellness-aqua shadow-wellness-sm'
-              : 'bg-white/92 shadow-wellness-sm hover:bg-white'
-          }`}
-        >
-          <p className="flex items-center gap-2 text-lg font-semibold text-charcoal">
-            <Calendar className="h-5 w-5" />
-            Daily Assessment
-          </p>
-          <p className="mt-2 text-base text-charcoal/70">Track daily wellbeing & mood.</p>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            if (hasPremiumAssessmentAccess) {
-              setMode('clinical');
-            }
-          }}
-          className={`rounded-[1.75rem] p-5 text-left transition ${
-            mode === 'clinical'
-              ? 'bg-wellness-aqua shadow-wellness-sm'
-              : 'bg-white/92 shadow-wellness-sm hover:bg-white'
-          }`}
-        >
-          <p className="text-lg font-semibold text-charcoal">Clinical Assessments</p>
-          <p className="mt-2 text-base text-charcoal/70">
-            PHQ-9 and GAD-7 scoring workflows.
-            {!hasPremiumAssessmentAccess ? ' (Platform Access required)' : ''}
-          </p>
-        </button>
+      <section className="rounded-[1.75rem] border border-[#DCE8F8] bg-white/88 p-4 shadow-wellness-sm">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#2B5EA7]">Direct Clinical Flow</p>
+        <p className="mt-2 text-sm text-charcoal/75">
+          You are now taken straight into PHQ-9/GAD-7 questions without the intermediate selection screen.
+        </p>
       </section>
 
       <section className="wellness-panel p-4 md:p-6">

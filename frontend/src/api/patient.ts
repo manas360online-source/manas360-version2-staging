@@ -87,6 +87,38 @@ export type StructuredAssessmentSubmitResponse = {
   action: string;
 };
 
+export type ActiveCbtAssignment = {
+  id: string;
+  templateType: string;
+  title: string;
+  description: string;
+  status: 'ASSIGNED' | 'IN_PROGRESS' | 'COMPLETED' | string;
+  createdAt: string;
+  providerName: string;
+};
+
+export type CbtAssignmentDetail = {
+  id: string;
+  templateType: string;
+  title: string;
+  description: string;
+  steps: Array<{
+    id: string;
+    title: string;
+    prompt: string;
+    inputType: string;
+    options?: string[];
+    min?: number;
+    max?: number;
+  }>;
+  responses: Record<string, unknown>;
+  status: 'ASSIGNED' | 'IN_PROGRESS' | 'COMPLETED' | string;
+  providerId: string;
+  providerName: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 const unwrapPayload = <T = any>(value: any): T => {
   if (value && typeof value === 'object') {
     if (value.data !== undefined) {
@@ -335,6 +367,32 @@ export const patientApi = {
       async () => (await http.get('/v1/therapy-plan', { params: week ? { week } : undefined })).data,
     ]),
   completeTherapyPlanTask: async (id: string) => (await http.patch(`/v1/therapy-plan/tasks/${encodeURIComponent(id)}/complete`)).data,
+  getActiveCbtAssignments: async (): Promise<ActiveCbtAssignment[]> => {
+    try {
+      const response = await http.get('/patient/cbt-assignments/active');
+      return response.data?.data ?? response.data ?? [];
+    } catch (error) {
+      // Fallback: try alternative endpoint
+      try {
+        const response = await http.get('/v1/cbt-assignments/active');
+        return response.data?.data ?? response.data ?? [];
+      } catch {
+        // If both fail, return empty array to prevent dashboard crash
+        return [];
+      }
+    }
+  },
+  getCbtAssignmentDetail: async (assignmentId: string): Promise<CbtAssignmentDetail> => {
+    const response = await http.get(`/patient/cbt-assignments/${encodeURIComponent(assignmentId)}`);
+    return response.data?.data ?? response.data;
+  },
+  saveCbtAssignmentProgress: async (
+    assignmentId: string,
+    payload: { responses: Record<string, unknown>; currentStep?: number; status?: 'IN_PROGRESS' | 'COMPLETED' },
+  ) => {
+    const response = await http.patch(`/patient/cbt-assignments/${encodeURIComponent(assignmentId)}`, payload);
+    return response.data?.data ?? response.data;
+  },
   getPricing: async () =>
     withFallbackChain([
       async () => (await http.get('/v1/pricing')).data,

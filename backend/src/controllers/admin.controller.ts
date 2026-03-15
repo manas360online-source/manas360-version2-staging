@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { AppError } from '../middleware/error.middleware';
-import { listUsers, getUserById, verifyTherapist, getMetrics, listSubscriptions } from '../services/admin.service';
+import { listUsers, getUserById, verifyTherapist, verifyProvider, approveProvider, getMetrics, listSubscriptions } from '../services/admin.service';
 import { sendSuccess } from '../utils/response';
 
 /**
@@ -61,6 +61,40 @@ export const verifyTherapistController = async (req: Request, res: Response): Pr
 	const result = await verifyTherapist(therapistProfileId, adminUserId);
 
 	sendSuccess(res, result, 'Therapist verified successfully');
+};
+
+export const verifyProviderController = async (req: Request, res: Response): Promise<void> => {
+	const providerUserId = req.validatedTherapistProfileId;
+	const adminUserId = req.auth?.userId;
+
+	if (!providerUserId) {
+		throw new AppError('Provider ID is required', 400);
+	}
+
+	if (!adminUserId) {
+		throw new AppError('Authentication required', 401);
+	}
+
+	const result = await verifyProvider(providerUserId, adminUserId);
+
+	sendSuccess(res, result, 'Provider verified successfully');
+};
+
+export const approveProviderController = async (req: Request, res: Response): Promise<void> => {
+	const providerUserId = req.params['id'] as string;
+	const adminUserId = req.auth?.userId;
+
+	if (!providerUserId) {
+		throw new AppError('Provider ID is required', 400);
+	}
+
+	if (!adminUserId) {
+		throw new AppError('Authentication required', 401);
+	}
+
+	const result = await approveProvider(providerUserId, adminUserId);
+
+	sendSuccess(res, result, 'Provider approved successfully');
 };
 
 /**

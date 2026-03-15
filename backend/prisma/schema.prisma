@@ -95,6 +95,39 @@ enum ProviderExtraQuestionStatus {
   ARCHIVED
 }
 
+enum RegistrationType {
+  RCI
+  NMC
+  STATE_COUNCIL
+  OTHER
+}
+
+enum OnboardingStatus {
+  PENDING
+  COMPLETED
+  REJECTED
+}
+
+enum ProviderDocumentType {
+  DEGREE
+  ID_PROOF
+  LICENSE
+}
+
+enum CbtTemplateType {
+  THOUGHT_RECORD
+  BEHAVIORAL
+  WORRY_POSTPONEMENT
+  SOCRATIC_QUESTIONING
+  EXPOSURE_HIERARCHY
+}
+
+enum CbtAssignmentStatus {
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+}
+
 // ============ USERS ============
 
 model User {
@@ -131,6 +164,7 @@ model User {
   isTherapistVerified           Boolean       @default(false)
   therapistVerifiedAt           DateTime?
   therapistVerifiedByUserId     String?
+  onboardingStatus              OnboardingStatus?
   isDeleted                     Boolean       @default(false)
   deletedAt                     DateTime?
   createdAt                     DateTime      @default(now())
@@ -174,6 +208,8 @@ model User {
   therapistAssessments          TherapistAssessmentRecord[]
   therapistResources            TherapistResource[]
   therapistCareTeamMembers      TherapistCareTeamMember[]
+  cbtAssignmentsAsPatient       CBTAssignment[]           @relation("CbtAssignmentPatient")
+  cbtAssignmentsAsProvider      CBTAssignment[]           @relation("CbtAssignmentProvider")
   therapistProfile              TherapistProfile?
   userCapabilities              UserCapability[]            @relation("UserCapabilitiesOwner")
   grantedCapabilities           UserCapability[]            @relation("UserCapabilitiesGrantor")
@@ -195,6 +231,7 @@ model User {
   labOrdersAsProvider           LabOrder[]                   @relation("LabOrderProvider")
   goalsAsPatient                Goal[]                       @relation("GoalPatient")
   goalsAsProvider               Goal[]                       @relation("GoalProvider")
+  providerDocumentsUploaded     ProviderDocument[]
 
   @@index([email])
   @@index([phone])
@@ -597,11 +634,31 @@ model TherapistProfile {
   id                String    @id @default(uuid())
   userId            String    @unique
   displayName       String
+  professionalType  String?
+  registrationType  RegistrationType?
+  registrationNum   String?   @unique
+  contactEmail      String?
+  education         String?
+  highestQual       String?
+  licenseRci        String?
+  licenseNmc        String?
   bio               String?
+  clinicalCategories String[] @default([])
   specializations   String[]  @default([])
   languages         String[]  @default([])
+  corporateReady    Boolean   @default(false)
+  shiftPreferences  String[]  @default([])
+  yearsExperience   Int?      @default(0)
   yearsOfExperience Int?      @default(0)
+  hourlyRate        Int?      @default(0)
   consultationFee   Int?      @default(0) // in minor units
+  bankDetails       Json?
+  tagline           String?
+  digitalSignature  String?
+  onboardingCompleted Boolean @default(false)
+  isVerified        Boolean   @default(false)
+  verifiedAt        DateTime?
+  verifiedByUserId  String?
   availability      Json? // array of slots { dayOfWeek, startMinute, endMinute, isAvailable }
   averageRating     Float?    @default(0)
   isDeleted         Boolean   @default(false)
@@ -609,10 +666,28 @@ model TherapistProfile {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documents         ProviderDocument[]
 
   @@index([userId])
   @@map("therapist_profiles")
+}
+
+model ProviderDocument {
+  id                String               @id @default(uuid())
+  providerProfileId String
+  userId            String
+  documentType      ProviderDocumentType
+  url               String
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  providerProfile TherapistProfile @relation(fields: [providerProfileId], references: [id], onDelete: Cascade)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerProfileId, documentType])
+  @@index([userId, documentType])
+  @@map("provider_documents")
 }
 
 model PatientAssessment {
@@ -1833,6 +1908,24 @@ model PatientExercise {
 
   @@index([patientId, status])
   @@map("patient_exercises")
+}
+
+model CBTAssignment {
+  id           String              @id @default(uuid())
+  patientId    String
+  providerId   String
+  templateType CbtTemplateType
+  content      Json?
+  status       CbtAssignmentStatus @default(ASSIGNED)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  patient  User @relation("CbtAssignmentPatient", fields: [patientId], references: [id], onDelete: Cascade)
+  provider User @relation("CbtAssignmentProvider", fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, status])
+  @@index([providerId, status])
+  @@map("cbt_assignments")
 }
 
 model PatientProgress {

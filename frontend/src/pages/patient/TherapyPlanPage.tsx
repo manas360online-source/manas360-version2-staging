@@ -355,9 +355,30 @@ export default function TherapyPlanPage() {
                   key={exercise.id}
                   type="button"
                   onClick={() => {
-                    if (!exercise.completed && exercise.sessionId) {
-                      navigate(`/patient/cbt/${exercise.sessionId}`);
+                    if (exercise.completed) return;
+
+                    const activityType = String(exercise.type || '').toUpperCase();
+                    if (activityType.includes('CLINICAL_ASSESSMENT') || activityType.includes('ASSESSMENT')) {
+                      navigate('/patient/assessments');
+                      return;
                     }
+
+                    if (activityType.includes('MOOD_CHECKIN')) {
+                      navigate('/patient/mood');
+                      return;
+                    }
+
+                    if (exercise.id) {
+                      navigate(`/patient/cbt-assignment/${exercise.id}`);
+                      return;
+                    }
+
+                    if (exercise.sessionId) {
+                      navigate(`/patient/cbt/${exercise.sessionId}`);
+                      return;
+                    }
+
+                    navigate('/patient/cbt-section');
                   }}
                   className="group flex w-full items-center justify-between rounded-[1.5rem] bg-white/92 p-4 text-left shadow-wellness-sm transition hover:shadow-wellness-md"
                 >
@@ -382,7 +403,9 @@ export default function TherapyPlanPage() {
                     </span>
                     {!exercise.completed ? (
                       <span className="inline-flex min-h-[44px] items-center rounded-full bg-[#E8F2FF] px-4 text-sm font-semibold text-[#2B5EA7] md:min-h-[34px] md:px-3 md:text-xs">
-                        Start Exercise
+                        {String(exercise.type || '').toUpperCase().includes('CLINICAL_ASSESSMENT')
+                          ? 'Start Assessment'
+                          : 'Start Exercise'}
                       </span>
                     ) : null}
                   </div>

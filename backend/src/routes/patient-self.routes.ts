@@ -15,6 +15,8 @@ import {
   getPatientMoodController,
   getPatientMoodStatsController,
   getPatientMoodTodayController,
+  getMyActiveCbtAssignmentsController,
+  getMyCbtAssignmentDetailController,
   getPatientPaymentMethodController,
   getPatientProgressController,
   getPatientReportsController,
@@ -22,6 +24,7 @@ import {
   getPatientRecordSecureUrlController,
   createPatientRecordShareLinkController,
   streamSharedPatientRecordController,
+  upsertMyCbtAssignmentResponseController,
   getPatientSettingsController,
   getPatientSupportCenterController,
   getPatientSubscriptionController,
@@ -88,6 +91,10 @@ router.get('/mood/history', requireAuth, requireRole('patient'), asyncHandler(ge
 router.get('/mood/stats', requireAuth, requireRole('patient'), asyncHandler(getPatientMoodStatsController));
 
 router.get('/progress', requireAuth, requireRole('patient'), asyncHandler(getPatientProgressController));
+
+router.get('/cbt-assignments/active', requireAuth, requireRole('patient'), asyncHandler(getMyActiveCbtAssignmentsController));
+router.get('/cbt-assignments/:assignmentId', requireAuth, requireRole('patient'), asyncHandler(getMyCbtAssignmentDetailController));
+router.patch('/cbt-assignments/:assignmentId', requireAuth, requireRole('patient'), asyncHandler(upsertMyCbtAssignmentResponseController));
 
 router.get('/exercises', requireAuth, requireRole('patient'), asyncHandler(getPatientExercisesController));
 router.post('/exercises/library', requireAuth, requireRole('patient'), asyncHandler(logWellnessLibraryActivityController));
