@@ -7,9 +7,9 @@ const cards = [
     features: ['24/7 availability', 'Mood tracking', 'Crisis escalation support'],
   },
   {
-    title: '🧩 Interactive CBT Training',
-    description: 'Evidence-based CBT exercises designed for short daily practice and practical behavior change.',
-    features: ['15-minute modules', 'Thought reframing', 'Multilingual support'],
+    title: '📊 Progress Tracking',
+    description: 'Comprehensive mood tracking and therapy progress monitoring with visual insights.',
+    features: ['Daily mood logs', 'Progress charts', 'Goal setting support'],
   },
   {
     title: '👥 Group Support Programs',

@@ -800,3 +800,75 @@ export const validateAdminListSubscriptionsQuery: RequestHandler[] = [
 	extractValidatedAdminListSubscriptionsQuery,
 ];
 
+const extractValidatedDailyCheckIn = (req: Request, _res: Response, next: NextFunction): void => {
+	req.validatedDailyCheckIn = {
+		date: req.body.date as string,
+		type: req.body.type as 'MORNING' | 'EVENING',
+		mood: Number(req.body.mood),
+		energy: req.body.energy !== undefined ? Number(req.body.energy) : undefined,
+		sleep: req.body.sleep !== undefined ? Number(req.body.sleep) : undefined,
+		context: (req.body.context as string[]) || [],
+		intention: req.body.intention as string | undefined,
+		reflectionGood: req.body.reflectionGood as string | undefined,
+		reflectionBad: req.body.reflectionBad as string | undefined,
+		stressLevel: req.body.stressLevel !== undefined ? Number(req.body.stressLevel) : undefined,
+		gratitude: req.body.gratitude as string | undefined,
+	};
+	next();
+};
+
+export const validateCreateDailyCheckInRequest: RequestHandler[] = [
+	body('date').isISO8601().withMessage('date must be a valid ISO8601 date'),
+	body('type').isIn(['MORNING', 'EVENING']).withMessage('type must be MORNING or EVENING'),
+	body('mood').isInt({ min: 1, max: 5 }).withMessage('mood must be an integer between 1 and 5'),
+	body('energy').optional().isInt({ min: 1, max: 5 }).withMessage('energy must be an integer between 1 and 5'),
+	body('sleep').optional().isInt({ min: 1, max: 5 }).withMessage('sleep must be an integer between 1 and 5'),
+	body('context').optional().isArray().withMessage('context must be an array of strings'),
+	body('context.*').optional().isString().trim().isLength({ min: 1, max: 100 }).withMessage('each context item must be 1-100 characters'),
+	body('intention').optional().isString().trim().isLength({ min: 1, max: 500 }).withMessage('intention must be 1-500 characters'),
+	body('reflectionGood').optional().isString().trim().isLength({ min: 1, max: 500 }).withMessage('reflectionGood must be 1-500 characters'),
+	body('reflectionBad').optional().isString().trim().isLength({ min: 1, max: 500 }).withMessage('reflectionBad must be 1-500 characters'),
+	body('stressLevel').optional().isInt({ min: 1, max: 5 }).withMessage('stressLevel must be an integer between 1 and 5'),
+	body('gratitude').optional().isString().trim().isLength({ min: 1, max: 500 }).withMessage('gratitude must be 1-500 characters'),
+	body().custom((body) => {
+		const type = body.type;
+		if (type === 'MORNING') {
+			// Morning check-in validation
+			if (body.energy === undefined) {
+				throw new Error('energy is required for morning check-in');
+			}
+			if (body.sleep === undefined) {
+				throw new Error('sleep is required for morning check-in');
+			}
+			if (body.intention === undefined || body.intention.trim().length === 0) {
+				throw new Error('intention is required for morning check-in');
+			}
+			// Evening fields should not be present
+			if (body.reflectionGood !== undefined || body.reflectionBad !== undefined || body.stressLevel !== undefined || body.gratitude !== undefined) {
+				throw new Error('evening fields should not be present in morning check-in');
+			}
+		} else if (type === 'EVENING') {
+			// Evening check-in validation
+			if (body.reflectionGood === undefined || body.reflectionGood.trim().length === 0) {
+				throw new Error('reflectionGood is required for evening check-in');
+			}
+			if (body.reflectionBad === undefined || body.reflectionBad.trim().length === 0) {
+				throw new Error('reflectionBad is required for evening check-in');
+			}
+			if (body.stressLevel === undefined) {
+				throw new Error('stressLevel is required for evening check-in');
+			}
+			if (body.gratitude === undefined || body.gratitude.trim().length === 0) {
+				throw new Error('gratitude is required for evening check-in');
+			}
+			// Morning fields should not be present
+			if (body.energy !== undefined || body.sleep !== undefined || body.intention !== undefined) {
+				throw new Error('morning fields should not be present in evening check-in');
+			}
+		}
+		return true;
+	}),
+	(req, _res, next) => applyValidationResult(req, next),
+	extractValidatedDailyCheckIn,
+];
+

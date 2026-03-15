@@ -338,7 +338,7 @@ const buildJourneyRecommendation = (input: { type: string; score: number; answer
 				recommendedProvider: 'therapist',
 				followUpDays: 3,
 				rationale: [`PHQ-9 indicates ${phq.severity} depressive symptoms.`],
-				actions: ['Book therapist session this week.', 'Start structured CBT activity plan.', 'Track mood and sleep for 7 days.'],
+				actions: ['Book therapist session this week.', 'Track mood and sleep for 7 days.'],
 			};
 		}
 
@@ -372,7 +372,7 @@ const buildJourneyRecommendation = (input: { type: string; score: number; answer
 				recommendedProvider: 'therapist',
 				followUpDays: 4,
 				rationale: [`GAD-7 indicates ${gad.severity} anxiety.`],
-				actions: ['Schedule therapist follow-up this week.', 'Continue CBT and relaxation routines.', 'Track anxiety triggers in daily journal.'],
+				actions: ['Schedule therapist follow-up this week.', 'Continue relaxation routines.', 'Track anxiety triggers in daily journal.'],
 			};
 		}
 
@@ -412,16 +412,9 @@ const toProviderListItem = async (user: any) => {
 		// 1. Ensure TherapistProfile exists, or fetch it if omitted
 		const profile = user.therapistProfile || await db.therapistProfile.findUnique({ where: { userId: user.id } }).catch(() => null);
 
-		// 2. Base specializations based on actual session templates or profile
-		const categories = await db.cBTSessionTemplate.findMany({
-			where: { therapistId: user.id, status: 'PUBLISHED' },
-			select: { category: true },
-			take: 10,
-		});
-		
-		const templateSpecializations = [...new Set(categories.map((c: any) => String(c.category || '').trim()).filter(Boolean))];
+		// 2. Base specializations based on profile
 		const profileSpecializations = Array.isArray(profile?.specializations) ? profile.specializations : [];
-		const allSpecializations = [...new Set([...templateSpecializations, ...profileSpecializations])];
+		const allSpecializations = [...new Set([...profileSpecializations])];
 
 		// 3. Aggregate Stats
 		const therapistProfile = profile || await db.therapistProfile.findUnique({ where: { userId: user.id } }).catch(() => null);

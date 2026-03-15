@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.validateAdminListSubscriptionsQuery = exports.validateTherapistProfileIdParam = exports.validateAdminGetUserIdParam = exports.validateAdminListUsersQuery = exports.validateTherapistEarningsQuery = exports.validateTherapistSessionNoteRequest = exports.validateTherapistLeadsQuery = exports.validateUploadTherapistDocumentRequest = exports.uploadTherapistDocumentMiddleware = exports.validateCreatePsychiatristFollowUpRequest = exports.validateCreateMedicationHistoryRequest = exports.validateDrugInteractionCheckRequest = exports.validateCreatePrescriptionRequest = exports.validateCreatePsychiatricAssessmentRequest = exports.validateCreateTherapistProfileRequest = exports.validateUpdateTherapistSessionStatusRequest = exports.validateTherapistSessionHistoryQuery = exports.validatePatientSessionHistoryQuery = exports.validateBookSessionRequest = exports.validateTherapistMatchQuery = exports.validatePatientMoodHistoryQuery = exports.validatePatientAssessmentHistoryQuery = exports.validateCreatePatientAssessmentRequest = exports.validateCreatePatientProfileRequest = exports.validateSessionIdParam = exports.validateChangePasswordRequest = exports.uploadProfilePhotoMiddleware = exports.validateUpdateMeRequest = exports.asyncHandler = void 0;
+exports.validateCreateDailyCheckInRequest = exports.validateAdminListSubscriptionsQuery = exports.validateTherapistProfileIdParam = exports.validateAdminGetUserIdParam = exports.validateAdminListUsersQuery = exports.validateTherapistEarningsQuery = exports.validateTherapistSessionNoteRequest = exports.validateTherapistLeadsQuery = exports.validateUploadTherapistDocumentRequest = exports.uploadTherapistDocumentMiddleware = exports.validateCreatePsychiatristFollowUpRequest = exports.validateCreateMedicationHistoryRequest = exports.validateDrugInteractionCheckRequest = exports.validateCreatePrescriptionRequest = exports.validateCreatePsychiatricAssessmentRequest = exports.validateCreateTherapistProfileRequest = exports.validateUpdateTherapistSessionStatusRequest = exports.validateTherapistSessionHistoryQuery = exports.validatePatientSessionHistoryQuery = exports.validateBookSessionRequest = exports.validateTherapistMatchQuery = exports.validatePatientMoodHistoryQuery = exports.validatePatientAssessmentHistoryQuery = exports.validateCreatePatientAssessmentRequest = exports.validateCreatePatientProfileRequest = exports.validateSessionIdParam = exports.validateChangePasswordRequest = exports.uploadProfilePhotoMiddleware = exports.validateUpdateMeRequest = exports.asyncHandler = void 0;
 const multer_1 = __importStar(require("multer"));
 const express_validator_1 = require("express-validator");
 const error_middleware_1 = require("./error.middleware");
@@ -689,4 +689,75 @@ exports.validateAdminListSubscriptionsQuery = [
     (0, express_validator_1.query)('limit').optional().isInt({ min: 1, max: 50 }).withMessage('limit must be between 1 and 50'),
     (req, _res, next) => applyValidationResult(req, next),
     extractValidatedAdminListSubscriptionsQuery,
+];
+const extractValidatedDailyCheckIn = (req, _res, next) => {
+    req.validatedDailyCheckIn = {
+        date: req.body.date,
+        type: req.body.type,
+        mood: Number(req.body.mood),
+        energy: req.body.energy !== undefined ? Number(req.body.energy) : undefined,
+        sleep: req.body.sleep !== undefined ? Number(req.body.sleep) : undefined,
+        context: req.body.context || [],
+        intention: req.body.intention,
+        reflectionGood: req.body.reflectionGood,
+        reflectionBad: req.body.reflectionBad,
+        stressLevel: req.body.stressLevel !== undefined ? Number(req.body.stressLevel) : undefined,
+        gratitude: req.body.gratitude,
+    };
+    next();
+};
+exports.validateCreateDailyCheckInRequest = [
+    (0, express_validator_1.body)('date').isISO8601().withMessage('date must be a valid ISO8601 date'),
+    (0, express_validator_1.body)('type').isIn(['MORNING', 'EVENING']).withMessage('type must be MORNING or EVENING'),
+    (0, express_validator_1.body)('mood').isInt({ min: 1, max: 5 }).withMessage('mood must be an integer between 1 and 5'),
+    (0, express_validator_1.body)('energy').optional().isInt({ min: 1, max: 5 }).withMessage('energy must be an integer between 1 and 5'),
+    (0, express_validator_1.body)('sleep').optional().isInt({ min: 1, max: 5 }).withMessage('sleep must be an integer between 1 and 5'),
+    (0, express_validator_1.body)('context').optional().isArray().withMessage('context must be an array of strings'),
+    (0, express_validator_1.body)('context.*').optional().isString().trim().isLength({ min: 1, max: 100 }).withMessage('each context item must be 1-100 characters'),
+    (0, express_validator_1.body)('intention').optional().isString().trim().isLength({ min: 1, max: 500 }).withMessage('intention must be 1-500 characters'),
+    (0, express_validator_1.body)('reflectionGood').optional().isString().trim().isLength({ min: 1, max: 500 }).withMessage('reflectionGood must be 1-500 characters'),
+    (0, express_validator_1.body)('reflectionBad').optional().isString().trim().isLength({ min: 1, max: 500 }).withMessage('reflectionBad must be 1-500 characters'),
+    (0, express_validator_1.body)('stressLevel').optional().isInt({ min: 1, max: 5 }).withMessage('stressLevel must be an integer between 1 and 5'),
+    (0, express_validator_1.body)('gratitude').optional().isString().trim().isLength({ min: 1, max: 500 }).withMessage('gratitude must be 1-500 characters'),
+    (0, express_validator_1.body)().custom((body) => {
+        const type = body.type;
+        if (type === 'MORNING') {
+            // Morning check-in validation
+            if (body.energy === undefined) {
+                throw new Error('energy is required for morning check-in');
+            }
+            if (body.sleep === undefined) {
+                throw new Error('sleep is required for morning check-in');
+            }
+            if (body.intention === undefined || body.intention.trim().length === 0) {
+                throw new Error('intention is required for morning check-in');
+            }
+            // Evening fields should not be present
+            if (body.reflectionGood !== undefined || body.reflectionBad !== undefined || body.stressLevel !== undefined || body.gratitude !== undefined) {
+                throw new Error('evening fields should not be present in morning check-in');
+            }
+        }
+        else if (type === 'EVENING') {
+            // Evening check-in validation
+            if (body.reflectionGood === undefined || body.reflectionGood.trim().length === 0) {
+                throw new Error('reflectionGood is required for evening check-in');
+            }
+            if (body.reflectionBad === undefined || body.reflectionBad.trim().length === 0) {
+                throw new Error('reflectionBad is required for evening check-in');
+            }
+            if (body.stressLevel === undefined) {
+                throw new Error('stressLevel is required for evening check-in');
+            }
+            if (body.gratitude === undefined || body.gratitude.trim().length === 0) {
+                throw new Error('gratitude is required for evening check-in');
+            }
+            // Morning fields should not be present
+            if (body.energy !== undefined || body.sleep !== undefined || body.intention !== undefined) {
+                throw new Error('morning fields should not be present in evening check-in');
+            }
+        }
+        return true;
+    }),
+    (req, _res, next) => applyValidationResult(req, next),
+    extractValidatedDailyCheckIn,
 ];

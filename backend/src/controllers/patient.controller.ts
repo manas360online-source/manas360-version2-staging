@@ -381,3 +381,33 @@ export const getMyTherapyPlanController = async (req: Request, res: Response): P
 	}
 };
 
+export const addDailyCheckInController = async (req: Request, res: Response): Promise<void> => {
+	const userId = getAuthUserId(req);
+
+	if (!req.validatedDailyCheckIn) {
+		throw new AppError('Invalid daily check-in payload', 400);
+	}
+
+	const checkInData = req.validatedDailyCheckIn;
+
+	// Create the daily check-in record
+	const dailyCheckIn = await prisma.dailyCheckIn.create({
+		data: {
+			patientId: userId,
+			date: new Date(checkInData.date),
+			type: checkInData.type,
+			mood: checkInData.mood,
+			energy: checkInData.energy,
+			sleep: checkInData.sleep,
+			context: checkInData.context || [],
+			intention: checkInData.intention,
+			reflectionGood: checkInData.reflectionGood,
+			reflectionBad: checkInData.reflectionBad,
+			stressLevel: checkInData.stressLevel,
+			gratitude: checkInData.gratitude,
+		},
+	});
+
+	sendSuccess(res, dailyCheckIn, 'Daily check-in recorded', 201);
+};
+

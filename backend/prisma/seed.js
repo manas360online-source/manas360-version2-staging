@@ -91,6 +91,20 @@ const createUsersByRole = ({ role, count, predefined = [] }) => {
 async function upsertUser(userInput, passwordHash) {
   const { email, firstName, lastName, role } = userInput;
   const providerType = providerTypeByRole[role] || null;
+  const providerFlags = providerType
+    ? {
+        onboardingStatus: 'COMPLETED',
+        isTherapistVerified: true,
+        therapistVerifiedAt: new Date(),
+        therapistVerifiedByUserId: null,
+      }
+    : {
+        onboardingStatus: null,
+        isTherapistVerified: false,
+        therapistVerifiedAt: null,
+        therapistVerifiedByUserId: null,
+      };
+
   return prisma.user.upsert({
     where: { email },
     update: {
@@ -104,10 +118,10 @@ async function upsertUser(userInput, passwordHash) {
       phoneVerified: false,
       isDeleted: false,
       status: 'ACTIVE',
-      isTherapistVerified: Boolean(providerType),
       passwordHash,
       failedLoginAttempts: 0,
       lockUntil: null,
+      ...providerFlags,
     },
     create: {
       email,
@@ -120,8 +134,8 @@ async function upsertUser(userInput, passwordHash) {
       emailVerified: true,
       phoneVerified: false,
       status: 'ACTIVE',
-      isTherapistVerified: Boolean(providerType),
       passwordHash,
+      ...providerFlags,
     },
   });
 }
@@ -201,6 +215,10 @@ async function seed() {
         consultationFee: defaults.consultationFee,
         averageRating: defaults.averageRating,
         availability: defaults.availability,
+        onboardingCompleted: true,
+        isVerified: true,
+        verifiedAt: new Date(),
+        verifiedByUserId: null,
       },
       create: {
         userId: provider.id,
@@ -212,6 +230,10 @@ async function seed() {
         consultationFee: defaults.consultationFee,
         averageRating: defaults.averageRating,
         availability: defaults.availability,
+        onboardingCompleted: true,
+        isVerified: true,
+        verifiedAt: new Date(),
+        verifiedByUserId: null,
       },
     }).catch(() => null);
   }

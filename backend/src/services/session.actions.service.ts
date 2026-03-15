@@ -1,7 +1,6 @@
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/error.middleware';
 import { publishPlaceholderNotificationEvent } from './notification.service';
-import { cbtSessionService } from './cbt-session.service';
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env';
 import cuid from 'cuid';
@@ -60,19 +59,6 @@ export class SessionActionsService {
     await prisma.sessionAuditLog.create({ data: { sessionId, userId: options.requestorId || therapistId, action: 'START_LIVE', entityType: 'PATIENT_SESSION', entityId: sessionId, changes: { roomId, mode, expiresAt } } } as any);
 
     return { room: { roomId, token, expiresAt } };
-  }
-
-  async duplicateTemplate(therapistId: string, templateId: string, opts: { publish?: boolean; title?: string } = {}, options: { requestorId?: string } = {}) {
-    // ensure therapist owns the template
-    const tpl = await prisma.cBTSessionTemplate.findUnique({ where: { id: templateId } });
-    if (!tpl) throw new AppError('Template not found', 404);
-    if (String(tpl.therapistId) !== String(therapistId)) throw new AppError('Forbidden', 403);
-
-    const newTpl = await cbtSessionService.cloneTemplate(templateId, therapistId, { makePrivate: false, title: opts.title });
-
-    await prisma.sessionAuditLog.create({ data: { userId: options.requestorId || therapistId, action: 'DUPLICATE', entityType: 'SESSION_TEMPLATE', entityId: templateId, changes: { newTemplateId: newTpl.id } } } as any);
-
-    return newTpl;
   }
 }
 

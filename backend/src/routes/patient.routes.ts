@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import {
+	addDailyCheckInController,
 	createPatientAssessmentController,
 	createPatientProfileController,
 	getMyMoodHistoryController,
@@ -20,6 +21,7 @@ import {
 	validateBookSessionRequest,
 	validatePatientSessionHistoryQuery,
 	validateTherapistMatchQuery,
+	validateCreateDailyCheckInRequest,
 } from '../middleware/validate.middleware';
 
 const router = Router();
@@ -33,6 +35,7 @@ router.get('/me/therapy-plan', requireAuth, requirePatientRole, asyncHandler(get
 router.get('/me/therapist-matches', requireAuth, requirePatientRole, ...validateTherapistMatchQuery, asyncHandler(getMyTherapistMatchesController));
 router.post('/me/sessions/book', requireAuth, requirePatientRole, ...validateBookSessionRequest, asyncHandler(bookMySessionController));
 router.get('/me/sessions', requireAuth, requirePatientRole, ...validatePatientSessionHistoryQuery, asyncHandler(getMySessionHistoryController));
+router.post('/me/daily-checkin', requireAuth, requirePatientRole, ...validateCreateDailyCheckInRequest, asyncHandler(addDailyCheckInController));
 
 export default router;
 

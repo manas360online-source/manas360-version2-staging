@@ -59,7 +59,7 @@ export class SessionExportService {
     doc.pipe(createWriteStream(filePath));
 
     // Header
-    doc.fontSize(24).font('Helvetica-Bold').text('CBT Session Report', { align: 'center' });
+    doc.fontSize(24).font('Helvetica-Bold').text('Session Report', { align: 'center' });
     doc.fontSize(10).fillColor('#666').text('Confidential - For Clinical Use Only', { align: 'center' });
     doc.moveDown(0.5);
     // Metadata: therapist, patient, date, version

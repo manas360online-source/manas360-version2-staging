@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getMyTherapyPlanController = exports.getMyTherapistMatchesController = exports.getMyMoodHistoryController = exports.getMyPatientAssessmentHistoryController = exports.createPatientAssessmentController = exports.getMyPatientProfileController = exports.createPatientProfileController = void 0;
+exports.addDailyCheckInController = exports.getMyTherapyPlanController = exports.getMyTherapistMatchesController = exports.getMyMoodHistoryController = exports.getMyPatientAssessmentHistoryController = exports.createPatientAssessmentController = exports.getMyPatientProfileController = exports.createPatientProfileController = void 0;
 const db_1 = require("../config/db");
 const error_middleware_1 = require("../middleware/error.middleware");
 const patient_service_1 = require("../services/patient.service");
@@ -336,3 +336,29 @@ const getMyTherapyPlanController = async (req, res) => {
     }
 };
 exports.getMyTherapyPlanController = getMyTherapyPlanController;
+const addDailyCheckInController = async (req, res) => {
+    const userId = getAuthUserId(req);
+    if (!req.validatedDailyCheckIn) {
+        throw new error_middleware_1.AppError('Invalid daily check-in payload', 400);
+    }
+    const checkInData = req.validatedDailyCheckIn;
+    // Create the daily check-in record
+    const dailyCheckIn = await db_1.prisma.dailyCheckIn.create({
+        data: {
+            patientId: userId,
+            date: new Date(checkInData.date),
+            type: checkInData.type,
+            mood: checkInData.mood,
+            energy: checkInData.energy,
+            sleep: checkInData.sleep,
+            context: checkInData.context || [],
+            intention: checkInData.intention,
+            reflectionGood: checkInData.reflectionGood,
+            reflectionBad: checkInData.reflectionBad,
+            stressLevel: checkInData.stressLevel,
+            gratitude: checkInData.gratitude,
+        },
+    });
+    (0, response_1.sendSuccess)(res, dailyCheckIn, 'Daily check-in recorded', 201);
+};
+exports.addDailyCheckInController = addDailyCheckInController;

@@ -399,51 +399,6 @@ export const deleteTherapistExercise = async (userId: string, id: string) => {
   return { id };
 };
 
-export const listTherapistCbtModules = async (userId: string) => {
-  await assertTherapist(userId);
-
-  const rows = await db.therapistCbtModule.findMany({ where: { therapistId: userId }, orderBy: { updatedAt: 'desc' } });
-  return {
-    items: rows.map((row: any) => ({
-      id: String(row.id),
-      title: String(row.title || ''),
-      approach: String(row.approach || ''),
-      assignedPatient: String(row.patientName || ''),
-      patientId: row.patientId ? String(row.patientId) : '',
-      status: String(row.status || 'draft'),
-      updatedAt: row.updatedAt,
-    })),
-  };
-};
-
-export const createTherapistCbtModule = async (userId: string, payload: any) => {
-  await assertTherapist(userId);
-
-  const patientId = payload.patientId ? String(payload.patientId) : null;
-  const patientName = await resolvePatientName(patientId, payload.assignedPatient);
-
-  return db.therapistCbtModule.create({
-    data: {
-      therapistId: userId,
-      patientId,
-      patientName: patientId || payload.assignedPatient ? patientName : null,
-      title: String(payload.title || '').trim(),
-      approach: String(payload.approach || '').trim(),
-      status: normalizeStatus(payload.status || (patientName ? 'active' : 'draft'), 'draft'),
-    },
-  });
-};
-
-export const deleteTherapistCbtModule = async (userId: string, id: string) => {
-  await assertTherapist(userId);
-
-  const existing = await db.therapistCbtModule.findFirst({ where: { id, therapistId: userId } });
-  if (!existing) throw new AppError('CBT module not found', 404);
-
-  await db.therapistCbtModule.delete({ where: { id } });
-  return { id };
-};
-
 export const listTherapistAssessmentRecords = async (userId: string) => {
   await assertTherapist(userId);
 

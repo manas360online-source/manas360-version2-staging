@@ -319,8 +319,8 @@ export const getMyMoodHistory = async (userId: string, query: PatientMoodHistory
 const severityToSpecializationMap: Record<string, string[]> = {
 	minimal: ['stress_management', 'general_wellness'],
 	mild: ['anxiety', 'stress_management', 'depression'],
-	moderate: ['anxiety', 'depression', 'cbt'],
-	moderately_severe: ['depression', 'trauma', 'cbt'],
+	moderate: ['anxiety', 'depression', 'therapy'],
+	moderately_severe: ['depression', 'trauma', 'therapy'],
 	severe: ['depression', 'trauma', 'crisis_intervention'],
 };
 

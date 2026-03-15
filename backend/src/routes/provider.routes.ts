@@ -7,8 +7,6 @@ import {
 	getProviderEarnings,
 	getProviderSettings,
 	getPatientAssessments,
-	listCbtAssignmentTemplates,
-	getPatientCBTModules,
 	getPatientGoals,
 	getPatientLabs,
 	getPatientNotes,
@@ -19,8 +17,6 @@ import {
 	getProviderDashboardController,
 	getProviderPatients,
 	publishWeeklyPlan,
-	reviewCBTModule,
-	quickAssignCbtTemplate,
 	scheduleNextSession,
 	saveWeeklyPlan,
 	sendMessage,
@@ -62,19 +58,11 @@ router.get('/patient/:patientId/overview', requireAuth, asyncHandler(getPatientO
 
 router.get('/patient/:patientId/assessments', requireAuth, asyncHandler(getPatientAssessments));
 
-router.get('/cbt-assignments/templates', requireAuth, asyncHandler(listCbtAssignmentTemplates));
-
-router.post('/patient/:patientId/cbt-assignments', requireAuth, asyncHandler(quickAssignCbtTemplate));
-
 router.post('/patient/:patientId/assign', requireAuth, asyncHandler(assignPatientItem));
 
 router.post('/patient/:patientId/weekly-plan', requireAuth, asyncHandler(saveWeeklyPlan));
 router.post('/patient/:patientId/weekly-plan/publish', requireAuth, asyncHandler(publishWeeklyPlan));
 router.post('/patient/:patientId/sessions/schedule', requireAuth, asyncHandler(scheduleNextSession));
-
-router.get('/patient/:patientId/cbt', requireAuth, asyncHandler(getPatientCBTModules));
-
-router.put('/patient/:patientId/cbt/:moduleId/review', requireAuth, asyncHandler(reviewCBTModule));
 
 router.get('/patient/:patientId/prescriptions', requireAuth, asyncHandler(getPatientPrescriptions));
 

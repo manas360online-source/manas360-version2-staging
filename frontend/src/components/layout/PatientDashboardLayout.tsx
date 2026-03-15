@@ -16,7 +16,6 @@ import {
   User,
   X,
 } from 'lucide-react';
-import { AnimatePresence, motion } from 'framer-motion';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { patientApi } from '../../api/patient';
 import { useAuth } from '../../context/AuthContext';
@@ -30,7 +29,7 @@ const mainNavItems = [
 const selfCareNavItems = [
   { to: '/patient/messages', label: 'Anytime Buddy (AI)', icon: MessageSquare, badge: 'AI' },
   { to: '/patient/check-in', label: 'Daily Check-in', icon: HeartPulse },
-  { to: '/patient/sound-therapy', label: 'Wellness Library', icon: Sparkles },
+  { to: '/patient/wellness-library', label: 'Wellness Library', icon: Sparkles },
 ];
 
 const progressNavItems = [
@@ -104,7 +103,6 @@ export default function PatientDashboardLayout() {
     '/patient/dashboard': 'Dashboard',
     '/patient/therapy-plan': 'My Therapy Plan',
     '/patient/sessions': 'Sessions',
-    '/patient/cbt-section': 'CBT Section',
     '/patient/care-team': 'Care Team',
     '/patient/assessments': 'Clinical Assessments',
     '/patient/messages': 'AI Support',
@@ -117,7 +115,10 @@ export default function PatientDashboardLayout() {
     '/patient/support': 'Help Center',
     '/patient/settings': 'Settings',
     '/patient/profile': 'Profile',
-    '/patient/sound-therapy': 'Wellness Library',
+    '/patient/wellness-library': 'Wellness Library',
+    '/patient/sleep-therapy': 'Sleep Therapy',
+    '/patient/sound-therapy': 'Sound Therapy',
+    '/patient/buddy': 'AI Buddy',
     '/patient/notifications': 'Notifications',
     '/patient/progress': 'My Progress',
     '/patient/provider-messages': 'Messages',
@@ -331,18 +332,7 @@ export default function PatientDashboardLayout() {
 
           <main className="w-full flex-1 px-3 py-4 sm:px-4 sm:py-5 lg:px-6 lg:py-7">
             <div className="wellness-page-shell rounded-[2rem] p-3 sm:p-4 lg:p-5">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={location.pathname}
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  transition={{ duration: 0.4, ease: 'easeOut' }}
-                  className="max-w-full"
-                >
-                  <Outlet />
-                </motion.div>
-              </AnimatePresence>
+              <Outlet />
             </div>
           </main>
         </div>

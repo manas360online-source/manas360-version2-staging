@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import { useProviderDashboard } from '../../../hooks/useProviderDashboard';
+import type { SmartAlertItem } from '../../../api/provider';
 
 type ProviderKind = 'THERAPIST' | 'PSYCHIATRIST' | 'COACH' | 'PSYCHOLOGIST';
 
@@ -14,6 +15,7 @@ type StatItem = {
 };
 
 type AlertItem = {
+  id?: string;
   title: string;
   detail: string;
   priority: 'high' | 'medium' | 'low';
@@ -89,6 +91,21 @@ const alertToneClass = (priority: AlertItem['priority']): string => {
   return 'border-slate-200 bg-slate-50';
 };
 
+const smartAlertToUi = (item: SmartAlertItem): AlertItem => {
+  const titleByTrigger: Record<SmartAlertItem['trigger'], string> = {
+    mood_decline: 'Mood decline detected',
+    stress_spike: 'High stress pattern',
+    sleep_risk: 'Sleep risk pattern',
+  };
+
+  return {
+    id: `${item.patientId}-${item.trigger}`,
+    title: `${titleByTrigger[item.trigger]} • ${item.patientName}`,
+    detail: item.message,
+    priority: item.severity,
+  };
+};
+
 export default function ProviderDashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -105,7 +122,11 @@ export default function ProviderDashboard() {
   });
 
   const adherenceDipCount = Number(data?.stats?.adherenceDipCount ?? 0);
+  const smartAlertsFromApi = Array.isArray(data?.smartAlerts) ? data.smartAlerts : [];
   const alerts = useMemo(() => {
+    if (smartAlertsFromApi.length > 0) {
+      return smartAlertsFromApi.map(smartAlertToUi);
+    }
     const base = alertsByRole[providerRole].filter((item) => item.title.toLowerCase() !== 'adherence dip');
     const dynamicAdherenceAlert: AlertItem = {
       title: 'Adherence dip',
@@ -115,7 +136,7 @@ export default function ProviderDashboard() {
       priority: adherenceDipCount > 0 ? 'medium' : 'low',
     };
     return [dynamicAdherenceAlert, ...base];
-  }, [adherenceDipCount, providerRole]);
+  }, [adherenceDipCount, providerRole, smartAlertsFromApi]);
 
   if (isLoading) {
     return (
@@ -225,7 +246,7 @@ export default function ProviderDashboard() {
 
           <div className="space-y-3">
             {alerts.map((item) => (
-              <div key={item.title} className={`rounded-lg border p-3 ${alertToneClass(item.priority)}`}>
+              <div key={item.id || item.title} className={`rounded-lg border p-3 ${alertToneClass(item.priority)}`}>
                 <div className="mb-1 flex items-center justify-between">
                   <p className="text-sm font-semibold text-slate-900">{item.title}</p>
                   <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{item.priority}</span>

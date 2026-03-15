@@ -128,6 +128,20 @@ interface AdminListSubscriptionsQuery {
 	limit: number;
 }
 
+interface DailyCheckInPayload {
+	date: string;
+	type: 'MORNING' | 'EVENING';
+	mood: number;
+	energy?: number;
+	sleep?: number;
+	context: string[];
+	intention?: string;
+	reflectionGood?: string;
+	reflectionBad?: string;
+	stressLevel?: number;
+	gratitude?: string;
+}
+
 declare global {
 	namespace Express {
 		interface Request {
@@ -157,6 +171,7 @@ declare global {
 			validatedAdminListSubscriptionsQuery?: AdminListSubscriptionsQuery;
 			validatedUserId?: string;
 			validatedTherapistProfileId?: string;
+			validatedDailyCheckIn?: DailyCheckInPayload;
 		}
 	}
 }

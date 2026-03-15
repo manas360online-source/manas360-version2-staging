@@ -47,15 +47,6 @@ export const startLiveSessionController = async (req: Request, res: Response) =>
   sendSuccess(res, result, 'Live session started');
 };
 
-export const duplicateTemplateController = async (req: Request, res: Response) => {
-  const userId = getAuthUserId(req);
-  const templateId = String(req.params.id);
-  const opts = { title: String(req.body?.title || '') };
-
-  const result = await sessionActionsService.duplicateTemplate(userId, templateId, opts, { requestorId: userId });
-  sendSuccess(res, result, 'Template duplicated', 201);
-};
-
 export const therapistProposeAppointmentSlotController = async (req: Request, res: Response) => {
   const userId = getAuthUserId(req);
   const requestRef = String(req.body?.requestRef || '').trim();
@@ -75,6 +66,5 @@ export const therapistActionsController = {
   cancelSessionController,
   sendReminderController,
   startLiveSessionController,
-  duplicateTemplateController,
   therapistProposeAppointmentSlotController,
 };

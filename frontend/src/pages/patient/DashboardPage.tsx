@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Area, AreaChart, ResponsiveContainer, Tooltip } from 'recharts';
-import { AnimatePresence, motion } from 'framer-motion';
 import { 
   CalendarDays, 
   MessageSquare, 
@@ -20,7 +19,6 @@ import { isOnboardingRequiredError, patientApi } from '../../api/patient';
 import type { ActiveCbtAssignment } from '../../api/patient';
 import { DashboardSkeletons } from '../../components/ui/Skeleton';
 import DashboardCard from '../../components/ui/DashboardCard';
-import PageTransition from '../../components/common/PageTransition';
 import { useTherapyData } from '../../hooks/useTherapyData';
 
 const moodEmojiMap: Record<number, string> = {
@@ -29,15 +27,6 @@ const moodEmojiMap: Record<number, string> = {
   3: '😐',
   4: '🙂',
   5: '😊',
-};
-
-const enterVariant = {
-  hidden: { opacity: 0, y: 20 },
-  visible: (delay: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.4, delay },
-  }),
 };
 
 const formatDateTime = (value?: string | Date) => {
@@ -146,8 +135,7 @@ export default function DashboardPage() {
   const actionPlanTasksRemaining = activeAssignments.length + (moodChecked ? 0 : 1);
 
   return (
-    <PageTransition>
-      <div className="mx-auto w-full max-w-[1400px] space-y-6 pb-20 lg:pb-6">
+    <div className="mx-auto w-full max-w-[1400px] space-y-6 pb-20 lg:pb-6">
       
       {/* 1. HERO SECTION */}
       <section className="relative overflow-hidden rounded-[2rem] bg-gradient-wellness-hero p-6 shadow-wellness-md sm:p-8">
@@ -164,12 +152,10 @@ export default function DashboardPage() {
             
             <div className="mt-4 flex flex-wrap items-center gap-3">
               {[1, 2, 3, 4, 5].map((value) => (
-                <motion.button
+                <button
                   key={value}
                   type="button"
                   onClick={() => navigate(`/patient/daily-checkin?initialMood=${value * 2}`)}
-                  whileHover={{ y: -4, scale: 1.04 }}
-                  whileTap={{ scale: 0.96 }}
                   className={`inline-flex h-14 w-14 items-center justify-center rounded-[1.35rem] text-[1.8rem] transition-all duration-300 sm:h-16 sm:w-16 sm:text-[2rem] ${
                     moodValue === value 
                       ? 'bg-wellness-aqua ring-2 ring-wellness-sky/30 shadow-wellness-sm' 
@@ -177,7 +163,7 @@ export default function DashboardPage() {
                   }`}
                 >
                   <span>{moodEmojiMap[value]}</span>
-                </motion.button>
+                </button>
               ))}
               
             </div>
@@ -195,7 +181,7 @@ export default function DashboardPage() {
       </section>
 
       {/* MID ROW: Up Next & Action Plan */}
-      <motion.div className="grid grid-cols-1 gap-6 lg:grid-cols-2" variants={enterVariant} initial="hidden" animate="visible" custom={0.1}>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         
         {/* 2. UP NEXT CARD (Therapy & Appointments) */}
         <DashboardCard as="section" className="flex flex-col transition-shadow hover:shadow-wellness-md">
@@ -288,10 +274,10 @@ export default function DashboardPage() {
           </div>
         </DashboardCard>
 
-      </motion.div>
+      </div>
 
       {/* BOTTOM ROW: Progress & AI Nudge */}
-      <motion.div className="grid grid-cols-1 gap-6 md:grid-cols-3 lg:grid-cols-3" variants={enterVariant} initial="hidden" animate="visible" custom={0.2}>
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3 lg:grid-cols-3">
         
         {/* 4. AI NUDGE (Proactive Engagement) */}
         <DashboardCard as="section" className="md:col-span-1 flex flex-col transition-shadow hover:shadow-wellness-md">
@@ -390,18 +376,10 @@ export default function DashboardPage() {
           </div>
         </DashboardCard>
         
-      </motion.div>
+      </div>
 
       {/* 6. QUICK ALERTS & NOTIFICATIONS */}
-      <AnimatePresence>
       {recentActivity.length > 0 && (
-        <motion.div
-          variants={enterVariant}
-          initial="hidden"
-          animate="visible"
-          exit={{ opacity: 0, y: -10, transition: { duration: 0.25 } }}
-          custom={0.3}
-        >
         <DashboardCard as="section" className="flex items-center gap-4 p-5 transition-colors hover:shadow-wellness-md">
           <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-50">
              <Bell className="h-5 w-5 text-amber-600" />
@@ -415,11 +393,8 @@ export default function DashboardPage() {
             View Updates
           </Link>
         </DashboardCard>
-        </motion.div>
       )}
-      </AnimatePresence>
 
-      </div>
-    </PageTransition>
+    </div>
   );
 }

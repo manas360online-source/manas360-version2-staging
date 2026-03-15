@@ -4,7 +4,6 @@ import { prisma } from '../config/db';
 import { sendSuccess } from '../utils/response';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
-import cbtTemplateLibrary from '../config/cbt-template-library.json';
 import {
 	getConversationMessages as getDirectConversationMessages,
 	getOrCreateConversation,
@@ -14,24 +13,13 @@ import {
 import { registerProviderProfile } from '../services/auth.service';
 
 type ProviderRole = 'THERAPIST' | 'PSYCHOLOGIST' | 'PSYCHIATRIST' | 'COACH';
-
-type CbtTemplateLibraryEntry = {
-	key: string;
-	title: string;
-	description?: string;
-	steps?: unknown[];
+type SmartTherapistAlert = {
+	patientId: string;
+	patientName: string;
+	severity: 'high' | 'medium';
+	trigger: 'mood_decline' | 'stress_spike' | 'sleep_risk';
+	message: string;
 };
-
-const cbtTemplateEntries: CbtTemplateLibraryEntry[] = Array.isArray((cbtTemplateLibrary as any)?.templates)
-	? (cbtTemplateLibrary as any).templates
-	: [];
-
-const cbtTemplateLookup = new Map<string, CbtTemplateLibraryEntry>(
-	cbtTemplateEntries.map((entry) => [String(entry.key || '').toUpperCase(), entry]),
-);
-
-const normalizeCbtTemplateType = (value: unknown): string => String(value || '').trim().toUpperCase();
-
 const authUserId = (req: Request): string => {
 	const userId = req.auth?.userId;
 	if (!userId) throw new AppError('Authentication required', 401);
@@ -126,6 +114,89 @@ const formatRate = (numerator: number, denominator: number): string => {
 	if (!denominator) return '0%';
 	return `${Math.round((numerator / denominator) * 100)}%`;
 };
+
+const toDateKey = (value: Date): string => value.toISOString().slice(0, 10);
+
+const buildSmartTherapistAlerts = (
+	patientRows: Array<{
+		id: string;
+		name: string;
+		checkIns: Array<{ date: Date; mood: number; stressLevel: number | null; sleep: number | null }>;
+	}>,
+): SmartTherapistAlert[] => {
+	const alerts: SmartTherapistAlert[] = [];
+
+	for (const patient of patientRows) {
+		if (!patient.checkIns.length) continue;
+
+		const groupedByDay = new Map<string, { moodTotal: number; moodCount: number }>();
+		for (const row of patient.checkIns) {
+			const key = toDateKey(row.date);
+			const current = groupedByDay.get(key) || { moodTotal: 0, moodCount: 0 };
+			current.moodTotal += row.mood;
+			current.moodCount += 1;
+			groupedByDay.set(key, current);
+		}
+
+		const recentDays = Array.from(groupedByDay.entries())
+			.map(([day, value]) => ({ day, avgMood: value.moodCount ? value.moodTotal / value.moodCount : 0 }))
+			.sort((a, b) => (a.day < b.day ? 1 : -1));
+
+		let lowMoodStreak = 0;
+		for (const day of recentDays) {
+			if (day.avgMood < 3) lowMoodStreak += 1;
+			else break;
+		}
+
+		const stressValues = patient.checkIns
+			.map((item) => item.stressLevel)
+			.filter((value): value is number => typeof value === 'number');
+		const stressScaleMax = stressValues.length ? Math.max(...stressValues) : 0;
+		const stressThreshold = stressScaleMax > 5 ? 8 : 4;
+		const stressSpikes = stressValues.filter((value) => value >= stressThreshold).length;
+
+		const sleepValues = patient.checkIns
+			.map((item) => item.sleep)
+			.filter((value): value is number => typeof value === 'number');
+		const sleepScaleMax = sleepValues.length ? Math.max(...sleepValues) : 0;
+		const lowSleepCount = sleepValues.filter((value) => (sleepScaleMax > 5 ? value < 4 : value <= 2)).length;
+
+		if (lowMoodStreak >= 3) {
+			alerts.push({
+				patientId: patient.id,
+				patientName: patient.name,
+				severity: 'high',
+				trigger: 'mood_decline',
+				message: `Mood decline detected for ${lowMoodStreak} consecutive days. Follow-up recommended.`,
+			});
+			continue;
+		}
+
+		if (stressSpikes >= 3) {
+			alerts.push({
+				patientId: patient.id,
+				patientName: patient.name,
+				severity: 'high',
+				trigger: 'stress_spike',
+				message: 'Repeated high-stress check-ins detected this week. Consider outreach.',
+			});
+			continue;
+		}
+
+		if (lowSleepCount >= 3) {
+			alerts.push({
+				patientId: patient.id,
+				patientName: patient.name,
+				severity: 'medium',
+				trigger: 'sleep_risk',
+				message: 'Repeated low-sleep pattern observed. Sleep-focused support recommended.',
+			});
+		}
+	}
+
+	return alerts;
+};
+
 const toMinorUnits = (value: unknown): number => {
 	if (typeof value === 'bigint') return Number(value);
 	if (typeof value === 'number') return value;
@@ -427,9 +498,6 @@ export const getProviderDashboardController = async (req: Request, res: Response
 		totalSessionsToday,
 		completedSessionsThisMonth,
 		totalSessionsThisMonth,
-		totalCbtSessionsThisWeek,
-		completedCbtSessionsThisWeek,
-		cbtSessionsThisWeekByPatient,
 		activePrescriptions,
 		activeGoals,
 		pendingNotes,
@@ -478,35 +546,6 @@ export const getProviderDashboardController = async (req: Request, res: Response
 				dateTime: { gte: startOfMonth },
 			},
 		}),
-		prisma.patientSession.count({
-			where: {
-				createdAt: { gte: sevenDaysAgo },
-				template: {
-					therapistId: providerId,
-				},
-			},
-		}),
-		prisma.patientSession.count({
-			where: {
-				createdAt: { gte: sevenDaysAgo },
-				status: 'COMPLETED',
-				template: {
-					therapistId: providerId,
-				},
-			},
-		}),
-		prisma.patientSession.findMany({
-			where: {
-				createdAt: { gte: sevenDaysAgo },
-				template: {
-					therapistId: providerId,
-				},
-			},
-			select: {
-				patientId: true,
-				status: true,
-			},
-		}),
 		prisma.prescription.count({
 			where: {
 				providerId,
@@ -550,30 +589,56 @@ export const getProviderDashboardController = async (req: Request, res: Response
 		if (row.patientProfile?.userId) uniquePatientIds.add(row.patientProfile.userId);
 	}
 
+	const patientIds = Array.from(uniquePatientIds);
+	const [patientUsers, recentDailyCheckIns] = patientIds.length
+		? await Promise.all([
+			prisma.user.findMany({
+				where: { id: { in: patientIds } },
+				select: { id: true, firstName: true, lastName: true, name: true },
+			}),
+			prisma.dailyCheckIn.findMany({
+				where: {
+					patientId: { in: patientIds },
+					date: { gte: new Date(Date.now() - (10 * 24 * 60 * 60 * 1000)) },
+				},
+				orderBy: { date: 'desc' },
+				select: { patientId: true, date: true, mood: true, stressLevel: true, sleep: true },
+			}),
+		])
+		: [[], []];
+
+	const patientNameMap = new Map<string, string>();
+	for (const user of patientUsers) {
+		patientNameMap.set(user.id, toPatientName(user.firstName, user.lastName, user.name));
+	}
+
+	const checkInsByPatient = new Map<string, Array<{ date: Date; mood: number; stressLevel: number | null; sleep: number | null }>>();
+	for (const row of recentDailyCheckIns) {
+		const list = checkInsByPatient.get(row.patientId) || [];
+		list.push({
+			date: row.date,
+			mood: Number(row.mood || 0),
+			stressLevel: row.stressLevel,
+			sleep: row.sleep,
+		});
+		checkInsByPatient.set(row.patientId, list);
+	}
+
+	const smartAlerts = buildSmartTherapistAlerts(
+		patientIds.map((patientId) => ({
+			id: patientId,
+			name: patientNameMap.get(patientId) || 'Patient',
+			checkIns: checkInsByPatient.get(patientId) || [],
+		})),
+	);
+
 	const activePatients = uniquePatientIds.size;
 	const adherenceRate = formatRate(completedSessionsThisMonth, totalSessionsThisMonth);
-	const cbtAdherence = formatRate(completedCbtSessionsThisWeek, totalCbtSessionsThisWeek);
-	const patientAlerts = todaySessions.filter((session) => {
+	const scheduleAlerts = todaySessions.filter((session) => {
 		const status = String(session.status).toUpperCase();
 		return status === 'PENDING' || status === 'CANCELLED';
 	}).length;
-
-	const cbtCompletionByPatient = new Map<string, { total: number; completed: number }>();
-	for (const entry of cbtSessionsThisWeekByPatient) {
-		const patientId = String(entry.patientId || '');
-		if (!patientId) continue;
-		const current = cbtCompletionByPatient.get(patientId) || { total: 0, completed: 0 };
-		current.total += 1;
-		if (String(entry.status).toUpperCase() === 'COMPLETED') {
-			current.completed += 1;
-		}
-		cbtCompletionByPatient.set(patientId, current);
-	}
-
-	const adherenceDipCount = Array.from(cbtCompletionByPatient.values()).filter((row) => {
-		if (!row.total) return false;
-		return (row.completed / row.total) * 100 < 60;
-	}).length;
+	const patientAlerts = scheduleAlerts + smartAlerts.length;
 
 	const statsByRole: Record<ProviderRole, Record<string, string | number>> = {
 		THERAPIST: {
@@ -581,37 +646,30 @@ export const getProviderDashboardController = async (req: Request, res: Response
 			activePatients,
 			pendingNotes,
 			patientAlerts,
-			cbtAdherence,
-			adherenceDipCount,
 		},
 		PSYCHOLOGIST: {
 			totalSessions: totalSessionsToday,
 			activePatients,
 			pendingNotes,
 			patientAlerts,
-			cbtAdherence,
-			adherenceDipCount,
 		},
 		PSYCHIATRIST: {
 			consultsToday: totalSessionsToday,
 			activePrescriptions,
 			interactionWarnings: patientAlerts,
 			adherenceRate,
-			cbtAdherence,
-			adherenceDipCount,
 		},
 		COACH: {
 			checkInsToday: totalSessionsToday,
 			activeGoals,
 			habitStreaks: completedSessionsThisMonth,
 			adherenceRate,
-			cbtAdherence,
-			adherenceDipCount,
 		},
 	};
 
 	const responseData = {
 		stats: statsByRole[role],
+		smartAlerts,
 		todaySessions: todaySessions.map((session) => {
 			const patient = session.patientProfile?.user;
 			const patientName = toPatientName(patient?.firstName, patient?.lastName, patient?.name);
@@ -1641,278 +1699,6 @@ export const updatePatientNote = async (req: Request, res: Response): Promise<vo
 	sendSuccess(res, responseData, 'Patient note updated');
 };
 
-export const getPatientCBTModules = async (req: Request, res: Response): Promise<void> => {
-	const providerId = authUserId(req);
-	await getProviderRole(providerId);
-	const patientId = String(req.params.patientId || '').trim();
-
-	if (!patientId) {
-		throw new AppError('Patient id is required', 400);
-	}
-
-	await ensureProviderPatientAccess(providerId, patientId);
-
-	const sessions = await prisma.patientSession.findMany({
-		where: { patientId },
-		orderBy: { createdAt: 'desc' },
-		select: {
-			id: true,
-			status: true,
-			createdAt: true,
-			completedAt: true,
-			sessionNotes: true,
-			template: {
-				select: {
-					title: true,
-					category: true,
-				},
-			},
-			responses: {
-				orderBy: { answeredAt: 'asc' },
-				select: {
-					id: true,
-					answeredAt: true,
-					responseData: true,
-					question: {
-						select: {
-							prompt: true,
-						},
-					},
-				},
-			},
-		},
-	});
-
-	const responseData = sessions.map((session) => ({
-		id: session.id,
-		moduleType: String(session.template?.title || session.template?.category || 'CBT Exercise'),
-		assignmentDate: session.createdAt.toISOString(),
-		status: mapPatientSessionStatus(String(session.status)),
-		submittedAnswers: session.responses.map((response) => ({
-			id: response.id,
-			question: response.question.prompt,
-			answer: toDisplayResponseValue(response.responseData),
-			rawResponse: response.responseData,
-			answeredAt: response.answeredAt.toISOString(),
-		})),
-		therapistFeedback: String(session.sessionNotes || ''),
-		completedAt: session.completedAt ? session.completedAt.toISOString() : null,
-	}));
-
-	sendSuccess(res, responseData, 'Patient CBT modules fetched');
-};
-
-export const listCbtAssignmentTemplates = async (req: Request, res: Response): Promise<void> => {
-	const providerId = authUserId(req);
-	await getProviderRole(providerId);
-
-	const templates = cbtTemplateEntries.map((entry) => ({
-		templateType: String(entry.key || '').toUpperCase(),
-		title: String(entry.title || 'CBT Template'),
-		description: String(entry.description || ''),
-		stepCount: Array.isArray(entry.steps) ? entry.steps.length : 0,
-	}));
-
-	sendSuccess(res, templates, 'CBT assignment templates fetched');
-};
-
-export const quickAssignCbtTemplate = async (req: Request, res: Response): Promise<void> => {
-	const providerId = authUserId(req);
-	await getProviderRole(providerId);
-	const patientId = String(req.params.patientId || '').trim();
-	const templateType = normalizeCbtTemplateType(req.body?.templateType);
-
-	if (!patientId) {
-		throw new AppError('Patient id is required', 400);
-	}
-	if (!templateType) {
-		throw new AppError('templateType is required', 400);
-	}
-
-	const template = cbtTemplateLookup.get(templateType);
-	if (!template) {
-		throw new AppError('Invalid templateType', 400);
-	}
-
-	await ensureProviderPatientAccess(providerId, patientId);
-
-	const assignment = await prisma.cBTAssignment.create({
-		data: {
-			patientId,
-			providerId,
-			templateType: templateType as any,
-			status: 'ASSIGNED' as any,
-			content: {
-				templateType,
-				title: String(template.title || 'CBT Template'),
-				description: String(template.description || ''),
-				steps: Array.isArray(template.steps) ? template.steps : [],
-			},
-		},
-		select: {
-			id: true,
-			templateType: true,
-			status: true,
-			createdAt: true,
-			content: true,
-		},
-	});
-
-	await prisma.notification.create({
-		data: {
-			userId: patientId,
-			type: 'HOMEWORK_ASSIGNED',
-			title: 'New Interactive Task Assigned',
-			message: `${String(template.title || 'A CBT task')} was assigned to your Daily Check-in Hub.`,
-			payload: {
-				event: 'CBT_ASSIGNMENT_CREATED',
-				assignmentId: assignment.id,
-				templateType,
-			},
-			sentAt: new Date(),
-		},
-	});
-
-	sendSuccess(
-		res,
-		{
-			id: assignment.id,
-			templateType,
-			status: String(assignment.status),
-			title: String((assignment.content as any)?.title || template.title || 'CBT Template'),
-			description: String((assignment.content as any)?.description || template.description || ''),
-			createdAt: assignment.createdAt.toISOString(),
-		},
-		'CBT template assigned to patient',
-		201,
-	);
-};
-
-export const reviewCBTModule = async (req: Request, res: Response): Promise<void> => {
-	const providerId = authUserId(req);
-	await getProviderRole(providerId);
-	const patientId = String(req.params.patientId || '').trim();
-	const moduleId = String(req.params.moduleId || '').trim();
-	const feedback = String(req.body?.feedback || '').trim();
-
-	if (!patientId) {
-		throw new AppError('Patient id is required', 400);
-	}
-	if (!moduleId) {
-		throw new AppError('Module id is required', 400);
-	}
-	if (!feedback) {
-		throw new AppError('Feedback is required', 400);
-	}
-
-	await ensureProviderPatientAccess(providerId, patientId);
-
-	const existing = await prisma.patientSession.findFirst({
-		where: {
-			id: moduleId,
-			patientId,
-		},
-		select: {
-			id: true,
-		},
-	});
-
-	if (!existing) {
-		throw new AppError('CBT module not found', 404);
-	}
-
-	const updated = await prisma.$transaction(async (tx) => {
-		const reviewedSession = await tx.patientSession.update({
-			where: { id: moduleId },
-			data: {
-				sessionNotes: feedback,
-				status: 'COMPLETED',
-				completedAt: new Date(),
-			},
-			select: {
-				id: true,
-				status: true,
-				createdAt: true,
-				completedAt: true,
-				sessionNotes: true,
-				template: {
-					select: {
-						title: true,
-						category: true,
-					},
-				},
-				responses: {
-					orderBy: { answeredAt: 'asc' },
-					select: {
-						id: true,
-						answeredAt: true,
-						responseData: true,
-						question: {
-							select: {
-								prompt: true,
-							},
-						},
-					},
-				},
-			},
-		});
-
-		const moduleName = String(reviewedSession.template?.title || reviewedSession.template?.category || 'CBT').replace(/\s+exercise$/i, '');
-		const messageText = `I have reviewed your ${moduleName} exercise. Check the feedback in your plan!`;
-
-		const conversation = await tx.directConversation.upsert({
-			where: {
-				patientId_providerId: {
-					patientId,
-					providerId,
-				},
-			},
-			create: {
-				patientId,
-				providerId,
-				isSupport: false,
-				lastMessageAt: new Date(),
-				lastMessageText: messageText,
-			},
-			update: {
-				lastMessageAt: new Date(),
-				lastMessageText: messageText,
-			},
-			select: { id: true },
-		});
-
-		await tx.directMessage.create({
-			data: {
-				conversationId: conversation.id,
-				senderId: providerId,
-				senderRole: 'provider',
-				content: messageText,
-				messageType: 'TEXT',
-			},
-		});
-
-		return reviewedSession;
-	});
-
-	const responseData = {
-		id: updated.id,
-		moduleType: String(updated.template?.title || updated.template?.category || 'CBT Exercise'),
-		assignmentDate: updated.createdAt.toISOString(),
-		status: mapPatientSessionStatus(String(updated.status)),
-		submittedAnswers: updated.responses.map((response) => ({
-			id: response.id,
-			question: response.question.prompt,
-			answer: toDisplayResponseValue(response.responseData),
-			rawResponse: response.responseData,
-			answeredAt: response.answeredAt.toISOString(),
-		})),
-		therapistFeedback: String(updated.sessionNotes || ''),
-		completedAt: updated.completedAt ? updated.completedAt.toISOString() : null,
-	};
-
-	sendSuccess(res, responseData, 'CBT module reviewed');
-};
-
 export const getConversations = async (req: Request, res: Response): Promise<void> => {
 	const providerId = authUserId(req);
 	await getProviderRole(providerId);
@@ -2385,84 +2171,11 @@ export const assignPatientItem = async (req: Request, res: Response): Promise<vo
 	};
 
 	const normalizedType = String(assignmentType || '').toUpperCase();
-	if (!['ASSESSMENT', 'GOAL', 'CBT'].includes(normalizedType)) {
-		throw new AppError('assignmentType must be ASSESSMENT, GOAL, or CBT', 400);
+	if (!['ASSESSMENT', 'GOAL'].includes(normalizedType)) {
+		throw new AppError('assignmentType must be ASSESSMENT or GOAL', 400);
 	}
 
 	const { patientProfileId } = await ensureProviderPatientAccess(providerId, patientId);
-
-	if (normalizedType === 'CBT') {
-		let template: { id: string; version: number; title: string } | null = null;
-
-		if (templateId) {
-			template = await prisma.cBTSessionTemplate.findFirst({
-				where: {
-					id: String(templateId),
-					therapistId: providerId,
-				},
-				select: {
-					id: true,
-					version: true,
-					title: true,
-				},
-			});
-		}
-
-		if (!template) {
-			template = await prisma.cBTSessionTemplate.findFirst({
-				where: { therapistId: providerId },
-				orderBy: { updatedAt: 'desc' },
-				select: {
-					id: true,
-					version: true,
-					title: true,
-				},
-			});
-		}
-
-		if (!template) {
-			template = await prisma.cBTSessionTemplate.create({
-				data: {
-					therapistId: providerId,
-					title: String(title || 'Assigned CBT Module').trim(),
-					description: 'Auto-created template from provider assignment flow.',
-					status: 'DRAFT',
-					version: 1,
-				},
-				select: {
-					id: true,
-					version: true,
-					title: true,
-				},
-			});
-		}
-
-		if (!template) {
-			throw new AppError('Unable to resolve CBT template for assignment', 500);
-		}
-
-		const session = await prisma.patientSession.create({
-			data: {
-				patientId,
-				templateId: template.id,
-				templateVersion: template.version,
-				status: 'NOT_STARTED',
-			},
-			select: {
-				id: true,
-				status: true,
-				createdAt: true,
-			},
-		});
-
-		sendSuccess(res, {
-			assignmentType: 'CBT',
-			id: session.id,
-			status: session.status,
-			createdAt: session.createdAt.toISOString(),
-		}, 'CBT assigned successfully');
-		return;
-	}
 
 	let plan = await prisma.therapyPlan.findFirst({
 		where: {

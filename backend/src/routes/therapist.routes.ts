@@ -27,7 +27,6 @@ import {
 	cancelSessionController,
 	sendReminderController,
 	startLiveSessionController,
-	duplicateTemplateController,
 	therapistProposeAppointmentSlotController,
 } from '../controllers/therapist.actions.controller';
 import { analyticsController } from '../controllers/analytics.controller';
@@ -55,12 +54,10 @@ import {
 } from '../controllers/therapist-dashboard.controller';
 import {
 	deleteMyTherapistCareTeamController,
-	deleteMyTherapistCbtModuleController,
 	deleteMyTherapistExerciseController,
 	deleteMyTherapistResourceController,
 	getMyTherapistAssessmentsController,
 	getMyTherapistCareTeamController,
-	getMyTherapistCbtModulesController,
 	getMyTherapistExercisesController,
 	getMyTherapistResourcesController,
 	getMyTherapistStructuredSessionNotesController,
@@ -69,7 +66,6 @@ import {
 	patchMyTherapistExerciseController,
 	postMyTherapistAssessmentController,
 	postMyTherapistCareTeamController,
-	postMyTherapistCbtModuleController,
 	postMyTherapistExerciseController,
 	postMyTherapistExerciseTrackController,
 	postMyTherapistResourceController,
@@ -107,10 +103,6 @@ router.post('/me/exercises', requireAuth, requireTherapistRole, asyncHandler(pos
 router.patch('/me/exercises/:id', requireAuth, requireTherapistRole, asyncHandler(patchMyTherapistExerciseController));
 router.post('/me/exercises/:id/track', requireAuth, requireTherapistRole, asyncHandler(postMyTherapistExerciseTrackController));
 router.delete('/me/exercises/:id', requireAuth, requireTherapistRole, asyncHandler(deleteMyTherapistExerciseController));
-
-router.get('/me/cbt-modules', requireAuth, requireTherapistRole, asyncHandler(getMyTherapistCbtModulesController));
-router.post('/me/cbt-modules', requireAuth, requireTherapistRole, asyncHandler(postMyTherapistCbtModuleController));
-router.delete('/me/cbt-modules/:id', requireAuth, requireTherapistRole, asyncHandler(deleteMyTherapistCbtModuleController));
 
 router.get('/me/assessments', requireAuth, requireTherapistRole, asyncHandler(getMyTherapistAssessmentsController));
 router.post('/me/assessments', requireAuth, requireTherapistRole, asyncHandler(postMyTherapistAssessmentController));
@@ -157,7 +149,6 @@ router.post(
 );
 
 // Template actions
-router.post('/me/templates/:id/actions/duplicate', requireAuth, requireTherapistRole, asyncHandler(duplicateTemplateController));
 
 router.get('/me/free-screening/questions', requireAuth, requireTherapistRole, asyncHandler(listProviderExtraQuestionsController));
 router.post('/me/free-screening/questions', requireAuth, requireTherapistRole, asyncHandler(createProviderExtraQuestionController));

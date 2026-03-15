@@ -101,6 +101,21 @@ const createPatientTablesIfMissing = async () => {
 };
 
 async function upsertUser({ email, firstName, lastName, role }, passwordHash) {
+  const isProvider = ['THERAPIST', 'PSYCHIATRIST', 'PSYCHOLOGIST', 'COACH'].includes(String(role || '').toUpperCase());
+  const providerFlags = isProvider
+    ? {
+        onboardingStatus: 'COMPLETED',
+        isTherapistVerified: true,
+        therapistVerifiedAt: new Date(),
+        therapistVerifiedByUserId: null,
+      }
+    : {
+        onboardingStatus: null,
+        isTherapistVerified: false,
+        therapistVerifiedAt: null,
+        therapistVerifiedByUserId: null,
+      };
+
   return prisma.user.upsert({
     where: { email },
     update: {
@@ -114,6 +129,7 @@ async function upsertUser({ email, firstName, lastName, role }, passwordHash) {
       lockUntil: null,
       isDeleted: false,
       passwordHash,
+      ...providerFlags,
     },
     create: {
       email,
@@ -124,6 +140,7 @@ async function upsertUser({ email, firstName, lastName, role }, passwordHash) {
       provider: 'LOCAL',
       emailVerified: true,
       passwordHash,
+      ...providerFlags,
     },
   });
 }
@@ -145,29 +162,44 @@ async function seed() {
     psychiatrists.push(psychiatrist);
   }
 
-  // Ensure therapist profiles exist
-  for (const therapist of therapists) {
-    const displayName = `${therapist.firstName} ${therapist.lastName}`.trim();
+  // Ensure provider profiles exist and are marked onboarding-complete/verified for direct dashboard entry.
+  const providers = [
+    ...therapists.map((provider) => ({ ...provider, professionalType: 'THERAPIST' })),
+    ...psychiatrists.map((provider) => ({ ...provider, professionalType: 'PSYCHIATRIST' })),
+  ];
+
+  for (const provider of providers) {
+    const displayName = `${provider.firstName} ${provider.lastName}`.trim();
     await prisma.therapistProfile.upsert({
-      where: { userId: therapist.id },
+      where: { userId: provider.id },
       update: {
         displayName,
+        professionalType: provider.professionalType,
         bio: null,
         specializations: [],
         languages: [],
         yearsOfExperience: 0,
         consultationFee: 0,
         availability: [],
+        onboardingCompleted: true,
+        isVerified: true,
+        verifiedAt: new Date(),
+        verifiedByUserId: null,
       },
       create: {
-        userId: therapist.id,
+        userId: provider.id,
         displayName,
+        professionalType: provider.professionalType,
         bio: null,
         specializations: [],
         languages: [],
         yearsOfExperience: 0,
         consultationFee: 0,
         availability: [],
+        onboardingCompleted: true,
+        isVerified: true,
+        verifiedAt: new Date(),
+        verifiedByUserId: null,
       },
     }).catch(() => null);
   }

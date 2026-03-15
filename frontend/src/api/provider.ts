@@ -9,8 +9,17 @@ export interface DashboardSessionItem {
   status: string;
 }
 
+export interface SmartAlertItem {
+  patientId: string;
+  patientName: string;
+  severity: 'high' | 'medium';
+  trigger: 'mood_decline' | 'stress_spike' | 'sleep_risk';
+  message: string;
+}
+
 export interface DashboardData {
   stats: Record<string, string | number>;
+  smartAlerts?: SmartAlertItem[];
   todaySessions: DashboardSessionItem[];
 }
 

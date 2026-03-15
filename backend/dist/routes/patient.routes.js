@@ -16,4 +16,5 @@ router.get('/me/therapy-plan', auth_middleware_1.requireAuth, rbac_middleware_1.
 router.get('/me/therapist-matches', auth_middleware_1.requireAuth, rbac_middleware_1.requirePatientRole, ...validate_middleware_1.validateTherapistMatchQuery, (0, validate_middleware_1.asyncHandler)(patient_controller_1.getMyTherapistMatchesController));
 router.post('/me/sessions/book', auth_middleware_1.requireAuth, rbac_middleware_1.requirePatientRole, ...validate_middleware_1.validateBookSessionRequest, (0, validate_middleware_1.asyncHandler)(session_controller_1.bookMySessionController));
 router.get('/me/sessions', auth_middleware_1.requireAuth, rbac_middleware_1.requirePatientRole, ...validate_middleware_1.validatePatientSessionHistoryQuery, (0, validate_middleware_1.asyncHandler)(session_controller_1.getMySessionHistoryController));
+router.post('/me/daily-checkin', auth_middleware_1.requireAuth, rbac_middleware_1.requirePatientRole, ...validate_middleware_1.validateCreateDailyCheckInRequest, (0, validate_middleware_1.asyncHandler)(patient_controller_1.addDailyCheckInController));
 exports.default = router;

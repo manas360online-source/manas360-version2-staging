@@ -49,10 +49,10 @@ const startServer = async (): Promise<void> => {
 	}).catch((err) => console.error('Socket init failed', err));
 
 	// start analytics rollup job
-	void startAnalyticsRollup();
+	// void startAnalyticsRollup(); // Commented out - references missing patient_sessions table
 	startDailyMoodPredictionJob();
 	startChatRetentionJob();
-	startPatientSharedReportCleanupJob();
+	// startPatientSharedReportCleanupJob(); // Commented out - references psychologist_reports table
 
 	const shutdown = async (signal: string): Promise<void> => {
 		console.log(`${signal} received. Shutting down gracefully...`);

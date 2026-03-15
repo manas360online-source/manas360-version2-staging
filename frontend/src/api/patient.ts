@@ -304,6 +304,58 @@ export const patientApi = {
     ),
   addMoodLog: async (payload: { mood: number; note?: string; intensity?: number; tags?: string[]; energy?: 'low' | 'medium' | 'high'; sleepHours?: string }) =>
     (await http.post('/patient/mood', payload)).data,
+  addDailyCheckIn: async (payload: {
+    type: 'morning' | 'evening';
+    mood?: number;
+    energy?: 'low' | 'medium' | 'high';
+    sleep?: string;
+    context?: string[];
+    intention?: string;
+    reflectionGood?: string;
+    reflectionBad?: string;
+    stressLevel?: number;
+    gratitude?: string;
+  }) => (await http.post('/patient/daily-checkin', payload)).data,
+  saveSleepSessionReflection: async (payload: {
+    reflection: string;
+    mood?: number;
+    stressLevel?: number;
+    gratitude?: string;
+    challenge?: string;
+    date?: string;
+  }) => {
+    const safeReflection = String(payload.reflection || '').trim() || 'Completed Nidra Sleep Therapy session.';
+    const safeMood = Math.max(1, Math.min(5, Number(payload.mood ?? 4)));
+    const safeStress = Math.max(1, Math.min(5, Number(payload.stressLevel ?? 2)));
+    const safeGratitude = String(payload.gratitude || '').trim() || 'I completed my sleep preparation routine.';
+    const safeChallenge = String(payload.challenge || '').trim() || 'No major challenge noted before sleep.';
+    const safeDate = payload.date || new Date().toISOString();
+
+    const v1Payload = {
+      date: safeDate,
+      type: 'EVENING' as const,
+      mood: safeMood,
+      reflectionGood: safeReflection,
+      reflectionBad: safeChallenge,
+      stressLevel: safeStress,
+      gratitude: safeGratitude,
+    };
+
+    const legacyPayload = {
+      type: 'evening' as const,
+      mood: safeMood,
+      reflectionGood: safeReflection,
+      reflectionBad: safeChallenge,
+      stressLevel: safeStress,
+      gratitude: safeGratitude,
+    };
+
+    return withFallbackChain([
+      async () => (await http.post('/v1/patients/me/daily-checkin', v1Payload)).data,
+      async () => (await http.post('/patient/me/daily-checkin', v1Payload)).data,
+      async () => (await http.post('/patient/daily-checkin', legacyPayload)).data,
+    ]);
+  },
   getProgress: async () =>
     withFallbackChain([
       async () => (await http.get('/patient/progress')).data,

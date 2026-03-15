@@ -10,7 +10,6 @@ import { ResultsPage } from './pages/Results'
 import { CrisisPage } from './pages/Crisis'
 import { OnboardingName } from './pages/OnboardingName'
 import { OnboardingEmail } from './pages/OnboardingEmail'
-const SessionSocketDemo = lazy(() => import('./components/SessionSocketDemo'));
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
 const SignupPage = lazy(() => import('./pages/auth/SignupPage'));
 const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage'));
@@ -30,8 +29,6 @@ const LiveSessionPage = lazy(() => import('./pages/patient/LiveSessionPage'));
 const DocumentsPage = lazy(() => import('./pages/patient/DocumentsPage'));
 const ProgressPage = lazy(() => import('./pages/patient/ProgressPage'));
 const SupportPage = lazy(() => import('./pages/patient/SupportPage'));
-const CBTSessionPlayerPage = lazy(() => import('./pages/patient/CBTSessionPlayerPage'));
-const CbtAssignmentPlayerPage = lazy(() => import('./pages/patient/CbtAssignmentPlayerPage'));
 const TherapyPlanPage = lazy(() => import('./pages/patient/TherapyPlanPage'));
 const PricingPage = lazy(() => import('./pages/patient/PricingPage'));
 const PatientTimelinePage = lazy(() => import('./pages/patient/PatientTimelinePage'));
@@ -39,8 +36,10 @@ const ReportsPage = lazy(() => import('./pages/patient/ReportsPage'));
 const PatientReportDownloadPage = lazy(() => import('./pages/patient/PatientReportDownloadPage'));
 const NotificationsPage = lazy(() => import('./pages/patient/NotificationsPage'));
 const SoundTherapyPage = lazy(() => import('./pages/patient/SoundTherapyPage'));
+const SleepTherapyPage = lazy(() => import('./pages/patient/SleepTherapyPage'));
+const WellnessLibraryPage = lazy(() => import('./pages/patient/WellnessLibraryPage'));
+const BuddyChatPage = lazy(() => import('./pages/patient/BuddyChatPage'));
 const ProviderMessagesPage = lazy(() => import('./pages/patient/ProviderMessagesPage'));
-const CBTPage = lazy(() => import('./pages/patient/CBTPage'));
 const PatientOnboardingPage = lazy(() => import('./pages/patient/PatientOnboardingPage'));
 const DailyCheckInPage = lazy(() => import('./pages/patient/DailyCheckInPage'));
 const VideoSessionPage = lazy(() => import('./pages/shared/VideoSessionPage'));
@@ -85,7 +84,6 @@ const ProviderInboxPage = lazy(() => import('./pages/provider/Messages'));
 const ProviderEarningsPage = lazy(() => import('./pages/provider/Earnings'));
 const ProviderSettingsPage = lazy(() => import('./pages/provider/Settings'));
 const ProviderDashboard = lazy(() => import('./pages/provider/Dashboard/ProviderDashboard'));
-const CbtToolsPage = lazy(() => import('./pages/provider/CbtToolsPage'));
 const ProviderOnboardingPage = lazy(() => import('./pages/provider/ProviderOnboardingPage'));
 const ProviderVerificationPendingPage = lazy(() => import('./pages/provider/ProviderVerificationPendingPage'));
 const HubLayout = lazy(() => import('./components/layout/HubLayout'));
@@ -94,7 +92,6 @@ const PatientChartLayout = lazy(() => import('./components/layout/PatientChartLa
 const ChartOverview = lazy(() => import('./pages/provider/Patients/Tabs/ChartOverview'));
 const SessionNotes = lazy(() => import('./pages/provider/Patients/Tabs/SessionNotes'));
 const Assessments = lazy(() => import('./pages/provider/Patients/Tabs/Assessments'));
-const CBTModules = lazy(() => import('./pages/provider/Patients/Tabs/CBTModules'));
 const PlanStudio = lazy(() => import('./pages/provider/Patients/Tabs/PlanStudio'));
 const Prescriptions = lazy(() => import('./pages/provider/Patients/Tabs/Prescriptions'));
 const LabOrders = lazy(() => import('./pages/provider/Patients/Tabs/LabOrders'));
@@ -166,14 +163,6 @@ function App() {
       <Route path="/onboarding/name" element={<OnboardingName onNext={handleOnboardingName} />} />
       <Route path="/onboarding/email" element={<OnboardingEmail userName={userName} />} />
         <Route
-          path="/session-demo"
-          element={
-            <ProtectedRoute>
-              <SessionSocketDemo sessionId={new URLSearchParams(window.location.hash.split('?')[1]).get('sessionId')} />
-            </ProtectedRoute>
-          }
-        />
-        <Route
           path="/therapist-dashboard"
           element={
             <ProtectedRoute>
@@ -198,8 +187,6 @@ function App() {
             <Route path="notes" element={<SessionNotes />} />
             <Route path="session-notes" element={<Navigate to="../notes" replace />} />
             <Route path="assessments" element={<Assessments />} />
-            <Route path="cbt" element={<CBTModules />} />
-            <Route path="cbt-modules" element={<Navigate to="../cbt" replace />} />
             <Route path="plan-builder" element={<PlanStudio />} />
             <Route path="goals" element={<GoalsAndHabits />} />
             <Route path="prescriptions" element={<Prescriptions />} />
@@ -208,7 +195,6 @@ function App() {
             <Route path="clinical-notes" element={<SessionNotes />} />
           </Route>
           <Route path="calendar" element={<ProviderCalendarPage />} />
-          <Route path="cbt-tools" element={<CbtToolsPage />} />
           <Route path="notes" element={<Navigate to="patient/123/notes" replace />} />
           <Route path="assessments" element={<Navigate to="patient/123/assessments" replace />} />
           <Route path="prescriptions" element={<Navigate to="patient/123/prescriptions" replace />} />
@@ -437,14 +423,13 @@ function App() {
           <Route path="book/:providerId" element={<BookSessionPage />} />
           <Route path="sessions" element={<SessionsPage />} />
           <Route path="sessions/:id" element={<PatientSessionDetailPage />} />
-          <Route path="cbt/:sessionId" element={<CBTSessionPlayerPage />} />
-          <Route path="cbt-assignment/:assignmentId" element={<CbtAssignmentPlayerPage />} />
-          <Route path="cbt-section" element={<CBTPage />} />
-          <Route path="cbt-section/:sessionId" element={<CBTSessionPlayerPage />} />
-          <Route path="exercises" element={<Navigate to="/patient/check-in?tab=cbt-practice" replace />} />
+          <Route path="exercises" element={<Navigate to="/patient/check-in?tab=daily-mood" replace />} />
           <Route path="sessions/:id/live" element={<LiveSessionPage />} />
           <Route path="mood" element={<Navigate to="/patient/check-in?tab=daily-mood" replace />} />
+          <Route path="wellness-library" element={<WellnessLibraryPage />} />
+          <Route path="sleep-therapy" element={<SleepTherapyPage />} />
           <Route path="sound-therapy" element={<SoundTherapyPage />} />
+          <Route path="buddy/:mode" element={<BuddyChatPage />} />
           <Route path="provider-messages" element={<ProviderMessagesPage />} />
           <Route path="provider-messages/:providerId" element={<ProviderMessagesPage />} />
           <Route path="messages" element={<AIChatPage />} />
@@ -463,7 +448,7 @@ function App() {
           <Route path="notifications" element={<NotificationsPage />} />
           <Route path="pricing" element={<PricingPage />} />
           <Route path="check-in" element={<DailyCheckInPage />} />
-          </Route>
+        </Route>
         <Route path="/providers/:id" element={<Navigate to="/patient/sessions" replace />} />
         <Route path="/book/:providerId" element={<Navigate to="/patient/sessions" replace />} />
         <Route path="/sessions" element={<Navigate to="/patient/sessions" replace />} />
@@ -474,7 +459,7 @@ function App() {
         <Route path="/terms" element={<TermsOfUsePage />} />
         <Route path="/privacy" element={<PrivacyPolicyPage />} />
         <Route path="/refunds" element={<CancellationRefundPolicyPage />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       </Suspense>
     </AuthProvider>

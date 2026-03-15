@@ -24,14 +24,12 @@ const tabConfig: Record<ProviderKind, TabItem[]> = {
     { label: 'Overview', path: 'overview' },
     { label: 'Session Notes', path: 'notes' },
     { label: 'Assessments', path: 'assessments' },
-    { label: 'CBT Modules', path: 'cbt' },
     { label: 'Plan Studio', path: 'plan-builder' },
   ],
   PSYCHOLOGIST: [
     { label: 'Overview', path: 'overview' },
     { label: 'Session Notes', path: 'notes' },
     { label: 'Assessments', path: 'assessments' },
-    { label: 'CBT Modules', path: 'cbt' },
     { label: 'Plan Studio', path: 'plan-builder' },
   ],
   COACH: [

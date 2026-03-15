@@ -41,30 +41,6 @@ enum SessionStatus {
   DEPRECATED
 }
 
-enum QuestionType {
-  MULTIPLE_CHOICE
-  TEXT
-  SLIDER
-  CHECKBOX
-}
-
-enum PatientSessionStatus {
-  NOT_STARTED
-  IN_PROGRESS
-  COMPLETED
-  ABANDONED
-  PAUSED
-}
-
-enum BranchingConditionOperator {
-  EQUALS
-  NOT_EQUALS
-  CONTAINS
-  GREATER_THAN
-  LESS_THAN
-  IN_ARRAY
-}
-
 enum UserProvider {
   LOCAL
   GOOGLE
@@ -114,20 +90,6 @@ enum ProviderDocumentType {
   LICENSE
 }
 
-enum CbtTemplateType {
-  THOUGHT_RECORD
-  BEHAVIORAL
-  WORRY_POSTPONEMENT
-  SOCRATIC_QUESTIONING
-  EXPOSURE_HIERARCHY
-}
-
-enum CbtAssignmentStatus {
-  ASSIGNED
-  IN_PROGRESS
-  COMPLETED
-}
-
 // ============ USERS ============
 
 model User {
@@ -171,9 +133,6 @@ model User {
   updatedAt                     DateTime      @updatedAt
 
   // Relations
-  therapistSessions             CBTSessionTemplate[]        @relation("TherapistSessions")
-  patientSessions               PatientSession[]
-  sessionResponses              PatientSessionResponse[]
   patientProfile                PatientProfile?
   therapyBookings               TherapySession[]
   financialPatientSessions      FinancialSession[]          @relation("FinancialPatient")
@@ -204,12 +163,9 @@ model User {
   patientInvoices               PatientInvoice[]
   therapistSessionNotesAuthored TherapistSessionNote[]      @relation("TherapistSessionNoteAuthor")
   therapistExercises            TherapistExercise[]
-  therapistCbtModules           TherapistCbtModule[]
   therapistAssessments          TherapistAssessmentRecord[]
   therapistResources            TherapistResource[]
   therapistCareTeamMembers      TherapistCareTeamMember[]
-  cbtAssignmentsAsPatient       CBTAssignment[]           @relation("CbtAssignmentPatient")
-  cbtAssignmentsAsProvider      CBTAssignment[]           @relation("CbtAssignmentProvider")
   therapistProfile              TherapistProfile?
   userCapabilities              UserCapability[]            @relation("UserCapabilitiesOwner")
   grantedCapabilities           UserCapability[]            @relation("UserCapabilitiesGrantor")
@@ -232,6 +188,7 @@ model User {
   goalsAsPatient                Goal[]                       @relation("GoalPatient")
   goalsAsProvider               Goal[]                       @relation("GoalProvider")
   providerDocumentsUploaded     ProviderDocument[]
+  dailyCheckIns                 DailyCheckIn[]               @relation("UserDailyCheckIns")
 
   @@index([email])
   @@index([phone])
@@ -415,185 +372,6 @@ model AuthAuditLog {
   @@map("auth_audit_logs")
 }
 
-// ============ CBT SESSION TEMPLATES ============
-
-model CBTSessionTemplate {
-  id                       String        @id @default(uuid())
-  title                    String
-  description              String?
-  isOfficial               Boolean       @default(false)
-  originTemplateId         String?
-  visibility               String        @default("ORG")
-  latestPublishedVersionId String?
-  version                  Int           @default(1)
-  status                   SessionStatus @default(DRAFT)
-  category                 String? // e.g., "Anxiety", "Depression", "Sleep"
-  targetAudience           String? // e.g., "Adults", "Teenagers"
-  estimatedDuration        Int? // in minutes
-
-  // Metadata
-  therapistId String
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  publishedAt DateTime?
-
-  // Relations
-  therapist       User                     @relation("TherapistSessions", fields: [therapistId], references: [id], onDelete: Cascade)
-  questions       CBTQuestion[]
-  patientSessions PatientSession[]
-  versions        CBTSessionVersion[]
-  tags            TemplateTagOnTemplate[]
-  libraries       SessionTemplateLibrary[]
-
-  @@unique([id, version])
-  @@index([therapistId])
-  @@index([status])
-  @@index([category])
-  @@index([createdAt])
-  @@map("cbt_session_templates")
-}
-
-model TemplateTag {
-  id        String                  @id @default(cuid())
-  name      String                  @unique
-  createdAt DateTime                @default(now())
-  templates TemplateTagOnTemplate[]
-
-  @@map("template_tags")
-}
-
-model TemplateTagOnTemplate {
-  templateId String
-  tagId      String
-  template   CBTSessionTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  tag        TemplateTag        @relation(fields: [tagId], references: [id], onDelete: Cascade)
-
-  @@id([templateId, tagId])
-  @@index([tagId])
-  @@map("template_tags_on_templates")
-}
-
-// ============ SESSION VERSIONING ============
-
-model CBTSessionVersion {
-  id           String    @id @default(uuid())
-  sessionId    String
-  version      Int
-  snapshotData Json // Full snapshot of template at this version
-  changeNotes  String?
-  createdBy    String?
-  createdAt    DateTime  @default(now())
-  publishedAt  DateTime?
-  isDraft      Boolean   @default(true)
-  checksum     String?
-
-  // Relations
-  session CBTSessionTemplate @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-
-  @@unique([sessionId, version])
-  @@index([sessionId])
-  @@index([createdAt])
-  @@map("cbt_session_versions")
-}
-
-// ============ QUESTIONS ============
-
-model CBTQuestion {
-  id          String       @id @default(uuid())
-  sessionId   String
-  type        QuestionType
-  prompt      String
-  description String?
-  orderIndex  Int // Order within session
-  isRequired  Boolean      @default(true)
-  helpText    String?
-
-  // Type-specific configurations stored as JSON
-  // For MULTIPLE_CHOICE: { options: [{ id, label, value }] }
-  // For SLIDER: { min, max, step, labels: { min?, mid?, max? } }
-  // For CHECKBOX: { options: [{ id, label, value }] }
-  // For TEXT: { minLength?, maxLength?, placeholder?, validationRegex? }
-  metadata Json?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  session              CBTSessionTemplate       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  branchingRules       QuestionBranchingRule[]  @relation("BranchingFromQuestion")
-  parentBranchingRules QuestionBranchingRule[]  @relation("BranchingToQuestion")
-  responses            PatientResponse[]
-  sessionResponses     PatientSessionResponse[]
-
-  @@unique([sessionId, orderIndex])
-  @@index([sessionId])
-  @@index([orderIndex])
-  @@map("cbt_questions")
-}
-
-// ============ BRANCHING LOGIC ============
-
-model QuestionBranchingRule {
-  id             String                     @id @default(uuid())
-  fromQuestionId String
-  toQuestionId   String
-  condition      Json // { operator: "EQUALS", value: "yes" }
-  operator       BranchingConditionOperator
-  conditionValue String // The value to match against
-
-  // Optional: Multiple conditions (AND logic)
-  // { conditions: [{ operator, value }, ...] }
-  complexCondition Json?
-
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-
-  // Relations
-  fromQuestion CBTQuestion @relation("BranchingFromQuestion", fields: [fromQuestionId], references: [id], onDelete: Cascade)
-  toQuestion   CBTQuestion @relation("BranchingToQuestion", fields: [toQuestionId], references: [id], onDelete: Cascade)
-
-  @@index([fromQuestionId])
-  @@index([toQuestionId])
-  @@index([fromQuestionId, toQuestionId])
-  @@map("question_branching_rules")
-}
-
-// ============ PATIENT SESSIONS (Session Instances) ============
-
-model PatientSession {
-  id                String               @id @default(uuid())
-  patientId         String
-  templateId        String
-  templateVersion   Int // Lock to specific template version (deprecated)
-  templateVersionId String? // reference to CBTSessionVersion.id
-  templateSnapshot  Json? // snapshot of the template at session start (immutable)
-  status            PatientSessionStatus @default(NOT_STARTED)
-
-  // Progress tracking
-  currentQuestionIndex Int       @default(0)
-  completedAt          DateTime?
-  abandonedAt          DateTime?
-  startedAt            DateTime?
-
-  // Session metadata
-  sessionNotes String? // Therapist notes about this session
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  // Relations
-  patient   User                     @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  template  CBTSessionTemplate       @relation(fields: [templateId], references: [id], onDelete: Restrict)
-  responses PatientSessionResponse[]
-  exports   SessionExport[]
-
-  @@index([patientId])
-  @@index([templateId])
-  @@index([status])
-  @@index([createdAt])
-  @@index([patientId, status])
-  @@map("patient_sessions")
-}
-
 // ============ PATIENT PROFILES & HEALTH RECORDS ============
 
 model PatientProfile {
@@ -617,7 +395,6 @@ model PatientProfile {
   progress                     PatientProgress?
   therapistSessionNotes        TherapistSessionNote[]
   therapistExercisesAssigned   TherapistExercise[]
-  therapistCbtModulesAssigned  TherapistCbtModule[]
   therapistAssessmentsAssigned TherapistAssessmentRecord[]
   therapistResourcesAssigned   TherapistResource[]
   therapistCareTeamMembers     TherapistCareTeamMember[]
@@ -913,101 +690,9 @@ model PatientMoodEntry {
   @@map("patient_mood_entries")
 }
 
-// ============ PATIENT RESPONSES ============
-
-model PatientSessionResponse {
-  id         String @id @default(uuid())
-  sessionId  String
-  patientId  String
-  questionId String
-
-  // Response data (flexible to support all question types)
-  // MULTIPLE_CHOICE: { selectedOptionId: "abc123" }
-  // TEXT: { text: "Patient's response" }
-  // SLIDER: { value: 7, min: 0, max: 10 }
-  // CHECKBOX: { selectedOptions: ["opt1", "opt2"] }
-  responseData Json
-
-  // Timing
-  timeSpentSeconds  Int? // Time spent on this question
-  answeredAt        DateTime  @default(now())
-  // Message acknowledgement fields
-  messageId         String?   @unique
-  deliveredToStream Boolean   @default(false)
-  acknowledgedAt    DateTime?
-  retryCount        Int       @default(0)
-
-  // Related response for follow-ups
-  previousResponseId String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  session           PatientSession           @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  patient           User                     @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  question          CBTQuestion              @relation(fields: [questionId], references: [id], onDelete: Restrict)
-  previousResponse  PatientSessionResponse?  @relation("FollowUpResponse", fields: [previousResponseId], references: [id], onDelete: SetNull)
-  followUpResponses PatientSessionResponse[] @relation("FollowUpResponse")
-
-  @@unique([sessionId, questionId])
-  @@index([sessionId])
-  @@index([patientId])
-  @@index([questionId])
-  @@index([answeredAt])
-  @@index([sessionId, patientId])
-  @@map("patient_session_responses")
-}
-
 // ============ RESPONSE ANALYTICS ============
 
-model PatientResponse {
-  id         String @id @default(uuid())
-  questionId String
-
-  // Aggregated response data
-  // { multipleChoice: { optionId: count }, text: { ... }, slider: { average, min, max } }
-  responseStats  Json
-  totalResponses Int  @default(0)
-
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  question CBTQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
-
-  @@unique([questionId])
-  @@index([questionId])
-  @@map("patient_responses")
-}
-
 // ============ SESSION EXPORTS ============
-
-model SessionExport {
-  id        String  @id @default(uuid())
-  sessionId String
-  jobId     String? @unique
-  format    String // "PDF" | "CSV" | "JSON"
-  fileName  String
-  filePath  String? // S3 path or local path
-  fileSize  Int?
-
-  // Export status
-  status       String  @default("PENDING") // "PENDING" | "COMPLETED" | "FAILED"
-  errorMessage String?
-
-  createdAt DateTime  @default(now())
-  expiresAt DateTime? // For temporary files
-
-  jobCreatedAt DateTime? @default(now())
-
-  // Relations
-  session PatientSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-
-  @@index([sessionId])
-  @@index([status])
-  @@index([createdAt])
-  @@map("session_exports")
-}
 
 // ============ THERAPY BOOKINGS (calendar/booking system) ============
 
@@ -1102,25 +787,6 @@ model TherapistExercise {
   @@index([therapistId, updatedAt(sort: Desc)])
   @@index([patientId])
   @@map("therapist_exercises")
-}
-
-model TherapistCbtModule {
-  id          String   @id @default(uuid())
-  therapistId String   @map("therapist_id")
-  patientId   String?  @map("patient_id")
-  patientName String?  @map("patient_name")
-  title       String
-  approach    String
-  status      String   @default("draft")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  therapist User            @relation(fields: [therapistId], references: [id], onDelete: Cascade)
-  patient   PatientProfile? @relation(fields: [patientId], references: [id], onDelete: SetNull)
-
-  @@index([therapistId, updatedAt(sort: Desc)])
-  @@index([patientId])
-  @@map("therapist_cbt_modules")
 }
 
 model TherapistAssessmentRecord {
@@ -1452,28 +1118,6 @@ model Notification {
 }
 
 // ============ SESSION TEMPLATES LIBRARY ============
-
-model SessionTemplateLibrary {
-  id         String   @id @default(uuid())
-  templateId String
-  category   String // "Public" | "Organization" | "Private"
-  tags       String[] // ["anxiety", "cbt", "beginner"]
-  ratings    Int? // Average rating
-  downloads  Int      @default(0)
-  isApproved Boolean  @default(false)
-  approvedBy String? // Admin user ID
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  template CBTSessionTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
-
-  @@unique([templateId])
-  @@index([category])
-  @@index([isApproved])
-  @@map("session_template_library")
-}
 
 // ============ AUDIT & COMPLIANCE ============
 
@@ -1910,24 +1554,6 @@ model PatientExercise {
   @@map("patient_exercises")
 }
 
-model CBTAssignment {
-  id           String              @id @default(uuid())
-  patientId    String
-  providerId   String
-  templateType CbtTemplateType
-  content      Json?
-  status       CbtAssignmentStatus @default(ASSIGNED)
-  createdAt    DateTime            @default(now())
-  updatedAt    DateTime            @updatedAt
-
-  patient  User @relation("CbtAssignmentPatient", fields: [patientId], references: [id], onDelete: Cascade)
-  provider User @relation("CbtAssignmentProvider", fields: [providerId], references: [id], onDelete: Cascade)
-
-  @@index([patientId, status])
-  @@index([providerId, status])
-  @@map("cbt_assignments")
-}
-
 model PatientProgress {
   id                 String   @id @default(uuid())
   patientId          String   @unique
@@ -2219,4 +1845,28 @@ model DirectMessage {
   @@index([conversationId, createdAt(sort: Desc)])
   @@index([senderId])
   @@map("direct_messages")
+}
+
+model DailyCheckIn {
+  id             String   @id @default(uuid())
+  patientId      String   @map("patient_id")
+  date           DateTime @map("date")
+  type           String   // "MORNING" | "EVENING"
+  mood           Int      // 1-5 scale
+  energy         Int?     // 1-5 scale (morning only)
+  sleep          Int?     // 1-5 scale (morning only)
+  context        String[] @default([]) // context tags (morning only)
+  intention      String?  // daily intention (morning only)
+  reflectionGood String?  // what went well (evening only)
+  reflectionBad  String?  // what was challenging (evening only)
+  stressLevel    Int?     // 1-5 scale (evening only)
+  gratitude      String?  // gratitude note (evening only)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  patient User @relation("UserDailyCheckIns", fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@unique([patientId, date, type], map: "daily_checkins_patient_date_type_uq")
+  @@index([patientId, date(sort: Desc)], map: "daily_checkins_patient_date_idx")
+  @@map("daily_checkins")
 }
