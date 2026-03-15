@@ -60,14 +60,18 @@ type ClaudeConversationMessage = {
 	content: string;
 };
 
-const DEFAULT_MODEL = process.env.CLAUDE_MODEL || 'claude-3-haiku';
-const DEFAULT_MAX_TOKENS = Number(process.env.CLAUDE_MAX_TOKENS || 512);
+// BEFORE:
+// const DEFAULT_MODEL = process.env.CLAUDE_MODEL || 'claude-3-haiku';
+
+// AFTER:
+const DEFAULT_MODEL = process.env.CLAUDE_MODEL || 'claude-haiku-4-5-20251001';
+const DEFAULT_MAX_TOKENS = Number(process.env.CLAUDE_MAX_TOKENS || 1024);
 const DEFAULT_TIMEOUT_MS = Number(process.env.CLAUDE_TIMEOUT_MS || 12000);
 const DAILY_TOKEN_BUDGET = Number(process.env.CLAUDE_DAILY_TOKEN_BUDGET || 0);
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const OPENAI_TRANSCRIPTION_API_URL = 'https://api.openai.com/v1/audio/transcriptions';
 const MAX_CONTEXT_MESSAGES = 10;
-const MAX_ALLOWED_TOKENS = 1024;
+const MAX_ALLOWED_TOKENS = 2048;
 const TRANSCRIPTION_TIMEOUT_MS = Number(process.env.OPENAI_TRANSCRIPTION_TIMEOUT_MS || 120000);
 const ENABLE_CLAUDE_TRANSCRIPT_CLEANUP = String(process.env.ENABLE_CLAUDE_TRANSCRIPT_CLEANUP || 'true').toLowerCase() !== 'false';
 
@@ -93,9 +97,11 @@ const getDayKey = (): string => {
 };
 
 const getBudgetForToday = (): number => {
-	if (process.env.NODE_ENV === 'development') return 0;
-	if (!Number.isFinite(DAILY_TOKEN_BUDGET) || DAILY_TOKEN_BUDGET <= 0) return 0;
-	return Math.floor(DAILY_TOKEN_BUDGET);
+  if (process.env.NODE_ENV === 'development') return 0;
+  if (!Number.isFinite(DAILY_TOKEN_BUDGET) || DAILY_TOKEN_BUDGET <= 0) return 0;
+  // Ignore suspiciously low budgets to prevent misconfiguration killing chat
+  if (DAILY_TOKEN_BUDGET < 10000) return 0;
+  return Math.floor(DAILY_TOKEN_BUDGET);
 };
 
 const estimateInputTokens = (messages: ClaudeConversationMessage[], systemPrompt: string): number => {

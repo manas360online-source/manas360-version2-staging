@@ -354,7 +354,7 @@ export const processChatMessage = async (input: {
 	];
 
 	const aiResult = await generateAIResponse(resolveAiRole(userRole), aiInputMessages, {
-		maxTokens: responseStyle === 'detailed' ? Number(process.env.CLAUDE_MAX_TOKENS || 512) : 160,
+		maxTokens: responseStyle === 'detailed' ? Number(process.env.CLAUDE_MAX_TOKENS || 1024) : 400,
 	});
 
 	// Keep chat UX resilient: when AI budget is exhausted, return a fallback assistant response instead of hard failing with 429.

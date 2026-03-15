@@ -42,7 +42,7 @@ export const chatRateLimiter = async (req: Request, _res: Response, next: NextFu
 			usage = await db.chatMessage.count({
 				where: {
 					userId,
-					role: 'assistant',
+					role: 'user',  // ← counts actual user messages sent
 					timestamp: { gte: todayStart },
 				},
 			});
@@ -55,10 +55,12 @@ export const chatRateLimiter = async (req: Request, _res: Response, next: NextFu
 			});
 		}
 
-		if (usage >= 3) {
-			next(new AppError('Daily AI chat limit reached for free tier (3/day). Upgrade to Premium for unlimited access.', 429));
+		const FREE_TIER_DAILY_LIMIT = process.env.NODE_ENV === 'development' ? 1000 : 3;
+		if (usage >= FREE_TIER_DAILY_LIMIT) {
+			next(new AppError('Daily AI chat limit reached for free tier. Upgrade to Premium for unlimited access.', 429));
 			return;
 		}
+  
 
 		next();
 	} catch (error) {
