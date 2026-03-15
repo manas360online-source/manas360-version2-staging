@@ -257,6 +257,180 @@ export const verifyTherapist = async (
 	};
 };
 
+export const verifyProvider = async (
+	providerUserId: string,
+	adminUserId: string,
+): Promise<{
+	_id: string;
+	isVerified: boolean;
+	verifiedAt: Date | null;
+	verifiedBy: string | null;
+	updatedAt: Date;
+}> => {
+	const admin = await db.user.findUnique({ where: { id: adminUserId }, select: { role: true } });
+	if (!admin || admin.role !== 'ADMIN') {
+		throw new AppError('Admin user not found', 404);
+	}
+
+	return db.$transaction(async (tx: any) => {
+		const providerUser = await tx.user.findUnique({
+			where: { id: providerUserId },
+			select: { id: true, role: true },
+		});
+
+		if (!providerUser) {
+			throw new AppError('Provider not found', 404);
+		}
+
+		const role = String(providerUser.role || '').toUpperCase();
+		if (!['THERAPIST', 'PSYCHIATRIST', 'PSYCHOLOGIST', 'COACH'].includes(role)) {
+			throw new AppError('Provider not found', 404);
+		}
+
+		const profile = await tx.therapistProfile.findUnique({
+			where: { userId: providerUser.id },
+			select: { id: true, isVerified: true, verifiedAt: true, verifiedByUserId: true, updatedAt: true },
+		});
+
+		if (!profile) {
+			throw new AppError('Provider profile not found', 404);
+		}
+
+		if (profile.isVerified) {
+			return {
+				_id: providerUser.id,
+				isVerified: true,
+				verifiedAt: profile.verifiedAt ?? null,
+				verifiedBy: profile.verifiedByUserId ?? null,
+				updatedAt: profile.updatedAt,
+			};
+		}
+
+		const now = new Date();
+
+		const updatedProfile = await tx.therapistProfile.update({
+			where: { userId: providerUser.id },
+			data: {
+				isVerified: true,
+				verifiedAt: now,
+				verifiedByUserId: adminUserId,
+			},
+			select: { isVerified: true, verifiedAt: true, verifiedByUserId: true, updatedAt: true },
+		});
+
+		await tx.user.update({
+			where: { id: providerUser.id },
+			data: {
+				isTherapistVerified: true,
+				therapistVerifiedAt: now,
+				therapistVerifiedByUserId: adminUserId,
+			},
+		});
+
+		return {
+			_id: providerUser.id,
+			isVerified: Boolean(updatedProfile.isVerified),
+			verifiedAt: updatedProfile.verifiedAt ?? null,
+			verifiedBy: updatedProfile.verifiedByUserId ?? null,
+			updatedAt: updatedProfile.updatedAt,
+		};
+	});
+};
+
+/**
+ * Approve provider onboarding
+ *
+ * Sets TherapistProfile.isVerified = true, User.isTherapistVerified = true,
+ * and User.onboardingStatus = 'COMPLETED'.
+ * Idempotent — returns current state if already approved.
+ */
+export const approveProvider = async (
+	providerUserId: string,
+	adminUserId: string,
+): Promise<{
+	_id: string;
+	isVerified: boolean;
+	onboardingStatus: string;
+	verifiedAt: Date | null;
+	verifiedBy: string | null;
+	updatedAt: Date;
+}> => {
+	const admin = await db.user.findUnique({ where: { id: adminUserId }, select: { role: true } });
+	if (!admin || admin.role !== 'ADMIN') {
+		throw new AppError('Admin user not found', 404);
+	}
+
+	return db.$transaction(async (tx: any) => {
+		const providerUser = await tx.user.findUnique({
+			where: { id: providerUserId },
+			select: { id: true, role: true, onboardingStatus: true },
+		});
+
+		if (!providerUser) {
+			throw new AppError('Provider not found', 404);
+		}
+
+		const role = String(providerUser.role || '').toUpperCase();
+		if (!['THERAPIST', 'PSYCHIATRIST', 'PSYCHOLOGIST', 'COACH'].includes(role)) {
+			throw new AppError('Provider not found', 404);
+		}
+
+		const profile = await tx.therapistProfile.findUnique({
+			where: { userId: providerUser.id },
+			select: { id: true, isVerified: true, verifiedAt: true, verifiedByUserId: true, updatedAt: true },
+		});
+
+		if (!profile) {
+			throw new AppError('Provider profile not found. Provider must submit onboarding first.', 404);
+		}
+
+		const alreadyCompleted =
+			profile.isVerified && String(providerUser.onboardingStatus || '').toUpperCase() === 'COMPLETED';
+
+		if (alreadyCompleted) {
+			return {
+				_id: providerUser.id,
+				isVerified: true,
+				onboardingStatus: 'COMPLETED',
+				verifiedAt: profile.verifiedAt ?? null,
+				verifiedBy: profile.verifiedByUserId ?? null,
+				updatedAt: profile.updatedAt,
+			};
+		}
+
+		const now = new Date();
+
+		const updatedProfile = await tx.therapistProfile.update({
+			where: { userId: providerUser.id },
+			data: {
+				isVerified: true,
+				verifiedAt: now,
+				verifiedByUserId: adminUserId,
+			},
+			select: { isVerified: true, verifiedAt: true, verifiedByUserId: true, updatedAt: true },
+		});
+
+		await tx.user.update({
+			where: { id: providerUser.id },
+			data: {
+				isTherapistVerified: true,
+				therapistVerifiedAt: now,
+				therapistVerifiedByUserId: adminUserId,
+				onboardingStatus: 'COMPLETED',
+			},
+		});
+
+		return {
+			_id: providerUser.id,
+			isVerified: Boolean(updatedProfile.isVerified),
+			onboardingStatus: 'COMPLETED',
+			verifiedAt: updatedProfile.verifiedAt ?? null,
+			verifiedBy: updatedProfile.verifiedByUserId ?? null,
+			updatedAt: updatedProfile.updatedAt,
+		};
+	});
+};
+
 /**
  * Get admin metrics from PostgreSQL via Prisma queries.
  */

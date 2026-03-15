@@ -520,7 +520,7 @@ export default function ProgressPage() {
                         <p className="text-xs text-charcoal/58">{row.dateLabel} • {row.severity}</p>
                       </div>
                       <Link
-                        to="/patient/assessments"
+                        to="/patient/care-team"
                         className="rounded-full border border-calm-sage/30 px-3 py-2 text-xs font-semibold text-calm-sage hover:bg-calm-sage/10"
                       >
                         View Full Breakdown

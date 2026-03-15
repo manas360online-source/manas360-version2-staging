@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import PDFDocument from 'pdfkit';
 import { AppError } from '../middleware/error.middleware';
 import { sendSuccess } from '../utils/response';
+import { prisma } from '../config/db';
 import {
 	chatWithAi,
 	cancelPatientSubscription,
@@ -75,6 +76,16 @@ const authUserId = (req: Request): string => {
 	const userId = req.auth?.userId;
 	if (!userId) throw new AppError('Authentication required', 401);
 	return userId;
+};
+
+const toTitleFromTemplateType = (templateType: string): string => {
+	const normalized = String(templateType || '').trim();
+	if (!normalized) return 'Interactive CBT Task';
+	return normalized
+		.toLowerCase()
+		.split('_')
+		.map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+		.join(' ');
 };
 
 export const getPatientDashboardController = async (req: Request, res: Response): Promise<void> => {
@@ -671,6 +682,175 @@ export const getPatientMoodStatsController = async (req: Request, res: Response)
 export const getPatientProgressController = async (req: Request, res: Response): Promise<void> => {
 	const data = await getPatientProgressAnalytics(authUserId(req));
 	sendSuccess(res, data, 'Patient progress fetched');
+};
+
+export const getMyActiveCbtAssignmentsController = async (req: Request, res: Response): Promise<void> => {
+	const userId = authUserId(req);
+
+	const assignments = await prisma.cBTAssignment.findMany({
+		where: {
+			patientId: userId,
+			status: {
+				in: ['ASSIGNED', 'IN_PROGRESS'] as any,
+			},
+		},
+		orderBy: { createdAt: 'desc' },
+		select: {
+			id: true,
+			templateType: true,
+			status: true,
+			createdAt: true,
+			content: true,
+			provider: {
+				select: {
+					firstName: true,
+					lastName: true,
+					name: true,
+				},
+			},
+		},
+	});
+
+	const data = assignments.map((assignment) => {
+		const content = (assignment.content || {}) as Record<string, unknown>;
+		const providerName = `${String(assignment.provider?.firstName || '').trim()} ${String(assignment.provider?.lastName || '').trim()}`.trim()
+			|| String(assignment.provider?.name || 'Care Provider');
+
+		return {
+			id: assignment.id,
+			templateType: String(assignment.templateType),
+			title: String(content.title || toTitleFromTemplateType(String(assignment.templateType))),
+			description: String(content.description || ''),
+			status: String(assignment.status),
+			createdAt: assignment.createdAt.toISOString(),
+			providerName,
+		};
+	});
+
+	sendSuccess(res, data, 'Active CBT assignments fetched');
+};
+
+export const getMyCbtAssignmentDetailController = async (req: Request, res: Response): Promise<void> => {
+	const userId = authUserId(req);
+	const assignmentId = String(req.params.assignmentId || '').trim();
+	if (!assignmentId) throw new AppError('assignment id is required', 422);
+
+	const assignment = await prisma.cBTAssignment.findFirst({
+		where: {
+			id: assignmentId,
+			patientId: userId,
+		},
+		select: {
+			id: true,
+			templateType: true,
+			status: true,
+			content: true,
+			createdAt: true,
+			updatedAt: true,
+			provider: {
+				select: {
+					id: true,
+					firstName: true,
+					lastName: true,
+					name: true,
+				},
+			},
+		},
+	});
+
+	if (!assignment) throw new AppError('CBT assignment not found', 404);
+
+	const content = (assignment.content || {}) as Record<string, unknown>;
+	const providerName = `${String(assignment.provider?.firstName || '').trim()} ${String(assignment.provider?.lastName || '').trim()}`.trim()
+		|| String(assignment.provider?.name || 'Care Provider');
+
+	sendSuccess(
+		res,
+		{
+			id: assignment.id,
+			templateType: String(assignment.templateType),
+			title: String(content.title || toTitleFromTemplateType(String(assignment.templateType))),
+			description: String(content.description || ''),
+			steps: Array.isArray(content.steps) ? content.steps : [],
+			responses: (content.responses || {}) as Record<string, unknown>,
+			status: String(assignment.status),
+			providerId: String(assignment.provider?.id || ''),
+			providerName,
+			createdAt: assignment.createdAt.toISOString(),
+			updatedAt: assignment.updatedAt.toISOString(),
+		},
+		'CBT assignment fetched',
+	);
+};
+
+export const upsertMyCbtAssignmentResponseController = async (req: Request, res: Response): Promise<void> => {
+	const userId = authUserId(req);
+	const assignmentId = String(req.params.assignmentId || '').trim();
+	if (!assignmentId) throw new AppError('assignment id is required', 422);
+
+	const requestedStatus = String(req.body?.status || '').trim().toUpperCase();
+	const status = requestedStatus === 'COMPLETED' ? 'COMPLETED' : 'IN_PROGRESS';
+	const responses = (req.body?.responses || {}) as Record<string, unknown>;
+	const currentStep = req.body?.currentStep !== undefined ? Number(req.body.currentStep) : undefined;
+
+	const existing = await prisma.cBTAssignment.findFirst({
+		where: { id: assignmentId, patientId: userId },
+		select: { id: true, providerId: true, templateType: true, content: true },
+	});
+
+	if (!existing) throw new AppError('CBT assignment not found', 404);
+
+	const previousContent = (existing.content || {}) as Record<string, unknown>;
+	const mergedContent = {
+		...previousContent,
+		responses,
+		currentStep: Number.isFinite(currentStep) ? currentStep : previousContent.currentStep,
+		lastSavedAt: new Date().toISOString(),
+		submittedAt: status === 'COMPLETED' ? new Date().toISOString() : previousContent.submittedAt,
+	};
+
+	const updated = await prisma.cBTAssignment.update({
+		where: { id: existing.id },
+		data: {
+			status: status as any,
+			content: mergedContent,
+		},
+		select: {
+			id: true,
+			status: true,
+			updatedAt: true,
+			content: true,
+			templateType: true,
+		},
+	});
+
+	if (status === 'COMPLETED') {
+		await prisma.notification.create({
+			data: {
+				userId: existing.providerId,
+				type: 'HOMEWORK_SUBMITTED',
+				title: 'Patient completed CBT assignment',
+				message: `A patient submitted ${toTitleFromTemplateType(String(updated.templateType))}.`,
+				payload: {
+					event: 'CBT_ASSIGNMENT_COMPLETED',
+					assignmentId: updated.id,
+					patientId: userId,
+				},
+				sentAt: new Date(),
+			},
+		});
+	}
+
+	sendSuccess(
+		res,
+		{
+			id: updated.id,
+			status: String(updated.status),
+			responses: ((updated.content as Record<string, unknown>)?.responses || {}) as Record<string, unknown>,
+			updatedAt: updated.updatedAt.toISOString(),
+		},
+		status === 'COMPLETED' ? 'CBT assignment submitted' : 'CBT assignment saved',
+	);
 };
 
 export const createPatientMoodController = async (req: Request, res: Response): Promise<void> => {

@@ -31,6 +31,20 @@ const formatDateTime = (value?: string) => {
   return date.toLocaleString();
 };
 
+const toLocalDateKey = (value: Date = new Date()) => {
+  const y = value.getFullYear();
+  const m = String(value.getMonth() + 1).padStart(2, '0');
+  const d = String(value.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+const isSameLocalDay = (value?: string | Date) => {
+  if (!value) return false;
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+  return toLocalDateKey(date) === toLocalDateKey();
+};
+
 type MoodItem = {
   id: string;
   mood: number;
@@ -128,6 +142,14 @@ export default function MoodTrackerPage() {
       .map((item) => ({ day: formatDate(item.created_at), mood: Number(item.mood || 0) }));
   }, [history]);
 
+  const hasSubmittedToday = useMemo(() => {
+    const count = Number(today?.entryCount || 0);
+    if (count > 0) return true;
+
+    const latestDate = today?.latest?.created_at || today?.latest?.createdAt || today?.latest?.date;
+    return isSameLocalDay(latestDate);
+  }, [today]);
+
   const latestMood = getMoodOption(mood);
   const dynamicPlaceholder = getDailyCheckInPlaceholder(mood);
   const suggestedAudio = useMemo(() => {
@@ -153,6 +175,11 @@ export default function MoodTrackerPage() {
 
   const saveMood = async () => {
     if (!mood) return;
+    if (hasSubmittedToday) {
+      setError('Daily check-in can be submitted only once per day. Please come back tomorrow.');
+      return;
+    }
+
     try {
       setSaving(true);
       setError(null);
@@ -184,6 +211,11 @@ export default function MoodTrackerPage() {
   return (
     <div className="mx-auto w-full max-w-[1180px] space-y-6 pb-20 lg:pb-6">
       {error && <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>}
+      {hasSubmittedToday ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Today&apos;s check-in is already completed. You can submit the next one tomorrow.
+        </div>
+      ) : null}
 
       <section className="relative overflow-hidden rounded-[32px] border border-[#d8e2dd] bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.95),_rgba(232,239,230,0.92)_42%,_rgba(247,243,234,0.95)_100%)] p-5 shadow-soft-sm sm:p-8">
         <div className="absolute inset-x-0 top-0 h-32 bg-[linear-gradient(135deg,rgba(255,255,255,0.9),rgba(196,217,207,0.24),rgba(255,223,186,0.24))]" />
@@ -210,7 +242,9 @@ export default function MoodTrackerPage() {
                 <button
                   key={value}
                   type="button"
-                  onClick={() => setStep(value)}
+                  onClick={() => {
+                    if (!hasSubmittedToday) setStep(value);
+                  }}
                   className={`rounded-full px-4 py-2 text-sm font-medium transition ${
                     step === value ? 'bg-charcoal text-white shadow-sm' : 'bg-white/80 text-charcoal/70 hover:bg-white'
                   }`}
@@ -240,7 +274,9 @@ export default function MoodTrackerPage() {
                               type="button"
                               whileTap={{ scale: 0.97 }}
                               animate={{ scale: active ? 1.06 : 1, opacity: active || !mood ? 1 : 0.55 }}
-                              onClick={() => selectMood(option.value)}
+                              onClick={() => {
+                                if (!hasSubmittedToday) selectMood(option.value);
+                              }}
                               className={`relative overflow-hidden rounded-[24px] border px-4 py-5 text-left transition ${
                                 active ? 'border-transparent bg-[#18322d] text-white shadow-lg' : 'border-[#dbe6e1] bg-white hover:border-[#b7cabc]'
                               }`}
@@ -276,6 +312,7 @@ export default function MoodTrackerPage() {
                               max={10}
                               step={1}
                               value={intensity}
+                              disabled={hasSubmittedToday}
                               onChange={(event) => setIntensity(Number(event.target.value))}
                               className="mt-5 h-2 w-full cursor-pointer accent-[#557366]"
                               aria-label="Mood intensity"
@@ -372,6 +409,7 @@ export default function MoodTrackerPage() {
                           id="mood-note"
                           className="mt-4 min-h-[156px] w-full rounded-[22px] border border-[#dbe6e1] bg-[#fcfcfa] px-4 py-4 text-sm text-charcoal outline-none transition focus:border-[#8db2a2]"
                           value={note}
+                          disabled={hasSubmittedToday}
                           onChange={(event) => setNote(event.target.value)}
                           placeholder={dynamicPlaceholder}
                         />
@@ -380,11 +418,11 @@ export default function MoodTrackerPage() {
                           <button
                             type="button"
                             onClick={() => void saveMood()}
-                            disabled={saving || !mood}
+                            disabled={saving || !mood || hasSubmittedToday}
                             className="inline-flex min-h-[52px] items-center justify-center rounded-full bg-[#18322d] px-6 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
                           >
                             <Sparkles className="mr-2 h-4 w-4" />
-                            {saving ? 'Saving your check-in...' : 'Save My Check-in'}
+                            {saving ? 'Saving your check-in...' : hasSubmittedToday ? 'Completed today' : 'Save My Check-in'}
                           </button>
                         </div>
                       </div>
@@ -397,7 +435,7 @@ export default function MoodTrackerPage() {
                 <button
                   type="button"
                   onClick={() => setStep((current) => Math.max(0, current - 1))}
-                  disabled={step === 0}
+                  disabled={step === 0 || hasSubmittedToday}
                   className="inline-flex items-center rounded-full bg-[#eef4f1] px-4 py-2 text-sm font-medium text-charcoal transition disabled:opacity-40"
                 >
                   <ArrowLeft className="mr-2 h-4 w-4" />
@@ -407,7 +445,7 @@ export default function MoodTrackerPage() {
                   <button
                     type="button"
                     onClick={() => setStep((current) => Math.min(2, current + 1))}
-                    disabled={step === 0 && !mood}
+                    disabled={hasSubmittedToday || (step === 0 && !mood)}
                     className="inline-flex items-center rounded-full bg-[#18322d] px-5 py-2.5 text-sm font-medium text-white transition disabled:opacity-40"
                   >
                     Next

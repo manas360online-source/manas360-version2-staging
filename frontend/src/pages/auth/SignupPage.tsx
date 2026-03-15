@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { getApiErrorMessage } from '../../api/auth';
 import { patientApi } from '../../api/patient';
 import RegisterForm from '../../components/auth/RegisterForm';
@@ -8,9 +8,6 @@ import { useAuth } from '../../context/AuthContext';
 export default function SignupPage() {
 	const { register, login } = useAuth();
 	const navigate = useNavigate();
-	const location = useLocation();
-	const next = new URLSearchParams(location.search).get('next');
-	const loginHref = next ? `/auth/login?next=${encodeURIComponent(next)}` : '/auth/login';
 
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -35,8 +32,9 @@ export default function SignupPage() {
 				setSuccess('Registration and platform activation successful. Redirecting to assessments...');
 				navigate('/patient/onboarding?next=/patient/assessments', { replace: true });
 			} else {
-				setSuccess('Registration successful. Please verify email OTP to unlock login access.');
-				navigate(loginHref, { replace: true });
+				const providerSetupRoute = '/onboarding/provider-setup';
+				setSuccess('Registration successful. Verify your email OTP, then continue to provider setup.');
+				navigate(`/auth/login?next=${encodeURIComponent(providerSetupRoute)}`, { replace: true });
 			}
 		} catch (err) {
 			setError(getApiErrorMessage(err, 'Registration failed.'));

@@ -1,0 +1,185 @@
+{
+  "templates": [
+    {
+      "key": "THOUGHT_RECORD",
+      "title": "Thought Record",
+      "description": "Capture automatic thoughts and build balanced alternatives.",
+      "steps": [
+        {
+          "id": "situation",
+          "title": "Situation",
+          "prompt": "Describe the situation that triggered this thought.",
+          "inputType": "text"
+        },
+        {
+          "id": "automatic_thought",
+          "title": "Automatic Thought",
+          "prompt": "What was the first thought that appeared?",
+          "inputType": "text"
+        },
+        {
+          "id": "belief_strength",
+          "title": "Belief Strength",
+          "prompt": "How strongly did you believe this thought?",
+          "inputType": "slider",
+          "min": 0,
+          "max": 10
+        },
+        {
+          "id": "balanced_thought",
+          "title": "Balanced Thought",
+          "prompt": "Write a more balanced thought.",
+          "inputType": "text"
+        }
+      ]
+    },
+    {
+      "key": "BEHAVIORAL",
+      "title": "Behavioral Activation",
+      "description": "Plan and track meaningful actions to improve mood.",
+      "steps": [
+        {
+          "id": "activity",
+          "title": "Activity",
+          "prompt": "What activity will you do today?",
+          "inputType": "text"
+        },
+        {
+          "id": "effort",
+          "title": "Effort Estimate",
+          "prompt": "How difficult does this feel right now?",
+          "inputType": "slider",
+          "min": 0,
+          "max": 10
+        },
+        {
+          "id": "category",
+          "title": "Category",
+          "prompt": "Select the activity category.",
+          "inputType": "radio",
+          "options": [
+            "Pleasure",
+            "Mastery",
+            "Connection",
+            "Self-care"
+          ]
+        },
+        {
+          "id": "schedule",
+          "title": "Schedule",
+          "prompt": "When will you do it?",
+          "inputType": "text"
+        }
+      ]
+    },
+    {
+      "key": "WORRY_POSTPONEMENT",
+      "title": "Worry Postponement",
+      "description": "Contain worry loops by scheduling a dedicated worry window.",
+      "steps": [
+        {
+          "id": "worry_topic",
+          "title": "Worry Topic",
+          "prompt": "What is your main worry right now?",
+          "inputType": "text"
+        },
+        {
+          "id": "urgency",
+          "title": "Urgency",
+          "prompt": "How urgent does this worry feel?",
+          "inputType": "slider",
+          "min": 0,
+          "max": 10
+        },
+        {
+          "id": "control_level",
+          "title": "Control Level",
+          "prompt": "How much control do you have over this today?",
+          "inputType": "radio",
+          "options": [
+            "No control",
+            "Some control",
+            "High control"
+          ]
+        },
+        {
+          "id": "worry_window",
+          "title": "Worry Window",
+          "prompt": "Set a specific time to revisit this worry.",
+          "inputType": "text"
+        }
+      ]
+    },
+    {
+      "key": "SOCRATIC_QUESTIONING",
+      "title": "Socratic Questioning",
+      "description": "Challenge unhelpful beliefs with structured reflective questions.",
+      "steps": [
+        {
+          "id": "belief",
+          "title": "Core Belief",
+          "prompt": "What belief are you examining?",
+          "inputType": "text"
+        },
+        {
+          "id": "evidence_for",
+          "title": "Evidence For",
+          "prompt": "What evidence supports this belief?",
+          "inputType": "text"
+        },
+        {
+          "id": "evidence_against",
+          "title": "Evidence Against",
+          "prompt": "What evidence does not support this belief?",
+          "inputType": "text"
+        },
+        {
+          "id": "certainty",
+          "title": "Certainty",
+          "prompt": "How certain are you now?",
+          "inputType": "slider",
+          "min": 0,
+          "max": 10
+        }
+      ]
+    },
+    {
+      "key": "EXPOSURE_HIERARCHY",
+      "title": "Exposure Hierarchy",
+      "description": "Break feared situations into gradual, manageable exposure steps.",
+      "steps": [
+        {
+          "id": "target_fear",
+          "title": "Target Fear",
+          "prompt": "What fear are you working on?",
+          "inputType": "text"
+        },
+        {
+          "id": "current_distress",
+          "title": "Current Distress",
+          "prompt": "How distressing is this right now?",
+          "inputType": "slider",
+          "min": 0,
+          "max": 10
+        },
+        {
+          "id": "exposure_level",
+          "title": "Exposure Level",
+          "prompt": "Pick a starting challenge level.",
+          "inputType": "radio",
+          "options": [
+            "Low",
+            "Medium",
+            "High"
+          ]
+        },
+        {
+          "id": "first_step",
+          "title": "First Step",
+          "prompt": "Describe your first exposure step.",
+          "inputType": "text"
+        }
+      ]
+    }
+  ]
+}

@@ -38,6 +38,11 @@ export const getDefaultRouteForRole = (role: unknown): string => {
   return '/patient/dashboard';
 };
 
+const isProviderRole = (role: unknown): boolean => {
+  const normalizedRole = normalizeRole(role);
+  return normalizedRole === 'therapist' || normalizedRole === 'psychiatrist' || normalizedRole === 'psychologist' || normalizedRole === 'coach';
+};
+
 const toBoolean = (value: unknown): boolean => value === true || value === 'true' || value === 1 || value === '1';
 
 export const hasCorporateAccess = (user: AuthUser | null | undefined): boolean => {
@@ -65,6 +70,18 @@ export const getPostLoginRoute = (user: AuthUser | null | undefined): string => 
 
   if (isPlatformAdminUser(user)) {
     return '/admin/dashboard';
+  }
+
+  if (isProviderRole(user.role)) {
+    const onboardingStatus = String(user.onboardingStatus || '').toUpperCase();
+
+    if (onboardingStatus !== 'COMPLETED') {
+      return '/onboarding/provider-setup';
+    }
+    if (!user.isTherapistVerified) {
+      return '/provider/verification-pending';
+    }
+    return '/provider/dashboard';
   }
 
   return getDefaultRouteForRole(user.role);

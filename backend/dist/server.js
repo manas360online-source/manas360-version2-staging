@@ -12,6 +12,7 @@ const analyticsRollup_job_1 = require("./jobs/analyticsRollup.job");
 require("./jobs/admin-analytics-export.worker");
 const dailyMoodPrediction_1 = require("./cron/dailyMoodPrediction");
 const chatRetention_job_1 = require("./jobs/chatRetention.job");
+const patientSharedReportCleanup_job_1 = require("./jobs/patientSharedReportCleanup.job");
 const sso_service_1 = require("./services/sso.service");
 const sso_service_2 = require("./services/sso.service");
 const gps_routes_1 = require("./routes/gps.routes");
@@ -52,6 +53,7 @@ const startServer = async () => {
     void (0, analyticsRollup_job_1.startAnalyticsRollup)();
     (0, dailyMoodPrediction_1.startDailyMoodPredictionJob)();
     (0, chatRetention_job_1.startChatRetentionJob)();
+    (0, patientSharedReportCleanup_job_1.startPatientSharedReportCleanupJob)();
     const shutdown = async (signal) => {
         console.log(`${signal} received. Shutting down gracefully...`);
         server.close(async () => {

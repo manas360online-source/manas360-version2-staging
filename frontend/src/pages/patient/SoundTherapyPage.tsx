@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
-  BookHeart,
-  Brain,
   ChevronLeft,
   ChevronRight,
   CloudMoon,
@@ -18,8 +17,8 @@ import {
 } from 'lucide-react';
 import { patientApi } from '../../api/patient';
 
-type WellnessFilter = 'all' | 'audio' | 'breathing' | 'sleep' | 'anxiety-relief' | 'cbt' | 'focus';
-type WellnessRow = 'quick-resets' | 'cbt' | 'soundscapes';
+type WellnessFilter = 'all' | 'audio' | 'breathing' | 'sleep' | 'anxiety-relief' | 'focus';
+type WellnessRow = 'quick-resets' | 'soundscapes';
 type WellnessKind = 'audio' | 'interactive';
 
 type WellnessItem = {
@@ -36,6 +35,21 @@ type WellnessItem = {
   tagLine: string;
   prompts?: string[];
 };
+
+type DrawerStepType = 'text' | 'emoji-slider' | 't-chart' | 'gauge';
+
+type DrawerStep = {
+  id: string;
+  title: string;
+  type: DrawerStepType;
+};
+
+type TChartValue = {
+  support: string;
+  contradict: string;
+};
+
+type DrawerAnswerValue = string | number | TChartValue;
 
 type ExerciseRow = {
   id: string;
@@ -65,7 +79,6 @@ const filterPills: Array<{ value: WellnessFilter; label: string }> = [
   { value: 'breathing', label: '🌬️ Breathing' },
   { value: 'sleep', label: '🛏️ Sleep' },
   { value: 'anxiety-relief', label: '🧠 Anxiety Relief' },
-  { value: 'cbt', label: '📝 CBT' },
   { value: 'focus', label: '🌊 Focus' },
 ];
 
@@ -73,10 +86,6 @@ const rowLabels: Record<WellnessRow, { title: string; subtitle: string }> = {
   'quick-resets': {
     title: 'Quick Resets (< 5 mins)',
     subtitle: 'Fast regulation tools for busy or overloaded moments.',
-  },
-  cbt: {
-    title: 'Cognitive Behavioral Therapy',
-    subtitle: 'Interactive thought work and guided reframing.',
   },
   soundscapes: {
     title: 'Soundscapes & Focus',
@@ -135,42 +144,6 @@ const wellnessItems: WellnessItem[] = [
     tagLine: 'Reset',
   },
   {
-    id: 'thought-record-lite',
-    title: 'Thought Record Lite',
-    description: 'Capture a stressful thought, test it gently, and write a more balanced version.',
-    durationMinutes: 6,
-    kind: 'interactive',
-    row: 'cbt',
-    filters: ['cbt', 'anxiety-relief'],
-    icon: Brain,
-    accent: 'from-[#d7e6f6] via-[#eef5ff] to-[#f7f3ea]',
-    badge: '📝 Interactive',
-    tagLine: 'Thought Work',
-    prompts: [
-      'What situation is bothering you most right now?',
-      'What is the automatic thought that showed up first?',
-      'What would a kinder, more balanced reframe sound like?',
-    ],
-  },
-  {
-    id: 'worry-download',
-    title: 'Worry Download',
-    description: 'Separate solvable problems from open loops so your mind has less to hold.',
-    durationMinutes: 7,
-    kind: 'interactive',
-    row: 'cbt',
-    filters: ['cbt', 'anxiety-relief'],
-    icon: BookHeart,
-    accent: 'from-[#efe2f6] via-[#f7effd] to-[#f6f2ea]',
-    badge: '📝 Interactive',
-    tagLine: 'Journal',
-    prompts: [
-      'List the top worry in one sentence.',
-      'Can you act on it today, or does it need to wait?',
-      'What would be a compassionate next step if you stop spiraling for tonight?',
-    ],
-  },
-  {
     id: 'sleep-story',
     title: 'Deep Sleep Soundscape',
     description: 'A darker ambient wash designed for low-energy, bad-sleep nights.',
@@ -224,6 +197,24 @@ const wellnessItems: WellnessItem[] = [
   },
 ];
 
+const getDrawerSteps = (item: WellnessItem | null): DrawerStep[] => {
+  if (!item) return [];
+  const prompts = item.prompts || [];
+  return prompts.map((prompt, index) => ({
+    id: `prompt_${index + 1}`,
+    title: prompt,
+    type: 'text',
+  }));
+};
+
+const moodFace = (value: number): string => {
+  if (value <= 2) return '😟';
+  if (value <= 4) return '😕';
+  if (value <= 6) return '😐';
+  if (value <= 8) return '🙂';
+  return '😌';
+};
+
 const getHeroRecommendation = (latest: MoodTodayPayload['latest'] | null | undefined) => {
   const metadata = latest?.metadata || {};
   const tags = Array.isArray(metadata.tags) ? metadata.tags : [];
@@ -235,7 +226,7 @@ const getHeroRecommendation = (latest: MoodTodayPayload['latest'] | null | undef
     return {
       item: wellnessItems.find((entry) => entry.id === 'sleep-story') || wellnessItems[0],
       eyebrow: 'Recommended for tonight',
-      title: 'Having trouble resting? Try our 10-minute Deep Sleep Soundscape.',
+      title: 'Low energy and rough sleep signals detected. Try a gentle sleep-first reset.',
       description: 'Your last Daily Check-in pointed to low energy and interrupted sleep, so this session is surfaced first.',
     };
   }
@@ -251,10 +242,10 @@ const getHeroRecommendation = (latest: MoodTodayPayload['latest'] | null | undef
 
   if (tags.includes('work')) {
     return {
-      item: wellnessItems.find((entry) => entry.id === 'thought-record-lite') || wellnessItems[0],
+      item: wellnessItems.find((entry) => entry.id === 'three-minute-grounding') || wellnessItems[0],
       eyebrow: 'Context-aware pick',
-      title: 'Work pressure showing up again? Try a quick Thought Record to unpack the loop.',
-      description: 'A CBT-style reflection can make the pressure more specific and less overwhelming.',
+      title: 'Work pressure showing up again? Start with a grounding reset before you continue.',
+      description: 'A short sensory reset can lower activation quickly and help you re-enter your workflow with more control.',
     };
   }
 
@@ -277,8 +268,7 @@ export default function SoundTherapyPage() {
   const [playerPlaying, setPlayerPlaying] = useState(false);
   const [drawerItem, setDrawerItem] = useState<WellnessItem | null>(null);
   const [drawerStep, setDrawerStep] = useState(0);
-  const [drawerAnswers, setDrawerAnswers] = useState<string[]>([]);
-  const [drawerInput, setDrawerInput] = useState('');
+  const [drawerAnswers, setDrawerAnswers] = useState<Record<string, DrawerAnswerValue>>({});
   const [loading, setLoading] = useState(true);
   const [savingFavorite, setSavingFavorite] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -359,7 +349,6 @@ export default function SoundTherapyPage() {
   const rowsBySection = useMemo(() => {
     const map: Record<WellnessRow, WellnessItem[]> = {
       'quick-resets': [],
-      cbt: [],
       soundscapes: [],
     };
     for (const item of filteredItems) {
@@ -433,25 +422,47 @@ export default function SoundTherapyPage() {
   const openExercise = (item: WellnessItem) => {
     setDrawerItem(item);
     setDrawerStep(0);
-    setDrawerAnswers([]);
-    setDrawerInput('');
+    setDrawerAnswers({});
   };
 
   const closeDrawer = () => {
     setDrawerItem(null);
     setDrawerStep(0);
-    setDrawerInput('');
-    setDrawerAnswers([]);
+    setDrawerAnswers({});
   };
+
+  const drawerSteps = useMemo(() => getDrawerSteps(drawerItem), [drawerItem]);
+  const currentDrawerStep = drawerSteps[drawerStep] || null;
+
+  const setDrawerAnswer = (stepId: string, value: DrawerAnswerValue) => {
+    setDrawerAnswers((current) => ({ ...current, [stepId]: value }));
+  };
+
+  const canContinueDrawerStep = useMemo(() => {
+    if (!currentDrawerStep) return false;
+    const value = drawerAnswers[currentDrawerStep.id];
+
+    if (currentDrawerStep.type === 'text') {
+      return typeof value === 'string' && value.trim().length > 0;
+    }
+
+    if (currentDrawerStep.type === 'emoji-slider' || currentDrawerStep.type === 'gauge') {
+      return typeof value === 'number';
+    }
+
+    if (currentDrawerStep.type === 't-chart') {
+      if (!value || typeof value !== 'object') return false;
+      const tValue = value as TChartValue;
+      return tValue.support.trim().length > 0 && tValue.contradict.trim().length > 0;
+    }
+
+    return false;
+  }, [currentDrawerStep, drawerAnswers]);
 
   const submitDrawerStep = async () => {
     if (!drawerItem) return;
-    const prompts = drawerItem.prompts || [];
-    const nextAnswers = [...drawerAnswers, drawerInput.trim()];
-    if (drawerStep < prompts.length - 1) {
-      setDrawerAnswers(nextAnswers);
+    if (drawerStep < drawerSteps.length - 1) {
       setDrawerStep((current) => current + 1);
-      setDrawerInput('');
       return;
     }
     await handleCompletion(drawerItem, 'Exercise completed. +10 Wellness Points.');
@@ -506,7 +517,7 @@ export default function SoundTherapyPage() {
             onClick={() => (item.kind === 'audio' ? startAudio(item) : openExercise(item))}
             className={`${item.kind === 'audio' ? 'wellness-primary-btn' : 'wellness-secondary-btn'} h-11 px-5`}
           >
-            {item.kind === 'audio' ? 'Play' : 'Open'}
+            {item.kind === 'audio' ? 'Play' : 'Start'}
           </button>
         </div>
       </article>
@@ -518,7 +529,7 @@ export default function SoundTherapyPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1500px] space-y-6 pb-28 lg:pb-24">
+    <div className="mx-auto w-full max-w-[1400px] space-y-6 pb-28 lg:pb-24">
       {notice ? (
         <div className="fixed right-5 top-20 z-40 rounded-2xl bg-charcoal px-4 py-3 text-sm font-medium text-white shadow-lg">
           {notice}
@@ -533,7 +544,7 @@ export default function SoundTherapyPage() {
               Wellness Library
             </p>
             <h1 className="mt-4 max-w-3xl font-serif text-3xl font-semibold tracking-tight text-charcoal sm:text-4xl">
-              Your self-care hub for quick resets, guided CBT, and sound-based calm.
+              Your self-care hub for quick resets and sound-based calm.
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-charcoal/70 sm:text-base">
               One place to browse what helps, save favorites, and keep your self-care activity connected to the rest of your treatment journey.
@@ -556,7 +567,7 @@ export default function SoundTherapyPage() {
                 className="inline-flex min-h-[46px] items-center rounded-full bg-white px-5 text-sm font-semibold text-charcoal transition hover:bg-white/90"
               >
                 <Play className="mr-2 h-4 w-4" />
-                Play now
+                {hero.item.kind === 'audio' ? 'Play now' : 'Start now'}
               </button>
               <Link to="/patient/therapy-plan" className="inline-flex min-h-[46px] items-center rounded-full border border-white/20 px-5 text-sm font-semibold text-white/88 transition hover:bg-white/10">
                 View therapy plan
@@ -624,7 +635,7 @@ export default function SoundTherapyPage() {
               </div>
             </div>
 
-            <div className="flex gap-4 overflow-x-auto pb-2 snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4 max-w-full">
               {rowItems.map(renderCard)}
             </div>
           </section>
@@ -684,7 +695,7 @@ export default function SoundTherapyPage() {
       {drawerItem ? (
         <div className="fixed inset-0 z-50 flex justify-end bg-charcoal/40 backdrop-blur-sm" onClick={closeDrawer}>
           <div
-            className="h-full w-full max-w-2xl overflow-y-auto bg-[#fcfefd] p-6 shadow-2xl sm:p-8"
+            className="h-full w-full max-w-[450px] overflow-y-auto bg-[#fcfefd] p-6 shadow-2xl"
             onClick={(event) => event.stopPropagation()}
             role="dialog"
             aria-modal="true"
@@ -701,38 +712,146 @@ export default function SoundTherapyPage() {
               </button>
             </div>
 
-            <div className="mt-8 rounded-[28px] bg-gradient-wellness-surface p-6 shadow-wellness-sm">
+            <div className="mt-8 rounded-[16px] bg-gradient-wellness-surface p-6 shadow-wellness-sm">
               <div className="mb-5 flex items-center justify-between text-sm text-charcoal/55">
-                <span>Prompt {drawerStep + 1} of {(drawerItem.prompts || []).length}</span>
+                <span>Step {drawerStep + 1} of {drawerSteps.length}</span>
                 <span>{drawerItem.durationMinutes} min</span>
               </div>
-              <h3 className="text-2xl font-semibold leading-tight text-charcoal">{drawerItem.prompts?.[drawerStep]}</h3>
-              <textarea
-                value={drawerInput}
-                onChange={(event) => setDrawerInput(event.target.value)}
-                className="mt-6 min-h-[180px] w-full rounded-[24px] border border-wellness-border bg-white px-4 py-4 text-sm text-charcoal outline-none transition focus:border-[#1E90FF]"
-                placeholder="Write whatever comes up. Short answers are fine."
-              />
+              <div className="h-2 w-full overflow-hidden rounded-full bg-calm-sage/15">
+                <div
+                  className="h-full rounded-full bg-calm-sage transition-all duration-300"
+                  style={{ width: `${Math.round(((drawerStep + 1) / Math.max(1, drawerSteps.length)) * 100)}%` }}
+                />
+              </div>
+
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={currentDrawerStep?.id || `step_${drawerStep}`}
+                  initial={{ opacity: 0, x: 18 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -18 }}
+                  transition={{ duration: 0.26, ease: 'easeOut' }}
+                >
+                  <h3 className="mt-6 text-3xl font-semibold leading-tight text-charcoal">{currentDrawerStep?.title}</h3>
+
+                  {currentDrawerStep?.type === 'text' ? (
+                    <textarea
+                      value={typeof drawerAnswers[currentDrawerStep.id] === 'string' ? (drawerAnswers[currentDrawerStep.id] as string) : ''}
+                      onChange={(event) => setDrawerAnswer(currentDrawerStep.id, event.target.value)}
+                      className="mt-6 min-h-[170px] w-full rounded-[16px] border border-wellness-border bg-white px-4 py-4 text-sm text-charcoal outline-none transition focus:border-[#1E90FF]"
+                      placeholder="Write whatever comes up. Short answers are fine."
+                    />
+                  ) : null}
+
+                  {currentDrawerStep?.type === 'emoji-slider' ? (
+                    <div className="mt-6 rounded-[16px] border border-wellness-border bg-white p-4">
+                      <div className="mb-3 flex items-center justify-between text-xs text-charcoal/60">
+                        <span>1</span>
+                        <span className="inline-flex items-center gap-2 rounded-full bg-calm-sage/10 px-3 py-1 text-sm font-semibold text-charcoal">
+                          <span>{moodFace(typeof drawerAnswers[currentDrawerStep.id] === 'number' ? (drawerAnswers[currentDrawerStep.id] as number) : 5)}</span>
+                          {typeof drawerAnswers[currentDrawerStep.id] === 'number' ? (drawerAnswers[currentDrawerStep.id] as number) : 5}/10
+                        </span>
+                        <span>10</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={1}
+                        max={10}
+                        value={typeof drawerAnswers[currentDrawerStep.id] === 'number' ? (drawerAnswers[currentDrawerStep.id] as number) : 5}
+                        onChange={(event) => setDrawerAnswer(currentDrawerStep.id, Number(event.target.value))}
+                        className="h-2 w-full cursor-pointer appearance-none rounded-full bg-calm-sage/20 accent-calm-sage"
+                      />
+                    </div>
+                  ) : null}
+
+                  {currentDrawerStep?.type === 't-chart' ? (
+                    <div className="mt-6 grid gap-3 md:grid-cols-2">
+                      <div className="rounded-[16px] border border-wellness-border bg-white p-4">
+                        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-charcoal/55">Supports Thought</p>
+                        <textarea
+                          value={
+                            typeof drawerAnswers[currentDrawerStep.id] === 'object' && drawerAnswers[currentDrawerStep.id] !== null
+                              ? ((drawerAnswers[currentDrawerStep.id] as TChartValue).support || '')
+                              : ''
+                          }
+                          onChange={(event) => {
+                            const currentValue = (typeof drawerAnswers[currentDrawerStep.id] === 'object' && drawerAnswers[currentDrawerStep.id] !== null
+                              ? (drawerAnswers[currentDrawerStep.id] as TChartValue)
+                              : { support: '', contradict: '' });
+                            setDrawerAnswer(currentDrawerStep.id, {
+                              ...currentValue,
+                              support: event.target.value,
+                            });
+                          }}
+                          className="min-h-[130px] w-full rounded-[16px] border border-wellness-border bg-white px-3 py-3 text-sm text-charcoal outline-none transition focus:border-[#1E90FF]"
+                          placeholder="Facts that support this thought"
+                        />
+                      </div>
+                      <div className="rounded-[16px] border border-wellness-border bg-white p-4">
+                        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-charcoal/55">Contradicts Thought</p>
+                        <textarea
+                          value={
+                            typeof drawerAnswers[currentDrawerStep.id] === 'object' && drawerAnswers[currentDrawerStep.id] !== null
+                              ? ((drawerAnswers[currentDrawerStep.id] as TChartValue).contradict || '')
+                              : ''
+                          }
+                          onChange={(event) => {
+                            const currentValue = (typeof drawerAnswers[currentDrawerStep.id] === 'object' && drawerAnswers[currentDrawerStep.id] !== null
+                              ? (drawerAnswers[currentDrawerStep.id] as TChartValue)
+                              : { support: '', contradict: '' });
+                            setDrawerAnswer(currentDrawerStep.id, {
+                              ...currentValue,
+                              contradict: event.target.value,
+                            });
+                          }}
+                          className="min-h-[130px] w-full rounded-[16px] border border-wellness-border bg-white px-3 py-3 text-sm text-charcoal outline-none transition focus:border-[#1E90FF]"
+                          placeholder="Facts that challenge this thought"
+                        />
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {currentDrawerStep?.type === 'gauge' ? (
+                    <div className="mt-6 rounded-[16px] border border-wellness-border bg-white p-4">
+                      <div className="mb-3 flex items-center justify-between text-xs text-charcoal/60">
+                        <span>0%</span>
+                        <span className="rounded-full bg-calm-sage/10 px-3 py-1 text-sm font-semibold text-charcoal">
+                          {typeof drawerAnswers[currentDrawerStep.id] === 'number' ? (drawerAnswers[currentDrawerStep.id] as number) : 50}%
+                        </span>
+                        <span>100%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        value={typeof drawerAnswers[currentDrawerStep.id] === 'number' ? (drawerAnswers[currentDrawerStep.id] as number) : 50}
+                        onChange={(event) => setDrawerAnswer(currentDrawerStep.id, Number(event.target.value))}
+                        className="h-2 w-full cursor-pointer appearance-none rounded-full bg-calm-sage/20 accent-calm-sage"
+                      />
+                    </div>
+                  ) : null}
+                </motion.div>
+              </AnimatePresence>
+
               <div className="mt-6 flex items-center justify-between gap-3">
                 <button
                   type="button"
                   onClick={() => {
                     if (drawerStep === 0) return;
-                    setDrawerAnswers((current) => current.slice(0, -1));
                     setDrawerStep((current) => current - 1);
-                    setDrawerInput(drawerAnswers[drawerStep - 1] || '');
                   }}
                   disabled={drawerStep === 0}
-                  className="rounded-full bg-wellness-aqua px-4 py-3 text-sm font-semibold text-charcoal disabled:opacity-40"
+                  className="rounded-[16px] bg-wellness-aqua px-4 py-3 text-sm font-semibold text-charcoal disabled:opacity-40"
                 >
                   Back
                 </button>
                 <button
                   type="button"
                   onClick={() => void submitDrawerStep()}
-                  className="wellness-primary-btn px-5 py-3"
+                  disabled={!canContinueDrawerStep}
+                  className="rounded-[16px] bg-calm-sage px-5 py-3 text-sm font-semibold text-white transition hover:bg-calm-sage/90 disabled:opacity-40"
                 >
-                  {drawerStep === (drawerItem.prompts || []).length - 1 ? 'Complete exercise' : 'Next prompt'}
+                  {drawerStep === drawerSteps.length - 1 ? 'Complete exercise' : 'Next Prompt'}
                 </button>
               </div>
             </div>

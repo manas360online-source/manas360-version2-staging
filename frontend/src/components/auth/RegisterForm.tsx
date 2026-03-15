@@ -304,7 +304,15 @@ export default function RegisterForm({ onSubmit, loading = false, error = null }
 				</div>
 			) : (
 				<Button type="submit" fullWidth loading={loading} className="min-h-[48px]">
-					{loading ? 'Creating account...' : 'Create Account'}
+					{loading
+						? 'Creating account...'
+						: role === 'therapist'
+							? 'Register as Therapist'
+							: role === 'psychiatrist'
+								? 'Register as Psychiatrist'
+								: role === 'coach'
+									? 'Register as Coach'
+									: 'Create Account'}
 				</Button>
 			)}
 

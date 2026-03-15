@@ -4,19 +4,72 @@ import { prisma } from '../config/db';
 import { sendSuccess } from '../utils/response';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
+import cbtTemplateLibrary from '../config/cbt-template-library.json';
 import {
 	getConversationMessages as getDirectConversationMessages,
 	getOrCreateConversation,
 	getProviderConversations,
 	sendDirectMessage,
 } from '../services/messaging.service';
+import { registerProviderProfile } from '../services/auth.service';
 
 type ProviderRole = 'THERAPIST' | 'PSYCHOLOGIST' | 'PSYCHIATRIST' | 'COACH';
+
+type CbtTemplateLibraryEntry = {
+	key: string;
+	title: string;
+	description?: string;
+	steps?: unknown[];
+};
+
+const cbtTemplateEntries: CbtTemplateLibraryEntry[] = Array.isArray((cbtTemplateLibrary as any)?.templates)
+	? (cbtTemplateLibrary as any).templates
+	: [];
+
+const cbtTemplateLookup = new Map<string, CbtTemplateLibraryEntry>(
+	cbtTemplateEntries.map((entry) => [String(entry.key || '').toUpperCase(), entry]),
+);
+
+const normalizeCbtTemplateType = (value: unknown): string => String(value || '').trim().toUpperCase();
 
 const authUserId = (req: Request): string => {
 	const userId = req.auth?.userId;
 	if (!userId) throw new AppError('Authentication required', 401);
 	return userId;
+};
+
+export const submitProviderOnboardingController = async (req: Request, res: Response): Promise<void> => {
+	const userId = authUserId(req);
+
+	const requiredString = (value: unknown, field: string): string => {
+		const normalized = typeof value === 'string' ? value.trim() : '';
+		if (!normalized) {
+			throw new AppError(`${field} is required`, 400);
+		}
+		return normalized;
+	};
+
+	const documents = Array.isArray(req.body?.documents)
+		? req.body.documents.map((document: Record<string, unknown>) => ({
+			documentType: requiredString(document?.documentType, 'documents.documentType') as 'DEGREE' | 'ID_PROOF' | 'LICENSE',
+			url: requiredString(document?.url, 'documents.url'),
+		}))
+		: [];
+
+	const result = await registerProviderProfile(userId, {
+		displayName: requiredString(req.body?.displayName, 'displayName'),
+		registrationType: (typeof req.body?.registrationType === 'string' ? req.body.registrationType.trim().toUpperCase() : 'OTHER') as 'RCI' | 'NMC' | 'STATE_COUNCIL' | 'OTHER',
+		registrationNum: requiredString(req.body?.registrationNum, 'registrationNum'),
+		yearsExperience: Number(req.body?.yearsExperience ?? 0),
+		highestQual: requiredString(req.body?.highestQual, 'highestQual'),
+		specializations: Array.isArray(req.body?.specializations) ? req.body.specializations.map(String) : [],
+		languages: Array.isArray(req.body?.languages) ? req.body.languages.map(String) : [],
+		hourlyRate: Number(req.body?.hourlyRate ?? 0),
+		bio: typeof req.body?.bio === 'string' ? req.body.bio : undefined,
+		documents,
+	});
+
+	sendSuccess(res, result, 'Provider onboarding submitted', 201);
 };
 
 const toInitials = (firstName?: string | null, lastName?: string | null, name?: string | null): string => {
@@ -1647,6 +1700,92 @@ export const getPatientCBTModules = async (req: Request, res: Response): Promise
 	}));
 
 	sendSuccess(res, responseData, 'Patient CBT modules fetched');
+};
+
+export const listCbtAssignmentTemplates = async (req: Request, res: Response): Promise<void> => {
+	const providerId = authUserId(req);
+	await getProviderRole(providerId);
+
+	const templates = cbtTemplateEntries.map((entry) => ({
+		templateType: String(entry.key || '').toUpperCase(),
+		title: String(entry.title || 'CBT Template'),
+		description: String(entry.description || ''),
+		stepCount: Array.isArray(entry.steps) ? entry.steps.length : 0,
+	}));
+
+	sendSuccess(res, templates, 'CBT assignment templates fetched');
+};
+
+export const quickAssignCbtTemplate = async (req: Request, res: Response): Promise<void> => {
+	const providerId = authUserId(req);
+	await getProviderRole(providerId);
+	const patientId = String(req.params.patientId || '').trim();
+	const templateType = normalizeCbtTemplateType(req.body?.templateType);
+
+	if (!patientId) {
+		throw new AppError('Patient id is required', 400);
+	}
+	if (!templateType) {
+		throw new AppError('templateType is required', 400);
+	}
+
+	const template = cbtTemplateLookup.get(templateType);
+	if (!template) {
+		throw new AppError('Invalid templateType', 400);
+	}
+
+	await ensureProviderPatientAccess(providerId, patientId);
+
+	const assignment = await prisma.cBTAssignment.create({
+		data: {
+			patientId,
+			providerId,
+			templateType: templateType as any,
+			status: 'ASSIGNED' as any,
+			content: {
+				templateType,
+				title: String(template.title || 'CBT Template'),
+				description: String(template.description || ''),
+				steps: Array.isArray(template.steps) ? template.steps : [],
+			},
+		},
+		select: {
+			id: true,
+			templateType: true,
+			status: true,
+			createdAt: true,
+			content: true,
+		},
+	});
+
+	await prisma.notification.create({
+		data: {
+			userId: patientId,
+			type: 'HOMEWORK_ASSIGNED',
+			title: 'New Interactive Task Assigned',
+			message: `${String(template.title || 'A CBT task')} was assigned to your Daily Check-in Hub.`,
+			payload: {
+				event: 'CBT_ASSIGNMENT_CREATED',
+				assignmentId: assignment.id,
+				templateType,
+			},
+			sentAt: new Date(),
+		},
+	});
+
+	sendSuccess(
+		res,
+		{
+			id: assignment.id,
+			templateType,
+			status: String(assignment.status),
+			title: String((assignment.content as any)?.title || template.title || 'CBT Template'),
+			description: String((assignment.content as any)?.description || template.description || ''),
+			createdAt: assignment.createdAt.toISOString(),
+		},
+		'CBT template assigned to patient',
+		201,
+	);
 };
 
 export const reviewCBTModule = async (req: Request, res: Response): Promise<void> => {

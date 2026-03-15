@@ -7,6 +7,7 @@ import {
 	getProviderEarnings,
 	getProviderSettings,
 	getPatientAssessments,
+	listCbtAssignmentTemplates,
 	getPatientCBTModules,
 	getPatientGoals,
 	getPatientLabs,
@@ -19,10 +20,12 @@ import {
 	getProviderPatients,
 	publishWeeklyPlan,
 	reviewCBTModule,
+	quickAssignCbtTemplate,
 	scheduleNextSession,
 	saveWeeklyPlan,
 	sendMessage,
 	sendGoalMessage,
+	submitProviderOnboardingController,
 	updatePatientNote,
 	updateProviderSettings,
 } from '../controllers/provider.controller';
@@ -31,6 +34,13 @@ import { requireRole } from '../middleware/rbac.middleware';
 import { asyncHandler } from '../middleware/validate.middleware';
 
 const router = Router();
+
+router.post(
+	'/onboarding',
+	requireAuth,
+	requireRole(['therapist', 'psychologist', 'psychiatrist', 'coach']),
+	asyncHandler(submitProviderOnboardingController),
+);
 
 router.get(
 	'/dashboard',
@@ -51,6 +61,10 @@ router.post('/messages', requireAuth, asyncHandler(sendMessage));
 router.get('/patient/:patientId/overview', requireAuth, asyncHandler(getPatientOverview));
 
 router.get('/patient/:patientId/assessments', requireAuth, asyncHandler(getPatientAssessments));
+
+router.get('/cbt-assignments/templates', requireAuth, asyncHandler(listCbtAssignmentTemplates));
+
+router.post('/patient/:patientId/cbt-assignments', requireAuth, asyncHandler(quickAssignCbtTemplate));
 
 router.post('/patient/:patientId/assign', requireAuth, asyncHandler(assignPatientItem));
 

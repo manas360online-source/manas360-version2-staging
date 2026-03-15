@@ -2,10 +2,13 @@ import { randomUUID } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import {
   BookingStatus,
+  OnboardingStatus,
   PlanActivityFrequency,
   PlanActivityType,
+  ProviderDocumentType,
   PrismaClient,
   ProviderType,
+  RegistrationType,
   UserProvider,
   UserRole,
   UserStatus,
@@ -161,6 +164,7 @@ const userPayload = (seed: SeedUser, role: UserRole, passwordHash: string) => {
     phoneVerified: false,
     isTherapistVerified: isProvider,
     therapistVerifiedAt: isProvider ? NOW : null,
+    onboardingStatus: isProvider ? OnboardingStatus.COMPLETED : null,
     failedLoginAttempts: 0,
     lockUntil: null,
     isDeleted: false,
@@ -227,15 +231,46 @@ const ensureProviderProfiles = async (providersByRole: Record<UserRole, Array<{ 
     const providers = providersByRole[role] || [];
     for (let i = 0; i < providers.length; i += 1) {
       const provider = providers[i];
-      await prisma.therapistProfile.upsert({
+      const registrationPrefix = role === UserRole.PSYCHIATRIST ? 'NMC' : 'RCI';
+      const registrationNum = `${registrationPrefix}-${role}-${String(i + 1).padStart(4, '0')}`;
+      const profileDisplayName = `Dr. ${displayName(provider.firstName, provider.lastName)}`;
+      const professionalType = String(role).toUpperCase();
+
+      const profile = await prisma.therapistProfile.upsert({
         where: { userId: provider.id },
         update: {
-          displayName: `Dr. ${displayName(provider.firstName, provider.lastName)}`,
-          bio: `Dr. ${displayName(provider.firstName, provider.lastName)} is a ${role.toLowerCase()} focused on evidence-based outcomes and continuity of care.`,
+          displayName: profileDisplayName,
+          professionalType,
+          registrationType: role === UserRole.PSYCHIATRIST ? RegistrationType.NMC : RegistrationType.RCI,
+          registrationNum,
+          contactEmail: `${provider.firstName.toLowerCase()}.${provider.lastName.toLowerCase()}.${role.toLowerCase()}@${EMAIL_DOMAIN}`,
+          education: role === UserRole.PSYCHIATRIST ? 'MBBS, MD (Psychiatry)' : 'M.Phil (Clinical Psychology)',
+          highestQual: role === UserRole.PSYCHIATRIST ? 'MD (Psychiatry)' : 'M.Phil (Clinical Psychology)',
+          licenseRci: role === UserRole.PSYCHIATRIST ? null : `RCI-LIC-${String(i + 1).padStart(4, '0')}`,
+          licenseNmc: role === UserRole.PSYCHIATRIST ? `NMC-LIC-${String(i + 1).padStart(4, '0')}` : null,
+          bio: `${profileDisplayName} is a ${role.toLowerCase()} focused on evidence-based outcomes and continuity of care.`,
+          clinicalCategories: ['Anxiety Disorders', 'Depression & Mood Disorders', 'Sleep & Stress Disorders'],
           specializations: specialtiesByRole[role],
           languages: languagePools[i % languagePools.length],
+          corporateReady: i % 2 === 0,
+          shiftPreferences: i % 3 === 0 ? ['MORNING', 'EVENING'] : ['EVENING'],
+          yearsExperience: 4 + (i % 12),
           yearsOfExperience: 4 + (i % 12),
+          hourlyRate: 90000 + i * 5000,
           consultationFee: 90000 + i * 5000,
+          bankDetails: {
+            accountName: profileDisplayName,
+            accountNumber: `00012233${String(i + 1).padStart(4, '0')}`,
+            ifsc: `HDFC000${String(i + 100).padStart(4, '0')}`,
+            bankName: 'HDFC Bank',
+            upiId: `${provider.firstName.toLowerCase()}.${provider.lastName.toLowerCase()}@okhdfcbank`,
+          },
+          tagline: role === UserRole.PSYCHIATRIST ? 'Medication and therapy aligned for measurable outcomes' : 'Trauma-informed and evidence-based therapy support',
+          digitalSignature: profileDisplayName,
+          onboardingCompleted: true,
+          isVerified: true,
+          verifiedAt: NOW,
+          verifiedByUserId: provider.id,
           averageRating: 4.2 + (i % 5) * 0.1,
           availability: [
             { dayOfWeek: 1, startMinute: 600, endMinute: 900, isAvailable: true },
@@ -247,18 +282,67 @@ const ensureProviderProfiles = async (providersByRole: Record<UserRole, Array<{ 
         },
         create: {
           userId: provider.id,
-          displayName: `Dr. ${displayName(provider.firstName, provider.lastName)}`,
-          bio: `Dr. ${displayName(provider.firstName, provider.lastName)} is a ${role.toLowerCase()} focused on evidence-based outcomes and continuity of care.`,
+          displayName: profileDisplayName,
+          professionalType,
+          registrationType: role === UserRole.PSYCHIATRIST ? RegistrationType.NMC : RegistrationType.RCI,
+          registrationNum,
+          contactEmail: `${provider.firstName.toLowerCase()}.${provider.lastName.toLowerCase()}.${role.toLowerCase()}@${EMAIL_DOMAIN}`,
+          education: role === UserRole.PSYCHIATRIST ? 'MBBS, MD (Psychiatry)' : 'M.Phil (Clinical Psychology)',
+          highestQual: role === UserRole.PSYCHIATRIST ? 'MD (Psychiatry)' : 'M.Phil (Clinical Psychology)',
+          licenseRci: role === UserRole.PSYCHIATRIST ? null : `RCI-LIC-${String(i + 1).padStart(4, '0')}`,
+          licenseNmc: role === UserRole.PSYCHIATRIST ? `NMC-LIC-${String(i + 1).padStart(4, '0')}` : null,
+          bio: `${profileDisplayName} is a ${role.toLowerCase()} focused on evidence-based outcomes and continuity of care.`,
+          clinicalCategories: ['Anxiety Disorders', 'Depression & Mood Disorders', 'Sleep & Stress Disorders'],
           specializations: specialtiesByRole[role],
           languages: languagePools[i % languagePools.length],
+          corporateReady: i % 2 === 0,
+          shiftPreferences: i % 3 === 0 ? ['MORNING', 'EVENING'] : ['EVENING'],
+          yearsExperience: 4 + (i % 12),
           yearsOfExperience: 4 + (i % 12),
+          hourlyRate: 90000 + i * 5000,
           consultationFee: 90000 + i * 5000,
+          bankDetails: {
+            accountName: profileDisplayName,
+            accountNumber: `00012233${String(i + 1).padStart(4, '0')}`,
+            ifsc: `HDFC000${String(i + 100).padStart(4, '0')}`,
+            bankName: 'HDFC Bank',
+            upiId: `${provider.firstName.toLowerCase()}.${provider.lastName.toLowerCase()}@okhdfcbank`,
+          },
+          tagline: role === UserRole.PSYCHIATRIST ? 'Medication and therapy aligned for measurable outcomes' : 'Trauma-informed and evidence-based therapy support',
+          digitalSignature: profileDisplayName,
+          onboardingCompleted: true,
+          isVerified: true,
+          verifiedAt: NOW,
+          verifiedByUserId: provider.id,
           averageRating: 4.2 + (i % 5) * 0.1,
           availability: [
             { dayOfWeek: 1, startMinute: 600, endMinute: 900, isAvailable: true },
             { dayOfWeek: 3, startMinute: 780, endMinute: 1020, isAvailable: true },
             { dayOfWeek: 5, startMinute: 660, endMinute: 900, isAvailable: true },
           ],
+        },
+      });
+
+      const documentBaseUrl = `https://assets.manas360.test/provider-docs/${provider.id}`;
+      await prisma.providerDocument.upsert({
+        where: { providerProfileId_documentType: { providerProfileId: profile.id, documentType: ProviderDocumentType.DEGREE } },
+        update: { url: `${documentBaseUrl}/degree.pdf`, userId: provider.id },
+        create: {
+          providerProfileId: profile.id,
+          userId: provider.id,
+          documentType: ProviderDocumentType.DEGREE,
+          url: `${documentBaseUrl}/degree.pdf`,
+        },
+      });
+
+      await prisma.providerDocument.upsert({
+        where: { providerProfileId_documentType: { providerProfileId: profile.id, documentType: ProviderDocumentType.LICENSE } },
+        update: { url: `${documentBaseUrl}/license.pdf`, userId: provider.id },
+        create: {
+          providerProfileId: profile.id,
+          userId: provider.id,
+          documentType: ProviderDocumentType.LICENSE,
+          url: `${documentBaseUrl}/license.pdf`,
         },
       });
     }

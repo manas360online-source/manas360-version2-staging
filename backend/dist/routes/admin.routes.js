@@ -37,6 +37,14 @@ router.get('/users/:id', auth_middleware_1.requireAuth, (0, rbac_middleware_1.re
  * Response: Updated therapist profile summary
  */
 router.patch('/therapists/:id/verify', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('manage_therapists'), ...validate_middleware_1.validateTherapistProfileIdParam, (0, validate_middleware_1.asyncHandler)(admin_controller_1.verifyTherapistController));
+router.post('/verify-provider/:id', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('manage_therapists'), ...validate_middleware_1.validateTherapistProfileIdParam, (0, validate_middleware_1.asyncHandler)(admin_controller_1.verifyProviderController));
+/**
+ * POST /api/v1/admin/approve-provider/:id
+ * Approve provider onboarding — sets isVerified, onboardingStatus = COMPLETED
+ * Route parameters:
+ *   - id: provider user ID
+ */
+router.post('/approve-provider/:id', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('manage_therapists'), (0, validate_middleware_1.asyncHandler)(admin_controller_1.approveProviderController));
 /**
  * GET /api/v1/admin/metrics
  * Get comprehensive platform metrics

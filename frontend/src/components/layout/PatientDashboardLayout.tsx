@@ -16,6 +16,7 @@ import {
   User,
   X,
 } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { patientApi } from '../../api/patient';
 import { useAuth } from '../../context/AuthContext';
@@ -28,7 +29,7 @@ const mainNavItems = [
 
 const selfCareNavItems = [
   { to: '/patient/messages', label: 'Anytime Buddy (AI)', icon: MessageSquare, badge: 'AI' },
-  { to: '/patient/mood', label: 'Daily Check-in', icon: HeartPulse },
+  { to: '/patient/check-in', label: 'Daily Check-in', icon: HeartPulse },
   { to: '/patient/sound-therapy', label: 'Wellness Library', icon: Sparkles },
 ];
 
@@ -44,7 +45,7 @@ const supportNavItems = [
 
 const bottomNavItems = [
   { to: '/patient/dashboard', label: 'Home', icon: Home },
-  { to: '/patient/mood', label: 'Check-in', icon: HeartPulse },
+  { to: '/patient/check-in', label: 'Check-in', icon: HeartPulse },
   { to: '/patient/sessions', label: 'My Care', icon: CalendarDays },
   { to: '/patient/messages', label: 'Support', icon: MessageSquare },
   { to: '/patient/settings', label: 'Account', icon: Settings2 },
@@ -66,13 +67,18 @@ export default function PatientDashboardLayout() {
   const [unreadCount, setUnreadCount] = useState(0);
 
   const fetchUnread = useCallback(async () => {
+    if (!user || user.role !== 'patient') {
+      setUnreadCount(0);
+      return;
+    }
+
     try {
       const res = await patientApi.getNotifications();
       const data = (res as any)?.data ?? res;
       const items = Array.isArray(data) ? data : [];
       setUnreadCount(items.filter((n: any) => !n.read).length);
     } catch { /* ignore */ }
-  }, []);
+  }, [user]);
 
   useEffect(() => { void fetchUnread(); }, [fetchUnread]);
 
@@ -102,8 +108,7 @@ export default function PatientDashboardLayout() {
     '/patient/care-team': 'Care Team',
     '/patient/assessments': 'Clinical Assessments',
     '/patient/messages': 'AI Support',
-    '/patient/exercises': 'Wellness Library',
-    '/patient/mood': 'Daily Check-in',
+    '/patient/check-in': 'Daily Check-in',
     '/patient/insights': 'My Progress',
     '/patient/timeline': 'Patient Timeline',
     '/patient/assessment-reports': 'My Progress',
@@ -326,7 +331,18 @@ export default function PatientDashboardLayout() {
 
           <main className="w-full flex-1 px-3 py-4 sm:px-4 sm:py-5 lg:px-6 lg:py-7">
             <div className="wellness-page-shell rounded-[2rem] p-3 sm:p-4 lg:p-5">
-              <Outlet />
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={location.pathname}
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.4, ease: 'easeOut' }}
+                  className="max-w-full"
+                >
+                  <Outlet />
+                </motion.div>
+              </AnimatePresence>
             </div>
           </main>
         </div>

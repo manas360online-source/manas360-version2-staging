@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.revokeSessionController = exports.sessionsController = exports.logoutController = exports.mfaVerifyController = exports.mfaSetupController = exports.resetPasswordController = exports.requestPasswordResetController = exports.refreshTokenController = exports.googleLoginController = exports.loginController = exports.verifyPhoneOtpController = exports.signupWithPhoneController = exports.verifyEmailOtpController = exports.signupWithEmailController = exports.meController = exports.registerController = void 0;
+exports.revokeSessionController = exports.sessionsController = exports.logoutController = exports.mfaVerifyController = exports.mfaSetupController = exports.resetPasswordController = exports.requestPasswordResetController = exports.refreshTokenController = exports.googleLoginController = exports.loginController = exports.verifyPhoneOtpController = exports.signupWithPhoneController = exports.verifyEmailOtpController = exports.signupWithEmailController = exports.meController = exports.providerRegisterController = exports.registerController = void 0;
 const crypto_1 = require("crypto");
 const env_1 = require("../config/env");
 const db_1 = require("../config/db");
@@ -64,6 +64,44 @@ const registerController = async (req, res) => {
     (0, response_1.sendSuccess)(res, result, 'Registration successful', 201);
 };
 exports.registerController = registerController;
+const providerRegisterController = async (req, res) => {
+    const userId = req.auth?.userId;
+    if (!userId) {
+        throw new error_middleware_1.AppError('Authentication required', 401);
+    }
+    const requiredString = (value, field) => {
+        const normalized = typeof value === 'string' ? value.trim() : '';
+        if (!normalized) {
+            throw new error_middleware_1.AppError(`${field} is required`, 400);
+        }
+        return normalized;
+    };
+    const result = await (0, auth_service_1.registerProviderProfile)(userId, {
+        displayName: requiredString(req.body.fullName ?? req.body.displayName, 'displayName'),
+        registrationType: (typeof req.body.registrationType === 'string'
+            ? req.body.registrationType.trim().toUpperCase()
+            : typeof req.body.licenseRci === 'string' && req.body.licenseRci.trim()
+                ? 'RCI'
+                : typeof req.body.licenseNmc === 'string' && req.body.licenseNmc.trim()
+                    ? 'NMC'
+                    : 'OTHER'),
+        registrationNum: requiredString(req.body.registrationNum, 'registrationNum'),
+        yearsExperience: Number(req.body.yearsOfExperience ?? req.body.yearsExperience ?? 0),
+        highestQual: requiredString(req.body.education ?? req.body.highestQual, 'highestQual'),
+        specializations: Array.isArray(req.body.specializations) ? req.body.specializations.map(String) : [],
+        languages: Array.isArray(req.body.languages) ? req.body.languages.map(String) : [],
+        hourlyRate: Number(req.body.consultationFee ?? req.body.hourlyRate ?? 0),
+        bio: typeof req.body.bio === 'string' ? req.body.bio : undefined,
+        documents: Array.isArray(req.body.documents)
+            ? req.body.documents.map((document) => ({
+                documentType: requiredString(document?.documentType, 'documents.documentType'),
+                url: requiredString(document?.url, 'documents.url'),
+            }))
+            : [],
+    });
+    (0, response_1.sendSuccess)(res, result, 'Provider onboarding submitted', 201);
+};
+exports.providerRegisterController = providerRegisterController;
 const meController = async (req, res) => {
     if (!req.auth?.userId) {
         throw new error_middleware_1.AppError('Authentication required', 401);
@@ -82,6 +120,13 @@ const meController = async (req, res) => {
             mfaEnabled: true,
             isTherapistVerified: true,
             therapistVerifiedAt: true,
+            onboardingStatus: true,
+            therapistProfile: {
+                select: {
+                    onboardingCompleted: true,
+                    isVerified: true,
+                },
+            },
         },
     });
     if (!user) {
@@ -101,6 +146,9 @@ const meController = async (req, res) => {
         mfaEnabled: user.mfaEnabled,
         isTherapistVerified: Boolean(user.isTherapistVerified),
         therapistVerifiedAt: user.therapistVerifiedAt ?? null,
+        onboardingStatus: user.onboardingStatus ?? null,
+        providerOnboardingCompleted: Boolean(user.therapistProfile?.onboardingCompleted),
+        providerProfileVerified: Boolean(user.therapistProfile?.isVerified),
         companyKey: companyMeta.company_key,
         company_key: companyMeta.company_key,
         isCompanyAdmin: Boolean(companyMeta.is_company_admin),

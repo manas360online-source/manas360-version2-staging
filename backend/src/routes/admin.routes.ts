@@ -8,7 +8,7 @@ import {
 	validateAdminListSubscriptionsQuery,
 	asyncHandler,
 } from '../middleware/validate.middleware';
-import { listUsersController, getUserController, verifyTherapistController, getMetricsController, listSubscriptionsController } from '../controllers/admin.controller';
+import { listUsersController, getUserController, verifyProviderController, verifyTherapistController, approveProviderController, getMetricsController, listSubscriptionsController } from '../controllers/admin.controller';
 import {
 	getAdminAnalyticsSummaryController,
 	getAdminMostUsedTemplatesController,
@@ -76,6 +76,29 @@ router.patch(
 	requirePermission('manage_therapists'),
 	...validateTherapistProfileIdParam,
 	asyncHandler(verifyTherapistController),
+);
+
+router.post(
+	'/verify-provider/:id',
+	requireAuth,
+	requireRole('admin'),
+	requirePermission('manage_therapists'),
+	...validateTherapistProfileIdParam,
+	asyncHandler(verifyProviderController),
+);
+
+/**
+ * POST /api/v1/admin/approve-provider/:id
+ * Approve provider onboarding — sets isVerified, onboardingStatus = COMPLETED
+ * Route parameters:
+ *   - id: provider user ID
+ */
+router.post(
+	'/approve-provider/:id',
+	requireAuth,
+	requireRole('admin'),
+	requirePermission('manage_therapists'),
+	asyncHandler(approveProviderController),
 );
 
 /**
