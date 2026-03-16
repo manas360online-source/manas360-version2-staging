@@ -25,6 +25,7 @@ import patientJourneyRoutes from './patient-journey.routes';
 import freeScreeningRoutes from './free-screening.routes';
 import gpsRoutes from './gps.routes';
 import providerRoutes from './provider.routes';
+import soundRoutes from './sound.routes';
 
 const router = Router();
 
@@ -68,6 +69,8 @@ router.use('/landing', landingRoutes);
 router.use('/v1/landing', landingRoutes);
 router.use('/webhooks', webhookRoutes);
 router.use('/chat', chatRoutes);
+router.use('/sounds', soundRoutes);
+router.use('/v1/sounds', soundRoutes);
 router.use('/v1', riskAnalyticsRoutes);
 router.use('/v1/gps', gpsRoutes);
 

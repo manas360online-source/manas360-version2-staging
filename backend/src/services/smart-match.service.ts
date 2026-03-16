@@ -28,6 +28,13 @@ interface ProviderMatch {
   availability?: string;
 }
 
+type AvailabilitySlot = {
+  dayOfWeek: number;
+  startMinute: number;
+  endMinute: number;
+  isAvailable?: boolean;
+};
+
 // Convert day/time preferences to a readable format
 const formatAvailabilityPrefs = (prefs: AvailabilityPrefs): string => {
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -38,6 +45,23 @@ const formatAvailabilityPrefs = (prefs: AvailabilityPrefs): string => {
     return `${String(startHour).padStart(2, '0')}:00-${String(endHour).padStart(2, '0')}:00`;
   });
   return `${days} (${times.join(', ')})`;
+};
+
+export const hasSmartMatchAvailabilityOverlap = (
+  availabilityPrefs: AvailabilityPrefs,
+  therapistAvailability: AvailabilitySlot[],
+): boolean => {
+  return availabilityPrefs.daysOfWeek.some((reqDay) =>
+    availabilityPrefs.timeSlots.some((reqTime) =>
+      therapistAvailability.some((slot: AvailabilitySlot) => {
+        return (
+          slot.dayOfWeek === reqDay &&
+          (slot.isAvailable ?? true) &&
+          isTimeOverlap(reqTime.startMinute, reqTime.endMinute, slot.startMinute, slot.endMinute)
+        );
+      }),
+    ),
+  );
 };
 
 // Query providers who match the requested availability
@@ -79,22 +103,7 @@ export const findMatchingProviders = async (
         if (!Array.isArray(slots)) return false;
 
         // Check if any of the requested days/times overlap with therapist's availability
-        return availabilityPrefs.daysOfWeek.some((reqDay) =>
-          availabilityPrefs.timeSlots.some((reqTime) =>
-            slots.some((slot: any) => {
-              return (
-                slot.dayOfWeek === reqDay &&
-                slot.isAvailable &&
-                isTimeOverlap(
-                  reqTime.startMinute,
-                  reqTime.endMinute,
-                  slot.startMinute,
-                  slot.endMinute,
-                )
-              );
-            }),
-          ),
-        );
+        return hasSmartMatchAvailabilityOverlap(availabilityPrefs, slots as AvailabilitySlot[]);
       } catch {
         return false;
       }

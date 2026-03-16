@@ -19,19 +19,34 @@ const assertTherapistUser = async (userId) => {
 };
 const getMyTherapistLeads = async (userId, query) => {
     await assertTherapistUser(userId);
+    const now = new Date();
     const pagination = (0, pagination_1.normalizePagination)({ page: query.page, limit: query.limit }, { defaultPage: 1, defaultLimit: 10, maxLimit: 50 });
     // Do not return unassigned leads (providerId: null) to avoid exposing newly-registered
     // patients to all therapists. Therapists will only see leads reserved for them
     // (paymentStatus: 'INITIATED') or leads they have purchased.
+    const availableWhere = {
+        status: 'AVAILABLE',
+        providerId: userId,
+        OR: [
+            { channel: 'CONSUMER' },
+            { channel: 'B2B_INSTITUTIONAL', visibleAt: { lte: now } },
+        ],
+        AND: [
+            {
+                OR: [
+                    { channel: 'B2B_INSTITUTIONAL' },
+                    { channel: 'CONSUMER', paymentStatus: 'INITIATED' },
+                ],
+            },
+        ],
+    };
+    const purchasedWhere = { status: 'PURCHASED', providerId: userId };
     const where = query.status
         ? query.status === 'available'
-            ? { status: 'AVAILABLE', providerId: userId, paymentStatus: 'INITIATED' }
-            : { status: 'PURCHASED', providerId: userId }
+            ? availableWhere
+            : purchasedWhere
         : {
-            OR: [
-                { status: 'AVAILABLE', providerId: userId, paymentStatus: 'INITIATED' },
-                { status: 'PURCHASED', providerId: userId },
-            ],
+            OR: [availableWhere, purchasedWhere],
         };
     const [total, leads] = await Promise.all([
         db.lead.count({ where }),
@@ -43,6 +58,9 @@ const getMyTherapistLeads = async (userId, query) => {
             select: {
                 id: true,
                 status: true,
+                channel: true,
+                tier: true,
+                visibleAt: true,
                 paymentStatus: true,
                 razorpayOrderId: true,
                 matchScore: true,

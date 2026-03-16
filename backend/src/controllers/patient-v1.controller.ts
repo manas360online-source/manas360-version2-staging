@@ -686,8 +686,13 @@ export const getPatientProgressController = async (req: Request, res: Response):
 
 export const getMyActiveCbtAssignmentsController = async (req: Request, res: Response): Promise<void> => {
 	const userId = authUserId(req);
+	const cbtModel = (prisma as any).cBTAssignment;
+	if (!cbtModel) {
+		sendSuccess(res, [], 'Active CBT assignments fetched');
+		return;
+	}
 
-	const assignments = await prisma.cBTAssignment.findMany({
+	const assignments = await cbtModel.findMany({
 		where: {
 			patientId: userId,
 			status: {
@@ -734,8 +739,10 @@ export const getMyCbtAssignmentDetailController = async (req: Request, res: Resp
 	const userId = authUserId(req);
 	const assignmentId = String(req.params.assignmentId || '').trim();
 	if (!assignmentId) throw new AppError('assignment id is required', 422);
+	const cbtModel = (prisma as any).cBTAssignment;
+	if (!cbtModel) throw new AppError('CBT assignment not found', 404);
 
-	const assignment = await prisma.cBTAssignment.findFirst({
+	const assignment = await cbtModel.findFirst({
 		where: {
 			id: assignmentId,
 			patientId: userId,
@@ -787,13 +794,15 @@ export const upsertMyCbtAssignmentResponseController = async (req: Request, res:
 	const userId = authUserId(req);
 	const assignmentId = String(req.params.assignmentId || '').trim();
 	if (!assignmentId) throw new AppError('assignment id is required', 422);
+	const cbtModel = (prisma as any).cBTAssignment;
+	if (!cbtModel) throw new AppError('CBT assignment not found', 404);
 
 	const requestedStatus = String(req.body?.status || '').trim().toUpperCase();
 	const status = requestedStatus === 'COMPLETED' ? 'COMPLETED' : 'IN_PROGRESS';
 	const responses = (req.body?.responses || {}) as Record<string, unknown>;
 	const currentStep = req.body?.currentStep !== undefined ? Number(req.body.currentStep) : undefined;
 
-	const existing = await prisma.cBTAssignment.findFirst({
+	const existing = await cbtModel.findFirst({
 		where: { id: assignmentId, patientId: userId },
 		select: { id: true, providerId: true, templateType: true, content: true },
 	});
@@ -809,7 +818,7 @@ export const upsertMyCbtAssignmentResponseController = async (req: Request, res:
 		submittedAt: status === 'COMPLETED' ? new Date().toISOString() : previousContent.submittedAt,
 	};
 
-	const updated = await prisma.cBTAssignment.update({
+	const updated = await cbtModel.update({
 		where: { id: existing.id },
 		data: {
 			status: status as any,

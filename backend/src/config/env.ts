@@ -89,6 +89,7 @@ export interface EnvConfig {
 	secretEncryptionKey?: string;
 	allowDevVerificationBypass: boolean;
 	allowDevPaymentBypass: boolean;
+	freesoundApiKey?: string;
 }
 
 export const env: EnvConfig = Object.freeze({
@@ -133,6 +134,7 @@ export const env: EnvConfig = Object.freeze({
 	secretEncryptionKey: process.env.SECRET_ENCRYPTION_KEY ?? undefined,
 	allowDevVerificationBypass: parseBoolean(process.env.DEV_VERIFICATION_BYPASS, parseNodeEnv(process.env.NODE_ENV) === 'development'),
 	allowDevPaymentBypass: parseBoolean(process.env.DEV_PAYMENT_BYPASS, parseNodeEnv(process.env.NODE_ENV) === 'development'),
+	freesoundApiKey: process.env.FREESOUND_API_KEY,
 });
 
 if (

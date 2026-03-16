@@ -10,4 +10,6 @@ router.get('/me', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherap
 router.post('/:id/purchase/initiate', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, ...validate_middleware_1.validateSessionIdParam, (0, validate_middleware_1.asyncHandler)(lead_controller_1.initiateMyTherapistLeadPurchaseController));
 router.post('/:id/purchase/confirm', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, ...validate_middleware_1.validateSessionIdParam, (0, validate_middleware_1.asyncHandler)(lead_controller_1.confirmMyTherapistLeadPurchaseController));
 router.post('/:id/purchase', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, ...validate_middleware_1.validateSessionIdParam, (0, validate_middleware_1.asyncHandler)(lead_controller_1.purchaseMyTherapistLeadController));
+router.post('/b2b/publish', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin']), (0, validate_middleware_1.asyncHandler)(lead_controller_1.publishInstitutionalEngagementLeadsController));
+router.post('/b2b/dispatch-priority-notifications', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin']), (0, validate_middleware_1.asyncHandler)(lead_controller_1.dispatchPriorityTierLeadNotificationsController));
 exports.default = router;

@@ -3,6 +3,8 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { GlobalFallbackLoader } from './components/ui/FallbackLoader';
 import ScrollToTop from './components/common/ScrollToTop';
+import { GlobalAudioProvider } from './context/GlobalAudioContext';
+import GlobalAudioPlayerConsole from './components/audio/GlobalAudioPlayerConsole';
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 import { AuthProvider, getPostLoginRoute, useAuth } from './context/AuthContext';
 import { Assessment } from './pages/Assessment'
@@ -133,6 +135,7 @@ function App() {
 
   return (
     <AuthProvider>
+      <GlobalAudioProvider>
       <Toaster
         position="top-center"
         toastOptions={{
@@ -462,6 +465,8 @@ function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       </Suspense>
+      <GlobalAudioPlayerConsole />
+      </GlobalAudioProvider>
     </AuthProvider>
   )
 }

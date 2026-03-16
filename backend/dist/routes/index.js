@@ -30,6 +30,7 @@ const patient_journey_routes_1 = __importDefault(require("./patient-journey.rout
 const free_screening_routes_1 = __importDefault(require("./free-screening.routes"));
 const gps_routes_1 = __importDefault(require("./gps.routes"));
 const provider_routes_1 = __importDefault(require("./provider.routes"));
+const sound_routes_1 = __importDefault(require("./sound.routes"));
 const router = (0, express_1.Router)();
 router.get('/health', (_req, res) => {
     res.status(200).json({
@@ -70,6 +71,8 @@ router.use('/landing', landing_routes_1.default);
 router.use('/v1/landing', landing_routes_1.default);
 router.use('/webhooks', webhook_routes_1.default);
 router.use('/chat', chat_routes_1.default);
+router.use('/sounds', sound_routes_1.default);
+router.use('/v1/sounds', sound_routes_1.default);
 router.use('/v1', riskAnalytics_routes_1.default);
 router.use('/v1/gps', gps_routes_1.default);
 exports.default = router;
