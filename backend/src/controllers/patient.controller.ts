@@ -185,7 +185,7 @@ export const getMyTherapyPlanController = async (req: Request, res: Response): P
 			startDate: true,
 			endDate: true,
 		},
-	});
+	}).catch(() => null);
 
 	const currentWeek = activePlan?.startDate ? getCurrentTreatmentWeek(activePlan.startDate) : 1;
 	const selectedWeek = weekQuery ?? currentWeek;
@@ -220,24 +220,16 @@ export const getMyTherapyPlanController = async (req: Request, res: Response): P
 				category: true,
 				weekNumber: true,
 			},
-		}),
-		prisma.patientSession.findMany({
-			where: { patientId: userId },
-			orderBy: { createdAt: 'desc' },
-			select: {
-				id: true,
-				status: true,
-				createdAt: true,
-				completedAt: true,
-				sessionNotes: true,
-				template: {
-					select: {
-						title: true,
-						category: true,
-					},
-				},
-			},
-		}),
+		}).catch(() => []),
+		// patientSession model was removed from schema; skip to avoid runtime TypeError
+		Promise.resolve([] as Array<{
+			id: string;
+			status: string | null;
+			createdAt: Date;
+			completedAt: Date | null;
+			sessionNotes: string | null;
+			template: { title: string; category: string | null } | null;
+		}>),
 		prisma.therapistSessionNote.findMany({
 			where: {
 				patientId: patientProfile.id,
@@ -261,7 +253,7 @@ export const getMyTherapyPlanController = async (req: Request, res: Response): P
 					},
 				},
 			},
-		}),
+		}).catch(() => []),
 		prisma.careTeamAssignment.findFirst({
 			where: {
 				patientId: userId,
@@ -277,7 +269,7 @@ export const getMyTherapyPlanController = async (req: Request, res: Response): P
 					},
 				},
 			},
-		}),
+		}).catch(() => null),
 	]);
 
 	const fallbackProviderName = getProviderDisplayName(careTeamAssignment?.provider);

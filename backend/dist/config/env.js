@@ -78,6 +78,7 @@ exports.env = Object.freeze({
     secretEncryptionKey: process.env.SECRET_ENCRYPTION_KEY ?? undefined,
     allowDevVerificationBypass: parseBoolean(process.env.DEV_VERIFICATION_BYPASS, parseNodeEnv(process.env.NODE_ENV) === 'development'),
     allowDevPaymentBypass: parseBoolean(process.env.DEV_PAYMENT_BYPASS, parseNodeEnv(process.env.NODE_ENV) === 'development'),
+    freesoundApiKey: process.env.FREESOUND_API_KEY,
 });
 if ((exports.env.nodeEnv === 'production' || exports.env.nodeEnv === 'staging')
     && (exports.env.jwtAccessSecret === JWT_ACCESS_FALLBACK || exports.env.jwtRefreshSecret === JWT_REFRESH_FALLBACK)) {

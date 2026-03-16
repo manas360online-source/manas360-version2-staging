@@ -152,7 +152,7 @@ const getMyTherapyPlanController = async (req, res) => {
             startDate: true,
             endDate: true,
         },
-    });
+    }).catch(() => null);
     const currentWeek = activePlan?.startDate ? getCurrentTreatmentWeek(activePlan.startDate) : 1;
     const selectedWeek = weekQuery ?? currentWeek;
     const planFilter = activePlan
@@ -185,24 +185,9 @@ const getMyTherapyPlanController = async (req, res) => {
                     category: true,
                     weekNumber: true,
                 },
-            }),
-            db_1.prisma.patientSession.findMany({
-                where: { patientId: userId },
-                orderBy: { createdAt: 'desc' },
-                select: {
-                    id: true,
-                    status: true,
-                    createdAt: true,
-                    completedAt: true,
-                    sessionNotes: true,
-                    template: {
-                        select: {
-                            title: true,
-                            category: true,
-                        },
-                    },
-                },
-            }),
+            }).catch(() => []),
+            // patientSession model was removed from schema; skip to avoid runtime TypeError
+            Promise.resolve([]),
             db_1.prisma.therapistSessionNote.findMany({
                 where: {
                     patientId: patientProfile.id,
@@ -226,7 +211,7 @@ const getMyTherapyPlanController = async (req, res) => {
                         },
                     },
                 },
-            }),
+            }).catch(() => []),
             db_1.prisma.careTeamAssignment.findFirst({
                 where: {
                     patientId: userId,
@@ -242,7 +227,7 @@ const getMyTherapyPlanController = async (req, res) => {
                         },
                     },
                 },
-            }),
+            }).catch(() => null),
         ]);
         const fallbackProviderName = getProviderDisplayName(careTeamAssignment?.provider);
         const fallbackProviderInitials = getProviderInitials(fallbackProviderName);

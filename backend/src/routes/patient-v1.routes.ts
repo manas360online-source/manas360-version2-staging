@@ -59,6 +59,7 @@ import {
 	updatePatientPaymentMethodController,
 	upgradePatientSubscriptionController,
 	verifyPaymentController,
+	getMyActiveCbtAssignmentsController,
 } from '../controllers/patient-v1.controller';
 import {
 	getAvailableProvidersController,
@@ -142,6 +143,9 @@ router.get('/mood', requireAuth, requireRole('patient'), asyncHandler(getPatient
 router.get('/exercises', requireAuth, requireRole('patient'), asyncHandler(getPatientExercisesController));
 router.post('/exercises/library', requireAuth, requireRole('patient'), asyncHandler(logWellnessLibraryActivityController));
 router.patch('/exercises/:id/complete', requireAuth, requireRole('patient'), asyncHandler(completePatientExerciseController));
+
+// CBT assignment fallback route (primary is /api/patient/cbt-assignments/*)
+router.get('/cbt-assignments/active', requireAuth, requireRole('patient'), asyncHandler(getMyActiveCbtAssignmentsController));
 
 // Direct messaging
 router.get('/patient/messages/conversations', requireAuth, requireRole('patient'), asyncHandler(getConversationsController));

@@ -423,6 +423,9 @@ model TherapistProfile {
   clinicalCategories String[] @default([])
   specializations   String[]  @default([])
   languages         String[]  @default([])
+  certifications    String[]  @default([])
+  baseLatitude      Float?    @map("base_latitude")
+  baseLongitude     Float?    @map("base_longitude")
   corporateReady    Boolean   @default(false)
   shiftPreferences  String[]  @default([])
   yearsExperience   Int?      @default(0)
@@ -1268,6 +1271,17 @@ enum LeadStatus {
   ACCEPTED
 }
 
+enum LeadTier {
+  EXCLUSIVE
+  PRIORITY
+  STANDARD
+}
+
+enum LeadChannel {
+  CONSUMER
+  B2B_INSTITUTIONAL
+}
+
 enum LeadPaymentStatus {
   NOT_REQUIRED
   INITIATED
@@ -1307,10 +1321,13 @@ model Lead {
   patientId              String
   providerId             String?
   status                 LeadStatus        @default(AVAILABLE)
+  channel                LeadChannel       @default(CONSUMER)
+  tier                   LeadTier?
   matchScore             Int?
   amountMinor            BigInt
   currency               String            @default("INR")
   previewData            Json?
+  visibleAt              DateTime?
   patientAcceptanceUntil DateTime?
   providerContactedAt    DateTime?
   purchasedAt            DateTime?
@@ -1330,7 +1347,9 @@ model Lead {
   @@index([status, createdAt(sort: Desc)])
   @@index([providerId, status])
   @@index([providerId, paymentStatus])
+  @@index([providerId, status, visibleAt])
   @@index([patientId, status])
+  @@index([channel, tier, visibleAt])
   @@index([patientAcceptanceUntil])
   @@map("leads")
 }

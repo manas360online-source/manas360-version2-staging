@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.middleware';
-import { requireTherapistRole } from '../middleware/rbac.middleware';
+import { requireRole, requireTherapistRole } from '../middleware/rbac.middleware';
 import {
 	asyncHandler,
 	validateSessionIdParam,
@@ -8,8 +8,10 @@ import {
 } from '../middleware/validate.middleware';
 import {
 	confirmMyTherapistLeadPurchaseController,
+	dispatchPriorityTierLeadNotificationsController,
 	getMyTherapistLeadsController,
 	initiateMyTherapistLeadPurchaseController,
+	publishInstitutionalEngagementLeadsController,
 	purchaseMyTherapistLeadController,
 } from '../controllers/lead.controller';
 
@@ -19,5 +21,7 @@ router.get('/me', requireAuth, requireTherapistRole, ...validateTherapistLeadsQu
 router.post('/:id/purchase/initiate', requireAuth, requireTherapistRole, ...validateSessionIdParam, asyncHandler(initiateMyTherapistLeadPurchaseController));
 router.post('/:id/purchase/confirm', requireAuth, requireTherapistRole, ...validateSessionIdParam, asyncHandler(confirmMyTherapistLeadPurchaseController));
 router.post('/:id/purchase', requireAuth, requireTherapistRole, ...validateSessionIdParam, asyncHandler(purchaseMyTherapistLeadController));
+router.post('/b2b/publish', requireAuth, requireRole(['admin', 'superadmin']), asyncHandler(publishInstitutionalEngagementLeadsController));
+router.post('/b2b/dispatch-priority-notifications', requireAuth, requireRole(['admin', 'superadmin']), asyncHandler(dispatchPriorityTierLeadNotificationsController));
 
 export default router;

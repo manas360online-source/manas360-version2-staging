@@ -6,6 +6,9 @@ import {
   cancelPatientSubscriptionController,
   completePatientExerciseController,
   createMoodController,
+  getMyActiveCbtAssignmentsController,
+  getMyCbtAssignmentDetailController,
+  upsertMyCbtAssignmentResponseController,
   downloadPatientInvoiceController,
   downgradePatientSubscriptionController,
   getPatientDashboardController,
@@ -92,6 +95,10 @@ router.get('/progress', requireAuth, requireRole('patient'), asyncHandler(getPat
 router.get('/exercises', requireAuth, requireRole('patient'), asyncHandler(getPatientExercisesController));
 router.post('/exercises/library', requireAuth, requireRole('patient'), asyncHandler(logWellnessLibraryActivityController));
 router.patch('/exercises/:id/complete', requireAuth, requireRole('patient'), asyncHandler(completePatientExerciseController));
+
+router.get('/cbt-assignments/active', requireAuth, requireRole('patient'), asyncHandler(getMyActiveCbtAssignmentsController));
+router.get('/cbt-assignments/:assignmentId', requireAuth, requireRole('patient'), asyncHandler(getMyCbtAssignmentDetailController));
+router.patch('/cbt-assignments/:assignmentId', requireAuth, requireRole('patient'), asyncHandler(upsertMyCbtAssignmentResponseController));
 
 // Direct messaging
 router.get('/messages/conversations', requireAuth, requireRole('patient'), asyncHandler(getConversationsController));
