@@ -22,7 +22,8 @@ export const mockAuth = {
   user: { id: '1', name: 'Test User', role: 'therapist' },
   isAuthenticated: true,
   login: vi.fn(),
-  logout: jest.fn(),
+  logout: vi.fn(),
+  
 };
 
 // Custom render function with providers

@@ -53,6 +53,7 @@ router.post('/me/sessions/:id/actions/remind', auth_middleware_1.requireAuth, rb
 router.post('/me/sessions/:id/actions/start-live', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, ...validate_middleware_1.validateSessionIdParam, (0, validate_middleware_1.asyncHandler)(therapist_actions_controller_1.startLiveSessionController));
 router.post('/me/appointments/propose-slot', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, (0, validate_middleware_1.asyncHandler)(therapist_actions_controller_1.therapistProposeAppointmentSlotController));
 // Smart Match appointment booking
+router.get('/me/appointments/pending', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, (0, validate_middleware_1.asyncHandler)(therapist_dashboard_controller_1.getMyTherapistPendingAppointmentRequestsController));
 router.post('/me/appointments/accept', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, (0, validate_middleware_1.asyncHandler)(smart_match_controller_1.acceptAppointmentController));
 router.post('/me/appointments/reject', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, (0, validate_middleware_1.asyncHandler)(smart_match_controller_1.rejectAppointmentController));
 // Analytics

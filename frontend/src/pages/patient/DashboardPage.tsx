@@ -92,7 +92,7 @@ export default function DashboardPage() {
         await fetchDashboardData();
       } catch (err: any) {
         if (isOnboardingRequiredError(err)) {
-          navigate('/patient/onboarding?next=/patient/assessments', { replace: true });
+          navigate('/patient/onboarding?next=/patient/sessions', { replace: true });
           return;
         }
         setError(err?.response?.data?.message || err?.message || 'Unable to load dashboard right now.');

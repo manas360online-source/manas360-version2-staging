@@ -11,7 +11,6 @@ import SmartMatchFlow from '../../components/patient/SmartMatchFlow';
 import {
   Video,
   Download,
-  FileText,
   Activity,
   UserPlus,
   Users,
@@ -1368,15 +1367,6 @@ export default function SessionsPage() {
                         </div>
 
                         <div className="flex gap-2 pl-12 sm:pl-0">
-                          {isCompleted ? (
-                            <Link
-                              to={`/patient/sessions/${session.id}`}
-                              className="inline-flex items-center gap-1.5 rounded-lg border border-calm-sage/20 px-3 py-1.5 text-xs font-medium text-charcoal/70 transition hover:bg-calm-sage/10 hover:text-charcoal"
-                            >
-                              <FileText className="h-3.5 w-3.5" />
-                              Clinical Note
-                            </Link>
-                          ) : null}
                           {isCompleted || session.paymentStatus === 'PAID' ? (
                             <button
                               onClick={() => void handleDownloadInvoice(session.id)}

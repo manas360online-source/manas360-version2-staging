@@ -38,6 +38,7 @@ import {
   updatePatientPaymentMethodController,
   upgradePatientSubscriptionController,
 } from '../controllers/patient-v1.controller';
+import { getMyPetStateController, upsertMyPetStateController } from '../controllers/pet.controller';
 import {
   getConversationsController,
   getMessagesController,
@@ -89,6 +90,9 @@ router.post('/mood', requireAuth, requireRole('patient'), asyncHandler(createMoo
 router.get('/mood/today', requireAuth, requireRole('patient'), asyncHandler(getPatientMoodTodayController));
 router.get('/mood/history', requireAuth, requireRole('patient'), asyncHandler(getPatientMoodController));
 router.get('/mood/stats', requireAuth, requireRole('patient'), asyncHandler(getPatientMoodStatsController));
+
+router.get('/pets/state', requireAuth, requireRole('patient'), asyncHandler(getMyPetStateController));
+router.put('/pets/state', requireAuth, requireRole('patient'), asyncHandler(upsertMyPetStateController));
 
 router.get('/progress', requireAuth, requireRole('patient'), asyncHandler(getPatientProgressController));
 

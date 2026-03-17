@@ -1,4 +1,4 @@
-import * as PDFDocument from 'pdfkit';
+import PDFDocument from 'pdfkit';
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/error.middleware';
 import { adminAnalyticsService } from './admin-analytics.service';

@@ -1,5 +1,5 @@
 import { prisma } from '../config/db';
-import * as PDFDocument from 'pdfkit';
+import PDFDocument from 'pdfkit';
 import { createWriteStream, readFileSync } from 'fs';
 import { join } from 'path';
 import * as csv from 'fast-csv';

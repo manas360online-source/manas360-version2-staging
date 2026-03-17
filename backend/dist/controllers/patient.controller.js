@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.addDailyCheckInController = exports.getMyTherapyPlanController = exports.getMyTherapistMatchesController = exports.getMyMoodHistoryController = exports.getMyPatientAssessmentHistoryController = exports.createPatientAssessmentController = exports.getMyPatientProfileController = exports.createPatientProfileController = void 0;
+exports.getMyPrescriptionsController = exports.getMyDocumentsController = exports.addDailyCheckInController = exports.getMyTherapyPlanController = exports.getMyTherapistMatchesController = exports.getMyMoodHistoryController = exports.getMyPatientAssessmentHistoryController = exports.createPatientAssessmentController = exports.getMyPatientProfileController = exports.createPatientProfileController = void 0;
 const db_1 = require("../config/db");
 const error_middleware_1 = require("../middleware/error.middleware");
 const patient_service_1 = require("../services/patient.service");
@@ -347,3 +347,133 @@ const addDailyCheckInController = async (req, res) => {
     (0, response_1.sendSuccess)(res, dailyCheckIn, 'Daily check-in recorded', 201);
 };
 exports.addDailyCheckInController = addDailyCheckInController;
+// ── Get my documents ─────────────────────────────────────
+const getMyDocumentsController = async (req, res) => {
+    const userId = getAuthUserId(req);
+    const [notes, prescriptions, assessments] = await Promise.all([
+        db_1.prisma.therapistSessionNote.findMany({
+            where: {
+                session: {
+                    patientProfile: { userId },
+                },
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 20,
+            select: {
+                id: true,
+                sessionType: true,
+                status: true,
+                createdAt: true,
+                session: {
+                    select: {
+                        dateTime: true,
+                        therapistProfile: {
+                            select: {
+                                user: {
+                                    select: { firstName: true, lastName: true },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        }),
+        db_1.prisma.prescription.findMany({
+            where: { patientId: userId },
+            orderBy: { prescribedDate: 'desc' },
+            take: 20,
+            select: {
+                id: true,
+                drugName: true,
+                dosage: true,
+                status: true,
+                prescribedDate: true,
+                provider: {
+                    select: {
+                        user: {
+                            select: { firstName: true, lastName: true },
+                        },
+                    },
+                },
+            },
+        }),
+        db_1.prisma.patientAssessment.findMany({
+            where: {
+                patientProfile: { userId },
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 20,
+            select: {
+                id: true,
+                type: true,
+                totalScore: true,
+                createdAt: true,
+            },
+        }),
+    ]);
+    const documents = [
+        ...notes.map((n) => {
+            const providerName = n.session?.therapistProfile?.user
+                ? `${n.session.therapistProfile.user.firstName || ''} ${n.session.therapistProfile.user.lastName || ''}`.trim()
+                : 'Provider';
+            return {
+                id: n.id,
+                title: `Session Notes — ${n.sessionType || 'Consultation'} (${providerName})`,
+                date: (n.session?.dateTime || n.createdAt).toISOString().slice(0, 10),
+                category: 'session',
+            };
+        }),
+        ...prescriptions.map((p) => {
+            const providerName = p.provider?.user
+                ? `${p.provider.user.firstName || ''} ${p.provider.user.lastName || ''}`.trim()
+                : 'Provider';
+            return {
+                id: p.id,
+                title: `Prescription — ${p.drugName} ${p.dosage} (${providerName})`,
+                date: p.prescribedDate.toISOString().slice(0, 10),
+                category: 'official',
+            };
+        }),
+        ...assessments.map((a) => ({
+            id: a.id,
+            title: `${a.type} Assessment Result — Score ${a.totalScore}`,
+            date: a.createdAt.toISOString().slice(0, 10),
+            category: 'assessment',
+        })),
+    ];
+    documents.sort((a, b) => b.date.localeCompare(a.date));
+    (0, response_1.sendSuccess)(res, documents, 'Patient documents fetched');
+};
+exports.getMyDocumentsController = getMyDocumentsController;
+// ── Get my prescriptions ─────────────────────────────────────
+const getMyPrescriptionsController = async (req, res) => {
+    const userId = getAuthUserId(req);
+    const prescriptions = await db_1.prisma.prescription.findMany({
+        where: { patientId: userId },
+        orderBy: { prescribedDate: 'desc' },
+        include: {
+            provider: {
+                select: {
+                    user: {
+                        select: { firstName: true, lastName: true },
+                    },
+                },
+            },
+        },
+    });
+    const responseData = prescriptions.map((item) => ({
+        id: item.id,
+        drugName: item.drugName,
+        dosage: item.dosage,
+        instructions: item.instructions,
+        prescribedDate: item.prescribedDate.toISOString(),
+        refillsRemaining: item.refillsRemaining,
+        status: item.status,
+        warnings: item.warnings,
+        providerName: item.provider?.user
+            ? `${item.provider.user.firstName || ''} ${item.provider.user.lastName || ''}`.trim()
+            : 'Provider',
+    }));
+    (0, response_1.sendSuccess)(res, responseData, 'Patient prescriptions fetched');
+};
+exports.getMyPrescriptionsController = getMyPrescriptionsController;

@@ -183,13 +183,13 @@ export default function PricingPage() {
       setTimeout(async () => {
         try {
           await patientApi.getDashboardV2();
-          navigate('/patient/assessments', { replace: true });
+          navigate('/patient/sessions', { replace: true });
         } catch (error) {
           if (isOnboardingRequiredError(error)) {
-            navigate('/patient/onboarding?next=/patient/assessments', { replace: true });
+            navigate('/patient/onboarding?next=/patient/sessions', { replace: true });
             return;
           }
-          navigate('/patient/assessments', { replace: true });
+          navigate('/patient/sessions', { replace: true });
         }
       }, 700);
     } catch (error: any) {

@@ -419,6 +419,16 @@ export const patientApi = {
       async () => (await http.get('/v1/therapy-plan', { params: week ? { week } : undefined })).data,
     ]),
   completeTherapyPlanTask: async (id: string) => (await http.patch(`/v1/therapy-plan/tasks/${encodeURIComponent(id)}/complete`)).data,
+  getPetState: async () =>
+    withFallbackChain([
+      async () => (await http.get('/patient/pets/state')).data,
+      async () => (await http.get('/v1/patients/me/pets/state')).data,
+    ]),
+  upsertPetState: async (payload: { selectedPet: 'koi' | 'pup' | 'owl'; vitality: number; unlockedItems: string[]; isPremium: boolean }) =>
+    withFallbackChain([
+      async () => (await http.put('/patient/pets/state', payload)).data,
+      async () => (await http.put('/v1/patients/me/pets/state', payload)).data,
+    ]),
   getActiveCbtAssignments: async (): Promise<ActiveCbtAssignment[]> => {
     try {
       const response = await http.get('/patient/cbt-assignments/active');

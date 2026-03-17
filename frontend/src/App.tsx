@@ -21,13 +21,10 @@ import PlatformAdminRoute from './components/PlatformAdminRoute'
 import CorporateRoute from './components/CorporateRoute'
 const PatientDashboardLayout = lazy(() => import('./components/layout/PatientDashboardLayout'));
 const DashboardPage = lazy(() => import('./pages/patient/DashboardPage'));
-const BookSessionPage = lazy(() => import('./pages/patient/BookSessionPage'));
 const SessionsPage = lazy(() => import('./pages/patient/SessionsPage'));
-const PatientSessionDetailPage = lazy(() => import('./pages/patient/SessionDetailPage'));
 const AIChatPage = lazy(() => import('./pages/patient/AIChatPage'));
 const ProfilePage = lazy(() => import('./pages/patient/ProfilePage'));
 const SettingsPage = lazy(() => import('./pages/patient/SettingsPage'));
-const LiveSessionPage = lazy(() => import('./pages/patient/LiveSessionPage'));
 const DocumentsPage = lazy(() => import('./pages/patient/DocumentsPage'));
 const ProgressPage = lazy(() => import('./pages/patient/ProgressPage'));
 const SupportPage = lazy(() => import('./pages/patient/SupportPage'));
@@ -40,6 +37,8 @@ const NotificationsPage = lazy(() => import('./pages/patient/NotificationsPage')
 const SoundTherapyPage = lazy(() => import('./pages/patient/SoundTherapyPage'));
 const SleepTherapyPage = lazy(() => import('./pages/patient/SleepTherapyPage'));
 const WellnessLibraryPage = lazy(() => import('./pages/patient/WellnessLibraryPage'));
+const DigitalPetsHubPage = lazy(() => import('./pages/patient/DigitalPetsHubPage'));
+const PetVrSanctuaryPage = lazy(() => import('./pages/patient/PetVrSanctuaryPage'));
 const BuddyChatPage = lazy(() => import('./pages/patient/BuddyChatPage'));
 const ProviderMessagesPage = lazy(() => import('./pages/patient/ProviderMessagesPage'));
 const PatientOnboardingPage = lazy(() => import('./pages/patient/PatientOnboardingPage'));
@@ -88,6 +87,7 @@ const ProviderSettingsPage = lazy(() => import('./pages/provider/Settings'));
 const ProviderDashboard = lazy(() => import('./pages/provider/Dashboard/ProviderDashboard'));
 const ProviderOnboardingPage = lazy(() => import('./pages/provider/ProviderOnboardingPage'));
 const ProviderVerificationPendingPage = lazy(() => import('./pages/provider/ProviderVerificationPendingPage'));
+const AppointmentRequestsPage = lazy(() => import('./pages/provider/AppointmentRequests'));
 const HubLayout = lazy(() => import('./components/layout/HubLayout'));
 const PatientList = lazy(() => import('./pages/provider/Patients/PatientList'));
 const PatientChartLayout = lazy(() => import('./components/layout/PatientChartLayout'));
@@ -98,6 +98,7 @@ const PlanStudio = lazy(() => import('./pages/provider/Patients/Tabs/PlanStudio'
 const Prescriptions = lazy(() => import('./pages/provider/Patients/Tabs/Prescriptions'));
 const LabOrders = lazy(() => import('./pages/provider/Patients/Tabs/LabOrders'));
 const GoalsAndHabits = lazy(() => import('./pages/provider/Patients/Tabs/GoalsAndHabits'));
+const CareTeamTab = lazy(() => import('./pages/provider/Patients/Tabs/CareTeamTab'));
 
 interface AssessmentData {
   symptoms?: string[];
@@ -190,6 +191,7 @@ function App() {
             <Route path="notes" element={<SessionNotes />} />
             <Route path="session-notes" element={<Navigate to="../notes" replace />} />
             <Route path="assessments" element={<Assessments />} />
+            <Route path="care-team" element={<CareTeamTab />} />
             <Route path="plan-builder" element={<PlanStudio />} />
             <Route path="goals" element={<GoalsAndHabits />} />
             <Route path="prescriptions" element={<Prescriptions />} />
@@ -206,6 +208,7 @@ function App() {
           <Route path="earnings" element={<ProviderEarningsPage />} />
           <Route path="messages" element={<ProviderInboxPage />} />
           <Route path="settings" element={<ProviderSettingsPage />} />
+          <Route path="appointments" element={<AppointmentRequestsPage />} />
         </Route>
         <Route
           path="/onboarding/provider-setup"
@@ -423,13 +426,12 @@ function App() {
           <Route path="care-team" element={<Navigate to="/patient/sessions" replace />} />
           <Route path="providers" element={<Navigate to="/patient/sessions" replace />} />
           <Route path="providers/:id" element={<Navigate to="/patient/sessions" replace />} />
-          <Route path="book/:providerId" element={<BookSessionPage />} />
           <Route path="sessions" element={<SessionsPage />} />
-          <Route path="sessions/:id" element={<PatientSessionDetailPage />} />
           <Route path="exercises" element={<Navigate to="/patient/check-in?tab=daily-mood" replace />} />
-          <Route path="sessions/:id/live" element={<LiveSessionPage />} />
           <Route path="mood" element={<Navigate to="/patient/check-in?tab=daily-mood" replace />} />
           <Route path="wellness-library" element={<WellnessLibraryPage />} />
+          <Route path="digital-pets" element={<DigitalPetsHubPage />} />
+          <Route path="vr-sanctuary" element={<PetVrSanctuaryPage />} />
           <Route path="sleep-therapy" element={<SleepTherapyPage />} />
           <Route path="sound-therapy" element={<SoundTherapyPage />} />
           <Route path="buddy/:mode" element={<BuddyChatPage />} />
@@ -438,7 +440,6 @@ function App() {
           <Route path="messages" element={<AIChatPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="settings" element={<SettingsPage />} />
-          <Route path="assessments" element={<Navigate to="/patient/care-team" replace />} />
           <Route path="assessment-reports" element={<Navigate to="/patient/progress?tab=clinical" replace />} />
           <Route path="billing" element={<Navigate to="/patient/settings?section=billing" replace />} />
           <Route path="documents" element={<DocumentsPage />} />
@@ -453,10 +454,9 @@ function App() {
           <Route path="check-in" element={<DailyCheckInPage />} />
         </Route>
         <Route path="/providers/:id" element={<Navigate to="/patient/sessions" replace />} />
-        <Route path="/book/:providerId" element={<Navigate to="/patient/sessions" replace />} />
         <Route path="/sessions" element={<Navigate to="/patient/sessions" replace />} />
-        <Route path="/sessions/:id/live" element={<Navigate to="/patient/sessions" replace />} />
         <Route path="/ai-chat" element={<Navigate to="/patient/messages" replace />} />
+        <Route path="/pet" element={<Navigate to="/patient/digital-pets" replace />} />
         <Route path="/profile" element={<Navigate to="/patient/profile" replace />} />
         <Route path="/settings" element={<Navigate to="/patient/settings" replace />} />
         <Route path="/terms" element={<TermsOfUsePage />} />

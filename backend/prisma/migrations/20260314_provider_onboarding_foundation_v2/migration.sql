@@ -28,12 +28,30 @@ ALTER TABLE "therapist_profiles"
   ADD COLUMN IF NOT EXISTS "yearsExperience" INTEGER DEFAULT 0,
   ADD COLUMN IF NOT EXISTS "hourlyRate" INTEGER DEFAULT 0;
 
-UPDATE "therapist_profiles"
-SET
-  "highestQual" = COALESCE("highestQual", "education"),
-  "yearsExperience" = COALESCE("yearsExperience", "yearsOfExperience", 0),
-  "hourlyRate" = COALESCE("hourlyRate", "consultationFee", 0)
-WHERE TRUE;
+DO $$
+BEGIN
+  -- Update legacy columns individually to avoid referencing missing columns in a single statement
+  IF EXISTS(
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'therapist_profiles' AND column_name = 'education'
+  ) THEN
+    EXECUTE 'UPDATE "therapist_profiles" SET "highestQual" = COALESCE("highestQual", "education") WHERE TRUE';
+  END IF;
+
+  IF EXISTS(
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'therapist_profiles' AND column_name = 'yearsOfExperience'
+  ) THEN
+    EXECUTE 'UPDATE "therapist_profiles" SET "yearsExperience" = COALESCE("yearsExperience", "yearsOfExperience") WHERE TRUE';
+  END IF;
+
+  IF EXISTS(
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'therapist_profiles' AND column_name = 'consultationFee'
+  ) THEN
+    EXECUTE 'UPDATE "therapist_profiles" SET "hourlyRate" = COALESCE("hourlyRate", "consultationFee") WHERE TRUE';
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS "provider_documents" (
   "id" TEXT PRIMARY KEY,

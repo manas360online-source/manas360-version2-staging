@@ -69,6 +69,14 @@ import {
 	acceptAppointmentController,
 	rejectAppointmentController,
 } from '../controllers/smart-match.controller';
+import {
+	getPatientDocuments,
+} from '../controllers/provider.controller';
+import {
+	getMyDocumentsController,
+	getPatientDocumentDownload,
+} from '../controllers/patient.controller';
+import { uploadPatientDocument } from '../controllers/patient.controller';
 
 const router = Router();
 
@@ -78,9 +86,13 @@ router.get('/patient/reports', requireAuth, requireRole('patient'), asyncHandler
 router.get('/patient/reports/shared/:id', requireAuth, requireRole('patient'), asyncHandler(getPatientSharedReportMetaController));
 router.get('/patient/reports/shared/:id/download', requireAuth, requireRole('patient'), asyncHandler(downloadPatientSharedReportController));
 router.post('/patient/reports/health-summary', requireAuth, requireRole('patient'), asyncHandler(generateCompleteHealthSummaryController));
+
+// Patient documents — reuses provider aggregation but scoped to own ID
+router.get('/patient/documents', requireAuth, requireRole('patient'), asyncHandler(getMyDocumentsController));
 router.get('/patient/records/:id/url', requireAuth, requireRole('patient'), asyncHandler(getPatientRecordSecureUrlController));
 router.post('/patient/records/:id/share', requireAuth, requireRole('patient'), asyncHandler(createPatientRecordShareLinkController));
 router.get('/patient/records/shared/:token', asyncHandler(streamSharedPatientRecordController));
+router.get('/patient/documents/:id/download', requireAuth, requireRole('patient'), asyncHandler(getPatientDocumentDownload));
 router.get('/patient/care-team', requireAuth, requireRole('patient'), asyncHandler(getMyCareTeamController));
 
 // Smart Match appointment booking flow
@@ -153,5 +165,7 @@ router.post('/patient/messages/start', requireAuth, requireRole('patient'), asyn
 router.get('/patient/messages/:conversationId', requireAuth, requireRole('patient'), asyncHandler(getMessagesController));
 router.post('/patient/messages', requireAuth, requireRole('patient'), asyncHandler(sendMessageController));
 router.post('/patient/messages/:conversationId/read', requireAuth, requireRole('patient'), asyncHandler(markMessagesReadController));
+
+router.post('/patient/documents/upload', requireAuth, requireRole('patient'), asyncHandler(uploadPatientDocument));
 
 export default router;

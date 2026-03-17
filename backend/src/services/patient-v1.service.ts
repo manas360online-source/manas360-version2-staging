@@ -454,7 +454,7 @@ export const getPatientDashboard = async (userId: string) => {
 	const patientProfile = await getPatientProfile(userId);
 	const now = new Date();
 
-	const [user, upcomingRaw, recentSessionsRaw, lastAssessment, recentMoodRaw, therapistUsers, exercises, progress] = await Promise.all([
+	const [user, upcomingRaw, recentSessionsRaw, lastAssessment, recentMoodRaw, therapistUsers, exercises, progress, recentPrescriptionsRaw] = await Promise.all([
 		db.user.findUnique({
 			where: { id: userId },
 			select: { id: true, name: true, firstName: true, lastName: true, email: true, role: true, createdAt: true },
@@ -529,6 +529,24 @@ export const getPatientDashboard = async (userId: string) => {
 				phqCurrent: true,
 			},
 		}).catch(() => null),
+		db.prescription.findMany({
+			where: { patientId: userId },
+			orderBy: { prescribedDate: 'desc' },
+			take: 5,
+			select: {
+				id: true,
+				drugName: true,
+				dosage: true,
+				prescribedDate: true,
+				provider: {
+					select: {
+						user: {
+							select: { firstName: true, lastName: true },
+						},
+					},
+				},
+			},
+		}).catch(() => []),
 	]);
 
 	const sessionProviderIds = Array.from(
@@ -605,6 +623,18 @@ export const getPatientDashboard = async (userId: string) => {
 			description: String(providerMap.get(String(session.therapistProfileId || '')) || 'Therapist'),
 			date: session.dateTime,
 		})),
+		...recentPrescriptionsRaw.slice(0, 3).map((prescription: any) => {
+			const providerName = prescription.provider?.user
+				? `${prescription.provider.user.firstName || ''} ${prescription.provider.user.lastName || ''}`.trim()
+				: 'Provider';
+			return {
+				id: `prescription-${prescription.id}`,
+				type: 'prescription',
+				title: `Prescription issued: ${prescription.drugName}`,
+				description: `${prescription.dosage} • ${providerName}`,
+				date: prescription.prescribedDate,
+			};
+		}),
 		...recentMoodRaw.slice(0, 3).map((mood: any, index: number) => ({
 			id: `mood-${mood.id || mood.date || index}-${index}`,
 			type: 'mood',

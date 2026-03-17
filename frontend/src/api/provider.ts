@@ -158,6 +158,7 @@ export interface GoalData {
   id: string;
   title: string;
   category: string;
+  status: string;
   startDate: string;
   streak: number;
   completionRate: number;
@@ -555,4 +556,188 @@ export const updatePatientNote = async (
 ): Promise<NoteData> => {
   const response = await http.put<Envelope<NoteData>>(`/v1/provider/patient/${patientId}/notes/${noteId}`, noteData);
   return unwrap<NoteData>(response.data);
+};
+
+// ============ PRESCRIPTION CRUD ============
+
+export interface CreatePrescriptionPayload {
+  drugName: string;
+  dosage: string;
+  instructions: string;
+  refillsRemaining?: number;
+  warnings?: string[];
+}
+
+export interface UpdatePrescriptionPayload {
+  dosage?: string;
+  instructions?: string;
+  refillsRemaining?: number;
+  warnings?: string[];
+}
+
+export const createPrescription = async (
+  patientId: string,
+  payload: CreatePrescriptionPayload,
+): Promise<PrescriptionData> => {
+  const response = await http.post<Envelope<PrescriptionData>>(`/v1/provider/patient/${patientId}/prescriptions`, payload);
+  return unwrap<PrescriptionData>(response.data);
+};
+
+export const updatePrescription = async (
+  patientId: string,
+  prescriptionId: string,
+  payload: UpdatePrescriptionPayload,
+): Promise<PrescriptionData> => {
+  const response = await http.patch<Envelope<PrescriptionData>>(`/v1/provider/patient/${patientId}/prescriptions/${prescriptionId}`, payload);
+  return unwrap<PrescriptionData>(response.data);
+};
+
+export const discontinuePrescription = async (
+  patientId: string,
+  prescriptionId: string,
+): Promise<{ id: string; status: string }> => {
+  const response = await http.delete<Envelope<{ id: string; status: string }>>(`/v1/provider/patient/${patientId}/prescriptions/${prescriptionId}`);
+  return unwrap<{ id: string; status: string }>(response.data);
+};
+
+// ============ LAB ORDER CRUD ============
+
+export interface CreateLabOrderPayload {
+  testName: string;
+  interpretation?: string;
+  biomarkers?: Array<{ name: string; value: string; referenceRange: string; status: string }>;
+}
+
+export interface UpdateLabOrderPayload {
+  status?: 'PENDING' | 'RESULTS_READY' | 'REVIEWED';
+  interpretation?: string;
+  biomarkers?: Array<{ name: string; value: string; referenceRange: string; status: string }>;
+}
+
+export const createLabOrder = async (
+  patientId: string,
+  payload: CreateLabOrderPayload,
+): Promise<LabOrderData> => {
+  const response = await http.post<Envelope<LabOrderData>>(`/v1/provider/patient/${patientId}/labs`, payload);
+  return unwrap<LabOrderData>(response.data);
+};
+
+export const updateLabOrder = async (
+  patientId: string,
+  labId: string,
+  payload: UpdateLabOrderPayload,
+): Promise<LabOrderData> => {
+  const response = await http.patch<Envelope<LabOrderData>>(`/v1/provider/patient/${patientId}/labs/${labId}`, payload);
+  return unwrap<LabOrderData>(response.data);
+};
+
+// ============ GOAL CRUD ============
+
+export interface CreateGoalPayload {
+  title: string;
+  category?: string;
+}
+
+export interface UpdateGoalPayload {
+  title?: string;
+  category?: string;
+  status?: 'IN_PROGRESS' | 'COMPLETED' | 'PAUSED';
+}
+
+export const createGoal = async (
+  patientId: string,
+  payload: CreateGoalPayload,
+): Promise<GoalData> => {
+  const response = await http.post<Envelope<GoalData>>(`/v1/provider/patient/${patientId}/goals`, payload);
+  return unwrap<GoalData>(response.data);
+};
+
+export const updateGoal = async (
+  patientId: string,
+  goalId: string,
+  payload: UpdateGoalPayload,
+): Promise<GoalData> => {
+  const response = await http.patch<Envelope<GoalData>>(`/v1/provider/patient/${patientId}/goals/${goalId}`, payload);
+  return unwrap<GoalData>(response.data);
+};
+
+// ============ CARE-TEAM MANAGEMENT ============
+
+export interface CareTeamAssignment {
+  assignmentId: string;
+  patientId: string;
+  patientName: string;
+  patientEmail: string | null;
+  assignedAt: string;
+  accessScope: Record<string, boolean>;
+}
+
+export const fetchProviderCareTeam = async (): Promise<CareTeamAssignment[]> => {
+  const response = await http.get<Envelope<CareTeamAssignment[]>>('/v1/provider/care-team');
+  return unwrap<CareTeamAssignment[]>(response.data);
+};
+
+export const assignPatientToCareTeam = async (
+  patientId: string,
+  accessScope?: Record<string, boolean>,
+): Promise<{ assignmentId: string; status: string }> => {
+  const response = await http.post<Envelope<{ assignmentId: string; status: string }>>(`/v1/provider/care-team/${patientId}`, { accessScope });
+  return unwrap<{ assignmentId: string; status: string }>(response.data);
+};
+
+export const removePatientFromCareTeam = async (
+  patientId: string,
+): Promise<{ assignmentId: string; status: string }> => {
+  const response = await http.delete<Envelope<{ assignmentId: string; status: string }>>(`/v1/provider/care-team/${patientId}`);
+  return unwrap<{ assignmentId: string; status: string }>(response.data);
+};
+
+// ============ APPOINTMENT REQUESTS ============
+
+export interface AppointmentRequestItem {
+  id: string;
+  patientId: string;
+  patientName: string;
+  patientEmail: string | null;
+  availabilityPrefs: unknown;
+  preferredSpecialization: string | null;
+  durationMinutes: number;
+  createdAt: string;
+  expiresAt: string | null;
+}
+
+export const fetchPendingAppointmentRequests = async (): Promise<AppointmentRequestItem[]> => {
+  const response = await http.get<Envelope<AppointmentRequestItem[]>>('/v1/provider/appointments/pending');
+  return unwrap<AppointmentRequestItem[]>(response.data);
+};
+
+export const acceptAppointmentRequest = async (
+  appointmentRequestId: string,
+  scheduledAt: string,
+): Promise<unknown> => {
+  const response = await http.post<Envelope<unknown>>(`/v1/provider/appointments/${appointmentRequestId}/accept`, {
+    scheduledAt,
+  });
+  return unwrap<unknown>(response.data);
+};
+
+export const rejectAppointmentRequest = async (
+  appointmentRequestId: string,
+): Promise<unknown> => {
+  const response = await http.post<Envelope<unknown>>(`/v1/provider/appointments/${appointmentRequestId}/reject`);
+  return unwrap<unknown>(response.data);
+};
+
+// ============ PATIENT DOCUMENTS ============
+
+export interface PatientDocumentItem {
+  id: string;
+  title: string;
+  date: string;
+  category: 'official' | 'session' | 'assessment';
+}
+
+export const fetchPatientDocuments = async (patientId: string): Promise<PatientDocumentItem[]> => {
+  const response = await http.get<Envelope<PatientDocumentItem[]>>(`/v1/provider/patient/${patientId}/documents`);
+  return unwrap<PatientDocumentItem[]>(response.data);
 };

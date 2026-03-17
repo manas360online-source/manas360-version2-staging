@@ -9,7 +9,7 @@ import {
   type WeeklyPlanActivityPayload,
 } from '../../../../api/provider';
 
-type WeekState = 'DRAFT' | 'PUBLISHED';
+type PlanState = 'DRAFT' | 'PUBLISHED';
 
 type TemplateItem = {
   id: string;
@@ -22,7 +22,7 @@ type TemplateItem = {
 
 type StagedActivity = WeeklyPlanActivityPayload & { id: string };
 
-const weekRibbon = Array.from({ length: 12 }, (_, idx) => idx + 1);
+const dayRibbon = Array.from({ length: 10 }, (_, idx) => idx + 1);
 
 const masterTemplates: TemplateItem[] = [
   {
@@ -73,9 +73,41 @@ const masterTemplates: TemplateItem[] = [
     frequency: 'WEEKLY_MILESTONE',
     estimatedMinutes: 20,
   },
+  {
+    id: 'tpl-ar-sanctuary-butterfly',
+    title: 'AR Butterfly Sanctuary',
+    activityType: 'AUDIO_THERAPY',
+    category: 'AR Sanctuary',
+    frequency: 'DAILY_RITUAL',
+    estimatedMinutes: 10,
+  },
+  {
+    id: 'tpl-ar-sanctuary-ocean',
+    title: 'AR Ocean Sanctuary',
+    activityType: 'AUDIO_THERAPY',
+    category: 'AR Sanctuary',
+    frequency: 'DAILY_RITUAL',
+    estimatedMinutes: 12,
+  },
+  {
+    id: 'tpl-sound-therapy-binaural',
+    title: 'Binaural Sound Therapy',
+    activityType: 'AUDIO_THERAPY',
+    category: 'Sound Therapy',
+    frequency: 'DAILY_RITUAL',
+    estimatedMinutes: 15,
+  },
+  {
+    id: 'tpl-sound-therapy-nature',
+    title: 'Nature Sound Therapy',
+    activityType: 'AUDIO_THERAPY',
+    category: 'Sound Therapy',
+    frequency: 'DAILY_RITUAL',
+    estimatedMinutes: 20,
+  },
 ];
 
-const toStatusBadge = (state: WeekState) => {
+const toStatusBadge = (state: PlanState) => {
   if (state === 'PUBLISHED') {
     return 'bg-[#E9F7F1] text-[#2F7A5F] border border-[#CDEBDD]';
   }
@@ -84,13 +116,13 @@ const toStatusBadge = (state: WeekState) => {
 
 export default function PlanStudio() {
   const { patientId = '' } = useParams();
-  const [selectedWeek, setSelectedWeek] = useState<number>(1);
+  const [selectedDay, setSelectedDay] = useState<number>(1);
   const [searchTerm, setSearchTerm] = useState('');
-  const [weekActivities, setWeekActivities] = useState<Record<number, StagedActivity[]>>({});
-  const [weekStatus, setWeekStatus] = useState<Record<number, WeekState>>({});
+  const [dayActivities, setDayActivities] = useState<Record<number, StagedActivity[]>>({});
+  const [dayStatus, setDayStatus] = useState<Record<number, PlanState>>({});
   const [draggingActivityId, setDraggingActivityId] = useState<string | null>(null);
 
-  const stagedActivities = useMemo(() => weekActivities[selectedWeek] || [], [weekActivities, selectedWeek]);
+  const stagedActivities = useMemo(() => dayActivities[selectedDay] || [], [dayActivities, selectedDay]);
 
   const visibleTemplates = useMemo(() => {
     const normalized = searchTerm.trim().toLowerCase();
@@ -106,6 +138,12 @@ export default function PlanStudio() {
     mutationFn: async () => {
       if (!patientId) throw new Error('Patient id is required');
 
+      // Calculate scheduled date for the day (today + selectedDay - 1)
+      const scheduledDate = new Date();
+      scheduledDate.setDate(scheduledDate.getDate() + selectedDay - 1);
+      // TODO: Use scheduledDateString when daily API is available
+      // const scheduledDateString = scheduledDate.toISOString().split('T')[0];
+
       const payloadActivities = stagedActivities.map((activity, index) => ({
         id: activity.id.startsWith('draft-') ? undefined : activity.id,
         title: String(activity.title || '').trim(),
@@ -117,19 +155,23 @@ export default function PlanStudio() {
         orderIndex: Number.isInteger(activity.orderIndex) ? Number(activity.orderIndex) : index,
       }));
 
+      // For now, use the weekly API with dayNumber instead of weekNumber
+      // TODO: Update to use daily plan API when available
       await updatePatientWeeklyPlan(patientId, {
-        weekNumber: selectedWeek,
+        weekNumber: selectedDay, // Using day as week for now
         activities: payloadActivities,
       });
 
-      return publishPatientWeeklyPlan(patientId, { weekNumber: selectedWeek });
+      return publishPatientWeeklyPlan(patientId, { 
+        weekNumber: selectedDay, // Using day as week for now
+      });
     },
     onSuccess: (result) => {
-      setWeekStatus((prev) => ({ ...prev, [selectedWeek]: 'PUBLISHED' }));
-      toast.success(`Week ${selectedWeek} is now live for patient (${result.publishedCount} activities published).`);
+      setDayStatus((prev) => ({ ...prev, [selectedDay]: 'PUBLISHED' }));
+      toast.success(`Day ${selectedDay} is now live for patient (${result.publishedCount} activities published).`);
     },
     onError: (error: any) => {
-      toast.error(String(error?.response?.data?.message || error?.message || 'Unable to publish this week right now.'));
+      toast.error(String(error?.response?.data?.message || error?.message || 'Unable to publish this day right now.'));
     },
   });
 
@@ -144,34 +186,34 @@ export default function PlanStudio() {
       estimatedMinutes: template.estimatedMinutes,
     };
 
-    setWeekActivities((prev) => ({
+    setDayActivities((prev) => ({
       ...prev,
-      [selectedWeek]: [...(prev[selectedWeek] || []), draft],
+      [selectedDay]: [...(prev[selectedDay] || []), draft],
     }));
 
-    setWeekStatus((prev) => ({ ...prev, [selectedWeek]: 'DRAFT' }));
-    toast.success(`${template.title} added to Week ${selectedWeek}`);
+    setDayStatus((prev) => ({ ...prev, [selectedDay]: 'DRAFT' }));
+    toast.success(`${template.title} added to Day ${selectedDay}`);
   };
 
   const removeActivity = (activityId: string) => {
-    setWeekActivities((prev) => ({
+    setDayActivities((prev) => ({
       ...prev,
-      [selectedWeek]: (prev[selectedWeek] || []).filter((item) => item.id !== activityId),
+      [selectedDay]: (prev[selectedDay] || []).filter((item) => item.id !== activityId),
     }));
-    setWeekStatus((prev) => ({ ...prev, [selectedWeek]: 'DRAFT' }));
+    setDayStatus((prev) => ({ ...prev, [selectedDay]: 'DRAFT' }));
   };
 
-  const clearWeek = () => {
-    setWeekActivities((prev) => ({ ...prev, [selectedWeek]: [] }));
-    setWeekStatus((prev) => ({ ...prev, [selectedWeek]: 'DRAFT' }));
-    toast.success(`Week ${selectedWeek} draft cleared.`);
+  const clearDay = () => {
+    setDayActivities((prev) => ({ ...prev, [selectedDay]: [] }));
+    setDayStatus((prev) => ({ ...prev, [selectedDay]: 'DRAFT' }));
+    toast.success(`Day ${selectedDay} draft cleared.`);
   };
 
   const reorderActivities = (fromId: string, toId: string) => {
     if (!fromId || !toId || fromId === toId) return;
 
-    setWeekActivities((prev) => {
-      const current = [...(prev[selectedWeek] || [])];
+    setDayActivities((prev) => {
+      const current = [...(prev[selectedDay] || [])];
       const fromIndex = current.findIndex((item) => item.id === fromId);
       const toIndex = current.findIndex((item) => item.id === toId);
       if (fromIndex < 0 || toIndex < 0) return prev;
@@ -181,14 +223,14 @@ export default function PlanStudio() {
 
       return {
         ...prev,
-        [selectedWeek]: current,
+        [selectedDay]: current,
       };
     });
 
-    setWeekStatus((prev) => ({ ...prev, [selectedWeek]: 'DRAFT' }));
+    setDayStatus((prev) => ({ ...prev, [selectedDay]: 'DRAFT' }));
   };
 
-  const currentWeekState = weekStatus[selectedWeek] || 'DRAFT';
+  const currentWeekState = dayStatus[selectedDay] || 'DRAFT';
 
   return (
     <div className="space-y-4" style={{ fontFamily: 'DM Sans, sans-serif' }}>
@@ -197,7 +239,7 @@ export default function PlanStudio() {
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Plan Studio</p>
             <h2 className="mt-1 text-2xl font-semibold text-[#1E293B]">Clinical Curriculum Workspace</h2>
-            <p className="mt-1 text-sm text-slate-500">Build week-by-week patient programs from master templates and publish when ready.</p>
+            <p className="mt-1 text-sm text-slate-500">Build day-by-day patient programs from master templates and publish when ready.</p>
           </div>
           <span className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold ${toStatusBadge(currentWeekState)}`}>
             {currentWeekState === 'PUBLISHED' ? 'Live for Patient' : 'Draft'}
@@ -206,17 +248,17 @@ export default function PlanStudio() {
 
         <div className="mt-4 overflow-x-auto pb-1">
           <div className="flex min-w-max items-center gap-2">
-            {weekRibbon.map((week) => (
+            {dayRibbon.map((day) => (
               <button
-                key={week}
+                key={day}
                 type="button"
-                onClick={() => setSelectedWeek(week)}
-                className={`rounded-full border px-3 py-1.5 text-sm font-semibold transition ${selectedWeek === week
+                onClick={() => setSelectedDay(day)}
+                className={`rounded-full border px-3 py-1.5 text-sm font-semibold transition ${selectedDay === day
                   ? 'border-[#1D4ED8] bg-[#EFF6FF] text-[#1D4ED8]'
                   : 'border-[#E5E7EB] bg-white text-slate-600 hover:bg-slate-50'
                 }`}
               >
-                Week {week}
+                Day {day}
               </button>
             ))}
           </div>
@@ -273,17 +315,17 @@ export default function PlanStudio() {
         <section className="rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-sm">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="text-lg font-semibold text-[#1E293B]">Week {selectedWeek} Drop Zone</h3>
-              <p className="text-sm text-slate-500">Activities assigned to this week</p>
+              <h3 className="text-lg font-semibold text-[#1E293B]">Day {selectedDay} Drop Zone</h3>
+              <p className="text-sm text-slate-500">Activities assigned to this day</p>
             </div>
             <button
               type="button"
-              onClick={clearWeek}
+              onClick={clearDay}
               disabled={stagedActivities.length === 0}
               className="inline-flex items-center gap-1 rounded-lg border border-[#E5E7EB] px-3 py-1.5 text-xs font-semibold text-slate-600 disabled:opacity-40"
             >
               <Trash2 className="h-3.5 w-3.5" />
-              Clear Week
+              Clear Day
             </button>
           </div>
 
@@ -325,7 +367,7 @@ export default function PlanStudio() {
 
             {stagedActivities.length === 0 ? (
               <div className="rounded-xl border border-dashed border-[#E5E7EB] bg-[#FAFAFA] p-8 text-center text-sm text-slate-500">
-                Week {selectedWeek} is empty. Add templates from the sidebar library.
+                Day {selectedDay} is empty. Add templates from the sidebar library.
               </div>
             ) : null}
           </div>
@@ -337,10 +379,10 @@ export default function PlanStudio() {
               disabled={saveAndPublishMutation.isPending || stagedActivities.length === 0}
               className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#1D4ED8] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1E40AF] disabled:opacity-60"
             >
-              {saveAndPublishMutation.isPending ? 'Publishing Week...' : (
+              {saveAndPublishMutation.isPending ? 'Publishing Day...' : (
                 <>
                   <Send className="h-4 w-4" />
-                  Publish Week
+                  Publish Day
                 </>
               )}
             </button>
@@ -348,7 +390,7 @@ export default function PlanStudio() {
             {currentWeekState === 'PUBLISHED' ? (
               <p className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-[#2F7A5F]">
                 <CheckCircle2 className="h-3.5 w-3.5" />
-                Week {selectedWeek} is live for patient.
+                Day {selectedDay} is live for patient.
               </p>
             ) : null}
           </div>

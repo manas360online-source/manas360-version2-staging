@@ -3,12 +3,15 @@ import {
 	addDailyCheckInController,
 	createPatientAssessmentController,
 	createPatientProfileController,
+	getMyDocumentsController,
 	getMyMoodHistoryController,
 	getMyPatientAssessmentHistoryController,
 	getMyPatientProfileController,
+	getMyPrescriptionsController,
 	getMyTherapyPlanController,
 	getMyTherapistMatchesController,
 } from '../controllers/patient.controller';
+import { getMyPetStateController, upsertMyPetStateController } from '../controllers/pet.controller';
 import { bookMySessionController, getMySessionHistoryController } from '../controllers/session.controller';
 import { requireAuth } from '../middleware/auth.middleware';
 import { requirePatientRole } from '../middleware/rbac.middleware';
@@ -36,6 +39,10 @@ router.get('/me/therapist-matches', requireAuth, requirePatientRole, ...validate
 router.post('/me/sessions/book', requireAuth, requirePatientRole, ...validateBookSessionRequest, asyncHandler(bookMySessionController));
 router.get('/me/sessions', requireAuth, requirePatientRole, ...validatePatientSessionHistoryQuery, asyncHandler(getMySessionHistoryController));
 router.post('/me/daily-checkin', requireAuth, requirePatientRole, ...validateCreateDailyCheckInRequest, asyncHandler(addDailyCheckInController));
+router.get('/me/pets/state', requireAuth, requirePatientRole, asyncHandler(getMyPetStateController));
+router.put('/me/pets/state', requireAuth, requirePatientRole, asyncHandler(upsertMyPetStateController));
+router.get('/documents', requireAuth, requirePatientRole, asyncHandler(getMyDocumentsController));
+router.get('/prescriptions', requireAuth, requirePatientRole, asyncHandler(getMyPrescriptionsController));
 
 export default router;
 

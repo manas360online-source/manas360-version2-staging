@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const patient_controller_1 = require("../controllers/patient.controller");
+const pet_controller_1 = require("../controllers/pet.controller");
 const session_controller_1 = require("../controllers/session.controller");
 const auth_middleware_1 = require("../middleware/auth.middleware");
 const rbac_middleware_1 = require("../middleware/rbac.middleware");
@@ -17,4 +18,8 @@ router.get('/me/therapist-matches', auth_middleware_1.requireAuth, rbac_middlewa
 router.post('/me/sessions/book', auth_middleware_1.requireAuth, rbac_middleware_1.requirePatientRole, ...validate_middleware_1.validateBookSessionRequest, (0, validate_middleware_1.asyncHandler)(session_controller_1.bookMySessionController));
 router.get('/me/sessions', auth_middleware_1.requireAuth, rbac_middleware_1.requirePatientRole, ...validate_middleware_1.validatePatientSessionHistoryQuery, (0, validate_middleware_1.asyncHandler)(session_controller_1.getMySessionHistoryController));
 router.post('/me/daily-checkin', auth_middleware_1.requireAuth, rbac_middleware_1.requirePatientRole, ...validate_middleware_1.validateCreateDailyCheckInRequest, (0, validate_middleware_1.asyncHandler)(patient_controller_1.addDailyCheckInController));
+router.get('/me/pets/state', auth_middleware_1.requireAuth, rbac_middleware_1.requirePatientRole, (0, validate_middleware_1.asyncHandler)(pet_controller_1.getMyPetStateController));
+router.put('/me/pets/state', auth_middleware_1.requireAuth, rbac_middleware_1.requirePatientRole, (0, validate_middleware_1.asyncHandler)(pet_controller_1.upsertMyPetStateController));
+router.get('/documents', auth_middleware_1.requireAuth, rbac_middleware_1.requirePatientRole, (0, validate_middleware_1.asyncHandler)(patient_controller_1.getMyDocumentsController));
+router.get('/prescriptions', auth_middleware_1.requireAuth, rbac_middleware_1.requirePatientRole, (0, validate_middleware_1.asyncHandler)(patient_controller_1.getMyPrescriptionsController));
 exports.default = router;
