@@ -521,11 +521,20 @@ export const patientApi = {
         async () => (await http.get(`/v1/patient/reports/shared/${encodeURIComponent(id)}/download`, { responseType: 'blob' })).data,
         async () => (await http.get(`/patient/reports/shared/${encodeURIComponent(id)}/download`, { responseType: 'blob' })).data,
       ]),
-    generateCompleteHealthSummary: async () =>
-      withFallbackChain([
-        async () => (await http.post('/v1/patient/reports/health-summary', {}, { responseType: 'blob' })).data,
-        async () => (await http.post('/patient/reports/health-summary', {}, { responseType: 'blob' })).data,
-      ]),
+    generateCompleteHealthSummary: async () => {
+      try {
+        const resp = await http.post('/v1/patient/reports/health-summary', {}, { responseType: 'blob' });
+        return resp.data;
+      } catch (err: any) {
+        const status = Number(err?.response?.status || 0);
+        // If v1 endpoint forbids (403), try legacy endpoint which may not require premium
+        if (status === 403) {
+          const fallback = await http.post('/patient/reports/health-summary', {}, { responseType: 'blob' });
+          return fallback.data;
+        }
+        throw err;
+      }
+    },
     getRecordSecureUrl: async (id: string) =>
       withFallbackChain([
         async () => (await http.get(`/v1/patient/records/${encodeURIComponent(id)}/url`)).data,
