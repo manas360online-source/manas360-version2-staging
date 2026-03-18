@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, waitFor } from '@testing-library/react';
 import { vi, describe, it, beforeEach, afterEach } from 'vitest';
 import axios from 'axios';
 import DocumentsPage from '../pages/patient/DocumentsPage';

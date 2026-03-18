@@ -1,415 +1,238 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Bot, Brain, CalendarClock, Clock3, HeartPulse, MoonStar, ShieldCheck, Sparkles, Waves } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
-import { isOnboardingRequiredError, patientApi } from '../../api/patient';
-
-const platformFeatures = [
-  'Therapist search and browsing',
-  'Session booking system',
-  'Basic Mitra AI chatbot (3 messages/day)',
-  'Mood tracking',
-  'Session scheduling',
-  'Payment processing',
-  'Video therapy platform',
-];
-
-const therapyPricing = [
-  {
-    provider: 'Clinical Psychologist',
-    mins45: 999,
-    mins60: 1499,
-  },
-  {
-    provider: 'Psychiatrist (MD)',
-    mins45: 1499,
-    mins60: 2499,
-  },
-  {
-    provider: 'Specialized Therapist',
-    mins45: 1299,
-    mins60: 1999,
-  },
-];
-
-const bundles = [
-  { label: '1 Hour Bundle', minutes: 60, price: 499, savings: null, popular: false },
-  { label: '2 Hour Bundle', minutes: 120, price: 899, savings: 99, popular: true },
-  { label: '3 Hour Bundle', minutes: 180, price: 1450, savings: null, popular: false },
-];
-
-const premiumFeatures = [
-  { icon: Sparkles, label: 'Digital Pet' },
-  { icon: Bot, label: 'Unlimited Mitra AI chatbot' },
-  { icon: Waves, label: 'IoT device integration' },
-  { icon: Brain, label: 'Advanced analytics' },
-  { icon: MoonStar, label: 'Sleep tracking' },
-  { icon: HeartPulse, label: 'CBT modules' },
-];
-
-const preferredTimeWindows = ['Evenings (6–9 PM)', 'Weekends', 'Early mornings'];
-
-type SessionTier = {
-  provider: string;
-  mins45: number;
-  mins60: number;
-};
-
-type BundleTier = { label: string; minutes: number; price: number; savings: number | null; popular: boolean };
-
-const providerLabelMap: Record<string, string> = {
-  'clinical-psychologist': 'Clinical Psychologist',
-  psychiatrist: 'Psychiatrist (MD)',
-  'specialized-therapist': 'Specialized Therapist',
-};
-
-const defaultPlatformFee = 199;
-
-// TODO(payment-gateway): Set VITE_PAYMENT_GATEWAY_DECIDED=true once gateway integration is live.
-// Until then, we intentionally keep a test bypass flow enabled so product work can continue.
-const PAYMENT_GATEWAY_DECIDED = import.meta.env.VITE_PAYMENT_GATEWAY_DECIDED === 'true';
+import { useState, useEffect } from 'react';
+import { ShieldCheck, Info } from 'lucide-react';
+import { patientApi } from '../../api/patient';
+import toast from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
 
 const isSubscriptionActive = (subscription: any): boolean => {
   if (!subscription) return false;
-
   const status = String(subscription?.status || '').toLowerCase();
   if (status === 'active' || status === 'trialing') return true;
   if (subscription?.isActive === true || subscription?.active === true) return true;
-
   return false;
 };
 
 export default function PricingPage() {
   const navigate = useNavigate();
-  const testPaymentMode = !PAYMENT_GATEWAY_DECIDED;
-  const [platformFee, setPlatformFee] = useState<number>(defaultPlatformFee);
-  const [sessionPricingConfig, setSessionPricingConfig] = useState<SessionTier[]>(therapyPricing);
-  const [bundleConfig, setBundleConfig] = useState<BundleTier[]>(bundles);
-  const [surchargePercent, setSurchargePercent] = useState(20);
-  const [pricingError, setPricingError] = useState<string | null>(null);
-
-  const [selectedProvider, setSelectedProvider] = useState(therapyPricing[0].provider);
-  const [duration, setDuration] = useState<45 | 60>(45);
-  const [preferredTime, setPreferredTime] = useState(false);
-  const [preferredWindow, setPreferredWindow] = useState(preferredTimeWindows[0]);
-  const [subscribing, setSubscribing] = useState(false);
-  const [subscriptionMessage, setSubscriptionMessage] = useState<string | null>(null);
   const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
+  const [subscribing, setSubscribing] = useState(false);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const [pricingResponse, subscriptionResponse] = await Promise.all([
-          patientApi.getPricing(),
-          patientApi.getSubscription().catch(() => null),
-        ]);
-        const payload = (pricingResponse as any)?.data ?? pricingResponse ?? {};
-        const subscriptionPayload = subscriptionResponse ? ((subscriptionResponse as any)?.data ?? subscriptionResponse) : null;
-        setHasActiveSubscription(isSubscriptionActive(subscriptionPayload));
-
-        const nextPlatformFee = Number(payload?.platformFee?.monthlyFee || defaultPlatformFee);
-        setPlatformFee(Number.isFinite(nextPlatformFee) ? nextPlatformFee : defaultPlatformFee);
-
-        const grouped = new Map<string, SessionTier>();
-        const sessionRows = Array.isArray(payload?.sessionPricing) ? payload.sessionPricing : [];
-        for (const row of sessionRows) {
-          const providerType = String(row?.providerType || '').toLowerCase();
-          const label = providerLabelMap[providerType] || providerType || 'Provider';
-          const duration = Number(row?.durationMinutes || 0);
-          const price = Number(row?.price || 0);
-          if (!duration || !Number.isFinite(price)) continue;
-          const base = grouped.get(label) || { provider: label, mins45: 0, mins60: 0 };
-          if (duration === 45) base.mins45 = price;
-          if (duration === 60) base.mins60 = price;
-          grouped.set(label, base);
-        }
-
-        const sessionValues = Array.from(grouped.values()).filter((item) => item.mins45 > 0 || item.mins60 > 0);
-        if (sessionValues.length > 0) {
-          setSessionPricingConfig(sessionValues);
-          setSelectedProvider((prev) =>
-            sessionValues.some((item) => item.provider === prev) ? prev : sessionValues[0].provider,
-          );
-        }
-
-        const bundleRows = Array.isArray(payload?.premiumBundles) ? payload.premiumBundles : [];
-        const dynamicBundles = bundleRows
-          .map((item: any) => ({
-            label: String(item?.bundleName || `${item?.minutes || 0} Minute Bundle`),
-            minutes: Number(item?.minutes || 0),
-            price: Number(item?.price || 0),
-            savings: null as number | null,
-            popular: Number(item?.minutes || 0) === 120,
-          }))
-          .filter((item: BundleTier) => item.minutes > 0 && item.price > 0)
-          .sort((a: BundleTier, b: BundleTier) => a.minutes - b.minutes);
-
-        if (dynamicBundles.length > 0) {
-          const oneHourPrice = dynamicBundles.find((item: BundleTier) => item.minutes === 60)?.price || 0;
-          setBundleConfig(
-            dynamicBundles.map((item: BundleTier) => {
-              if (item.minutes === 120 && oneHourPrice > 0) {
-                const savings = Math.max(0, oneHourPrice * 2 - item.price);
-                return { ...item, savings: savings > 0 ? savings : null, popular: true };
-              }
-              return item;
-            }),
-          );
-        }
-
-        const surcharge = Number(payload?.surchargePercent || 20);
-        setSurchargePercent(Number.isFinite(surcharge) ? surcharge : 20);
-        setPricingError(null);
-      } catch (error: any) {
-        setPricingError(error?.response?.data?.message || 'Showing default pricing while live pricing is unavailable.');
-      }
-    })();
+    patientApi.getSubscription()
+      .then((res) => setHasActiveSubscription(isSubscriptionActive((res as any)?.data ?? res)))
+      .catch(() => {});
   }, []);
 
-  const selectedProviderPricing = useMemo(
-    () => sessionPricingConfig.find((item) => item.provider === selectedProvider) || sessionPricingConfig[0],
-    [selectedProvider, sessionPricingConfig],
-  );
-
-  const basePrice = duration === 45 ? selectedProviderPricing.mins45 : selectedProviderPricing.mins60;
-  const finalPrice = preferredTime ? Math.round(basePrice * (1 + surchargePercent / 100)) : basePrice;
-
-  const onStartSubscription = async () => {
-    setSubscriptionMessage(null);
+  const onStartSubscription = async (planKey: string) => {
     setSubscribing(true);
     try {
-      await patientApi.upgradeSubscription();
-      setSubscriptionMessage('Subscription activated successfully.');
+      const response = await patientApi.upgradeSubscription({ planKey });
+      const payload = (response as any)?.data ?? response;
+      if (payload.redirectUrl) {
+        window.location.href = payload.redirectUrl;
+        return;
+      }
+      toast.success('Subscription activated successfully.');
       setHasActiveSubscription(true);
-      setTimeout(async () => {
-        try {
-          await patientApi.getDashboardV2();
-          navigate('/patient/sessions', { replace: true });
-        } catch (error) {
-          if (isOnboardingRequiredError(error)) {
-            navigate('/patient/onboarding?next=/patient/sessions', { replace: true });
-            return;
-          }
-          navigate('/patient/sessions', { replace: true });
-        }
-      }, 700);
+      setTimeout(() => navigate('/patient/dashboard', { replace: true }), 1000);
     } catch (error: any) {
-      setSubscriptionMessage(error?.response?.data?.message || 'Could not activate subscription right now.');
+      toast.error(error?.response?.data?.message || 'Could not initiate subscription.');
     } finally {
       setSubscribing(false);
     }
   };
 
+  const platformPlans = [
+    { key: 'free', name: 'Free Tier', price: '₹0', billing: '—', includes: '3 tracks/day, AI chatbot, basic self-help', bestFor: 'First-time users', rawPrice: 0 },
+    { key: 'monthly', name: 'Monthly', price: '₹99/M', billing: 'Monthly', includes: 'Full platform access, assessments, matching', bestFor: 'Trial users', rawPrice: 99 },
+    { key: 'quarterly', name: 'Quarterly (MVP)', price: '₹299/Q', billing: 'Quarterly', includes: 'Full access + priority matching + assessments', bestFor: 'Primary B2C plan', rawPrice: 299 },
+    { key: 'premium_monthly', name: 'Premium Monthly', price: '₹299/M', billing: 'Monthly', includes: 'Unlimited streaming, downloads, AI insights', bestFor: 'Power users', rawPrice: 299 },
+    { key: 'premium_annual', name: 'Premium Annual', price: '₹2,999/Y', billing: 'Annual', includes: 'All premium (₹250/M effective, 16% off)', bestFor: 'Committed users', rawPrice: 2999 },
+  ];
+
+  const sessionFees = [
+    { provider: 'Therapist / Counselor', tier1: '₹500', tier2: '₹1,000', tier3: '₹2,000', notes: 'CBT, stress, coping' },
+    { provider: 'Clinical Psychologist', tier1: '₹699', tier2: '₹1,500', tier3: '₹2,500', notes: 'Assessment, testing' },
+    { provider: 'Psychiatrist (MD)', tier1: '₹999', tier2: '₹2,000', tier3: '₹5,000', notes: '' },
+    { provider: 'NLP Coach', tier1: '₹500', tier2: '₹1,000', tier3: '₹1,500', notes: 'NLP + NAC' },
+    { provider: 'Executive Coach', tier1: '₹1,500', tier2: '₹2,500', tier3: '₹5,000', notes: 'Leadership' },
+  ];
+
+  const specialtyServices = [
+    { service: 'Couple Therapy', price: '₹1,499/S', format: 'Video (60 min)', availability: 'By appointment', provider: 'Licensed therapist' },
+    { service: 'Sleep Therapy', price: '₹1,499/S', format: 'Video (45 min)', availability: 'Evening slots', provider: 'Sleep specialist' },
+    { service: 'NRI — Psychologist', price: '₹2,999/S', format: 'Video (50 min)', availability: 'IST eve / NRI AM', provider: 'Licensed psychologist' },
+    { service: 'NRI — Psychiatrist', price: '₹3,499/S', format: 'Video (30 min)', availability: 'IST eve / NRI AM', provider: 'MD Psychiatrist' },
+    { service: 'NRI — Therapist', price: '₹3,599/S', format: 'Video (50 min)', availability: 'IST eve / NRI AM', provider: 'Senior therapist' },
+    { service: 'Executive (Weekend)', price: '₹1,999/S', format: 'Video (60 min)', availability: 'Sat & Sun', provider: 'Executive coach' },
+  ];
+
+  const addons = [
+    { feature: 'Anytime Buddy', price: '₹99', duration: '15 min', description: 'On-demand emotional support chat' },
+    { feature: 'Digital Pet Hub', price: '₹99', duration: '15 min', description: 'Hormone companion interaction' },
+    { feature: 'IVR Therapy', price: '₹499', duration: 'Per call', description: 'Voice-based therapy + PHQ screening' },
+    { feature: 'Vent Buddy', price: '₹99', duration: '15 min', description: 'Anonymous venting with trained listener' },
+    { feature: 'Sound Therapy Track', price: '₹30', duration: 'Per track', description: 'Own forever, unlimited play + download' },
+    { feature: 'Sound Bundle (10)', price: '₹250', duration: '10 tracks', description: '17% discount (₹25/track)' },
+  ];
+
   return (
-    <div className="space-y-8 bg-slate-50 pb-24">
-      <section className="overflow-hidden rounded-3xl border border-indigo-200/60 bg-gradient-to-br from-indigo-700 via-violet-700 to-indigo-900 p-6 text-white shadow-xl md:p-8">
-        <p className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em]">
-          <ShieldCheck className="h-3.5 w-3.5" />
-          MANAS360 Pricing
-        </p>
-        <h1 className="mt-3 text-3xl font-semibold md:text-4xl">Professional Subscription Plans for Patients</h1>
-        <p className="mt-2 max-w-2xl text-sm text-indigo-100">
-          Transparent, flexible pricing designed for sustained mental wellness care and premium therapy experiences.
-        </p>
-      </section>
-
-      <section className="rounded-3xl border border-indigo-100 bg-white p-6 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-indigo-600">Section 1 - Platform Access</p>
-        {testPaymentMode ? (
-          <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
-            Test payment mode is enabled. Platform activation will skip gateway checkout until payment gateway selection is finalized.
-          </div>
-        ) : null}
-        <div className="mt-3 rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-xs text-indigo-900">
-          Step 1: Platform fee unlocks assessments, AI insights, and matching tools. Step 2: provider fee is paid later only when booking a therapy session.
-        </div>
-        <div className="mt-4 grid gap-5 md:grid-cols-[1.2fr_2fr]">
-          <div className="rounded-2xl border border-indigo-200 bg-indigo-50/50 p-5">
-            <p className="text-sm font-semibold text-indigo-700">Standard Access</p>
-            <p className="mt-1 text-3xl font-bold text-indigo-900">₹{platformFee}<span className="text-sm font-medium text-indigo-700">/month</span></p>
-            <button
-              type="button"
-              onClick={() => void onStartSubscription()}
-              disabled={subscribing || hasActiveSubscription}
-              className="mt-4 inline-flex min-h-[40px] items-center rounded-xl bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-70"
-            >
-              {hasActiveSubscription
-                ? 'Platform Access Active'
-                : subscribing
-                  ? 'Activating...'
-                  : testPaymentMode
-                    ? 'Activate Platform Access (Test)'
-                    : 'Proceed to Payment'}
-            </button>
-            {subscriptionMessage ? <p className="mt-2 text-xs text-indigo-800">{subscriptionMessage}</p> : null}
-            <p className="mt-2 text-xs text-indigo-700">This payment does not include therapy session fees.</p>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {platformFeatures.map((feature) => (
-              <div key={feature} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
-                {feature}
-              </div>
-            ))}
-          </div>
-        </div>
-        {pricingError ? <p className="mt-3 text-xs text-amber-700">{pricingError}</p> : null}
-      </section>
-
-      <section className="rounded-3xl border border-teal-100 bg-white p-6 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700">Section 2 - Premium Wallet</p>
-        <p className="mt-2 text-xs text-slate-600">Buy minutes to unlock premium AI features, CBT modules, analytics, and wellness tools. Minutes never expire.</p>
-        <div className="mt-4 grid gap-4 md:grid-cols-3">
-          {bundleConfig.map((bundle) => (
-            <article
-              key={bundle.label}
-              className={`relative rounded-2xl border p-4 shadow-sm ${bundle.popular ? 'border-indigo-400 bg-indigo-50/40' : 'border-slate-200 bg-white'}`}
-            >
-              {bundle.popular ? (
-                <span className="absolute -top-2.5 right-3 rounded-full bg-indigo-600 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-white">
-                  Most Popular
-                </span>
-              ) : null}
-              <p className="text-sm font-semibold text-slate-900">{bundle.label}</p>
-              <p className="mt-1 text-xs text-slate-600">{bundle.minutes} minutes of premium access</p>
-              <p className="mt-2 text-2xl font-bold text-slate-900">₹{bundle.price}</p>
-              {bundle.savings ? <p className="mt-1 text-xs font-medium text-emerald-700">Save ₹{bundle.savings} vs buying separately</p> : null}
-              <Link
-                to="/patient/settings?section=billing"
-                className="mt-4 inline-flex min-h-[38px] items-center rounded-xl bg-teal-600 px-4 text-sm font-semibold text-white hover:bg-teal-500"
-              >
-                Buy in Wallet
-              </Link>
-            </article>
-          ))}
-        </div>
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {premiumFeatures.map((item) => {
-            const Icon = item.icon;
-            return (
-              <div key={item.label} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                <Icon className="h-4 w-4 text-teal-600" />
-                <span>{item.label}</span>
-              </div>
-            );
-          })}
+    <div className="space-y-8 bg-slate-50 pb-24 min-h-screen">
+      <section className="overflow-hidden bg-gradient-to-br from-indigo-700 via-violet-700 to-indigo-900 px-6 py-12 text-white shadow-xl">
+        <div className="mx-auto max-w-7xl">
+          <p className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em]">
+            <ShieldCheck className="h-4 w-4" />
+            Pricing & Services
+          </p>
+          <h1 className="mt-4 text-3xl font-bold md:text-5xl">Transparent Wellness Pricing</h1>
+          <p className="mt-4 text-base text-indigo-100 max-w-2xl">
+            Choose a platform subscription to access core self-help modules, mood tracking, and AI, then book clinical sessions a-la-carte as needed.
+          </p>
         </div>
       </section>
 
-      <section className="rounded-3xl border border-violet-100 bg-white p-6 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-violet-600">Section 3 - Therapy Session Rate Card</p>
-        <p className="mt-2 text-xs text-slate-600">Paid at booking time only when you schedule a session. Platform access (Section 1) is billed separately.</p>
-        <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-200">
-          <table className="min-w-full bg-white text-left text-sm">
-            <thead className="bg-slate-50 text-slate-600">
-              <tr>
-                <th className="px-5 py-3 font-semibold">Provider Type</th>
-                <th className="px-5 py-3 font-semibold">45 min</th>
-                <th className="px-5 py-3 font-semibold">60 min</th>
-                <th className="px-5 py-3 font-semibold"></th>
-              </tr>
-            </thead>
-            <tbody className="text-slate-800">
-              {sessionPricingConfig.map((tier) => (
-                <tr key={tier.provider} className="border-t border-slate-100">
-                  <td className="px-5 py-3 font-medium">{tier.provider}</td>
-                  <td className="px-5 py-3">₹{tier.mins45}</td>
-                  <td className="px-5 py-3">₹{tier.mins60}</td>
-                  <td className="px-5 py-3">
-                    <Link
-                      to="/patient/care-team?tab=browse"
-                      className="inline-flex items-center rounded-lg border border-violet-300 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-100"
-                    >
-                      Book Session
-                    </Link>
-                  </td>
+      <div className="mx-auto max-w-7xl px-4 space-y-12">
+        {/* PLATFORM SUBSCRIPTION */}
+        <section className="rounded-3xl border border-indigo-100 bg-white p-6 shadow-sm">
+          <div className="mb-6 border-b border-indigo-50 pb-4">
+            <h2 className="text-xl font-bold text-slate-800">Platform Subscription (Access Fee)</h2>
+            <p className="text-sm text-slate-500 mt-1">Unlock AI tools, assessments, matching, and audio libraries.</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-sm whitespace-nowrap">
+              <thead className="bg-slate-50 text-slate-600">
+                <tr>
+                  <th className="px-5 py-3 font-semibold rounded-tl-xl">Plan</th>
+                  <th className="px-5 py-3 font-semibold">Price</th>
+                  <th className="px-5 py-3 font-semibold">Billing</th>
+                  <th className="px-5 py-3 font-semibold">Includes</th>
+                  <th className="px-5 py-3 font-semibold">Best For</th>
+                  <th className="px-5 py-3 font-semibold rounded-tr-xl">Action</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-          ⏰ <span className="font-semibold">Peak Hours (+{surchargePercent}% surcharge):</span> Sessions booked during Evenings (6–9 PM), Early Mornings (6–9 AM), and Weekends carry a {surchargePercent}% premium.
-        </div>
-      </section>
-
-      <section className="rounded-3xl border border-indigo-100 bg-white p-6 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-indigo-600">Section 4 - Premium Scheduling</p>
-        <div className="mt-4 grid gap-5 lg:grid-cols-[1.2fr_1fr]">
-          <div className="space-y-3">
-            <label className="block text-sm font-medium text-slate-700">Provider Type</label>
-            <select
-              value={selectedProvider}
-              onChange={(event) => setSelectedProvider(event.target.value)}
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
-            >
-              {sessionPricingConfig.map((item) => (
-                <option key={item.provider} value={item.provider}>{item.provider}</option>
-              ))}
-            </select>
-
-            <label className="mt-3 block text-sm font-medium text-slate-700">Duration</label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setDuration(45)}
-                className={`rounded-xl px-3 py-2 text-sm font-medium ${duration === 45 ? 'bg-indigo-600 text-white' : 'border border-slate-300 bg-white text-slate-700'}`}
-              >
-                45 min
-              </button>
-              <button
-                type="button"
-                onClick={() => setDuration(60)}
-                className={`rounded-xl px-3 py-2 text-sm font-medium ${duration === 60 ? 'bg-indigo-600 text-white' : 'border border-slate-300 bg-white text-slate-700'}`}
-              >
-                60 min
-              </button>
-            </div>
-
-            <label className="mt-3 block text-sm font-medium text-slate-700">Preferred Time Window</label>
-            <select
-              value={preferredWindow}
-              onChange={(event) => setPreferredWindow(event.target.value)}
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
-            >
-              {preferredTimeWindows.map((window) => (
-                <option key={window} value={window}>{window}</option>
-              ))}
-            </select>
-
-            <div className="mt-2 flex items-center gap-3 rounded-xl border border-indigo-100 bg-indigo-50/60 px-3 py-2">
-              <CalendarClock className="h-4 w-4 text-indigo-600" />
-              <span className="text-sm text-indigo-800">Standard Time</span>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={preferredTime}
-                onClick={() => setPreferredTime((prev) => !prev)}
-                className={`relative ml-auto h-6 w-11 rounded-full transition ${preferredTime ? 'bg-indigo-600' : 'bg-slate-300'}`}
-              >
-                <span
-                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${preferredTime ? 'left-5' : 'left-0.5'}`}
-                />
-              </button>
-              <span className="text-sm font-medium text-indigo-800">Preferred Time (+20%)</span>
-            </div>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-slate-800">
+                {platformPlans.map((plan) => (
+                  <tr key={plan.key} className="hover:bg-slate-50/50">
+                    <td className="px-5 py-4 font-bold text-indigo-700">{plan.name}</td>
+                    <td className="px-5 py-4 font-semibold text-slate-900">{plan.price}</td>
+                    <td className="px-5 py-4">{plan.billing}</td>
+                    <td className="px-5 py-4 whitespace-normal min-w-[200px]">{plan.includes}</td>
+                    <td className="px-5 py-4 text-slate-600">{plan.bestFor}</td>
+                    <td className="px-5 py-4">
+                      <button
+                        type="button"
+                        onClick={() => void onStartSubscription(plan.key)}
+                        disabled={subscribing || (hasActiveSubscription && plan.rawPrice === 0)}
+                        className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-indigo-500 disabled:opacity-50"
+                      >
+                        {subscribing ? 'Processing...' : plan.rawPrice === 0 ? 'Current Plan' : 'Subscribe'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
+        </section>
 
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <p className="text-xs uppercase tracking-[0.1em] text-slate-500">Live Price Preview</p>
-            <h3 className="mt-2 text-base font-semibold text-slate-900">{selectedProvider}</h3>
-            <p className="mt-1 text-sm text-slate-700">{duration} min session</p>
-            <p className="mt-3 text-sm text-slate-600">Base: ₹{basePrice}</p>
-            <p className="mt-1 text-sm text-slate-600">Schedule: {preferredTime ? preferredWindow : 'Standard Time'}</p>
-            <p className="mt-3 text-3xl font-bold text-indigo-700">₹{finalPrice}</p>
-            <p className="mt-1 text-xs text-slate-500">Dynamic update: +{surchargePercent}% applied only for preferred scheduling.</p>
-            <Link to="/patient/care-team?tab=browse" className="mt-4 inline-flex min-h-[40px] items-center rounded-xl bg-indigo-600 px-4 text-sm font-semibold text-white hover:bg-indigo-500">
-              Continue to Booking
-            </Link>
+        {/* SESSION FEES */}
+        <section className="rounded-3xl border border-teal-100 bg-white p-6 shadow-sm">
+          <div className="mb-6 border-b border-teal-50 pb-4">
+            <h2 className="text-xl font-bold text-slate-800">Session Fees</h2>
+            <p className="text-sm text-slate-500 mt-1">Per Session — Paid to Provider at the time of booking.</p>
           </div>
-        </div>
-        <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-600">
-          <div className="flex items-center gap-2"><Clock3 className="h-4 w-4 text-teal-600" /> Preferred windows: Evenings (6-9 PM), Weekends, Early mornings.</div>
-        </div>
-      </section>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-sm whitespace-nowrap">
+              <thead className="bg-slate-50 text-slate-600">
+                <tr>
+                  <th className="px-5 py-3 font-semibold rounded-tl-xl">Provider Type</th>
+                  <th className="px-5 py-3 font-semibold">Tier 1 (Budget)</th>
+                  <th className="px-5 py-3 font-semibold">Tier 2 (Standard)</th>
+                  <th className="px-5 py-3 font-semibold">Tier 3 (Premium)</th>
+                  <th className="px-5 py-3 font-semibold rounded-tr-xl">Notes</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-slate-800">
+                {sessionFees.map((fee) => (
+                  <tr key={fee.provider} className="hover:bg-slate-50/50">
+                    <td className="px-5 py-4 font-bold text-teal-700">{fee.provider}</td>
+                    <td className="px-5 py-4 font-semibold">{fee.tier1}</td>
+                    <td className="px-5 py-4 font-semibold">{fee.tier2}</td>
+                    <td className="px-5 py-4 font-semibold">{fee.tier3}</td>
+                    <td className="px-5 py-4 text-slate-500">{fee.notes}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="mt-4 flex gap-2 rounded-xl bg-teal-50 p-3 text-xs text-teal-800">
+            <Info className="h-4 w-4 flex-shrink-0" />
+            <p><strong>Note:</strong> S = Session | M = Monthly | Q = Quarterly | Y = Yearly · ASHA referral patients: First 3 sessions free/subsidized</p>
+          </div>
+        </section>
+
+        {/* SPECIALTY SERVICES */}
+        <section className="rounded-3xl border border-violet-100 bg-white p-6 shadow-sm">
+          <div className="mb-6 border-b border-violet-50 pb-4">
+            <h2 className="text-xl font-bold text-slate-800">Specialty Services</h2>
+            <p className="text-sm text-slate-500 mt-1">Targeted and specialized interventions by experts.</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-sm whitespace-nowrap">
+              <thead className="bg-slate-50 text-slate-600">
+                <tr>
+                  <th className="px-5 py-3 font-semibold rounded-tl-xl">Service</th>
+                  <th className="px-5 py-3 font-semibold">Price</th>
+                  <th className="px-5 py-3 font-semibold">Format</th>
+                  <th className="px-5 py-3 font-semibold">Availability</th>
+                  <th className="px-5 py-3 font-semibold rounded-tr-xl">Provider</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-slate-800">
+                {specialtyServices.map((specialty) => (
+                  <tr key={specialty.service} className="hover:bg-slate-50/50">
+                    <td className="px-5 py-4 font-bold text-violet-700">{specialty.service}</td>
+                    <td className="px-5 py-4 font-bold">{specialty.price}</td>
+                    <td className="px-5 py-4">{specialty.format}</td>
+                    <td className="px-5 py-4">{specialty.availability}</td>
+                    <td className="px-5 py-4 text-slate-600">{specialty.provider}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        {/* ADD-ON FEATURES */}
+        <section className="rounded-3xl border border-amber-100 bg-white p-6 shadow-sm">
+          <div className="mb-6 border-b border-amber-50 pb-4">
+            <h2 className="text-xl font-bold text-slate-800">Add-On Features (À La Carte)</h2>
+            <p className="text-sm text-slate-500 mt-1">Purchase specific functionality alongside your plan.</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-sm whitespace-nowrap">
+              <thead className="bg-slate-50 text-slate-600">
+                <tr>
+                  <th className="px-5 py-3 font-semibold rounded-tl-xl">Feature</th>
+                  <th className="px-5 py-3 font-semibold">Price</th>
+                  <th className="px-5 py-3 font-semibold">Duration</th>
+                  <th className="px-5 py-3 font-semibold rounded-tr-xl">Description</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-slate-800">
+                {addons.map((addon) => (
+                  <tr key={addon.feature} className="hover:bg-slate-50/50">
+                    <td className="px-5 py-4 font-bold text-amber-700">{addon.feature}</td>
+                    <td className="px-5 py-4 font-bold">{addon.price}</td>
+                    <td className="px-5 py-4">{addon.duration}</td>
+                    <td className="px-5 py-4 whitespace-normal min-w-[200px] text-slate-600">{addon.description}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
     </div>
   );
 }

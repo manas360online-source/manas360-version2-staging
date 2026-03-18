@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.middleware';
 import { requireRole } from '../middleware/rbac.middleware';
-import { asyncHandler } from '../middleware/validate.middleware';
+import { asyncHandler, validateCreateDailyCheckInRequest } from '../middleware/validate.middleware';
 import {
   cancelPatientSubscriptionController,
   completePatientExerciseController,
@@ -38,6 +38,7 @@ import {
   updatePatientPaymentMethodController,
   upgradePatientSubscriptionController,
 } from '../controllers/patient-v1.controller';
+import { addDailyCheckInController } from '../controllers/patient.controller';
 import { getMyPetStateController, upsertMyPetStateController } from '../controllers/pet.controller';
 import {
   getConversationsController,
@@ -95,6 +96,7 @@ router.get('/pets/state', requireAuth, requireRole('patient'), asyncHandler(getM
 router.put('/pets/state', requireAuth, requireRole('patient'), asyncHandler(upsertMyPetStateController));
 
 router.get('/progress', requireAuth, requireRole('patient'), asyncHandler(getPatientProgressController));
+router.post('/daily-checkin', requireAuth, requireRole('patient'), ...validateCreateDailyCheckInRequest, asyncHandler(addDailyCheckInController));
 
 router.get('/exercises', requireAuth, requireRole('patient'), asyncHandler(getPatientExercisesController));
 router.post('/exercises/library', requireAuth, requireRole('patient'), asyncHandler(logWellnessLibraryActivityController));

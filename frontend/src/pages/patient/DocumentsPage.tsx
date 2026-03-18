@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { FileText, FileStack, ClipboardCheck, Download, Share2, Loader2, FilePlus2 } from 'lucide-react';
-import axios from 'axios';
 import toast from 'react-hot-toast';
 import { io, Socket } from 'socket.io-client';
 import { useRef } from 'react';
+import { patientApi } from '../../api/patient';
 
 type DocItem = {
   id: string;
@@ -82,13 +82,12 @@ export default function DocumentsPage() {
   useEffect(() => {
     (async () => {
       try {
-        const token = localStorage.getItem('token');
-        const res = await axios.get('/api/v1/patient/documents', {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
-        const rows = Array.isArray(res.data?.data) ? res.data.data : [];
+        const res = await patientApi.getDocuments();
+        const data = res?.data ?? res;
+        const rows = Array.isArray(data) ? data : [];
         setDocs(rows.length > 0 ? (rows as DocItem[]) : FALLBACK_DOCS);
-      } catch {
+      } catch (e) {
+        console.error('Fetch docs failed:', e);
         setDocs(FALLBACK_DOCS);
       } finally {
         setLoading(false);
@@ -103,11 +102,9 @@ export default function DocumentsPage() {
 
     const poll = async () => {
       try {
-        const token = localStorage.getItem('token');
-        const res = await axios.get('/api/v1/patient/documents', {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
-        const rows = Array.isArray(res.data?.data) ? res.data.data : [];
+        const res = await patientApi.getDocuments();
+        const data = res?.data ?? res;
+        const rows = Array.isArray(data) ? data : [];
 
         if (!mounted) return;
 
@@ -134,13 +131,11 @@ export default function DocumentsPage() {
       }
     };
 
-    const intervalId = setInterval(poll, 15000);
     // run one immediate poll after mount
     void poll();
 
     return () => {
       mounted = false;
-      clearInterval(intervalId);
     };
   }, [/* docs intentionally excluded to avoid re-registering */]);
 
@@ -176,10 +171,40 @@ export default function DocumentsPage() {
   const handleGeneratePDF = async () => {
     setGeneratingPDF(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1200));
-      window.print();
+      const blob = await patientApi.generateCompleteHealthSummary();
+      const url = window.URL.createObjectURL(new Blob([blob]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Health-Summary-${new Date().toISOString().split('T')[0]}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+      toast.success('Health summary generated and download started!');
+    } catch (e) {
+      console.error('Failed to generate health summary:', e);
+      toast.error('Failed to generate complete health summary. Please try again later.');
     } finally {
       setGeneratingPDF(false);
+    }
+  };
+
+  const handleShare = async (doc: DocItem) => {
+    if (doc.id.length < 5) {
+      toast.error('Cannot share sample documents');
+      return;
+    }
+    try {
+      const res = await patientApi.createRecordShareLink(doc.id);
+      const data = (res as any)?.data ?? res;
+      if (data.shareUrl) {
+        await navigator.clipboard.writeText(`Document: ${doc.title}\nLink: ${data.shareUrl}\nPIN: ${data.pin}`);
+        toast.success('Secure share link and PIN copied to clipboard!');
+      } else {
+        toast.error('Share link generation failed');
+      }
+    } catch (e) {
+      console.error('Failed to share document:', e);
+      toast.error('Failed to create secure share link');
     }
   };
 
@@ -256,14 +281,14 @@ export default function DocumentsPage() {
                   form.append('category', uploadCategory);
                   setUploading(true);
                   try {
-                    const token = localStorage.getItem('token');
-                    const res = await axios.post('/api/v1/patient/documents/upload', form, { headers: token ? { Authorization: `Bearer ${token}` } : {}, });
-                    const created = res.data?.data;
+                    const res = await patientApi.uploadDocument(form);
+                    const created = res?.data ?? res;
                     if (created) {
                       const newDoc: DocItem = { id: created.id, title: created.title, date: (created.createdAt || new Date().toISOString()), category: uploadCategory === 'lab-result' ? 'official' : 'assessment' };
                       setDocs((prev) => [newDoc, ...prev]);
                       toast.success('Uploaded document');
                       setUploadOpen(false);
+                      setUploadTitle('');
                     }
                   } catch (e) {
                     toast.error('Upload failed');
@@ -324,11 +349,14 @@ export default function DocumentsPage() {
                             type="button"
                             title="Download"
                             onClick={async () => {
+                              if (doc.id.length < 5) {
+                                toast.error('Sample documents cannot be downloaded');
+                                return;
+                              }
                               try {
-                                const token = localStorage.getItem('token');
-                                const res = await axios.get(`/api/v1/patient/documents/${encodeURIComponent(doc.id)}/download`, { headers: token ? { Authorization: `Bearer ${token}` } : {}, });
-                                const url = res.data?.data?.url;
-                                if (url) window.open(url, '_blank', 'noopener,noreferrer'); else toast.error('No file available');
+                                const res = await patientApi.getDocumentDownloadUrl(doc.id);
+                                const data = res?.data ?? res;
+                                if (data?.url) window.open(data.url, '_blank', 'noopener,noreferrer'); else toast.error('No file available');
                               } catch (e) {
                                 toast.error('Download failed');
                               }
@@ -340,6 +368,7 @@ export default function DocumentsPage() {
                           <button
                             type="button"
                             title="Share Securely"
+                            onClick={() => handleShare(doc)}
                             className="flex h-8 w-8 items-center justify-center rounded-xl border border-ink-200 bg-white text-ink-400 transition hover:border-calm-sage hover:text-calm-sage"
                           >
                             <Share2 className="h-3.5 w-3.5" />

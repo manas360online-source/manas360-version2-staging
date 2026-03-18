@@ -1,7 +1,7 @@
 import { prisma } from '../config/db';
 import PDFDocument from 'pdfkit';
 import { s3Client } from './s3.service';
-import { PutObjectCommand } from '@aws-sdk/client-s3';
+import { PutObjectCommand, ServerSideEncryption } from '@aws-sdk/client-s3';
 import { env } from '../config/env';
 
 export async function renderPrescriptionPdfBuffer(prescription: any, providerName: string, patientName: string): Promise<Buffer> {
@@ -93,7 +93,7 @@ export const publishPrescriptionDocument = async (prescriptionId: string): Promi
   const fileName = `prescription-${prescriptionId}-${Date.now()}.pdf`;
   const objectKey = `patient-documents/${patientUserId}/${fileName}`;
 
-  await s3Client.send(new PutObjectCommand(Object.assign({ Bucket: env.awsS3Bucket, Key: objectKey, Body: buffer, ContentType: 'application/pdf' }, env.awsS3DisableServerSideEncryption ? {} : { ServerSideEncryption: 'AES256' })));
+  await s3Client.send(new PutObjectCommand(Object.assign({ Bucket: env.awsS3Bucket, Key: objectKey, Body: buffer, ContentType: 'application/pdf' }, env.awsS3DisableServerSideEncryption ? {} : { ServerSideEncryption: 'AES256' as ServerSideEncryption })));
 
   const created = await prisma.patientDocument.create({ data: { patientId: patientUserId, title: `Prescription — ${pres.drugName}`, category: 'prescription', source: 'prescription', sourceId: prescriptionId, s3ObjectKey: objectKey } });
 

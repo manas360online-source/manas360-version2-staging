@@ -8,7 +8,7 @@ import PDFDocument from 'pdfkit';
 import fs from 'fs';
 import path from 'path';
 import { s3Client } from '../services/s3.service';
-import { PutObjectCommand } from '@aws-sdk/client-s3';
+import { PutObjectCommand, ServerSideEncryption } from '@aws-sdk/client-s3';
 import { env } from '../config/env';
 import {
 	getConversationMessages as getDirectConversationMessages,
@@ -1430,7 +1430,7 @@ export const createAddendum = async (req: Request, res: Response): Promise<void>
 	const { content, providerSignature } = req.body as { content: string; providerSignature?: string };
 
 	if (!noteId || !content) {
-		sendError(res, new AppError('noteId and content are required', 400));
+		sendError(res, 'noteId and content are required', 400);
 		return;
 	}
 
@@ -1440,7 +1440,7 @@ export const createAddendum = async (req: Request, res: Response): Promise<void>
 		sendSuccess(res, row, 'Addendum created');
 	} catch (err) {
 		console.error('createAddendum error', err);
-		sendError(res, err instanceof Error ? err : new AppError('Unable to create addendum', 500));
+		sendError(res, err instanceof Error ? err.message : 'Unable to create addendum', 500);
 	}
 };
 
@@ -1755,7 +1755,7 @@ export const updatePatientNote = async (req: Request, res: Response): Promise<vo
 				doc.fontSize(12).text('Plan');
 				doc.fontSize(10).text(updated.note.plan || '');
 				doc.end();
-				await new Promise((resolve, reject) => stream.on('finish', resolve).on('error', reject));
+				await new Promise<void>((resolve, reject) => stream.on('finish', () => resolve()).on('error', (err) => reject(err)));
 				const buffer = await fs.promises.readFile(tmpPath);
 						// resolve patient user id (notes store patientProfileId but inbox rooms use userId)
 						let patientUserId = updated.note.patientId;
@@ -1767,7 +1767,7 @@ export const updatePatientNote = async (req: Request, res: Response): Promise<vo
 						}
 
 						const objectKey = `patient-documents/${patientUserId}/${fileName}`;
-						await s3Client.send(new PutObjectCommand(Object.assign({ Bucket: env.awsS3Bucket, Key: objectKey, Body: buffer, ContentType: 'application/pdf' }, env.awsS3DisableServerSideEncryption ? {} : { ServerSideEncryption: 'AES256' })));
+						await s3Client.send(new PutObjectCommand(Object.assign({ Bucket: env.awsS3Bucket, Key: objectKey, Body: buffer, ContentType: 'application/pdf' }, env.awsS3DisableServerSideEncryption ? {} : { ServerSideEncryption: 'AES256' as ServerSideEncryption })));
 						const createdDoc = await prisma.patientDocument.create({ data: { patientId: patientUserId, title: `Signed Note — ${responseData.sessionType}`, source: 'session-note', sourceId: updated.note.id, s3ObjectKey: objectKey } });
 						try {
 							// notify patient's inbox in real time if socket is available

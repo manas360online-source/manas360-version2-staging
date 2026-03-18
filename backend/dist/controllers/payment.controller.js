@@ -1,10 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.razorpayWebhookController = exports.completeFinancialSessionController = exports.createSessionPaymentController = void 0;
+exports.getPhonePeStatusController = exports.phonepeWebhookController = exports.razorpayWebhookController = exports.completeFinancialSessionController = exports.createSessionPaymentController = void 0;
 const error_middleware_1 = require("../middleware/error.middleware");
 const response_1 = require("../utils/response");
+const env_1 = require("../config/env");
 const payment_service_1 = require("../services/payment.service");
 const subscription_service_1 = require("../services/subscription.service");
+const phonepe_service_1 = require("../services/phonepe.service");
 const getAuthUserId = (req) => {
     const userId = req.auth?.userId;
     if (!userId) {
@@ -61,3 +63,39 @@ const razorpayWebhookController = async (req, res) => {
     res.status(200).json({ success: true, ...result });
 };
 exports.razorpayWebhookController = razorpayWebhookController;
+const phonepeWebhookController = async (req, res) => {
+    // 1. Mandatory BasicAuth validation (UAT compliance)
+    const authHeader = String(req.headers['authorization'] ?? '');
+    if (env_1.env.phonePeWebhookUsername && env_1.env.phonePeWebhookPassword) {
+        const expectedAuth = 'Basic ' + Buffer.from(`${env_1.env.phonePeWebhookUsername}:${env_1.env.phonePeWebhookPassword}`).toString('base64');
+        if (authHeader !== expectedAuth) {
+            throw new error_middleware_1.AppError('Invalid webhook authorization', 401);
+        }
+    }
+    // 2. Existing X-VERIFY signature check
+    const xVerify = String(req.headers['x-verify'] ?? '');
+    if (!xVerify) {
+        throw new error_middleware_1.AppError('Missing x-verify header', 400);
+    }
+    const body = req.body.response; // The base64 response string from PhonePe
+    const isValid = (0, phonepe_service_1.verifyPhonePeWebhook)(body, xVerify);
+    if (!isValid) {
+        throw new error_middleware_1.AppError('Invalid PhonePe signature', 401);
+    }
+    const decoded = JSON.parse(Buffer.from(body, 'base64').toString('utf-8'));
+    const result = await (0, payment_service_1.processPhonePeWebhook)(decoded);
+    res.status(200).json({ success: true, ...result });
+};
+exports.phonepeWebhookController = phonepeWebhookController;
+const getPhonePeStatusController = async (req, res) => {
+    const transactionId = String(req.params.transactionId ?? '').trim();
+    if (!transactionId) {
+        throw new error_middleware_1.AppError('transactionId is required', 422);
+    }
+    const status = await (0, phonepe_service_1.checkPhonePeStatus)(transactionId);
+    if (!status) {
+        throw new error_middleware_1.AppError('Unable to fetch payment status', 502);
+    }
+    res.status(200).json({ success: true, data: status });
+};
+exports.getPhonePeStatusController = getPhonePeStatusController;

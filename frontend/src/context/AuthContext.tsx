@@ -73,6 +73,9 @@ export const getPostLoginRoute = (user: AuthUser | null | undefined): string => 
   }
 
   if (isProviderRole(user.role)) {
+    // Dev/testing bypass: when VITE_SKIP_ONBOARDING=true or running in Vite dev, skip onboarding redirect.
+    const skipOnboarding = (import.meta.env.VITE_SKIP_ONBOARDING || '').toString() === 'true' || import.meta.env.DEV === true;
+    if (skipOnboarding) return '/provider/dashboard';
     const onboardingStatus = String(user.onboardingStatus || '').toUpperCase();
 
     if (onboardingStatus !== 'COMPLETED') {

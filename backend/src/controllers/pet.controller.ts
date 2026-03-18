@@ -54,26 +54,21 @@ const deriveCompanionMood = (
 export const getMyPetStateController = async (req: Request, res: Response): Promise<void> => {
   const userId = getAuthUserId(req);
 
-  const [petRows, todayCheckIns, moodRows] = await Promise.all([
-    prisma.$queryRawUnsafe<Array<{
-      selectedPet: string;
-      vitality: number;
-      unlockedItems: unknown;
-      isPremium: boolean;
-      companionMood: string | null;
-    }>>(
-      'SELECT selected_pet AS "selectedPet", vitality, unlocked_items AS "unlockedItems", is_premium AS "isPremium", companion_mood AS "companionMood" FROM user_pets WHERE user_id = $1 LIMIT 1',
-      userId,
-    ),
-    prisma.$queryRawUnsafe<Array<{ mood: number | null; stressLevel: number | null; sleep: number | null; context: string[] | null }>>(
-      'SELECT mood, stress_level AS "stressLevel", sleep, context FROM daily_checkins WHERE patient_id = $1 AND date::date = CURRENT_DATE',
-      userId,
-    ),
-    prisma.$queryRawUnsafe<Array<{ moodValue: number | null }>>(
-      'SELECT mood_value AS "moodValue" FROM mood_logs WHERE user_id = $1 ORDER BY logged_at DESC LIMIT 1',
-      userId,
-    ),
+  const [petRowsRaw, todayCheckInsRaw, moodRowsRaw] = await Promise.all([
+    prisma.$queryRawUnsafe('SELECT selected_pet AS "selectedPet", vitality, unlocked_items AS "unlockedItems", is_premium AS "isPremium", companion_mood AS "companionMood" FROM user_pets WHERE user_id = $1 LIMIT 1', userId),
+    prisma.$queryRawUnsafe('SELECT mood, stress_level AS "stressLevel", sleep, context FROM daily_checkins WHERE patient_id = $1 AND date::date = CURRENT_DATE', userId),
+    prisma.$queryRawUnsafe('SELECT mood_value AS "moodValue" FROM mood_logs WHERE user_id = $1 ORDER BY logged_at DESC LIMIT 1', userId),
   ]);
+
+  const petRows = petRowsRaw as Array<{
+    selectedPet: string;
+    vitality: number;
+    unlockedItems: unknown;
+    isPremium: boolean;
+    companionMood: string | null;
+  }>;
+  const todayCheckIns = todayCheckInsRaw as Array<{ mood: number | null; stressLevel: number | null; sleep: number | null; context: string[] | null }>;
+  const moodRows = moodRowsRaw as Array<{ moodValue: number | null }>;
 
   const existing = petRows[0];
   const selectedPet = normalizePetType(existing?.selectedPet);

@@ -410,7 +410,8 @@ export const addDailyCheckInController = async (req: Request, res: Response): Pr
 export const getMyDocumentsController = async (req: Request, res: Response): Promise<void> => {
 	const userId = getAuthUserId(req);
 
-	const [notes, prescriptions, assessments] = await Promise.all([
+	try {
+	const [notes, prescriptions, assessments, phqAssessments, gadAssessments] = await Promise.all([
 		prisma.therapistSessionNote.findMany({
 			where: {
 				session: {
@@ -428,11 +429,7 @@ export const getMyDocumentsController = async (req: Request, res: Response): Pro
 					select: {
 						dateTime: true,
 						therapistProfile: {
-							select: {
-								user: {
-									select: { firstName: true, lastName: true },
-								},
-							},
+							select: { firstName: true, lastName: true },
 						},
 					},
 				},
@@ -450,16 +447,15 @@ export const getMyDocumentsController = async (req: Request, res: Response): Pro
 				prescribedDate: true,
 				provider: {
 					select: {
-						user: {
-							select: { firstName: true, lastName: true },
-						},
+						firstName: true,
+						lastName: true,
 					},
 				},
 			},
 		}),
 		prisma.patientAssessment.findMany({
 			where: {
-				patientProfile: { userId },
+				patient: { userId },
 			},
 			orderBy: { createdAt: 'desc' },
 			take: 20,
@@ -470,37 +466,74 @@ export const getMyDocumentsController = async (req: Request, res: Response): Pro
 				createdAt: true,
 			},
 		}),
+		prisma.pHQ9Assessment.findMany({
+			where: { userId },
+			orderBy: { createdAt: 'desc' },
+			take: 20,
+			select: {
+				id: true,
+				totalScore: true,
+				createdAt: true,
+			},
+		}).catch(() => []),
+		prisma.gAD7Assessment.findMany({
+			where: { userId },
+			orderBy: { createdAt: 'desc' },
+			take: 20,
+			select: {
+				id: true,
+				totalScore: true,
+				createdAt: true,
+			},
+		}).catch(() => []),
 	]);
 
 	type DocItem = { id: string; title: string; date: string; category: 'official' | 'session' | 'assessment' };
 
 	const documents: DocItem[] = [
 		...notes.map((n) => {
-			const providerName = n.session?.therapistProfile?.user
-				? `${n.session.therapistProfile.user.firstName || ''} ${n.session.therapistProfile.user.lastName || ''}`.trim()
+			const tp = n.session?.therapistProfile as any;
+			const providerName = tp
+				? tp.user
+					? `${tp.user.firstName || ''} ${tp.user.lastName || ''}`.trim()
+					: `${tp.firstName || ''} ${tp.lastName || ''}`.trim()
 				: 'Provider';
+			const dateObj = n.session?.dateTime || n.createdAt;
 			return {
 				id: n.id,
 				title: `Session Notes — ${n.sessionType || 'Consultation'} (${providerName})`,
-				date: (n.session?.dateTime || n.createdAt).toISOString().slice(0, 10),
+				date: dateObj ? new Date(dateObj).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
 				category: 'session' as const,
 			};
 		}),
 		...prescriptions.map((p) => {
-			const providerName = p.provider?.user
-				? `${p.provider.user.firstName || ''} ${p.provider.user.lastName || ''}`.trim()
+			const prov = p.provider as any;
+			const providerName = prov
+				? `${prov.firstName || ''} ${prov.lastName || ''}`.trim()
 				: 'Provider';
 			return {
 				id: p.id,
 				title: `Prescription — ${p.drugName} ${p.dosage} (${providerName})`,
-				date: p.prescribedDate.toISOString().slice(0, 10),
+				date: p.prescribedDate ? new Date(p.prescribedDate).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
 				category: 'official' as const,
 			};
 		}),
 		...assessments.map((a) => ({
 			id: a.id,
 			title: `${a.type} Assessment Result — Score ${a.totalScore}`,
-			date: a.createdAt.toISOString().slice(0, 10),
+			date: a.createdAt ? new Date(a.createdAt).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+			category: 'assessment' as const,
+		})),
+		...phqAssessments.map((a) => ({
+			id: a.id,
+			title: `PHQ-9 Assessment Result — Score ${a.totalScore}`,
+			date: a.createdAt ? new Date(a.createdAt).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+			category: 'assessment' as const,
+		})),
+		...gadAssessments.map((a) => ({
+			id: a.id,
+			title: `GAD-7 Assessment Result — Score ${a.totalScore}`,
+			date: a.createdAt ? new Date(a.createdAt).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
 			category: 'assessment' as const,
 		})),
 	];
@@ -508,6 +541,9 @@ export const getMyDocumentsController = async (req: Request, res: Response): Pro
 	documents.sort((a, b) => b.date.localeCompare(a.date));
 
 	sendSuccess(res, documents, 'Patient documents fetched');
+	} catch (error) {
+		throw error;
+	}
 };
 
 // ── Get my prescriptions ─────────────────────────────────────
@@ -520,9 +556,8 @@ export const getMyPrescriptionsController = async (req: Request, res: Response):
 		include: {
 			provider: {
 				select: {
-					user: {
-						select: { firstName: true, lastName: true },
-					},
+					firstName: true,
+					lastName: true,
 				},
 			},
 		},
@@ -537,8 +572,8 @@ export const getMyPrescriptionsController = async (req: Request, res: Response):
 		refillsRemaining: item.refillsRemaining,
 		status: item.status,
 		warnings: item.warnings,
-		providerName: item.provider?.user
-			? `${item.provider.user.firstName || ''} ${item.provider.user.lastName || ''}`.trim()
+		providerName: item.provider
+			? `${item.provider.firstName || ''} ${item.provider.lastName || ''}`.trim()
 			: 'Provider',
 	}));
 
@@ -562,7 +597,7 @@ export const uploadPatientDocument = async (req: Request, res: Response): Promis
   const fileName = `lab-${profile.id}-${Date.now()}.pdf`;
   const objectKey = `patient-documents/${userId}/${fileName}`;
 	// Build PutObject input with correct AWS SDK types
-	const serverSideEnc: ServerSideEncryption | undefined = env.awsS3DisableServerSideEncryption ? undefined : 'AES256';
+	const serverSideEnc: ServerSideEncryption | undefined = env.awsS3DisableServerSideEncryption ? undefined : ('AES256' as ServerSideEncryption);
 	const putInput: PutObjectCommandInput = {
 		Bucket: env.awsS3Bucket,
 		Key: objectKey,

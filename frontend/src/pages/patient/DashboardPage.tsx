@@ -155,7 +155,7 @@ export default function DashboardPage() {
                 <button
                   key={value}
                   type="button"
-                  onClick={() => navigate(`/patient/daily-checkin?initialMood=${value * 2}`)}
+                  onClick={() => navigate(`/patient/check-in?tab=daily-mood&initialMood=${value * 2}`)}
                   className={`inline-flex h-14 w-14 items-center justify-center rounded-[1.35rem] text-[1.8rem] transition-all duration-300 sm:h-16 sm:w-16 sm:text-[2rem] ${
                     moodValue === value 
                       ? 'bg-wellness-aqua ring-2 ring-wellness-sky/30 shadow-wellness-sm' 
@@ -165,7 +165,6 @@ export default function DashboardPage() {
                   <span>{moodEmojiMap[value]}</span>
                 </button>
               ))}
-              
             </div>
             <p className="mt-4 text-sm text-charcoal/55">Tap once to open the full Daily Check-in flow.</p>
           </div>

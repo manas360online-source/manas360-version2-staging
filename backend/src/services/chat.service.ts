@@ -251,18 +251,18 @@ export const processChatMessage = async (input: {
 					role: 'user'
 				}
 			}),
-			db.patientSubscription.findFirst({
-				where: { userId: input.userId, status: 'ACTIVE' }
+			db.patientSubscription.findUnique({
+				where: { userId: input.userId }
 			})
 		]);
 
-		const isPremium = !!subscription;
-		const DAILY_FREE_LIMIT = 5;
+		const isPremium = subscription && subscription.plan !== 'free' && subscription.status === 'active';
+		const DAILY_FREE_LIMIT = 3;
 		
 		if (!isPremium && messagesToday >= DAILY_FREE_LIMIT) {
 			return {
 				conversation_id: 'limit-reached',
-				response: "We've reached our chat limit for today on the Basic plan, but you did great work today! I've added a journaling prompt to your Therapy Plan if you want to keep reflecting.",
+				response: "You've used your 3 free AI messages for today. Upgrade to a Monthly or Premium plan for unlimited support and deeper insights!",
 				messages: [],
 				bot_name: 'Anytime Buddy',
 				bot_type: botType,

@@ -4,7 +4,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -76,6 +75,7 @@ model User {
   patientPaymentMethod          PatientPaymentMethod?
   patientProfile                PatientProfile?
   patientSubscription           PatientSubscription?
+  providerSubscription          ProviderSubscription?
   phq9Assessments               PHQ9Assessment[]            @relation("UserPHQ9Assessments")
   prescriptionsAsPatient        Prescription[]              @relation("PrescriptionPatient")
   prescriptionsAsProvider       Prescription[]              @relation("PrescriptionProvider")
@@ -1042,14 +1042,16 @@ model Lead {
 
 model FinancialPayment {
   id                    String                 @id @default(uuid())
-  sessionId             String
-  providerId            String
+  sessionId             String?
+  providerId            String?
+  patientId             String?
   providerGateway       String                 @default("RAZORPAY")
   razorpayOrderId       String                 @unique
   razorpayPaymentId     String?                @unique
   status                FinancialPaymentStatus @default(INITIATED)
   amountMinor           BigInt
   currency              String                 @default("INR")
+  metadata              Json?
   therapistShareMinor   BigInt                 @default(0)
   platformShareMinor    BigInt                 @default(0)
   captureIdempotencyKey String?                @unique
@@ -1059,8 +1061,8 @@ model FinancialPayment {
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
   paymentType           FinancialPaymentType   @default(PROVIDER_FEE)
-  wallet                ProviderWallet         @relation("WalletPayments", fields: [providerId], references: [providerId])
-  session               FinancialSession       @relation("SessionPayments", fields: [sessionId], references: [id])
+  wallet                ProviderWallet?        @relation("WalletPayments", fields: [providerId], references: [providerId])
+  session               FinancialSession?      @relation("SessionPayments", fields: [sessionId], references: [id])
   revenueLedger         RevenueLedger[]        @relation("PaymentRevenueLedger")
   walletTransactions    WalletTransaction[]    @relation("PaymentWalletTransactions")
 
@@ -1195,6 +1197,7 @@ model PatientSubscription {
   price        Int
   billingCycle String
   status       String
+  paymentId    String?
   autoRenew    Boolean  @default(true)
   renewalDate  DateTime
   createdAt    DateTime @default(now())
@@ -1795,3 +1798,69 @@ enum PlanActivityType {
   READING_MATERIAL
   SESSION_BOOKING
 }
+
+model PatientPlanConfig {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  name        String
+  price       Int
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("patient_plan_configs")
+}
+
+enum ProviderPlan {
+  free
+  basic
+  standard
+  premium
+}
+
+model ProviderSubscription {
+  id            String       @id @default(uuid())
+  providerId    String       @unique
+  plan          ProviderPlan
+  price         Int
+  leadsPerWeek  Int
+  startDate     DateTime     @default(now())
+  expiryDate    DateTime
+  status        String       // "active" | "expired" | "cancelled"
+  autoRenew     Boolean      @default(false)
+  paymentId     String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  provider      User         @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@map("provider_subscriptions")
+}
+
+model LeadPurchase {
+  id          String   @id @default(uuid())
+  providerId  String
+  leadId      String
+  price       Int
+  discount    Int      @default(0)
+  finalPrice  Int
+  status      String   // "pending" | "success" | "failed"
+  paymentId   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([providerId, status])
+  @@index([leadId])
+  @@unique([providerId, leadId])
+  @@map("lead_purchases")
+}
+
+model ProviderPlanConfig {
+  id        String   @id @default(uuid())
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("provider_plan_configs")
+}
+

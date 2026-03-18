@@ -44,6 +44,7 @@ const ProviderMessagesPage = lazy(() => import('./pages/patient/ProviderMessages
 const PatientOnboardingPage = lazy(() => import('./pages/patient/PatientOnboardingPage'));
 const DailyCheckInPage = lazy(() => import('./pages/patient/DailyCheckInPage'));
 const VideoSessionPage = lazy(() => import('./pages/shared/VideoSessionPage'));
+const PaymentStatusPage = lazy(() => import('./pages/shared/PaymentStatus'));
 const AdminPortalLoginPage = lazy(() => import('./pages/admin/AdminPortalLoginPage'));
 const AdminDashboardPage = lazy(() => import('./pages/admin/Dashboard'));
 const AdminShellLayout = lazy(() => import('./components/admin/AdminShellLayout'));
@@ -88,6 +89,7 @@ const ProviderDashboard = lazy(() => import('./pages/provider/Dashboard/Provider
 const ProviderOnboardingPage = lazy(() => import('./pages/provider/ProviderOnboardingPage'));
 const ProviderVerificationPendingPage = lazy(() => import('./pages/provider/ProviderVerificationPendingPage'));
 const AppointmentRequestsPage = lazy(() => import('./pages/provider/AppointmentRequests'));
+const ProviderSubscriptionPage = lazy(() => import('./pages/provider/ProviderSubscriptionPage'));
 const HubLayout = lazy(() => import('./components/layout/HubLayout'));
 const PatientList = lazy(() => import('./pages/provider/Patients/PatientList'));
 const PatientChartLayout = lazy(() => import('./components/layout/PatientChartLayout'));
@@ -209,6 +211,7 @@ function App() {
           <Route path="messages" element={<ProviderInboxPage />} />
           <Route path="settings" element={<ProviderSettingsPage />} />
           <Route path="appointments" element={<AppointmentRequestsPage />} />
+          <Route path="subscription" element={<ProviderSubscriptionPage />} />
         </Route>
         <Route
           path="/onboarding/provider-setup"
@@ -236,6 +239,7 @@ function App() {
         <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
         <Route path="/admin-portal/login" element={<AdminPortalLoginPage />} />
         <Route path="/corporate/login" element={<Navigate to="/auth/login" replace />} />
+        <Route path="/payment/status" element={<PaymentStatusPage />} />
         <Route
           path="/dashboard"
           element={

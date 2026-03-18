@@ -741,3 +741,45 @@ export const fetchPatientDocuments = async (patientId: string): Promise<PatientD
   const response = await http.get<Envelope<PatientDocumentItem[]>>(`/v1/provider/patient/${patientId}/documents`);
   return unwrap<PatientDocumentItem[]>(response.data);
 };
+
+// ============ PROVIDER SUBSCRIPTION & LEADS ============
+
+export const fetchProviderSubscription = async () => {
+  const response = await http.get<Envelope<any>>('/v1/provider/subscription');
+  return unwrap<any>(response.data);
+};
+
+export const upgradeProviderSubscription = async (payload: { planKey: string }) => {
+  const response = await http.patch<Envelope<any>>('/v1/provider/subscription/upgrade', payload);
+  return unwrap<any>(response.data);
+};
+
+export const cancelProviderSubscription = async () => {
+  const response = await http.patch<Envelope<any>>('/v1/provider/subscription/cancel');
+  return unwrap<any>(response.data);
+};
+
+export const fetchProviderPlans = async () => {
+  const response = await http.get<Envelope<any[]>>('/v1/provider/plans');
+  return unwrap<any[]>(response.data);
+};
+
+export const fetchProviderLeads = async () => {
+  const response = await http.get<Envelope<any[]>>('/v1/provider/leads');
+  return unwrap<any[]>(response.data);
+};
+
+export const fetchProviderLeadStats = async () => {
+  const response = await http.get<Envelope<any>>('/v1/provider/lead-stats');
+  return unwrap<any>(response.data);
+};
+
+export const fetchProviderMarketplace = async () => {
+  const response = await http.get<Envelope<any[]>>('/v1/provider/marketplace');
+  return unwrap<any[]>(response.data);
+};
+
+export const purchaseProviderLead = async (leadId: string) => {
+  const response = await http.post<Envelope<any>>('/v1/provider/marketplace/purchase', { leadId });
+  return unwrap<any>(response.data);
+};

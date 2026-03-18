@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { DeleteObjectCommand, PutObjectCommand, S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, PutObjectCommand, S3Client, GetObjectCommand, ServerSideEncryption } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { env } from '../config/env';
 import { AppError } from '../middleware/error.middleware';
@@ -86,7 +86,7 @@ export const uploadProfilePhotoToS3 = async (params: {
 			Key: objectKey,
 			Body: params.buffer,
 			ContentType: params.mimeType,
-		}, env.awsS3DisableServerSideEncryption ? {} : { ServerSideEncryption: 'AES256' })),
+		}, env.awsS3DisableServerSideEncryption ? {} : { ServerSideEncryption: 'AES256' as ServerSideEncryption })),
 	);
 
 	return {
@@ -147,7 +147,7 @@ export const uploadTherapistDocumentToS3 = async (params: {
 			Key: objectKey,
 			Body: params.buffer,
 			ContentType: params.mimeType,
-		}, env.awsS3DisableServerSideEncryption ? {} : { ServerSideEncryption: 'AES256' })),
+		}, env.awsS3DisableServerSideEncryption ? {} : { ServerSideEncryption: 'AES256' as ServerSideEncryption })),
 	);
 
 	return {
@@ -200,7 +200,7 @@ export const uploadSessionAudioToS3 = async (params: {
 			Key: objectKey,
 			Body: params.buffer,
 			ContentType: params.mimeType,
-		}, env.awsS3DisableServerSideEncryption ? {} : { ServerSideEncryption: 'AES256' })),
+		}, env.awsS3DisableServerSideEncryption ? {} : { ServerSideEncryption: 'AES256' as ServerSideEncryption })),
 	);
 
 	return {

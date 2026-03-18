@@ -291,3 +291,28 @@ export const downloadAdminAnalyticsExportController = async (req: Request, res: 
 	});
 	stream.pipe(res);
 };
+
+export const getAdminRevenueAnalyticsController = async (req: Request, res: Response): Promise<void> => {
+	const result = await adminAnalyticsService.getRevenueAnalytics();
+	sendSuccess(res, result, 'Admin revenue analytics fetched successfully');
+};
+
+export const getAdminUserMetricsController = async (req: Request, res: Response): Promise<void> => {
+	const result = await adminAnalyticsService.getUserMetrics();
+	sendSuccess(res, result, 'Admin user metrics fetched successfully');
+};
+
+export const getAdminProviderMetricsController = async (req: Request, res: Response): Promise<void> => {
+	const result = await adminAnalyticsService.getProviderMetrics();
+	sendSuccess(res, result, 'Admin provider metrics fetched successfully');
+};
+
+export const getAdminMarketplaceMetricsController = async (req: Request, res: Response): Promise<void> => {
+	const result = await adminAnalyticsService.getMarketplaceMetrics();
+	sendSuccess(res, result, 'Admin marketplace metrics fetched successfully');
+};
+
+export const getAdminSystemHealthController = async (req: Request, res: Response): Promise<void> => {
+	const result = await adminAnalyticsService.getSystemHealthMetrics();
+	sendSuccess(res, result, 'Admin system health fetched successfully');
+};

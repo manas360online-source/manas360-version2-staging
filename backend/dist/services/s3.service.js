@@ -17,6 +17,13 @@ const clientConfig = {
         }
         : {}),
 };
+// Support custom S3 endpoint (e.g., MinIO) and path-style addressing for local testing
+if (env_1.env.awsS3Endpoint) {
+    clientConfig.endpoint = env_1.env.awsS3Endpoint;
+}
+if (env_1.env.awsS3ForcePathStyle) {
+    clientConfig.forcePathStyle = true;
+}
 exports.s3Client = new client_s3_1.S3Client(clientConfig);
 const getExtensionFromMimeType = (mimeType) => {
     if (mimeType === 'image/jpeg') {
@@ -52,12 +59,12 @@ const uploadProfilePhotoToS3 = async (params) => {
     const extension = getExtensionFromMimeType(params.mimeType);
     const uniqueName = `${Date.now()}-${(0, crypto_1.randomUUID)()}.${extension}`;
     const objectKey = `users/${params.userId}/profile/${uniqueName}`;
-    await exports.s3Client.send(new client_s3_1.PutObjectCommand({
+    await exports.s3Client.send(new client_s3_1.PutObjectCommand(Object.assign({
         Bucket: env_1.env.awsS3Bucket,
         Key: objectKey,
         Body: params.buffer,
         ContentType: params.mimeType,
-    }));
+    }, env_1.env.awsS3DisableServerSideEncryption ? {} : { ServerSideEncryption: 'AES256' })));
     return {
         objectKey,
         objectUrl: buildObjectUrl(env_1.env.awsS3Bucket, objectKey),
@@ -85,13 +92,12 @@ const uploadTherapistDocumentToS3 = async (params) => {
     const extension = getDocumentExtensionFromMimeType(params.mimeType);
     const uniqueName = `${Date.now()}-${(0, crypto_1.randomUUID)()}.${extension}`;
     const objectKey = `therapists/${params.therapistUserId}/documents/${params.documentType}/${uniqueName}`;
-    await exports.s3Client.send(new client_s3_1.PutObjectCommand({
+    await exports.s3Client.send(new client_s3_1.PutObjectCommand(Object.assign({
         Bucket: env_1.env.awsS3Bucket,
         Key: objectKey,
         Body: params.buffer,
         ContentType: params.mimeType,
-        ServerSideEncryption: 'AES256',
-    }));
+    }, env_1.env.awsS3DisableServerSideEncryption ? {} : { ServerSideEncryption: 'AES256' })));
     return {
         objectKey,
         objectUrl: buildObjectUrl(env_1.env.awsS3Bucket, objectKey),
@@ -119,13 +125,12 @@ const uploadSessionAudioToS3 = async (params) => {
     const safeExtension = String(params.fileExtension || 'wav').replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'wav';
     const uniqueName = `${Date.now()}-${(0, crypto_1.randomUUID)()}.${safeExtension}`;
     const objectKey = `sessions/${params.sessionId}/audio/${uniqueName}`;
-    await exports.s3Client.send(new client_s3_1.PutObjectCommand({
+    await exports.s3Client.send(new client_s3_1.PutObjectCommand(Object.assign({
         Bucket: env_1.env.awsS3Bucket,
         Key: objectKey,
         Body: params.buffer,
         ContentType: params.mimeType,
-        ServerSideEncryption: 'AES256',
-    }));
+    }, env_1.env.awsS3DisableServerSideEncryption ? {} : { ServerSideEncryption: 'AES256' })));
     return {
         objectKey,
         objectUrl: buildObjectUrl(env_1.env.awsS3Bucket, objectKey),

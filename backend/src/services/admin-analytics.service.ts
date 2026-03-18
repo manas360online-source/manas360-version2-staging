@@ -253,6 +253,118 @@ export class AdminAnalyticsService {
 			nextCursor: next,
 		};
 	}
+	async getRevenueAnalytics() {
+		// Active Patient Subscriptions MRR
+		const patientSubs = await prisma.patientSubscription.findMany({
+			where: { status: 'active' },
+			select: { plan: true, price: true },
+		});
+		let patientMrr = 0;
+		patientSubs.forEach((sub) => {
+			if (sub.plan.includes('quarterly')) patientMrr += sub.price / 3;
+			else if (sub.plan.includes('annual')) patientMrr += sub.price / 12;
+			else patientMrr += sub.price;
+		});
+
+		// Active Provider Subscriptions MRR
+		const providerSubs = await prisma.providerSubscription.findMany({
+			where: { status: 'active' },
+			select: { plan: true, price: true },
+		});
+		let providerMrr = 0;
+		providerSubs.forEach((sub) => {
+			if (sub.plan.includes('quarterly')) providerMrr += sub.price / 3;
+			else if (sub.plan.includes('annual')) providerMrr += sub.price / 12;
+			else providerMrr += sub.price;
+		});
+
+		// Marketplace Sales
+		const marketplaceAgg = await prisma.leadPurchase.aggregate({
+			_sum: { finalPrice: true },
+			where: { status: 'success' },
+		});
+		const marketplaceSales = marketplaceAgg._sum.finalPrice || 0;
+
+		// Session Commissions
+		const sessionsAgg = await prisma.revenueLedger.aggregate({
+			_sum: { platformCommissionMinor: true },
+			where: { type: 'SESSION' },
+		});
+		const sessionCommissions = Number(sessionsAgg._sum.platformCommissionMinor || 0) / 100;
+
+		const total = patientMrr + providerMrr + marketplaceSales + sessionCommissions;
+		const mrr = patientMrr + providerMrr;
+
+		return {
+			patientSubscriptions: patientMrr,
+			providerSubscriptions: providerMrr,
+			marketplaceSales,
+			sessionCommissions,
+			total,
+			mrr,
+		};
+	}
+
+	async getUserMetrics() {
+		const totalPatients = await prisma.user.count({ where: { role: 'patient' } });
+		const activeSubscribers = await prisma.patientSubscription.count({ where: { status: 'active' } });
+
+		return {
+			totalPatients,
+			activeSubscribers,
+			freeVsPaidRatio: totalPatients > 0 ? (activeSubscribers / totalPatients) * 100 : 0,
+		};
+	}
+
+	async getProviderMetrics() {
+		const totalProviders = await prisma.user.count({ where: { role: 'provider' } });
+		const activeSubscriptions = await prisma.providerSubscription.count({ where: { status: 'active' } });
+		
+		const planDistributionRaw = await prisma.providerSubscription.groupBy({
+			by: ['plan'],
+			_count: true,
+			where: { status: 'active' }
+		});
+
+		const planDistribution = planDistributionRaw.map(p => ({
+			name: p.plan,
+			value: p._count
+		}));
+
+		return {
+			totalProviders,
+			activeSubscriptions,
+			planDistribution,
+		};
+	}
+
+	async getMarketplaceMetrics() {
+		const totalGenerated = await prisma.lead.count();
+		const totalAssigned = await prisma.lead.count({ where: { providerId: { not: null } } });
+		const purchased = await prisma.leadPurchase.count({ where: { status: 'success' } });
+
+		return {
+			generated: totalGenerated,
+			assigned: totalAssigned,
+			purchased,
+			conversionRate: totalGenerated > 0 ? (purchased / totalGenerated) * 100 : 0,
+		};
+	}
+
+	async getSystemHealthMetrics() {
+		const failedLeadPayments = await prisma.leadPurchase.count({ where: { status: 'failed' } });
+		const failedSessionPayments = await prisma.financialPayment.count({ where: { status: 'FAILED' } });
+		const pendingPayments = await prisma.financialPayment.count({ where: { status: 'PENDING_CAPTURE' } });
+		const expiredSubscriptions = await prisma.providerSubscription.count({
+			where: { status: 'active', expiryDate: { lt: new Date() } }
+		});
+
+		return {
+			failedPayments: failedLeadPayments + failedSessionPayments,
+			pendingPayments,
+			expiredSubscriptions,
+		};
+	}
 }
 
 export const adminAnalyticsService = new AdminAnalyticsService();

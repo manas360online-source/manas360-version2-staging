@@ -38,7 +38,7 @@ const helpArticles: HelpArticle[] = [
   {
     id: 'wallet-subscriptions',
     title: 'Wallet & Subscriptions',
-    summary: 'Understand the ₹199 base fee, premium minutes top-up, and refund policy for wallet charges.',
+    summary: 'Understand the ₹99 base fee, premium minutes top-up, and refund policy for wallet charges.',
     category: 'billing',
     keywords: ['refund', 'wallet', 'subscription', 'minutes', 'billing', 'plan'],
   },
@@ -90,7 +90,7 @@ const categoryCards: Array<{
     id: 'billing',
     title: 'Billing & Premium Minutes',
     subtitle: 'Clear answers for plans, wallet minutes, and refunds.',
-    bullets: ['How the ₹199 base plan works', 'Where to buy more AI minutes', 'Refund policy'],
+    bullets: ['How the ₹99 base plan works', 'Where to buy more AI minutes', 'Refund policy'],
     icon: CreditCard,
   },
   {

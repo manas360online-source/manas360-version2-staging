@@ -81,9 +81,13 @@ export interface EnvConfig {
 	redisUrl: string;
 	analyticsRollupIntervalSeconds?: number;
 	disableAuthRateLimit: boolean;
+	// When true, disable adding ServerSideEncryption header for S3 uploads (useful for MinIO)
+	awsS3DisableServerSideEncryption: boolean;
 	razorpayKeyId?: string;
 	razorpayKeySecret?: string;
 	razorpayWebhookSecret?: string;
+	phonePeWebhookUsername?: string;
+	phonePeWebhookPassword?: string;
 	paymentProviderSharePercent: number;
 	paymentPlatformSharePercent: number;
 	webhookIdempotencyTtlSeconds: number;
@@ -133,6 +137,8 @@ export const env: EnvConfig = Object.freeze({
 	razorpayKeyId: process.env.RAZORPAY_KEY_ID,
 	razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET,
 	razorpayWebhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET,
+	phonePeWebhookUsername: process.env.PHONEPE_WEBHOOK_USERNAME,
+	phonePeWebhookPassword: process.env.PHONEPE_WEBHOOK_PASSWORD,
 	paymentProviderSharePercent: parseNumber(process.env.PAYMENT_PROVIDER_SHARE_PERCENT, 60),
 	paymentPlatformSharePercent: parseNumber(process.env.PAYMENT_PLATFORM_SHARE_PERCENT, 40),
 	webhookIdempotencyTtlSeconds: parseNumber(process.env.WEBHOOK_IDEMPOTENCY_TTL_SECONDS, 3600),
@@ -149,4 +155,3 @@ if (
 ) {
 	throw new Error('JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must be configured for staging/production');
 }
-

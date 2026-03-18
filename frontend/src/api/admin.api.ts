@@ -442,3 +442,59 @@ export const replaceAdminScoringBands = async (
 ): Promise<ApiEnvelope<{ items: AdminScreeningScoringBand[] }>> => {
 	return (await client.put<ApiEnvelope<{ items: AdminScreeningScoringBand[] }>>(`/v1/admin/screening/templates/${encodeURIComponent(templateId)}/scoring-bands`, { bands })).data;
 };
+
+// --- Phase 13: Admin Analytics ---
+
+export type AdminRevenueAnalytics = {
+	patientSubscriptions: number;
+	providerSubscriptions: number;
+	marketplaceSales: number;
+	sessionCommissions: number;
+	total: number;
+	mrr: number;
+};
+
+export type AdminUserMetrics = {
+	totalPatients: number;
+	activeSubscribers: number;
+	freeVsPaidRatio: number;
+};
+
+export type AdminProviderMetrics = {
+	totalProviders: number;
+	activeSubscriptions: number;
+	planDistribution: Array<{ name: string; value: number }>;
+};
+
+export type AdminMarketplaceMetrics = {
+	generated: number;
+	assigned: number;
+	purchased: number;
+	conversionRate: number;
+};
+
+export type AdminSystemHealthMetrics = {
+	failedPayments: number;
+	pendingPayments: number;
+	expiredSubscriptions: number;
+};
+
+export const getAdminRevenueAnalytics = async (): Promise<ApiEnvelope<AdminRevenueAnalytics>> => {
+	return (await client.get<ApiEnvelope<AdminRevenueAnalytics>>('/v1/admin/analytics/revenue')).data;
+};
+
+export const getAdminUserMetrics = async (): Promise<ApiEnvelope<AdminUserMetrics>> => {
+	return (await client.get<ApiEnvelope<AdminUserMetrics>>('/v1/admin/analytics/users')).data;
+};
+
+export const getAdminProviderMetrics = async (): Promise<ApiEnvelope<AdminProviderMetrics>> => {
+	return (await client.get<ApiEnvelope<AdminProviderMetrics>>('/v1/admin/analytics/providers')).data;
+};
+
+export const getAdminMarketplaceMetrics = async (): Promise<ApiEnvelope<AdminMarketplaceMetrics>> => {
+	return (await client.get<ApiEnvelope<AdminMarketplaceMetrics>>('/v1/admin/analytics/marketplace')).data;
+};
+
+export const getAdminSystemHealth = async (): Promise<ApiEnvelope<AdminSystemHealthMetrics>> => {
+	return (await client.get<ApiEnvelope<AdminSystemHealthMetrics>>('/v1/admin/analytics/health')).data;
+};

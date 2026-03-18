@@ -801,28 +801,52 @@ export const validateAdminListSubscriptionsQuery: RequestHandler[] = [
 ];
 
 const extractValidatedDailyCheckIn = (req: Request, _res: Response, next: NextFunction): void => {
+	const body = req.body;
+	const type = String(body.type || '').toUpperCase() as 'MORNING' | 'EVENING';
+
+	const mapStringToValue = (val: any): number | undefined => {
+		if (val === undefined || val === null) return undefined;
+		if (typeof val === 'number') return val;
+		const s = String(val).toLowerCase();
+		if (s.includes('low')) return 2;
+		if (s.includes('medium')) return 3;
+		if (s.includes('high')) return 4;
+		if (s.includes('great')) return 5;
+		if (s.includes('very low')) return 1;
+		if (s.includes('very high')) return 5;
+		// Sleep ranges
+		if (s.includes('4') && s.includes('6')) return 2;
+		if (s.includes('6') && s.includes('8')) return 3;
+		if (s.includes('8') && s.includes('10')) return 4;
+		if (s.includes('less than 4')) return 1;
+		if (s.includes('more than 10')) return 5;
+		
+		const parsed = parseInt(s, 10);
+		return isNaN(parsed) ? undefined : parsed;
+	};
+
 	req.validatedDailyCheckIn = {
-		date: req.body.date as string,
-		type: req.body.type as 'MORNING' | 'EVENING',
-		mood: Number(req.body.mood),
-		energy: req.body.energy !== undefined ? Number(req.body.energy) : undefined,
-		sleep: req.body.sleep !== undefined ? Number(req.body.sleep) : undefined,
-		context: (req.body.context as string[]) || [],
-		intention: req.body.intention as string | undefined,
-		reflectionGood: req.body.reflectionGood as string | undefined,
-		reflectionBad: req.body.reflectionBad as string | undefined,
-		stressLevel: req.body.stressLevel !== undefined ? Number(req.body.stressLevel) : undefined,
-		gratitude: req.body.gratitude as string | undefined,
+		date: body.date ? String(body.date) : new Date().toISOString(),
+		type,
+		mood: Number(body.mood),
+		energy: mapStringToValue(body.energy),
+		sleep: mapStringToValue(body.sleep),
+		context: Array.isArray(body.context) ? body.context : [],
+		intention: String(body.intention || ''),
+		reflectionGood: String(body.reflectionGood || ''),
+		reflectionBad: String(body.reflectionBad || ''),
+		stressLevel: body.stressLevel !== undefined ? Number(body.stressLevel) : undefined,
+		gratitude: String(body.gratitude || ''),
 	};
 	next();
 };
 
 export const validateCreateDailyCheckInRequest: RequestHandler[] = [
-	body('date').isISO8601().withMessage('date must be a valid ISO8601 date'),
-	body('type').isIn(['MORNING', 'EVENING']).withMessage('type must be MORNING or EVENING'),
+	body('date').optional().isISO8601().withMessage('date must be a valid ISO8601 date'),
+	body('type').isString().toLowerCase().isIn(['morning', 'evening']).withMessage('type must be morning or evening'),
 	body('mood').isInt({ min: 1, max: 5 }).withMessage('mood must be an integer between 1 and 5'),
-	body('energy').optional().isInt({ min: 1, max: 5 }).withMessage('energy must be an integer between 1 and 5'),
-	body('sleep').optional().isInt({ min: 1, max: 5 }).withMessage('sleep must be an integer between 1 and 5'),
+	body('energy').optional().custom((val) => typeof val === 'string' || (typeof val === 'number' && val >= 1 && val <= 5)),
+	body('sleep').optional().custom((val) => typeof val === 'string' || (typeof val === 'number' && val >= 1 && val <= 5)),
 	body('context').optional().isArray().withMessage('context must be an array of strings'),
 	body('context.*').optional().isString().trim().isLength({ min: 1, max: 100 }).withMessage('each context item must be 1-100 characters'),
 	body('intention').optional().isString().trim().isLength({ min: 1, max: 500 }).withMessage('intention must be 1-500 characters'),
@@ -831,7 +855,7 @@ export const validateCreateDailyCheckInRequest: RequestHandler[] = [
 	body('stressLevel').optional().isInt({ min: 1, max: 5 }).withMessage('stressLevel must be an integer between 1 and 5'),
 	body('gratitude').optional().isString().trim().isLength({ min: 1, max: 500 }).withMessage('gratitude must be 1-500 characters'),
 	body().custom((body) => {
-		const type = body.type;
+		const type = String(body.type || '').toUpperCase();
 		if (type === 'MORNING') {
 			// Morning check-in validation
 			if (body.energy === undefined) {
@@ -840,7 +864,7 @@ export const validateCreateDailyCheckInRequest: RequestHandler[] = [
 			if (body.sleep === undefined) {
 				throw new Error('sleep is required for morning check-in');
 			}
-			if (body.intention === undefined || body.intention.trim().length === 0) {
+			if (body.intention === undefined || String(body.intention || '').trim().length === 0) {
 				throw new Error('intention is required for morning check-in');
 			}
 			// Evening fields should not be present
@@ -849,16 +873,16 @@ export const validateCreateDailyCheckInRequest: RequestHandler[] = [
 			}
 		} else if (type === 'EVENING') {
 			// Evening check-in validation
-			if (body.reflectionGood === undefined || body.reflectionGood.trim().length === 0) {
+			if (body.reflectionGood === undefined || String(body.reflectionGood || '').trim().length === 0) {
 				throw new Error('reflectionGood is required for evening check-in');
 			}
-			if (body.reflectionBad === undefined || body.reflectionBad.trim().length === 0) {
+			if (body.reflectionBad === undefined || String(body.reflectionBad || '').trim().length === 0) {
 				throw new Error('reflectionBad is required for evening check-in');
 			}
 			if (body.stressLevel === undefined) {
 				throw new Error('stressLevel is required for evening check-in');
 			}
-			if (body.gratitude === undefined || body.gratitude.trim().length === 0) {
+			if (body.gratitude === undefined || String(body.gratitude || '').trim().length === 0) {
 				throw new Error('gratitude is required for evening check-in');
 			}
 			// Morning fields should not be present

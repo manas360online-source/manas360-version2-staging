@@ -18,7 +18,7 @@ export default function SignupPage() {
 		email: string;
 		password: string;
 		role: 'patient' | 'therapist' | 'psychiatrist' | 'coach';
-		selectedPlan?: 'basic' | 'standard' | 'premium';
+		selectedPlan?: 'free' | 'monthly' | 'quarterly' | 'premium_monthly' | 'premium_annual';
 		paymentMethod?: string;
 	}) => {
 		setError(null);
@@ -28,7 +28,13 @@ export default function SignupPage() {
 			await register(payload.email, payload.password, payload.name, payload.role);
 			if (payload.role === 'patient') {
 				await login(payload.email, payload.password);
-				await patientApi.upgradeSubscription();
+				const subscriptionResponse = await patientApi.upgradeSubscription({ planKey: 'free' });
+				
+				if (subscriptionResponse?.redirectUrl) {
+					window.location.href = subscriptionResponse.redirectUrl;
+					return;
+				}
+
 				setSuccess('Registration and platform activation successful. Redirecting to care...');
 				navigate('/patient/onboarding?next=/patient/sessions', { replace: true });
 			} else {

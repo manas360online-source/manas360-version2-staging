@@ -123,5 +123,25 @@ router.post('/appointments/:requestId/reject', requireAuth, requireRole(provider
 // Meeting link
 router.post('/meeting-link/:sessionId', requireAuth, requireRole(providerRoles), asyncHandler(generateMeetingLink));
 
-export default router;
+// ── Provider Subscription & Leads ──
+import {
+	getProviderSubscriptionController,
+	upgradeProviderSubscriptionController,
+	cancelProviderSubscriptionController,
+	getProviderLeadsController,
+	getProviderLeadStatsController,
+	getProviderMarketplaceController,
+	purchaseMarketplaceLeadController,
+	getProviderPlansController,
+} from '../controllers/provider-subscription.controller';
 
+router.get('/plans', asyncHandler(getProviderPlansController)); // public
+router.get('/subscription', requireAuth, requireRole(providerRoles), asyncHandler(getProviderSubscriptionController));
+router.patch('/subscription/upgrade', requireAuth, requireRole(providerRoles), asyncHandler(upgradeProviderSubscriptionController));
+router.patch('/subscription/cancel', requireAuth, requireRole(providerRoles), asyncHandler(cancelProviderSubscriptionController));
+router.get('/leads', requireAuth, requireRole(providerRoles), asyncHandler(getProviderLeadsController));
+router.get('/lead-stats', requireAuth, requireRole(providerRoles), asyncHandler(getProviderLeadStatsController));
+router.get('/marketplace', requireAuth, requireRole(providerRoles), asyncHandler(getProviderMarketplaceController));
+router.post('/marketplace/purchase', requireAuth, requireRole(providerRoles), asyncHandler(purchaseMarketplaceLeadController));
+
+export default router;
