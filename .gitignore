@@ -13,3 +13,4 @@ load-tests/**/node_modules/
 !*.env.example
 !backend/.env.example
 !frontend/.env.example
+/public/*.mp4
