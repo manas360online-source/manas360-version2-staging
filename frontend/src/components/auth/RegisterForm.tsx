@@ -5,7 +5,7 @@ import Input from '../ui/Input';
 
 type PublicSignupRole = 'patient' | 'therapist' | 'psychiatrist' | 'coach';
 
-type PlatformPlan = 'basic' | 'standard' | 'premium';
+type PlatformPlan = 'free' | 'monthly' | 'quarterly' | 'premium_monthly' | 'premium_annual';
 type RegistrationStep = 1 | 2 | 3;
 
 type RegisterFormProps = {
@@ -20,7 +20,7 @@ export default function RegisterForm({ onSubmit, loading = false, error = null }
 	const [password, setPassword] = useState('');
 	const [confirmPassword, setConfirmPassword] = useState('');
 	const [role, setRole] = useState<PublicSignupRole>('patient');
-	const [selectedPlan, setSelectedPlan] = useState<PlatformPlan>('standard');
+	const [selectedPlan, setSelectedPlan] = useState<PlatformPlan>('free');
 	const [paymentMethod, setPaymentMethod] = useState<string>('UPI');
 	const [step, setStep] = useState<RegistrationStep>(1);
 	const [localError, setLocalError] = useState<string | null>(null);
@@ -100,12 +100,43 @@ export default function RegisterForm({ onSubmit, loading = false, error = null }
 		features: string[];
 	}> = [
 		{
-			key: 'standard',
-			name: 'Standard Plan',
-			price: '₹199 / month',
-			badge: 'Most Popular',
+			key: 'free',
+			name: 'Free Tier',
+			price: '₹0',
+			description: 'Basic self-help for first-time users.',
+			features: ['3 tracks/day', 'AI chatbot (basic)'],
+		},
+		{
+			key: 'monthly',
+			name: 'Monthly Plan',
+			price: '₹99 / month',
+			badge: 'Trial users',
 			description: 'Full platform access for daily care.',
 			features: ['PHQ-9 and GAD-7', 'Therapist discovery', 'Session scheduling'],
+		},
+		{
+			key: 'quarterly',
+			name: 'Quarterly (MVP)',
+			price: '₹299 / quarter',
+			badge: 'Primary B2C',
+			description: 'Full access + priority matching.',
+			features: ['Priority matching', 'All assessments'],
+		},
+		{
+			key: 'premium_monthly',
+			name: 'Premium Monthly',
+			price: '₹299 / month',
+			description: 'Unlimited streaming and AI tools.',
+			features: ['Unlimited Audio', 'AI insights'],
+		},
+		{
+			key: 'premium_annual',
+			name: 'Premium Annual',
+			price: '₹2,999 / year',
+			badge: 'Best Value',
+			note: '16% off monthly premium',
+			description: 'Everything including premium tools.',
+			features: ['All premium features'],
 		},
 	];
 

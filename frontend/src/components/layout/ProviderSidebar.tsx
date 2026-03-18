@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Home, Users, Calendar, Settings, MessageSquare, CreditCard, LogOut } from 'lucide-react';
+import { Home, Users, Calendar, Settings, MessageSquare, CreditCard, LogOut, ClipboardCheck, Star } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 export const ProviderSidebar = () => {
@@ -28,6 +28,7 @@ export const ProviderSidebar = () => {
           { label: 'Dashboard', path: '/provider/dashboard', icon: <Home size={18} /> },
           { label: 'My Patients', path: '/provider/patients', icon: <Users size={18} /> },
           { label: 'Calendar', path: '/provider/calendar', icon: <Calendar size={18} /> },
+          { label: 'Appointments', path: '/provider/appointments', icon: <ClipboardCheck size={18} /> },
         ]
       }
     ];
@@ -37,6 +38,7 @@ export const ProviderSidebar = () => {
         category: 'PRACTICE & SUPPORT',
         items: [
           { label: 'Earnings', path: '/provider/earnings', icon: <CreditCard size={18} /> },
+          { label: 'Premium Plan', path: '/provider/subscription', icon: <Star size={18} /> },
           { label: 'Messages', path: '/provider/messages', icon: <MessageSquare size={18} /> },
           { label: 'Settings', path: '/provider/settings', icon: <Settings size={18} /> },
         ]

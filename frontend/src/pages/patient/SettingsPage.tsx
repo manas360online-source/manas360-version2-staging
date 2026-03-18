@@ -13,7 +13,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { patientApi } from '../../api/patient';
 import { useAuth } from '../../context/AuthContext';
 import { http } from '../../lib/http';
@@ -194,9 +194,6 @@ const formatCurrencyInr = (amount: number) => new Intl.NumberFormat('en-IN', {
   maximumFractionDigits: 0,
 }).format(amount);
 
-// TODO(payment-gateway): Switch this to true via env once gateway selection and integration are complete.
-const PAYMENT_GATEWAY_DECIDED = import.meta.env.VITE_PAYMENT_GATEWAY_DECIDED === 'true';
-
 export default function SettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const sectionFromQuery = parseSectionId(searchParams.get('section'));
@@ -210,22 +207,12 @@ export default function SettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [billingLoading, setBillingLoading] = useState(false);
-  const [billingActionLoading, setBillingActionLoading] = useState<string | null>(null);
   const [billingError, setBillingError] = useState<string | null>(null);
   const [billingData, setBillingData] = useState<{
     subscription: any | null;
     paymentMethod: any | null;
     invoices: any[];
   }>({ subscription: null, paymentMethod: null, invoices: [] });
-  const [walletMinutes, setWalletMinutes] = useState<number>(45);
-  const [animatedWalletMinutes, setAnimatedWalletMinutes] = useState<number>(45);
-  const [usageExpanded, setUsageExpanded] = useState(false);
-  const [walletCheckoutBundle, setWalletCheckoutBundle] = useState<number | null>(null);
-  const [minutesWarning, setMinutesWarning] = useState<{ open: boolean; required: number; feature: string }>({
-    open: false,
-    required: 0,
-    feature: '',
-  });
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
     newPassword: '',
@@ -332,33 +319,6 @@ export default function SettingsPage() {
 
     void refreshBillingData();
   }, [activeSection, mobileOpen]);
-
-  useEffect(() => {
-    const rawValue = billingData.subscription?.premiumMinutesRemaining
-      ?? billingData.subscription?.walletMinutes
-      ?? billingData.subscription?.minutesRemaining;
-    if (rawValue === undefined || rawValue === null) return;
-    const parsed = Number(rawValue);
-    if (!Number.isFinite(parsed)) return;
-    setWalletMinutes(Math.max(0, Math.floor(parsed)));
-  }, [billingData.subscription]);
-
-  useEffect(() => {
-    let frame = 0;
-    const startValue = animatedWalletMinutes;
-    const targetValue = walletMinutes;
-    if (startValue === targetValue) return;
-
-    const timer = window.setInterval(() => {
-      frame += 1;
-      const progress = Math.min(1, frame / 18);
-      const nextValue = Math.round(startValue + (targetValue - startValue) * progress);
-      setAnimatedWalletMinutes(nextValue);
-      if (progress >= 1) window.clearInterval(timer);
-    }, 16);
-
-    return () => window.clearInterval(timer);
-  }, [walletMinutes]);
 
   const refreshBillingData = async () => {
     setBillingLoading(true);
@@ -814,56 +774,10 @@ export default function SettingsPage() {
   );
 
   const renderBilling = () => {
-    const testPaymentMode = !PAYMENT_GATEWAY_DECIDED;
     const status = String(billingData.subscription?.status || '').toLowerCase();
     const isActive = status === 'active' || status === 'trialing' || status === 'renewed';
-
-    const runBillingAction = async (actionKey: string, action: () => Promise<any>, successMessage: string) => {
-      setBillingActionLoading(actionKey);
-      setBillingError(null);
-      setSuccess(null);
-      try {
-        await action();
-        setSuccess(successMessage);
-        await refreshBillingData();
-      } catch (err: any) {
-        setBillingError(err?.response?.data?.message || err?.message || 'Unable to update subscription right now.');
-      } finally {
-        setBillingActionLoading(null);
-      }
-    };
-
-    const startWalletTopUp = async (bundleMinutes: number, bundlePrice: number) => {
-      setWalletCheckoutBundle(bundleMinutes);
-      setSuccess(null);
-      setBillingError(null);
-
-      if (testPaymentMode) {
-        window.setTimeout(() => {
-          setWalletMinutes((prev) => prev + bundleMinutes);
-          setWalletCheckoutBundle(null);
-          setSuccess(`Top-up successful (test mode): +${bundleMinutes} minutes for ${formatCurrencyInr(bundlePrice)}.`);
-        }, 350);
-        return;
-      }
-
-      // TODO(payment-gateway): Launch Razorpay checkout drawer here.
-      // 1) Request order from backend
-      // 2) Open Razorpay modal/drawer
-      // 3) Verify payment
-      // 4) Refresh wallet balance from API
-      setWalletCheckoutBundle(null);
-      setSuccess('Razorpay checkout will open here once payment gateway is enabled.');
-    };
-
-    const requireMinutes = (needed: number, feature: string) => {
-      if (walletMinutes >= needed) {
-        setWalletMinutes((prev) => Math.max(0, prev - needed));
-        setSuccess(`${needed} minute${needed > 1 ? 's' : ''} used for ${feature}.`);
-        return;
-      }
-      setMinutesWarning({ open: true, required: needed, feature });
-    };
+    const planName = String(billingData.subscription?.plan?.name || billingData.subscription?.plan?.key || 'Free Tier');
+    const expiryDate = billingData.subscription?.expiryDate ? new Date(billingData.subscription.expiryDate).toLocaleDateString() : 'Never';
 
     return (
       <div className="space-y-4">
@@ -872,152 +786,27 @@ export default function SettingsPage() {
           <div className="rounded-xl border border-calm-sage/20 bg-white/80 p-4 text-sm text-charcoal/70">Loading billing details...</div>
         ) : (
           <>
-            {/* Section 1: Platform Access */}
             <section className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-indigo-700">Section 1 - Platform Access</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-indigo-700">Current Subscription</p>
               <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h3 className="text-lg font-semibold text-indigo-950">Standard Access</h3>
-                  <p className="mt-1 text-2xl font-bold text-indigo-900">₹199<span className="text-sm font-medium text-indigo-700"> / month</span></p>
+                  <h3 className="text-lg font-semibold text-indigo-950">{planName}</h3>
+                  {isActive ? (
+                    <p className="mt-1 text-sm text-indigo-900">
+                      Active until <span className="font-semibold">{expiryDate}</span>
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-sm text-indigo-900 font-semibold">
+                      Your subscription is currently inactive.
+                    </p>
+                  )}
                 </div>
-                {isActive ? (
-                  <span className="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
-                    Active ✅
-                  </span>
-                ) : (
-                  <button
-                    type="button"
-                    disabled={Boolean(billingActionLoading)}
-                    onClick={() =>
-                      void runBillingAction(
-                        'activate-platform',
-                        () => patientApi.reactivateSubscription(),
-                        'Platform access activated.',
-                      )
-                    }
-                    className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
-                  >
-                    {billingActionLoading === 'activate-platform' ? 'Activating...' : 'Subscribe Now'}
-                  </button>
-                )}
-              </div>
-              <ul className="mt-4 grid grid-cols-1 gap-2 text-sm text-indigo-950 sm:grid-cols-2">
-                <li>✓ Platform access</li>
-                <li>✓ Therapist search & booking</li>
-                <li>✓ Session scheduling & secure payment processing</li>
-                <li>✓ Basic AI chatbot (Mitra) - Limited to 3 messages/day</li>
-                <li>✓ Access to all free features (3 CBT modules, Basic Dashboard)</li>
-              </ul>
-            </section>
-
-            {/* Section 2: Premium Wallet */}
-            <section className="rounded-xl border border-calm-sage/20 bg-white/90 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-charcoal/65">Section 2 - Premium Wallet</p>
-              <div className="mt-3 rounded-xl border border-calm-sage/20 bg-[#F6FAF4] p-4">
-                <p className="text-xs font-medium text-charcoal/70">Current Balance</p>
-                <p className="mt-1 text-2xl font-bold text-charcoal">⏳ {animatedWalletMinutes} Minutes Remaining</p>
-                <p className="mt-1 text-xs text-charcoal/60">Minutes never expire</p>
-              </div>
-
-              {testPaymentMode && (
-                <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
-                  Test mode is ON. Wallet top-ups are simulated and minutes are added instantly.
-                </div>
-              )}
-
-              <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-3">
-                {[
-                  { mins: 60, label: '1 Hour Bundle (60 mins)', price: 499, tag: '₹8.32/min' },
-                  { mins: 120, label: '2 Hour Bundle (120 mins)', price: 899, tag: 'Save 10%' },
-                  { mins: 180, label: '3 Hour Bundle (180 mins)', price: 1450, tag: 'Save 3% - Maximum Value' },
-                ].map((bundle) => (
-                  <article
-                    key={bundle.mins}
-                    className={`rounded-xl border p-3 ${bundle.mins === 120 ? 'border-calm-sage bg-[#F4F8F3]' : 'border-calm-sage/20 bg-white'}`}
-                  >
-                    <p className="text-sm font-semibold text-charcoal">{bundle.label}</p>
-                    <p className="mt-1 text-xl font-bold text-charcoal">{formatCurrencyInr(bundle.price)}</p>
-                    <p className="mt-1 text-xs font-medium text-calm-sage">{bundle.tag}</p>
-                    <button
-                      type="button"
-                      onClick={() => void startWalletTopUp(bundle.mins, bundle.price)}
-                      disabled={walletCheckoutBundle !== null}
-                      className="mt-3 w-full rounded-lg bg-calm-sage px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
-                    >
-                      {walletCheckoutBundle === bundle.mins ? 'Processing...' : `Buy ${bundle.mins} mins`}
-                    </button>
-                  </article>
-                ))}
-              </div>
-
-              <div className="mt-4 rounded-xl border border-calm-sage/20 bg-white p-3">
-                <button
-                  type="button"
-                  onClick={() => setUsageExpanded((prev) => !prev)}
-                  className="flex w-full items-center justify-between text-left"
+                <Link
+                  to="/patient/pricing"
+                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500"
                 >
-                  <span className="text-sm font-semibold text-charcoal">What uses my minutes?</span>
-                  {usageExpanded ? <ChevronUp className="h-4 w-4 text-charcoal/70" /> : <ChevronDown className="h-4 w-4 text-charcoal/70" />}
-                </button>
-
-                {usageExpanded && (
-                  <div className="mt-3 overflow-x-auto">
-                    <table className="min-w-full text-left text-xs">
-                      <thead>
-                        <tr className="border-b border-calm-sage/20 text-charcoal/60">
-                          <th className="py-2 pr-3">Category</th>
-                          <th className="py-2 pr-3">Feature</th>
-                          <th className="py-2">Minutes</th>
-                        </tr>
-                      </thead>
-                      <tbody className="text-charcoal/80">
-                        <tr className="border-b border-calm-sage/10"><td className="py-2 pr-3">AI & Chat</td><td className="py-2 pr-3">Mitra Unlimited</td><td className="py-2">1 min/chat</td></tr>
-                        <tr className="border-b border-calm-sage/10"><td className="py-2 pr-3">AI & Chat</td><td className="py-2 pr-3">Deep AI Insights</td><td className="py-2">5 mins/session</td></tr>
-                        <tr className="border-b border-calm-sage/10"><td className="py-2 pr-3">Wellness Tools</td><td className="py-2 pr-3">Full Sleep Tracking</td><td className="py-2">5 mins/night</td></tr>
-                        <tr className="border-b border-calm-sage/10"><td className="py-2 pr-3">Wellness Tools</td><td className="py-2 pr-3">50+ CBT Modules</td><td className="py-2">15 mins/module</td></tr>
-                        <tr className="border-b border-calm-sage/10"><td className="py-2 pr-3">Wellness Tools</td><td className="py-2 pr-3">IoT White Light Sync</td><td className="py-2">10 mins/day</td></tr>
-                        <tr className="border-b border-calm-sage/10"><td className="py-2 pr-3">Analytics</td><td className="py-2 pr-3">Data Export to CSV/PDF</td><td className="py-2">2 mins/export</td></tr>
-                        <tr className="border-b border-calm-sage/10"><td className="py-2 pr-3">Analytics</td><td className="py-2 pr-3">ML Predictions</td><td className="py-2">5 mins</td></tr>
-                        <tr><td className="py-2 pr-3">Gamification</td><td className="py-2 pr-3">Digital Pet</td><td className="py-2">5 mins/day</td></tr>
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-3 rounded-lg border border-calm-sage/20 bg-[#FAFAF8] p-3">
-                <p className="text-xs text-charcoal/70">Sample premium action</p>
-                <button
-                  type="button"
-                  onClick={() => requireMinutes(2, 'Data Export (CSV/PDF)')}
-                  className="mt-2 rounded-lg border border-calm-sage/25 bg-white px-3 py-2 text-xs font-semibold text-charcoal"
-                >
-                  Try Export (Consumes 2 mins)
-                </button>
-              </div>
-            </section>
-
-            {/* Section 3: Therapy Session Rate Card */}
-            <section className="rounded-xl border border-calm-sage/20 bg-white/90 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-charcoal/65">Section 3 - Therapy Session Rate Card</p>
-              <div className="mt-3 overflow-x-auto rounded-xl border border-calm-sage/15">
-                <table className="min-w-full bg-white text-left text-sm">
-                  <thead className="bg-[#F4F8F3] text-charcoal/70">
-                    <tr>
-                      <th className="px-4 py-3">Provider Type</th>
-                      <th className="px-4 py-3">45 min</th>
-                      <th className="px-4 py-3">60 min</th>
-                    </tr>
-                  </thead>
-                  <tbody className="text-charcoal">
-                    <tr className="border-t border-calm-sage/10"><td className="px-4 py-3 font-medium">Clinical Psychologist</td><td className="px-4 py-3">₹999</td><td className="px-4 py-3">₹1,499</td></tr>
-                    <tr className="border-t border-calm-sage/10"><td className="px-4 py-3 font-medium">Specialized Therapist</td><td className="px-4 py-3">₹1,299</td><td className="px-4 py-3">₹1,999</td></tr>
-                    <tr className="border-t border-calm-sage/10"><td className="px-4 py-3 font-medium">Psychiatrist (MD)</td><td className="px-4 py-3">₹1,499</td><td className="px-4 py-3">₹2,499</td></tr>
-                  </tbody>
-                </table>
-              </div>
-              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-                ⏰ <span className="font-semibold">Premium Times (+20% Surcharge):</span> Appointments booked during peak hours (Evenings 6-9 PM, Early Mornings 6-9 AM, and Weekends) carry a 20% premium.
+                  Manage / Upgrade Plan
+                </Link>
               </div>
             </section>
 
@@ -1026,7 +815,7 @@ export default function SettingsPage() {
             <p className="mt-1 text-sm text-charcoal/75">
               {billingData.paymentMethod
                 ? `${billingData.paymentMethod.cardBrand || 'Card'} •••• ${billingData.paymentMethod.cardLast4 || '----'}`
-                : 'No payment method added'}
+                : 'No registered payment methods'}
             </p>
             </div>
 
@@ -1050,36 +839,6 @@ export default function SettingsPage() {
               </div>
             )}
             </div>
-
-            {minutesWarning.open && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-                <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl">
-                  <h4 className="text-base font-semibold text-charcoal">Insufficient Premium Minutes</h4>
-                  <p className="mt-2 text-sm text-charcoal/80">
-                    You need {minutesWarning.required} Premium Minutes to use {minutesWarning.feature}. Top up your wallet to continue.
-                  </p>
-                  <div className="mt-4 flex justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setMinutesWarning({ open: false, required: 0, feature: '' })}
-                      className="rounded-lg border border-calm-sage/20 bg-white px-3 py-2 text-sm text-charcoal/80"
-                    >
-                      Close
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMinutesWarning({ open: false, required: 0, feature: '' });
-                        void startWalletTopUp(120, 899);
-                      }}
-                      className="rounded-lg bg-calm-sage px-3 py-2 text-sm font-semibold text-white"
-                    >
-                      Top Up Wallet
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
           </>
         )}
       </div>

@@ -474,7 +474,7 @@ export default function ProgressPage() {
     return structured
       .map((item: any) => {
         const key = String(item?.templateKey || item?.template?.key || '').toLowerCase();
-        const type = key.includes('phq-9') ? 'PHQ-9' : key.includes('gad-7') ? 'GAD-7' : String(item?.templateTitle || 'Assessment');
+        const type = item?.type || (key.includes('phq-9') ? 'PHQ-9' : key.includes('gad-7') ? 'GAD-7' : String(item?.templateTitle || 'Assessment'));
         const date = parseDate(item?.submittedAt || item?.createdAt);
         if (!date) return null;
         return {

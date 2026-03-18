@@ -72,6 +72,8 @@ export interface EnvConfig {
 	awsS3Bucket: string;
 	awsAccessKeyId?: string;
 	awsSecretAccessKey?: string;
+	awsS3Endpoint?: string;
+	awsS3ForcePathStyle: boolean;
 	profilePhotoSignedUrlTtlSeconds: number;
 	therapistDocumentSignedUrlTtlSeconds: number;
 	exportSignedUrlTtlSeconds: number;
@@ -79,9 +81,13 @@ export interface EnvConfig {
 	redisUrl: string;
 	analyticsRollupIntervalSeconds?: number;
 	disableAuthRateLimit: boolean;
+	// When true, disable adding ServerSideEncryption header for S3 uploads (useful for MinIO)
+	awsS3DisableServerSideEncryption: boolean;
 	razorpayKeyId?: string;
 	razorpayKeySecret?: string;
 	razorpayWebhookSecret?: string;
+	phonePeWebhookUsername?: string;
+	phonePeWebhookPassword?: string;
 	paymentProviderSharePercent: number;
 	paymentPlatformSharePercent: number;
 	webhookIdempotencyTtlSeconds: number;
@@ -117,6 +123,10 @@ export const env: EnvConfig = Object.freeze({
 	awsS3Bucket: process.env.AWS_S3_BUCKET ?? '',
 	awsAccessKeyId: process.env.AWS_ACCESS_KEY_ID,
 	awsSecretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+	awsS3Endpoint: process.env.AWS_S3_ENDPOINT,
+	awsS3ForcePathStyle: parseBoolean(process.env.AWS_S3_FORCE_PATH_STYLE, false),
+	// When true, disable adding ServerSideEncryption header for S3 uploads (useful for MinIO)
+	awsS3DisableServerSideEncryption: parseBoolean(process.env.AWS_S3_DISABLE_SERVER_SIDE_ENCRYPTION, false),
 	profilePhotoSignedUrlTtlSeconds: parseNumber(process.env.PROFILE_PHOTO_SIGNED_URL_TTL_SECONDS, 900),
 	therapistDocumentSignedUrlTtlSeconds: parseNumber(process.env.THERAPIST_DOCUMENT_SIGNED_URL_TTL_SECONDS, 900),
 	exportSignedUrlTtlSeconds: parseNumber(process.env.EXPORT_SIGNED_URL_TTL_SECONDS, 3600),
@@ -127,6 +137,8 @@ export const env: EnvConfig = Object.freeze({
 	razorpayKeyId: process.env.RAZORPAY_KEY_ID,
 	razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET,
 	razorpayWebhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET,
+	phonePeWebhookUsername: process.env.PHONEPE_WEBHOOK_USERNAME,
+	phonePeWebhookPassword: process.env.PHONEPE_WEBHOOK_PASSWORD,
 	paymentProviderSharePercent: parseNumber(process.env.PAYMENT_PROVIDER_SHARE_PERCENT, 60),
 	paymentPlatformSharePercent: parseNumber(process.env.PAYMENT_PLATFORM_SHARE_PERCENT, 40),
 	webhookIdempotencyTtlSeconds: parseNumber(process.env.WEBHOOK_IDEMPOTENCY_TTL_SECONDS, 3600),
@@ -143,4 +155,3 @@ if (
 ) {
 	throw new Error('JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must be configured for staging/production');
 }
-

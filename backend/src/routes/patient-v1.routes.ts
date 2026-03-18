@@ -1,6 +1,8 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { requireAuth } from '../middleware/auth.middleware';
 import { requireRole } from '../middleware/rbac.middleware';
+import { requireSubscription, requirePremiumSubscription } from '../middleware/subscription.middleware';
 import { asyncHandler } from '../middleware/validate.middleware';
 import {
 	getConversationsController,
@@ -69,6 +71,14 @@ import {
 	acceptAppointmentController,
 	rejectAppointmentController,
 } from '../controllers/smart-match.controller';
+import {
+	getPatientDocuments,
+} from '../controllers/provider.controller';
+import {
+	getMyDocumentsController,
+	getPatientDocumentDownload,
+} from '../controllers/patient.controller';
+import { uploadPatientDocument } from '../controllers/patient.controller';
 
 const router = Router();
 
@@ -78,26 +88,30 @@ router.get('/patient/reports', requireAuth, requireRole('patient'), asyncHandler
 router.get('/patient/reports/shared/:id', requireAuth, requireRole('patient'), asyncHandler(getPatientSharedReportMetaController));
 router.get('/patient/reports/shared/:id/download', requireAuth, requireRole('patient'), asyncHandler(downloadPatientSharedReportController));
 router.post('/patient/reports/health-summary', requireAuth, requireRole('patient'), asyncHandler(generateCompleteHealthSummaryController));
+
+// Patient documents — reuses provider aggregation but scoped to own ID
+router.get('/patient/documents', requireAuth, requireRole('patient'), asyncHandler(getMyDocumentsController));
 router.get('/patient/records/:id/url', requireAuth, requireRole('patient'), asyncHandler(getPatientRecordSecureUrlController));
 router.post('/patient/records/:id/share', requireAuth, requireRole('patient'), asyncHandler(createPatientRecordShareLinkController));
 router.get('/patient/records/shared/:token', asyncHandler(streamSharedPatientRecordController));
+router.get('/patient/documents/:id/download', requireAuth, requireRole('patient'), asyncHandler(getPatientDocumentDownload));
 router.get('/patient/care-team', requireAuth, requireRole('patient'), asyncHandler(getMyCareTeamController));
 
 // Smart Match appointment booking flow
 router.get('/patient/providers/smart-match', requireAuth, requireRole('patient'), asyncHandler(getAvailableProvidersController));
-router.post('/patient/appointments/smart-match', requireAuth, requireRole('patient'), asyncHandler(createAppointmentRequestController));
+router.post('/patient/appointments/smart-match', requireAuth, requireRole('patient'), requireSubscription, asyncHandler(createAppointmentRequestController));
 router.get('/patient/appointments/requests/pending', requireAuth, requireRole('patient'), asyncHandler(getPatientPendingRequestsController));
 router.get('/patient/appointments/payment-pending', requireAuth, requireRole('patient'), asyncHandler(getPaymentPendingRequestController));
 
 // Legacy routes (kept for backward compatibility)
 router.get('/patient/providers/available', requireAuth, requireRole('patient'), asyncHandler(listAvailableProvidersController));
-router.post('/patient/appointments/request', requireAuth, requireRole('patient'), asyncHandler(requestAppointmentWithPreferredProvidersController));
+router.post('/patient/appointments/request', requireAuth, requireRole('patient'), requireSubscription, asyncHandler(requestAppointmentWithPreferredProvidersController));
 router.post('/patient/appointments/confirm-slot', requireAuth, requireRole('patient'), asyncHandler(patientConfirmProposedAppointmentSlotController));
 
 router.get('/providers', requireAuth, requireRole('patient'), asyncHandler(listProvidersController));
 router.get('/providers/:id', requireAuth, requireRole('patient'), asyncHandler(getProviderByIdController));
 
-router.post('/sessions/book', requireAuth, requireRole('patient'), asyncHandler(bookSessionController));
+router.post('/sessions/book', requireAuth, requireRole('patient'), requireSubscription, asyncHandler(bookSessionController));
 router.get('/sessions/upcoming', requireAuth, requireRole('patient'), asyncHandler(upcomingSessionsController));
 router.get('/sessions/history', requireAuth, requireRole('patient'), asyncHandler(sessionHistoryController));
 router.get('/sessions/:id/documents/session-pdf', requireAuth, requireRole('patient'), asyncHandler(sessionSummaryPdfController));
@@ -153,5 +167,9 @@ router.post('/patient/messages/start', requireAuth, requireRole('patient'), asyn
 router.get('/patient/messages/:conversationId', requireAuth, requireRole('patient'), asyncHandler(getMessagesController));
 router.post('/patient/messages', requireAuth, requireRole('patient'), asyncHandler(sendMessageController));
 router.post('/patient/messages/:conversationId/read', requireAuth, requireRole('patient'), asyncHandler(markMessagesReadController));
+
+const upload = multer({ storage: multer.memoryStorage() });
+
+router.post('/patient/documents/upload', requireAuth, requireRole('patient'), upload.single('file'), asyncHandler(uploadPatientDocument));
 
 export default router;

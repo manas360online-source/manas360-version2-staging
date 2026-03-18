@@ -7,6 +7,8 @@ import {
 	createRazorpayOrder,
 	verifyRazorpayWebhookSignature,
 } from './razorpay.service';
+import { initiatePhonePePayment } from './phonepe.service';
+import { logger } from '../utils/logger';
 
 const redis = createClient({ url: env.redisUrl });
 const isTestEnv = process.env.NODE_ENV === 'test';
@@ -65,28 +67,24 @@ export const createSessionPayment = async (input: CreateFinancialSessionInput) =
 	}
 
 	const idempotencyKey = randomUUID();
-	const receipt = `sess_${Date.now()}_${idempotencyKey.slice(0, 8)}`;
+	const transactionId = `SESS_${Date.now()}_${idempotencyKey.slice(0, 8)}`;
 	const shouldBypass = env.allowDevPaymentBypass && env.nodeEnv === 'development';
 
-	let order: { id: string };
+	let redirectUrl: string;
 	try {
-		order = await createRazorpayOrder({
-			amountMinor,
-			currency: input.currency ?? 'INR',
-			receipt,
-			notes: {
-				patientId: input.patientId,
-				providerId: input.providerId,
-			},
+		redirectUrl = await initiatePhonePePayment({
+			transactionId,
+			userId: input.patientId,
+			amountInPaise: amountMinor,
+			callbackUrl: `${env.apiPrefix}/payment/phonepe/webhook`,
+			redirectUrl: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/payment-status`,
 		});
 	} catch (error: any) {
 		if (!shouldBypass) {
-			throw new AppError(error?.message || 'Failed to create Razorpay order', 500);
+			throw new AppError(error?.message || 'Failed to initiate PhonePe payment', 500);
 		}
 
-		order = {
-			id: `order_dev_${Date.now()}_${idempotencyKey.slice(0, 8)}`,
-		};
+		redirectUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/payment-status?id=${transactionId}`;
 	}
 
 	const created = await db.$transaction(async (tx: any) => {
@@ -106,7 +104,7 @@ export const createSessionPayment = async (input: CreateFinancialSessionInput) =
 				expectedAmountMinor: amountMinor,
 				currency: input.currency ?? 'INR',
 				idempotencyKey,
-				razorpayOrderId: order.id,
+				razorpayOrderId: transactionId,
 			},
 		});
 
@@ -114,7 +112,7 @@ export const createSessionPayment = async (input: CreateFinancialSessionInput) =
 			data: {
 				sessionId: session.id,
 				providerId: input.providerId,
-				razorpayOrderId: order.id,
+				razorpayOrderId: transactionId,
 				status: 'PENDING_CAPTURE',
 				amountMinor,
 				currency: input.currency ?? 'INR',
@@ -128,7 +126,8 @@ export const createSessionPayment = async (input: CreateFinancialSessionInput) =
 		sessionId: created.session.id,
 		paymentId: created.payment.id,
 		paymentType: 'provider_fee',
-		razorpayOrderId: order.id,
+		transactionId,
+		redirectUrl,
 		amountMinor,
 		currency: input.currency ?? 'INR',
 		feeBreakdown: {
@@ -139,295 +138,123 @@ export const createSessionPayment = async (input: CreateFinancialSessionInput) =
 	};
 };
 
-const markWebhookFailed = async (eventId: string, errorMessage: string): Promise<void> => {
-	try {
-		await db.webhookLog.updateMany({
-			where: { provider: 'RAZORPAY', eventId },
-			data: {
-				processStatus: 'FAILED',
-				errorMessage,
-				processedAt: new Date(),
-			},
-		});
-	} catch {
-		// best effort
-	}
-};
+export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: boolean; message: string }> => {
+	const { success, code, data } = decoded;
+	const merchantTransactionId = String(data?.merchantTransactionId || '');
+	
+	logger.info(`[PaymentService] PhonePe Webhook Received: ${merchantTransactionId}`, { success, code, amount: data?.amount });
 
-export const processRazorpayWebhook = async (rawBody: string, signature: string): Promise<{ handled: boolean; message: string }> => {
-	if (!env.razorpayWebhookSecret) {
-		throw new AppError('RAZORPAY_WEBHOOK_SECRET not configured', 500);
+	if (!merchantTransactionId) {
+		logger.error(`[PaymentService] PhonePe Webhook Rejected: Missing merchantTransactionId`, { decoded });
+		throw new AppError('Missing merchantTransactionId in PhonePe webhook', 422);
 	}
 
-	const isSignatureValid = verifyRazorpayWebhookSignature(rawBody, signature, env.razorpayWebhookSecret);
-	if (!isSignatureValid) {
-		throw new AppError('Invalid Razorpay webhook signature', 401);
-	}
-
-	const event = JSON.parse(rawBody) as any;
-	const eventId = String(event?.id ?? '');
-	const eventType = String(event?.event ?? '');
-
-	if (!eventId || !eventType) {
-		throw new AppError('Invalid webhook payload', 422);
-	}
-
-	const cacheKey = `webhook:razorpay:${eventId}`;
-	let setOk: string | null = 'OK';
-	if (!isTestEnv) {
-		setOk = await redis.set(cacheKey, '1', {
-			NX: true,
-			EX: env.webhookIdempotencyTtlSeconds,
-		}).catch(() => 'OK');
-	}
-	if (!setOk) {
-		return { handled: true, message: 'Duplicate webhook (cache)' };
-	}
-
-	const payloadHash = sha256(rawBody);
-
-	try {
-		await db.webhookLog.create({
-			data: {
-				provider: 'RAZORPAY',
-				eventId,
-				eventType,
-				payloadHash,
-				signature,
-				isSignatureValid: true,
-				processStatus: 'RECEIVED',
-				rawPayload: event,
-			},
-		});
-	} catch {
-		return { handled: true, message: 'Duplicate webhook (db unique)' };
-	}
-
-	if (eventType === 'payment.captured') {
-		const paymentEntity = event?.payload?.payment?.entity;
-		const razorpayOrderId = String(paymentEntity?.order_id ?? '');
-		const razorpayPaymentId = String(paymentEntity?.id ?? '');
-		const amountMinor = asMinor(Number(paymentEntity?.amount ?? 0));
-
-		if (!razorpayOrderId || !razorpayPaymentId || !amountMinor) {
-			await markWebhookFailed(eventId, 'Missing payment identifiers');
-			throw new AppError('Invalid payment.captured payload', 422);
-		}
-
-		await db.$transaction(async (tx: any) => {
-			await tx.$queryRawUnsafe(
-				'SELECT "id" FROM "financial_payments" WHERE "razorpayOrderId" = $1 FOR UPDATE',
-				razorpayOrderId,
-			);
-
-			const payment = await tx.financialPayment.findFirst({
-				where: { razorpayOrderId },
-			});
-
-			if (!payment) {
-				throw new AppError('Payment record not found for webhook order', 404);
-			}
-
-			if (payment.status === 'CAPTURED') {
-				await tx.webhookLog.updateMany({
-					where: { provider: 'RAZORPAY', eventId },
-					data: { processStatus: 'SKIPPED_DUPLICATE', processedAt: new Date() },
+	if (success && code === 'PAYMENT_SUCCESS') {
+		if (merchantTransactionId.startsWith('SESS_')) {
+			await db.$transaction(async (tx: any) => {
+				const payment = await tx.financialPayment.findFirst({
+					where: { razorpayOrderId: merchantTransactionId },
 				});
-				return;
-			}
 
-			if (payment.status === 'FAILED') {
-				await tx.webhookLog.updateMany({
-					where: { provider: 'RAZORPAY', eventId },
-					data: { processStatus: 'SKIPPED_DUPLICATE', processedAt: new Date() },
-				});
-				return;
-			}
+				if (!payment || payment.status === 'CAPTURED') return;
 
-			const therapistShareMinor = Math.floor(amountMinor * providerShareRatio);
-			const platformShareMinor = amountMinor - therapistShareMinor;
+				const amountMinor = Number(data.amount);
+				const therapistShareMinor = Math.floor(amountMinor * providerShareRatio);
+				const platformShareMinor = amountMinor - therapistShareMinor;
 
-			const paymentStatusUpdate = await tx.financialPayment.updateMany({
-				where: {
-					id: payment.id,
-					status: { in: ['INITIATED', 'PENDING_CAPTURE'] },
-				},
-				data: {
-					status: 'CAPTURED',
-					razorpayPaymentId,
-					capturedAt: new Date(),
-					therapistShareMinor,
-					platformShareMinor,
-				},
-			});
-
-			if (paymentStatusUpdate.count === 0) {
-				await tx.webhookLog.updateMany({
-					where: { provider: 'RAZORPAY', eventId },
-					data: { processStatus: 'SKIPPED_DUPLICATE', processedAt: new Date() },
-				});
-				return;
-			}
-
-			let wallet = await tx.providerWallet.findUnique({
-				where: { providerId: payment.providerId },
-			});
-
-			if (!wallet) {
-				wallet = await tx.providerWallet.create({
-					data: { providerId: payment.providerId },
-				});
-			}
-
-			await tx.$queryRawUnsafe(
-				'SELECT "providerId" FROM "provider_wallets" WHERE "providerId" = $1 FOR UPDATE',
-				payment.providerId,
-			);
-
-			const lockedWallet = await tx.providerWallet.findUnique({
-				where: { providerId: payment.providerId },
-			});
-			if (!lockedWallet) {
-				throw new AppError('Wallet not found after lock', 500);
-			}
-
-			const balanceBefore = BigInt(lockedWallet.pendingBalanceMinor ?? 0);
-			const balanceAfter = balanceBefore + BigInt(therapistShareMinor);
-
-			const ledger = await tx.revenueLedger.create({
-				data: {
-					type: 'SESSION',
-					grossAmountMinor: amountMinor,
-					platformCommissionMinor: platformShareMinor,
-					providerShareMinor: therapistShareMinor,
-					paymentType: 'PROVIDER_FEE',
-					taxAmountMinor: 0,
-					currency: payment.currency,
-					referenceId: payment.sessionId,
-					sessionId: payment.sessionId,
-					paymentId: payment.id,
-				},
-			});
-
-			await tx.providerWallet.update({
-				where: { providerId: payment.providerId },
-				data: {
-					pendingBalanceMinor: balanceAfter,
-					lifetimeEarningsMinor: BigInt(lockedWallet.lifetimeEarningsMinor ?? 0) + BigInt(therapistShareMinor),
-					version: (lockedWallet.version ?? 1) + 1,
-				},
-			});
-
-			await tx.financialSession.update({
-				where: { id: payment.sessionId },
-				data: {
-					status: 'CONFIRMED',
-					confirmedAt: new Date(),
-				},
-			});
-
-			await tx.walletTransaction.create({
-				data: {
-					providerId: payment.providerId,
-					walletTxnType: 'CREDIT_PENDING',
-					status: 'POSTED',
-					amountMinor: therapistShareMinor,
-					currency: payment.currency,
-					balanceBeforeMinor: balanceBefore,
-					balanceAfterMinor: balanceAfter,
-					sessionId: payment.sessionId,
-					paymentId: payment.id,
-					revenueLedgerId: ledger.id,
-					referenceKey: `paycap:${payment.id}`,
-					metadata: { eventId, razorpayPaymentId, razorpayOrderId },
-				},
-			});
-
-			await tx.webhookLog.updateMany({
-				where: { provider: 'RAZORPAY', eventId },
-				data: {
-					processStatus: 'PROCESSED',
-					processedAt: new Date(),
-					sessionId: payment.sessionId,
-				},
-			});
-		});
-
-		return { handled: true, message: 'payment.captured processed' };
-	}
-
-	if (eventType === 'payment.failed') {
-		const paymentEntity = event?.payload?.payment?.entity;
-		const razorpayOrderId = String(paymentEntity?.order_id ?? '');
-
-		if (!razorpayOrderId) {
-			await markWebhookFailed(eventId, 'Missing order id');
-			throw new AppError('Invalid payment.failed payload', 422);
-		}
-
-		await db.$transaction(async (tx: any) => {
-			await tx.$queryRawUnsafe(
-				'SELECT "id" FROM "financial_payments" WHERE "razorpayOrderId" = $1 FOR UPDATE',
-				razorpayOrderId,
-			);
-
-			const payment = await tx.financialPayment.findFirst({ where: { razorpayOrderId } });
-			if (!payment) {
-				throw new AppError('Payment record not found for failed event', 404);
-			}
-
-			if (payment.status === 'CAPTURED') {
-				await tx.webhookLog.updateMany({
-					where: { provider: 'RAZORPAY', eventId },
+				await tx.financialPayment.update({
+					where: { id: payment.id },
 					data: {
-						processStatus: 'SKIPPED_DUPLICATE',
-						processedAt: new Date(),
-						sessionId: payment.sessionId,
+						status: 'CAPTURED',
+						razorpayPaymentId: String(data.transactionId),
+						capturedAt: new Date(),
+						therapistShareMinor,
+						platformShareMinor,
 					},
 				});
-				return;
-			}
 
-			const failedUpdate = await tx.financialPayment.updateMany({
-				where: { id: payment.id, status: { in: ['INITIATED', 'PENDING_CAPTURE'] } },
-				data: {
-					status: 'FAILED',
-					failedAt: new Date(),
-					failureReason: String(paymentEntity?.error_description ?? 'payment_failed'),
-				},
-			});
-
-			if (failedUpdate.count === 0) {
-				await tx.webhookLog.updateMany({
-					where: { provider: 'RAZORPAY', eventId },
+				await tx.financialSession.update({
+					where: { id: payment.sessionId },
+					data: { status: 'CONFIRMED', confirmedAt: new Date() },
+				});
+				
+				await tx.revenueLedger.create({
 					data: {
-						processStatus: 'SKIPPED_DUPLICATE',
-						processedAt: new Date(),
+						type: 'SESSION',
+						grossAmountMinor: amountMinor,
+						platformCommissionMinor: platformShareMinor,
+						providerShareMinor: therapistShareMinor,
+						paymentType: 'PROVIDER_FEE',
+						taxAmountMinor: 0,
+						currency: payment.currency,
+						referenceId: payment.sessionId,
 						sessionId: payment.sessionId,
+						paymentId: payment.id,
 					},
 				});
-				return;
+			});
+			logger.info(`[PaymentService] Session payment processed and capture recorded`, { merchantTransactionId });
+			return { handled: true, message: 'PhonePe session payment processed' };
+		}
+
+		if (merchantTransactionId.startsWith('SUB_')) {
+			const parts = merchantTransactionId.split('_');
+			const userId = parts[1];
+			const planKey = data.metadata?.plan || parts[2];
+
+			const { checkPhonePeStatus } = await import('./phonepe.service');
+			const verify = await checkPhonePeStatus(merchantTransactionId);
+			if (!verify || !verify.success || verify.code !== 'PAYMENT_SUCCESS' || verify.data?.state !== 'COMPLETED') {
+				throw new AppError("Patient payment not verified", 400);
 			}
 
-			await tx.financialSession.updateMany({
-				where: { id: payment.sessionId, status: { in: ['PENDING_PAYMENT'] } },
-				data: { status: 'EXPIRED', expiredAt: new Date() },
-			});
+			// Fix 8: Idempotency check for patient
+			const { prisma } = await import('../config/db');
+			const existingSub = await prisma.patientSubscription.findUnique({ where: { userId } });
+			if (existingSub?.paymentId === merchantTransactionId) {
+				logger.debug(`[PaymentService] Patient subscription webhook bypassed (Idempotency)`, { merchantTransactionId });
+				return { handled: true, message: 'Patient subscription already processed' };
+			}
 
-			await tx.webhookLog.updateMany({
-				where: { provider: 'RAZORPAY', eventId },
-				data: {
-					processStatus: 'PROCESSED',
-					processedAt: new Date(),
-					sessionId: payment.sessionId,
-				},
-			});
-		});
+			const { reactivatePatientSubscription } = await import('./patient-v1.service');
+			await reactivatePatientSubscription(userId);
+			
+			logger.info(`[PaymentService] Patient subscription activated successfully`, { merchantTransactionId, userId, planKey });
+			return { handled: true, message: 'PhonePe subscription payment processed' };
+		}
 
-		return { handled: true, message: 'payment.failed processed' };
+		if (merchantTransactionId.startsWith('PROV_SUB_')) {
+			const parts = merchantTransactionId.split('_');
+			// PROV_SUB_{providerId}_{planKey}_{timestamp}
+			const providerId = parts[2];
+			
+			// Fix 7: Get plan from metadata payload (fallback to URL param)
+			const planKey = data.metadata?.plan || parts[3];
+
+			const { checkPhonePeStatus } = await import('./phonepe.service');
+			const verify = await checkPhonePeStatus(merchantTransactionId);
+			if (!verify || !verify.success || verify.code !== 'PAYMENT_SUCCESS' || verify.data?.state !== 'COMPLETED') {
+				throw new AppError("Provider payment not verified or not completed", 400);
+			}
+
+			// Fix 8: Idempotency check for provider
+			const { prisma } = await import('../config/db');
+			const existingSub = await prisma.providerSubscription.findUnique({ where: { providerId } });
+			if (existingSub?.paymentId === merchantTransactionId) {
+				logger.debug(`[PaymentService] Provider subscription webhook bypassed (Idempotency)`, { merchantTransactionId });
+				return { handled: true, message: 'Provider subscription already processed' };
+			}
+
+			const { activateProviderSubscription } = await import('./provider-subscription.service');
+			await activateProviderSubscription(providerId, planKey as any, merchantTransactionId);
+
+			logger.info(`[PaymentService] Provider subscription activated successfully`, { merchantTransactionId, providerId, planKey });
+			return { handled: true, message: 'PhonePe provider subscription payment processed' };
+		}
 	}
 
-	return { handled: false, message: `Unhandled event: ${eventType}` };
+	logger.warn(`[PaymentService] PhonePe Webhook unhandled condition (success: ${success}, code: ${code})`, { merchantTransactionId });
+	return { handled: true, message: `PhonePe status: ${code}` };
 };
 
 export const releaseSessionEarnings = async (sessionId: string, actorTherapistId?: string): Promise<void> => {
@@ -509,14 +336,123 @@ export const releaseSessionEarnings = async (sessionId: string, actorTherapistId
 			},
 		});
 
-		const finalized = await tx.financialSession.updateMany({
+		await tx.financialSession.updateMany({
 			where: { id: sessionId, status: { in: ['CONFIRMED', 'IN_PROGRESS'] } },
 			data: { status: 'COMPLETED', completedAt: new Date() },
 		});
-
-		if (finalized.count === 0 && session.status !== 'COMPLETED') {
-			throw new AppError('Session is not in a releasable state', 409);
-		}
 	});
 };
 
+export const processRazorpayWebhook = async (rawBody: string, signature: string): Promise<{ handled: boolean; message: string }> => {
+	if (!env.razorpayWebhookSecret) {
+		throw new AppError('RAZORPAY_WEBHOOK_SECRET not configured', 500);
+	}
+
+	const isSignatureValid = verifyRazorpayWebhookSignature(rawBody, signature, env.razorpayWebhookSecret);
+	if (!isSignatureValid) {
+		throw new AppError('Invalid Razorpay webhook signature', 401);
+	}
+
+	const event = JSON.parse(rawBody) as any;
+	const eventId = String(event?.id ?? '');
+	const eventType = String(event?.event ?? '');
+
+	if (!eventId || !eventType) {
+		throw new AppError('Invalid webhook payload', 422);
+	}
+
+	const cacheKey = `webhook:razorpay:${eventId}`;
+	let setOk: string | null = 'OK';
+	if (!isTestEnv) {
+		setOk = await redis.set(cacheKey, '1', {
+			NX: true,
+			EX: env.webhookIdempotencyTtlSeconds,
+		}).catch(() => 'OK');
+	}
+	if (!setOk) {
+		return { handled: true, message: 'Duplicate webhook (cache)' };
+	}
+
+	const payloadHash = sha256(rawBody);
+
+	try {
+		await db.webhookLog.create({
+			data: {
+				provider: 'RAZORPAY',
+				eventId,
+				eventType,
+				payloadHash,
+				signature,
+				isSignatureValid: true,
+				processStatus: 'RECEIVED',
+				rawPayload: event,
+			},
+		});
+	} catch {
+		return { handled: true, message: 'Duplicate webhook (db unique)' };
+	}
+
+	if (eventType === 'payment.captured') {
+		const paymentEntity = event?.payload?.payment?.entity;
+		const razorpayOrderId = String(paymentEntity?.order_id ?? '');
+		const razorpayPaymentId = String(paymentEntity?.id ?? '');
+		const amountMinor = asMinor(Number(paymentEntity?.amount ?? 0));
+
+		if (!razorpayOrderId || !razorpayPaymentId || !amountMinor) {
+			await db.webhookLog.updateMany({
+				where: { provider: 'RAZORPAY', eventId },
+				data: { processStatus: 'FAILED' },
+			});
+			throw new AppError('Invalid payment.captured payload', 422);
+		}
+
+		await db.$transaction(async (tx: any) => {
+			const payment = await tx.financialPayment.findFirst({
+				where: { razorpayOrderId },
+			});
+
+			if (!payment || payment.status === 'CAPTURED' || payment.status === 'FAILED') return;
+
+			const therapistShareMinor = Math.floor(amountMinor * providerShareRatio);
+			const platformShareMinor = amountMinor - therapistShareMinor;
+
+			await tx.financialPayment.update({
+				where: { id: payment.id },
+				data: {
+					status: 'CAPTURED',
+					razorpayPaymentId,
+					capturedAt: new Date(),
+					therapistShareMinor,
+					platformShareMinor,
+				},
+			});
+
+			await tx.providerWallet.upsert({
+				where: { providerId: payment.providerId },
+				update: {
+					pendingBalanceMinor: { increment: therapistShareMinor },
+					lifetimeEarningsMinor: { increment: therapistShareMinor },
+				},
+				create: {
+					providerId: payment.providerId,
+					pendingBalanceMinor: therapistShareMinor,
+					lifetimeEarningsMinor: therapistShareMinor,
+				},
+			});
+
+			await tx.financialSession.update({
+				where: { id: payment.sessionId },
+				data: { status: 'CONFIRMED', confirmedAt: new Date() },
+			});
+
+			await tx.webhookLog.updateMany({
+				where: { provider: 'RAZORPAY', eventId },
+				data: { processStatus: 'PROCESSED', processedAt: new Date(), sessionId: payment.sessionId },
+			});
+		});
+
+		return { handled: true, message: 'payment.captured processed' };
+	}
+
+	return { handled: false, message: `Unhandled event: ${eventType}` };
+};

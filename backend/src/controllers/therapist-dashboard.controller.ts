@@ -8,6 +8,7 @@ import {
 	listTherapistPayoutHistoryData,
 	listTherapistSessionNotesData,
 } from '../services/therapist-dashboard.service';
+import { getProviderPendingRequests } from '../services/smart-match.service';
 
 const authUserId = (req: Request): string => {
 	const userId = req.auth?.userId;
@@ -40,4 +41,9 @@ export const getMyTherapistMessagesController = async (req: Request, res: Respon
 export const getMyTherapistPayoutHistoryController = async (req: Request, res: Response): Promise<void> => {
 	const data = await listTherapistPayoutHistoryData(authUserId(req));
 	sendSuccess(res, data, 'Therapist payout history fetched');
+};
+
+export const getMyTherapistPendingAppointmentRequestsController = async (req: Request, res: Response): Promise<void> => {
+	const data = await getProviderPendingRequests(authUserId(req));
+	sendSuccess(res, data, 'Therapist pending appointment requests fetched');
 };

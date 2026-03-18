@@ -7,15 +7,1569 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ============ ENUMS ============
+model User {
+  id                            String                      @id @default(uuid())
+  email                         String?                     @unique
+  firstName                     String                      @default("")
+  lastName                      String                      @default("")
+  role                          UserRole
+  createdAt                     DateTime                    @default(now())
+  updatedAt                     DateTime                    @updatedAt
+  deletedAt                     DateTime?
+  emailVerificationOtpExpiresAt DateTime?
+  emailVerificationOtpHash      String?
+  emailVerified                 Boolean                     @default(false)
+  failedLoginAttempts           Int                         @default(0)
+  googleId                      String?                     @unique
+  isDeleted                     Boolean                     @default(false)
+  lastLoginAt                   DateTime?
+  lockUntil                     DateTime?
+  mfaEnabled                    Boolean                     @default(false)
+  mfaSecret                     String?
+  name                          String?
+  passwordChangedAt             DateTime?
+  passwordHash                  String?
+  passwordResetOtpExpiresAt     DateTime?
+  passwordResetOtpHash          String?
+  phone                         String?                     @unique
+  phoneVerificationOtpExpiresAt DateTime?
+  phoneVerificationOtpHash      String?
+  phoneVerified                 Boolean                     @default(false)
+  profileImageKey               String?
+  profileImageUrl               String?
+  provider                      UserProvider                @default(LOCAL)
+  showNameToProviders           Boolean                     @default(true)
+  isTherapistVerified           Boolean                     @default(false)
+  therapistVerifiedAt           DateTime?
+  therapistVerifiedByUserId     String?
+  providerType                  ProviderType?               @map("provider_type")
+  companyId                     String?                     @map("company_id")
+  companyKey                    String?                     @map("company_key")
+  isCompanyAdmin                Boolean                     @default(false) @map("is_company_admin")
+  status                        UserStatus                  @default(ACTIVE)
+  onboardingStatus              OnboardingStatus?
+  aiConversations               AIConversation[]
+  auditEventsAsActor            AuditEvent[]                @relation("AuditEventsActor")
+  authAuditLogs                 AuthAuditLog[]
+  authSessions                  AuthSession[]
+  careTeamAssignmentsCreated    CareTeamAssignment[]        @relation("CareTeamAssignmentCreator")
+  careTeamAssignmentsAsPatient  CareTeamAssignment[]        @relation("CareTeamAssignmentPatient")
+  careTeamAssignmentsAsProvider CareTeamAssignment[]        @relation("CareTeamAssignmentProvider")
+  chatAnalyses                  ChatAnalysis[]              @relation("UserChatAnalyses")
+  chatMessages                  ChatMessage[]
+  consentRevocations            Consent[]                   @relation("ConsentRevokedByUser")
+  consents                      Consent[]
+  crisisEscalations             CrisisEscalation[]          @relation("UserCrisisEscalations")
+  financialAuditEvents          FinancialAuditLog[]         @relation("UserFinancialAudits")
+  financialPatientSessions      FinancialSession[]          @relation("FinancialPatient")
+  financialProviderSessions     FinancialSession[]          @relation("FinancialProvider")
+  gad7Assessments               GAD7Assessment[]            @relation("UserGAD7Assessments")
+  goalsAsPatient                Goal[]                      @relation("GoalPatient")
+  goalsAsProvider               Goal[]                      @relation("GoalProvider")
+  labOrdersAsPatient            LabOrder[]                  @relation("LabOrderPatient")
+  labOrdersAsProvider           LabOrder[]                  @relation("LabOrderProvider")
+  patientLeads                  Lead[]                      @relation("LeadPatient")
+  providerLeads                 Lead[]                      @relation("LeadProvider")
+  subscriptions                 MarketplaceSubscription[]   @relation("UserSubscriptions")
+  moodLogs                      MoodLog[]                   @relation("UserMoodLogs")
+  moodPredictions               MoodPrediction[]            @relation("UserMoodPredictions")
+  notifications                 Notification[]
+  patientInvoices               PatientInvoice[]
+  patientPaymentMethod          PatientPaymentMethod?
+  patientProfile                PatientProfile?
+  patientSubscription           PatientSubscription?
+  providerSubscription          ProviderSubscription?
+  phq9Assessments               PHQ9Assessment[]            @relation("UserPHQ9Assessments")
+  prescriptionsAsPatient        Prescription[]              @relation("PrescriptionPatient")
+  prescriptionsAsProvider       Prescription[]              @relation("PrescriptionProvider")
+  providerExtraQuestionsCreated ProviderExtraQuestion[]
+  providerWallet                ProviderWallet?             @relation("ProviderWalletOwner")
+  riskScores                    RiskScore[]                 @relation("UserRiskScores")
+  bookingIntentsAsPatient       SessionBookingIntent[]      @relation("BookingIntentPatient")
+  bookingIntentsAsProvider      SessionBookingIntent[]      @relation("BookingIntentProvider")
+  tenantPoliciesUpdated         TenantPolicy[]              @relation("TenantPolicyUpdatedBy")
+  therapistAssessments          TherapistAssessmentRecord[]
+  therapistCareTeamMembers      TherapistCareTeamMember[]
+  therapistExercises            TherapistExercise[]
+  therapistProfile              TherapistProfile?
+  therapistResources            TherapistResource[]
+  therapistSessionNotesAuthored TherapistSessionNote[]      @relation("TherapistSessionNoteAuthor")
+  therapyBookings               TherapySession[]
+  grantedCapabilities           UserCapability[]            @relation("UserCapabilitiesGrantor")
+  userCapabilities              UserCapability[]            @relation("UserCapabilitiesOwner")
+
+  @@index([email])
+  @@index([phone])
+  @@index([role])
+  @@index([providerType])
+  @@index([companyId])
+  @@index([status])
+  @@index([companyId, status])
+  @@index([isDeleted])
+  @@map("users")
+}
+
+model UserCapability {
+  id          String    @id @default(uuid())
+  userId      String
+  capability  String
+  source      String    @default("effective")
+  isEffective Boolean   @default(true)
+  grantedById String?
+  computedAt  DateTime  @default(now())
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  grantedBy   User?     @relation("UserCapabilitiesGrantor", fields: [grantedById], references: [id])
+  user        User      @relation("UserCapabilitiesOwner", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, capability])
+  @@index([capability, isEffective])
+  @@index([computedAt])
+  @@map("user_capabilities")
+}
+
+model CareTeamAssignment {
+  id           String    @id @default(uuid())
+  patientId    String
+  providerId   String
+  assignedById String?
+  accessScope  Json
+  status       String    @default("ACTIVE")
+  assignedAt   DateTime  @default(now())
+  revokedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  assignedBy   User?     @relation("CareTeamAssignmentCreator", fields: [assignedById], references: [id])
+  patient      User      @relation("CareTeamAssignmentPatient", fields: [patientId], references: [id], onDelete: Cascade)
+  provider     User      @relation("CareTeamAssignmentProvider", fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@unique([patientId, providerId])
+  @@index([providerId, status])
+  @@index([assignedAt])
+  @@map("care_team_assignments")
+}
+
+model Consent {
+  id          String    @id @default(uuid())
+  userId      String
+  consentType String
+  purpose     String
+  artifactRef String?
+  status      String    @default("GRANTED")
+  grantedAt   DateTime  @default(now())
+  revokedAt   DateTime?
+  revokedById String?
+  metadata    Json?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  revokedBy   User?     @relation("ConsentRevokedByUser", fields: [revokedById], references: [id])
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, consentType, status])
+  @@index([grantedAt])
+  @@map("consents")
+}
+
+model AuditEvent {
+  id         String   @id @default(uuid())
+  actorId    String?
+  actorRole  String?
+  tenantId   String?
+  scope      String
+  action     String
+  entityType String
+  entityId   String?
+  beforeJson Json?
+  afterJson  Json?
+  ipAddress  String?
+  userAgent  String?
+  traceId    String?
+  createdAt  DateTime @default(now())
+  actor      User?    @relation("AuditEventsActor", fields: [actorId], references: [id])
+
+  @@index([tenantId, scope, createdAt(sort: Desc)])
+  @@index([actorId, createdAt(sort: Desc)])
+  @@index([entityType, entityId])
+  @@index([traceId])
+  @@map("audit_events")
+}
+
+model TenantPolicy {
+  id            String   @id @default(uuid())
+  tenantId      String   @unique
+  privacyPolicy Json
+  featureFlags  Json
+  policyVersion Int      @default(1)
+  updatedById   String?
+  effectiveFrom DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  updatedBy     User?    @relation("TenantPolicyUpdatedBy", fields: [updatedById], references: [id])
+
+  @@index([effectiveFrom])
+  @@map("tenant_policies")
+}
+
+model AuthSession {
+  id               String    @id @default(uuid())
+  userId           String
+  jti              String    @unique
+  refreshTokenHash String
+  ipAddress        String?
+  userAgent        String?
+  device           String?
+  revokedAt        DateTime?
+  expiresAt        DateTime
+  lastActiveAt     DateTime  @default(now())
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([userId, expiresAt])
+  @@map("auth_sessions")
+}
+
+model AuthAuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  event     String
+  status    String
+  email     String?
+  phone     String?
+  ipAddress String?
+  userAgent String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([event, createdAt])
+  @@map("auth_audit_logs")
+}
+
+model PatientProfile {
+  id                           String                       @id @default(uuid())
+  userId                       String                       @unique
+  age                          Int
+  gender                       String
+  medicalHistory               String?
+  emergencyContact             Json
+  isDeleted                    Boolean                      @default(false)
+  deletedAt                    DateTime?
+  createdAt                    DateTime                     @default(now())
+  updatedAt                    DateTime                     @updatedAt
+  assessments                  PatientAssessment[]
+  exercises                    PatientExercise[]
+  moodEntries                  PatientMoodEntry[]
+  user                         User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  progress                     PatientProgress?
+  providerQuestionAssignments  ProviderQuestionAssignment[]
+  screeningAttempts            ScreeningAttempt[]
+  therapistAssessmentsAssigned TherapistAssessmentRecord[]
+  therapistCareTeamMembers     TherapistCareTeamMember[]
+  therapistExercisesAssigned   TherapistExercise[]
+  therapistResourcesAssigned   TherapistResource[]
+  therapistSessionNotes        TherapistSessionNote[]
+  therapySessions              TherapySession[]
+
+  @@index([userId])
+  @@map("patient_profiles")
+}
+
+model TherapistProfile {
+  id                  String            @id @default(uuid())
+  userId              String            @unique
+  displayName         String
+  bio                 String?
+  specializations     String[]          @default([])
+  languages           String[]          @default([])
+  yearsOfExperience   Int?              @default(0)
+  consultationFee     Int?              @default(0)
+  availability        Json?
+  averageRating       Float?            @default(0)
+  isDeleted           Boolean           @default(false)
+  deletedAt           DateTime?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  registrationType    RegistrationType?
+  highestQual         String?
+  yearsExperience     Int?              @default(0)
+  hourlyRate          Int?              @default(0)
+  professionalType    String?
+  registrationNum     String?
+  contactEmail        String?
+  education           String?
+  licenseRci          String?
+  licenseNmc          String?
+  clinicalCategories  String[]          @default([])
+  corporateReady      Boolean           @default(false)
+  shiftPreferences    String[]          @default([])
+  bankDetails         Json?
+  tagline             String?
+  digitalSignature    String?
+  onboardingCompleted Boolean           @default(false)
+  isVerified          Boolean           @default(false)
+  verifiedAt          DateTime?
+  verifiedByUserId    String?
+  certifications      String[]          @default([])
+  baseLatitude        Float?            @map("base_latitude")
+  baseLongitude       Float?            @map("base_longitude")
+  user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("therapist_profiles")
+}
+
+model ProviderDocument {
+  id                String               @id @default(uuid())
+  providerProfileId String
+  userId            String
+  documentType      ProviderDocumentType
+  url               String
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  @@unique([providerProfileId, documentType])
+  @@index([userId, documentType])
+  @@map("provider_documents")
+}
+
+model PatientAssessment {
+  id            String         @id @default(uuid())
+  patientId     String
+  type          String
+  answers       Int[]
+  totalScore    Int
+  severityLevel String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  patient       PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, createdAt])
+  @@map("patient_assessments")
+}
+
+model ScreeningTemplate {
+  id               String                  @id @default(uuid())
+  key              String                  @unique
+  title            String
+  description      String?
+  estimatedMinutes Int                     @default(3)
+  isPublic         Boolean                 @default(true)
+  randomizeOrder   Boolean                 @default(true)
+  status           ScreeningTemplateStatus @default(DRAFT)
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  attempts         ScreeningAttempt[]
+  questions        ScreeningQuestion[]
+  scoringBands     ScreeningScoringBand[]
+
+  @@index([key, status])
+  @@map("screening_templates")
+}
+
+model ScreeningQuestion {
+  id                                 String                    @id @default(uuid())
+  templateId                         String
+  prompt                             String
+  sectionKey                         String                    @default("general")
+  orderIndex                         Int
+  isActive                           Boolean                   @default(true)
+  createdAt                          DateTime                  @default(now())
+  updatedAt                          DateTime                  @updatedAt
+  providerExtraQuestionsFromTemplate ProviderExtraQuestion[]
+  answers                            ScreeningAnswer[]
+  options                            ScreeningQuestionOption[]
+  template                           ScreeningTemplate         @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, orderIndex])
+  @@index([templateId, isActive])
+  @@map("screening_questions")
+}
+
+model ScreeningQuestionOption {
+  id                       String                        @id @default(uuid())
+  questionId               String
+  label                    String
+  optionIndex              Int
+  points                   Int
+  createdAt                DateTime                      @default(now())
+  updatedAt                DateTime                      @updatedAt
+  providerExtraOptionLinks ProviderExtraQuestionOption[]
+  answers                  ScreeningAnswer[]
+  question                 ScreeningQuestion             @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([questionId, optionIndex])
+  @@index([questionId])
+  @@map("screening_question_options")
+}
+
+model ScreeningScoringBand {
+  id             String            @id @default(uuid())
+  templateId     String
+  minScore       Int
+  maxScore       Int
+  severity       String
+  interpretation String
+  recommendation String
+  actionLabel    String
+  orderIndex     Int               @default(0)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  template       ScreeningTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, orderIndex])
+  @@index([templateId, minScore, maxScore])
+  @@map("screening_scoring_bands")
+}
+
+model ScreeningAttempt {
+  id                  String                       @id @default(uuid())
+  templateId          String
+  patientId           String?
+  accessTokenHash     String?
+  status              ScreeningAttemptStatus       @default(IN_PROGRESS)
+  attemptSeed         Int
+  presentedOrder      Json
+  totalScore          Int?
+  severityLevel       String?
+  interpretation      String?
+  recommendation      String?
+  actionLabel         String?
+  startedAt           DateTime                     @default(now())
+  submittedAt         DateTime?
+  expiresAt           DateTime?
+  createdAt           DateTime                     @default(now())
+  updatedAt           DateTime                     @updatedAt
+  providerAssignments ProviderQuestionAssignment[]
+  answers             ScreeningAnswer[]
+  patient             PatientProfile?              @relation(fields: [patientId], references: [id])
+  template            ScreeningTemplate            @relation(fields: [templateId], references: [id])
+
+  @@index([templateId, status])
+  @@index([patientId, createdAt])
+  @@map("screening_attempts")
+}
+
+model ScreeningAnswer {
+  id          String                  @id @default(uuid())
+  attemptId   String
+  questionId  String
+  optionId    String
+  optionIndex Int
+  points      Int
+  createdAt   DateTime                @default(now())
+  attempt     ScreeningAttempt        @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  option      ScreeningQuestionOption @relation(fields: [optionId], references: [id])
+  question    ScreeningQuestion       @relation(fields: [questionId], references: [id])
+
+  @@unique([attemptId, questionId])
+  @@index([attemptId])
+  @@index([questionId])
+  @@map("screening_answers")
+}
+
+model ProviderExtraQuestion {
+  id                 String                        @id @default(uuid())
+  providerId         String
+  templateQuestionId String?
+  prompt             String
+  sectionKey         String                        @default("provider-extra")
+  isRequired         Boolean                       @default(false)
+  status             ProviderExtraQuestionStatus   @default(DRAFT)
+  createdAt          DateTime                      @default(now())
+  updatedAt          DateTime                      @updatedAt
+  options            ProviderExtraQuestionOption[]
+  provider           User                          @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  templateQuestion   ScreeningQuestion?            @relation(fields: [templateQuestionId], references: [id])
+  assignments        ProviderQuestionAssignment[]
+
+  @@index([providerId, status])
+  @@map("provider_extra_questions")
+}
+
+model ProviderExtraQuestionOption {
+  id                    String                       @id @default(uuid())
+  questionId            String
+  label                 String
+  optionIndex           Int
+  points                Int
+  templateOptionId      String?
+  createdAt             DateTime                     @default(now())
+  updatedAt             DateTime                     @updatedAt
+  question              ProviderExtraQuestion        @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  templateOption        ScreeningQuestionOption?     @relation(fields: [templateOptionId], references: [id])
+  selectedInAssignments ProviderQuestionAssignment[]
+
+  @@unique([questionId, optionIndex])
+  @@index([questionId])
+  @@map("provider_extra_question_options")
+}
+
+model ProviderQuestionAssignment {
+  id                 String                       @id @default(uuid())
+  providerQuestionId String
+  patientId          String
+  attemptId          String?
+  isActive           Boolean                      @default(true)
+  assignedAt         DateTime                     @default(now())
+  expiresAt          DateTime?
+  selectedOptionId   String?
+  patientNotes       String?
+  answeredAt         DateTime?
+  createdAt          DateTime                     @default(now())
+  updatedAt          DateTime                     @updatedAt
+  attempt            ScreeningAttempt?            @relation(fields: [attemptId], references: [id])
+  patient            PatientProfile               @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  providerQuestion   ProviderExtraQuestion        @relation(fields: [providerQuestionId], references: [id], onDelete: Cascade)
+  selectedOption     ProviderExtraQuestionOption? @relation(fields: [selectedOptionId], references: [id])
+
+  @@index([patientId, isActive])
+  @@index([providerQuestionId])
+  @@index([attemptId])
+  @@map("provider_question_assignments")
+}
+
+model PatientMoodEntry {
+  id        String         @id @default(uuid())
+  patientId String
+  moodScore Int
+  note      String?
+  date      DateTime
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  patient   PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, date])
+  @@map("patient_mood_entries")
+}
+
+model TherapySession {
+  id                       String                @id @default(uuid())
+  bookingReferenceId       String                @unique
+  patientProfileId         String
+  therapistProfileId       String
+  dateTime                 DateTime
+  status                   BookingStatus         @default(PENDING)
+  noteEncryptedContent     String?
+  noteIv                   String?
+  noteAuthTag              String?
+  noteUpdatedAt            DateTime?
+  noteUpdatedByTherapistId String?
+  cancelledAt              DateTime?
+  createdAt                DateTime              @default(now())
+  updatedAt                DateTime              @updatedAt
+  durationMinutes          Int                   @default(50)
+  sessionFeeMinor          BigInt                @default(0)
+  paymentStatus            String                @default("UNPAID")
+  agoraChannel             String?
+  agoraToken               String?
+  meetingRoomName          String?               @map("meeting_room_name")
+  isLocked                 Boolean               @default(true)
+  audioRecordingUrl        String?               @map("audio_recording_url")
+  transcript               String?
+  therapistSessionNote     TherapistSessionNote?
+  patientProfile           PatientProfile        @relation(fields: [patientProfileId], references: [id], onDelete: Cascade)
+  therapistProfile         User                  @relation(fields: [therapistProfileId], references: [id], onDelete: Cascade)
+
+  @@index([therapistProfileId, dateTime])
+  @@index([patientProfileId, dateTime])
+  @@map("therapy_sessions")
+}
+
+model TherapistSessionNote {
+  id               String         @id @default(uuid())
+  sessionId        String         @unique @map("session_id")
+  therapistId      String         @map("therapist_id")
+  patientId        String         @map("patient_id")
+  sessionType      String         @default("Therapy Session") @map("session_type")
+  subjective       String         @default("")
+  objective        String         @default("")
+  assessment       String         @default("")
+  plan             String         @default("")
+  phq9             Int?
+  gad7             Int?
+  assignedExercise String?        @map("assigned_exercise")
+  nextSessionDate  DateTime?      @map("next_session_date")
+  status           String         @default("draft")
+  history          Json?
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+  patient          PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  session          TherapySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  therapist        User           @relation("TherapistSessionNoteAuthor", fields: [therapistId], references: [id], onDelete: Cascade)
+
+  @@index([therapistId, updatedAt(sort: Desc)])
+  @@index([patientId, updatedAt(sort: Desc)])
+  @@map("therapist_session_notes")
+}
+
+model TherapistExercise {
+  id             String          @id @default(uuid())
+  therapistId    String          @map("therapist_id")
+  patientId      String?         @map("patient_id")
+  patientName    String?         @map("patient_name")
+  name           String
+  category       String
+  worksheetUrl   String?         @map("worksheet_url")
+  completionRate Int             @default(0) @map("completion_rate")
+  status         String          @default("active")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  patient        PatientProfile? @relation(fields: [patientId], references: [id])
+  therapist      User            @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+
+  @@index([therapistId, updatedAt(sort: Desc)])
+  @@index([patientId])
+  @@map("therapist_exercises")
+}
+
+model TherapistAssessmentRecord {
+  id          String          @id @default(uuid())
+  therapistId String          @map("therapist_id")
+  patientId   String?         @map("patient_id")
+  patientName String          @map("patient_name")
+  type        String
+  score       Int
+  assessedAt  DateTime        @default(now()) @map("assessed_at")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+  patient     PatientProfile? @relation(fields: [patientId], references: [id])
+  therapist   User            @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+
+  @@index([therapistId, assessedAt(sort: Desc)])
+  @@index([patientId])
+  @@map("therapist_assessment_records")
+}
+
+model TherapistResource {
+  id          String          @id @default(uuid())
+  therapistId String          @map("therapist_id")
+  patientId   String?         @map("patient_id")
+  patientName String?         @map("patient_name")
+  title       String
+  type        String
+  views       Int             @default(0)
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+  patient     PatientProfile? @relation(fields: [patientId], references: [id])
+  therapist   User            @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+
+  @@index([therapistId, updatedAt(sort: Desc)])
+  @@index([patientId])
+  @@map("therapist_resources")
+}
+
+model TherapistCareTeamMember {
+  id            String          @id @default(uuid())
+  therapistId   String          @map("therapist_id")
+  patientId     String?         @map("patient_id")
+  role          String
+  name          String
+  treatment     String          @default("")
+  notes         String          @default("")
+  suggestions   String          @default("")
+  prescriptions String          @default("")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+  patient       PatientProfile? @relation(fields: [patientId], references: [id])
+  therapist     User            @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+
+  @@index([therapistId, updatedAt(sort: Desc)])
+  @@index([patientId])
+  @@map("therapist_care_team_members")
+}
+
+model SessionBookingIntent {
+  id                String              @id @default(uuid())
+  patientId         String
+  providerId        String
+  scheduledAt       DateTime
+  durationMinute    Int                 @default(50)
+  amountMinor       BigInt
+  currency          String              @default("INR")
+  razorpayOrderId   String              @unique
+  razorpayPaymentId String?
+  status            BookingIntentStatus @default(PENDING)
+  sessionId         String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  patient           User                @relation("BookingIntentPatient", fields: [patientId], references: [id], onDelete: Cascade)
+  provider          User                @relation("BookingIntentProvider", fields: [providerId], references: [id])
+
+  @@index([patientId, status, createdAt])
+  @@index([providerId, scheduledAt])
+  @@index([scheduledAt])
+  @@map("session_booking_intents")
+}
+
+model AppointmentRequest {
+  id                      String                   @id @default(uuid())
+  patientId               String
+  availabilityPrefs       Json
+  providers               Json                     @default("[]")
+  acceptedProviderId      String?                  @map("accepted_provider_id")
+  scheduledAt             DateTime?                @map("scheduled_at")
+  durationMinutes         Int                      @default(50) @map("duration_minutes")
+  preferredSpecialization String?                  @map("preferred_specialization")
+  paymentDeadlineAt       DateTime?                @map("payment_deadline_at")
+  razorpayOrderId         String?                  @unique @map("razorpay_order_id")
+  razorpayPaymentId       String?                  @map("razorpay_payment_id")
+  amountMinor             BigInt?
+  currency                String                   @default("INR")
+  status                  AppointmentRequestStatus @default(PENDING)
+  expiresAt               DateTime?                @map("expires_at")
+  cancelledAt             DateTime?                @map("cancelled_at")
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+
+  @@index([patientId, status, createdAt(sort: Desc)])
+  @@index([status, expiresAt])
+  @@index([acceptedProviderId])
+  @@map("appointment_requests")
+}
+
+model AIConversation {
+  id        String   @id @default(uuid())
+  userId    String
+  messages  Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("ai_conversations")
+}
+
+model AIDailyTokenUsage {
+  id         String   @id @default(uuid())
+  dayKey     String   @unique @map("day_key")
+  tokensUsed Int      @default(0) @map("tokens_used")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([dayKey])
+  @@map("ai_daily_token_usage")
+}
+
+model ChatMessage {
+  messageId String   @id @default(uuid()) @map("message_id")
+  userId    String   @map("user_id")
+  role      String
+  content   String
+  timestamp DateTime @default(now())
+  botType   String   @map("bot_type")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, botType, timestamp(sort: Desc)], map: "chat_messages_user_bot_ts_idx")
+  @@index([userId, timestamp(sort: Desc)], map: "chat_messages_user_ts_idx")
+  @@map("chat_messages")
+}
+
+model PHQ9Assessment {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  answers      Int[]
+  totalScore   Int      @map("total_score")
+  q9Score      Int      @map("q9_score")
+  severity     String
+  riskWeight   Float    @map("risk_weight")
+  q9CrisisFlag Boolean  @default(false) @map("q9_crisis_flag")
+  assessedAt   DateTime @default(now()) @map("assessed_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  user         User     @relation("UserPHQ9Assessments", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, assessedAt(sort: Desc)], map: "phq9_assessments_user_ts_idx")
+  @@index([q9CrisisFlag, assessedAt(sort: Desc)], map: "phq9_assessments_q9_idx")
+  @@map("phq9_assessments")
+}
+
+model GAD7Assessment {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  answers    Int[]
+  totalScore Int      @map("total_score")
+  severity   String
+  riskWeight Float    @map("risk_weight")
+  assessedAt DateTime @default(now()) @map("assessed_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  user       User     @relation("UserGAD7Assessments", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, assessedAt(sort: Desc)], map: "gad7_assessments_user_ts_idx")
+  @@map("gad7_assessments")
+}
+
+model RiskScore {
+  id                  String   @id @default(uuid())
+  userId              String   @map("user_id")
+  phq9Component       Float    @default(0) @map("phq9_component")
+  gad7Component       Float    @default(0) @map("gad7_component")
+  chatComponent       Float    @default(0) @map("chat_component")
+  behavioralComponent Float    @default(0) @map("behavioral_component")
+  compositeScore      Float    @default(0) @map("composite_score")
+  riskLevel           String   @map("risk_level")
+  source              String   @default("system")
+  metadata            Json?
+  evaluatedAt         DateTime @default(now()) @map("evaluated_at")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+  user                User     @relation("UserRiskScores", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, evaluatedAt(sort: Desc)], map: "risk_scores_user_ts_idx")
+  @@index([riskLevel, evaluatedAt(sort: Desc)], map: "risk_scores_level_ts_idx")
+  @@map("risk_scores")
+}
+
+model CrisisEscalation {
+  id                 String    @id @default(uuid())
+  userId             String    @map("user_id")
+  riskScoreId        String?   @map("risk_score_id")
+  riskLevel          String    @map("risk_level")
+  status             String    @default("OPEN")
+  reason             String?
+  opsAlertedAt       DateTime? @map("ops_alerted_at")
+  patientShownAt     DateTime? @map("patient_shown_at")
+  therapistAlertedAt DateTime? @map("therapist_alerted_at")
+  backupAlertedAt    DateTime? @map("backup_alerted_at")
+  therapistAckAt     DateTime? @map("therapist_ack_at")
+  therapistId        String?   @map("therapist_id")
+  backupTherapistId  String?   @map("backup_therapist_id")
+  payload            Json?
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  user               User      @relation("UserCrisisEscalations", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, createdAt(sort: Desc)], map: "crisis_escalations_user_status_idx")
+  @@index([riskLevel, status, createdAt(sort: Desc)], map: "crisis_escalations_level_status_idx")
+  @@map("crisis_escalations")
+}
+
+model MoodLog {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  moodValue Int      @map("mood_value")
+  note      String?
+  source    String   @default("manual")
+  loggedAt  DateTime @default(now()) @map("logged_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  user      User     @relation("UserMoodLogs", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, loggedAt(sort: Desc)], map: "mood_logs_user_ts_idx")
+  @@map("mood_logs")
+}
+
+model ChatAnalysis {
+  id             String   @id @default(uuid())
+  userId         String   @map("user_id")
+  botType        String   @map("bot_type")
+  messageContent String   @map("message_content")
+  sentimentScore Float    @default(0) @map("sentiment_score")
+  crisisRisk     Float    @default(0) @map("crisis_risk")
+  crisisIntent   Boolean  @default(false) @map("crisis_intent")
+  urgencyLevel   String   @default("LOW") @map("urgency_level")
+  detectedThemes String[] @default([]) @map("detected_themes")
+  fallbackUsed   Boolean  @default(false) @map("fallback_used")
+  analysisJson   Json     @map("analysis_json")
+  createdAt      DateTime @default(now()) @map("created_at")
+  user           User     @relation("UserChatAnalyses", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)], map: "chat_analyses_user_ts_idx")
+  @@index([urgencyLevel, createdAt(sort: Desc)], map: "chat_analyses_urgency_ts_idx")
+  @@map("chat_analyses")
+}
+
+model MoodPrediction {
+  id                 String    @id @default(uuid())
+  userId             String    @map("user_id")
+  predictionDate     DateTime  @map("prediction_date")
+  predictedMood      Float     @map("predicted_mood")
+  confidencePct      Float     @map("confidence_pct")
+  trendDirection     String    @map("trend_direction")
+  deteriorationAlert Boolean   @default(false) @map("deterioration_alert")
+  factorAnalysis     Json?     @map("factor_analysis")
+  actualMood         Float?    @map("actual_mood")
+  maeSnapshot        Float?    @map("mae_snapshot")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  batchDate          DateTime? @map("batch_date")
+  day1Predicted      Float?    @map("day1_predicted")
+  day2Predicted      Float?    @map("day2_predicted")
+  day3Predicted      Float?    @map("day3_predicted")
+  day4Predicted      Float?    @map("day4_predicted")
+  day5Predicted      Float?    @map("day5_predicted")
+  day6Predicted      Float?    @map("day6_predicted")
+  day7Predicted      Float?    @map("day7_predicted")
+  influencingFactors Json?     @map("influencing_factors")
+  accuracyWithin2Pct Float?    @map("accuracy_within_2_pct")
+  user               User      @relation("UserMoodPredictions", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, predictionDate], map: "mood_predictions_user_date_uq")
+  @@index([userId, predictionDate(sort: Desc)], map: "mood_predictions_user_date_idx")
+  @@map("mood_predictions")
+}
+
+model Notification {
+  id          String    @id @default(uuid())
+  userId      String
+  type        String
+  title       String
+  message     String
+  payload     Json?
+  isRead      Boolean   @default(false)
+  scheduledAt DateTime?
+  sentAt      DateTime?
+  createdAt   DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt])
+  @@index([scheduledAt])
+  @@map("notifications")
+}
+
+model SessionAuditLog {
+  id         String   @id @default(cuid())
+  sessionId  String?
+  userId     String?
+  action     String
+  entityType String
+  entityId   String
+  changes    Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  @@index([sessionId])
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("session_audit_logs")
+}
+
+model SessionPresence {
+  id          String   @id @default(cuid())
+  sessionId   String
+  userId      String
+  role        UserRole
+  status      String   @default("OFFLINE")
+  lastSeenAt  DateTime @default(now())
+  clientCount Int      @default(0)
+  updatedAt   DateTime @updatedAt
+
+  @@unique([sessionId, userId, role])
+  @@index([sessionId])
+  @@index([userId])
+  @@map("session_presence")
+}
+
+model ExportLog {
+  id          String   @id @default(cuid())
+  therapistId String
+  sessionId   String
+  exportType  String
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([therapistId])
+  @@index([sessionId])
+  @@index([createdAt])
+  @@map("export_logs")
+}
+
+model FinancialSession {
+  id                  String                 @id @default(uuid())
+  patientId           String
+  providerId          String
+  status              FinancialSessionStatus @default(PENDING_PAYMENT)
+  expectedAmountMinor BigInt
+  currency            String                 @default("INR")
+  idempotencyKey      String                 @unique
+  razorpayOrderId     String?                @unique
+  confirmedAt         DateTime?
+  completedAt         DateTime?
+  expiredAt           DateTime?
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+  payments            FinancialPayment[]     @relation("SessionPayments")
+  patient             User                   @relation("FinancialPatient", fields: [patientId], references: [id])
+  provider            User                   @relation("FinancialProvider", fields: [providerId], references: [id])
+  revenueLedger       RevenueLedger[]        @relation("SessionRevenueLedger")
+  walletTransactions  WalletTransaction[]    @relation("SessionWalletTransactions")
+
+  @@index([patientId, status])
+  @@index([providerId, status])
+  @@index([createdAt])
+  @@map("financial_sessions")
+}
+
+model Lead {
+  id                     String            @id @default(uuid())
+  patientId              String
+  providerId             String?
+  status                 LeadStatus        @default(AVAILABLE)
+  matchScore             Int?
+  amountMinor            BigInt
+  currency               String            @default("INR")
+  previewData            Json?
+  patientAcceptanceUntil DateTime?
+  providerContactedAt    DateTime?
+  purchasedAt            DateTime?
+  acceptedAt             DateTime?
+  expiresAt              DateTime?
+  idempotencyKey         String?           @unique
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+  paymentStatus          LeadPaymentStatus @default(NOT_REQUIRED)
+  razorpayOrderId        String?           @unique
+  razorpayPaymentId      String?           @unique
+  paymentCapturedAt      DateTime?
+  channel                LeadChannel       @default(CONSUMER)
+  tier                   LeadTier?
+  visibleAt              DateTime?
+  patient                User              @relation("LeadPatient", fields: [patientId], references: [id])
+  provider               User?             @relation("LeadProvider", fields: [providerId], references: [id], onDelete: Restrict)
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([providerId, status])
+  @@index([providerId, paymentStatus])
+  @@index([providerId, status, visibleAt])
+  @@index([patientId, status])
+  @@index([channel, tier, visibleAt])
+  @@index([patientAcceptanceUntil])
+  @@map("leads")
+}
+
+model FinancialPayment {
+  id                    String                 @id @default(uuid())
+  sessionId             String?
+  providerId            String?
+  patientId             String?
+  providerGateway       String                 @default("RAZORPAY")
+  razorpayOrderId       String                 @unique
+  razorpayPaymentId     String?                @unique
+  status                FinancialPaymentStatus @default(INITIATED)
+  amountMinor           BigInt
+  currency              String                 @default("INR")
+  metadata              Json?
+  therapistShareMinor   BigInt                 @default(0)
+  platformShareMinor    BigInt                 @default(0)
+  captureIdempotencyKey String?                @unique
+  capturedAt            DateTime?
+  failedAt              DateTime?
+  failureReason         String?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  paymentType           FinancialPaymentType   @default(PROVIDER_FEE)
+  wallet                ProviderWallet?        @relation("WalletPayments", fields: [providerId], references: [providerId])
+  session               FinancialSession?      @relation("SessionPayments", fields: [sessionId], references: [id])
+  revenueLedger         RevenueLedger[]        @relation("PaymentRevenueLedger")
+  walletTransactions    WalletTransaction[]    @relation("PaymentWalletTransactions")
+
+  @@index([sessionId, status])
+  @@index([providerId, status])
+  @@index([paymentType, status])
+  @@index([razorpayOrderId])
+  @@index([createdAt])
+  @@map("financial_payments")
+}
+
+model ProviderWallet {
+  providerId            String              @id
+  pendingBalanceMinor   BigInt              @default(0)
+  availableBalanceMinor BigInt              @default(0)
+  lifetimeEarningsMinor BigInt              @default(0)
+  isFrozen              Boolean             @default(false)
+  frozenReason          String?
+  frozenAt              DateTime?
+  version               Int                 @default(1)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  payments              FinancialPayment[]  @relation("WalletPayments")
+  payouts               PayoutRequest[]     @relation("WalletPayouts")
+  provider              User                @relation("ProviderWalletOwner", fields: [providerId], references: [id])
+  transactions          WalletTransaction[] @relation("WalletTransactions")
+
+  @@index([isFrozen])
+  @@index([updatedAt])
+  @@map("provider_wallets")
+}
+
+model WalletTransaction {
+  id                 String            @id @default(uuid())
+  providerId         String
+  walletTxnType      WalletTxnType
+  status             WalletTxnStatus   @default(POSTED)
+  amountMinor        BigInt
+  currency           String            @default("INR")
+  balanceBeforeMinor BigInt
+  balanceAfterMinor  BigInt
+  sessionId          String?
+  paymentId          String?
+  payoutRequestId    String?
+  revenueLedgerId    String?
+  referenceKey       String?           @unique
+  metadata           Json?
+  createdAt          DateTime          @default(now())
+  payment            FinancialPayment? @relation("PaymentWalletTransactions", fields: [paymentId], references: [id], onDelete: Restrict)
+  payout             PayoutRequest?    @relation("PayoutWalletTransactions", fields: [payoutRequestId], references: [id], onDelete: Restrict)
+  wallet             ProviderWallet    @relation("WalletTransactions", fields: [providerId], references: [providerId])
+  revenue            RevenueLedger?    @relation("RevenueWalletTransactions", fields: [revenueLedgerId], references: [id], onDelete: Restrict)
+  session            FinancialSession? @relation("SessionWalletTransactions", fields: [sessionId], references: [id], onDelete: Restrict)
+
+  @@index([providerId, createdAt(sort: Desc)])
+  @@index([walletTxnType, createdAt(sort: Desc)])
+  @@index([sessionId])
+  @@index([paymentId])
+  @@index([payoutRequestId])
+  @@map("wallet_transactions")
+}
+
+model PayoutRequest {
+  id                     String              @id @default(uuid())
+  providerId             String
+  amountMinor            BigInt
+  currency               String              @default("INR")
+  status                 PayoutStatus        @default(REQUESTED)
+  minWithdrawalRuleMinor BigInt              @default(10000)
+  requestedAt            DateTime            @default(now())
+  approvedAt             DateTime?
+  paidAt                 DateTime?
+  rejectedAt             DateTime?
+  approvedByAdminId      String?
+  rejectedByAdminId      String?
+  rejectionReason        String?
+  bankReference          String?             @unique
+  idempotencyKey         String              @unique
+  provider               ProviderWallet      @relation("WalletPayouts", fields: [providerId], references: [providerId])
+  walletTransactions     WalletTransaction[] @relation("PayoutWalletTransactions")
+
+  @@index([providerId, status, requestedAt(sort: Desc)])
+  @@index([status, requestedAt(sort: Desc)])
+  @@map("payout_requests")
+}
+
+model MarketplaceSubscription {
+  id                     String                @id @default(uuid())
+  userId                 String
+  domain                 SubscriptionDomain
+  plan                   SubscriptionPlan
+  status                 SubscriptionStatus    @default(PAST_DUE)
+  providerGateway        String                @default("RAZORPAY")
+  razorpaySubscriptionId String                @unique
+  razorpayPlanId         String
+  currentPeriodStart     DateTime?
+  currentPeriodEnd       DateTime?
+  nextBillingDate        DateTime?
+  cancelledAt            DateTime?
+  expiredAt              DateTime?
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+  user                   User                  @relation("UserSubscriptions", fields: [userId], references: [id])
+  revenueLedger          RevenueLedger[]       @relation("SubscriptionRevenueLedger")
+  invoices               SubscriptionInvoice[] @relation("SubscriptionInvoices")
+
+  @@index([userId, domain, status])
+  @@index([status, nextBillingDate])
+  @@index([createdAt])
+  @@map("marketplace_subscriptions")
+}
+
+model SubscriptionInvoice {
+  id                String                  @id @default(uuid())
+  subscriptionId    String
+  razorpayPaymentId String?                 @unique
+  amountMinor       BigInt
+  currency          String                  @default("INR")
+  billedAt          DateTime
+  nextBillingDate   DateTime?
+  createdAt         DateTime                @default(now())
+  subscription      MarketplaceSubscription @relation("SubscriptionInvoices", fields: [subscriptionId], references: [id])
+
+  @@index([subscriptionId, billedAt(sort: Desc)])
+  @@map("subscription_invoices")
+}
+
+model PatientSubscription {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  planName     String
+  price        Int
+  billingCycle String
+  status       String
+  paymentId    String?
+  autoRenew    Boolean  @default(true)
+  renewalDate  DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@map("patient_subscriptions")
+}
+
+model PatientPaymentMethod {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  cardLast4   String
+  cardBrand   String
+  expiryMonth Int
+  expiryYear  Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("patient_payment_methods")
+}
+
+model PatientInvoice {
+  id         String   @id @default(uuid())
+  userId     String
+  amount     Int
+  status     String
+  invoiceUrl String?
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("patient_invoices")
+}
+
+model PatientExercise {
+  id         String         @id @default(uuid())
+  patientId  String
+  title      String
+  assignedBy String
+  duration   Int
+  status     String
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  patient    PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, status])
+  @@map("patient_exercises")
+}
+
+model PatientProgress {
+  id                 String         @id @default(uuid())
+  patientId          String         @unique
+  sessionsCompleted  Int            @default(0)
+  totalSessions      Int            @default(0)
+  exercisesCompleted Int            @default(0)
+  totalExercises     Int            @default(0)
+  phqStart           Int?
+  phqCurrent         Int?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  patient            PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@map("patient_progress")
+}
+
+model RevenueLedger {
+  id                      String                   @id @default(uuid())
+  type                    RevenueType
+  grossAmountMinor        BigInt
+  platformCommissionMinor BigInt
+  providerShareMinor      BigInt
+  taxAmountMinor          BigInt                   @default(0)
+  currency                String                   @default("INR")
+  referenceId             String
+  paymentId               String?
+  sessionId               String?
+  subscriptionId          String?
+  createdAt               DateTime                 @default(now())
+  paymentType             FinancialPaymentType?
+  payment                 FinancialPayment?        @relation("PaymentRevenueLedger", fields: [paymentId], references: [id], onDelete: Restrict)
+  session                 FinancialSession?        @relation("SessionRevenueLedger", fields: [sessionId], references: [id], onDelete: Restrict)
+  subscription            MarketplaceSubscription? @relation("SubscriptionRevenueLedger", fields: [subscriptionId], references: [id], onDelete: Restrict)
+  walletTransactions      WalletTransaction[]      @relation("RevenueWalletTransactions")
+
+  @@index([type, createdAt(sort: Desc)])
+  @@index([referenceId, createdAt(sort: Desc)])
+  @@index([sessionId])
+  @@index([subscriptionId])
+  @@map("revenue_ledger")
+}
+
+model WebhookLog {
+  id               String               @id @default(uuid())
+  provider         WebhookProvider      @default(RAZORPAY)
+  eventId          String
+  eventType        String
+  payloadHash      String
+  signature        String
+  isSignatureValid Boolean
+  processStatus    WebhookProcessStatus @default(RECEIVED)
+  firstSeenAt      DateTime             @default(now())
+  processedAt      DateTime?
+  errorMessage     String?
+  sessionId        String?
+  subscriptionId   String?
+  rawPayload       Json
+
+  @@unique([provider, eventId])
+  @@index([eventType, processStatus])
+  @@index([firstSeenAt])
+  @@map("webhook_logs")
+}
+
+model FinancialAuditLog {
+  id         String                  @id @default(uuid())
+  actorType  FinancialAuditActorType
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String
+  reason     String?
+  beforeJson Json?
+  afterJson  Json?
+  traceId    String?
+  createdAt  DateTime                @default(now())
+  actor      User?                   @relation("UserFinancialAudits", fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([entityType, entityId, createdAt(sort: Desc)])
+  @@index([actorType, createdAt(sort: Desc)])
+  @@index([traceId])
+  @@map("financial_audit_logs")
+}
+
+model Certification {
+  id                 String             @id @default(uuid())
+  slug               String             @unique
+  code               String             @unique
+  title              String
+  shortTitle         String?
+  subtitle           String
+  level              CertificationLevel
+  levelBadge         String
+  journeyDescription String
+  durationLabel      String
+  investmentLabel    String
+  monthlyIncomeLabel String?
+  modulesCount       Int?
+  deliveryMode       String?
+  sessionRateLabel   String?
+  outcomeLabel       String?
+  prerequisitesLabel String
+  primaryCtaLabel    String
+  secondaryCtaLabel  String             @default("Learn More")
+  isInvitationOnly   Boolean            @default(false)
+  enrollmentOpen     Boolean            @default(true)
+  sortOrder          Int                @default(100)
+  isActive           Boolean            @default(true)
+  metadata           Json?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@index([level, sortOrder])
+  @@index([isActive, sortOrder])
+  @@map("certifications")
+}
+
+model TherapyPlan {
+  id           String   @id @default(uuid())
+  patientId    String
+  therapistId  String?
+  title        String
+  providerNote String?
+  startDate    DateTime
+  endDate      DateTime
+  status       String   @default("ACTIVE")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([patientId, status])
+  @@map("therapy_plans")
+}
+
+model TherapyPlanActivity {
+  id               String                @id @default(uuid())
+  planId           String
+  title            String
+  frequency        PlanActivityFrequency @default(ONE_TIME)
+  activityType     PlanActivityType
+  referenceId      String?
+  estimatedMinutes Int?                  @default(5)
+  orderIndex       Int                   @default(0)
+  dayNumber        Int                   @default(1)
+  isPublished      Boolean               @default(false)
+  category         String?
+  status           String                @default("PENDING")
+  completedAt      DateTime?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  @@index([planId])
+  @@map("therapy_plan_activities")
+}
+
+model Addendum {
+  id                String   @id @default(uuid())
+  noteId            String   @map("note_id")
+  content           String
+  timestamp         DateTime @default(now())
+  providerSignature String?  @map("provider_signature")
+
+  @@index([noteId])
+  @@map("addendums")
+}
+
+model PatientDocument {
+  id          String   @id @default(uuid())
+  patientId   String   @map("patient_id")
+  title       String
+  category    String   @default("other")
+  source      String?
+  sourceId    String?  @map("source_id")
+  filePath    String?  @map("file_path")
+  s3ObjectKey String?  @map("s3_object_key")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([patientId])
+  @@map("patient_documents")
+}
+
+model Prescription {
+  id               String   @id @default(uuid())
+  patientId        String   @map("patient_id")
+  providerId       String   @map("provider_id")
+  drugName         String   @map("drug_name")
+  dosage           String
+  instructions     String
+  prescribedDate   DateTime @default(now()) @map("prescribed_date")
+  refillsRemaining Int      @default(0) @map("refills_remaining")
+  status           String   @default("ACTIVE")
+  adherenceRate    Int      @default(0) @map("adherence_rate")
+  warnings         String[] @default([])
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+  patient          User     @relation("PrescriptionPatient", fields: [patientId], references: [id], onDelete: Cascade)
+  provider         User     @relation("PrescriptionProvider", fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, status])
+  @@index([providerId, status])
+  @@map("prescriptions")
+}
+
+model LabOrder {
+  id                String   @id @default(uuid())
+  patientId         String   @map("patient_id")
+  providerId        String   @map("provider_id")
+  testName          String   @map("test_name")
+  dateOrdered       DateTime @default(now()) @map("date_ordered")
+  status            String   @default("PENDING")
+  orderingPhysician String   @map("ordering_physician")
+  interpretation    String
+  biomarkers        Json
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  patient           User     @relation("LabOrderPatient", fields: [patientId], references: [id], onDelete: Cascade)
+  provider          User     @relation("LabOrderProvider", fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, status])
+  @@index([providerId, status])
+  @@map("lab_orders")
+}
+
+model Goal {
+  id          String    @id @default(uuid())
+  patientId   String    @map("patient_id")
+  providerId  String    @map("provider_id")
+  title       String
+  category    String?
+  status      String    @default("IN_PROGRESS")
+  startDate   DateTime  @default(now()) @map("start_date")
+  completedAt DateTime? @map("completed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  patient     User      @relation("GoalPatient", fields: [patientId], references: [id], onDelete: Cascade)
+  provider    User      @relation("GoalProvider", fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, status])
+  @@index([providerId, status])
+  @@map("goals")
+}
+
+model DirectConversation {
+  id              String    @id @default(uuid())
+  patientId       String
+  providerId      String
+  isSupport       Boolean   @default(false)
+  lastMessageAt   DateTime?
+  lastMessageText String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([patientId, providerId])
+  @@index([patientId, lastMessageAt(sort: Desc)])
+  @@index([providerId, lastMessageAt(sort: Desc)])
+  @@map("direct_conversations")
+}
+
+model DirectMessage {
+  id             String    @id @default(uuid())
+  conversationId String
+  senderId       String
+  senderRole     String
+  content        String
+  messageType    String    @default("TEXT")
+  metadata       Json?
+  readAt         DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([conversationId, createdAt(sort: Desc)])
+  @@index([senderId])
+  @@map("direct_messages")
+}
+
+model DailyCheckIn {
+  id             String   @id @default(uuid())
+  patientId      String   @map("patient_id")
+  date           DateTime @map("date")
+  type           String
+  mood           Int
+  energy         Int?
+  sleep          Int?
+  context        String[] @default([])
+  intention      String?
+  reflectionGood String?
+  reflectionBad  String?
+  stressLevel    Int?
+  gratitude      String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@unique([patientId, date, type], map: "daily_checkins_patient_date_type_uq")
+  @@index([patientId, date(sort: Desc)], map: "daily_checkins_patient_date_idx")
+  @@map("daily_checkins")
+}
+
+model UserPet {
+  id            String   @id @default(uuid())
+  userId        String   @unique @map("user_id")
+  selectedPet   String   @default("koi") @map("selected_pet")
+  vitality      Int      @default(24)
+  unlockedItems Json     @default("[]") @map("unlocked_items")
+  isPremium     Boolean  @default(false) @map("is_premium")
+  companionMood String?  @map("companion_mood")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([selectedPet])
+  @@map("user_pets")
+}
 
 enum UserRole {
   PATIENT
   THERAPIST
-  PSYCHOLOGIST
+  ADMIN
   PSYCHIATRIST
   COACH
-  ADMIN
+  PSYCHOLOGIST
   SUPER_ADMIN
 }
 
@@ -90,224 +1644,6 @@ enum ProviderDocumentType {
   LICENSE
 }
 
-// ============ USERS ============
-
-model User {
-  id                            String        @id @default(uuid())
-  name                          String?
-  email                         String?       @unique
-  phone                         String?       @unique
-  firstName                     String        @default("")
-  lastName                      String        @default("")
-  role                          UserRole
-  providerType                  ProviderType? @map("provider_type")
-  companyId                     String?       @map("company_id")
-  status                        UserStatus    @default(ACTIVE)
-  provider                      UserProvider  @default(LOCAL)
-  passwordHash                  String?
-  googleId                      String?       @unique
-  profileImageKey               String?
-  profileImageUrl               String?
-  showNameToProviders           Boolean       @default(true)
-  emailVerified                 Boolean       @default(false)
-  phoneVerified                 Boolean       @default(false)
-  emailVerificationOtpHash      String?
-  emailVerificationOtpExpiresAt DateTime?
-  phoneVerificationOtpHash      String?
-  phoneVerificationOtpExpiresAt DateTime?
-  passwordResetOtpHash          String?
-  passwordResetOtpExpiresAt     DateTime?
-  mfaEnabled                    Boolean       @default(false)
-  mfaSecret                     String?
-  failedLoginAttempts           Int           @default(0)
-  lockUntil                     DateTime?
-  lastLoginAt                   DateTime?
-  passwordChangedAt             DateTime?
-  isTherapistVerified           Boolean       @default(false)
-  therapistVerifiedAt           DateTime?
-  therapistVerifiedByUserId     String?
-  onboardingStatus              OnboardingStatus?
-  isDeleted                     Boolean       @default(false)
-  deletedAt                     DateTime?
-  createdAt                     DateTime      @default(now())
-  updatedAt                     DateTime      @updatedAt
-
-  // Relations
-  patientProfile                PatientProfile?
-  therapyBookings               TherapySession[]
-  financialPatientSessions      FinancialSession[]          @relation("FinancialPatient")
-  financialProviderSessions     FinancialSession[]          @relation("FinancialProvider")
-  patientLeads                  Lead[]                      @relation("LeadPatient")
-  providerLeads                 Lead[]                      @relation("LeadProvider")
-  providerWallet                ProviderWallet?             @relation("ProviderWalletOwner")
-  subscriptions                 MarketplaceSubscription[]   @relation("UserSubscriptions")
-  financialAuditEvents          FinancialAuditLog[]         @relation("UserFinancialAudits")
-  authSessions                  AuthSession[]
-  authAuditLogs                 AuthAuditLog[]
-  aiConversations               AIConversation[]
-  chatMessages                  ChatMessage[]
-  phq9Assessments               PHQ9Assessment[]            @relation("UserPHQ9Assessments")
-  gad7Assessments               GAD7Assessment[]            @relation("UserGAD7Assessments")
-  riskScores                    RiskScore[]                 @relation("UserRiskScores")
-  crisisEscalations             CrisisEscalation[]          @relation("UserCrisisEscalations")
-  moodLogs                      MoodLog[]                   @relation("UserMoodLogs")
-  chatAnalyses                  ChatAnalysis[]              @relation("UserChatAnalyses")
-  moodPredictions               MoodPrediction[]            @relation("UserMoodPredictions")
-  notifications                 Notification[]
-  bookingIntentsAsPatient       SessionBookingIntent[]      @relation("BookingIntentPatient")
-  bookingIntentsAsProvider      SessionBookingIntent[]      @relation("BookingIntentProvider")
-  appointmentRequestsAsPatient  AppointmentRequest[]        @relation("AppointmentRequestPatient")
-  appointmentRequestsAccepted   AppointmentRequest[]        @relation("AppointmentRequestAcceptedProvider")
-  patientSubscription           PatientSubscription?
-  patientPaymentMethod          PatientPaymentMethod?
-  patientInvoices               PatientInvoice[]
-  therapistSessionNotesAuthored TherapistSessionNote[]      @relation("TherapistSessionNoteAuthor")
-  therapistExercises            TherapistExercise[]
-  therapistAssessments          TherapistAssessmentRecord[]
-  therapistResources            TherapistResource[]
-  therapistCareTeamMembers      TherapistCareTeamMember[]
-  therapistProfile              TherapistProfile?
-  userCapabilities              UserCapability[]            @relation("UserCapabilitiesOwner")
-  grantedCapabilities           UserCapability[]            @relation("UserCapabilitiesGrantor")
-  careTeamAssignmentsAsPatient  CareTeamAssignment[]        @relation("CareTeamAssignmentPatient")
-  careTeamAssignmentsAsProvider CareTeamAssignment[]        @relation("CareTeamAssignmentProvider")
-  careTeamAssignmentsCreated    CareTeamAssignment[]        @relation("CareTeamAssignmentCreator")
-  providerExtraQuestionsCreated ProviderExtraQuestion[]
-  consents                      Consent[]
-  consentRevocations            Consent[]                   @relation("ConsentRevokedByUser")
-  auditEventsAsActor            AuditEvent[]                @relation("AuditEventsActor")
-  tenantPoliciesUpdated         TenantPolicy[]              @relation("TenantPolicyUpdatedBy")
-  therapyPlans                  TherapyPlan[]               @relation("TherapistPlans")
-  directConversationsAsPatient  DirectConversation[]         @relation("DirectConversationPatient")
-  directConversationsAsProvider DirectConversation[]         @relation("DirectConversationProvider")
-  directMessagesSent            DirectMessage[]              @relation("DirectMessageSender")
-  prescriptionsAsPatient        Prescription[]               @relation("PrescriptionPatient")
-  prescriptionsAsProvider       Prescription[]               @relation("PrescriptionProvider")
-  labOrdersAsPatient            LabOrder[]                   @relation("LabOrderPatient")
-  labOrdersAsProvider           LabOrder[]                   @relation("LabOrderProvider")
-  goalsAsPatient                Goal[]                       @relation("GoalPatient")
-  goalsAsProvider               Goal[]                       @relation("GoalProvider")
-  providerDocumentsUploaded     ProviderDocument[]
-  dailyCheckIns                 DailyCheckIn[]               @relation("UserDailyCheckIns")
-
-  @@index([email])
-  @@index([phone])
-  @@index([role])
-  @@index([providerType])
-  @@index([companyId])
-  @@index([status])
-  @@index([companyId, status])
-  @@index([isDeleted])
-  @@map("users")
-}
-
-model UserCapability {
-  id          String    @id @default(uuid())
-  userId      String
-  capability  String
-  source      String    @default("effective")
-  isEffective Boolean   @default(true)
-  grantedById String?
-  computedAt  DateTime  @default(now())
-  expiresAt   DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  user      User  @relation("UserCapabilitiesOwner", fields: [userId], references: [id], onDelete: Cascade)
-  grantedBy User? @relation("UserCapabilitiesGrantor", fields: [grantedById], references: [id], onDelete: SetNull)
-
-  @@unique([userId, capability])
-  @@index([capability, isEffective])
-  @@index([computedAt])
-  @@map("user_capabilities")
-}
-
-model CareTeamAssignment {
-  id           String    @id @default(uuid())
-  patientId    String
-  providerId   String
-  assignedById String?
-  accessScope  Json
-  status       String    @default("ACTIVE")
-  assignedAt   DateTime  @default(now())
-  revokedAt    DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-
-  patient    User  @relation("CareTeamAssignmentPatient", fields: [patientId], references: [id], onDelete: Cascade)
-  provider   User  @relation("CareTeamAssignmentProvider", fields: [providerId], references: [id], onDelete: Cascade)
-  assignedBy User? @relation("CareTeamAssignmentCreator", fields: [assignedById], references: [id], onDelete: SetNull)
-
-  @@unique([patientId, providerId])
-  @@index([providerId, status])
-  @@index([assignedAt])
-  @@map("care_team_assignments")
-}
-
-model Consent {
-  id          String    @id @default(uuid())
-  userId      String
-  consentType String
-  purpose     String
-  artifactRef String?
-  status      String    @default("GRANTED")
-  grantedAt   DateTime  @default(now())
-  revokedAt   DateTime?
-  revokedById String?
-  metadata    Json?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  user      User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  revokedBy User? @relation("ConsentRevokedByUser", fields: [revokedById], references: [id], onDelete: SetNull)
-
-  @@index([userId, consentType, status])
-  @@index([grantedAt])
-  @@map("consents")
-}
-
-model AuditEvent {
-  id         String   @id @default(uuid())
-  actorId    String?
-  actorRole  String?
-  tenantId   String?
-  scope      String
-  action     String
-  entityType String
-  entityId   String?
-  beforeJson Json?
-  afterJson  Json?
-  ipAddress  String?
-  userAgent  String?
-  traceId    String?
-  createdAt  DateTime @default(now())
-
-  actor User? @relation("AuditEventsActor", fields: [actorId], references: [id], onDelete: SetNull)
-
-  @@index([tenantId, scope, createdAt(sort: Desc)])
-  @@index([actorId, createdAt(sort: Desc)])
-  @@index([entityType, entityId])
-  @@index([traceId])
-  @@map("audit_events")
-}
-
-model TenantPolicy {
-  id            String   @id @default(uuid())
-  tenantId      String   @unique
-  privacyPolicy Json
-  featureFlags  Json
-  policyVersion Int      @default(1)
-  updatedById   String?
-  effectiveFrom DateTime @default(now())
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  updatedBy User? @relation("TenantPolicyUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
-
-  @@index([effectiveFrom])
-  @@map("tenant_policies")
-}
-
 enum BookingIntentStatus {
   PENDING
   CONFIRMED
@@ -332,849 +1668,11 @@ enum ProviderRequestStatus {
   CANCELLED
 }
 
-model AuthSession {
-  id               String    @id @default(uuid())
-  userId           String
-  jti              String    @unique
-  refreshTokenHash String
-  ipAddress        String?
-  userAgent        String?
-  device           String?
-  revokedAt        DateTime?
-  expiresAt        DateTime
-  lastActiveAt     DateTime  @default(now())
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, revokedAt])
-  @@index([userId, expiresAt])
-  @@map("auth_sessions")
-}
-
-model AuthAuditLog {
-  id        String   @id @default(uuid())
-  userId    String?
-  event     String
-  status    String
-  email     String?
-  phone     String?
-  ipAddress String?
-  userAgent String?
-  metadata  Json?
-  createdAt DateTime @default(now())
-
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  @@index([userId, createdAt])
-  @@index([event, createdAt])
-  @@map("auth_audit_logs")
-}
-
-// ============ PATIENT PROFILES & HEALTH RECORDS ============
-
-model PatientProfile {
-  id               String    @id @default(uuid())
-  userId           String    @unique
-  age              Int
-  gender           String
-  medicalHistory   String?
-  emergencyContact Json
-  isDeleted        Boolean   @default(false)
-  deletedAt        DateTime?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-
-  // Relations
-  user                         User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  assessments                  PatientAssessment[]
-  moodEntries                  PatientMoodEntry[]
-  therapySessions              TherapySession[]
-  exercises                    PatientExercise[]
-  progress                     PatientProgress?
-  therapistSessionNotes        TherapistSessionNote[]
-  therapistExercisesAssigned   TherapistExercise[]
-  therapistAssessmentsAssigned TherapistAssessmentRecord[]
-  therapistResourcesAssigned   TherapistResource[]
-  therapistCareTeamMembers     TherapistCareTeamMember[]
-  screeningAttempts            ScreeningAttempt[]
-  providerQuestionAssignments  ProviderQuestionAssignment[]
-  TherapyPlan                  TherapyPlan[]
-
-  @@index([userId])
-  @@map("patient_profiles")
-}
-
-// Therapist profile stored separately for therapist-specific metadata
-model TherapistProfile {
-  id                String    @id @default(uuid())
-  userId            String    @unique
-  displayName       String
-  professionalType  String?
-  registrationType  RegistrationType?
-  registrationNum   String?   @unique
-  contactEmail      String?
-  education         String?
-  highestQual       String?
-  licenseRci        String?
-  licenseNmc        String?
-  bio               String?
-  clinicalCategories String[] @default([])
-  specializations   String[]  @default([])
-  languages         String[]  @default([])
-  certifications    String[]  @default([])
-  baseLatitude      Float?    @map("base_latitude")
-  baseLongitude     Float?    @map("base_longitude")
-  corporateReady    Boolean   @default(false)
-  shiftPreferences  String[]  @default([])
-  yearsExperience   Int?      @default(0)
-  yearsOfExperience Int?      @default(0)
-  hourlyRate        Int?      @default(0)
-  consultationFee   Int?      @default(0) // in minor units
-  bankDetails       Json?
-  tagline           String?
-  digitalSignature  String?
-  onboardingCompleted Boolean @default(false)
-  isVerified        Boolean   @default(false)
-  verifiedAt        DateTime?
-  verifiedByUserId  String?
-  availability      Json? // array of slots { dayOfWeek, startMinute, endMinute, isAvailable }
-  averageRating     Float?    @default(0)
-  isDeleted         Boolean   @default(false)
-  deletedAt         DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-
-  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  documents         ProviderDocument[]
-
-  @@index([userId])
-  @@map("therapist_profiles")
-}
-
-model ProviderDocument {
-  id                String               @id @default(uuid())
-  providerProfileId String
-  userId            String
-  documentType      ProviderDocumentType
-  url               String
-  createdAt         DateTime             @default(now())
-  updatedAt         DateTime             @updatedAt
-
-  providerProfile TherapistProfile @relation(fields: [providerProfileId], references: [id], onDelete: Cascade)
-  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([providerProfileId, documentType])
-  @@index([userId, documentType])
-  @@map("provider_documents")
-}
-
-model PatientAssessment {
-  id            String   @id @default(uuid())
-  patientId     String
-  type          String
-  answers       Int[]
-  totalScore    Int
-  severityLevel String
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  // Relations
-  patient PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
-
-  @@index([patientId, createdAt])
-  @@map("patient_assessments")
-}
-
-model ScreeningTemplate {
-  id               String                  @id @default(uuid())
-  key              String                  @unique
-  title            String
-  description      String?
-  estimatedMinutes Int                     @default(3)
-  isPublic         Boolean                 @default(true)
-  randomizeOrder   Boolean                 @default(true)
-  status           ScreeningTemplateStatus @default(DRAFT)
-  createdAt        DateTime                @default(now())
-  updatedAt        DateTime                @updatedAt
-
-  questions    ScreeningQuestion[]
-  scoringBands ScreeningScoringBand[]
-  attempts     ScreeningAttempt[]
-
-  @@index([key, status])
-  @@map("screening_templates")
-}
-
-model ScreeningQuestion {
-  id         String   @id @default(uuid())
-  templateId String
-  prompt     String
-  sectionKey String   @default("general")
-  orderIndex Int
-  isActive   Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  template                           ScreeningTemplate         @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  options                            ScreeningQuestionOption[]
-  answers                            ScreeningAnswer[]
-  providerExtraQuestionsFromTemplate ProviderExtraQuestion[]
-
-  @@unique([templateId, orderIndex])
-  @@index([templateId, isActive])
-  @@map("screening_questions")
-}
-
-model ScreeningQuestionOption {
-  id          String   @id @default(uuid())
-  questionId  String
-  label       String
-  optionIndex Int
-  points      Int
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  question                 ScreeningQuestion             @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  answers                  ScreeningAnswer[]
-  providerExtraOptionLinks ProviderExtraQuestionOption[]
-
-  @@unique([questionId, optionIndex])
-  @@index([questionId])
-  @@map("screening_question_options")
-}
-
-model ScreeningScoringBand {
-  id             String   @id @default(uuid())
-  templateId     String
-  minScore       Int
-  maxScore       Int
-  severity       String
-  interpretation String
-  recommendation String
-  actionLabel    String
-  orderIndex     Int      @default(0)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  template ScreeningTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
-
-  @@unique([templateId, orderIndex])
-  @@index([templateId, minScore, maxScore])
-  @@map("screening_scoring_bands")
-}
-
-model ScreeningAttempt {
-  id              String                 @id @default(uuid())
-  templateId      String
-  patientId       String?
-  accessTokenHash String?
-  status          ScreeningAttemptStatus @default(IN_PROGRESS)
-  attemptSeed     Int
-  presentedOrder  Json
-  totalScore      Int?
-  severityLevel   String?
-  interpretation  String?
-  recommendation  String?
-  actionLabel     String?
-  startedAt       DateTime               @default(now())
-  submittedAt     DateTime?
-  expiresAt       DateTime?
-  createdAt       DateTime               @default(now())
-  updatedAt       DateTime               @updatedAt
-
-  template            ScreeningTemplate            @relation(fields: [templateId], references: [id], onDelete: Restrict)
-  patient             PatientProfile?              @relation(fields: [patientId], references: [id], onDelete: SetNull)
-  answers             ScreeningAnswer[]
-  providerAssignments ProviderQuestionAssignment[]
-
-  @@index([templateId, status])
-  @@index([patientId, createdAt])
-  @@map("screening_attempts")
-}
-
-model ScreeningAnswer {
-  id          String   @id @default(uuid())
-  attemptId   String
-  questionId  String
-  optionId    String
-  optionIndex Int
-  points      Int
-  createdAt   DateTime @default(now())
-
-  attempt  ScreeningAttempt        @relation(fields: [attemptId], references: [id], onDelete: Cascade)
-  question ScreeningQuestion       @relation(fields: [questionId], references: [id], onDelete: Restrict)
-  option   ScreeningQuestionOption @relation(fields: [optionId], references: [id], onDelete: Restrict)
-
-  @@unique([attemptId, questionId])
-  @@index([attemptId])
-  @@index([questionId])
-  @@map("screening_answers")
-}
-
-model ProviderExtraQuestion {
-  id                 String                      @id @default(uuid())
-  providerId         String
-  templateQuestionId String?
-  prompt             String
-  sectionKey         String                      @default("provider-extra")
-  isRequired         Boolean                     @default(false)
-  status             ProviderExtraQuestionStatus @default(DRAFT)
-  createdAt          DateTime                    @default(now())
-  updatedAt          DateTime                    @updatedAt
-
-  provider         User                          @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  templateQuestion ScreeningQuestion?            @relation(fields: [templateQuestionId], references: [id], onDelete: SetNull)
-  options          ProviderExtraQuestionOption[]
-  assignments      ProviderQuestionAssignment[]
-
-  @@index([providerId, status])
-  @@map("provider_extra_questions")
-}
-
-model ProviderExtraQuestionOption {
-  id               String   @id @default(uuid())
-  questionId       String
-  label            String
-  optionIndex      Int
-  points           Int
-  templateOptionId String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  question              ProviderExtraQuestion        @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  templateOption        ScreeningQuestionOption?     @relation(fields: [templateOptionId], references: [id], onDelete: SetNull)
-  selectedInAssignments ProviderQuestionAssignment[]
-
-  @@unique([questionId, optionIndex])
-  @@index([questionId])
-  @@map("provider_extra_question_options")
-}
-
-model ProviderQuestionAssignment {
-  id                 String    @id @default(uuid())
-  providerQuestionId String
-  patientId          String
-  attemptId          String?
-  isActive           Boolean   @default(true)
-  assignedAt         DateTime  @default(now())
-  expiresAt          DateTime?
-  selectedOptionId   String?
-  patientNotes       String?
-  answeredAt         DateTime?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
-
-  providerQuestion ProviderExtraQuestion        @relation(fields: [providerQuestionId], references: [id], onDelete: Cascade)
-  patient          PatientProfile               @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  attempt          ScreeningAttempt?            @relation(fields: [attemptId], references: [id], onDelete: SetNull)
-  selectedOption   ProviderExtraQuestionOption? @relation(fields: [selectedOptionId], references: [id], onDelete: SetNull)
-
-  @@index([patientId, isActive])
-  @@index([providerQuestionId])
-  @@index([attemptId])
-  @@map("provider_question_assignments")
-}
-
-model PatientMoodEntry {
-  id        String   @id @default(uuid())
-  patientId String
-  moodScore Int
-  note      String?
-  date      DateTime
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  patient PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
-
-  @@index([patientId, date])
-  @@map("patient_mood_entries")
-}
-
-// ============ RESPONSE ANALYTICS ============
-
-// ============ SESSION EXPORTS ============
-
-// ============ THERAPY BOOKINGS (calendar/booking system) ============
-
 enum BookingStatus {
   PENDING
   CONFIRMED
   CANCELLED
   COMPLETED
-}
-
-model TherapySession {
-  id                 String        @id @default(uuid())
-  bookingReferenceId String        @unique
-  patientProfileId   String
-  therapistProfileId String
-  meetingRoomName    String?       @map("meeting_room_name")
-  dateTime           DateTime
-  durationMinutes    Int           @default(50)
-  isLocked           Boolean       @default(true)
-  sessionFeeMinor    BigInt        @default(0)
-  paymentStatus      String        @default("UNPAID")
-  agoraChannel       String?
-  agoraToken         String?
-  status             BookingStatus @default(PENDING)
-  transcript         String?
-  audioRecordingUrl  String?       @map("audio_recording_url")
-
-  // Encrypted therapist note (optional)
-  noteEncryptedContent     String?
-  noteIv                   String?
-  noteAuthTag              String?
-  noteUpdatedAt            DateTime?
-  noteUpdatedByTherapistId String?
-
-  cancelledAt DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  patientProfile       PatientProfile        @relation(fields: [patientProfileId], references: [id], onDelete: Cascade)
-  therapistProfile     User                  @relation(fields: [therapistProfileId], references: [id], onDelete: Cascade)
-  therapistSessionNote TherapistSessionNote?
-
-  @@index([therapistProfileId, dateTime])
-  @@index([patientProfileId, dateTime])
-  @@map("therapy_sessions")
-}
-
-model TherapistSessionNote {
-  id               String    @id @default(uuid())
-  sessionId        String    @unique @map("session_id")
-  therapistId      String    @map("therapist_id")
-  patientId        String    @map("patient_id")
-  sessionType      String    @default("Therapy Session") @map("session_type")
-  subjective       String    @default("")
-  objective        String    @default("")
-  assessment       String    @default("")
-  plan             String    @default("")
-  phq9             Int?
-  gad7             Int?
-  assignedExercise String?   @map("assigned_exercise")
-  nextSessionDate  DateTime? @map("next_session_date")
-  status           String    @default("draft")
-  history          Json?
-  createdAt        DateTime  @default(now()) @map("created_at")
-  updatedAt        DateTime  @updatedAt @map("updated_at")
-
-  session   TherapySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  therapist User           @relation("TherapistSessionNoteAuthor", fields: [therapistId], references: [id], onDelete: Cascade)
-  patient   PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
-
-  @@index([therapistId, updatedAt(sort: Desc)])
-  @@index([patientId, updatedAt(sort: Desc)])
-  @@map("therapist_session_notes")
-}
-
-model TherapistExercise {
-  id             String   @id @default(uuid())
-  therapistId    String   @map("therapist_id")
-  patientId      String?  @map("patient_id")
-  patientName    String?  @map("patient_name")
-  name           String
-  category       String
-  worksheetUrl   String?  @map("worksheet_url")
-  completionRate Int      @default(0) @map("completion_rate")
-  status         String   @default("active")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
-
-  therapist User            @relation(fields: [therapistId], references: [id], onDelete: Cascade)
-  patient   PatientProfile? @relation(fields: [patientId], references: [id], onDelete: SetNull)
-
-  @@index([therapistId, updatedAt(sort: Desc)])
-  @@index([patientId])
-  @@map("therapist_exercises")
-}
-
-model TherapistAssessmentRecord {
-  id          String   @id @default(uuid())
-  therapistId String   @map("therapist_id")
-  patientId   String?  @map("patient_id")
-  patientName String   @map("patient_name")
-  type        String
-  score       Int
-  assessedAt  DateTime @default(now()) @map("assessed_at")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  therapist User            @relation(fields: [therapistId], references: [id], onDelete: Cascade)
-  patient   PatientProfile? @relation(fields: [patientId], references: [id], onDelete: SetNull)
-
-  @@index([therapistId, assessedAt(sort: Desc)])
-  @@index([patientId])
-  @@map("therapist_assessment_records")
-}
-
-model TherapistResource {
-  id          String   @id @default(uuid())
-  therapistId String   @map("therapist_id")
-  patientId   String?  @map("patient_id")
-  patientName String?  @map("patient_name")
-  title       String
-  type        String
-  views       Int      @default(0)
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  therapist User            @relation(fields: [therapistId], references: [id], onDelete: Cascade)
-  patient   PatientProfile? @relation(fields: [patientId], references: [id], onDelete: SetNull)
-
-  @@index([therapistId, updatedAt(sort: Desc)])
-  @@index([patientId])
-  @@map("therapist_resources")
-}
-
-model TherapistCareTeamMember {
-  id            String   @id @default(uuid())
-  therapistId   String   @map("therapist_id")
-  patientId     String?  @map("patient_id")
-  role          String
-  name          String
-  treatment     String   @default("")
-  notes         String   @default("")
-  suggestions   String   @default("")
-  prescriptions String   @default("")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-
-  therapist User            @relation(fields: [therapistId], references: [id], onDelete: Cascade)
-  patient   PatientProfile? @relation(fields: [patientId], references: [id], onDelete: SetNull)
-
-  @@index([therapistId, updatedAt(sort: Desc)])
-  @@index([patientId])
-  @@map("therapist_care_team_members")
-}
-
-model SessionBookingIntent {
-  id                String              @id @default(uuid())
-  patientId         String
-  providerId        String
-  scheduledAt       DateTime
-  durationMinute    Int                 @default(50)
-  amountMinor       BigInt
-  currency          String              @default("INR")
-  razorpayOrderId   String              @unique
-  razorpayPaymentId String?
-  status            BookingIntentStatus @default(PENDING)
-  sessionId         String?
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-
-  patient  User @relation("BookingIntentPatient", fields: [patientId], references: [id], onDelete: Cascade)
-  provider User @relation("BookingIntentProvider", fields: [providerId], references: [id], onDelete: Restrict)
-
-  @@index([patientId, status, createdAt])
-  @@index([providerId, scheduledAt])
-  @@index([scheduledAt])
-  @@map("session_booking_intents")
-}
-
-// Smart Match appointment request: patient submits availability, system matches up to 3 providers
-model AppointmentRequest {
-  id                    String                    @id @default(uuid())
-  patientId             String
-  // Availability preferences (JSON): { daysOfWeek: [0-6], timeSlots: [{ startMinute, endMinute }] }
-  availabilityPrefs     Json
-  // Array of provider objects: [{ providerId, status, rejectedAt?, acceptedAt? }]
-  providers             Json                      @default("[]")
-  acceptedProviderId    String?                   @map("accepted_provider_id")
-  scheduledAt           DateTime?                 @map("scheduled_at")
-  durationMinutes       Int                       @default(50) @map("duration_minutes")
-  preferredSpecialization String?                @map("preferred_specialization")
-  // Payment deadline = scheduledAt - 6 hours. Must pay by this to lock the session.
-  paymentDeadlineAt     DateTime?                 @map("payment_deadline_at")
-  // Razorpay payment fields (only created once provider accepts)
-  razorpayOrderId       String?                   @map("razorpay_order_id") @unique
-  razorpayPaymentId     String?                   @map("razorpay_payment_id")
-  amountMinor           BigInt?
-  currency              String                    @default("INR")
-  status                AppointmentRequestStatus  @default(PENDING)
-  // Expiry allows stale requests to be auto-cleaned (e.g. 24 hours if no provider accepts)
-  expiresAt             DateTime?                 @map("expires_at")
-  cancelledAt           DateTime?                 @map("cancelled_at")
-  createdAt             DateTime                  @default(now())
-  updatedAt             DateTime                  @updatedAt
-
-  patient  User @relation("AppointmentRequestPatient", fields: [patientId], references: [id], onDelete: Cascade)
-  acceptedProvider User? @relation("AppointmentRequestAcceptedProvider", fields: [acceptedProviderId], references: [id], onDelete: SetNull)
-
-  @@index([patientId, status, createdAt(sort: Desc)])
-  @@index([status, expiresAt])
-  @@index([acceptedProviderId])
-  @@map("appointment_requests")
-}
-
-model AIConversation {
-  id        String   @id @default(uuid())
-  userId    String
-  messages  Json
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, createdAt])
-  @@map("ai_conversations")
-}
-
-model AIDailyTokenUsage {
-  id         String   @id @default(uuid())
-  dayKey     String   @unique @map("day_key")
-  tokensUsed Int      @default(0) @map("tokens_used")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
-
-  @@index([dayKey], map: "ai_daily_token_usage_day_key_idx")
-  @@map("ai_daily_token_usage")
-}
-
-model ChatMessage {
-  messageId String   @id @default(uuid()) @map("message_id")
-  userId    String   @map("user_id")
-  role      String
-  content   String
-  timestamp DateTime @default(now())
-  botType   String   @map("bot_type")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, botType, timestamp(sort: Desc)], map: "chat_messages_user_bot_ts_idx")
-  @@index([userId, timestamp(sort: Desc)], map: "chat_messages_user_ts_idx")
-  @@map("chat_messages")
-}
-
-model PHQ9Assessment {
-  id           String   @id @default(uuid())
-  userId       String   @map("user_id")
-  answers      Int[]
-  totalScore   Int      @map("total_score")
-  q9Score      Int      @map("q9_score")
-  severity     String
-  riskWeight   Float    @map("risk_weight")
-  q9CrisisFlag Boolean  @default(false) @map("q9_crisis_flag")
-  assessedAt   DateTime @default(now()) @map("assessed_at")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-
-  user User @relation("UserPHQ9Assessments", fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, assessedAt(sort: Desc)], map: "phq9_assessments_user_ts_idx")
-  @@index([q9CrisisFlag, assessedAt(sort: Desc)], map: "phq9_assessments_q9_idx")
-  @@map("phq9_assessments")
-}
-
-model GAD7Assessment {
-  id         String   @id @default(uuid())
-  userId     String   @map("user_id")
-  answers    Int[]
-  totalScore Int      @map("total_score")
-  severity   String
-  riskWeight Float    @map("risk_weight")
-  assessedAt DateTime @default(now()) @map("assessed_at")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
-
-  user User @relation("UserGAD7Assessments", fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, assessedAt(sort: Desc)], map: "gad7_assessments_user_ts_idx")
-  @@map("gad7_assessments")
-}
-
-model RiskScore {
-  id                  String   @id @default(uuid())
-  userId              String   @map("user_id")
-  phq9Component       Float    @default(0) @map("phq9_component")
-  gad7Component       Float    @default(0) @map("gad7_component")
-  chatComponent       Float    @default(0) @map("chat_component")
-  behavioralComponent Float    @default(0) @map("behavioral_component")
-  compositeScore      Float    @default(0) @map("composite_score")
-  riskLevel           String   @map("risk_level")
-  source              String   @default("system")
-  metadata            Json?
-  evaluatedAt         DateTime @default(now()) @map("evaluated_at")
-  createdAt           DateTime @default(now()) @map("created_at")
-  updatedAt           DateTime @updatedAt @map("updated_at")
-
-  user User @relation("UserRiskScores", fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, evaluatedAt(sort: Desc)], map: "risk_scores_user_ts_idx")
-  @@index([riskLevel, evaluatedAt(sort: Desc)], map: "risk_scores_level_ts_idx")
-  @@map("risk_scores")
-}
-
-model CrisisEscalation {
-  id                 String    @id @default(uuid())
-  userId             String    @map("user_id")
-  riskScoreId        String?   @map("risk_score_id")
-  riskLevel          String    @map("risk_level")
-  status             String    @default("OPEN")
-  reason             String?
-  opsAlertedAt       DateTime? @map("ops_alerted_at")
-  patientShownAt     DateTime? @map("patient_shown_at")
-  therapistAlertedAt DateTime? @map("therapist_alerted_at")
-  backupAlertedAt    DateTime? @map("backup_alerted_at")
-  therapistAckAt     DateTime? @map("therapist_ack_at")
-  therapistId        String?   @map("therapist_id")
-  backupTherapistId  String?   @map("backup_therapist_id")
-  payload            Json?
-  createdAt          DateTime  @default(now()) @map("created_at")
-  updatedAt          DateTime  @updatedAt @map("updated_at")
-
-  user User @relation("UserCrisisEscalations", fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, status, createdAt(sort: Desc)], map: "crisis_escalations_user_status_idx")
-  @@index([riskLevel, status, createdAt(sort: Desc)], map: "crisis_escalations_level_status_idx")
-  @@map("crisis_escalations")
-}
-
-model MoodLog {
-  id        String   @id @default(uuid())
-  userId    String   @map("user_id")
-  moodValue Int      @map("mood_value")
-  note      String?
-  source    String   @default("manual")
-  loggedAt  DateTime @default(now()) @map("logged_at")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  user User @relation("UserMoodLogs", fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, loggedAt(sort: Desc)], map: "mood_logs_user_ts_idx")
-  @@map("mood_logs")
-}
-
-model ChatAnalysis {
-  id             String   @id @default(uuid())
-  userId         String   @map("user_id")
-  botType        String   @map("bot_type")
-  messageContent String   @map("message_content")
-  sentimentScore Float    @default(0) @map("sentiment_score")
-  crisisRisk     Float    @default(0) @map("crisis_risk")
-  crisisIntent   Boolean  @default(false) @map("crisis_intent")
-  urgencyLevel   String   @default("LOW") @map("urgency_level")
-  detectedThemes String[] @default([]) @map("detected_themes")
-  fallbackUsed   Boolean  @default(false) @map("fallback_used")
-  analysisJson   Json     @map("analysis_json")
-  createdAt      DateTime @default(now()) @map("created_at")
-
-  user User @relation("UserChatAnalyses", fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, createdAt(sort: Desc)], map: "chat_analyses_user_ts_idx")
-  @@index([urgencyLevel, createdAt(sort: Desc)], map: "chat_analyses_urgency_ts_idx")
-  @@map("chat_analyses")
-}
-
-model MoodPrediction {
-  id                 String    @id @default(uuid())
-  userId             String    @map("user_id")
-  batchDate          DateTime? @map("batch_date")
-  predictionDate     DateTime  @map("prediction_date")
-  predictedMood      Float     @map("predicted_mood")
-  day1Predicted      Float?    @map("day1_predicted")
-  day2Predicted      Float?    @map("day2_predicted")
-  day3Predicted      Float?    @map("day3_predicted")
-  day4Predicted      Float?    @map("day4_predicted")
-  day5Predicted      Float?    @map("day5_predicted")
-  day6Predicted      Float?    @map("day6_predicted")
-  day7Predicted      Float?    @map("day7_predicted")
-  confidencePct      Float     @map("confidence_pct")
-  trendDirection     String    @map("trend_direction")
-  deteriorationAlert Boolean   @default(false) @map("deterioration_alert")
-  factorAnalysis     Json?     @map("factor_analysis")
-  influencingFactors Json?     @map("influencing_factors")
-  actualMood         Float?    @map("actual_mood")
-  maeSnapshot        Float?    @map("mae_snapshot")
-  accuracyWithin2Pct Float?    @map("accuracy_within_2_pct")
-  createdAt          DateTime  @default(now()) @map("created_at")
-  updatedAt          DateTime  @updatedAt @map("updated_at")
-
-  user User @relation("UserMoodPredictions", fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, predictionDate], map: "mood_predictions_user_date_uq")
-  @@index([userId, predictionDate(sort: Desc)], map: "mood_predictions_user_date_idx")
-  @@map("mood_predictions")
-}
-
-model Notification {
-  id          String    @id @default(uuid())
-  userId      String
-  type        String
-  title       String
-  message     String
-  payload     Json?
-  isRead      Boolean   @default(false)
-  scheduledAt DateTime?
-  sentAt      DateTime?
-  createdAt   DateTime  @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, isRead, createdAt])
-  @@index([scheduledAt])
-  @@map("notifications")
-}
-
-// ============ SESSION TEMPLATES LIBRARY ============
-
-// ============ AUDIT & COMPLIANCE ============
-
-model SessionAuditLog {
-  id         String  @id @default(cuid())
-  sessionId  String?
-  userId     String?
-  action     String // "CREATED", "UPDATED", "DELETED", "PUBLISHED"
-  entityType String // "SESSION_TEMPLATE", "PATIENT_SESSION", "RESPONSE"
-  entityId   String
-  changes    Json? // Diff of what changed
-  ipAddress  String?
-
-  createdAt DateTime @default(now())
-
-  @@index([sessionId])
-  @@index([userId])
-  @@index([action])
-  @@index([createdAt])
-  @@map("session_audit_logs")
-}
-
-// ============ PRESENCE TRACKING ============
-
-model SessionPresence {
-  id          String   @id @default(cuid())
-  sessionId   String
-  userId      String
-  role        UserRole
-  status      String   @default("OFFLINE")
-  lastSeenAt  DateTime @default(now())
-  clientCount Int      @default(0)
-  updatedAt   DateTime @updatedAt
-
-  @@unique([sessionId, userId, role])
-  @@index([sessionId])
-  @@index([userId])
-  @@map("session_presence")
-}
-
-// Export logs for audit trail when therapists export session data
-model ExportLog {
-  id          String   @id @default(cuid())
-  therapistId String
-  sessionId   String
-  exportType  String
-  ipAddress   String?
-  userAgent   String?
-  createdAt   DateTime @default(now())
-
-  @@index([therapistId])
-  @@index([sessionId])
-  @@index([createdAt])
-  @@map("export_logs")
 }
 
 enum FinancialSessionStatus {
@@ -1289,412 +1787,6 @@ enum LeadPaymentStatus {
   FAILED
 }
 
-model FinancialSession {
-  id                  String                 @id @default(uuid())
-  patientId           String
-  providerId          String
-  status              FinancialSessionStatus @default(PENDING_PAYMENT)
-  expectedAmountMinor BigInt
-  currency            String                 @default("INR")
-  idempotencyKey      String                 @unique
-  razorpayOrderId     String?                @unique
-  confirmedAt         DateTime?
-  completedAt         DateTime?
-  expiredAt           DateTime?
-  createdAt           DateTime               @default(now())
-  updatedAt           DateTime               @updatedAt
-
-  patient            User                @relation("FinancialPatient", fields: [patientId], references: [id], onDelete: Restrict)
-  provider           User                @relation("FinancialProvider", fields: [providerId], references: [id], onDelete: Restrict)
-  payments           FinancialPayment[]  @relation("SessionPayments")
-  walletTransactions WalletTransaction[] @relation("SessionWalletTransactions")
-  revenueLedger      RevenueLedger[]     @relation("SessionRevenueLedger")
-
-  @@index([patientId, status])
-  @@index([providerId, status])
-  @@index([createdAt])
-  @@map("financial_sessions")
-}
-
-model Lead {
-  id                     String            @id @default(uuid())
-  patientId              String
-  providerId             String?
-  status                 LeadStatus        @default(AVAILABLE)
-  channel                LeadChannel       @default(CONSUMER)
-  tier                   LeadTier?
-  matchScore             Int?
-  amountMinor            BigInt
-  currency               String            @default("INR")
-  previewData            Json?
-  visibleAt              DateTime?
-  patientAcceptanceUntil DateTime?
-  providerContactedAt    DateTime?
-  purchasedAt            DateTime?
-  acceptedAt             DateTime?
-  expiresAt              DateTime?
-  paymentStatus          LeadPaymentStatus @default(NOT_REQUIRED)
-  razorpayOrderId        String?           @unique
-  razorpayPaymentId      String?           @unique
-  paymentCapturedAt      DateTime?
-  idempotencyKey         String?           @unique
-  createdAt              DateTime          @default(now())
-  updatedAt              DateTime          @updatedAt
-
-  patient  User  @relation("LeadPatient", fields: [patientId], references: [id], onDelete: Restrict)
-  provider User? @relation("LeadProvider", fields: [providerId], references: [id], onDelete: Restrict)
-
-  @@index([status, createdAt(sort: Desc)])
-  @@index([providerId, status])
-  @@index([providerId, paymentStatus])
-  @@index([providerId, status, visibleAt])
-  @@index([patientId, status])
-  @@index([channel, tier, visibleAt])
-  @@index([patientAcceptanceUntil])
-  @@map("leads")
-}
-
-model FinancialPayment {
-  id                    String                 @id @default(uuid())
-  sessionId             String
-  providerId            String
-  providerGateway       String                 @default("RAZORPAY")
-  razorpayOrderId       String                 @unique
-  razorpayPaymentId     String?                @unique
-  status                FinancialPaymentStatus @default(INITIATED)
-  paymentType           FinancialPaymentType   @default(PROVIDER_FEE)
-  amountMinor           BigInt
-  currency              String                 @default("INR")
-  therapistShareMinor   BigInt                 @default(0)
-  platformShareMinor    BigInt                 @default(0)
-  captureIdempotencyKey String?                @unique
-  capturedAt            DateTime?
-  failedAt              DateTime?
-  failureReason         String?
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
-
-  session            FinancialSession    @relation("SessionPayments", fields: [sessionId], references: [id], onDelete: Restrict)
-  wallet             ProviderWallet      @relation("WalletPayments", fields: [providerId], references: [providerId], onDelete: Restrict)
-  revenueLedger      RevenueLedger[]     @relation("PaymentRevenueLedger")
-  walletTransactions WalletTransaction[] @relation("PaymentWalletTransactions")
-
-  @@index([sessionId, status])
-  @@index([providerId, status])
-  @@index([paymentType, status])
-  @@index([razorpayOrderId])
-  @@index([createdAt])
-  @@map("financial_payments")
-}
-
-model ProviderWallet {
-  providerId            String    @id
-  pendingBalanceMinor   BigInt    @default(0)
-  availableBalanceMinor BigInt    @default(0)
-  lifetimeEarningsMinor BigInt    @default(0)
-  isFrozen              Boolean   @default(false)
-  frozenReason          String?
-  frozenAt              DateTime?
-  version               Int       @default(1)
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
-
-  provider     User                @relation("ProviderWalletOwner", fields: [providerId], references: [id], onDelete: Restrict)
-  transactions WalletTransaction[] @relation("WalletTransactions")
-  payouts      PayoutRequest[]     @relation("WalletPayouts")
-  payments     FinancialPayment[]  @relation("WalletPayments")
-
-  @@index([isFrozen])
-  @@index([updatedAt])
-  @@map("provider_wallets")
-}
-
-model WalletTransaction {
-  id                 String          @id @default(uuid())
-  providerId         String
-  walletTxnType      WalletTxnType
-  status             WalletTxnStatus @default(POSTED)
-  amountMinor        BigInt
-  currency           String          @default("INR")
-  balanceBeforeMinor BigInt
-  balanceAfterMinor  BigInt
-  sessionId          String?
-  paymentId          String?
-  payoutRequestId    String?
-  revenueLedgerId    String?
-  referenceKey       String?         @unique
-  metadata           Json?
-  createdAt          DateTime        @default(now())
-
-  wallet  ProviderWallet    @relation("WalletTransactions", fields: [providerId], references: [providerId], onDelete: Restrict)
-  session FinancialSession? @relation("SessionWalletTransactions", fields: [sessionId], references: [id], onDelete: Restrict)
-  payment FinancialPayment? @relation("PaymentWalletTransactions", fields: [paymentId], references: [id], onDelete: Restrict)
-  payout  PayoutRequest?    @relation("PayoutWalletTransactions", fields: [payoutRequestId], references: [id], onDelete: Restrict)
-  revenue RevenueLedger?    @relation("RevenueWalletTransactions", fields: [revenueLedgerId], references: [id], onDelete: Restrict)
-
-  @@index([providerId, createdAt(sort: Desc)])
-  @@index([walletTxnType, createdAt(sort: Desc)])
-  @@index([sessionId])
-  @@index([paymentId])
-  @@index([payoutRequestId])
-  @@map("wallet_transactions")
-}
-
-model PayoutRequest {
-  id                     String       @id @default(uuid())
-  providerId             String
-  amountMinor            BigInt
-  currency               String       @default("INR")
-  status                 PayoutStatus @default(REQUESTED)
-  minWithdrawalRuleMinor BigInt       @default(10000)
-  requestedAt            DateTime     @default(now())
-  approvedAt             DateTime?
-  paidAt                 DateTime?
-  rejectedAt             DateTime?
-  approvedByAdminId      String?
-  rejectedByAdminId      String?
-  rejectionReason        String?
-  bankReference          String?      @unique
-  idempotencyKey         String       @unique
-
-  provider           ProviderWallet      @relation("WalletPayouts", fields: [providerId], references: [providerId], onDelete: Restrict)
-  walletTransactions WalletTransaction[] @relation("PayoutWalletTransactions")
-
-  @@index([providerId, status, requestedAt(sort: Desc)])
-  @@index([status, requestedAt(sort: Desc)])
-  @@map("payout_requests")
-}
-
-model MarketplaceSubscription {
-  id                     String             @id @default(uuid())
-  userId                 String
-  domain                 SubscriptionDomain
-  plan                   SubscriptionPlan
-  status                 SubscriptionStatus @default(PAST_DUE)
-  providerGateway        String             @default("RAZORPAY")
-  razorpaySubscriptionId String             @unique
-  razorpayPlanId         String
-  currentPeriodStart     DateTime?
-  currentPeriodEnd       DateTime?
-  nextBillingDate        DateTime?
-  cancelledAt            DateTime?
-  expiredAt              DateTime?
-  createdAt              DateTime           @default(now())
-  updatedAt              DateTime           @updatedAt
-
-  user          User                  @relation("UserSubscriptions", fields: [userId], references: [id], onDelete: Restrict)
-  invoices      SubscriptionInvoice[] @relation("SubscriptionInvoices")
-  revenueLedger RevenueLedger[]       @relation("SubscriptionRevenueLedger")
-
-  @@index([userId, domain, status])
-  @@index([status, nextBillingDate])
-  @@index([createdAt])
-  @@map("marketplace_subscriptions")
-}
-
-model SubscriptionInvoice {
-  id                String    @id @default(uuid())
-  subscriptionId    String
-  razorpayPaymentId String?   @unique
-  amountMinor       BigInt
-  currency          String    @default("INR")
-  billedAt          DateTime
-  nextBillingDate   DateTime?
-  createdAt         DateTime  @default(now())
-
-  subscription MarketplaceSubscription @relation("SubscriptionInvoices", fields: [subscriptionId], references: [id], onDelete: Restrict)
-
-  @@index([subscriptionId, billedAt(sort: Desc)])
-  @@map("subscription_invoices")
-}
-
-model PatientSubscription {
-  id           String   @id @default(uuid())
-  userId       String   @unique
-  planName     String
-  price        Int
-  billingCycle String
-  status       String
-  autoRenew    Boolean  @default(true)
-  renewalDate  DateTime
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([status])
-  @@map("patient_subscriptions")
-}
-
-model PatientPaymentMethod {
-  id          String   @id @default(uuid())
-  userId      String   @unique
-  cardLast4   String
-  cardBrand   String
-  expiryMonth Int
-  expiryYear  Int
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("patient_payment_methods")
-}
-
-model PatientInvoice {
-  id         String   @id @default(uuid())
-  userId     String
-  amount     Int
-  status     String
-  invoiceUrl String?
-  createdAt  DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, createdAt])
-  @@map("patient_invoices")
-}
-
-model PatientExercise {
-  id         String   @id @default(uuid())
-  patientId  String
-  title      String
-  assignedBy String
-  duration   Int
-  status     String
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  // NOTE: assignedBy is currently mock therapist reference.
-  // Replace with real therapist relation once therapist module is built.
-  patient PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
-
-  @@index([patientId, status])
-  @@map("patient_exercises")
-}
-
-model PatientProgress {
-  id                 String   @id @default(uuid())
-  patientId          String   @unique
-  sessionsCompleted  Int      @default(0)
-  totalSessions      Int      @default(0)
-  exercisesCompleted Int      @default(0)
-  totalExercises     Int      @default(0)
-  phqStart           Int?
-  phqCurrent         Int?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-
-  patient PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
-
-  @@map("patient_progress")
-}
-
-model RevenueLedger {
-  id                      String                @id @default(uuid())
-  type                    RevenueType
-  grossAmountMinor        BigInt
-  platformCommissionMinor BigInt
-  providerShareMinor      BigInt
-  paymentType             FinancialPaymentType?
-  taxAmountMinor          BigInt                @default(0)
-  currency                String                @default("INR")
-  referenceId             String
-  paymentId               String?
-  sessionId               String?
-  subscriptionId          String?
-  createdAt               DateTime              @default(now())
-
-  payment            FinancialPayment?        @relation("PaymentRevenueLedger", fields: [paymentId], references: [id], onDelete: Restrict)
-  session            FinancialSession?        @relation("SessionRevenueLedger", fields: [sessionId], references: [id], onDelete: Restrict)
-  subscription       MarketplaceSubscription? @relation("SubscriptionRevenueLedger", fields: [subscriptionId], references: [id], onDelete: Restrict)
-  walletTransactions WalletTransaction[]      @relation("RevenueWalletTransactions")
-
-  @@index([type, createdAt(sort: Desc)])
-  @@index([referenceId, createdAt(sort: Desc)])
-  @@index([sessionId])
-  @@index([subscriptionId])
-  @@map("revenue_ledger")
-}
-
-model WebhookLog {
-  id               String               @id @default(uuid())
-  provider         WebhookProvider      @default(RAZORPAY)
-  eventId          String
-  eventType        String
-  payloadHash      String
-  signature        String
-  isSignatureValid Boolean
-  processStatus    WebhookProcessStatus @default(RECEIVED)
-  firstSeenAt      DateTime             @default(now())
-  processedAt      DateTime?
-  errorMessage     String?
-  sessionId        String?
-  subscriptionId   String?
-  rawPayload       Json
-
-  @@unique([provider, eventId])
-  @@index([eventType, processStatus])
-  @@index([firstSeenAt])
-  @@map("webhook_logs")
-}
-
-model FinancialAuditLog {
-  id         String                  @id @default(uuid())
-  actorType  FinancialAuditActorType
-  actorId    String?
-  action     String
-  entityType String
-  entityId   String
-  reason     String?
-  beforeJson Json?
-  afterJson  Json?
-  traceId    String?
-  createdAt  DateTime                @default(now())
-
-  actor User? @relation("UserFinancialAudits", fields: [actorId], references: [id], onDelete: Restrict)
-
-  @@index([entityType, entityId, createdAt(sort: Desc)])
-  @@index([actorType, createdAt(sort: Desc)])
-  @@index([traceId])
-  @@map("financial_audit_logs")
-}
-
-model Certification {
-  id                 String             @id @default(uuid())
-  slug               String             @unique
-  code               String             @unique
-  title              String
-  shortTitle         String?
-  subtitle           String
-  level              CertificationLevel
-  levelBadge         String
-  journeyDescription String
-  durationLabel      String
-  investmentLabel    String
-  monthlyIncomeLabel String?
-  modulesCount       Int?
-  deliveryMode       String?
-  sessionRateLabel   String?
-  outcomeLabel       String?
-  prerequisitesLabel String
-  primaryCtaLabel    String
-  secondaryCtaLabel  String             @default("Learn More")
-  isInvitationOnly   Boolean            @default(false)
-  enrollmentOpen     Boolean            @default(true)
-  sortOrder          Int                @default(100)
-  isActive           Boolean            @default(true)
-  metadata           Json?
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-
-  @@index([level, sortOrder])
-  @@index([isActive, sortOrder])
-  @@map("certifications")
-}
-
-// ============ THERAPY PLANS (Guided Recovery) ============
-
 enum PlanActivityFrequency {
   DAILY_RITUAL
   WEEKLY_MILESTONE
@@ -1710,182 +1802,110 @@ enum PlanActivityType {
   SESSION_BOOKING
 }
 
-model TherapyPlan {
-  id          String  @id @default(uuid())
-  patientId   String
-  therapistId String?
-
-  title        String
-  providerNote String?
-
-  startDate DateTime
-  endDate   DateTime
-  status    String   @default("ACTIVE")
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  patient    PatientProfile        @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  therapist  User?                 @relation("TherapistPlans", fields: [therapistId], references: [id], onDelete: SetNull)
-  activities TherapyPlanActivity[]
-
-  @@index([patientId, status])
-  @@map("therapy_plans")
-}
-
-model TherapyPlanActivity {
-  id     String @id @default(uuid())
-  planId String
-
-  title        String
-  frequency    PlanActivityFrequency @default(ONE_TIME)
-  activityType PlanActivityType
-
-  referenceId String?
-
-  estimatedMinutes Int? @default(5)
-  orderIndex       Int  @default(0)
-  weekNumber       Int  @default(1)
-  isPublished      Boolean @default(false)
-  category         String?
-
-  status      String    @default("PENDING")
-  completedAt DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  plan TherapyPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
-
-  @@index([planId])
-  @@map("therapy_plan_activities")
-}
-
-model Prescription {
-  id               String   @id @default(uuid())
-  patientId        String   @map("patient_id")
-  providerId       String   @map("provider_id")
-  drugName         String   @map("drug_name")
-  dosage           String
-  instructions     String
-  prescribedDate   DateTime @default(now()) @map("prescribed_date")
-  refillsRemaining Int      @default(0) @map("refills_remaining")
-  status           String   @default("ACTIVE")
-  adherenceRate    Int      @default(0) @map("adherence_rate")
-  warnings         String[] @default([])
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
-
-  patient  User @relation("PrescriptionPatient", fields: [patientId], references: [id], onDelete: Cascade)
-  provider User @relation("PrescriptionProvider", fields: [providerId], references: [id], onDelete: Cascade)
-
-  @@index([patientId, status])
-  @@index([providerId, status])
-  @@map("prescriptions")
-}
-
-model LabOrder {
-  id                String   @id @default(uuid())
-  patientId         String   @map("patient_id")
-  providerId        String   @map("provider_id")
-  testName          String   @map("test_name")
-  dateOrdered       DateTime @default(now()) @map("date_ordered")
-  status            String   @default("PENDING")
-  orderingPhysician String   @map("ordering_physician")
-  interpretation    String
-  biomarkers        Json
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
-
-  patient  User @relation("LabOrderPatient", fields: [patientId], references: [id], onDelete: Cascade)
-  provider User @relation("LabOrderProvider", fields: [providerId], references: [id], onDelete: Cascade)
-
-  @@index([patientId, status])
-  @@index([providerId, status])
-  @@map("lab_orders")
-}
-
-model Goal {
+model PatientPlanConfig {
   id          String   @id @default(uuid())
-  patientId   String   @map("patient_id")
-  providerId  String   @map("provider_id")
-  title       String
-  category    String?
-  status      String   @default("IN_PROGRESS")
-  startDate   DateTime @default(now()) @map("start_date")
-  completedAt DateTime? @map("completed_at")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  key         String   @unique
+  name        String
+  price       Int
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  patient  User @relation("GoalPatient", fields: [patientId], references: [id], onDelete: Cascade)
-  provider User @relation("GoalProvider", fields: [providerId], references: [id], onDelete: Cascade)
+  @@map("patient_plan_configs")
+}
 
-  @@index([patientId, status])
+enum ProviderPlan {
+  free
+  basic
+  standard
+  premium
+}
+
+model ProviderSubscription {
+  id            String       @id @default(uuid())
+  providerId    String       @unique
+  plan          ProviderPlan
+  price         Int
+  leadsPerWeek  Int
+  startDate     DateTime     @default(now())
+  expiryDate    DateTime
+  status        String       // "active" | "expired" | "cancelled"
+  autoRenew     Boolean      @default(false)
+  paymentId     String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  provider      User         @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@map("provider_subscriptions")
+}
+
+model LeadPurchase {
+  id          String   @id @default(uuid())
+  providerId  String
+  leadId      String
+  price       Int
+  discount    Int      @default(0)
+  finalPrice  Int
+  status      String   // "pending" | "success" | "failed"
+  paymentId   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
   @@index([providerId, status])
-  @@map("goals")
+  @@index([leadId])
+  @@unique([providerId, leadId])
+  @@map("lead_purchases")
 }
 
-// ─── Direct Provider ↔ Patient Messaging ────────────────────────────────────
+model ProviderPlanConfig {
+  id        String   @id @default(uuid())
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-model DirectConversation {
-  id              String    @id @default(uuid())
-  patientId       String
-  providerId      String
-  isSupport       Boolean   @default(false)
-  lastMessageAt   DateTime?
-  lastMessageText String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-
-  patient  User            @relation("DirectConversationPatient",  fields: [patientId],  references: [id], onDelete: Cascade)
-  provider User            @relation("DirectConversationProvider", fields: [providerId], references: [id], onDelete: Cascade)
-  messages DirectMessage[]
-
-  @@unique([patientId, providerId])
-  @@index([patientId,  lastMessageAt(sort: Desc)])
-  @@index([providerId, lastMessageAt(sort: Desc)])
-  @@map("direct_conversations")
+  @@map("provider_plan_configs")
 }
 
-model DirectMessage {
-  id             String    @id @default(uuid())
-  conversationId String
-  senderId       String
-  senderRole     String    // patient | provider | system
-  content        String
-  messageType    String    @default("TEXT") // TEXT | SYSTEM | ASSESSMENT | SESSION_SUMMARY
-  metadata       Json?
-  readAt         DateTime?
-  createdAt      DateTime  @default(now())
+model SystemStatus {
+  id         Int       @id @default(1)
+  isLive     Boolean   @default(false)
+  launchedBy String?
+  launchedAt DateTime?
 
-  conversation DirectConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender       User               @relation("DirectMessageSender", fields: [senderId], references: [id], onDelete: Cascade)
-
-  @@index([conversationId, createdAt(sort: Desc)])
-  @@index([senderId])
-  @@map("direct_messages")
+  @@map("system_status")
 }
 
-model DailyCheckIn {
-  id             String   @id @default(uuid())
-  patientId      String   @map("patient_id")
-  date           DateTime @map("date")
-  type           String   // "MORNING" | "EVENING"
-  mood           Int      // 1-5 scale
-  energy         Int?     // 1-5 scale (morning only)
-  sleep          Int?     // 1-5 scale (morning only)
-  context        String[] @default([]) // context tags (morning only)
-  intention      String?  // daily intention (morning only)
-  reflectionGood String?  // what went well (evening only)
-  reflectionBad  String?  // what was challenging (evening only)
-  stressLevel    Int?     // 1-5 scale (evening only)
-  gratitude      String?  // gratitude note (evening only)
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+model SSOTenant {
+  id              Int      @id @default(autoincrement())
+  key             String   @unique
+  name            String
+  provider        String
+  issuer          String?
+  clientId        String?  @map("client_id")
+  clientSecret    String?  @map("client_secret")
+  metadataUrl     String?  @map("metadata_url")
+  allowedDomains  String[] @map("allowed_domains")
+  config          Json?
+  enabled         Boolean  @default(true)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @default(now()) @map("updated_at")
+  ownerCompanyKey String?  @map("owner_company_key")
 
-  patient User @relation("UserDailyCheckIns", fields: [patientId], references: [id], onDelete: Cascade)
-
-  @@unique([patientId, date, type], map: "daily_checkins_patient_date_type_uq")
-  @@index([patientId, date(sort: Desc)], map: "daily_checkins_patient_date_idx")
-  @@map("daily_checkins")
+  @@map("sso_tenants")
 }
+
+model SSOIdentity {
+  id              Int      @id @default(autoincrement())
+  userId          String   @map("user_id")
+  tenantKey       String   @map("tenant_key")
+  provider        String
+  providerSubject String   @map("provider_subject")
+  email           String?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @default(now()) @map("updated_at")
+
+  @@unique([tenantKey, provider, providerSubject])
+  @@map("sso_identities")
+}
+

@@ -8,6 +8,11 @@ import { analyticsService } from './analytics.service';
 import { transcribeSession } from './aiService';
 import { createClient } from 'redis';
 import { env } from '../config/env';
+import PDFDocument from 'pdfkit';
+import path from 'path';
+import fs from 'fs';
+import { s3Client } from './s3.service';
+import { PutObjectCommand, ServerSideEncryption } from '@aws-sdk/client-s3';
 
 const db = prisma as any;
 
@@ -715,6 +720,123 @@ export const saveMyTherapistSessionNote = async (
 		},
 		updatedAt: updated.updatedAt,
 	};
+};
+
+/**
+ * Generates and uploads a PDF document for a signed therapist session note.
+ * Pulls patientId (User UUID) from the database to ensure correct folder mapping.
+ */
+export const uploadSessionDocument = async (noteId: string) => {
+	const note = await prisma.therapistSessionNote.findUnique({
+		where: { id: noteId },
+		include: {
+			patient: {
+				select: {
+					userId: true,
+				},
+			},
+			therapist: {
+				select: {
+					firstName: true,
+					lastName: true,
+					name: true,
+				},
+			},
+			session: {
+				select: {
+					dateTime: true,
+					durationMinutes: true,
+				},
+			},
+		},
+	});
+
+	if (!note) return;
+	if (String(note.status || '').toLowerCase() !== 'signed') return;
+
+	try {
+		const doc = new PDFDocument({ margin: 50 });
+		const fileName = `note-${note.id}-${Date.now()}.pdf`;
+		const exportDir = path.join(process.cwd(), 'exports', 'notes');
+		await fs.promises.mkdir(exportDir, { recursive: true });
+		const tmpPath = path.join(exportDir, fileName);
+		const stream = fs.createWriteStream(tmpPath);
+
+		doc.pipe(stream);
+		doc.fontSize(20).text('Clinical Note', { align: 'center' });
+		doc.moveDown();
+
+		const providerName = `${note.therapist.firstName || ''} ${note.therapist.lastName || ''}`.trim() || note.therapist.name || 'Provider';
+		doc.fontSize(12).text(`Therapist: ${providerName}`);
+		doc.text(`Patient ID: ${note.patientId}`);
+		doc.text(`Session Date: ${note.session.dateTime.toISOString()}`);
+		doc.moveDown();
+
+		doc.fontSize(12).text('Subjective');
+		doc.fontSize(10).text(note.subjective || '');
+		doc.moveDown();
+
+		doc.fontSize(12).text('Objective');
+		doc.fontSize(10).text(note.objective || '');
+		doc.moveDown();
+
+		doc.fontSize(12).text('Assessment');
+		doc.fontSize(10).text(note.assessment || '');
+		doc.moveDown();
+
+		doc.fontSize(12).text('Plan');
+		doc.fontSize(10).text(note.plan || '');
+		doc.end();
+
+		await new Promise<void>((resolve, reject) => {
+			stream.on('finish', () => resolve());
+			stream.on('error', (err) => reject(err));
+		});
+
+		const buffer = await fs.promises.readFile(tmpPath);
+
+		// Pull the User UUID (patientUserId) from the patient profile relation
+		const patientUserId = note.patient.userId;
+		const objectKey = `patient-documents/${patientUserId}/${fileName}`;
+
+		await s3Client.send(new PutObjectCommand({
+			Bucket: env.awsS3Bucket,
+			Key: objectKey,
+			Body: buffer,
+			ContentType: 'application/pdf',
+			ServerSideEncryption: env.awsS3DisableServerSideEncryption ? undefined : ('AES256' as ServerSideEncryption),
+		}));
+
+		const createdDoc = await prisma.patientDocument.create({
+			data: {
+				patientId: patientUserId,
+				title: `Signed Note — ${note.sessionType}`,
+				source: 'session-note',
+				sourceId: note.id,
+				s3ObjectKey: objectKey,
+			},
+		});
+
+		// Trigger real-time notification
+		try {
+			const { notifyPatientDocument } = await import('../routes/gps.routes');
+			notifyPatientDocument(patientUserId, {
+				id: createdDoc.id,
+				title: createdDoc.title,
+				date: createdDoc.createdAt,
+				category: 'session',
+				s3ObjectKey: createdDoc.s3ObjectKey,
+			});
+		} catch (e) {
+			console.warn('Real-time notify failed', e);
+		}
+
+		// Cleanup local tmp file
+		await fs.promises.unlink(tmpPath).catch(() => {});
+	} catch (e) {
+		console.error('Session note PDF generation/upload failed:', e);
+		throw e;
+	}
 };
 
 export const addResponseNote = async (

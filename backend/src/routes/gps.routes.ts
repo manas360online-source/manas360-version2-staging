@@ -1,3 +1,10 @@
+// Notify provider of new lab upload
+export function notifyProviderLabUpload(providerId: string, payload: any) {
+  const io = require('../socket').io;
+  const room = `inbox:${providerId}`;
+  io.to(room).emit('provider:lab-upload', payload);
+  console.log('notifyProviderLabUpload ->', { room, payloadPreview: { documentId: payload.documentId, patientId: payload.patientId, title: payload.title } });
+}
 /**
  * GPS Meter REST routes
  * POST   /v1/gps/sessions/:sessionId/start    – therapist starts GPS monitoring
@@ -39,6 +46,18 @@ const db = prisma as any;
 let _io: IOServer | null = null;
 export function setSocketIO(io: IOServer): void {
   _io = io;
+}
+
+// Notify patient inbox about a newly created document
+export function notifyPatientDocument(patientId: string, payload: Record<string, any>): void {
+  try {
+    if (!_io) return;
+    const room = `inbox:${patientId}`;
+    console.log('notifyPatientDocument ->', { room, payloadPreview: { id: payload.id, title: payload.title } });
+    _io.to(room).emit('patient:document:new', payload);
+  } catch (e) {
+    console.warn('notifyPatientDocument failed', e);
+  }
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────

@@ -48,6 +48,7 @@ import { exportRateLimiter } from '../middleware/exportRateLimiter.middleware';
 import {
 	getMyTherapistDashboardController,
 	getMyTherapistMessagesController,
+	getMyTherapistPendingAppointmentRequestsController,
 	getMyTherapistPatientsController,
 	getMyTherapistPayoutHistoryController,
 	getMyTherapistSessionNotesController,
@@ -126,6 +127,7 @@ router.post('/me/sessions/:id/actions/remind', requireAuth, requireTherapistRole
 router.post('/me/sessions/:id/actions/start-live', requireAuth, requireTherapistRole, ...validateSessionIdParam, asyncHandler(startLiveSessionController));
 router.post('/me/appointments/propose-slot', requireAuth, requireTherapistRole, asyncHandler(therapistProposeAppointmentSlotController));
 // Smart Match appointment booking
+router.get('/me/appointments/pending', requireAuth, requireTherapistRole, asyncHandler(getMyTherapistPendingAppointmentRequestsController));
 router.post('/me/appointments/accept', requireAuth, requireTherapistRole, asyncHandler(acceptAppointmentController));
 router.post('/me/appointments/reject', requireAuth, requireTherapistRole, asyncHandler(rejectAppointmentController));
 // Analytics

@@ -460,12 +460,12 @@ export const getJourneyRecommendationController = async (req: Request, res: Resp
 };
 
 export const getMyTreatmentPlanController = async (req: Request, res: Response): Promise<void> => {
-	const weekRaw = req.query.week;
-	const week = weekRaw !== undefined ? Number(weekRaw) : undefined;
-	if (weekRaw !== undefined && (!Number.isInteger(week) || Number(week) <= 0)) {
-		throw new AppError('week must be a positive integer', 422);
+	const dayRaw = req.query.day;
+	const day = dayRaw !== undefined ? Number(dayRaw) : undefined;
+	if (dayRaw !== undefined && (!Number.isInteger(day) || Number(day) <= 0)) {
+		throw new AppError('day must be a positive integer', 422);
 	}
-	const data = await getMyTreatmentPlan(authUserId(req), week);
+	const data = await getMyTreatmentPlan(authUserId(req), day);
 	sendSuccess(res, data, 'Treatment plan fetched');
 };
 
@@ -603,8 +603,31 @@ export const getPatientSubscriptionController = async (req: Request, res: Respon
 };
 
 export const upgradePatientSubscriptionController = async (req: Request, res: Response): Promise<void> => {
-	const data = await updatePatientSubscriptionPlan(authUserId(req), 'upgrade');
-	sendSuccess(res, data, 'Subscription upgraded');
+	const userId = authUserId(req);
+	const { planKey } = req.body;
+
+	if (!planKey) {
+		throw new AppError('planKey is required', 422);
+	}
+
+	const { getActivePlatformPlan } = await import('../services/pricing.service');
+	const plan = await getActivePlatformPlan(planKey);
+	
+	if (!plan) {
+		throw new AppError('Invalid plan key', 422);
+	}
+
+	// Free plan: activate immediately using legacy logic
+	if (plan.price === 0) {
+		const data = await updatePatientSubscriptionPlan(userId, 'upgrade');
+		sendSuccess(res, data, 'Free plan activated');
+		return;
+	}
+
+	// Paid plan: initiate PhonePe payment (supports dev bypass)
+	const { initiatePatientSubscriptionPayment } = await import('../services/patient-subscription-payment.service');
+	const data = await initiatePatientSubscriptionPayment(userId, planKey);
+	sendSuccess(res, data, 'Payment initiated');
 };
 
 export const downgradePatientSubscriptionController = async (req: Request, res: Response): Promise<void> => {

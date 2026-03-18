@@ -38,7 +38,7 @@ export default function AdminPricingManagementPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const [platformFee, setPlatformFee] = useState('199');
+  const [platformFee, setPlatformFee] = useState('99');
   const [surcharge, setSurcharge] = useState('20');
   const [sessionRows, setSessionRows] = useState<SessionEdit[]>([]);
   const [bundleRows, setBundleRows] = useState<BundleEdit[]>([]);
@@ -51,7 +51,7 @@ export default function AdminPricingManagementPage() {
       const response = await getAdminPricingConfig();
       const data = response?.data;
       setConfig(data);
-      setPlatformFee(String(data?.platformFee?.monthlyFee ?? 199));
+      setPlatformFee(String(data?.platformFee?.monthlyFee ?? 99));
       setSurcharge(String(data?.surchargePercent ?? 20));
       setSessionRows(
         (data?.sessionPricing || []).map((row: AdminPricingSessionItem) => ({

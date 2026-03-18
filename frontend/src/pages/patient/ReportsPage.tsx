@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FileText, Download, Eye, Share2, ClipboardList, Activity, Pill, TrendingUp } from 'lucide-react';
 import { patientApi } from '../../api/patient';
+import toast from 'react-hot-toast';
 
 type ReportItem = {
   id: string;
@@ -78,6 +79,35 @@ export default function ReportsPage() {
     { key: 'assessment', label: 'Assessment' },
   ];
 
+  const handleAction = async (report: ReportItem, action: 'view' | 'download' | 'share') => {
+    if (report.id.startsWith('f')) {
+      toast.error('Sample reports cannot be accessed. Real reports will appear after your sessions.');
+      return;
+    }
+    try {
+      if (action === 'share') {
+        const res = await patientApi.createRecordShareLink(report.id);
+        const data = (res as any)?.data ?? res;
+        if (data.shareUrl) {
+          await navigator.clipboard.writeText(`Report: ${report.title}\nLink: ${data.shareUrl}\nPIN: ${data.pin}`);
+          toast.success('Share link and PIN copied to clipboard!');
+        }
+        return;
+      }
+
+      const res = await patientApi.getRecordSecureUrl(report.id);
+      const data = (res as any)?.data ?? res;
+      if (data.secureUrl) {
+        window.open(data.secureUrl, '_blank', 'noopener,noreferrer');
+      } else {
+        toast.error('Could not generate secure link');
+      }
+    } catch (e) {
+      console.error(`Report ${action} failed:`, e);
+      toast.error(`Failed to ${action} report`);
+    }
+  };
+
   return (
     <div className="mx-auto w-full max-w-[1400px] space-y-5 pb-20 lg:pb-6">
       {/* Header */}
@@ -91,6 +121,18 @@ export default function ReportsPage() {
             <p className="mt-1 text-sm text-charcoal/70">View, download, and share clinical progress reports.</p>
           </div>
         </div>
+      </section>
+
+      {/* Documents Link */}
+      <section className="rounded-xl border border-calm-sage/15 bg-white/90 p-4">
+        <p className="text-sm text-charcoal/70">Need complete documents and prescriptions?</p>
+        <Link
+          to="/patient/documents"
+          className="mt-2 inline-flex min-h-[34px] items-center gap-1.5 rounded-xl border border-calm-sage/25 px-3 text-xs font-medium text-charcoal/70 transition hover:bg-calm-sage/10"
+        >
+          <FileText className="h-3.5 w-3.5" />
+          Open Document Center
+        </Link>
       </section>
 
       {/* Stats */}
@@ -193,6 +235,7 @@ export default function ReportsPage() {
                 <div className="flex shrink-0 flex-wrap gap-2">
                   <button
                     type="button"
+                    onClick={() => handleAction(report, 'view')}
                     className="inline-flex min-h-[34px] items-center gap-1.5 rounded-xl border border-calm-sage/25 px-3 text-xs font-medium text-charcoal/70 transition hover:bg-calm-sage/10"
                   >
                     <Eye className="h-3.5 w-3.5" />
@@ -200,6 +243,7 @@ export default function ReportsPage() {
                   </button>
                   <button
                     type="button"
+                    onClick={() => handleAction(report, 'download')}
                     className="inline-flex min-h-[34px] items-center gap-1.5 rounded-xl border border-calm-sage/25 px-3 text-xs font-medium text-charcoal/70 transition hover:bg-calm-sage/10"
                   >
                     <Download className="h-3.5 w-3.5" />
@@ -207,6 +251,7 @@ export default function ReportsPage() {
                   </button>
                   <button
                     type="button"
+                    onClick={() => handleAction(report, 'share')}
                     className="inline-flex min-h-[34px] items-center gap-1.5 rounded-xl border border-calm-sage/25 px-3 text-xs font-medium text-charcoal/70 transition hover:bg-calm-sage/10"
                   >
                     <Share2 className="h-3.5 w-3.5" />
@@ -219,17 +264,6 @@ export default function ReportsPage() {
         })}
       </div>
 
-      {/* Documents Link */}
-      <section className="rounded-xl border border-calm-sage/15 bg-white/90 p-4">
-        <p className="text-sm text-charcoal/70">Need complete documents and prescriptions?</p>
-        <Link
-          to="/patient/documents"
-          className="mt-2 inline-flex min-h-[34px] items-center gap-1.5 rounded-xl border border-calm-sage/25 px-3 text-xs font-medium text-charcoal/70 transition hover:bg-calm-sage/10"
-        >
-          <FileText className="h-3.5 w-3.5" />
-          Open Document Center
-        </Link>
-      </section>
     </div>
   );
 }

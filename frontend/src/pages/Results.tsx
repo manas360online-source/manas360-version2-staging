@@ -127,7 +127,7 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({ data }) => {
             </button>
             
             <button
-              onClick={() => navigate('/auth/signup?next=/patient/assessments')}
+              onClick={() => navigate('/auth/signup?next=/patient/sessions')}
               className={`
                 group flex-1 min-h-[3rem] px-6
                 bg-white border-2 border-gentle-blue text-gentle-blue

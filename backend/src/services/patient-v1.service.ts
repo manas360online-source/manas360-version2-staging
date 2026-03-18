@@ -152,13 +152,13 @@ const isWithinProviderAvailability = (scheduledAt: Date, availability: Availabil
 	return startMinute >= daySlot.startMinute && endMinute <= daySlot.endMinute;
 };
 
-const mapMoodRow = (row: { id: string; mood: number; note?: string | null; created_at: Date | string }) => {
+const mapMoodRow = (row: { id: string; mood: number; note?: string | null; created_at: Date | string; metadata?: any }) => {
 	const parsed = parseDailyCheckInNote(row.note);
 	return {
 		id: row.id,
 		mood: Number(row.mood || 0),
 		note: parsed.journal,
-		metadata: parsed.metadata,
+		metadata: row.metadata || parsed.metadata,
 		created_at: row.created_at,
 	};
 };
@@ -454,7 +454,7 @@ export const getPatientDashboard = async (userId: string) => {
 	const patientProfile = await getPatientProfile(userId);
 	const now = new Date();
 
-	const [user, upcomingRaw, recentSessionsRaw, lastAssessment, recentMoodRaw, therapistUsers, exercises, progress] = await Promise.all([
+	const [user, upcomingRaw, recentSessionsRaw, lastAssessment, recentMoodRaw, therapistUsers, exercises, progress, recentPrescriptionsRaw] = await Promise.all([
 		db.user.findUnique({
 			where: { id: userId },
 			select: { id: true, name: true, firstName: true, lastName: true, email: true, role: true, createdAt: true },
@@ -529,6 +529,24 @@ export const getPatientDashboard = async (userId: string) => {
 				phqCurrent: true,
 			},
 		}).catch(() => null),
+		db.prescription.findMany({
+			where: { patientId: userId },
+			orderBy: { prescribedDate: 'desc' },
+			take: 5,
+			select: {
+				id: true,
+				drugName: true,
+				dosage: true,
+				prescribedDate: true,
+				provider: {
+					select: {
+						user: {
+							select: { firstName: true, lastName: true },
+						},
+					},
+				},
+			},
+		}).catch(() => []),
 	]);
 
 	const sessionProviderIds = Array.from(
@@ -605,6 +623,18 @@ export const getPatientDashboard = async (userId: string) => {
 			description: String(providerMap.get(String(session.therapistProfileId || '')) || 'Therapist'),
 			date: session.dateTime,
 		})),
+		...recentPrescriptionsRaw.slice(0, 3).map((prescription: any) => {
+			const providerName = prescription.provider
+				? `${prescription.provider.firstName || ''} ${prescription.provider.lastName || ''}`.trim()
+				: 'Provider';
+			return {
+				id: `prescription-${prescription.id}`,
+				type: 'prescription',
+				title: `Prescription issued: ${prescription.drugName}`,
+				description: `${prescription.dosage} • ${providerName}`,
+				date: prescription.prescribedDate,
+			};
+		}),
 		...recentMoodRaw.slice(0, 3).map((mood: any, index: number) => ({
 			id: `mood-${mood.id || mood.date || index}-${index}`,
 			type: 'mood',
@@ -697,8 +727,8 @@ const ensureSubscriptionRecord = async (userId: string) => {
 		subscription = await db.patientSubscription.create({
 			data: {
 				userId,
-				planName: activePlan.planName,
-				price: activePlan.monthlyFee,
+				planName: activePlan.name,
+				price: activePlan.price,
 				billingCycle: 'monthly',
 				status: 'inactive',
 				autoRenew: false,
@@ -717,8 +747,8 @@ const ensureSubscriptionRecord = async (userId: string) => {
 		subscription = await db.patientSubscription.update({
 			where: { userId },
 			data: {
-				planName: activePlan.planName,
-				price: activePlan.monthlyFee,
+				planName: activePlan.name,
+				price: activePlan.price,
 				renewalDate: nextRenewalDate,
 			},
 		}).catch(() => subscription);
@@ -728,9 +758,9 @@ const ensureSubscriptionRecord = async (userId: string) => {
 			 VALUES ($1, $2, $3, CURRENT_DATE, $4::date, 'active', $5, NOW(), NOW())`,
 			crypto.randomUUID(),
 			userId,
-			activePlan.id,
+			activePlan.key,
 			nextRenewalDate,
-			activePlan.monthlyFee,
+			activePlan.price,
 		).catch(() => null);
 	}
 	return subscription;
@@ -742,7 +772,7 @@ export const getPatientSubscription = async (userId: string) => {
 	const activePlan = await getActivePlatformPlan();
 	return {
 		...subscription,
-		nextRenewalPrice: activePlan.monthlyFee,
+		nextRenewalPrice: activePlan.price,
 		priceLockedUntil: subscription.renewalDate,
 	};
 };
@@ -759,12 +789,12 @@ export const updatePatientSubscriptionPlan = async (userId: string, action: 'upg
 		? Math.min(planOrder.length - 1, currentIndex + 1)
 		: Math.max(0, currentIndex - 1);
 	const nextPlan = planOrder[nextIndex];
-	const price = activePlan.monthlyFee;
+	const price = activePlan.price;
 
 	const updated = await db.patientSubscription.update({
 		where: { userId },
 		data: {
-			planName: activePlan.planName || `${nextPlan[0].toUpperCase()}${nextPlan.slice(1)} Plan`,
+			planName: activePlan.name || `${nextPlan[0].toUpperCase()}${nextPlan.slice(1)} Plan`,
 			price,
 			billingCycle: nextPlan === 'pro' ? 'yearly' : 'monthly',
 			status: 'active',
@@ -803,8 +833,8 @@ export const reactivatePatientSubscription = async (userId: string) => {
 	const updated = await db.patientSubscription.update({
 		where: { userId },
 		data: {
-			planName: activePlan.planName,
-			price: activePlan.monthlyFee,
+			planName: activePlan.name,
+			price: activePlan.price,
 			status: 'active',
 			autoRenew: true,
 			renewalDate: new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000),
@@ -815,8 +845,8 @@ export const reactivatePatientSubscription = async (userId: string) => {
 	await sendSubscriptionActivationEmail({
 		to: String(user?.email || ''),
 		name: String(user?.name || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || ''),
-		planName: String(updated.planName || activePlan.planName || 'Standard Plan'),
-		priceInr: Math.round(Number(updated.price || activePlan.monthlyFee || 0) / 100),
+		planName: String(updated.planName || activePlan.name || 'Standard Plan'),
+		priceInr: Math.round(Number(updated.price || activePlan.price || 0) / 100),
 	});
 
 	return updated;
@@ -1040,13 +1070,13 @@ export const initiateSessionBooking = async (
 			durationMinute: duration,
 			amountMinor,
 			currency: 'INR',
-			razorpayOrderId: payment.razorpayOrderId,
+			razorpayOrderId: payment.transactionId,
 			status: 'PENDING',
 		},
 	});
 
 	return {
-		order_id: payment.razorpayOrderId,
+		order_id: payment.transactionId,
 		amount: amountMinor,
 		currency: 'INR',
 		provider_id: input.providerId,
@@ -1752,26 +1782,44 @@ export const createMoodLog = async (userId: string, input: { mood: number; note?
 
 export const getMoodHistory = async (userId: string) => {
 	const patientProfile = await getPatientProfile(userId);
-	const patientMoodModel = db.patientMoodEntry;
-	if (patientMoodModel && typeof patientMoodModel.findMany === 'function') {
-		const rows = await patientMoodModel.findMany({ where: { patientId: patientProfile.id }, orderBy: { date: 'desc' }, take: 60 });
-		return rows.map((r: any) => mapMoodRow({ id: r.id, mood: r.moodScore, note: r.note, created_at: r.createdAt }));
-	}
+	const [patientMoodRows, moodLogRows, dailyCheckIns] = await Promise.all([
+		db.patientMoodEntry.findMany({
+			where: { patientId: patientProfile.id },
+			orderBy: { date: 'desc' },
+			take: 60,
+		}).catch(() => []),
+		db.moodLog.findMany({
+			where: { userId },
+			orderBy: { loggedAt: 'desc' },
+			take: 60,
+		}).catch(() => []),
+		db.dailyCheckIn.findMany({
+			where: { patientId: userId },
+			orderBy: { date: 'desc' },
+			take: 60,
+		}).catch(() => []),
+	]);
 
-	const moodLogModel = db.moodLog;
-	if (!moodLogModel || typeof moodLogModel.findMany !== 'function') {
-		return [];
-	}
+	const unified: any[] = [
+		...patientMoodRows.map((r: any) => mapMoodRow({ id: r.id, mood: r.moodScore, note: r.note, created_at: r.createdAt || r.date })),
+		...moodLogRows.map((r: any) => mapMoodRow({ id: r.id, mood: Number(r.moodValue || 0), note: r.note, created_at: r.createdAt || r.loggedAt })),
+		...dailyCheckIns.map((r: any) => mapMoodRow({
+			id: r.id,
+			mood: Number(r.mood || 0),
+			note: r.reflectionGood || r.intention || '',
+			created_at: r.createdAt || r.date,
+			metadata: {
+				tags: r.context || [],
+				energy: r.energy ? (['low', 'medium', 'high'][r.energy - 1] || 'medium') : undefined,
+				sleepHours: r.sleep ? String(r.sleep) : undefined,
+				stressLevel: r.stressLevel || undefined,
+			},
+		})),
+	];
 
-	const moodLogRows = await moodLogModel.findMany({ where: { userId }, orderBy: { loggedAt: 'desc' }, take: 60 }).catch(() => []);
-	return moodLogRows.map((row: any) =>
-		mapMoodRow({
-			id: row.id,
-			mood: Number(row.moodValue || 0),
-			note: row.note,
-			created_at: row.createdAt || row.loggedAt,
-		}),
-	);
+	return unified
+		.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+		.slice(0, 60);
 };
 
 export const getMoodToday = async (userId: string) => {
@@ -1891,7 +1939,7 @@ export const getMoodStats = async (userId: string) => {
 
 export const getPatientProgressAnalytics = async (userId: string) => {
 	const patientProfile = await getPatientProfile(userId);
-	const [sessions, exercises, assessments, moodHistory] = await Promise.all([
+	const [sessions, exercises, legacyAssessments, phqAssessments, gadAssessments, moodHistory] = await Promise.all([
 		db.therapySession.findMany({
 			where: { patientProfileId: patientProfile.id },
 			select: { id: true, status: true, dateTime: true },
@@ -1908,8 +1956,26 @@ export const getPatientProgressAnalytics = async (userId: string) => {
 			orderBy: { createdAt: 'asc' },
 			take: 20,
 		}),
+		db.pHQ9Assessment.findMany({
+			where: { userId: patientProfile.userId },
+			select: { id: true, totalScore: true, severity: true, createdAt: true },
+			orderBy: { createdAt: 'asc' },
+			take: 20,
+		}).catch(() => []),
+		db.gAD7Assessment.findMany({
+			where: { userId: patientProfile.userId },
+			select: { id: true, totalScore: true, severity: true, createdAt: true },
+			orderBy: { createdAt: 'asc' },
+			take: 20,
+		}).catch(() => []),
 		getMoodHistory(userId),
 	]);
+
+	const assessments: any[] = [
+		...legacyAssessments,
+		...phqAssessments.map(a => ({ id: a.id, type: 'PHQ-9', totalScore: a.totalScore, severityLevel: a.severity, createdAt: a.createdAt })),
+		...gadAssessments.map(a => ({ id: a.id, type: 'GAD-7', totalScore: a.totalScore, severityLevel: a.severity, createdAt: a.createdAt })),
+	].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
 	const totalSessions = sessions.length;
 	const completedSessions = sessions.filter((session: any) => String(session.status).toUpperCase() === 'COMPLETED').length;
@@ -2011,13 +2077,25 @@ export const getPatientInsights = async (userId: string) => {
 export const getPatientReports = async (userId: string) => {
 	const patientProfile = await getPatientProfile(userId);
 
-	const [assessments, sessions] = await Promise.all([
+	const [legacyAssessments, phqAssessments, gadAssessments, sessions] = await Promise.all([
 		db.patientAssessment.findMany({
 			where: { patientId: patientProfile.id },
 			orderBy: { createdAt: 'desc' },
 			take: 12,
 			select: { id: true, type: true, totalScore: true, severityLevel: true, createdAt: true },
 		}),
+		db.pHQ9Assessment.findMany({
+			where: { userId: patientProfile.userId },
+			orderBy: { createdAt: 'desc' },
+			take: 12,
+			select: { id: true, totalScore: true, severity: true, createdAt: true },
+		}).catch(() => []),
+		db.gAD7Assessment.findMany({
+			where: { userId: patientProfile.userId },
+			orderBy: { createdAt: 'desc' },
+			take: 12,
+			select: { id: true, totalScore: true, severity: true, createdAt: true },
+		}).catch(() => []),
 		db.therapySession.findMany({
 			where: { patientProfileId: patientProfile.id, status: 'COMPLETED' },
 			orderBy: { dateTime: 'desc' },
@@ -2029,6 +2107,12 @@ export const getPatientReports = async (userId: string) => {
 			},
 		}),
 	]);
+
+	const assessments = [
+		...legacyAssessments,
+		...phqAssessments.map(a => ({ id: a.id, type: 'PHQ-9', totalScore: a.totalScore, severityLevel: a.severity, createdAt: a.createdAt })),
+		...gadAssessments.map(a => ({ id: a.id, type: 'GAD-7', totalScore: a.totalScore, severityLevel: a.severity, createdAt: a.createdAt })),
+	].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
 	const assessmentReports = assessments.map((item: any) => ({
 		id: `assessment-${item.id}`,

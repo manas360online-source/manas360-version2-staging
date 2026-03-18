@@ -1,6 +1,42 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getMyTherapistEarnings = exports.getMyTherapistSessionNoteDecrypted = exports.deleteResponseNote = exports.updateResponseNote = exports.getResponseNoteDecrypted = exports.listResponseNotes = exports.addResponseNote = exports.saveMyTherapistSessionNote = exports.updateMyTherapistSessionStatus = exports.getMyTherapistSessionDetail = exports.getMyTherapistSessions = exports.getMySessionHistory = exports.bookPatientSession = void 0;
+exports.getMyTherapistEarnings = exports.getMyTherapistSessionNoteDecrypted = exports.deleteResponseNote = exports.updateResponseNote = exports.getResponseNoteDecrypted = exports.listResponseNotes = exports.addResponseNote = exports.uploadSessionDocument = exports.saveMyTherapistSessionNote = exports.updateMyTherapistSessionStatus = exports.getMyTherapistSessionDetail = exports.getMyTherapistSessions = exports.getMySessionHistory = exports.bookPatientSession = void 0;
 const crypto_1 = require("crypto");
 const error_middleware_1 = require("../middleware/error.middleware");
 const db_1 = require("../config/db");
@@ -11,6 +47,11 @@ const analytics_service_1 = require("./analytics.service");
 const aiService_1 = require("./aiService");
 const redis_1 = require("redis");
 const env_1 = require("../config/env");
+const pdfkit_1 = __importDefault(require("pdfkit"));
+const path_1 = __importDefault(require("path"));
+const fs_1 = __importDefault(require("fs"));
+const s3_service_1 = require("./s3.service");
+const client_s3_1 = require("@aws-sdk/client-s3");
 const db = db_1.prisma;
 const ACTIVE_STATUSES = ['pending', 'confirmed'];
 const PRISMA_ACTIVE_STATUSES = ACTIVE_STATUSES.map((s) => s.toUpperCase());
@@ -583,6 +624,112 @@ const saveMyTherapistSessionNote = async (userId, sessionId, payload) => {
     };
 };
 exports.saveMyTherapistSessionNote = saveMyTherapistSessionNote;
+/**
+ * Generates and uploads a PDF document for a signed therapist session note.
+ * Pulls patientId (User UUID) from the database to ensure correct folder mapping.
+ */
+const uploadSessionDocument = async (noteId) => {
+    const note = await db_1.prisma.therapistSessionNote.findUnique({
+        where: { id: noteId },
+        include: {
+            patient: {
+                select: {
+                    userId: true,
+                },
+            },
+            therapist: {
+                select: {
+                    firstName: true,
+                    lastName: true,
+                    name: true,
+                },
+            },
+            session: {
+                select: {
+                    dateTime: true,
+                    durationMinutes: true,
+                },
+            },
+        },
+    });
+    if (!note)
+        return;
+    if (String(note.status || '').toLowerCase() !== 'signed')
+        return;
+    try {
+        const doc = new pdfkit_1.default({ margin: 50 });
+        const fileName = `note-${note.id}-${Date.now()}.pdf`;
+        const exportDir = path_1.default.join(process.cwd(), 'exports', 'notes');
+        await fs_1.default.promises.mkdir(exportDir, { recursive: true });
+        const tmpPath = path_1.default.join(exportDir, fileName);
+        const stream = fs_1.default.createWriteStream(tmpPath);
+        doc.pipe(stream);
+        doc.fontSize(20).text('Clinical Note', { align: 'center' });
+        doc.moveDown();
+        const providerName = `${note.therapist.firstName || ''} ${note.therapist.lastName || ''}`.trim() || note.therapist.name || 'Provider';
+        doc.fontSize(12).text(`Therapist: ${providerName}`);
+        doc.text(`Patient ID: ${note.patientId}`);
+        doc.text(`Session Date: ${note.session.dateTime.toISOString()}`);
+        doc.moveDown();
+        doc.fontSize(12).text('Subjective');
+        doc.fontSize(10).text(note.subjective || '');
+        doc.moveDown();
+        doc.fontSize(12).text('Objective');
+        doc.fontSize(10).text(note.objective || '');
+        doc.moveDown();
+        doc.fontSize(12).text('Assessment');
+        doc.fontSize(10).text(note.assessment || '');
+        doc.moveDown();
+        doc.fontSize(12).text('Plan');
+        doc.fontSize(10).text(note.plan || '');
+        doc.end();
+        await new Promise((resolve, reject) => {
+            stream.on('finish', () => resolve());
+            stream.on('error', (err) => reject(err));
+        });
+        const buffer = await fs_1.default.promises.readFile(tmpPath);
+        // Pull the User UUID (patientUserId) from the patient profile relation
+        const patientUserId = note.patient.userId;
+        const objectKey = `patient-documents/${patientUserId}/${fileName}`;
+        await s3_service_1.s3Client.send(new client_s3_1.PutObjectCommand({
+            Bucket: env_1.env.awsS3Bucket,
+            Key: objectKey,
+            Body: buffer,
+            ContentType: 'application/pdf',
+            ServerSideEncryption: env_1.env.awsS3DisableServerSideEncryption ? undefined : 'AES256',
+        }));
+        const createdDoc = await db_1.prisma.patientDocument.create({
+            data: {
+                patientId: patientUserId,
+                title: `Signed Note — ${note.sessionType}`,
+                source: 'session-note',
+                sourceId: note.id,
+                s3ObjectKey: objectKey,
+            },
+        });
+        // Trigger real-time notification
+        try {
+            const { notifyPatientDocument } = await Promise.resolve().then(() => __importStar(require('../routes/gps.routes')));
+            notifyPatientDocument(patientUserId, {
+                id: createdDoc.id,
+                title: createdDoc.title,
+                date: createdDoc.createdAt,
+                category: 'session',
+                s3ObjectKey: createdDoc.s3ObjectKey,
+            });
+        }
+        catch (e) {
+            console.warn('Real-time notify failed', e);
+        }
+        // Cleanup local tmp file
+        await fs_1.default.promises.unlink(tmpPath).catch(() => { });
+    }
+    catch (e) {
+        console.error('Session note PDF generation/upload failed:', e);
+        throw e;
+    }
+};
+exports.uploadSessionDocument = uploadSessionDocument;
 const addResponseNote = async (userId, sessionId, responseId, content) => {
     void userId;
     void sessionId;

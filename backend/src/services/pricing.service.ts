@@ -45,12 +45,12 @@ const ensurePricingTables = async (): Promise<void> => {
 	await db.$executeRawUnsafe(`
 		CREATE TABLE IF NOT EXISTS platform_subscription (
 			id TEXT PRIMARY KEY,
+			plan_key VARCHAR(50) NOT NULL UNIQUE,
 			plan_name VARCHAR(100) NOT NULL,
-			monthly_fee INTEGER NOT NULL,
+			price INTEGER NOT NULL,
+			billing_cycle VARCHAR(50) NOT NULL,
 			description TEXT,
 			active BOOLEAN NOT NULL DEFAULT TRUE,
-			effective_from TIMESTAMP NOT NULL DEFAULT NOW(),
-			effective_to TIMESTAMP,
 			created_at TIMESTAMP NOT NULL DEFAULT NOW(),
 			updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 		);
@@ -65,26 +65,9 @@ const ensurePricingTables = async (): Promise<void> => {
 			provider_share INTEGER NOT NULL,
 			platform_share INTEGER NOT NULL,
 			active BOOLEAN NOT NULL DEFAULT TRUE,
-			effective_from TIMESTAMP NOT NULL DEFAULT NOW(),
-			effective_to TIMESTAMP,
 			created_at TIMESTAMP NOT NULL DEFAULT NOW(),
 			updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
 			UNIQUE(provider_type, duration_minutes)
-		);
-	`);
-
-	await db.$executeRawUnsafe(`
-		CREATE TABLE IF NOT EXISTS premium_bundles (
-			id TEXT PRIMARY KEY,
-			bundle_name VARCHAR(100) NOT NULL,
-			minutes INTEGER NOT NULL,
-			price INTEGER NOT NULL,
-			active BOOLEAN NOT NULL DEFAULT TRUE,
-			effective_from TIMESTAMP NOT NULL DEFAULT NOW(),
-			effective_to TIMESTAMP,
-			created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-			updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
-			UNIQUE(bundle_name, minutes)
 		);
 	`);
 
@@ -97,341 +80,177 @@ const ensurePricingTables = async (): Promise<void> => {
 	`);
 
 	await db.$executeRawUnsafe(`
-		CREATE TABLE IF NOT EXISTS user_subscriptions (
+		CREATE TABLE IF NOT EXISTS product_addons (
 			id TEXT PRIMARY KEY,
-			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-			plan_id TEXT REFERENCES platform_subscription(id) ON DELETE SET NULL,
-			start_date DATE NOT NULL,
-			end_date DATE,
-			status VARCHAR(50) NOT NULL,
-			price_snapshot INTEGER,
+			addon_key VARCHAR(50) NOT NULL UNIQUE,
+			addon_name VARCHAR(100) NOT NULL,
+			price INTEGER NOT NULL,
+			active BOOLEAN NOT NULL DEFAULT TRUE,
 			created_at TIMESTAMP NOT NULL DEFAULT NOW(),
 			updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 		);
 	`);
-
-	await db.$executeRawUnsafe(`
-		CREATE TABLE IF NOT EXISTS premium_minutes (
-			id TEXT PRIMARY KEY,
-			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-			minutes_total INTEGER NOT NULL,
-			minutes_used INTEGER NOT NULL DEFAULT 0,
-			created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-			updated_at TIMESTAMP NOT NULL DEFAULT NOW()
-		);
-	`);
-
-	await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS idx_platform_subscription_active ON platform_subscription(active, effective_from DESC);');
-	await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS idx_session_pricing_active ON session_pricing(active, provider_type, duration_minutes);');
-	await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS idx_premium_bundles_active ON premium_bundles(active, minutes);');
-
-	const platformRows = (await db.$queryRawUnsafe('SELECT COUNT(*)::int AS count FROM platform_subscription')) as Array<{ count: number }>;
-	if (Number(platformRows?.[0]?.count || 0) === 0) {
-		await db.$executeRawUnsafe(
-			`INSERT INTO platform_subscription (id, plan_name, monthly_fee, description, active, effective_from, created_at, updated_at)
-			 VALUES ($1, $2, $3, $4, TRUE, NOW(), NOW(), NOW())`,
-			randomUUID(),
-			'Standard Access',
-			199,
-			'MANAS360 platform access plan',
-		);
-	}
-
-	const sessionRows = (await db.$queryRawUnsafe('SELECT COUNT(*)::int AS count FROM session_pricing')) as Array<{ count: number }>;
-	if (Number(sessionRows?.[0]?.count || 0) === 0) {
-		const seedRows: SessionPricingInput[] = [
-			{ providerType: 'clinical-psychologist', durationMinutes: 45, price: 999 },
-			{ providerType: 'clinical-psychologist', durationMinutes: 60, price: 1499 },
-			{ providerType: 'psychiatrist', durationMinutes: 45, price: 1499 },
-			{ providerType: 'psychiatrist', durationMinutes: 60, price: 2499 },
-			{ providerType: 'specialized-therapist', durationMinutes: 45, price: 1299 },
-			{ providerType: 'specialized-therapist', durationMinutes: 60, price: 1999 },
-		];
-		for (const row of seedRows) {
-			const providerShare = Math.round(row.price * 0.6);
-			await db.$executeRawUnsafe(
-				`INSERT INTO session_pricing
-				 (id, provider_type, duration_minutes, price, provider_share, platform_share, active, effective_from, created_at, updated_at)
-				 VALUES ($1, $2, $3, $4, $5, $6, TRUE, NOW(), NOW(), NOW())`,
-				randomUUID(),
-				normalizeProviderType(row.providerType),
-				row.durationMinutes,
-				row.price,
-				providerShare,
-				row.price - providerShare,
-			);
-		}
-	}
-
-	const bundleRows = (await db.$queryRawUnsafe('SELECT COUNT(*)::int AS count FROM premium_bundles')) as Array<{ count: number }>;
-	if (Number(bundleRows?.[0]?.count || 0) === 0) {
-		const seedBundles: PremiumBundleInput[] = [
-			{ bundleName: '1 Hour Bundle', minutes: 60, price: 499 },
-			{ bundleName: '2 Hour Bundle', minutes: 120, price: 899 },
-			{ bundleName: '3 Hour Bundle', minutes: 180, price: 1450 },
-		];
-		for (const row of seedBundles) {
-			await db.$executeRawUnsafe(
-				`INSERT INTO premium_bundles
-				 (id, bundle_name, minutes, price, active, effective_from, created_at, updated_at)
-				 VALUES ($1, $2, $3, $4, TRUE, NOW(), NOW(), NOW())`,
-				randomUUID(),
-				row.bundleName,
-				row.minutes,
-				row.price,
-			);
-		}
-	}
-
-	await db.$executeRawUnsafe(
-		`INSERT INTO system_settings (key, value, updated_at)
-		 VALUES ('preferred_time_surcharge', '20', NOW())
-		 ON CONFLICT (key)
-		 DO NOTHING`,
-	);
 
 	initialized = true;
+
+	// Seed Subscription Plans
+	const platformRows = (await db.$queryRawUnsafe('SELECT COUNT(*)::int AS count FROM platform_subscription')) as Array<{ count: number }>;
+	if (Number(platformRows?.[0]?.count || 0) === 0) {
+		const plans = [
+			{ key: 'free', name: 'Free Tier', price: 0, cycle: 'none' },
+			{ key: 'monthly', name: 'Monthly Plan', price: 99, cycle: 'monthly' },
+			{ key: 'quarterly', name: 'Quarterly Plan', price: 299, cycle: 'quarterly' },
+			{ key: 'premium_monthly', name: 'Premium Monthly', price: 299, cycle: 'monthly' },
+			{ key: 'premium_annual', name: 'Premium Annual', price: 2999, cycle: 'yearly' },
+		];
+		for (const plan of plans) {
+			await db.$executeRawUnsafe(
+				`INSERT INTO platform_subscription (id, plan_key, plan_name, price, billing_cycle, active)
+				 VALUES ($1, $2, $3, $4, $5, TRUE) ON CONFLICT DO NOTHING`,
+				randomUUID(), plan.key, plan.name, plan.price, plan.cycle
+			);
+		}
+	}
+
+	// Seed Session Pricing
+	const sessionRows = (await db.$queryRawUnsafe('SELECT COUNT(*)::int AS count FROM session_pricing')) as Array<{ count: number }>;
+	if (Number(sessionRows?.[0]?.count || 0) === 0) {
+		const sessionSeed = [
+			{ type: 'therapist', duration: 45, price: 500 },
+			{ type: 'therapist', duration: 60, price: 1000 },
+			{ type: 'clinical-psychologist', duration: 45, price: 699 },
+			{ type: 'clinical-psychologist', duration: 60, price: 1500 },
+			{ type: 'psychiatrist', duration: 45, price: 999 },
+			{ type: 'psychiatrist', duration: 60, price: 2000 },
+			{ type: 'nlp-coach', duration: 45, price: 500 },
+			{ type: 'nlp-coach', duration: 60, price: 1000 },
+			{ type: 'executive-coach', duration: 45, price: 1500 },
+			{ type: 'executive-coach', duration: 60, price: 2500 },
+		];
+		for (const row of sessionSeed) {
+			const providerShare = Math.round(row.price * 0.7);
+			await db.$executeRawUnsafe(
+				`INSERT INTO session_pricing (id, provider_type, duration_minutes, price, provider_share, platform_share, active)
+				 VALUES ($1, $2, $3, $4, $5, $6, TRUE) ON CONFLICT DO NOTHING`,
+				randomUUID(), row.type, row.duration, row.price, providerShare, row.price - providerShare
+			);
+		}
+	}
+
+	// Seed Add-ons
+	const addonRows = (await db.$queryRawUnsafe('SELECT COUNT(*)::int AS count FROM product_addons')) as Array<{ count: number }>;
+	if (Number(addonRows?.[0]?.count || 0) === 0) {
+		const addons = [
+			{ key: 'anytime_buddy', name: 'Anytime Buddy', price: 99 },
+			{ key: 'pet_hub', name: 'Digital Pet Hub', price: 99 },
+			{ key: 'ivr_therapy', name: 'IVR Therapy', price: 499 },
+			{ key: 'vent_buddy', name: 'Vent Buddy', price: 99 },
+			{ key: 'sound_track', name: 'Sound Track', price: 30 },
+			{ key: 'sound_bundle', name: 'Sound Bundle', price: 250 },
+		];
+		for (const addon of addons) {
+			await db.$executeRawUnsafe(
+				`INSERT INTO product_addons (id, addon_key, addon_name, price)
+				 VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`,
+				randomUUID(), addon.key, addon.name, addon.price
+			);
+		}
+	}
 };
 
 export const getPricingConfig = async () => {
 	await ensurePricingTables();
-
-	const platformRows = (await db.$queryRawUnsafe(
-		`SELECT id, plan_name, monthly_fee, description, active, effective_from, effective_to
-		 FROM platform_subscription
-		 WHERE active = TRUE
-		 ORDER BY updated_at DESC
-		 LIMIT 1`,
-	)) as any[];
-
-	const sessionRows = (await db.$queryRawUnsafe(
-		`SELECT id, provider_type, duration_minutes, price, provider_share, platform_share, active, effective_from, effective_to
-		 FROM session_pricing
-		 WHERE active = TRUE
-		 ORDER BY provider_type ASC, duration_minutes ASC`,
-	)) as any[];
-
-	const bundleRows = (await db.$queryRawUnsafe(
-		`SELECT id, bundle_name, minutes, price, active, effective_from, effective_to
-		 FROM premium_bundles
-		 WHERE active = TRUE
-		 ORDER BY minutes ASC`,
-	)) as any[];
-
-	const settingRows = (await db.$queryRawUnsafe(
-		`SELECT key, value FROM system_settings WHERE key = 'preferred_time_surcharge' LIMIT 1`,
-	)) as any[];
-
-	const activePlan = platformRows?.[0] || null;
-	const surchargePercent = Number(settingRows?.[0]?.value || 20);
+	const plans = await db.$queryRawUnsafe(`SELECT * FROM platform_subscription WHERE active = TRUE`);
+	const sessions = await db.$queryRawUnsafe(`SELECT * FROM session_pricing WHERE active = TRUE`);
+	const addons = await db.$queryRawUnsafe(`SELECT * FROM product_addons WHERE active = TRUE`);
+	const settings = await db.$queryRawUnsafe(`SELECT * FROM system_settings WHERE key = 'preferred_time_surcharge'`);
+	
+	const surchargePercent = Number(settings?.[0]?.value || 20);
 
 	return {
-		platformFee: activePlan
-			? {
-				id: String(activePlan.id),
-				planName: String(activePlan.plan_name),
-				monthlyFee: Number(activePlan.monthly_fee || 0),
-				description: activePlan.description ? String(activePlan.description) : null,
-				active: Boolean(activePlan.active),
-				effectiveFrom: toIso(activePlan.effective_from),
-				effectiveTo: toIso(activePlan.effective_to),
-			}
-			: null,
-		sessionPricing: sessionRows.map((row) => ({
-			id: String(row.id),
-			providerType: String(row.provider_type),
-			durationMinutes: Number(row.duration_minutes || 0),
-			price: Number(row.price || 0),
-			providerShare: Number(row.provider_share || 0),
-			platformShare: Number(row.platform_share || 0),
-			active: Boolean(row.active),
-			effectiveFrom: toIso(row.effective_from),
-			effectiveTo: toIso(row.effective_to),
+		plans: plans.map((p: any) => ({
+			key: p.plan_key,
+			name: p.plan_name,
+			price: p.price,
+			billingCycle: p.billing_cycle
 		})),
-		premiumBundles: bundleRows.map((row) => ({
-			id: String(row.id),
-			bundleName: String(row.bundle_name),
-			minutes: Number(row.minutes || 0),
-			price: Number(row.price || 0),
-			active: Boolean(row.active),
-			effectiveFrom: toIso(row.effective_from),
-			effectiveTo: toIso(row.effective_to),
+		sessions: sessions.map((s: any) => ({
+			providerType: s.provider_type,
+			duration: s.duration_minutes,
+			price: s.price
 		})),
-		surchargePercent,
+		addons: addons.map((a: any) => ({
+			key: a.addon_key,
+			name: a.addon_name,
+			price: a.price
+		})),
+		surchargePercent
 	};
 };
 
-export const updatePricingConfig = async (input: UpdatePricingInput, _adminUserId?: string) => {
+export const updatePricingConfig = async (input: any) => {
 	await ensurePricingTables();
-
-	const platformFee = input.platformFee ?? input.platform_fee;
-	if (platformFee !== undefined && Number.isFinite(Number(platformFee)) && Number(platformFee) >= 0) {
-		const existingRows = (await db.$queryRawUnsafe(
-			`SELECT id FROM platform_subscription WHERE active = TRUE ORDER BY updated_at DESC LIMIT 1`,
-		)) as any[];
-		const existingId = existingRows?.[0]?.id ? String(existingRows[0].id) : null;
-
-		if (existingId) {
-			await db.$executeRawUnsafe(
-				`UPDATE platform_subscription SET monthly_fee = $1, updated_at = NOW() WHERE id = $2`,
-				Number(platformFee),
-				existingId,
-			);
-		}
-	}
-
-	const sessionPricing = Array.isArray(input.sessionPricing)
-		? input.sessionPricing
-		: Array.isArray(input.session_pricing)
-			? input.session_pricing
-			: [];
-
-	for (const item of sessionPricing) {
-		const providerType = normalizeProviderType(item.providerType);
-		const durationMinutes = Number(item.durationMinutes || 0);
-		const price = Number(item.price || 0);
-		if (!providerType || !durationMinutes || !Number.isFinite(price) || price < 0) continue;
-
-		const providerShare = Number.isFinite(Number(item.providerShare))
-			? Number(item.providerShare)
-			: Math.round(price * 0.6);
-		const platformShare = Number.isFinite(Number(item.platformShare))
-			? Number(item.platformShare)
-			: price - providerShare;
-		const active = item.active === undefined ? true : Boolean(item.active);
-
+	
+	if (input.preferredTimeSurcharge !== undefined || input.surchargePercent !== undefined) {
+        const val = input.preferredTimeSurcharge ?? input.surchargePercent;
 		await db.$executeRawUnsafe(
-			`INSERT INTO session_pricing (id, provider_type, duration_minutes, price, provider_share, platform_share, active, effective_from, created_at, updated_at)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW(), NOW())
-			 ON CONFLICT (provider_type, duration_minutes)
-			 DO UPDATE SET
-				price = EXCLUDED.price,
-				provider_share = EXCLUDED.provider_share,
-				platform_share = EXCLUDED.platform_share,
-				active = EXCLUDED.active,
-				updated_at = NOW()`,
-			randomUUID(),
-			providerType,
-			durationMinutes,
-			price,
-			providerShare,
-			platformShare,
-			active,
+			`UPDATE system_settings SET value = $1 WHERE key = 'preferred_time_surcharge'`,
+			String(val)
 		);
 	}
 
-	const premiumBundles = Array.isArray(input.premiumBundles)
-		? input.premiumBundles
-		: Array.isArray(input.premium_bundles)
-			? input.premium_bundles
-			: [];
+    if (input.sessionPricing && Array.isArray(input.sessionPricing)) {
+        for (const session of input.sessionPricing) {
+            if (!session.providerType || !session.duration) continue;
+            
+            const price = Number(session.price);
+            if (Number.isNaN(price)) continue;
 
-	for (const item of premiumBundles) {
-		const bundleName = String(item.bundleName || '').trim();
-		const minutes = Number(item.minutes || 0);
-		const price = Number(item.price || 0);
-		if (!bundleName || !minutes || !Number.isFinite(price) || price < 0) continue;
-		const active = item.active === undefined ? true : Boolean(item.active);
+            const providerShare = Math.round(price * 0.7);
+            const platformShare = price - providerShare;
+            await db.$executeRawUnsafe(
+                `UPDATE session_pricing SET price = $1, provider_share = $2, platform_share = $3 WHERE provider_type = $4 AND duration_minutes = $5`,
+                price, providerShare, platformShare, session.providerType, session.duration
+            );
+        }
+    }
 
-		await db.$executeRawUnsafe(
-			`INSERT INTO premium_bundles (id, bundle_name, minutes, price, active, effective_from, created_at, updated_at)
-			 VALUES ($1, $2, $3, $4, $5, NOW(), NOW(), NOW())
-			 ON CONFLICT (bundle_name, minutes)
-			 DO UPDATE SET
-				price = EXCLUDED.price,
-				active = EXCLUDED.active,
-				updated_at = NOW()`,
-			randomUUID(),
-			bundleName,
-			minutes,
-			price,
-			active,
-		);
-	}
-
-	const surcharge = input.preferredTimeSurcharge ?? input.preferred_time_surcharge;
-	if (surcharge !== undefined && Number.isFinite(Number(surcharge))) {
-		await db.$executeRawUnsafe(
-			`INSERT INTO system_settings (key, value, updated_at)
-			 VALUES ('preferred_time_surcharge', $1, NOW())
-			 ON CONFLICT (key)
-			 DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-			String(Number(surcharge)),
-		);
-	}
+    if (input.platformFee !== undefined) {
+        let val = input.platformFee;
+        if (typeof val === 'object') {
+             val = val.monthlyFee || val.monthly_fee;
+        }
+        if (val !== undefined && !Number.isNaN(Number(val))) {
+            await db.$executeRawUnsafe(`UPDATE platform_subscription SET price = $1 WHERE plan_key = 'monthly'`, Number(val));
+        }
+    }
 
 	return getPricingConfig();
 };
 
-export const getSessionQuote = async (input: {
-	providerType?: string;
-	durationMinutes?: number;
-	preferredTime?: boolean;
-}) => {
+export const getSessionQuote = async (input: { providerType?: string; durationMinutes?: number; preferredTime?: boolean }) => {
 	await ensurePricingTables();
-	const providerType = normalizeProviderType(input.providerType || 'clinical-psychologist');
-	const duration = input.durationMinutes && input.durationMinutes > 0 ? Math.floor(input.durationMinutes) : 45;
-	const preferredTime = Boolean(input.preferredTime);
-
-	const row = (await db.$queryRawUnsafe(
-		`SELECT provider_type, duration_minutes, price
-		 FROM session_pricing
-		 WHERE active = TRUE AND provider_type = $1 AND duration_minutes = $2
-		 LIMIT 1`,
-		providerType,
-		duration,
-	)) as any[];
-
-	const fallbackRow = (await db.$queryRawUnsafe(
-		`SELECT provider_type, duration_minutes, price
-		 FROM session_pricing
-		 WHERE active = TRUE AND provider_type = $1
-		 ORDER BY ABS(duration_minutes - $2) ASC
-		 LIMIT 1`,
-		providerType,
-		duration,
-	)) as any[];
-
-	const selectedRow = row?.[0] || fallbackRow?.[0] || null;
-	const basePrice = Number(selectedRow?.price || 999);
-
-	const settingRows = (await db.$queryRawUnsafe(
-		`SELECT value FROM system_settings WHERE key = 'preferred_time_surcharge' LIMIT 1`,
-	)) as any[];
+	const type = normalizeProviderType(input.providerType || 'therapist');
+	const duration = input.durationMinutes || 45;
+	const row = (await db.$queryRawUnsafe(`SELECT price FROM session_pricing WHERE provider_type = $1 AND duration_minutes = $2 AND active = TRUE`, type, duration)) as any[];
+	const basePrice = row?.[0]?.price || (type.includes('psychiatrist') ? 999 : 500);
+	const settingRows = (await db.$queryRawUnsafe(`SELECT value FROM system_settings WHERE key = 'preferred_time_surcharge'`)) as any[];
 	const surchargePercent = Number(settingRows?.[0]?.value || 20);
-	const finalPrice = preferredTime ? Math.round(basePrice * (1 + surchargePercent / 100)) : basePrice;
+	const finalPrice = input.preferredTime ? Math.round(basePrice * (1 + surchargePercent / 100)) : basePrice;
 
-	return {
-		providerType: String(selectedRow?.provider_type || providerType),
-		durationMinutes: Number(selectedRow?.duration_minutes || duration),
-		basePrice,
-		surchargePercent,
-		preferredTime,
-		finalPrice,
-	};
+	return { providerType: type, durationMinutes: duration, basePrice, surchargePercent, preferredTime: !!input.preferredTime, finalPrice };
 };
 
-export const getActivePlatformPlan = async () => {
-	const config = await getPricingConfig();
-	const plan = config.platformFee;
-	if (!plan) {
-		return {
-			id: null,
-			planName: 'Standard Access',
-			monthlyFee: 199,
-		};
-	}
-
-	return {
-		id: plan.id,
-		planName: plan.planName,
-		monthlyFee: Number(plan.monthlyFee || 199),
-	};
+export const getActivePlatformPlan = async (planKey: string = 'monthly') => {
+	await ensurePricingTables();
+	const row = (await db.$queryRawUnsafe(`SELECT * FROM platform_subscription WHERE plan_key = $1 AND active = TRUE`, planKey)) as any[];
+	if (!row?.[0]) return { key: 'free', name: 'Free Tier', price: 0 };
+	return { key: row[0].plan_key, name: row[0].plan_name, price: row[0].price };
 };
 
 export const getAdminPricingConfigWithImpact = async () => {
 	const config = await getPricingConfig();
-	const activePrice = Number(config.platformFee?.monthlyFee || 0);
+	const activePrice = Number(config.plans.find((p: any) => p.key === 'monthly')?.price || 99);
 
 	let summaryRows: any[] = [];
 

@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
 import {
   fetchProviderSettings,
   updateProviderSettings,
+  fetchProviderSubscription,
   type ProviderAvailabilitySlot,
   type ProviderSettingsResponse,
 } from '../../api/provider';
@@ -35,9 +37,15 @@ const createFallbackState = (): ProviderSettingsResponse => ({
 
 export default function Settings() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const settingsQuery = useQuery({
     queryKey: ['providerSettings'],
     queryFn: fetchProviderSettings,
+  });
+
+  const subQuery = useQuery({
+    queryKey: ['providerSubscription'],
+    queryFn: () => fetchProviderSubscription().catch(() => null),
   });
 
   const [bio, setBio] = useState('');
@@ -103,6 +111,12 @@ export default function Settings() {
 
   const previewImage = profileImageUrl.trim();
 
+  // Subscription data
+  const sub = subQuery.data as any;
+  const planName = sub?.plan ? sub.plan.charAt(0).toUpperCase() + sub.plan.slice(1) : 'Free';
+  const planStatus = sub?.status || 'inactive';
+  const expiryDate = sub?.expiryDate ? new Date(sub.expiryDate).toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' }) : '—';
+
   return (
     <div className="space-y-6">
       <section className="rounded-[28px] border border-[#D9E1D5] bg-[radial-gradient(circle_at_top_left,_rgba(21,89,74,0.16),_transparent_35%),linear-gradient(135deg,#F6FBF8_0%,#FFFFFF_62%)] p-8 shadow-[0_18px_60px_rgba(31,41,55,0.06)]">
@@ -111,6 +125,39 @@ export default function Settings() {
         <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
           Manage the profile details patients see when booking and define the working hours that produce bookable session slots.
         </p>
+      </section>
+
+      {/* Billing & Plan Section */}
+      <section className="rounded-[24px] border border-[#DCE5D9] bg-white p-6 shadow-sm">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#6B7B68]">Billing & Plan</p>
+            <h2 className="mt-2 text-xl font-semibold text-[#23313A]">Your Current Subscription</h2>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/provider/subscription')}
+            className="rounded-full bg-[#285947] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1d4436]"
+          >
+            Upgrade Plan
+          </button>
+        </div>
+        <div className="mt-5 grid gap-4 md:grid-cols-3">
+          <div className="rounded-2xl border border-[#E6ECE2] bg-[#FBFCFA] p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#6B7B68]">Active Plan</p>
+            <p className="mt-1 text-lg font-bold text-[#23313A]">{planName}</p>
+          </div>
+          <div className="rounded-2xl border border-[#E6ECE2] bg-[#FBFCFA] p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#6B7B68]">Status</p>
+            <p className={`mt-1 text-lg font-bold ${planStatus === 'active' ? 'text-emerald-700' : 'text-amber-700'}`}>
+              {planStatus === 'active' ? '● Active' : '○ Inactive'}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-[#E6ECE2] bg-[#FBFCFA] p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#6B7B68]">Renewal Date</p>
+            <p className="mt-1 text-lg font-bold text-[#23313A]">{expiryDate}</p>
+          </div>
+        </div>
       </section>
 
       {settingsQuery.isLoading ? (

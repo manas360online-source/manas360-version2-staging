@@ -1,10 +1,46 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.addDailyCheckInController = exports.getMyTherapyPlanController = exports.getMyTherapistMatchesController = exports.getMyMoodHistoryController = exports.getMyPatientAssessmentHistoryController = exports.createPatientAssessmentController = exports.getMyPatientProfileController = exports.createPatientProfileController = void 0;
+exports.getPatientDocumentDownload = exports.uploadPatientDocument = exports.getMyPrescriptionsController = exports.getMyDocumentsController = exports.addDailyCheckInController = exports.getMyTherapyPlanController = exports.getMyTherapistMatchesController = exports.getMyMoodHistoryController = exports.getMyPatientAssessmentHistoryController = exports.createPatientAssessmentController = exports.getMyPatientProfileController = exports.createPatientProfileController = void 0;
 const db_1 = require("../config/db");
 const error_middleware_1 = require("../middleware/error.middleware");
-const patient_service_1 = require("../services/patient.service");
 const response_1 = require("../utils/response");
+const s3_service_1 = require("../services/s3.service");
+const client_s3_1 = require("@aws-sdk/client-s3");
+const patient_service_1 = require("../services/patient.service");
+const env_1 = require("../config/env");
 const cleanFeedbackText = (value) => String(value || '').replace(/\s+/g, ' ').trim();
 const getProviderDisplayName = (provider) => {
     const firstName = String(provider?.firstName || '').trim();
@@ -61,11 +97,11 @@ const mapPatientSessionBadge = (status) => {
         return 'In Progress';
     return 'New';
 };
-const getCurrentTreatmentWeek = (startDate) => {
-    const millisPerWeek = 7 * 24 * 60 * 60 * 1000;
+const getCurrentTreatmentDay = (startDate) => {
+    const millisPerDay = 24 * 60 * 60 * 1000;
     const now = Date.now();
     const diff = Math.max(0, now - startDate.getTime());
-    return Math.floor(diff / millisPerWeek) + 1;
+    return Math.floor(diff / millisPerDay) + 1;
 };
 const isExerciseActivityType = (activityType) => {
     const normalized = String(activityType || '').toUpperCase();
@@ -129,10 +165,10 @@ const getMyTherapistMatchesController = async (req, res) => {
 exports.getMyTherapistMatchesController = getMyTherapistMatchesController;
 const getMyTherapyPlanController = async (req, res) => {
     const userId = getAuthUserId(req);
-    const weekQueryRaw = req.query.week;
-    const weekQuery = weekQueryRaw !== undefined ? Number(weekQueryRaw) : undefined;
-    if (weekQueryRaw !== undefined && (!Number.isInteger(weekQuery) || Number(weekQuery) <= 0)) {
-        throw new error_middleware_1.AppError('week must be a positive integer', 422);
+    const dayQueryRaw = req.query.day;
+    const dayQuery = dayQueryRaw !== undefined ? Number(dayQueryRaw) : undefined;
+    if (dayQueryRaw !== undefined && (!Number.isInteger(dayQuery) || Number(dayQuery) <= 0)) {
+        throw new error_middleware_1.AppError('day must be a positive integer', 422);
     }
     const patientProfile = await db_1.prisma.patientProfile.findUnique({
         where: { userId },
@@ -153,8 +189,8 @@ const getMyTherapyPlanController = async (req, res) => {
             endDate: true,
         },
     }).catch(() => null);
-    const currentWeek = activePlan?.startDate ? getCurrentTreatmentWeek(activePlan.startDate) : 1;
-    const selectedWeek = weekQuery ?? currentWeek;
+    const currentDay = activePlan?.startDate ? getCurrentTreatmentDay(activePlan.startDate) : 1;
+    const selectedDay = dayQuery ?? currentDay;
     const planFilter = activePlan
         ? { id: activePlan.id }
         : {
@@ -168,7 +204,7 @@ const getMyTherapyPlanController = async (req, res) => {
                     plan: {
                         ...planFilter,
                     },
-                    weekNumber: selectedWeek,
+                    dayNumber: selectedDay,
                     isPublished: true,
                 },
                 orderBy: [
@@ -183,7 +219,7 @@ const getMyTherapyPlanController = async (req, res) => {
                     createdAt: true,
                     completedAt: true,
                     category: true,
-                    weekNumber: true,
+                    dayNumber: true,
                 },
             }).catch(() => []),
             // patientSession model was removed from schema; skip to avoid runtime TypeError
@@ -239,7 +275,7 @@ const getMyTherapyPlanController = async (req, res) => {
             category: String(goal.category || mapGoalCategory(goal.title, String(goal.activityType))),
             todayCheckInDone: String(goal.status || '').toUpperCase() === 'COMPLETED',
             startDate: goal.createdAt.toISOString(),
-            weekNumber: goal.weekNumber,
+            dayNumber: goal.dayNumber,
         }));
         const cbtExercises = providerAssignedExercises.map((activity) => ({
             id: activity.id,
@@ -250,7 +286,7 @@ const getMyTherapyPlanController = async (req, res) => {
             completed: String(activity.status || '').toUpperCase() === 'COMPLETED',
             assignedAt: activity.createdAt.toISOString(),
             completedAt: activity.completedAt ? activity.completedAt.toISOString() : null,
-            weekNumber: activity.weekNumber,
+            dayNumber: activity.dayNumber,
         }));
         const recentFeedback = [
             ...therapistNotes
@@ -289,7 +325,7 @@ const getMyTherapyPlanController = async (req, res) => {
                 title: goal.title,
                 category: goal.category,
                 completed: goal.todayCheckInDone,
-                weekNumber: goal.weekNumber,
+                dayNumber: goal.dayNumber,
             })),
             ...cbtExercises.map((exercise) => ({
                 id: exercise.id,
@@ -298,20 +334,20 @@ const getMyTherapyPlanController = async (req, res) => {
                 type: exercise.type,
                 completed: exercise.completed,
                 status: exercise.status,
-                weekNumber: exercise.weekNumber,
+                dayNumber: exercise.dayNumber,
             })),
         ];
-        const maxAssignedWeek = goalActivities.reduce((maxWeek, activity) => Math.max(maxWeek, Number(activity.weekNumber || 1)), 1);
-        const totalWeeks = Math.max(maxAssignedWeek, currentWeek);
+        const maxAssignedDay = goalActivities.reduce((maxDay, activity) => Math.max(maxDay, Number(activity.dayNumber || 1)), 1);
+        const totalDays = Math.max(maxAssignedDay, currentDay);
         (0, response_1.sendSuccess)(res, {
             dailyTasks,
             goals,
             cbtExercises,
             recentFeedback,
-            weekContext: {
-                selectedWeek,
-                currentWeek,
-                totalWeeks,
+            dayContext: {
+                selectedDay,
+                currentDay,
+                totalDays,
             },
         }, 'Therapy plan fetched');
     }
@@ -347,3 +383,255 @@ const addDailyCheckInController = async (req, res) => {
     (0, response_1.sendSuccess)(res, dailyCheckIn, 'Daily check-in recorded', 201);
 };
 exports.addDailyCheckInController = addDailyCheckInController;
+// ── Get my documents ─────────────────────────────────────
+const getMyDocumentsController = async (req, res) => {
+    const userId = getAuthUserId(req);
+    try {
+        const [notes, prescriptions, assessments, phqAssessments, gadAssessments] = await Promise.all([
+            db_1.prisma.therapistSessionNote.findMany({
+                where: {
+                    session: {
+                        patientProfile: { userId },
+                    },
+                },
+                orderBy: { createdAt: 'desc' },
+                take: 20,
+                select: {
+                    id: true,
+                    sessionType: true,
+                    status: true,
+                    createdAt: true,
+                    session: {
+                        select: {
+                            dateTime: true,
+                            therapistProfile: {
+                                select: { firstName: true, lastName: true },
+                            },
+                        },
+                    },
+                },
+            }),
+            db_1.prisma.prescription.findMany({
+                where: { patientId: userId },
+                orderBy: { prescribedDate: 'desc' },
+                take: 20,
+                select: {
+                    id: true,
+                    drugName: true,
+                    dosage: true,
+                    status: true,
+                    prescribedDate: true,
+                    provider: {
+                        select: {
+                            firstName: true,
+                            lastName: true,
+                        },
+                    },
+                },
+            }),
+            db_1.prisma.patientAssessment.findMany({
+                where: {
+                    patient: { userId },
+                },
+                orderBy: { createdAt: 'desc' },
+                take: 20,
+                select: {
+                    id: true,
+                    type: true,
+                    totalScore: true,
+                    createdAt: true,
+                },
+            }),
+            db_1.prisma.pHQ9Assessment.findMany({
+                where: { userId },
+                orderBy: { createdAt: 'desc' },
+                take: 20,
+                select: {
+                    id: true,
+                    totalScore: true,
+                    createdAt: true,
+                },
+            }).catch(() => []),
+            db_1.prisma.gAD7Assessment.findMany({
+                where: { userId },
+                orderBy: { createdAt: 'desc' },
+                take: 20,
+                select: {
+                    id: true,
+                    totalScore: true,
+                    createdAt: true,
+                },
+            }).catch(() => []),
+        ]);
+        const documents = [
+            ...notes.map((n) => {
+                const tp = n.session?.therapistProfile;
+                const providerName = tp
+                    ? tp.user
+                        ? `${tp.user.firstName || ''} ${tp.user.lastName || ''}`.trim()
+                        : `${tp.firstName || ''} ${tp.lastName || ''}`.trim()
+                    : 'Provider';
+                const dateObj = n.session?.dateTime || n.createdAt;
+                return {
+                    id: n.id,
+                    title: `Session Notes — ${n.sessionType || 'Consultation'} (${providerName})`,
+                    date: dateObj ? new Date(dateObj).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+                    category: 'session',
+                };
+            }),
+            ...prescriptions.map((p) => {
+                const prov = p.provider;
+                const providerName = prov
+                    ? `${prov.firstName || ''} ${prov.lastName || ''}`.trim()
+                    : 'Provider';
+                return {
+                    id: p.id,
+                    title: `Prescription — ${p.drugName} ${p.dosage} (${providerName})`,
+                    date: p.prescribedDate ? new Date(p.prescribedDate).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+                    category: 'official',
+                };
+            }),
+            ...assessments.map((a) => ({
+                id: a.id,
+                title: `${a.type} Assessment Result — Score ${a.totalScore}`,
+                date: a.createdAt ? new Date(a.createdAt).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+                category: 'assessment',
+            })),
+            ...phqAssessments.map((a) => ({
+                id: a.id,
+                title: `PHQ-9 Assessment Result — Score ${a.totalScore}`,
+                date: a.createdAt ? new Date(a.createdAt).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+                category: 'assessment',
+            })),
+            ...gadAssessments.map((a) => ({
+                id: a.id,
+                title: `GAD-7 Assessment Result — Score ${a.totalScore}`,
+                date: a.createdAt ? new Date(a.createdAt).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+                category: 'assessment',
+            })),
+        ];
+        documents.sort((a, b) => b.date.localeCompare(a.date));
+        (0, response_1.sendSuccess)(res, documents, 'Patient documents fetched');
+    }
+    catch (error) {
+        throw error;
+    }
+};
+exports.getMyDocumentsController = getMyDocumentsController;
+// ── Get my prescriptions ─────────────────────────────────────
+const getMyPrescriptionsController = async (req, res) => {
+    const userId = getAuthUserId(req);
+    const prescriptions = await db_1.prisma.prescription.findMany({
+        where: { patientId: userId },
+        orderBy: { prescribedDate: 'desc' },
+        include: {
+            provider: {
+                select: {
+                    firstName: true,
+                    lastName: true,
+                },
+            },
+        },
+    });
+    const responseData = prescriptions.map((item) => ({
+        id: item.id,
+        drugName: item.drugName,
+        dosage: item.dosage,
+        instructions: item.instructions,
+        prescribedDate: item.prescribedDate.toISOString(),
+        refillsRemaining: item.refillsRemaining,
+        status: item.status,
+        warnings: item.warnings,
+        providerName: item.provider
+            ? `${item.provider.firstName || ''} ${item.provider.lastName || ''}`.trim()
+            : 'Provider',
+    }));
+    (0, response_1.sendSuccess)(res, responseData, 'Patient prescriptions fetched');
+};
+exports.getMyPrescriptionsController = getMyPrescriptionsController;
+const uploadPatientDocument = async (req, res) => {
+    const userId = req.auth?.userId;
+    if (!userId)
+        throw new error_middleware_1.AppError('Authentication required', 401);
+    // Accepts: file (Buffer), title (string), category (string: 'lab-result' | 'prescription'), optional notes
+    const { title, category = 'lab-result', notes } = req.body;
+    const file = req.file || req.body.file; // Support multipart or base64
+    if (!file)
+        throw new error_middleware_1.AppError('No file uploaded', 400);
+    // Find patient profile
+    const profile = await db_1.prisma.patientProfile.findUnique({ where: { userId }, select: { id: true } });
+    if (!profile)
+        throw new error_middleware_1.AppError('Patient profile not found', 404);
+    // S3 upload
+    const fileName = `lab-${profile.id}-${Date.now()}.pdf`;
+    const objectKey = `patient-documents/${userId}/${fileName}`;
+    // Build PutObject input with correct AWS SDK types
+    const serverSideEnc = env_1.env.awsS3DisableServerSideEncryption ? undefined : 'AES256';
+    const putInput = {
+        Bucket: env_1.env.awsS3Bucket,
+        Key: objectKey,
+        Body: file,
+        ContentType: 'application/pdf',
+        ...(serverSideEnc ? { ServerSideEncryption: serverSideEnc } : {}),
+    };
+    await s3_service_1.s3Client.send(new client_s3_1.PutObjectCommand(putInput));
+    // Create DB row
+    const doc = await db_1.prisma.patientDocument.create({
+        data: {
+            patientId: userId,
+            title: title || 'Lab Result',
+            category,
+            source: 'lab-upload',
+            s3ObjectKey: objectKey,
+            filePath: undefined,
+        },
+    });
+    // Notify provider (emit socket event)
+    try {
+        // Find assigned provider(s) for this patient
+        const assignments = await db_1.prisma.careTeamAssignment.findMany({
+            where: { patientId: profile.id },
+            select: { providerId: true },
+        });
+        for (const assignment of assignments) {
+            // Emit to provider inbox room
+            const { notifyProviderLabUpload } = await Promise.resolve().then(() => __importStar(require('../routes/gps.routes')));
+            notifyProviderLabUpload(assignment.providerId, {
+                documentId: doc.id,
+                patientId: userId,
+                title: doc.title,
+                category: doc.category,
+                s3ObjectKey: doc.s3ObjectKey,
+                uploadedAt: doc.createdAt,
+            });
+        }
+    }
+    catch (e) {
+        console.warn('Provider notify failed', e);
+    }
+    (0, response_1.sendSuccess)(res, doc, 'Document uploaded', 201);
+};
+exports.uploadPatientDocument = uploadPatientDocument;
+// ── Get presigned download URL for a patient document ─────────────────
+const getPatientDocumentDownload = async (req, res) => {
+    const userId = getAuthUserId(req);
+    const docId = String(req.params.id);
+    const doc = await db_1.prisma.patientDocument.findUnique({ where: { id: docId } });
+    if (!doc)
+        throw new error_middleware_1.AppError('Document not found', 404);
+    if (doc.patientId !== userId)
+        throw new error_middleware_1.AppError('Not authorized', 403);
+    if (!doc.s3ObjectKey)
+        throw new error_middleware_1.AppError('No file available for download', 404);
+    try {
+        const { GetObjectCommand } = await Promise.resolve().then(() => __importStar(require('@aws-sdk/client-s3')));
+        const { getSignedUrl } = await Promise.resolve().then(() => __importStar(require('@aws-sdk/s3-request-presigner')));
+        const cmd = new GetObjectCommand({ Bucket: env_1.env.awsS3Bucket, Key: doc.s3ObjectKey });
+        const url = await getSignedUrl(s3_service_1.s3Client, cmd, { expiresIn: 60 * 5 });
+        (0, response_1.sendSuccess)(res, { url }, 'Presigned url generated');
+    }
+    catch (e) {
+        throw new error_middleware_1.AppError('Failed to generate download url', 500);
+    }
+};
+exports.getPatientDocumentDownload = getPatientDocumentDownload;

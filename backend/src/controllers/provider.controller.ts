@@ -1,9 +1,15 @@
-import type { Request, Response } from 'express';
+import type { Request, Response, RequestHandler } from 'express';
 import { AppError } from '../middleware/error.middleware';
 import { prisma } from '../config/db';
-import { sendSuccess } from '../utils/response';
+import { sendSuccess, sendError } from '../utils/response';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
+import PDFDocument from 'pdfkit';
+import fs from 'fs';
+import path from 'path';
+import { s3Client } from '../services/s3.service';
+import { PutObjectCommand, ServerSideEncryption } from '@aws-sdk/client-s3';
+import { env } from '../config/env';
 import {
 	getConversationMessages as getDirectConversationMessages,
 	getOrCreateConversation,
@@ -1415,6 +1421,29 @@ export const getPatientNotes = async (req: Request, res: Response): Promise<void
 	sendSuccess(res, responseData, 'Patient notes fetched');
 };
 
+export const createAddendum = async (req: Request, res: Response): Promise<void> => {
+	const providerId = authUserId(req);
+	await getProviderRole(providerId);
+
+	const patientId = String(req.params.patientId || '').trim();
+	const noteId = String(req.params.noteId || '').trim();
+	const { content, providerSignature } = req.body as { content: string; providerSignature?: string };
+
+	if (!noteId || !content) {
+		sendError(res, 'noteId and content are required', 400);
+		return;
+	}
+
+	try {
+		// create addendum row
+		const row = await prisma.addendum.create({ data: { noteId, content: String(content || ''), providerSignature: providerSignature ? String(providerSignature) : null } });
+		sendSuccess(res, row, 'Addendum created');
+	} catch (err) {
+		console.error('createAddendum error', err);
+		sendError(res, err instanceof Error ? err.message : 'Unable to create addendum', 500);
+	}
+};
+
 export const createPatientNote = async (req: Request, res: Response): Promise<void> => {
 	const providerId = authUserId(req);
 	await getProviderRole(providerId);
@@ -1662,6 +1691,7 @@ export const updatePatientNote = async (req: Request, res: Response): Promise<vo
 			select: {
 				id: true,
 				sessionId: true,
+				patientId: true,
 				sessionType: true,
 				subjective: true,
 				objective: true,
@@ -1695,6 +1725,68 @@ export const updatePatientNote = async (req: Request, res: Response): Promise<vo
 		plan: updated.note.plan,
 		createdAt: updated.note.createdAt.toISOString(),
 	};
+
+	// Trigger PDF generation & upload for signed notes (fire-and-forget)
+	if (String(updated.note.status || '').toLowerCase() === 'signed') {
+		(async () => {
+			try {
+				const doc = new PDFDocument({ margin: 50 });
+				const fileName = `note-${updated.note.id}-${Date.now()}.pdf`;
+				const exportDir = path.join(process.cwd(), 'exports', 'notes');
+				await fs.promises.mkdir(exportDir, { recursive: true });
+				const tmpPath = path.join(exportDir, fileName);
+				const stream = fs.createWriteStream(tmpPath);
+				doc.pipe(stream);
+				doc.fontSize(20).text('Clinical Note', { align: 'center' });
+				doc.moveDown();
+				doc.fontSize(12).text(`Therapist: ${responseData.providerName}`);
+				doc.text(`Patient ID: ${updated.note.patientId}`);
+				doc.text(`Session Date: ${responseData.sessionDate}`);
+				doc.moveDown();
+				doc.fontSize(12).text('Subjective');
+				doc.fontSize(10).text(updated.note.subjective || '');
+				doc.moveDown();
+				doc.fontSize(12).text('Objective');
+				doc.fontSize(10).text(updated.note.objective || '');
+				doc.moveDown();
+				doc.fontSize(12).text('Assessment');
+				doc.fontSize(10).text(updated.note.assessment || '');
+				doc.moveDown();
+				doc.fontSize(12).text('Plan');
+				doc.fontSize(10).text(updated.note.plan || '');
+				doc.end();
+				await new Promise<void>((resolve, reject) => stream.on('finish', () => resolve()).on('error', (err) => reject(err)));
+				const buffer = await fs.promises.readFile(tmpPath);
+						// resolve patient user id (notes store patientProfileId but inbox rooms use userId)
+						let patientUserId = updated.note.patientId;
+						try {
+							const profile = await prisma.patientProfile.findUnique({ where: { id: String(updated.note.patientId) }, select: { userId: true } });
+							if (profile?.userId) patientUserId = profile.userId;
+						} catch {
+							// fallback to whatever id we have
+						}
+
+						const objectKey = `patient-documents/${patientUserId}/${fileName}`;
+						await s3Client.send(new PutObjectCommand(Object.assign({ Bucket: env.awsS3Bucket, Key: objectKey, Body: buffer, ContentType: 'application/pdf' }, env.awsS3DisableServerSideEncryption ? {} : { ServerSideEncryption: 'AES256' as ServerSideEncryption })));
+						const createdDoc = await prisma.patientDocument.create({ data: { patientId: patientUserId, title: `Signed Note — ${responseData.sessionType}`, source: 'session-note', sourceId: updated.note.id, s3ObjectKey: objectKey } });
+						try {
+							// notify patient's inbox in real time if socket is available
+							const { notifyPatientDocument } = await import('../routes/gps.routes');
+							notifyPatientDocument(patientUserId, {
+								id: createdDoc.id,
+								title: createdDoc.title,
+								date: createdDoc.createdAt,
+								category: 'session',
+								s3ObjectKey: createdDoc.s3ObjectKey,
+							});
+						} catch (e) {
+							console.warn('real-time notify failed', e);
+						}
+			} catch (e) {
+				console.error('note PDF generation/upload failed', e);
+			}
+		})();
+	}
 
 	sendSuccess(res, responseData, 'Patient note updated');
 };
@@ -1859,9 +1951,9 @@ export const saveWeeklyPlan = async (req: Request, res: Response): Promise<void>
 		throw new AppError('Patient id is required', 400);
 	}
 
-	const inputWeekNumber = Number(req.body?.weekNumber);
-	if (!Number.isInteger(inputWeekNumber) || inputWeekNumber < 1) {
-		throw new AppError('weekNumber must be a positive integer', 400);
+	const inputDayNumber = Number(req.body?.dayNumber ?? req.body?.weekNumber);
+	if (!Number.isInteger(inputDayNumber) || inputDayNumber < 1) {
+		throw new AppError('dayNumber must be a positive integer', 400);
 	}
 
 	const activitiesInput = Array.isArray(req.body?.activities) ? req.body.activities : null;
@@ -1921,7 +2013,7 @@ export const saveWeeklyPlan = async (req: Request, res: Response): Promise<void>
 			referenceId: item?.referenceId ? String(item.referenceId) : null,
 			estimatedMinutes: Number.isFinite(Number(item?.estimatedMinutes)) ? Number(item.estimatedMinutes) : 10,
 			orderIndex: Number.isInteger(Number(item?.orderIndex)) ? Number(item.orderIndex) : index,
-			weekNumber: inputWeekNumber,
+			dayNumber: inputDayNumber,
 			category: item?.category ? String(item.category).trim() || null : null,
 			status: 'PENDING',
 			isPublished: false,
@@ -1932,7 +2024,7 @@ export const saveWeeklyPlan = async (req: Request, res: Response): Promise<void>
 		const existingWeekActivities = await tx.therapyPlanActivity.findMany({
 			where: {
 				planId: plan!.id,
-				weekNumber: inputWeekNumber,
+				dayNumber: inputDayNumber,
 			},
 			select: {
 				id: true,
@@ -1953,7 +2045,7 @@ export const saveWeeklyPlan = async (req: Request, res: Response): Promise<void>
 				referenceId: activity.referenceId,
 				estimatedMinutes: activity.estimatedMinutes,
 				orderIndex: activity.orderIndex,
-				weekNumber: activity.weekNumber,
+				dayNumber: activity.dayNumber,
 				category: activity.category,
 				status: activity.status,
 				isPublished: activity.isPublished,
@@ -1980,7 +2072,7 @@ export const saveWeeklyPlan = async (req: Request, res: Response): Promise<void>
 		const deleted = await tx.therapyPlanActivity.deleteMany({
 			where: {
 				planId: plan!.id,
-				weekNumber: inputWeekNumber,
+				dayNumber: inputDayNumber,
 				status: 'PENDING',
 				id: retainedIds.length > 0 ? { notIn: retainedIds } : undefined,
 			},
@@ -1996,7 +2088,7 @@ export const saveWeeklyPlan = async (req: Request, res: Response): Promise<void>
 	sendSuccess(res, {
 		planId: plan.id,
 		patientId,
-		weekNumber: inputWeekNumber,
+		dayNumber: inputDayNumber,
 		deletedCount: result.deletedCount,
 		insertedCount: result.insertedCount,
 		updatedCount: result.updatedCount,
@@ -2014,9 +2106,9 @@ export const publishWeeklyPlan = async (req: Request, res: Response): Promise<vo
 		throw new AppError('Patient id is required', 400);
 	}
 
-	const inputWeekNumber = Number(req.body?.weekNumber);
-	if (!Number.isInteger(inputWeekNumber) || inputWeekNumber < 1) {
-		throw new AppError('weekNumber must be a positive integer', 400);
+	const inputDayNumber = Number(req.body?.dayNumber ?? req.body?.weekNumber);
+	if (!Number.isInteger(inputDayNumber) || inputDayNumber < 1) {
+		throw new AppError('dayNumber must be a positive integer', 400);
 	}
 
 	const { patientProfileId } = await ensureProviderPatientAccess(providerId, patientId);
@@ -2038,7 +2130,7 @@ export const publishWeeklyPlan = async (req: Request, res: Response): Promise<vo
 	const updated = await prisma.therapyPlanActivity.updateMany({
 		where: {
 			planId: plan.id,
-			weekNumber: inputWeekNumber,
+			dayNumber: inputDayNumber,
 		},
 		data: {
 			isPublished: true,
@@ -2048,7 +2140,7 @@ export const publishWeeklyPlan = async (req: Request, res: Response): Promise<vo
 	sendSuccess(res, {
 		planId: plan.id,
 		patientId,
-		weekNumber: inputWeekNumber,
+		dayNumber: inputDayNumber,
 		publishedCount: updated.count,
 	}, 'Weekly plan published');
 };
@@ -2436,4 +2528,544 @@ export const generateMeetingLink = async (req: Request, res: Response): Promise<
 		},
 		'Meeting link generated',
 	);
+};
+
+// ============ PRESCRIPTION CRUD ============
+
+export const createPrescription = async (req: Request, res: Response): Promise<void> => {
+	const providerId = authUserId(req);
+	await getProviderRole(providerId);
+	const patientId = String(req.params.patientId);
+	await ensureProviderPatientAccess(providerId, patientId);
+
+	const drugName = String(req.body?.drugName || '').trim();
+	const dosage = String(req.body?.dosage || '').trim();
+	const instructions = String(req.body?.instructions || '').trim();
+	const refillsRemaining = Math.max(0, Number(req.body?.refillsRemaining ?? 0));
+	const warnings = Array.isArray(req.body?.warnings) ? req.body.warnings.map(String) : [];
+
+	if (!drugName) throw new AppError('drugName is required', 400);
+	if (!dosage) throw new AppError('dosage is required', 400);
+	if (!instructions) throw new AppError('instructions is required', 400);
+
+	const prescription = await prisma.prescription.create({
+		data: {
+			patientId,
+			providerId,
+			drugName,
+			dosage,
+			instructions,
+			refillsRemaining,
+			warnings,
+			status: 'ACTIVE',
+			adherenceRate: 0,
+		},
+	});
+
+	// fire-and-forget: generate prescription PDF, upload and notify patient
+	void (async () => {
+		try {
+			const { publishPrescriptionDocument } = await import('../services/documents.service');
+			await publishPrescriptionDocument(prescription.id);
+		} catch (e) {
+			console.warn('prescription document publish failed', e);
+		}
+	})();
+
+	sendSuccess(res, {
+		id: prescription.id,
+		drugName: prescription.drugName,
+		dosage: prescription.dosage,
+		instructions: prescription.instructions,
+		prescribedDate: prescription.prescribedDate.toISOString(),
+		refillsRemaining: prescription.refillsRemaining,
+		status: 'Active',
+		adherenceRate: 0,
+		warnings: prescription.warnings,
+	}, 'Prescription created', 201);
+};
+
+export const updatePrescription = async (req: Request, res: Response): Promise<void> => {
+	const providerId = authUserId(req);
+	await getProviderRole(providerId);
+	const patientId = String(req.params.patientId);
+	const prescriptionId = String(req.params.prescriptionId);
+	await ensureProviderPatientAccess(providerId, patientId);
+
+	const existing = await prisma.prescription.findFirst({
+		where: { id: prescriptionId, patientId, providerId },
+	});
+	if (!existing) throw new AppError('Prescription not found', 404);
+
+	const data: Record<string, unknown> = {};
+	if (req.body?.dosage !== undefined) data.dosage = String(req.body.dosage).trim();
+	if (req.body?.instructions !== undefined) data.instructions = String(req.body.instructions).trim();
+	if (req.body?.refillsRemaining !== undefined) data.refillsRemaining = Math.max(0, Number(req.body.refillsRemaining));
+	if (req.body?.warnings !== undefined) data.warnings = Array.isArray(req.body.warnings) ? req.body.warnings.map(String) : [];
+
+	const updated = await prisma.prescription.update({
+		where: { id: prescriptionId },
+		data,
+	});
+
+	sendSuccess(res, {
+		id: updated.id,
+		drugName: updated.drugName,
+		dosage: updated.dosage,
+		instructions: updated.instructions,
+		prescribedDate: updated.prescribedDate.toISOString(),
+		refillsRemaining: updated.refillsRemaining,
+		status: updated.status === 'ACTIVE' ? 'Active' : 'Discontinued',
+		adherenceRate: updated.adherenceRate,
+		warnings: updated.warnings,
+	}, 'Prescription updated');
+};
+
+export const discontinuePrescription = async (req: Request, res: Response): Promise<void> => {
+	const providerId = authUserId(req);
+	await getProviderRole(providerId);
+	const patientId = String(req.params.patientId);
+	const prescriptionId = String(req.params.prescriptionId);
+	await ensureProviderPatientAccess(providerId, patientId);
+
+	const existing = await prisma.prescription.findFirst({
+		where: { id: prescriptionId, patientId, providerId },
+	});
+	if (!existing) throw new AppError('Prescription not found', 404);
+
+	await prisma.prescription.update({
+		where: { id: prescriptionId },
+		data: { status: 'DISCONTINUED' },
+	});
+
+	sendSuccess(res, { id: prescriptionId, status: 'Discontinued' }, 'Prescription discontinued');
+};
+
+// ============ LAB ORDER CRUD ============
+
+export const createLabOrder = async (req: Request, res: Response): Promise<void> => {
+	const providerId = authUserId(req);
+	await getProviderRole(providerId);
+	const patientId = String(req.params.patientId);
+	await ensureProviderPatientAccess(providerId, patientId);
+
+	const testName = String(req.body?.testName || '').trim();
+	const interpretation = String(req.body?.interpretation || '').trim();
+	const biomarkers = Array.isArray(req.body?.biomarkers) ? req.body.biomarkers : [];
+
+	if (!testName) throw new AppError('testName is required', 400);
+
+	const provider = await prisma.user.findUnique({
+		where: { id: providerId },
+		select: { firstName: true, lastName: true, name: true },
+	});
+
+	const labOrder = await prisma.labOrder.create({
+		data: {
+			patientId,
+			providerId,
+			testName,
+			orderingPhysician: toPatientName(provider?.firstName, provider?.lastName, provider?.name),
+			interpretation: interpretation || 'Pending interpretation',
+			biomarkers,
+			status: 'PENDING',
+		},
+	});
+
+	sendSuccess(res, {
+		id: labOrder.id,
+		testName: labOrder.testName,
+		dateOrdered: labOrder.dateOrdered.toISOString(),
+		status: 'Pending',
+		orderingPhysician: labOrder.orderingPhysician,
+		interpretation: labOrder.interpretation,
+		biomarkers: labOrder.biomarkers,
+	}, 'Lab order created', 201);
+};
+
+export const updateLabOrderStatus = async (req: Request, res: Response): Promise<void> => {
+	const providerId = authUserId(req);
+	await getProviderRole(providerId);
+	const patientId = String(req.params.patientId);
+	const labId = String(req.params.labId);
+	await ensureProviderPatientAccess(providerId, patientId);
+
+	const existing = await prisma.labOrder.findFirst({
+		where: { id: labId, patientId, providerId },
+	});
+	if (!existing) throw new AppError('Lab order not found', 404);
+
+	const data: Record<string, unknown> = {};
+	if (req.body?.status) {
+		const normalized = String(req.body.status).toUpperCase();
+		if (['PENDING', 'RESULTS_READY', 'REVIEWED'].includes(normalized)) {
+			data.status = normalized;
+		}
+	}
+	if (req.body?.interpretation !== undefined) data.interpretation = String(req.body.interpretation).trim();
+	if (req.body?.biomarkers !== undefined) data.biomarkers = Array.isArray(req.body.biomarkers) ? req.body.biomarkers : existing.biomarkers;
+
+	const updated = await prisma.labOrder.update({
+		where: { id: labId },
+		data,
+	});
+
+	const displayStatus = updated.status === 'RESULTS_READY' ? 'Results Ready' : updated.status === 'REVIEWED' ? 'Reviewed' : 'Pending';
+
+	sendSuccess(res, {
+		id: updated.id,
+		testName: updated.testName,
+		dateOrdered: updated.dateOrdered.toISOString(),
+		status: displayStatus,
+		orderingPhysician: updated.orderingPhysician,
+		interpretation: updated.interpretation,
+		biomarkers: updated.biomarkers,
+	}, 'Lab order updated');
+};
+
+// ============ GOAL CRUD ============
+
+export const createGoal = async (req: Request, res: Response): Promise<void> => {
+	const providerId = authUserId(req);
+	await getProviderRole(providerId);
+	const patientId = String(req.params.patientId);
+	await ensureProviderPatientAccess(providerId, patientId);
+
+	const title = String(req.body?.title || '').trim();
+	const category = String(req.body?.category || '').trim() || 'Wellness';
+
+	if (!title) throw new AppError('title is required', 400);
+
+	const goal = await prisma.goal.create({
+		data: {
+			patientId,
+			providerId,
+			title,
+			category,
+			status: 'IN_PROGRESS',
+		},
+	});
+
+	sendSuccess(res, {
+		id: goal.id,
+		title: goal.title,
+		category: goal.category,
+		status: goal.status,
+		startDate: goal.startDate.toISOString(),
+		streak: 0,
+		completionRate: 0,
+		weeklyTracker: ['empty', 'empty', 'empty', 'empty', 'empty', 'empty', 'empty'],
+	}, 'Goal created', 201);
+};
+
+export const updateGoal = async (req: Request, res: Response): Promise<void> => {
+	const providerId = authUserId(req);
+	await getProviderRole(providerId);
+	const patientId = String(req.params.patientId);
+	const goalId = String(req.params.goalId);
+	await ensureProviderPatientAccess(providerId, patientId);
+
+	const existing = await prisma.goal.findFirst({
+		where: { id: goalId, patientId, providerId },
+	});
+	if (!existing) throw new AppError('Goal not found', 404);
+
+	const data: Record<string, unknown> = {};
+	if (req.body?.title !== undefined) data.title = String(req.body.title).trim();
+	if (req.body?.category !== undefined) data.category = String(req.body.category).trim();
+	if (req.body?.status !== undefined) {
+		const normalized = String(req.body.status).toUpperCase();
+		if (['IN_PROGRESS', 'COMPLETED', 'PAUSED'].includes(normalized)) {
+			data.status = normalized;
+			if (normalized === 'COMPLETED') data.completedAt = new Date();
+		}
+	}
+
+	const updated = await prisma.goal.update({
+		where: { id: goalId },
+		data,
+	});
+
+	sendSuccess(res, {
+		id: updated.id,
+		title: updated.title,
+		category: updated.category,
+		status: updated.status,
+		startDate: updated.startDate.toISOString(),
+	}, 'Goal updated');
+};
+
+// ============ CARE-TEAM MANAGEMENT ============
+
+export const getProviderCareTeam = async (req: Request, res: Response): Promise<void> => {
+	const providerId = authUserId(req);
+	await getProviderRole(providerId);
+
+	const assignments = await prisma.careTeamAssignment.findMany({
+		where: { providerId, status: 'ACTIVE' },
+		include: {
+			patient: {
+				select: { id: true, firstName: true, lastName: true, name: true, email: true },
+			},
+		},
+		orderBy: { assignedAt: 'desc' },
+	});
+
+	const careTeam = assignments.map((a) => ({
+		assignmentId: a.id,
+		patientId: a.patientId,
+		patientName: toPatientName(a.patient.firstName, a.patient.lastName, a.patient.name),
+		patientEmail: a.patient.email,
+		assignedAt: a.assignedAt.toISOString(),
+		accessScope: a.accessScope,
+	}));
+
+	sendSuccess(res, careTeam, 'Care team fetched');
+};
+
+export const assignCareTeam = async (req: Request, res: Response): Promise<void> => {
+	const providerId = authUserId(req);
+	await getProviderRole(providerId);
+	const patientId = req.params.patientId;
+
+	const patient = await prisma.user.findUnique({
+		where: { id: patientId },
+		select: { id: true, role: true },
+	});
+	if (!patient || String(patient.role).toLowerCase() !== 'patient') {
+		throw new AppError('Patient not found', 404);
+	}
+
+	const existing = await prisma.careTeamAssignment.findUnique({
+		where: { patientId_providerId: { patientId, providerId } },
+	});
+
+	if (existing && existing.status === 'ACTIVE') {
+		sendSuccess(res, { assignmentId: existing.id, status: 'ACTIVE' }, 'Already assigned');
+		return;
+	}
+
+	const accessScope = req.body?.accessScope ?? { chart: true, messaging: true, sessions: true };
+
+	const assignment = existing
+		? await prisma.careTeamAssignment.update({
+				where: { id: existing.id },
+				data: { status: 'ACTIVE', revokedAt: null, accessScope, assignedAt: new Date() },
+			})
+		: await prisma.careTeamAssignment.create({
+				data: {
+					patientId,
+					providerId,
+					assignedById: providerId,
+					accessScope,
+					status: 'ACTIVE',
+				},
+			});
+
+	sendSuccess(res, { assignmentId: assignment.id, status: 'ACTIVE' }, 'Care team assignment created', 201);
+};
+
+export const removeCareTeam = async (req: Request, res: Response): Promise<void> => {
+	const providerId = authUserId(req);
+	await getProviderRole(providerId);
+	const patientId = req.params.patientId;
+
+	const existing = await prisma.careTeamAssignment.findUnique({
+		where: { patientId_providerId: { patientId, providerId } },
+	});
+
+	if (!existing || existing.status !== 'ACTIVE') {
+		throw new AppError('Care team assignment not found', 404);
+	}
+
+	await prisma.careTeamAssignment.update({
+		where: { id: existing.id },
+		data: { status: 'REVOKED', revokedAt: new Date() },
+	});
+
+	sendSuccess(res, { assignmentId: existing.id, status: 'REVOKED' }, 'Care team assignment revoked');
+};
+
+// ============ APPOINTMENT REQUEST QUEUE ============
+
+export const getPendingAppointmentRequests = async (req: Request, res: Response): Promise<void> => {
+	const providerId = authUserId(req);
+	await getProviderRole(providerId);
+
+	const requests = await prisma.appointmentRequest.findMany({
+		where: { status: 'PENDING' },
+		orderBy: { createdAt: 'desc' },
+		include: {
+			patient: {
+				select: { id: true, firstName: true, lastName: true, name: true, email: true },
+			},
+		},
+	});
+
+	const pending = requests.filter((r) => {
+		const providers = Array.isArray(r.providers) ? r.providers : [];
+		return (providers as Array<{ providerId: string; status?: string }>).some(
+			(p) => p.providerId === providerId && (!p.status || p.status === 'PENDING'),
+		);
+	});
+
+	const result = pending.map((r) => ({
+		id: r.id,
+		patientId: r.patientId,
+		patientName: toPatientName(r.patient.firstName, r.patient.lastName, r.patient.name),
+		patientEmail: r.patient.email,
+		availabilityPrefs: r.availabilityPrefs,
+		preferredSpecialization: r.preferredSpecialization,
+		durationMinutes: r.durationMinutes,
+		createdAt: r.createdAt.toISOString(),
+		expiresAt: r.expiresAt?.toISOString() || null,
+	}));
+
+	sendSuccess(res, result, 'Pending appointment requests fetched');
+};
+
+// ============ PATIENT DOCUMENTS AGGREGATION ============
+
+export const getPatientDocuments = async (req: Request, res: Response): Promise<void> => {
+	const providerId = authUserId(req);
+	await getProviderRole(providerId);
+	const patientId = String(req.params.patientId);
+	await ensureProviderPatientAccess(providerId, patientId);
+
+	const [notes, prescriptions, assessments] = await Promise.all([
+		prisma.therapistSessionNote.findMany({
+			where: {
+				session: {
+					therapistProfileId: providerId,
+					patientProfile: { userId: patientId },
+				},
+			},
+			orderBy: { createdAt: 'desc' },
+			take: 20,
+			select: {
+				id: true,
+				sessionType: true,
+				status: true,
+				createdAt: true,
+				session: {
+					select: { dateTime: true },
+				},
+			},
+		}),
+		prisma.prescription.findMany({
+			where: { patientId, providerId },
+			orderBy: { prescribedDate: 'desc' },
+			take: 20,
+			select: {
+				id: true,
+				drugName: true,
+				dosage: true,
+				status: true,
+				prescribedDate: true,
+			},
+		}),
+		prisma.patientAssessment.findMany({
+			where: {
+				patientProfile: { userId: patientId },
+			},
+			orderBy: { createdAt: 'desc' },
+			take: 20,
+			select: {
+				id: true,
+				type: true,
+				totalScore: true,
+				createdAt: true,
+			},
+		}),
+	]);
+
+	type DocItem = { id: string; title: string; date: string; category: 'official' | 'session' | 'assessment' };
+
+	const documents: DocItem[] = [
+		...notes.map((n) => ({
+			id: n.id,
+			title: `Session Notes — ${n.sessionType || 'Consultation'} (${toDisplayNoteStatus(n.status || undefined)})`,
+			date: (n.session?.dateTime || n.createdAt).toISOString().slice(0, 10),
+			category: 'session' as const,
+		})),
+		...prescriptions.map((p) => ({
+			id: p.id,
+			title: `Prescription — ${p.drugName} ${p.dosage}`,
+			date: p.prescribedDate.toISOString().slice(0, 10),
+			category: 'official' as const,
+		})),
+		...assessments.map((a) => ({
+			id: a.id,
+			title: `${a.type} Result — Score ${a.totalScore}`,
+			date: a.createdAt.toISOString().slice(0, 10),
+			category: 'assessment' as const,
+		})),
+	];
+
+	documents.sort((a, b) => b.date.localeCompare(a.date));
+
+	sendSuccess(res, documents, 'Patient documents fetched');
+};
+
+// ── Accept appointment request ─────────────────────────────────────
+export const acceptAppointmentRequest = async (req: Request, res: Response): Promise<void> => {
+	const userId = authUserId(req);
+	const requestId = String(req.params.requestId);
+	const { scheduledAt } = req.body as { scheduledAt: string };
+
+	if (!scheduledAt) {
+		sendError(res, 'scheduledAt is required', 400);
+		return;
+	}
+
+	const appointmentReq = await prisma.appointmentRequest.findFirst({
+		where: { id: requestId, providerId: userId, status: 'PENDING' },
+	});
+
+	if (!appointmentReq) {
+		sendError(res, 'Appointment request not found or already handled', 404);
+		return;
+	}
+
+	// Create a calendar session
+	const session = await prisma.calendarSession.create({
+		data: {
+			patientId: appointmentReq.patientId,
+			providerId: userId,
+			dateTime: new Date(scheduledAt),
+			duration: appointmentReq.durationMinutes || 50,
+			type: 'Therapy',
+			status: 'Upcoming',
+		},
+	});
+
+	// Update request status
+	await prisma.appointmentRequest.update({
+		where: { id: requestId },
+		data: { status: 'ACCEPTED' },
+	});
+
+	sendSuccess(res, { sessionId: session.id, scheduledAt }, 'Appointment accepted and scheduled');
+};
+
+// ── Reject appointment request ─────────────────────────────────────
+export const rejectAppointmentRequest = async (req: Request, res: Response): Promise<void> => {
+	const userId = authUserId(req);
+	const requestId = String(req.params.requestId);
+
+	const appointmentReq = await prisma.appointmentRequest.findFirst({
+		where: { id: requestId, providerId: userId, status: 'PENDING' },
+	});
+
+	if (!appointmentReq) {
+		sendError(res, 'Appointment request not found or already handled', 404);
+		return;
+	}
+
+	await prisma.appointmentRequest.update({
+		where: { id: requestId },
+		data: { status: 'REJECTED' },
+	});
+
+	sendSuccess(res, { requestId }, 'Appointment request declined');
 };

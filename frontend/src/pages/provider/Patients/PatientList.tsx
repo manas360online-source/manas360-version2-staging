@@ -33,9 +33,13 @@ const getSessionText = (item: { nextSessionDate: string | null; lastSessionDate:
 
 const loadingRows = Array.from({ length: 6 });
 
+type StatusFilter = 'All' | 'Active' | 'At Risk' | 'Needs Review';
+
 export default function PatientList() {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('All');
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
   const {
     data: patients = [],
     isLoading,
@@ -44,17 +48,25 @@ export default function PatientList() {
   } = useProviderPatients();
 
   const filtered = useMemo(() => {
-    const term = query.trim().toLowerCase();
-    if (!term) return patients;
+    let result = patients;
 
-    return patients.filter((item) => {
-      return (
-        item.name.toLowerCase().includes(term) ||
-        String(item.email || '').toLowerCase().includes(term) ||
-        item.primaryConcern.toLowerCase().includes(term)
-      );
-    });
-  }, [query, patients]);
+    if (statusFilter !== 'All') {
+      result = result.filter((item) => item.status === statusFilter);
+    }
+
+    const term = query.trim().toLowerCase();
+    if (term) {
+      result = result.filter((item) => {
+        return (
+          item.name.toLowerCase().includes(term) ||
+          String(item.email || '').toLowerCase().includes(term) ||
+          item.primaryConcern.toLowerCase().includes(term)
+        );
+      });
+    }
+
+    return result;
+  }, [query, patients, statusFilter]);
 
   const mappedRows: PatientRow[] = useMemo(() => {
     return filtered.map((item) => ({
@@ -85,13 +97,34 @@ export default function PatientList() {
               className="w-full border-0 bg-transparent text-sm text-slate-700 outline-none"
             />
           </label>
-          <button
-            type="button"
-            className="inline-flex items-center gap-2 rounded-xl border border-[#E5E5E5] bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-all hover:shadow-md hover:-translate-y-0.5"
-          >
-            <Filter className="h-4 w-4" />
-            Filter
-          </button>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowFilterMenu(!showFilterMenu)}
+              className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-all hover:shadow-md hover:-translate-y-0.5 ${
+                statusFilter !== 'All' ? 'border-[#4A6741] bg-[#E8EFE6] text-[#2D4128]' : 'border-[#E5E5E5] bg-white text-slate-700'
+              }`}
+            >
+              <Filter className="h-4 w-4" />
+              {statusFilter === 'All' ? 'Filter' : statusFilter}
+            </button>
+            {showFilterMenu && (
+              <div className="absolute right-0 top-full z-20 mt-1 w-44 rounded-xl border border-[#E5E5E5] bg-white py-1 shadow-lg">
+                {(['All', 'Active', 'At Risk', 'Needs Review'] as StatusFilter[]).map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => { setStatusFilter(opt); setShowFilterMenu(false); }}
+                    className={`w-full px-4 py-2 text-left text-sm transition ${
+                      statusFilter === opt ? 'bg-[#E8EFE6] font-semibold text-[#2D4128]' : 'text-slate-700 hover:bg-[#FAFAF8]'
+                    }`}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </header>
 

@@ -145,13 +145,30 @@ export default function SlideOverBookingDrawer({
       const scheduledAt = new Date(selectedDate);
       scheduledAt.setHours(hours, minutes, 0, 0);
 
-      // Call the existing patientApi endpoint
+      // Call the existing patientApi endpoint to create the therapy booking
       await patientApi.bookSession({
         providerId: provider.id,
         scheduledAt: scheduledAt.toISOString(),
         durationMinutes: 50,
       });
 
+      // Initiate session payment so backend returns a gateway redirect URL
+      try {
+        const amountRupees = provider.sessionPrice || 1500;
+        const amountMinor = Math.round(Number(amountRupees) * 100); // convert to paise
+        const paymentPayload: any = await patientApi.createSessionPayment({ providerId: provider.id, amountMinor });
+        const redirectUrl = paymentPayload?.redirectUrl || paymentPayload?.data?.redirectUrl;
+        if (redirectUrl) {
+          // Redirect user to payment gateway
+          window.location.href = redirectUrl;
+          return;
+        }
+      } catch (payErr: any) {
+        // If payment initiation fails, fall back to showing success + allow manual handling
+        console.warn('Session payment initiation failed', payErr);
+      }
+
+      // If no redirect required, show success UI and close drawer
       setStep(3); // Show Success UI
       // Notify parent to refresh the Care Team / Next Up state
       setTimeout(() => {

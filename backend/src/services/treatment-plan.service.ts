@@ -139,10 +139,10 @@ const getOrCreateActivePlan = async (patientProfileId: string, providerId: strin
   return plan;
 };
 
-const getCurrentTreatmentWeek = (startDate: Date): number => {
-  const millisPerWeek = 7 * 24 * 60 * 60 * 1000;
+const getCurrentTreatmentDay = (startDate: Date): number => {
+  const millisPerDay = 24 * 60 * 60 * 1000;
   const diff = Math.max(0, Date.now() - startDate.getTime());
-  return Math.floor(diff / millisPerWeek) + 1;
+  return Math.floor(diff / millisPerDay) + 1;
 };
 
 export const syncTreatmentPlanFromAssessment = async (
@@ -184,7 +184,7 @@ export const syncTreatmentPlanFromAssessment = async (
   };
 };
 
-export const getMyTreatmentPlan = async (userId: string, weekNumber?: number) => {
+export const getMyTreatmentPlan = async (userId: string, dayNumber?: number) => {
   const connectedProviderId = await getConnectedProvider(userId);
   if (!connectedProviderId) {
     throw new AppError('Therapy plan will be available once you are connected with a provider.', 404);
@@ -192,16 +192,14 @@ export const getMyTreatmentPlan = async (userId: string, weekNumber?: number) =>
 
   const patientProfile = await getPatientProfile(userId);
   const plan = await getOrCreateActivePlan(patientProfile.id, connectedProviderId);
-  const currentWeek = getCurrentTreatmentWeek(plan.startDate);
-  const selectedWeek = weekNumber && Number.isInteger(weekNumber) && weekNumber > 0 ? weekNumber : currentWeek;
-  const filteredActivities = plan.activities.filter(
-    (item) => Number(item.weekNumber || 1) === selectedWeek && item.isPublished,
-  );
+  const currentDay = getCurrentTreatmentDay(plan.startDate);
+  const selectedDay = dayNumber && Number.isInteger(dayNumber) && dayNumber > 0 ? dayNumber : currentDay;
+  const filteredActivities = plan.activities.filter((item) => Number(item.dayNumber || 1) === selectedDay && item.isPublished);
 
-  const completed = filteredActivities.filter(a => a.status === 'COMPLETED').length;
+  const completed = filteredActivities.filter((a) => a.status === 'COMPLETED').length;
   const adherencePercent = filteredActivities.length ? Number(((completed / filteredActivities.length) * 100).toFixed(1)) : 0;
-  const maxAssignedWeek = plan.activities.reduce((max, item) => Math.max(max, Number(item.weekNumber || 1)), 1);
-  const totalWeeks = Math.max(maxAssignedWeek, currentWeek);
+  const maxAssignedDay = plan.activities.reduce((max, item) => Math.max(max, Number(item.dayNumber || 1)), 1);
+  const totalDays = Math.max(maxAssignedDay, currentDay);
 
   // We map cleanly to the format the frontend expects, which has the new properties.
   return {
@@ -212,9 +210,9 @@ export const getMyTreatmentPlan = async (userId: string, weekNumber?: number) =>
       providerNote: plan.providerNote,
       startDate: plan.startDate,
       endDate: plan.endDate,
-      weekNumber: selectedWeek,
-      totalWeeks,
-      currentWeek,
+      dayNumber: selectedDay,
+      totalDays,
+      currentDay,
       adherencePercent,
       updatedAt: plan.updatedAt,
     },
@@ -224,7 +222,7 @@ export const getMyTreatmentPlan = async (userId: string, weekNumber?: number) =>
       frequency: item.frequency,
       activityType: item.activityType,
       category: item.category,
-      weekNumber: item.weekNumber,
+      dayNumber: item.dayNumber,
       status: item.status,
       completedAt: item.completedAt,
       estimatedMinutes: item.estimatedMinutes,

@@ -69,3 +69,14 @@ export const adminAnalyticsExportRateLimiter = rateLimit({
 	},
 });
 
+export const documentsRateLimiter = rateLimit({
+	windowMs: 10 * 60 * 1000,
+	max: 50,
+	standardHeaders: true,
+	legacyHeaders: false,
+	message: {
+		success: false,
+		message: 'Too many document requests. Please try again in a few minutes.',
+	},
+});
+

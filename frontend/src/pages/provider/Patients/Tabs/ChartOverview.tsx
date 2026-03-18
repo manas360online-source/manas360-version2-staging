@@ -6,6 +6,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { assignPatientItem, scheduleNextSession } from '../../../../api/provider';
 import { useAuth } from '../../../../context/AuthContext';
 import { usePatientOverview } from '../../../../hooks/usePatientOverview';
+import { usePatientPrescriptions } from '../../../../hooks/usePatientPrescriptions';
+import { usePatientGoals } from '../../../../hooks/usePatientGoals';
 
 type ProviderKind = 'THERAPIST' | 'PSYCHIATRIST' | 'COACH' | 'PSYCHOLOGIST';
 
@@ -19,23 +21,7 @@ type ContextItem = {
   subtitle: string;
 };
 
-const psychiatristContext: ContextItem[] = [
-  { title: 'Sertraline 50 mg', subtitle: 'Daily morning dose • adherence stable for 4 weeks' },
-  { title: 'Clonazepam 0.25 mg', subtitle: 'PRN for acute sleep disruption • last refill 8 days ago' },
-  { title: 'Vitamin D3 2000 IU', subtitle: 'Adjunct supplement • monitored under shared care plan' },
-];
-
-const therapyContext: ContextItem[] = [
-  { title: 'Challenge cognitive distortions', subtitle: 'Track all-or-nothing thoughts in post-session worksheet' },
-  { title: 'Behavioral activation target', subtitle: 'Complete 3 restorative activities this week and log energy shift' },
-  { title: 'Sleep routine stabilization', subtitle: 'Maintain wind-down routine before 11 PM on 5 of 7 nights' },
-];
-
-const coachContext: ContextItem[] = [
-  { title: 'Morning walk streak', subtitle: '6-day streak • average completion 24 minutes' },
-  { title: 'Hydration habit', subtitle: 'Goal hit on 5 of last 7 days • consistency improving' },
-  { title: 'Breathing reset practice', subtitle: 'Logged 2 resets today • strongest adherence after lunch' },
-];
+// Removed hardcoded context arrays — now fetched from real patient data
 
 const normalizeRole = (role: string | undefined): ProviderKind => {
   const normalized = String(role || 'THERAPIST').toUpperCase();
@@ -107,6 +93,8 @@ export default function ChartOverview() {
 
   const providerRole = useMemo(() => normalizeRole(user?.role), [user?.role]);
   const { data: overview, isLoading, isError } = usePatientOverview(patientId);
+  const { data: prescriptions = [] } = usePatientPrescriptions(patientId);
+  const { data: goals = [] } = usePatientGoals(patientId);
 
   const { mutate: assignAssessment, isPending: isAssigning } = useMutation({
     mutationFn: () => assignPatientItem(patientId!, { assignmentType: 'ASSESSMENT', title: 'PHQ-9 Assessment' }),
@@ -155,12 +143,27 @@ export default function ChartOverview() {
         ? 'Active Habits & Streaks'
         : 'Active Treatment Plan / CBT Goals';
 
-  const contextItems =
-    providerRole === 'PSYCHIATRIST'
-      ? psychiatristContext
-      : providerRole === 'COACH'
-        ? coachContext
-        : therapyContext;
+  const contextItems: ContextItem[] = useMemo(() => {
+    if (providerRole === 'PSYCHIATRIST') {
+      const activeMeds = prescriptions.filter((rx) => rx.status === 'Active').slice(0, 5);
+      if (activeMeds.length > 0) {
+        return activeMeds.map((rx) => ({
+          title: `${rx.drugName} ${rx.dosage}`,
+          subtitle: `${rx.instructions} • ${rx.refillsRemaining} refills remaining`,
+        }));
+      }
+      return [{ title: 'No active medications', subtitle: 'Prescriptions will appear here when created.' }];
+    }
+    // Therapist, Coach, Psychologist — show goals
+    const activeGoals = goals.filter((g) => g.status === 'IN_PROGRESS').slice(0, 5);
+    if (activeGoals.length > 0) {
+      return activeGoals.map((g) => ({
+        title: g.title,
+        subtitle: `${g.category} • 🔥 ${g.streak}-day streak • ${g.completionRate}% completion`,
+      }));
+    }
+    return [{ title: 'No active goals', subtitle: 'Goals will appear here when created for the patient.' }];
+  }, [providerRole, prescriptions, goals]);
 
   if (isLoading) {
     return <SkeletonGrid />;

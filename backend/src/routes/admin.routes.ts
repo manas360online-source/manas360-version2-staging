@@ -216,6 +216,111 @@ router.get('/analytics/export/:exportJobKey/status', requireAuth, requireRole('a
  * GET /api/v1/admin/analytics/export/:exportJobKey/download
  * Download completed async export output.
  */
-router.get('/analytics/export/:exportJobKey/download', requireAuth, requireRole('admin'), asyncHandler(downloadAdminAnalyticsExportController));
+/**
+ * POST /api/v1/admin/waive-subscription
+ * Admin grants a subscription without charging the user (free access).
+ * Skips PhonePe entirely. Logs as ADMIN_WAIVER_GRANTED.
+ * Generates a dummy transaction audit record.
+ */
+router.post('/waive-subscription', requireAuth, requireRole('admin'), asyncHandler(async (req: any, res: any) => {
+	const { prisma } = await import('../config/db');
+	const { logger } = await import('../utils/logger');
+	const { randomUUID } = await import('crypto');
+
+	const adminId = req.auth?.userId;
+	const userId = String(req.body.userId ?? '').trim();
+	const planKey = String(req.body.planKey ?? 'basic').trim();
+	const durationDays = Number(req.body.durationDays) || 30;
+	const reason = String(req.body.reason ?? 'Admin waiver').trim();
+
+	if (!userId) {
+		return res.status(422).json({ success: false, message: 'userId is required' });
+	}
+
+	const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, role: true } });
+	if (!user) {
+		return res.status(404).json({ success: false, message: 'User not found' });
+	}
+
+	const role = String(user.role || '').toUpperCase();
+	const expiryDate = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000);
+	const dummyTxId = `WAIVER_${Date.now()}_${randomUUID().substring(0, 8)}`;
+
+	// Create a financial record for audit trail
+	await prisma.financialPayment.create({
+		data: {
+			id: randomUUID(),
+			razorpayPaymentId: dummyTxId,
+			status: 'CAPTURED',
+			amountMinor: 0,
+			currency: 'INR',
+			patientId: role === 'PATIENT' ? userId : undefined,
+			providerId: role !== 'PATIENT' ? userId : undefined,
+			metadata: { 
+				action: 'ADMIN_WAIVER', 
+				adminId, 
+                reason, 
+                planKey, 
+                durationDays 
+            }
+		}
+	});
+
+	if (['THERAPIST', 'PSYCHIATRIST', 'PSYCHOLOGIST', 'COACH'].includes(role)) {
+		await prisma.providerSubscription.upsert({
+			where: { providerId: userId },
+			create: {
+				providerId: userId,
+				plan: planKey,
+				status: 'active',
+				startDate: new Date(),
+				expiryDate,
+				leadsUsedThisWeek: 0,
+			},
+			update: {
+				plan: planKey,
+				status: 'active',
+				startDate: new Date(),
+				expiryDate,
+				leadsUsedThisWeek: 0,
+			},
+		});
+	} else {
+		await prisma.patientSubscription.upsert({
+			where: { userId },
+			create: {
+				userId,
+				planName: planKey,
+				price: 0,
+				status: 'active',
+				autoRenew: false,
+				renewalDate: expiryDate,
+			},
+			update: {
+				planName: planKey,
+				price: 0,
+				status: 'active',
+				autoRenew: false,
+				renewalDate: expiryDate,
+			},
+		});
+	}
+
+	logger.info('[AdminWaiver] ADMIN_WAIVER_GRANTED', {
+		adminId,
+		userId,
+		role,
+		planKey,
+		durationDays,
+		expiryDate: expiryDate.toISOString(),
+		reason,
+		dummyTxId
+	});
+
+	res.status(200).json({
+		success: true,
+		message: `Subscription waived for user ${userId}. Plan: ${planKey}, Duration: ${durationDays} days. Record: ${dummyTxId}`,
+	});
+}));
 
 export default router;

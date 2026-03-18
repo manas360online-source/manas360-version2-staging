@@ -96,7 +96,47 @@ export default function SubscribePage() {
       .sort((a, b) => a.minutes - b.minutes);
   }, [pricing?.premiumBundles]);
 
-  const goToPayment = (category: string, itemName: string) => {
+  const mapPlanNameToKey = (name: string) => {
+    const normalized = String(name || '').toLowerCase();
+    if (normalized.includes('free')) return 'free';
+    if (normalized.includes('premium') && normalized.includes('annual')) return 'premium_annual';
+    if (normalized.includes('premium') && normalized.includes('monthly')) return 'premium_monthly';
+    if (normalized.includes('quarter')) return 'quarterly';
+    if (normalized.includes('monthly')) return 'monthly';
+    return normalized.replace(/[^a-z0-9_]+/g, '_');
+  };
+
+  const goToPayment = async (category: string, itemName: string) => {
+    // Platform subscription: attempt to initiate subscription directly
+    if (category === 'platform-subscription') {
+      const planKeyFromPricing = (pricing as any)?.platformFee?.planKey || (pricing as any)?.platformFee?.plan_name || (pricing as any)?.platformFee?.planName;
+      const planKey = String(planKeyFromPricing || itemName || '').trim() || mapPlanNameToKey(String(itemName || 'monthly'));
+
+      if (!isAuthenticated) {
+        const next = `/patient/settings?section=billing&source=subscribe&category=${encodeURIComponent(category)}&item=${encodeURIComponent(itemName)}&planKey=${encodeURIComponent(planKey)}`;
+        navigate(`/auth/login?next=${encodeURIComponent(next)}`);
+        return;
+      }
+
+      try {
+        const resp = await (patientApi as any).upgradeSubscription({ planKey });
+        const payload = (resp as any)?.data ?? resp;
+        if (payload?.redirectUrl) {
+          window.location.href = payload.redirectUrl;
+          return;
+        }
+        // Fallback: navigate to billing section where user can continue
+        navigate(`/patient/settings?section=billing`);
+        return;
+      } catch (err: any) {
+        // On failure, fall back to billing page so user can try again
+        console.error('Failed to initiate subscription:', err);
+        navigate(`/patient/settings?section=billing`);
+        return;
+      }
+    }
+
+    // Default: preserve previous behavior (navigate to billing section)
     const nextPath = `${checkoutBasePath}&source=subscribe&category=${encodeURIComponent(category)}&item=${encodeURIComponent(itemName)}&beneficiaries=${beneficiaryCount}&provider=${encodeURIComponent(selectedProvider)}`;
 
     if (isAuthenticated) {

@@ -1,64 +1,87 @@
-import { Activity, AlertCircle, Download, FileText, Plus } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { Beaker, CheckCircle, MessageSquare, Plus, RefreshCw, X } from 'lucide-react';
+import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { usePatientLabs } from '../../../../hooks/usePatientLabs';
+import { createLabOrder, updateLabOrder, sendGoalMessage } from '../../../../api/provider';
+import type { CreateLabOrderPayload } from '../../../../api/provider';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 
-type LabStatus = 'Pending' | 'Results Ready' | 'Reviewed';
-type BiomarkerStatus = 'High' | 'Normal' | 'Low';
-
-const formatDate = (value: string): string => {
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: '2-digit',
-    year: 'numeric',
-  }).format(new Date(value));
+const statusColor = (status: string) => {
+  switch (status) {
+    case 'Results Ready': return 'bg-amber-50 text-amber-700 border-amber-200';
+    case 'Reviewed': return 'bg-[#f0f5ee] text-[#2D4128] border-[#d4e3cf]';
+    default: return 'bg-slate-50 text-slate-600 border-slate-200';
+  }
 };
 
-const labStatusClass = (status: LabStatus) => {
-  if (status === 'Pending') return 'bg-amber-50 text-amber-700';
-  if (status === 'Results Ready') return 'bg-blue-50 text-blue-700';
-  return 'bg-[#f0f5ee] text-[#2D4128]';
-};
-
-const biomarkerStatusClass = (status: BiomarkerStatus) => {
-  if (status === 'High') return 'bg-red-50 text-red-700';
-  if (status === 'Low') return 'bg-amber-50 text-amber-700';
-  return 'bg-[#f0f5ee] text-[#2D4128]';
-};
+type ModalType = 'create' | 'message' | null;
 
 export default function LabOrders() {
   const { patientId } = useParams();
-  const { data: labOrders = [], isLoading, isError, refetch } = usePatientLabs(patientId);
+  const queryClient = useQueryClient();
+  const { data: labs = [], isLoading, isError, refetch } = usePatientLabs(patientId);
+  const [modalType, setModalType] = useState<ModalType>(null);
   const [selectedLabId, setSelectedLabId] = useState('');
 
-  useEffect(() => {
-    if (!labOrders.length) {
-      setSelectedLabId('');
-      return;
-    }
+  // Form state
+  const [formTestName, setFormTestName] = useState('');
+  const [formInterpretation, setFormInterpretation] = useState('');
+  const [formMessage, setFormMessage] = useState('');
 
-    const hasSelected = labOrders.some((lab) => lab.id === selectedLabId);
-    if (!hasSelected) {
-      setSelectedLabId(labOrders[0].id);
-    }
-  }, [labOrders, selectedLabId]);
+  const invalidate = () => { void queryClient.invalidateQueries({ queryKey: ['patientLabs', patientId] }); };
 
-  const selectedLab = useMemo(
-    () => labOrders.find((lab) => lab.id === selectedLabId) ?? labOrders[0],
-    [labOrders, selectedLabId],
-  );
+  const createMutation = useMutation({
+    mutationFn: (payload: CreateLabOrderPayload) => createLabOrder(patientId!, payload),
+    onSuccess: () => { toast.success('Lab order created'); invalidate(); setModalType(null); },
+    onError: () => { toast.error('Failed to create lab order'); },
+  });
+
+  const reviewMutation = useMutation({
+    mutationFn: (labId: string) => updateLabOrder(patientId!, labId, { status: 'REVIEWED' }),
+    onSuccess: () => { toast.success('Lab marked as reviewed'); invalidate(); },
+    onError: () => { toast.error('Failed to update lab status'); },
+  });
+
+  const openCreateModal = () => {
+    setFormTestName(''); setFormInterpretation('');
+    setModalType('create');
+  };
+
+  const openMessageModal = (labId: string) => {
+    setSelectedLabId(labId); setFormMessage('');
+    setModalType('message');
+  };
+
+  const handleCreateSubmit = () => {
+    if (!formTestName.trim()) { toast.error('Test name is required'); return; }
+    createMutation.mutate({
+      testName: formTestName.trim(),
+      interpretation: formInterpretation.trim() || undefined,
+    });
+  };
+
+  const handleSendMessage = async () => {
+    if (!formMessage.trim() || !selectedLabId) return;
+    try {
+      await sendGoalMessage(patientId!, selectedLabId, formMessage.trim());
+      toast.success('Message sent to patient');
+      setModalType(null);
+    } catch {
+      toast.error('Failed to send message');
+    }
+  };
 
   return (
     <div className="space-y-4" style={{ fontFamily: 'DM Sans, sans-serif' }}>
       <header className="flex flex-col gap-3 rounded-xl border border-[#E5E5E5] bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="font-display text-2xl font-semibold text-[#2D4128]">Lab Orders & Results</h2>
-          <p className="mt-1 text-sm text-slate-500">Review diagnostic orders and abnormal biomarker flags for patient ID {patientId || '123'}.</p>
+          <p className="mt-1 text-sm text-slate-500">Ordering, tracking, and reviewing diagnostic lab work.</p>
         </div>
         <button
           type="button"
-          onClick={() => toast.success('New order submitted')}
+          onClick={openCreateModal}
           className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#4A6741] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#2D4128]"
         >
           <Plus className="h-4 w-4" />
@@ -66,177 +89,165 @@ export default function LabOrders() {
         </button>
       </header>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <aside className="lg:col-span-1">
-          <div className="rounded-xl border border-[#E5E5E5] bg-white p-4 shadow-sm">
-            <div className="flex items-center justify-between gap-3 border-b border-[#E5E5E5] pb-4">
-              <div>
-                <p className="font-display text-lg font-semibold text-[#2D4128]">Lab History</p>
-                <p className="text-sm text-slate-500">Recent orders and review status</p>
-              </div>
-              <div className="rounded-full bg-[#FAFAF8] px-3 py-1 text-xs font-semibold text-slate-500">
-                {isLoading ? 'Loading...' : `${labOrders.length} orders`}
-              </div>
-            </div>
+      <div className="rounded-xl border border-[#E5E5E5] bg-white shadow-sm">
+        {isLoading && (
+          <div className="space-y-3 p-5">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={`lab-skeleton-${i}`} className="h-24 animate-pulse rounded-xl bg-[#FAFAF8]" />
+            ))}
+          </div>
+        )}
 
-            <div className="mt-4 max-h-[680px] space-y-3 overflow-y-auto pr-1">
-              {isLoading && (
-                <div className="space-y-3">
-                  {Array.from({ length: 3 }).map((_, index) => (
-                    <div key={`lab-skeleton-${index}`} className="h-20 animate-pulse rounded-xl border border-[#E5E5E5] bg-[#FAFAF8]" />
-                  ))}
-                </div>
-              )}
-
-              {!isLoading && labOrders.map((lab) => {
-                const isActive = lab.id === selectedLab?.id;
-
-                return (
-                  <button
-                    key={lab.id}
-                    type="button"
-                    onClick={() => setSelectedLabId(lab.id)}
-                    className={`w-full rounded-xl border px-4 py-4 text-left transition-all ${
-                      isActive
-                        ? 'border-[#E5E5E5] border-l-4 border-l-[#4A6741] bg-[#E8EFE6]'
-                        : 'border-[#E5E5E5] bg-white hover:bg-[#FAFAF8]'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-display text-sm font-semibold text-[#2D4128]">{lab.testName}</p>
-                        <p className="mt-1 text-xs text-slate-500">Ordered {formatDate(lab.dateOrdered)}</p>
-                      </div>
-                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${labStatusClass(lab.status as LabStatus)}`}>
-                        {lab.status}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
-
-              {!isLoading && !isError && labOrders.length === 0 && (
-                <div className="rounded-xl border border-dashed border-[#E5E5E5] bg-[#FAFAF8] px-4 py-8 text-center">
-                  <p className="font-display text-sm font-semibold text-[#2D4128]">No lab orders found</p>
-                  <p className="mt-1 text-xs text-slate-500">Lab orders and results will appear here once available.</p>
-                </div>
-              )}
+        {!isLoading && isError && (
+          <div className="p-5">
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
+              <p className="font-display text-sm font-semibold">Unable to load lab orders</p>
+              <button type="button" onClick={() => { void refetch(); }} className="mt-2 inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-100">
+                <RefreshCw className="h-4 w-4" /> Retry
+              </button>
             </div>
           </div>
-        </aside>
+        )}
 
-        <section className="lg:col-span-2">
-          <div className="rounded-xl border border-[#E5E5E5] bg-white p-5 shadow-sm">
-            {isLoading && (
-              <div className="space-y-4">
-                <div className="h-20 animate-pulse rounded-xl bg-[#FAFAF8]" />
-                <div className="h-48 animate-pulse rounded-xl bg-[#FAFAF8]" />
-                <div className="h-24 animate-pulse rounded-xl bg-[#FAFAF8]" />
-              </div>
-            )}
+        {!isLoading && !isError && labs.length === 0 && (
+          <div className="p-5 text-center">
+            <div className="rounded-xl border border-dashed border-[#E5E5E5] bg-[#FAFAF8] px-4 py-10">
+              <Beaker className="mx-auto h-8 w-8 text-slate-400" />
+              <p className="mt-3 font-display text-sm font-semibold text-[#2D4128]">No lab orders found</p>
+              <p className="mt-1 text-xs text-slate-500">Lab orders and results will appear here.</p>
+            </div>
+          </div>
+        )}
 
-            {!isLoading && isError && (
-              <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
-                <p className="font-display text-sm font-semibold">Unable to load lab orders</p>
-                <p className="mt-1 text-sm">Please try again.</p>
-                <button
-                  type="button"
-                  onClick={() => { void refetch(); }}
-                  className="mt-3 inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100"
-                >
-                  <Download className="h-4 w-4" />
-                  Retry
-                </button>
-              </div>
-            )}
-
-            {!isLoading && !isError && selectedLab && (
-              <>
-                <div className="flex flex-col gap-4 border-b border-[#E5E5E5] pb-5 md:flex-row md:items-start md:justify-between">
-                  <div>
-                    <div className="flex items-center gap-2 text-[#4A6741]">
-                      <Activity className="h-5 w-5" />
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em]">Lab Detail</p>
-                    </div>
-                    <h3 className="mt-2 font-display text-2xl font-semibold text-[#2D4128]">{selectedLab.testName}</h3>
-                    <p className="mt-1 text-sm text-slate-500">Ordering physician: {selectedLab.orderingPhysician}</p>
-                    <p className="mt-1 text-sm text-slate-500">Date ordered: {formatDate(selectedLab.dateOrdered)}</p>
+        {!isLoading && !isError && labs.length > 0 && (
+          <div className="divide-y divide-[#E5E5E5]">
+            {labs.map((lab) => (
+              <div key={lab.id} className="flex flex-col gap-4 p-5 md:flex-row md:items-start md:justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3">
+                    <Beaker className="h-5 w-5 text-[#4A6741]" />
+                    <h3 className="font-display text-base font-semibold text-[#2D4128]">{lab.testName}</h3>
+                    <span className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusColor(lab.status)}`}>
+                      {lab.status}
+                    </span>
                   </div>
-
-                  <button
-                    type="button"
-                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#E5E5E5] bg-white px-4 py-2.5 text-sm font-semibold text-[#2D4128] transition hover:bg-[#FAFAF8]"
-                  >
-                    <Download className="h-4 w-4" />
-                    Download PDF
-                  </button>
-                </div>
-
-                <div className="mt-5 overflow-hidden rounded-xl border border-[#E5E5E5]">
-                  <table className="min-w-full divide-y divide-[#E5E5E5]">
-                    <thead className="bg-[#FAFAF8]">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Biomarker</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Value</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Reference Range</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#E5E5E5] bg-white">
-                      {selectedLab.biomarkers.map((result) => (
-                        <tr key={`${selectedLab.id}-${result.name}`}>
-                          <td className="px-4 py-4 text-sm text-[#2D4128]">{result.name}</td>
-                          <td className="px-4 py-4 text-sm text-slate-700">{result.value}</td>
-                          <td className="px-4 py-4 text-sm text-slate-600">{result.referenceRange}</td>
-                          <td className="px-4 py-4">
-                            <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${biomarkerStatusClass(result.status as BiomarkerStatus)}`}>
-                              {result.status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="mt-6 rounded-xl border border-gray-200 bg-gray-50 p-4">
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="mt-0.5 h-5 w-5 text-slate-500" />
-                    <div>
-                      <p className="font-display text-sm font-semibold text-[#2D4128]">Clinical Interpretation</p>
-                      <p className="mt-1 text-sm leading-6 text-slate-700">{selectedLab.interpretation}</p>
+                  <p className="mt-2 text-sm text-slate-500">Ordered: {new Date(lab.dateOrdered).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })}</p>
+                  <p className="mt-1 text-sm text-slate-500">Dr. {lab.orderingPhysician}</p>
+                  {lab.interpretation && (
+                    <div className="mt-3 rounded-lg border border-[#E5E5E5] bg-[#FAFAF8] p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Interpretation</p>
+                      <p className="mt-1 text-sm text-[#2D4128]">{lab.interpretation}</p>
                     </div>
-                  </div>
+                  )}
+                  {lab.biomarkers && lab.biomarkers.length > 0 && (
+                    <div className="mt-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Biomarkers</p>
+                      <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                        {lab.biomarkers.map((bm, i) => (
+                          <div key={i} className="rounded-lg border border-[#E5E5E5] bg-white px-3 py-2 text-xs">
+                            <p className="font-semibold text-[#2D4128]">{bm.name}</p>
+                            <p className="text-slate-600">{bm.value} ({bm.referenceRange})</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-
-                <div className="mt-6 flex flex-col gap-3 border-t border-[#E5E5E5] pt-5 sm:flex-row sm:justify-end">
+                <div className="flex flex-wrap gap-2">
+                  {lab.status !== 'Reviewed' && lab.status !== 'Pending' && (
+                    <button
+                      type="button"
+                      onClick={() => reviewMutation.mutate(lab.id)}
+                      disabled={reviewMutation.isPending}
+                      className="inline-flex items-center gap-2 rounded-lg border border-[#E5E5E5] bg-white px-3 py-2 text-sm font-semibold text-[#2D4128] hover:bg-[#FAFAF8] disabled:opacity-50"
+                    >
+                      <CheckCircle className="h-4 w-4" />
+                      {reviewMutation.isPending ? 'Marking...' : 'Mark Reviewed'}
+                    </button>
+                  )}
                   <button
                     type="button"
-                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#4A6741] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#2D4128]"
+                    onClick={() => openMessageModal(lab.id)}
+                    className="inline-flex items-center gap-2 rounded-lg border border-[#E5E5E5] bg-white px-3 py-2 text-sm font-semibold text-[#2D4128] hover:bg-[#FAFAF8]"
                   >
-                    <FileText className="h-4 w-4" />
-                    Mark as Reviewed
-                  </button>
-                  <button
-                    type="button"
-                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#E5E5E5] bg-white px-4 py-2.5 text-sm font-semibold text-[#2D4128] transition hover:bg-[#FAFAF8]"
-                  >
-                    <AlertCircle className="h-4 w-4" />
+                    <MessageSquare className="h-4 w-4" />
                     Message Patient
                   </button>
                 </div>
-              </>
-            )}
-
-            {!isLoading && !isError && !selectedLab && (
-              <div className="rounded-xl border border-dashed border-[#E5E5E5] bg-[#FAFAF8] px-4 py-10 text-center">
-                <p className="font-display text-base font-semibold text-[#2D4128]">No lab selected</p>
-                <p className="mt-1 text-sm text-slate-500">Select a lab order to review biomarkers and clinical interpretation.</p>
               </div>
-            )}
+            ))}
           </div>
-        </section>
+        )}
       </div>
+
+      {/* Create Lab / Message Modal */}
+      {modalType && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-2xl border border-[#E5E5E5] bg-white p-6 shadow-xl">
+            <div className="flex items-center justify-between border-b border-[#E5E5E5] pb-4">
+              <h3 className="font-display text-xl font-semibold text-[#2D4128]">
+                {modalType === 'create' ? 'Order New Lab' : 'Message Patient'}
+              </h3>
+              <button type="button" onClick={() => setModalType(null)} className="rounded-lg p-1 text-slate-400 hover:bg-[#FAFAF8] hover:text-slate-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              {modalType === 'create' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-semibold text-[#2D4128]">Test Name *</label>
+                    <input
+                      type="text"
+                      value={formTestName}
+                      onChange={(e) => setFormTestName(e.target.value)}
+                      className="mt-1.5 w-full rounded-lg border border-[#E5E5E5] bg-white px-3 py-2.5 text-sm text-[#2D4128] outline-none focus:border-[#4A6741] focus:ring-2 focus:ring-[#4A6741]/10"
+                      placeholder="e.g. Complete Blood Count (CBC)"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-[#2D4128]">Interpretation Notes</label>
+                    <textarea
+                      rows={3}
+                      value={formInterpretation}
+                      onChange={(e) => setFormInterpretation(e.target.value)}
+                      className="mt-1.5 w-full rounded-lg border border-[#E5E5E5] bg-white px-3 py-2.5 text-sm text-[#2D4128] outline-none focus:border-[#4A6741] focus:ring-2 focus:ring-[#4A6741]/10"
+                      placeholder="Optional initial notes"
+                    />
+                  </div>
+                </>
+              )}
+              {modalType === 'message' && (
+                <div>
+                  <label className="block text-sm font-semibold text-[#2D4128]">Message to Patient *</label>
+                  <textarea
+                    rows={4}
+                    value={formMessage}
+                    onChange={(e) => setFormMessage(e.target.value)}
+                    className="mt-1.5 w-full rounded-lg border border-[#E5E5E5] bg-white px-3 py-2.5 text-sm text-[#2D4128] outline-none focus:border-[#4A6741] focus:ring-2 focus:ring-[#4A6741]/10"
+                    placeholder="Your lab results are in. Let's discuss..."
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3 border-t border-[#E5E5E5] pt-4">
+              <button type="button" onClick={() => setModalType(null)} className="rounded-lg border border-[#E5E5E5] bg-white px-4 py-2.5 text-sm font-semibold text-[#2D4128] hover:bg-[#FAFAF8]">
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={modalType === 'create' ? handleCreateSubmit : () => void handleSendMessage()}
+                disabled={createMutation.isPending}
+                className="rounded-lg bg-[#4A6741] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#2D4128] disabled:opacity-50"
+              >
+                {createMutation.isPending ? 'Saving...' : modalType === 'create' ? 'Create Lab Order' : 'Send Message'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

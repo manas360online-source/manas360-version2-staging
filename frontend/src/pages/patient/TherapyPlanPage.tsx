@@ -43,22 +43,22 @@ type TherapyPlanPayload = {
   goals: GoalItem[];
   cbtExercises: ExerciseItem[];
   recentFeedback: FeedbackItem[];
-  weekContext?: {
-    selectedWeek: number;
-    currentWeek: number;
-    totalWeeks: number;
+  dayContext?: {
+    selectedDay: number;
+    currentDay: number;
+    totalDays: number;
   };
 };
 
 const asPayload = <T,>(value: any): T => (value?.data ?? value) as T;
 
-const getWeekFromDate = (dateLike: string | Date | null | undefined): number | null => {
+const getDayFromDate = (dateLike: string | Date | null | undefined): number | null => {
   if (!dateLike) return null;
   const date = new Date(dateLike);
   if (Number.isNaN(date.getTime())) return null;
-  const millisPerWeek = 7 * 24 * 60 * 60 * 1000;
+  const millisPerDay = 24 * 60 * 60 * 1000;
   const diff = Math.max(0, Date.now() - date.getTime());
-  return Math.floor(diff / millisPerWeek) + 1;
+  return Math.floor(diff / millisPerDay) + 1;
 };
 
 const formatDate = (value: string) =>
@@ -90,16 +90,27 @@ export default function TherapyPlanPage() {
     retry: false,
   });
 
-  const weekFromProfile = getWeekFromDate(profileQuery.data?.createdAt);
-  const weekFromSignup = getWeekFromDate((user as any)?.createdAt);
-  const derivedCurrentWeek = Math.max(1, Number(weekFromProfile || weekFromSignup || 1));
+  const dayFromProfile = getDayFromDate(profileQuery.data?.createdAt);
+  const dayFromSignup = getDayFromDate((user as any)?.createdAt);
+  const derivedCurrentDay = Math.max(1, Number(dayFromProfile || dayFromSignup || 1));
 
-  const therapyPlanQuery = useQuery(['patient-therapy-plan', derivedCurrentWeek], async () => {
-    const response = await patientApi.getTherapyPlan(derivedCurrentWeek);
+  const [selectedDay, setSelectedDay] = useState<number>(derivedCurrentDay);
+
+  const therapyPlanQuery = useQuery(['patient-therapy-plan', selectedDay], async () => {
+    const response = await patientApi.getTherapyPlan(selectedDay);
     return asPayload<TherapyPlanPayload | null>(response);
   }, {
     retry: false,
-    enabled: derivedCurrentWeek > 0,
+    enabled: selectedDay > 0,
+  });
+
+  // Also fetch the current-day plan to compute current-day progress for locking logic
+  const currentDayPlanQuery = useQuery(['patient-therapy-plan-current', derivedCurrentDay], async () => {
+    const response = await patientApi.getTherapyPlan(derivedCurrentDay);
+    return asPayload<TherapyPlanPayload | null>(response);
+  }, {
+    retry: false,
+    enabled: derivedCurrentDay > 0,
   });
 
   const planData = therapyPlanQuery.data ?? null;
@@ -116,7 +127,26 @@ export default function TherapyPlanPage() {
 
     try {
       await patientApi.completeTherapyPlanTask(taskId);
-      toast.success('Great job staying consistent! 🔥');
+      
+      // Reward digital pet with oxytocin boost (increase vitality by 5-10 points)
+      try {
+        const petState = await patientApi.getPetState();
+        const oxytocinReward = Math.floor(Math.random() * 6) + 5; // 5-10 points
+        const newVitality = Math.min(100, petState.vitality + oxytocinReward);
+        
+        await patientApi.upsertPetState({
+          selectedPet: petState.selectedPet,
+          vitality: newVitality,
+          unlockedItems: petState.unlockedItems,
+          isPremium: petState.isPremium,
+        });
+        
+        toast.success(`Great job staying consistent! 🔥 Your pet gained ${oxytocinReward} vitality points!`);
+      } catch (petError) {
+        // If pet update fails, still show success for task completion
+        toast.success('Great job staying consistent! 🔥');
+      }
+      
       await therapyPlanQuery.refetch();
     } catch {
       setActionError('Unable to mark activity as complete.');
@@ -126,26 +156,35 @@ export default function TherapyPlanPage() {
     }
   };
 
-  const activeWeek = Number(planData?.weekContext?.selectedWeek || derivedCurrentWeek || planData?.weekContext?.currentWeek || 1);
-  const currentWeek = Number(planData?.weekContext?.currentWeek || derivedCurrentWeek || activeWeek);
-  const totalWeeks = Number(planData?.weekContext?.totalWeeks || currentWeek);
-  const nextWeek = currentWeek + 1;
+  // Active day is the currently selected day in the UI
+  const activeDay = Number(planData?.dayContext?.selectedDay || selectedDay || derivedCurrentDay);
+  const currentDay = Number(planData?.dayContext?.currentDay || derivedCurrentDay || activeDay);
+  const totalDays = Number(planData?.dayContext?.totalDays || currentDay);
+  const nextDay = currentDay + 1;
   const goals = useMemo(
-    () => (Array.isArray(planData?.goals) ? planData.goals.filter((goal) => Number(goal.weekNumber || activeWeek) === activeWeek) : []),
-    [planData, activeWeek],
+    () => (Array.isArray(planData?.goals) ? planData.goals.filter((goal) => Number(goal.weekNumber || activeDay) === activeDay) : []),
+    [planData, activeDay],
   );
   const exercises = useMemo(
     () => (Array.isArray(planData?.cbtExercises)
-      ? planData.cbtExercises.filter((exercise) => Number(exercise.weekNumber || activeWeek) === activeWeek)
+      ? planData.cbtExercises.filter((exercise) => Number(exercise.weekNumber || activeDay) === activeDay)
       : []),
-    [planData, activeWeek],
+    [planData, activeDay],
   );
   const recentFeedback = useMemo(() => (Array.isArray(planData?.recentFeedback) ? planData.recentFeedback : []), [planData]);
   const featuredFeedback = recentFeedback[0] ?? null;
   const hasPlan = goals.length > 0 || exercises.length > 0;
-  const totalWeeklyTasks = goals.length + exercises.length;
-  const completedWeeklyTasks = goals.filter((goal) => goal.todayCheckInDone).length + exercises.filter((exercise) => exercise.completed).length;
-  const weeklyProgressPercent = totalWeeklyTasks > 0 ? Math.round((completedWeeklyTasks / totalWeeklyTasks) * 100) : 0;
+  const totalDailyTasks = goals.length + exercises.length;
+  const completedDailyTasks = goals.filter((goal) => goal.todayCheckInDone).length + exercises.filter((exercise) => exercise.completed).length;
+  const dailyProgressPercent = totalDailyTasks > 0 ? Math.round((completedDailyTasks / totalDailyTasks) * 100) : 0;
+
+  // Compute current-day progress percent from the separate query (used to determine whether future days unlock)
+  const currentDayData = currentDayPlanQuery.data ?? null;
+  const currentGoals = Array.isArray(currentDayData?.goals) ? currentDayData!.goals : [];
+  const currentExercises = Array.isArray(currentDayData?.cbtExercises) ? currentDayData!.cbtExercises : [];
+  const currentTotalDailyTasks = currentGoals.length + currentExercises.length;
+  const currentCompletedDailyTasks = currentGoals.filter((g) => g.todayCheckInDone).length + currentExercises.filter((e) => e.completed).length;
+  const currentDayProgressPercent = currentTotalDailyTasks > 0 ? Math.round((currentCompletedDailyTasks / currentTotalDailyTasks) * 100) : 0;
 
   if (loading) {
     return (
@@ -204,18 +243,43 @@ export default function TherapyPlanPage() {
             Your daily goals and therapist-assigned exercises are organized here so you can check in and keep momentum without friction.
           </p>
           <p className="mt-4 inline-flex rounded-full bg-white/75 px-4 py-2 text-sm font-semibold text-charcoal/80">
-            You are in Week {activeWeek} of your journey{totalWeeks > 0 ? ` (${Math.min(activeWeek, totalWeeks)}/${totalWeeks})` : ''}
+            You are in Day {activeDay} of your journey{totalDays > 0 ? ` (${Math.min(activeDay, totalDays)}/${totalDays})` : ''}
           </p>
+
+          {/* Day selector ribbon: lock future days until current day is 100% complete */}
+          <div className="mt-4 flex gap-2 overflow-x-auto">
+            {Array.from({ length: Math.max(1, totalDays) }).map((_, i) => {
+              const dayNum = i + 1;
+              const isActive = dayNum === activeDay;
+              const canView = (() => {
+                if (dayNum <= derivedCurrentDay) return true; // past & current
+                if (dayNum === derivedCurrentDay + 1 && currentDayProgressPercent === 100) return true; // unlock next day when current is complete
+                return false;
+              })();
+
+              return (
+                <button
+                  key={`day-${dayNum}`}
+                  type="button"
+                  onClick={() => { if (canView) setSelectedDay(dayNum); }}
+                  disabled={!canView}
+                  className={`rounded-full px-3 py-1 text-sm font-semibold ${isActive ? 'bg-calm-sage text-white' : 'bg-white/80 text-charcoal'} ${!canView ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'}`}
+                >
+                  Day {dayNum}
+                </button>
+              );
+            })}
+          </div>
 
           <div className="mt-5 rounded-2xl bg-white/80 p-4 shadow-wellness-sm">
             <div className="flex items-center justify-between gap-3">
-              <p className="text-sm font-semibold text-charcoal">{completedWeeklyTasks} of {totalWeeklyTasks} tasks completed this week</p>
-              <span className="text-xs font-bold text-charcoal/55">{weeklyProgressPercent}%</span>
+              <p className="text-sm font-semibold text-charcoal">{completedDailyTasks} of {totalDailyTasks} tasks completed today</p>
+              <span className="text-xs font-bold text-charcoal/55">{dailyProgressPercent}%</span>
             </div>
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#E5ECE9]">
               <div
                 className="h-full rounded-full bg-[linear-gradient(90deg,#79C7A2_0%,#5DAE8B_100%)] transition-all duration-500"
-                style={{ width: `${weeklyProgressPercent}%` }}
+                style={{ width: `${dailyProgressPercent}%` }}
               />
             </div>
           </div>
@@ -223,8 +287,8 @@ export default function TherapyPlanPage() {
           <div className="relative mt-4 overflow-hidden rounded-2xl border border-[#E4EAF4] bg-white/75 p-4">
             <div className="absolute inset-0 bg-white/35 backdrop-blur-[2px]" />
             <div className="relative z-10">
-              <p className="text-xs font-bold uppercase tracking-[0.14em] text-charcoal/45">Next Week Preview</p>
-              <p className="mt-1 text-sm font-semibold text-charcoal/80">Week {nextWeek} is being prepared by your provider</p>
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-charcoal/45">Next Day Preview</p>
+              <p className="mt-1 text-sm font-semibold text-charcoal/80">Day {nextDay} is being prepared by your provider</p>
             </div>
           </div>
 
@@ -271,16 +335,23 @@ export default function TherapyPlanPage() {
           </div>
           {goals.length > 0 ? (
             <div className="flex gap-4 overflow-x-auto pb-2">
-              {goals.map((goal) => {
+              {goals.map((goal, index) => {
+                // Sequential tasking: only show current task and completed ones
+                const previousTasksCompleted = goals.slice(0, index).every(g => g.todayCheckInDone);
+                const isLocked = !previousTasksCompleted && !goal.todayCheckInDone;
+                
                 const isCompleting = completingTaskIds.includes(goal.id);
                 return (
-                  <div key={goal.id} className="min-w-[260px] rounded-[1.6rem] bg-white/92 p-5 shadow-wellness-sm">
+                  <div key={goal.id} className={`min-w-[260px] rounded-[1.6rem] bg-white/92 p-5 shadow-wellness-sm ${isLocked ? 'opacity-60' : ''}`}>
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${categoryClass(goal.category)}`}>
                           {goal.category}
                         </span>
                         <h3 className="mt-3 text-base font-semibold text-charcoal">{goal.title}</h3>
+                        {isLocked && (
+                          <p className="mt-2 text-xs text-amber-600 font-medium">Complete previous tasks first</p>
+                        )}
                       </div>
                       <Sparkles className="h-5 w-5 text-[#77BFA3]" />
                     </div>
@@ -288,10 +359,10 @@ export default function TherapyPlanPage() {
                     <button
                       type="button"
                       onClick={() => void completeTask(goal.id)}
-                      disabled={goal.todayCheckInDone || isCompleting}
+                      disabled={goal.todayCheckInDone || isCompleting || isLocked}
                       className="mt-5 inline-flex min-h-[50px] w-full items-center justify-center rounded-full bg-[#D8F0E7] px-5 text-base font-semibold text-charcoal transition hover:bg-[#BFE4D6] disabled:cursor-not-allowed disabled:bg-[#EEF4F1] disabled:text-charcoal/40 md:min-h-[42px] md:px-4 md:text-sm"
                     >
-                      {goal.todayCheckInDone ? 'Checked In' : isCompleting ? 'Saving...' : 'Check In'}
+                      {goal.todayCheckInDone ? 'Checked In' : isCompleting ? 'Saving...' : isLocked ? 'Locked' : 'Check In'}
                     </button>
                   </div>
                 );
@@ -350,67 +421,76 @@ export default function TherapyPlanPage() {
           </div>
           {exercises.length > 0 ? (
             <div className="space-y-3">
-              {exercises.map((exercise) => (
-                <button
-                  key={exercise.id}
-                  type="button"
-                  onClick={() => {
-                    if (exercise.completed) return;
+              {exercises.map((exercise, index) => {
+                // Sequential tasking: only allow starting current exercise if previous are completed
+                const previousExercisesCompleted = exercises.slice(0, index).every(e => e.completed);
+                const isLocked = !previousExercisesCompleted && !exercise.completed;
+                
+                return (
+                  <button
+                    key={exercise.id}
+                    type="button"
+                    onClick={() => {
+                      if (exercise.completed || isLocked) return;
 
-                    const activityType = String(exercise.type || '').toUpperCase();
-                    if (activityType.includes('CLINICAL_ASSESSMENT') || activityType.includes('ASSESSMENT')) {
-                      navigate('/patient/assessments');
-                      return;
-                    }
+                      const activityType = String(exercise.type || '').toUpperCase();
+                      if (activityType.includes('CLINICAL_ASSESSMENT') || activityType.includes('ASSESSMENT')) {
+                        navigate('/patient/sessions');
+                        return;
+                      }
 
-                    if (activityType.includes('MOOD_CHECKIN')) {
-                      navigate('/patient/mood');
-                      return;
-                    }
+                      if (activityType.includes('MOOD_CHECKIN')) {
+                        navigate('/patient/mood');
+                        return;
+                      }
 
-                    if (exercise.id) {
-                      navigate(`/patient/cbt-assignment/${exercise.id}`);
-                      return;
-                    }
+                      if (exercise.id) {
+                        navigate(`/patient/cbt-assignment/${exercise.id}`);
+                        return;
+                      }
 
-                    if (exercise.sessionId) {
-                      navigate(`/patient/cbt/${exercise.sessionId}`);
-                      return;
-                    }
+                      if (exercise.sessionId) {
+                        navigate(`/patient/cbt/${exercise.sessionId}`);
+                        return;
+                      }
 
-                    navigate('/patient/cbt-section');
-                  }}
-                  className="group flex w-full items-center justify-between rounded-[1.5rem] bg-white/92 p-4 text-left shadow-wellness-sm transition hover:shadow-wellness-md"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#ECF5FF] text-[#2B5EA7]">
-                      <ClipboardCheck className="h-5 w-5" />
+                      navigate('/patient/cbt-section');
+                    }}
+                    className={`group flex w-full items-center justify-between rounded-[1.5rem] bg-white/92 p-4 text-left shadow-wellness-sm transition hover:shadow-wellness-md ${isLocked ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#ECF5FF] text-[#2B5EA7]">
+                        <ClipboardCheck className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-charcoal">{exercise.title}</p>
+                        <p className="mt-0.5 text-xs text-charcoal/55">{exercise.type} • Assigned {formatDate(exercise.assignedAt)}</p>
+                        {isLocked && (
+                          <p className="mt-1 text-xs text-amber-600 font-medium">Complete previous exercises first</p>
+                        )}
+                        {exercise.therapistFeedback ? (
+                          <p className="mt-1.5 max-w-xl text-xs leading-relaxed text-charcoal/65">
+                            Latest feedback: &ldquo;{exercise.therapistFeedback}&rdquo;
+                          </p>
+                        ) : null}
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium text-charcoal">{exercise.title}</p>
-                      <p className="mt-0.5 text-xs text-charcoal/55">{exercise.type} • Assigned {formatDate(exercise.assignedAt)}</p>
-                      {exercise.therapistFeedback ? (
-                        <p className="mt-1.5 max-w-xl text-xs leading-relaxed text-charcoal/65">
-                          Latest feedback: &ldquo;{exercise.therapistFeedback}&rdquo;
-                        </p>
+
+                    <div className="flex items-center gap-3">
+                      <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${exerciseStatusClass(exercise.status)}`}>
+                        {exercise.status}
+                      </span>
+                      {!exercise.completed ? (
+                        <span className="inline-flex min-h-[44px] items-center rounded-full bg-[#E8F2FF] px-4 text-sm font-semibold text-[#2B5EA7] md:min-h-[34px] md:px-3 md:text-xs">
+                          {isLocked ? 'Locked' : String(exercise.type || '').toUpperCase().includes('CLINICAL_ASSESSMENT')
+                            ? 'Start Assessment'
+                            : 'Start Exercise'}
+                        </span>
                       ) : null}
                     </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${exerciseStatusClass(exercise.status)}`}>
-                      {exercise.status}
-                    </span>
-                    {!exercise.completed ? (
-                      <span className="inline-flex min-h-[44px] items-center rounded-full bg-[#E8F2FF] px-4 text-sm font-semibold text-[#2B5EA7] md:min-h-[34px] md:px-3 md:text-xs">
-                        {String(exercise.type || '').toUpperCase().includes('CLINICAL_ASSESSMENT')
-                          ? 'Start Assessment'
-                          : 'Start Exercise'}
-                      </span>
-                    ) : null}
-                  </div>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           ) : (
             <div className="rounded-[1.5rem] border border-dashed border-wellness-border p-8 text-center">
@@ -421,5 +501,5 @@ export default function TherapyPlanPage() {
       </div>
 
     </div>
-  );
+  );;
 }

@@ -250,8 +250,18 @@ export const patientApi = {
   submitClinicalJourney: async (payload: JourneyClinicalRequest): Promise<JourneyRecommendationResponse> =>
     (await http.post('/v1/patient-journey/clinical-assessment', payload)).data,
   startStructuredAssessment: async (payload: { templateKey: string }): Promise<StructuredAssessmentStartResponse> => {
-    const response = await http.post('/v1/free-screening/start/me', payload);
-    return response.data?.data ?? response.data;
+    try {
+      const response = await http.post('/v1/free-screening/start/me', payload);
+      return response.data?.data ?? response.data;
+    } catch (err: any) {
+      const status = Number(err?.response?.status || 0);
+      if (status === 401) {
+        // Not authenticated — fall back to public free-screening start endpoint
+        const publicResp = await http.post('/v1/free-screening/start', payload);
+        return publicResp.data?.data ?? publicResp.data;
+      }
+      throw err;
+    }
   },
   submitStructuredAssessment: async (
     attemptId: string,
@@ -389,8 +399,12 @@ export const patientApi = {
     const response = await http.get('/patient/subscription');
     return unwrapPayload(response.data);
   },
-  upgradeSubscription: async () => {
-    const response = await http.patch('/patient/subscription/upgrade');
+  createSessionPayment: async (payload: { providerId: string; amountMinor: number; currency?: string }) => {
+    const response = await http.post('/v1/payments/sessions', payload);
+    return unwrapPayload(response.data);
+  },
+  upgradeSubscription: async (payload: { planKey: string }) => {
+    const response = await http.patch('/patient/subscription/upgrade', payload);
     return unwrapPayload(response.data);
   },
   downgradeSubscription: async () => {
@@ -419,6 +433,16 @@ export const patientApi = {
       async () => (await http.get('/v1/therapy-plan', { params: week ? { week } : undefined })).data,
     ]),
   completeTherapyPlanTask: async (id: string) => (await http.patch(`/v1/therapy-plan/tasks/${encodeURIComponent(id)}/complete`)).data,
+  getPetState: async () =>
+    withFallbackChain([
+      async () => (await http.get('/patient/pets/state')).data,
+      async () => (await http.get('/v1/patients/me/pets/state')).data,
+    ]),
+  upsertPetState: async (payload: { selectedPet: 'koi' | 'pup' | 'owl'; vitality: number; unlockedItems: string[]; isPremium: boolean }) =>
+    withFallbackChain([
+      async () => (await http.put('/patient/pets/state', payload)).data,
+      async () => (await http.put('/v1/patients/me/pets/state', payload)).data,
+    ]),
   getActiveCbtAssignments: async (): Promise<ActiveCbtAssignment[]> => {
     try {
       const response = await http.get('/patient/cbt-assignments/active');
@@ -461,11 +485,27 @@ export const patientApi = {
   getNotifications: async () => (await http.get('/v1/notifications')).data,
   markNotificationRead: async (id: string) => (await http.patch(`/v1/notifications/${encodeURIComponent(id)}/read`)).data,
     // Progress & Analytics
-    getInsights: async () =>
-      withFallbackChain([
-        async () => (await http.get('/v1/patient/insights')).data,
-        async () => (await http.get('/patient/insights')).data,
-      ]),
+    getInsights: async () => {
+      try {
+        const res = await http.get('/v1/patient/insights');
+        return res.data?.data ?? res.data;
+      } catch (err: any) {
+        const status = Number(err?.response?.status || 0);
+        // If user is forbidden (403) — likely not on premium plan — return null so UI can show CTA
+        if (status === 403) return null;
+        // If not found, try legacy endpoint fallback
+        if (status === 404) {
+          try {
+            const res = await http.get('/patient/insights');
+            return res.data?.data ?? res.data;
+          } catch (e: any) {
+            if (Number(e?.response?.status || 0) === 403) return null;
+            throw e;
+          }
+        }
+        throw err;
+      }
+    },
     getReports: async () =>
       withFallbackChain([
         async () => (await http.get('/v1/patient/reports')).data,
@@ -481,11 +521,20 @@ export const patientApi = {
         async () => (await http.get(`/v1/patient/reports/shared/${encodeURIComponent(id)}/download`, { responseType: 'blob' })).data,
         async () => (await http.get(`/patient/reports/shared/${encodeURIComponent(id)}/download`, { responseType: 'blob' })).data,
       ]),
-    generateCompleteHealthSummary: async () =>
-      withFallbackChain([
-        async () => (await http.post('/v1/patient/reports/health-summary', {}, { responseType: 'blob' })).data,
-        async () => (await http.post('/patient/reports/health-summary', {}, { responseType: 'blob' })).data,
-      ]),
+    generateCompleteHealthSummary: async () => {
+      try {
+        const resp = await http.post('/v1/patient/reports/health-summary', {}, { responseType: 'blob' });
+        return resp.data;
+      } catch (err: any) {
+        const status = Number(err?.response?.status || 0);
+        // If v1 endpoint forbids (403), try legacy endpoint which may not require premium
+        if (status === 403) {
+          const fallback = await http.post('/patient/reports/health-summary', {}, { responseType: 'blob' });
+          return fallback.data;
+        }
+        throw err;
+      }
+    },
     getRecordSecureUrl: async (id: string) =>
       withFallbackChain([
         async () => (await http.get(`/v1/patient/records/${encodeURIComponent(id)}/url`)).data,
@@ -495,6 +544,21 @@ export const patientApi = {
       withFallbackChain([
         async () => (await http.post(`/v1/patient/records/${encodeURIComponent(id)}/share`)).data,
         async () => (await http.post(`/patient/records/${encodeURIComponent(id)}/share`)).data,
+      ]),
+    // Documents
+    getDocuments: async () =>
+      withFallbackChain([
+        async () => (await http.get('/v1/patient/documents')).data,
+        async () => (await http.get('/patient/documents')).data,
+      ]),
+    uploadDocument: async (payload: FormData) =>
+      (await http.post('/v1/patient/documents/upload', payload, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })).data,
+    getDocumentDownloadUrl: async (id: string) =>
+      withFallbackChain([
+        async () => (await http.get(`/v1/patient/documents/${encodeURIComponent(id)}/download`)).data,
+        async () => (await http.get(`/patient/documents/${encodeURIComponent(id)}/download`)).data,
       ]),
     // Care Team
     getMyProviders: async () =>

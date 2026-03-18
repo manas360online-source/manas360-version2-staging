@@ -26,13 +26,25 @@ ALTER TABLE "prescriptions" ADD COLUMN IF NOT EXISTS "status" TEXT NOT NULL DEFA
 ALTER TABLE "prescriptions" ADD COLUMN IF NOT EXISTS "adherence_rate" INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE "prescriptions" ADD COLUMN IF NOT EXISTS "warnings" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];
 
-UPDATE "prescriptions"
-SET "provider_id" = "psychiatrist_id"
-WHERE "provider_id" IS NULL AND "psychiatrist_id" IS NOT NULL;
+DO $$
+BEGIN
+  IF EXISTS(
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'prescriptions' AND column_name = 'psychiatrist_id'
+  ) THEN
+    EXECUTE 'UPDATE "prescriptions" SET "provider_id" = "psychiatrist_id" WHERE "provider_id" IS NULL AND "psychiatrist_id" IS NOT NULL';
+  END IF;
+END $$;
 
-UPDATE "prescriptions"
-SET "dosage" = COALESCE("starting_dose", "target_dose", "max_dose", 'N/A')
-WHERE "dosage" IS NULL;
+DO $$
+BEGIN
+  IF EXISTS(
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'prescriptions' AND column_name IN ('starting_dose','target_dose','max_dose')
+  ) THEN
+    EXECUTE 'UPDATE "prescriptions" SET "dosage" = COALESCE("starting_dose", "target_dose", "max_dose", ''N/A'') WHERE "dosage" IS NULL';
+  END IF;
+END $$;
 
 DO $$
 BEGIN

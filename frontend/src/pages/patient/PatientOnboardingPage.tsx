@@ -6,7 +6,7 @@ import { patientApi } from '../../api/patient';
 export default function PatientOnboardingPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const next = new URLSearchParams(location.search).get('next') || '/patient/assessments';
+  const next = new URLSearchParams(location.search).get('next') || '/patient/sessions';
   const [age, setAge] = useState('25');
   const [gender, setGender] = useState<'male' | 'female' | 'other' | 'prefer_not_to_say'>('prefer_not_to_say');
   const [medicalHistory, setMedicalHistory] = useState('');

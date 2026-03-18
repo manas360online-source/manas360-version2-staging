@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.adminAnalyticsExportRateLimiter = exports.screeningPublicRateLimiter = exports.webhookRateLimiter = exports.paymentRateLimiter = exports.userSessionRateLimiter = exports.authRateLimiter = void 0;
+exports.documentsRateLimiter = exports.adminAnalyticsExportRateLimiter = exports.screeningPublicRateLimiter = exports.webhookRateLimiter = exports.paymentRateLimiter = exports.userSessionRateLimiter = exports.authRateLimiter = void 0;
 const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
 const env_1 = require("../config/env");
 exports.authRateLimiter = (0, express_rate_limit_1.default)({
@@ -66,5 +66,15 @@ exports.adminAnalyticsExportRateLimiter = (0, express_rate_limit_1.default)({
     message: {
         success: false,
         message: 'Too many analytics export requests. Try again in a few minutes.',
+    },
+});
+exports.documentsRateLimiter = (0, express_rate_limit_1.default)({
+    windowMs: 10 * 60 * 1000,
+    max: 50,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+        success: false,
+        message: 'Too many document requests. Please try again in a few minutes.',
     },
 });

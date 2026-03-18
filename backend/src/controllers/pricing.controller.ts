@@ -20,6 +20,6 @@ export const updateAdminPricingConfigController = async (req: Request, res: Resp
 		throw new AppError('Pricing update payload is required', 422);
 	}
 
-	const data = await updatePricingConfig(body, req.auth?.userId);
+	const data = await updatePricingConfig(body);
 	sendSuccess(res, data, 'Pricing configuration updated');
 };
