@@ -6,6 +6,7 @@ import { env } from './config/env';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware';
 import { requestLogger } from './middleware/logger.middleware';
 import apiRoutes from './routes';
+import { launchGuard } from './middleware/launchGuard.middleware';
 import client from 'prom-client';
 import * as Sentry from '@sentry/node';
 import { initSentry } from './config/sentry';
@@ -51,7 +52,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(requestLogger);
 
-app.use(env.apiPrefix, apiRoutes);
+app.use(env.apiPrefix, launchGuard, apiRoutes);
 
 // Prometheus metrics endpoint
 const collectDefaultMetrics = client.collectDefaultMetrics;

@@ -83,11 +83,11 @@ import { uploadPatientDocument } from '../controllers/patient.controller';
 const router = Router();
 
 router.get('/patient/dashboard', requireAuth, requireRole('patient'), asyncHandler(getPatientDashboardController));
-router.get('/patient/insights', requireAuth, requireRole('patient'), requirePremiumSubscription, asyncHandler(getPatientInsightsController));
+router.get('/patient/insights', requireAuth, requireRole('patient'), asyncHandler(getPatientInsightsController));
 router.get('/patient/reports', requireAuth, requireRole('patient'), asyncHandler(getPatientReportsController));
 router.get('/patient/reports/shared/:id', requireAuth, requireRole('patient'), asyncHandler(getPatientSharedReportMetaController));
 router.get('/patient/reports/shared/:id/download', requireAuth, requireRole('patient'), asyncHandler(downloadPatientSharedReportController));
-router.post('/patient/reports/health-summary', requireAuth, requireRole('patient'), requirePremiumSubscription, asyncHandler(generateCompleteHealthSummaryController));
+router.post('/patient/reports/health-summary', requireAuth, requireRole('patient'), asyncHandler(generateCompleteHealthSummaryController));
 
 // Patient documents — reuses provider aggregation but scoped to own ID
 router.get('/patient/documents', requireAuth, requireRole('patient'), asyncHandler(getMyDocumentsController));

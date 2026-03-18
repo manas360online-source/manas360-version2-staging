@@ -1,8 +1,16 @@
 const { randomUUID } = require('crypto');
 const bcrypt = require('bcrypt');
 const { PrismaClient } = require('@prisma/client');
+const { Pool } = require('pg');
+const { PrismaPg } = require('@prisma/adapter-pg');
 
-const prisma = new PrismaClient();
+// Use same adapter initialization as the application so the generated
+// Prisma client has the expected adapter available when constructed.
+const connectionString = process.env.DATABASE_URL || '';
+const pool = new Pool({ connectionString });
+const adapter = new PrismaPg(pool);
+
+const prisma = new PrismaClient({ adapter });
 
 const patientSeeds = [
   { email: 'patient1@manas360.local', firstName: 'Priya', lastName: 'Kumar' },
@@ -99,6 +107,15 @@ const createPatientTablesIfMissing = async () => {
     );
   `);
 };
+
+async function safeExecute(sql, ...params) {
+  try {
+    return await prisma.$executeRawUnsafe(sql, ...params);
+  } catch (err) {
+    console.warn('seed: safeExecute skipped SQL due to error:', err && err.message ? err.message : err);
+    return null;
+  }
+}
 
 async function upsertUser({ email, firstName, lastName, role }, passwordHash) {
   const isProvider = ['THERAPIST', 'PSYCHIATRIST', 'PSYCHOLOGIST', 'COACH'].includes(String(role || '').toUpperCase());
@@ -270,7 +287,7 @@ async function seed() {
     }
 
     const subscriptionStatus = index === 1 ? 'cancelled' : 'active';
-    await prisma.$executeRawUnsafe(
+    await safeExecute(
       `INSERT INTO "patient_subscriptions" ("id","userId","planName","price","billingCycle","status","autoRenew","renewalDate","createdAt","updatedAt")
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW(),NOW())
        ON CONFLICT ("userId") DO UPDATE
@@ -285,7 +302,7 @@ async function seed() {
       plusDays(30),
     );
 
-    await prisma.$executeRawUnsafe(
+    await safeExecute(
       `INSERT INTO "patient_payment_methods" ("id","userId","cardLast4","cardBrand","expiryMonth","expiryYear","createdAt","updatedAt")
        VALUES ($1,$2,$3,$4,$5,$6,NOW(),NOW())
        ON CONFLICT ("userId") DO UPDATE
@@ -299,7 +316,7 @@ async function seed() {
     );
 
     for (let invoiceIndex = 0; invoiceIndex < 3; invoiceIndex += 1) {
-      await prisma.$executeRawUnsafe(
+      await safeExecute(
         `INSERT INTO "patient_invoices" ("id","userId","amount","status","invoiceUrl","createdAt")
          VALUES ($1,$2,$3,$4,$5,$6)
          ON CONFLICT ("id") DO NOTHING;`,
@@ -321,7 +338,7 @@ async function seed() {
     ];
 
     for (const row of exerciseRows) {
-      await prisma.$executeRawUnsafe(
+      await safeExecute(
         `INSERT INTO "patient_exercises" ("id","patientId","title","assignedBy","duration","status","createdAt","updatedAt")
          VALUES ($1,$2,$3,$4,$5,$6,NOW(),NOW())
          ON CONFLICT ("id") DO NOTHING;`,
@@ -334,7 +351,7 @@ async function seed() {
       );
     }
 
-    await prisma.$executeRawUnsafe(
+    await safeExecute(
       `INSERT INTO "patient_progress" ("id","patientId","sessionsCompleted","totalSessions","exercisesCompleted","totalExercises","phqStart","phqCurrent","createdAt","updatedAt")
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW(),NOW())
        ON CONFLICT ("patientId") DO UPDATE
@@ -361,9 +378,9 @@ async function seed() {
   for (const cSeed of corporateSeeds) {
     const corpUser = await upsertUser({ ...cSeed, role: 'PATIENT' }, corporatePasswordHash);
 
-    await prisma.$executeRawUnsafe(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS company_key text;`);
-    await prisma.$executeRawUnsafe(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS is_company_admin boolean DEFAULT false;`);
-    await prisma.$executeRawUnsafe(
+    await safeExecute(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS company_key text;`);
+    await safeExecute(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS is_company_admin boolean DEFAULT false;`);
+    await safeExecute(
       `UPDATE "users" SET company_key = $2, is_company_admin = false WHERE id = $1`,
       corpUser.id,
       'techcorp-india',

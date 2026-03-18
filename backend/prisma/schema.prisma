@@ -4,6 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -43,6 +44,8 @@ model User {
   therapistVerifiedByUserId     String?
   providerType                  ProviderType?               @map("provider_type")
   companyId                     String?                     @map("company_id")
+  companyKey                    String?                     @map("company_key")
+  isCompanyAdmin                Boolean                     @default(false) @map("is_company_admin")
   status                        UserStatus                  @default(ACTIVE)
   onboardingStatus              OnboardingStatus?
   aiConversations               AIConversation[]
@@ -1862,5 +1865,47 @@ model ProviderPlanConfig {
   updatedAt DateTime @updatedAt
 
   @@map("provider_plan_configs")
+}
+
+model SystemStatus {
+  id         Int       @id @default(1)
+  isLive     Boolean   @default(false)
+  launchedBy String?
+  launchedAt DateTime?
+
+  @@map("system_status")
+}
+
+model SSOTenant {
+  id              Int      @id @default(autoincrement())
+  key             String   @unique
+  name            String
+  provider        String
+  issuer          String?
+  clientId        String?  @map("client_id")
+  clientSecret    String?  @map("client_secret")
+  metadataUrl     String?  @map("metadata_url")
+  allowedDomains  String[] @map("allowed_domains")
+  config          Json?
+  enabled         Boolean  @default(true)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @default(now()) @map("updated_at")
+  ownerCompanyKey String?  @map("owner_company_key")
+
+  @@map("sso_tenants")
+}
+
+model SSOIdentity {
+  id              Int      @id @default(autoincrement())
+  userId          String   @map("user_id")
+  tenantKey       String   @map("tenant_key")
+  provider        String
+  providerSubject String   @map("provider_subject")
+  email           String?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @default(now()) @map("updated_at")
+
+  @@unique([tenantKey, provider, providerSubject])
+  @@map("sso_identities")
 }
 

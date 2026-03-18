@@ -1,4 +1,4 @@
-import { useState, Suspense, lazy } from 'react';
+import { useState, useEffect, Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { GlobalFallbackLoader } from './components/ui/FallbackLoader';
@@ -6,6 +6,8 @@ import ScrollToTop from './components/common/ScrollToTop';
 import { GlobalAudioProvider } from './context/GlobalAudioContext';
 import GlobalAudioPlayerConsole from './components/audio/GlobalAudioPlayerConsole';
 const LandingPage = lazy(() => import('./pages/LandingPage'));
+import ClinicalLaunchScreen from './pages/ClinicalLaunchScreen';
+import { getSystemStatus } from './api/system-status.api';
 import { AuthProvider, getPostLoginRoute, useAuth } from './context/AuthContext';
 import { Assessment } from './pages/Assessment'
 import { ResultsPage } from './pages/Results'
@@ -119,8 +121,22 @@ function DashboardRedirect() {
 }
 
 function App() {
+  const [isLive, setIsLive] = useState<boolean | null>(null);
   const [assessmentData, setAssessmentData] = useState<AssessmentData | null>(null);
   const [userName, setUserName] = useState<string>('');
+
+  useEffect(() => {
+    const checkStatus = async () => {
+      try {
+        const status = await getSystemStatus();
+        setIsLive(status.isLive);
+      } catch (error) {
+        console.error('Failed to fetch system status:', error);
+        setIsLive(false); 
+      }
+    };
+    checkStatus();
+  }, []);
 
   const handleAssessmentSubmit = (data: AssessmentData, isCritical: boolean) => {
     setAssessmentData(data);
@@ -135,6 +151,14 @@ function App() {
     setUserName(data.firstName);
     window.location.href = '/#/onboarding/email';
   };
+
+  if (isLive === null) {
+    return <GlobalFallbackLoader />;
+  }
+
+  if (isLive === false) {
+    return <ClinicalLaunchScreen onActivated={() => setIsLive(true)} />;
+  }
 
   return (
     <AuthProvider>
