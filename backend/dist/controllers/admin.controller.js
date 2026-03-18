@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.listSubscriptionsController = exports.getMetricsController = exports.verifyTherapistController = exports.getUserController = exports.listUsersController = void 0;
+exports.listSubscriptionsController = exports.getMetricsController = exports.approveProviderController = exports.verifyProviderController = exports.verifyTherapistController = exports.getUserController = exports.listUsersController = void 0;
 const error_middleware_1 = require("../middleware/error.middleware");
 const admin_service_1 = require("../services/admin.service");
 const response_1 = require("../utils/response");
@@ -54,6 +54,32 @@ const verifyTherapistController = async (req, res) => {
     (0, response_1.sendSuccess)(res, result, 'Therapist verified successfully');
 };
 exports.verifyTherapistController = verifyTherapistController;
+const verifyProviderController = async (req, res) => {
+    const providerUserId = req.validatedTherapistProfileId;
+    const adminUserId = req.auth?.userId;
+    if (!providerUserId) {
+        throw new error_middleware_1.AppError('Provider ID is required', 400);
+    }
+    if (!adminUserId) {
+        throw new error_middleware_1.AppError('Authentication required', 401);
+    }
+    const result = await (0, admin_service_1.verifyProvider)(providerUserId, adminUserId);
+    (0, response_1.sendSuccess)(res, result, 'Provider verified successfully');
+};
+exports.verifyProviderController = verifyProviderController;
+const approveProviderController = async (req, res) => {
+    const providerUserId = req.params['id'];
+    const adminUserId = req.auth?.userId;
+    if (!providerUserId) {
+        throw new error_middleware_1.AppError('Provider ID is required', 400);
+    }
+    if (!adminUserId) {
+        throw new error_middleware_1.AppError('Authentication required', 401);
+    }
+    const result = await (0, admin_service_1.approveProvider)(providerUserId, adminUserId);
+    (0, response_1.sendSuccess)(res, result, 'Provider approved successfully');
+};
+exports.approveProviderController = approveProviderController;
 /**
  * GET /api/v1/admin/metrics
  * Get comprehensive platform metrics

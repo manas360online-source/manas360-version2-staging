@@ -1,10 +1,10 @@
 import { randomUUID } from 'crypto';
-import { DeleteObjectCommand, PutObjectCommand, S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, PutObjectCommand, S3Client, GetObjectCommand, ServerSideEncryption } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { env } from '../config/env';
 import { AppError } from '../middleware/error.middleware';
 
-const clientConfig = {
+const clientConfig: any = {
 	region: env.awsRegion,
 	...(env.awsAccessKeyId && env.awsSecretAccessKey
 		? {
@@ -15,6 +15,14 @@ const clientConfig = {
 		}
 		: {}),
 };
+
+// Support custom S3 endpoint (e.g., MinIO) and path-style addressing for local testing
+if (env.awsS3Endpoint) {
+	clientConfig.endpoint = env.awsS3Endpoint;
+}
+if (env.awsS3ForcePathStyle) {
+	clientConfig.forcePathStyle = true;
+}
 
 export const s3Client = new S3Client(clientConfig);
 
@@ -73,12 +81,12 @@ export const uploadProfilePhotoToS3 = async (params: {
 	const objectKey = `users/${params.userId}/profile/${uniqueName}`;
 
 	await s3Client.send(
-		new PutObjectCommand({
+		new PutObjectCommand(Object.assign({
 			Bucket: env.awsS3Bucket,
 			Key: objectKey,
 			Body: params.buffer,
 			ContentType: params.mimeType,
-		}),
+		}, env.awsS3DisableServerSideEncryption ? {} : { ServerSideEncryption: 'AES256' as ServerSideEncryption })),
 	);
 
 	return {
@@ -116,6 +124,11 @@ export interface UploadedTherapistDocument {
 	objectUrl: string;
 }
 
+export interface UploadedSessionAudio {
+	objectKey: string;
+	objectUrl: string;
+}
+
 export const uploadTherapistDocumentToS3 = async (params: {
 	therapistUserId: string;
 	documentType: 'license' | 'degree' | 'certificate';
@@ -129,13 +142,12 @@ export const uploadTherapistDocumentToS3 = async (params: {
 	const objectKey = `therapists/${params.therapistUserId}/documents/${params.documentType}/${uniqueName}`;
 
 	await s3Client.send(
-		new PutObjectCommand({
+		new PutObjectCommand(Object.assign({
 			Bucket: env.awsS3Bucket,
 			Key: objectKey,
 			Body: params.buffer,
 			ContentType: params.mimeType,
-			ServerSideEncryption: 'AES256',
-		}),
+		}, env.awsS3DisableServerSideEncryption ? {} : { ServerSideEncryption: 'AES256' as ServerSideEncryption })),
 	);
 
 	return {
@@ -155,5 +167,45 @@ export const getSignedTherapistDocumentUrl = async (objectKey: string): Promise<
 		}),
 		{ expiresIn: env.therapistDocumentSignedUrlTtlSeconds },
 	);
+};
+
+export const getSignedS3ObjectUrl = async (objectKey: string, expiresInSeconds = env.exportSignedUrlTtlSeconds): Promise<string> => {
+	assertS3Configured();
+
+	return getSignedUrl(
+		s3Client,
+		new GetObjectCommand({
+			Bucket: env.awsS3Bucket,
+			Key: objectKey,
+		}),
+		{ expiresIn: expiresInSeconds },
+	);
+};
+
+export const uploadSessionAudioToS3 = async (params: {
+	sessionId: string;
+	buffer: Buffer;
+	mimeType: string;
+	fileExtension?: string;
+}): Promise<UploadedSessionAudio> => {
+	assertS3Configured();
+
+	const safeExtension = String(params.fileExtension || 'wav').replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'wav';
+	const uniqueName = `${Date.now()}-${randomUUID()}.${safeExtension}`;
+	const objectKey = `sessions/${params.sessionId}/audio/${uniqueName}`;
+
+	await s3Client.send(
+		new PutObjectCommand(Object.assign({
+			Bucket: env.awsS3Bucket,
+			Key: objectKey,
+			Body: params.buffer,
+			ContentType: params.mimeType,
+		}, env.awsS3DisableServerSideEncryption ? {} : { ServerSideEncryption: 'AES256' as ServerSideEncryption })),
+	);
+
+	return {
+		objectKey,
+		objectUrl: buildObjectUrl(env.awsS3Bucket, objectKey),
+	};
 };
 

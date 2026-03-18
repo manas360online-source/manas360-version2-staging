@@ -13,6 +13,9 @@ const crisisKeywords = [
 	'zindagi khatam',
 	'jeena nahi',
 	'aatmahatya',
+	'hopeless',
+	'hopelessness',
+	'end it',
 ];
 
 export const detectCrisisSignal = (message: string): boolean => {

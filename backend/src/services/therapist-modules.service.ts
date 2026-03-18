@@ -1,5 +1,6 @@
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/error.middleware';
+import { generateSummary } from './ai.service';
 
 const db = prisma as any;
 
@@ -215,6 +216,97 @@ export const upsertTherapistStructuredSessionNote = async (
   };
 };
 
+export const generateTherapistAiSessionNote = async (userId: string, sessionId: string) => {
+  await assertTherapist(userId);
+
+  const session = await db.therapySession.findFirst({
+    where: { id: sessionId, therapistProfileId: userId },
+    select: {
+      id: true,
+      patientProfileId: true,
+      transcript: true,
+    },
+  });
+
+  if (!session) {
+    throw new AppError('Session not found', 404);
+  }
+
+  const transcript = String(session.transcript || '').trim();
+  if (!transcript) {
+    throw new AppError('No transcript found for this session', 400);
+  }
+
+  const summary = await generateSummary(transcript);
+
+  const existingNote = await db.therapistSessionNote.findUnique({
+    where: { sessionId },
+    select: { history: true },
+  });
+
+  const history = Array.isArray(existingNote?.history) ? existingNote.history : [];
+  const nextHistory = [
+    ...history,
+    {
+      at: new Date().toISOString(),
+      event: 'ai_clinical_summary_generated',
+      moodAnalysis: {
+        emotionalTone: summary.moodSentiment.primaryEmotionalState,
+        energyLevel: `Volatility ${summary.moodSentiment.emotionalVolatilityScore}/10`,
+        riskSignals: `Anxiety ${summary.moodSentiment.anxietyLevelScore}/10`,
+      },
+      moodSentiment: summary.moodSentiment,
+      actionItems: summary.actionItems,
+    },
+  ];
+
+  const updated = await db.therapistSessionNote.upsert({
+    where: { sessionId },
+    create: {
+      sessionId,
+      therapistId: userId,
+      patientId: String(session.patientProfileId),
+      sessionType: 'Therapy Session',
+      subjective: summary.soapNote.subjective,
+      objective: summary.soapNote.objective,
+      assessment: summary.soapNote.assessment,
+      plan: summary.soapNote.plan,
+      status: 'draft',
+      history: nextHistory,
+    },
+    update: {
+      subjective: summary.soapNote.subjective,
+      objective: summary.soapNote.objective,
+      assessment: summary.soapNote.assessment,
+      plan: summary.soapNote.plan,
+      history: nextHistory,
+    },
+  });
+
+  await db.therapySession.update({
+    where: { id: sessionId },
+    data: {
+      noteUpdatedAt: new Date(),
+      noteUpdatedByTherapistId: userId,
+    },
+  });
+
+  return {
+    sessionId,
+    noteId: String(updated.id),
+    moodAnalysis: {
+      emotionalTone: summary.moodSentiment.primaryEmotionalState,
+      energyLevel: `Volatility ${summary.moodSentiment.emotionalVolatilityScore}/10`,
+      riskSignals: `Anxiety ${summary.moodSentiment.anxietyLevelScore}/10`,
+    },
+    moodSentiment: summary.moodSentiment,
+    soapNote: summary.soapNote,
+    actionItems: summary.actionItems,
+    status: String(updated.status),
+    updatedAt: updated.updatedAt,
+  };
+};
+
 export const listTherapistExercises = async (userId: string) => {
   await assertTherapist(userId);
 
@@ -304,51 +396,6 @@ export const deleteTherapistExercise = async (userId: string, id: string) => {
   if (!existing) throw new AppError('Exercise not found', 404);
 
   await db.therapistExercise.delete({ where: { id } });
-  return { id };
-};
-
-export const listTherapistCbtModules = async (userId: string) => {
-  await assertTherapist(userId);
-
-  const rows = await db.therapistCbtModule.findMany({ where: { therapistId: userId }, orderBy: { updatedAt: 'desc' } });
-  return {
-    items: rows.map((row: any) => ({
-      id: String(row.id),
-      title: String(row.title || ''),
-      approach: String(row.approach || ''),
-      assignedPatient: String(row.patientName || ''),
-      patientId: row.patientId ? String(row.patientId) : '',
-      status: String(row.status || 'draft'),
-      updatedAt: row.updatedAt,
-    })),
-  };
-};
-
-export const createTherapistCbtModule = async (userId: string, payload: any) => {
-  await assertTherapist(userId);
-
-  const patientId = payload.patientId ? String(payload.patientId) : null;
-  const patientName = await resolvePatientName(patientId, payload.assignedPatient);
-
-  return db.therapistCbtModule.create({
-    data: {
-      therapistId: userId,
-      patientId,
-      patientName: patientId || payload.assignedPatient ? patientName : null,
-      title: String(payload.title || '').trim(),
-      approach: String(payload.approach || '').trim(),
-      status: normalizeStatus(payload.status || (patientName ? 'active' : 'draft'), 'draft'),
-    },
-  });
-};
-
-export const deleteTherapistCbtModule = async (userId: string, id: string) => {
-  await assertTherapist(userId);
-
-  const existing = await db.therapistCbtModule.findFirst({ where: { id, therapistId: userId } });
-  if (!existing) throw new AppError('CBT module not found', 404);
-
-  await db.therapistCbtModule.delete({ where: { id } });
   return { id };
 };
 

@@ -29,19 +29,13 @@ const ensurePsychiatristTables = async (): Promise<void> => {
   await db.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS prescriptions (
       id TEXT PRIMARY KEY,
-      psychiatrist_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      provider_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       patient_id TEXT NOT NULL REFERENCES patient_profiles(id) ON DELETE CASCADE,
       drug_name TEXT NOT NULL,
-      brand_name TEXT,
-      indication TEXT,
-      starting_dose TEXT,
-      target_dose TEXT,
-      max_dose TEXT,
+      dosage TEXT,
       frequency TEXT,
       duration TEXT,
-      instructions TEXT,
-      is_active BOOLEAN NOT NULL DEFAULT true,
-      review_due_at TIMESTAMP,
+      status TEXT,
       created_at TIMESTAMP NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMP NOT NULL DEFAULT NOW()
     );
@@ -50,9 +44,9 @@ const ensurePsychiatristTables = async (): Promise<void> => {
   await db.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS drug_interactions (
       id TEXT PRIMARY KEY,
-      psychiatrist_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      patient_id TEXT REFERENCES patient_profiles(id) ON DELETE SET NULL,
-      prescription_id TEXT,
+      "psychiatristId" TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      "patientId" TEXT REFERENCES patient_profiles(id) ON DELETE SET NULL,
+      "prescriptionId" TEXT,
       primary_substance TEXT NOT NULL,
       interacting_substance TEXT NOT NULL,
       severity TEXT NOT NULL,
@@ -67,8 +61,8 @@ const ensurePsychiatristTables = async (): Promise<void> => {
   await db.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS medication_history (
       id TEXT PRIMARY KEY,
-      psychiatrist_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      patient_id TEXT NOT NULL REFERENCES patient_profiles(id) ON DELETE CASCADE,
+      "psychiatristId" TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      "patientId" TEXT NOT NULL REFERENCES patient_profiles(id) ON DELETE CASCADE,
       medication TEXT NOT NULL,
       old_dose TEXT,
       new_dose TEXT,
@@ -82,7 +76,7 @@ const ensurePsychiatristTables = async (): Promise<void> => {
   await db.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS patient_vitals (
       id TEXT PRIMARY KEY,
-      patient_id TEXT NOT NULL REFERENCES patient_profiles(id) ON DELETE CASCADE,
+      "patientId" TEXT NOT NULL REFERENCES patient_profiles(id) ON DELETE CASCADE,
       recorded_by TEXT REFERENCES users(id) ON DELETE SET NULL,
       systolic INTEGER,
       diastolic INTEGER,
@@ -98,7 +92,7 @@ const ensurePsychiatristTables = async (): Promise<void> => {
   await db.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS psychologist_wellness_plans (
       id TEXT PRIMARY KEY,
-      patient_id TEXT NOT NULL REFERENCES patient_profiles(id) ON DELETE CASCADE,
+      "patientId" TEXT NOT NULL REFERENCES patient_profiles(id) ON DELETE CASCADE,
       created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
       plan_items JSONB NOT NULL DEFAULT '[]'::jsonb,
       notes TEXT,
@@ -112,7 +106,7 @@ const ensurePsychiatristTables = async (): Promise<void> => {
   await db.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS psychiatrist_medication_library (
       id TEXT PRIMARY KEY,
-      psychiatrist_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      "psychiatristId" TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       drug_name TEXT NOT NULL,
       starting_dose TEXT,
       max_dose TEXT,
@@ -126,7 +120,7 @@ const ensurePsychiatristTables = async (): Promise<void> => {
   await db.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS psychiatrist_assessment_templates (
       id TEXT PRIMARY KEY,
-      psychiatrist_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      "psychiatristId" TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       name TEXT NOT NULL,
       checklist TEXT,
       severity_scale TEXT,
@@ -140,37 +134,113 @@ const ensurePsychiatristTables = async (): Promise<void> => {
   await db.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS psychiatrist_assessment_drafts (
       id TEXT PRIMARY KEY,
-      psychiatrist_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      patient_id TEXT NOT NULL REFERENCES patient_profiles(id) ON DELETE CASCADE,
+      "psychiatristId" TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      "patientId" TEXT NOT NULL REFERENCES patient_profiles(id) ON DELETE CASCADE,
       payload JSONB NOT NULL DEFAULT '{}'::jsonb,
       created_at TIMESTAMP NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
-      UNIQUE(psychiatrist_id, patient_id)
+      UNIQUE("psychiatristId", "patientId")
     );
   `);
 
   await db.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS psychiatrist_settings (
       id TEXT PRIMARY KEY,
-      psychiatrist_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      "psychiatristId" TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       payload JSONB NOT NULL DEFAULT '{}'::jsonb,
       created_at TIMESTAMP NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
-      UNIQUE(psychiatrist_id)
+      UNIQUE("psychiatristId")
     );
   `);
 
-  await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS psychiatric_assessments_psychiatrist_idx ON psychiatric_assessments(psychiatrist_id, created_at DESC);');
-  await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS psychiatric_assessments_patient_idx ON psychiatric_assessments(patient_id, created_at DESC);');
-  await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS prescriptions_psychiatrist_idx ON prescriptions(psychiatrist_id, created_at DESC);');
-  await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS prescriptions_patient_idx ON prescriptions(patient_id, created_at DESC);');
-  await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS medication_history_patient_idx ON medication_history(patient_id, changed_at DESC);');
-  await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS patient_vitals_patient_idx ON patient_vitals(patient_id, recorded_at DESC);');
-  await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS psychologist_wellness_plans_patient_idx ON psychologist_wellness_plans(patient_id, created_at DESC);');
-  await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS psychiatrist_medication_library_idx ON psychiatrist_medication_library(psychiatrist_id, updated_at DESC);');
-  await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS psychiatrist_assessment_templates_idx ON psychiatrist_assessment_templates(psychiatrist_id, updated_at DESC);');
-  await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS psychiatrist_assessment_drafts_idx ON psychiatrist_assessment_drafts(psychiatrist_id, patient_id, updated_at DESC);');
-  await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS psychiatrist_settings_idx ON psychiatrist_settings(psychiatrist_id, updated_at DESC);');
+  try {
+    await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS psychiatric_assessments_psychiatrist_idx ON psychiatric_assessments("psychiatristId", "createdAt" DESC);');
+  } catch (e) {
+    try {
+      await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS psychiatric_assessments_psychiatrist_idx ON psychiatric_assessments(psychiatrist_id, created_at DESC);');
+    } catch {}
+  }
+
+  try {
+    await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS psychiatric_assessments_patient_idx ON psychiatric_assessments("patientId", "createdAt" DESC);');
+  } catch (e) {
+    try {
+      await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS psychiatric_assessments_patient_idx ON psychiatric_assessments(patient_id, created_at DESC);');
+    } catch {}
+  }
+
+  try {
+    await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS prescriptions_psychiatrist_idx ON prescriptions(provider_id, created_at DESC);');
+  } catch (e) {
+    try {
+      await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS prescriptions_psychiatrist_idx ON prescriptions(psychiatrist_id, created_at DESC);');
+    } catch {}
+  }
+
+  try {
+    await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS prescriptions_patient_idx ON prescriptions(patient_id, created_at DESC);');
+  } catch (e) {
+    try {
+      await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS prescriptions_patient_idx ON prescriptions("patientId", "createdAt" DESC);');
+    } catch {}
+  }
+
+  try {
+    await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS medication_history_patient_idx ON medication_history("patientId", "changedAt" DESC);');
+  } catch (e) {
+    try {
+      await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS medication_history_patient_idx ON medication_history(patient_id, changed_at DESC);');
+    } catch {}
+  }
+
+  try {
+    await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS patient_vitals_patient_idx ON patient_vitals("patientId", "recordedAt" DESC);');
+  } catch (e) {
+    try {
+      await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS patient_vitals_patient_idx ON patient_vitals(patient_id, recorded_at DESC);');
+    } catch {}
+  }
+
+  try {
+    await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS psychologist_wellness_plans_patient_idx ON psychologist_wellness_plans("patientId", "createdAt" DESC);');
+  } catch (e) {
+    try {
+      await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS psychologist_wellness_plans_patient_idx ON psychologist_wellness_plans(patient_id, created_at DESC);');
+    } catch {}
+  }
+
+  try {
+    await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS psychiatrist_medication_library_idx ON psychiatrist_medication_library("psychiatristId", "updatedAt" DESC);');
+  } catch (e) {
+    try {
+      await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS psychiatrist_medication_library_idx ON psychiatrist_medication_library(psychiatrist_id, updated_at DESC);');
+    } catch {}
+  }
+
+  try {
+    await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS psychiatrist_assessment_templates_idx ON psychiatrist_assessment_templates("psychiatristId", "updatedAt" DESC);');
+  } catch (e) {
+    try {
+      await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS psychiatrist_assessment_templates_idx ON psychiatrist_assessment_templates(psychiatrist_id, updated_at DESC);');
+    } catch {}
+  }
+
+  try {
+    await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS psychiatrist_assessment_drafts_idx ON psychiatrist_assessment_drafts("psychiatristId", "patientId", "updatedAt" DESC);');
+  } catch (e) {
+    try {
+      await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS psychiatrist_assessment_drafts_idx ON psychiatrist_assessment_drafts(psychiatrist_id, patient_id, updated_at DESC);');
+    } catch {}
+  }
+
+  try {
+    await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS psychiatrist_settings_idx ON psychiatrist_settings("psychiatristId", "updatedAt" DESC);');
+  } catch (e) {
+    try {
+      await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS psychiatrist_settings_idx ON psychiatrist_settings(psychiatrist_id, updated_at DESC);');
+    } catch {}
+  }
 
   initialized = true;
 };
@@ -364,15 +434,15 @@ export const getPsychiatristDashboard = async (userId: string, patientId?: strin
         },
       }),
       db.$queryRawUnsafe(
-        `SELECT COUNT(*)::int AS value FROM prescriptions WHERE psychiatrist_id = $1 AND is_active = true AND review_due_at IS NOT NULL AND review_due_at <= NOW()`,
+        `SELECT COUNT(*)::int AS value FROM prescriptions WHERE "psychiatristId" = $1 AND is_active = true AND review_due_at IS NOT NULL AND review_due_at <= NOW()`,
         userId,
       ),
       db.$queryRawUnsafe(
-        `SELECT COUNT(*)::int AS value FROM drug_interactions WHERE psychiatrist_id = $1 AND severity IN ('CRITICAL', 'CAUTION')`,
+        `SELECT COUNT(*)::int AS value FROM drug_interactions WHERE "psychiatristId" = $1 AND severity IN ('CRITICAL', 'CAUTION')`,
         userId,
       ),
       db.$queryRawUnsafe(
-        `SELECT COUNT(*)::int AS value FROM psychiatric_assessments pa WHERE pa.psychiatrist_id = $1 AND LOWER(COALESCE(pa.severity, '')) IN ('severe','moderately severe')`,
+        `SELECT COUNT(*)::int AS value FROM psychiatric_assessments pa WHERE pa."psychiatristId" = $1 AND LOWER(COALESCE(pa.severity, '')) IN ('severe','moderately severe')`,
         userId,
       ),
     ]);
@@ -381,7 +451,7 @@ export const getPsychiatristDashboard = async (userId: string, patientId?: strin
     if (patientIds.length > 0) {
       const placeholders = patientIds.map((_, i) => `$${i + 1}`).join(',');
       const rows = await db.$queryRawUnsafe(
-        `SELECT COUNT(*)::int AS value FROM psychologist_wellness_plans WHERE is_active = true AND adherence_score < 60 AND patient_id IN (${placeholders})`,
+        `SELECT COUNT(*)::int AS value FROM psychologist_wellness_plans WHERE is_active = true AND adherence_score < 60 AND "patientId" IN (${placeholders})`,
         ...patientIds,
       );
       nonAdherenceCount = Number((rows as any[])[0]?.value || 0);
@@ -412,17 +482,17 @@ export const getPsychiatristDashboard = async (userId: string, patientId?: strin
       select: { dateTime: true },
     }),
     db.$queryRawUnsafe(
-      `SELECT clinical_impression, severity, created_at FROM psychiatric_assessments WHERE psychiatrist_id = $1 AND patient_id = $2 ORDER BY created_at DESC LIMIT 1`,
+      `SELECT clinical_impression, severity, created_at FROM psychiatric_assessments WHERE "psychiatristId" = $1 AND "patientId" = $2 ORDER BY created_at DESC LIMIT 1`,
       userId,
       patientId,
     ),
     db.$queryRawUnsafe(
-      `SELECT drug_name, starting_dose, frequency, duration, instructions FROM prescriptions WHERE psychiatrist_id = $1 AND patient_id = $2 AND is_active = true ORDER BY created_at DESC`,
+      `SELECT drug_name, starting_dose, frequency, duration, instructions FROM prescriptions WHERE "psychiatristId" = $1 AND "patientId" = $2 AND is_active = true ORDER BY created_at DESC`,
       userId,
       patientId,
     ),
     db.$queryRawUnsafe(
-      `SELECT plan_items, notes, adherence_score, created_at FROM psychologist_wellness_plans WHERE patient_id = $1 AND is_active = true ORDER BY created_at DESC LIMIT 1`,
+      `SELECT plan_items, notes, adherence_score, created_at FROM psychologist_wellness_plans WHERE "patientId" = $1 AND is_active = true ORDER BY created_at DESC LIMIT 1`,
       patientId,
     ),
   ]);
@@ -494,13 +564,14 @@ export const createPsychiatricAssessment = async (userId: string, payload: any) 
 
   const patientId = String(payload.patientId || '').trim();
   if (!patientId) throw new AppError('patientId is required', 400);
-  await getPatientBasics(patientId);
+  const patient = await getPatientBasics(patientId);
+  const patientUserId = patient.patientUserId;
 
   const id = randomUUID();
   await db.$executeRawUnsafe(
     `
     INSERT INTO psychiatric_assessments (
-      id, psychiatrist_id, patient_id, chief_complaint, symptoms, duration_weeks,
+      id, "psychiatristId", "patientId", chief_complaint, symptoms, duration_weeks,
       medical_history, lab_results, clinical_impression, severity, status, created_at, updated_at
     ) VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7::jsonb,$8::jsonb,$9,$10,$11,NOW(),NOW())
     `,
@@ -526,12 +597,12 @@ export const listPsychiatricAssessments = async (userId: string, patientId?: str
 
   const rows = patientId
     ? await db.$queryRawUnsafe(
-        `SELECT * FROM psychiatric_assessments WHERE psychiatrist_id = $1 AND patient_id = $2 ORDER BY created_at DESC LIMIT 100`,
+        `SELECT * FROM psychiatric_assessments WHERE "psychiatristId" = $1 AND "patientId" = $2 ORDER BY created_at DESC LIMIT 100`,
         userId,
         patientId,
       )
     : await db.$queryRawUnsafe(
-        `SELECT * FROM psychiatric_assessments WHERE psychiatrist_id = $1 ORDER BY created_at DESC LIMIT 100`,
+        `SELECT * FROM psychiatric_assessments WHERE "psychiatristId" = $1 ORDER BY created_at DESC LIMIT 100`,
         userId,
       );
 
@@ -544,31 +615,30 @@ export const createPrescription = async (userId: string, payload: any) => {
 
   const patientId = String(payload.patientId || '').trim();
   if (!patientId) throw new AppError('patientId is required', 400);
-  await getPatientBasics(patientId);
+  const patient = await getPatientBasics(patientId);
+  const patientUserId = patient.patientUserId;
 
   const id = randomUUID();
   const instructions = buildMedicationInstruction(payload);
 
+  const dosage = payload.dosage ? String(payload.dosage) : payload.startingDose ? String(payload.startingDose) : null;
+  const status = String(payload.status || 'active');
+  const instructionsText = instructions;
+
   await db.$executeRawUnsafe(
     `
     INSERT INTO prescriptions (
-      id, psychiatrist_id, patient_id, drug_name, brand_name, indication, starting_dose,
-      target_dose, max_dose, frequency, duration, instructions, is_active, review_due_at, created_at, updated_at
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,$13,NOW(),NOW())
+      id, patient_id, provider_id, drug_name, dosage, instructions, prescribed_date, status, created_at, updated_at
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW(),NOW())
     `,
     id,
+    patientUserId,
     userId,
-    patientId,
     String(payload.drugName || '').trim(),
-    payload.brandName ? String(payload.brandName) : null,
-    payload.indication ? String(payload.indication) : null,
-    payload.startingDose ? String(payload.startingDose) : null,
-    payload.targetDose ? String(payload.targetDose) : null,
-    payload.maxDose ? String(payload.maxDose) : null,
-    payload.frequency ? String(payload.frequency) : null,
-    payload.duration ? String(payload.duration) : null,
-    instructions,
-    payload.reviewDueAt ? new Date(payload.reviewDueAt) : null,
+    dosage,
+    instructionsText,
+    payload.prescribedDate ? new Date(payload.prescribedDate) : new Date(),
+    status,
   );
 
   return { id, instructions };
@@ -580,11 +650,11 @@ export const listPrescriptions = async (userId: string, patientId?: string) => {
 
   const rows = patientId
     ? await db.$queryRawUnsafe(
-        `SELECT * FROM prescriptions WHERE psychiatrist_id = $1 AND patient_id = $2 ORDER BY created_at DESC`,
+        `SELECT * FROM prescriptions WHERE "psychiatristId" = $1 AND "patientId" = $2 ORDER BY created_at DESC`,
         userId,
         patientId,
       )
-    : await db.$queryRawUnsafe(`SELECT * FROM prescriptions WHERE psychiatrist_id = $1 ORDER BY created_at DESC`, userId);
+    : await db.$queryRawUnsafe(`SELECT * FROM prescriptions WHERE "psychiatristId" = $1 ORDER BY created_at DESC`, userId);
 
   return { items: rows };
 };
@@ -608,7 +678,7 @@ export const checkDrugInteractions = async (userId: string, payload: any) => {
     await db.$executeRawUnsafe(
       `
       INSERT INTO drug_interactions (
-        id, psychiatrist_id, patient_id, primary_substance, interacting_substance, severity, risk, recommendation, resolution, override_justification, created_at
+        id, "psychiatristId", "patientId", primary_substance, interacting_substance, severity, risk, recommendation, resolution, override_justification, created_at
       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW())
       `,
       randomUUID(),
@@ -647,7 +717,7 @@ export const recordMedicationAdjustment = async (userId: string, payload: any) =
   await db.$executeRawUnsafe(
     `
     INSERT INTO medication_history (
-      id, psychiatrist_id, patient_id, medication, old_dose, new_dose, reason, outcome, changed_at, created_at
+      id, "psychiatristId", "patientId", medication, old_dose, new_dose, reason, outcome, changed_at, created_at
     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW())
     `,
     id,
@@ -670,11 +740,11 @@ export const listMedicationHistory = async (userId: string, patientId?: string) 
 
   const rows = patientId
     ? await db.$queryRawUnsafe(
-        `SELECT * FROM medication_history WHERE psychiatrist_id = $1 AND patient_id = $2 ORDER BY changed_at DESC`,
+        `SELECT * FROM medication_history WHERE "psychiatristId" = $1 AND "patientId" = $2 ORDER BY changed_at DESC`,
         userId,
         patientId,
       )
-    : await db.$queryRawUnsafe(`SELECT * FROM medication_history WHERE psychiatrist_id = $1 ORDER BY changed_at DESC`, userId);
+    : await db.$queryRawUnsafe(`SELECT * FROM medication_history WHERE "psychiatristId" = $1 ORDER BY changed_at DESC`, userId);
 
   return { items: rows };
 };
@@ -695,7 +765,7 @@ export const getParameterTracking = async (userId: string, patientId: string) =>
       patient.patientUserId,
     ),
     db.$queryRawUnsafe(
-      `SELECT recorded_at, adherence_percent, side_effects, systolic, diastolic, pulse, weight FROM patient_vitals WHERE patient_id = $1 ORDER BY recorded_at ASC LIMIT 24`,
+      `SELECT recorded_at, adherence_percent, side_effects, systolic, diastolic, pulse, weight FROM patient_vitals WHERE "patientId" = $1 ORDER BY recorded_at ASC LIMIT 24`,
       patientId,
     ),
   ]);
@@ -778,7 +848,7 @@ export const getSelfModeDashboard = async (userId: string) => {
     }),
     db.patientProfile.count(),
     db.$queryRawUnsafe(
-      `SELECT COUNT(*)::int AS value FROM prescriptions WHERE psychiatrist_id = $1 AND is_active = true`,
+      `SELECT COUNT(*)::int AS value FROM prescriptions WHERE "psychiatristId" = $1 AND is_active = true`,
       userId,
     ),
     db.therapySession.count({ where: { therapistProfileId: userId, dateTime: { gte: weekStart } } }),
@@ -792,8 +862,8 @@ export const getSelfModeDashboard = async (userId: string) => {
     ).catch(() => [{ value: null }]),
     db.$queryRawUnsafe(
       `SELECT TO_CHAR(created_at, 'Mon YY') AS label, COUNT(*)::int AS value
-       FROM prescriptions
-       WHERE psychiatrist_id = $1
+      FROM prescriptions
+      WHERE "psychiatristId" = $1
        GROUP BY TO_CHAR(created_at, 'Mon YY'), DATE_TRUNC('month', created_at)
        ORDER BY DATE_TRUNC('month', created_at) DESC
        LIMIT 6`,
@@ -810,8 +880,8 @@ export const getSelfModeDashboard = async (userId: string) => {
                   ELSE 70
                 END
               )::numeric, 1) AS value
-       FROM psychiatric_assessments
-       WHERE psychiatrist_id = $1
+      FROM psychiatric_assessments
+      WHERE "psychiatristId" = $1
        GROUP BY TO_CHAR(created_at, 'Mon YY'), DATE_TRUNC('month', created_at)
        ORDER BY DATE_TRUNC('month', created_at) DESC
        LIMIT 6`,
@@ -819,8 +889,8 @@ export const getSelfModeDashboard = async (userId: string) => {
     ),
     db.$queryRawUnsafe(
       `SELECT TO_CHAR(date_time, 'Mon YY') AS label, COALESCE(SUM(session_fee_minor), 0)::bigint AS value
-       FROM therapy_sessions
-       WHERE therapist_profile_id = $1
+      FROM therapy_sessions
+      WHERE therapist_profile_id = $1
        GROUP BY TO_CHAR(date_time, 'Mon YY'), DATE_TRUNC('month', date_time)
        ORDER BY DATE_TRUNC('month', date_time) DESC
        LIMIT 6`,
@@ -829,7 +899,7 @@ export const getSelfModeDashboard = async (userId: string) => {
     db.$queryRawUnsafe(
       `SELECT COUNT(*)::int AS value
        FROM prescriptions
-       WHERE psychiatrist_id = $1
+       WHERE "psychiatristId" = $1
          AND is_active = true
          AND review_due_at IS NOT NULL
          AND review_due_at <= NOW()`,
@@ -871,7 +941,7 @@ export const listPsychiatristMedicationLibrary = async (userId: string) => {
   const rows = await db.$queryRawUnsafe(
     `SELECT id, drug_name, starting_dose, max_dose, side_effects, notes, created_at, updated_at
      FROM psychiatrist_medication_library
-     WHERE psychiatrist_id = $1
+     WHERE "psychiatristId" = $1
      ORDER BY updated_at DESC`,
     userId,
   );
@@ -900,7 +970,7 @@ export const createPsychiatristMedicationLibraryItem = async (userId: string, pa
   const id = randomUUID();
   await db.$executeRawUnsafe(
     `INSERT INTO psychiatrist_medication_library (
-      id, psychiatrist_id, drug_name, starting_dose, max_dose, side_effects, notes, created_at, updated_at
+      id, "psychiatristId", drug_name, starting_dose, max_dose, side_effects, notes, created_at, updated_at
     ) VALUES ($1,$2,$3,$4,$5,$6,$7,NOW(),NOW())`,
     id,
     userId,
@@ -921,7 +991,7 @@ export const listPsychiatristAssessmentTemplates = async (userId: string) => {
   const rows = await db.$queryRawUnsafe(
     `SELECT id, name, checklist, severity_scale, duration_field, notes, created_at, updated_at
      FROM psychiatrist_assessment_templates
-     WHERE psychiatrist_id = $1
+     WHERE "psychiatristId" = $1
      ORDER BY updated_at DESC`,
     userId,
   );
@@ -950,7 +1020,7 @@ export const createPsychiatristAssessmentTemplate = async (userId: string, paylo
   const id = randomUUID();
   await db.$executeRawUnsafe(
     `INSERT INTO psychiatrist_assessment_templates (
-      id, psychiatrist_id, name, checklist, severity_scale, duration_field, notes, created_at, updated_at
+      id, "psychiatristId", name, checklist, severity_scale, duration_field, notes, created_at, updated_at
     ) VALUES ($1,$2,$3,$4,$5,$6,$7,NOW(),NOW())`,
     id,
     userId,
@@ -972,10 +1042,10 @@ export const getPsychiatristAssessmentDraft = async (userId: string, patientId: 
   if (!normalizedPatientId) throw new AppError('patientId is required', 400);
   await getPatientBasics(normalizedPatientId);
 
-  const rows = await db.$queryRawUnsafe(
+    const rows = await db.$queryRawUnsafe(
     `SELECT payload, updated_at
      FROM psychiatrist_assessment_drafts
-     WHERE psychiatrist_id = $1 AND patient_id = $2
+     WHERE "psychiatristId" = $1 AND "patientId" = $2
      LIMIT 1`,
     userId,
     normalizedPatientId,
@@ -998,9 +1068,9 @@ export const upsertPsychiatristAssessmentDraft = async (userId: string, patientI
   await getPatientBasics(normalizedPatientId);
 
   await db.$executeRawUnsafe(
-    `INSERT INTO psychiatrist_assessment_drafts (id, psychiatrist_id, patient_id, payload, created_at, updated_at)
+    `INSERT INTO psychiatrist_assessment_drafts (id, "psychiatristId", "patientId", payload, created_at, updated_at)
      VALUES ($1,$2,$3,$4::jsonb,NOW(),NOW())
-     ON CONFLICT (psychiatrist_id, patient_id)
+     ON CONFLICT ("psychiatristId", "patientId")
      DO UPDATE SET payload = EXCLUDED.payload, updated_at = NOW()`,
     randomUUID(),
     userId,
@@ -1019,7 +1089,7 @@ export const clearPsychiatristAssessmentDraft = async (userId: string, patientId
   if (!normalizedPatientId) throw new AppError('patientId is required', 400);
 
   await db.$executeRawUnsafe(
-    `DELETE FROM psychiatrist_assessment_drafts WHERE psychiatrist_id = $1 AND patient_id = $2`,
+    `DELETE FROM psychiatrist_assessment_drafts WHERE "psychiatristId" = $1 AND "patientId" = $2`,
     userId,
     normalizedPatientId,
   );
@@ -1034,7 +1104,7 @@ export const getPsychiatristSettings = async (userId: string) => {
   const rows = await db.$queryRawUnsafe(
     `SELECT payload, updated_at
      FROM psychiatrist_settings
-     WHERE psychiatrist_id = $1
+     WHERE "psychiatristId" = $1
      LIMIT 1`,
     userId,
   );
@@ -1051,9 +1121,9 @@ export const upsertPsychiatristSettings = async (userId: string, payload: any) =
   await assertPsychiatrist(userId);
 
   await db.$executeRawUnsafe(
-    `INSERT INTO psychiatrist_settings (id, psychiatrist_id, payload, created_at, updated_at)
+    `INSERT INTO psychiatrist_settings (id, "psychiatristId", payload, created_at, updated_at)
      VALUES ($1,$2,$3::jsonb,NOW(),NOW())
-     ON CONFLICT (psychiatrist_id)
+     ON CONFLICT ("psychiatristId")
      DO UPDATE SET payload = EXCLUDED.payload, updated_at = NOW()`,
     randomUUID(),
     userId,

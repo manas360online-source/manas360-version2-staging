@@ -16,7 +16,7 @@ const tiers = [
     price: '₹299',
     period: '/month',
     description: 'Full support experience with therapy enablement and guided programs.',
-    features: ['Everything in Free', 'Unlimited AI conversations', 'Priority matching', 'Full CBT and support programs'],
+    features: ['Everything in Free', 'Unlimited AI conversations', 'Priority matching', 'Full therapy and support programs'],
     cta: 'Start 7-Day Trial',
     featured: true,
   },

@@ -6,7 +6,8 @@ interface PatientProfileInput {
 	age: number;
 	gender: 'male' | 'female' | 'other' | 'prefer_not_to_say';
 	medicalHistory?: string;
-	emergencyContact: {
+	carrier?: string;
+	emergencyContact?: {
 		name: string;
 		relation: string;
 		phone: string;
@@ -76,6 +77,12 @@ const assertPatientUser = async (userId: string): Promise<void> => {
 export const createPatientProfile = async (userId: string, input: PatientProfileInput) => {
 	await assertPatientUser(userId);
 
+	const emergencyContactPayload: Record<string, string> = {};
+	if (input.emergencyContact?.name) emergencyContactPayload.name = input.emergencyContact.name;
+	if (input.emergencyContact?.relation) emergencyContactPayload.relation = input.emergencyContact.relation;
+	if (input.emergencyContact?.phone) emergencyContactPayload.phone = input.emergencyContact.phone;
+	if (input.carrier) emergencyContactPayload.carrier = input.carrier;
+
 	const existingProfile = await prisma.patientProfile.findUnique({ where: { userId } });
 	if (existingProfile) {
 		throw new AppError('Patient profile already exists', 409);
@@ -87,7 +94,7 @@ export const createPatientProfile = async (userId: string, input: PatientProfile
 			age: input.age,
 			gender: input.gender,
 			medicalHistory: input.medicalHistory ?? null,
-			emergencyContact: input.emergencyContact as any,
+			emergencyContact: emergencyContactPayload,
 		},
 	});
 
@@ -312,8 +319,8 @@ export const getMyMoodHistory = async (userId: string, query: PatientMoodHistory
 const severityToSpecializationMap: Record<string, string[]> = {
 	minimal: ['stress_management', 'general_wellness'],
 	mild: ['anxiety', 'stress_management', 'depression'],
-	moderate: ['anxiety', 'depression', 'cbt'],
-	moderately_severe: ['depression', 'trauma', 'cbt'],
+	moderate: ['anxiety', 'depression', 'therapy'],
+	moderately_severe: ['depression', 'trauma', 'therapy'],
 	severe: ['depression', 'trauma', 'crisis_intervention'],
 };
 
@@ -485,19 +492,23 @@ export const getMyTherapistMatches = async (userId: string, query: TherapistMatc
 	const targetSpecializations = normalizeStrings(severityToSpecializationMap[latestAssessment.severityLevel] ?? []);
 
 	const therapists = await prisma.user.findMany({
-		where: { role: 'THERAPIST' },
-		select: {
-			id: true,
-			firstName: true,
-			lastName: true,
+		where: { 
+			role: { in: ['THERAPIST', 'PSYCHIATRIST', 'COACH', 'PSYCHOLOGIST'] },
+			isTherapistVerified: true,
+			isDeleted: false
+		},
+		include: {
+			therapistProfile: true
 		},
 		take: 500,
 	});
 
 	const rankedMatches = therapists
 		.map((therapist) => {
-			const therapistSpecializations: string[] = [];
-			const therapistLanguages: string[] = [];
+			const profile = therapist.therapistProfile;
+			const therapistSpecializations = normalizeStrings(profile?.specializations || []);
+			const therapistLanguages = normalizeStrings(profile?.languages || []);
+			const availabilitySlots = (profile?.availability as any) || [];
 
 			const severityScore = scoreSeverity(therapistSpecializations, targetSpecializations);
 			const specializationScore = scoreSpecialization(
@@ -506,27 +517,27 @@ export const getMyTherapistMatches = async (userId: string, query: TherapistMatc
 				targetSpecializations,
 			);
 			const languageScore = scoreLanguage(therapistLanguages, query.languagePreference);
-			const availabilityScore = scoreAvailability(therapist.availabilitySlots ?? [], query.nextHours);
+			const availabilityScore = scoreAvailability(availabilitySlots, query.nextHours);
 
-			const compatibilityScore = calculateCompatibilityScore({
+			const matchScore = calculateCompatibilityScore({
 				severityScore,
 				specializationScore,
 				languageScore,
 				availabilityScore,
 			});
 
-			const capacityRatio = 0;
+			const capacityRatio = 0; // Placeholder for future logic
 
 			return {
 				therapist: {
 					id: therapist.id,
 					displayName: `${therapist.firstName} ${therapist.lastName}`.trim(),
-					specializations: [],
-					languages: [],
-					yearsOfExperience: 0,
-					averageRating: 0,
+					specializations: therapistSpecializations.slice(0, 3),
+					languages: therapistLanguages,
+					yearsOfExperience: profile?.yearsOfExperience || 0,
+					averageRating: profile?.averageRating || 0,
 				},
-				compatibilityScore,
+				matchScore,
 				scoreBreakdown: {
 					severity: Number((severityScore * 100).toFixed(2)),
 					specialization: Number((specializationScore * 100).toFixed(2)),
@@ -537,8 +548,8 @@ export const getMyTherapistMatches = async (userId: string, query: TherapistMatc
 			};
 		})
 		.sort((a, b) => {
-			if (b.compatibilityScore !== a.compatibilityScore) {
-				return b.compatibilityScore - a.compatibilityScore;
+			if (b.matchScore !== a.matchScore) {
+				return b.matchScore - a.matchScore;
 			}
 
 			if (b.capacityRatio !== a.capacityRatio) {

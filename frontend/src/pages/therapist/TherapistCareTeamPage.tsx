@@ -29,6 +29,21 @@ export default function TherapistCareTeamPage() {
     return `Patient context ID: ${selectedPatientId}`;
   }, [selectedPatientId]);
 
+  const uniqueMembers = useMemo(() => {
+    return members.reduce<TherapistCareTeamMemberItem[]>((acc, member) => {
+      const uniqueId = String(member?.id || '').trim();
+      if (!uniqueId) {
+        acc.push(member);
+        return acc;
+      }
+      const exists = acc.some((item) => String(item?.id || '').trim() === uniqueId);
+      if (!exists) {
+        acc.push(member);
+      }
+      return acc;
+    }, []);
+  }, [members]);
+
   const resetForm = () => {
     setEditingId('');
     setRole('Therapist');
@@ -155,7 +170,7 @@ export default function TherapistCareTeamPage() {
           </TherapistCard>
 
           <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            {members.map((member) => (
+            {uniqueMembers.map((member) => (
               <TherapistCard key={member.id} className="p-5">
                 <div className="mb-3 flex items-center justify-between">
                   <h3 className="font-display text-base font-bold text-ink-800">{member.name}</h3>

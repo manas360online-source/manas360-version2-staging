@@ -1,5 +1,6 @@
 import { prisma } from '../config/db';
 import { acknowledgeEscalation, resolveEscalation } from './crisisEscalation';
+import { parseDailyCheckInNote } from './dailyCheckIn.service';
 import { generateMoodPredictionForUser, updateMoodPredictionAccuracy } from './moodPrediction';
 import { recomputeCompositeRisk } from './compositeRisk';
 
@@ -40,8 +41,14 @@ export const getMoodHistory = async (userId: string) => {
 	]);
 
 	return {
-		mood_logs: moodLogs,
-		legacy_mood_entries: patientMoodEntries,
+		mood_logs: moodLogs.map((row: any) => {
+			const parsed = parseDailyCheckInNote(row.note);
+			return { ...row, note: parsed.journal, metadata: parsed.metadata };
+		}),
+		legacy_mood_entries: patientMoodEntries.map((row: any) => {
+			const parsed = parseDailyCheckInNote(row.note);
+			return { ...row, note: parsed.journal, metadata: parsed.metadata };
+		}),
 	};
 };
 

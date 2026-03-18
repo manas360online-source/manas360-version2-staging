@@ -6,10 +6,13 @@ const redis_1 = require("redis");
 const env_1 = require("../config/env");
 const redisUrl = process.env.REDIS_URL || env_1.env.redisUrl || 'redis://127.0.0.1:6379';
 const redis = (0, redis_1.createClient)({ url: redisUrl });
-redis.on('error', (error) => {
-    console.warn('[analytics.service] Redis unavailable, cache layer degraded', error);
-});
-redis.connect().catch(() => { });
+const isTestEnv = process.env.NODE_ENV === 'test';
+if (!isTestEnv) {
+    redis.on('error', (error) => {
+        console.warn('[analytics.service] Redis unavailable, cache layer degraded', error);
+    });
+    void redis.connect().catch(() => { });
+}
 class AnalyticsService {
     cacheTtl = 300; // seconds
     /**

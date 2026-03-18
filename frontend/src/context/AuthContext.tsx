@@ -7,7 +7,7 @@ import {
   type AuthUser,
 } from '../api/auth';
 
-export type AppRole = 'patient' | 'therapist' | 'psychiatrist' | 'coach' | 'admin';
+export type AppRole = 'patient' | 'therapist' | 'psychiatrist' | 'psychologist' | 'coach' | 'admin';
 
 const normalizeRole = (value: unknown): AppRole | null => {
   if (typeof value !== 'string') {
@@ -15,7 +15,14 @@ const normalizeRole = (value: unknown): AppRole | null => {
   }
 
   const normalized = value.toLowerCase();
-  if (normalized === 'patient' || normalized === 'therapist' || normalized === 'psychiatrist' || normalized === 'coach' || normalized === 'admin') {
+  if (
+    normalized === 'patient' ||
+    normalized === 'therapist' ||
+    normalized === 'psychiatrist' ||
+    normalized === 'psychologist' ||
+    normalized === 'coach' ||
+    normalized === 'admin'
+  ) {
     return normalized;
   }
 
@@ -24,10 +31,16 @@ const normalizeRole = (value: unknown): AppRole | null => {
 
 export const getDefaultRouteForRole = (role: unknown): string => {
   const normalizedRole = normalizeRole(role);
+  if (normalizedRole === 'psychologist') return '/provider/dashboard';
   if (normalizedRole === 'admin') return '/admin/dashboard';
-  if (normalizedRole === 'psychiatrist') return '/psychiatrist/dashboard';
-  if (normalizedRole === 'therapist' || normalizedRole === 'coach') return '/therapist/analytics';
-  return '/dashboard';
+  if (normalizedRole === 'psychiatrist') return '/provider/dashboard';
+  if (normalizedRole === 'therapist' || normalizedRole === 'coach') return '/provider/dashboard';
+  return '/patient/dashboard';
+};
+
+const isProviderRole = (role: unknown): boolean => {
+  const normalizedRole = normalizeRole(role);
+  return normalizedRole === 'therapist' || normalizedRole === 'psychiatrist' || normalizedRole === 'psychologist' || normalizedRole === 'coach';
 };
 
 const toBoolean = (value: unknown): boolean => value === true || value === 'true' || value === 1 || value === '1';
@@ -49,7 +62,7 @@ export const isPlatformAdminUser = (user: AuthUser | null | undefined): boolean 
 };
 
 export const getPostLoginRoute = (user: AuthUser | null | undefined): string => {
-  if (!user) return '/dashboard';
+  if (!user) return '/patient/dashboard';
 
   if (hasCorporateAccess(user)) {
     return '/corporate/dashboard';
@@ -57,6 +70,21 @@ export const getPostLoginRoute = (user: AuthUser | null | undefined): string => 
 
   if (isPlatformAdminUser(user)) {
     return '/admin/dashboard';
+  }
+
+  if (isProviderRole(user.role)) {
+    // Dev/testing bypass: when VITE_SKIP_ONBOARDING=true or running in Vite dev, skip onboarding redirect.
+    const skipOnboarding = (import.meta.env.VITE_SKIP_ONBOARDING || '').toString() === 'true' || import.meta.env.DEV === true;
+    if (skipOnboarding) return '/provider/dashboard';
+    const onboardingStatus = String(user.onboardingStatus || '').toUpperCase();
+
+    if (onboardingStatus !== 'COMPLETED') {
+      return '/onboarding/provider-setup';
+    }
+    if (!user.isTherapistVerified) {
+      return '/provider/verification-pending';
+    }
+    return '/provider/dashboard';
   }
 
   return getDefaultRouteForRole(user.role);
@@ -88,15 +116,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const hasCheckedInitialAuthRef = useRef(false);
+  const authProbeBlockKey = 'manas360.auth.probe.blocked';
 
   const hasSessionHint = useCallback((): boolean => {
     if (typeof document === 'undefined') {
       return false;
     }
 
+    if (typeof window !== 'undefined' && window.sessionStorage.getItem(authProbeBlockKey) === '1') {
+      return false;
+    }
+
     const csrfCookieName = (import.meta.env.VITE_CSRF_COOKIE_NAME || 'csrf_token').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     return new RegExp(`(?:^|; )${csrfCookieName}=`).test(document.cookie);
-  }, []);
+  }, [authProbeBlockKey]);
 
   const clearSessionHint = useCallback((): void => {
     if (typeof document === 'undefined') {
@@ -105,7 +138,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const csrfCookieName = import.meta.env.VITE_CSRF_COOKIE_NAME || 'csrf_token';
     document.cookie = `${csrfCookieName}=; Max-Age=0; path=/`;
-  }, []);
+    document.cookie = `${csrfCookieName}=; Max-Age=0; path=/api`;
+
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.removeItem(authProbeBlockKey);
+    }
+  }, [authProbeBlockKey]);
 
   const checkAuth = useCallback(async () => {
     if (!hasSessionHint()) {
@@ -117,13 +155,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const currentUser = await meApi();
       setUser(currentUser);
-    } catch {
+    } catch (error: any) {
       setUser(null);
       clearSessionHint();
+      if (typeof window !== 'undefined' && error?.response?.status === 401) {
+        window.sessionStorage.setItem(authProbeBlockKey, '1');
+      }
     } finally {
       setLoading(false);
     }
-	}, [hasSessionHint, clearSessionHint]);
+	}, [hasSessionHint, clearSessionHint, authProbeBlockKey]);
 
   useEffect(() => {
     if (hasCheckedInitialAuthRef.current) {
@@ -137,8 +178,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (identifier: string, password: string) => {
     const loggedInUser = await loginApi({ identifier, password });
     setUser(loggedInUser);
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.removeItem(authProbeBlockKey);
+    }
     return loggedInUser;
-  }, []);
+  }, [authProbeBlockKey]);
 
   const register = useCallback(async (email: string, password: string, name: string, role: 'patient' | 'therapist' | 'psychiatrist' | 'coach') => {
     await registerApi({ email, password, name, role });

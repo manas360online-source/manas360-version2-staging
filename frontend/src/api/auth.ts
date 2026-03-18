@@ -11,7 +11,7 @@ export interface AuthUser {
 	id: string;
 	email: string | null;
 	phone: string | null;
-	role: 'patient' | 'therapist' | 'psychiatrist' | 'coach' | 'admin' | string;
+	role: 'patient' | 'therapist' | 'psychiatrist' | 'psychologist' | 'coach' | 'admin' | string;
 	companyKey?: string | null;
 	company_key?: string | null;
 	isCompanyAdmin?: boolean | null;
@@ -21,6 +21,11 @@ export interface AuthUser {
 	emailVerified?: boolean;
 	phoneVerified?: boolean;
 	mfaEnabled?: boolean;
+	isTherapistVerified?: boolean;
+	therapistVerifiedAt?: string | null;
+	onboardingStatus?: 'PENDING' | 'COMPLETED' | 'REJECTED' | string | null;
+	providerOnboardingCompleted?: boolean;
+	providerProfileVerified?: boolean;
 }
 
 export interface LoginPayload {
@@ -33,6 +38,33 @@ export interface RegisterPayload {
 	password: string;
 	name: string;
 	role: 'patient' | 'therapist' | 'psychiatrist' | 'coach';
+}
+
+export interface ProviderRegisterPayload {
+	professionalType: string;
+	fullName: string;
+	email: string;
+	registrationNum: string;
+	yearsOfExperience: number;
+	education: string;
+	licenseRci?: string;
+	licenseNmc?: string;
+	clinicalCategories: string[];
+	specializations: string[];
+	languages: string[];
+	corporateReady: boolean;
+	shiftPreferences: string[];
+	consultationFee: number;
+	bankDetails: {
+		accountName: string;
+		accountNumber: string;
+		ifsc: string;
+		bankName: string;
+		upiId?: string;
+	};
+	tagline: string;
+	bio: string;
+	digitalSignature: string;
 }
 
 export interface PasswordResetRequestPayload {
@@ -67,6 +99,10 @@ export const login = async (payload: LoginPayload): Promise<AuthUser> => {
 
 export const register = async (payload: RegisterPayload): Promise<void> => {
 	await http.post<ApiEnvelope<{ userId: string; email: string; message: string }>>('/auth/register', payload);
+};
+
+export const providerRegister = async (payload: ProviderRegisterPayload): Promise<void> => {
+	await http.post<ApiEnvelope<unknown>>('/v1/provider/onboarding', payload);
 };
 
 export const googleLogin = async (idToken: string): Promise<AuthUser> => {

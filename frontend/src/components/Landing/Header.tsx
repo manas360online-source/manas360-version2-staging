@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Instagram, Linkedin, MessageCircle, Youtube } from 'lucide-react';
 import { MegaNav } from './MegaNav';
+import { theme } from '../../theme/theme';
 
 const LANG_OPTIONS = ['English', 'हिन्दी', 'தமிழ்', 'తెలుగు', 'ಕನ್ನಡ'];
 
@@ -38,7 +39,8 @@ export const Header: React.FC = () => {
   return (
     <header className="fixed inset-x-0 top-0 z-50" role="banner">
       <div
-        className="w-full border-b border-calm-sage/20 bg-[#064E5C]/85 px-4 py-2.5 shadow-soft-md backdrop-blur-md transition-all duration-500 md:px-6 lg:px-10"
+        className="w-full border-b border-calm-sage/20 px-4 py-2.5 shadow-soft-md backdrop-blur-md transition-all duration-500 md:px-6 lg:px-10"
+        style={{ backgroundColor: theme.colors.brandTopbarOverlay }}
       >
         {/* Top row: brand + actions */}
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 rounded-2xl px-3 py-1.5">

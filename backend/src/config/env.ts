@@ -44,8 +44,12 @@ const parseCorsOrigins = (value: string | undefined): string[] => {
 		.filter((origin) => origin.length > 0);
 };
 
+const JWT_ACCESS_FALLBACK = 'change-access-secret';
+const JWT_REFRESH_FALLBACK = 'change-refresh-secret';
+
 export interface EnvConfig {
 	nodeEnv: NodeEnv;
+	isDevelopment: boolean;
 	port: number;
 	apiPrefix: string;
 	corsOrigins: string[];
@@ -68,6 +72,8 @@ export interface EnvConfig {
 	awsS3Bucket: string;
 	awsAccessKeyId?: string;
 	awsSecretAccessKey?: string;
+	awsS3Endpoint?: string;
+	awsS3ForcePathStyle: boolean;
 	profilePhotoSignedUrlTtlSeconds: number;
 	therapistDocumentSignedUrlTtlSeconds: number;
 	exportSignedUrlTtlSeconds: number;
@@ -75,24 +81,32 @@ export interface EnvConfig {
 	redisUrl: string;
 	analyticsRollupIntervalSeconds?: number;
 	disableAuthRateLimit: boolean;
+	// When true, disable adding ServerSideEncryption header for S3 uploads (useful for MinIO)
+	awsS3DisableServerSideEncryption: boolean;
 	razorpayKeyId?: string;
 	razorpayKeySecret?: string;
 	razorpayWebhookSecret?: string;
+	phonePeWebhookUsername?: string;
+	phonePeWebhookPassword?: string;
 	paymentProviderSharePercent: number;
 	paymentPlatformSharePercent: number;
 	webhookIdempotencyTtlSeconds: number;
 	minPayoutMinor: number;
 	secretEncryptionKey?: string;
+	allowDevVerificationBypass: boolean;
+	allowDevPaymentBypass: boolean;
+	freesoundApiKey?: string;
 }
 
 export const env: EnvConfig = Object.freeze({
 	nodeEnv: parseNodeEnv(process.env.NODE_ENV),
+	isDevelopment: parseNodeEnv(process.env.NODE_ENV) === 'development',
 	port: parsePort(process.env.PORT),
 	apiPrefix: process.env.API_PREFIX ?? '/api',
 	corsOrigins: parseCorsOrigins(process.env.CORS_ORIGIN),
 	databaseUrl: process.env.DATABASE_URL,
-	jwtAccessSecret: process.env.JWT_ACCESS_SECRET ?? 'change-access-secret',
-	jwtRefreshSecret: process.env.JWT_REFRESH_SECRET ?? 'change-refresh-secret',
+	jwtAccessSecret: process.env.JWT_ACCESS_SECRET ?? JWT_ACCESS_FALLBACK,
+	jwtRefreshSecret: process.env.JWT_REFRESH_SECRET ?? JWT_REFRESH_FALLBACK,
 	jwtAccessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN ?? '15m',
 	jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '7d',
 	cookieDomain: process.env.COOKIE_DOMAIN,
@@ -109,6 +123,10 @@ export const env: EnvConfig = Object.freeze({
 	awsS3Bucket: process.env.AWS_S3_BUCKET ?? '',
 	awsAccessKeyId: process.env.AWS_ACCESS_KEY_ID,
 	awsSecretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+	awsS3Endpoint: process.env.AWS_S3_ENDPOINT,
+	awsS3ForcePathStyle: parseBoolean(process.env.AWS_S3_FORCE_PATH_STYLE, false),
+	// When true, disable adding ServerSideEncryption header for S3 uploads (useful for MinIO)
+	awsS3DisableServerSideEncryption: parseBoolean(process.env.AWS_S3_DISABLE_SERVER_SIDE_ENCRYPTION, false),
 	profilePhotoSignedUrlTtlSeconds: parseNumber(process.env.PROFILE_PHOTO_SIGNED_URL_TTL_SECONDS, 900),
 	therapistDocumentSignedUrlTtlSeconds: parseNumber(process.env.THERAPIST_DOCUMENT_SIGNED_URL_TTL_SECONDS, 900),
 	exportSignedUrlTtlSeconds: parseNumber(process.env.EXPORT_SIGNED_URL_TTL_SECONDS, 3600),
@@ -119,10 +137,21 @@ export const env: EnvConfig = Object.freeze({
 	razorpayKeyId: process.env.RAZORPAY_KEY_ID,
 	razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET,
 	razorpayWebhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET,
+	phonePeWebhookUsername: process.env.PHONEPE_WEBHOOK_USERNAME,
+	phonePeWebhookPassword: process.env.PHONEPE_WEBHOOK_PASSWORD,
 	paymentProviderSharePercent: parseNumber(process.env.PAYMENT_PROVIDER_SHARE_PERCENT, 60),
 	paymentPlatformSharePercent: parseNumber(process.env.PAYMENT_PLATFORM_SHARE_PERCENT, 40),
 	webhookIdempotencyTtlSeconds: parseNumber(process.env.WEBHOOK_IDEMPOTENCY_TTL_SECONDS, 3600),
 	minPayoutMinor: parseNumber(process.env.MIN_PAYOUT_MINOR, 10000),
 	secretEncryptionKey: process.env.SECRET_ENCRYPTION_KEY ?? undefined,
+	allowDevVerificationBypass: parseBoolean(process.env.DEV_VERIFICATION_BYPASS, parseNodeEnv(process.env.NODE_ENV) === 'development'),
+	allowDevPaymentBypass: parseBoolean(process.env.DEV_PAYMENT_BYPASS, parseNodeEnv(process.env.NODE_ENV) === 'development'),
+	freesoundApiKey: process.env.FREESOUND_API_KEY,
 });
 
+if (
+	(env.nodeEnv === 'production' || env.nodeEnv === 'staging')
+	&& (env.jwtAccessSecret === JWT_ACCESS_FALLBACK || env.jwtRefreshSecret === JWT_REFRESH_FALLBACK)
+) {
+	throw new Error('JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must be configured for staging/production');
+}

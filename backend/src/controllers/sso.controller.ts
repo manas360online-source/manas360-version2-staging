@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express';
+import { randomBytes } from 'crypto';
 import { sendSuccess } from '../utils/response';
 import * as ssoService from '../services/sso.service';
 import { asyncHandler } from '../middleware/validate.middleware';
@@ -15,6 +16,51 @@ const getRequestMeta = (req: any) => ({
     device: req.get('x-device-id') ?? undefined,
 });
 
+const resolveCookieDomain = (): string | undefined => {
+    const rawDomain = env.cookieDomain?.trim();
+    if (!rawDomain) {
+        return undefined;
+    }
+
+    const normalized = rawDomain.toLowerCase();
+    if (normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '::1') {
+        return undefined;
+    }
+
+    return rawDomain;
+};
+
+const cookieDomain = resolveCookieDomain();
+
+const authCookieOptions = {
+    httpOnly: true,
+    secure: env.cookieSecure,
+    sameSite: 'strict' as const,
+    domain: cookieDomain,
+    path: '/',
+};
+
+const setAuthCookies = (res: Response, accessToken: string, refreshToken: string): void => {
+    res.cookie('access_token', accessToken, {
+        ...authCookieOptions,
+        maxAge: 15 * 60 * 1000,
+    });
+
+    res.cookie(env.refreshCookieName, refreshToken, {
+        ...authCookieOptions,
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    res.cookie(env.csrfCookieName, randomBytes(24).toString('hex'), {
+        httpOnly: false,
+        secure: env.cookieSecure,
+        sameSite: 'strict',
+        domain: cookieDomain,
+        path: '/',
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+};
+
 // Start OIDC authorization
 export const authorizeController = async (req: Request, res: Response): Promise<void> => {
     const tenantKey = String(req.params.tenantKey);
@@ -28,8 +74,22 @@ export const authorizeController = async (req: Request, res: Response): Promise<
     const nonce = uuidv4();
 
     // store state/nonce in cookie for callback validation
-    res.cookie(`sso_state_${tenantKey}`, state, { httpOnly: true, maxAge: 5 * 60 * 1000, secure: env.cookieSecure });
-    res.cookie(`sso_nonce_${tenantKey}`, nonce, { httpOnly: true, maxAge: 5 * 60 * 1000, secure: env.cookieSecure });
+    res.cookie(`sso_state_${tenantKey}`, state, {
+        httpOnly: true,
+        secure: env.cookieSecure,
+        sameSite: 'lax',
+        domain: cookieDomain,
+        path: '/',
+        maxAge: 5 * 60 * 1000,
+    });
+    res.cookie(`sso_nonce_${tenantKey}`, nonce, {
+        httpOnly: true,
+        secure: env.cookieSecure,
+        sameSite: 'lax',
+        domain: cookieDomain,
+        path: '/',
+        maxAge: 5 * 60 * 1000,
+    });
 
     const { client } = await ssoService.buildOidcClient(tenant as any);
 
@@ -85,8 +145,7 @@ export const callbackController = async (req: Request, res: Response): Promise<v
     const result = await loginOrCreateUserFromProfile({ tenant, claims, tokenSet }, meta as any);
 
     // set auth cookies consistent with existing login flow
-    res.cookie('access_token', result.accessToken, { httpOnly: true, secure: env.cookieSecure, maxAge: 15 * 60 * 1000 });
-    res.cookie(env.refreshCookieName, result.refreshToken, { httpOnly: true, secure: env.cookieSecure, maxAge: 7 * 24 * 60 * 60 * 1000 });
+    setAuthCookies(res, result.accessToken, result.refreshToken);
 
     // redirect to app
     const appUrl = process.env.APP_URL ?? '/';

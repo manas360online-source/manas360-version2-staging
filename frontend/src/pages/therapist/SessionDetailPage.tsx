@@ -1,7 +1,6 @@
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSessionDetail } from '../../hooks/useSessionDetail';
-import SessionResponseViewer from '../../components/CBT/SessionResponseViewer';
 
 const SessionHeader: React.FC<{ session: any }> = ({ session }) => {
   return (
@@ -25,7 +24,7 @@ const PatientCard: React.FC<{ patient: any }> = ({ patient }) => (
   </div>
 );
 
-// Timeline rendering is handled by the virtualized SessionResponseViewer
+// Timeline rendering is handled by the session detail view
 
 const BranchVisualizer: React.FC<{ branching: any }> = ({ branching }) => {
   const path = branching?.path ?? [];
@@ -65,8 +64,11 @@ const SessionDetailPage: React.FC = () => {
           <div className="responsive-card"><BranchVisualizer branching={detail?.branching} /></div>
         </div>
         <div className="lg:col-span-2 h-[640px] md:h-[720px]">
-          <div className="border rounded-xl h-full bg-white">
-            <SessionResponseViewer sessionId={id as string} />
+          <div className="border rounded-xl h-full bg-white flex items-center justify-center">
+            <div className="text-center text-gray-500">
+              <p className="text-lg font-medium">Session Details</p>
+              <p className="text-sm mt-2">CBT functionality has been removed from this application.</p>
+            </div>
           </div>
         </div>
       </div>

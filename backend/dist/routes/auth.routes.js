@@ -7,6 +7,7 @@ const rateLimiter_middleware_1 = require("../middleware/rateLimiter.middleware")
 const validate_middleware_1 = require("../middleware/validate.middleware");
 const router = (0, express_1.Router)();
 router.post('/register', rateLimiter_middleware_1.authRateLimiter, (0, validate_middleware_1.asyncHandler)(auth_controller_1.registerController));
+router.post('/provider-register', auth_middleware_1.requireAuth, rateLimiter_middleware_1.authRateLimiter, (0, validate_middleware_1.asyncHandler)(auth_controller_1.providerRegisterController));
 router.post('/signup/email', rateLimiter_middleware_1.authRateLimiter, (0, validate_middleware_1.asyncHandler)(auth_controller_1.signupWithEmailController));
 router.post('/verify/email-otp', rateLimiter_middleware_1.authRateLimiter, (0, validate_middleware_1.asyncHandler)(auth_controller_1.verifyEmailOtpController));
 router.post('/signup/phone', rateLimiter_middleware_1.authRateLimiter, (0, validate_middleware_1.asyncHandler)(auth_controller_1.signupWithPhoneController));

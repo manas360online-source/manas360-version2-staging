@@ -39,6 +39,15 @@ const assertPatientUser = async (userId) => {
 };
 const createPatientProfile = async (userId, input) => {
     await assertPatientUser(userId);
+    const emergencyContactPayload = {};
+    if (input.emergencyContact?.name)
+        emergencyContactPayload.name = input.emergencyContact.name;
+    if (input.emergencyContact?.relation)
+        emergencyContactPayload.relation = input.emergencyContact.relation;
+    if (input.emergencyContact?.phone)
+        emergencyContactPayload.phone = input.emergencyContact.phone;
+    if (input.carrier)
+        emergencyContactPayload.carrier = input.carrier;
     const existingProfile = await db_1.default.patientProfile.findUnique({ where: { userId } });
     if (existingProfile) {
         throw new error_middleware_1.AppError('Patient profile already exists', 409);
@@ -49,7 +58,7 @@ const createPatientProfile = async (userId, input) => {
             age: input.age,
             gender: input.gender,
             medicalHistory: input.medicalHistory ?? null,
-            emergencyContact: input.emergencyContact,
+            emergencyContact: emergencyContactPayload,
         },
     });
     return db_1.default.patientProfile.findUnique({ where: { id: profile.id }, select: safePatientSelect });
@@ -225,8 +234,8 @@ exports.getMyMoodHistory = getMyMoodHistory;
 const severityToSpecializationMap = {
     minimal: ['stress_management', 'general_wellness'],
     mild: ['anxiety', 'stress_management', 'depression'],
-    moderate: ['anxiety', 'depression', 'cbt'],
-    moderately_severe: ['depression', 'trauma', 'cbt'],
+    moderate: ['anxiety', 'depression', 'therapy'],
+    moderately_severe: ['depression', 'trauma', 'therapy'],
     severe: ['depression', 'trauma', 'crisis_intervention'],
 };
 const WEIGHTS = {
@@ -342,39 +351,43 @@ const getMyTherapistMatches = async (userId, query) => {
     }
     const targetSpecializations = normalizeStrings(severityToSpecializationMap[latestAssessment.severityLevel] ?? []);
     const therapists = await db_1.default.user.findMany({
-        where: { role: 'THERAPIST' },
-        select: {
-            id: true,
-            firstName: true,
-            lastName: true,
+        where: {
+            role: { in: ['THERAPIST', 'PSYCHIATRIST', 'COACH', 'PSYCHOLOGIST'] },
+            isTherapistVerified: true,
+            isDeleted: false
+        },
+        include: {
+            therapistProfile: true
         },
         take: 500,
     });
     const rankedMatches = therapists
         .map((therapist) => {
-        const therapistSpecializations = [];
-        const therapistLanguages = [];
+        const profile = therapist.therapistProfile;
+        const therapistSpecializations = normalizeStrings(profile?.specializations || []);
+        const therapistLanguages = normalizeStrings(profile?.languages || []);
+        const availabilitySlots = profile?.availability || [];
         const severityScore = scoreSeverity(therapistSpecializations, targetSpecializations);
         const specializationScore = scoreSpecialization(therapistSpecializations, query.specializationPreference, targetSpecializations);
         const languageScore = scoreLanguage(therapistLanguages, query.languagePreference);
-        const availabilityScore = scoreAvailability(therapist.availabilitySlots ?? [], query.nextHours);
-        const compatibilityScore = calculateCompatibilityScore({
+        const availabilityScore = scoreAvailability(availabilitySlots, query.nextHours);
+        const matchScore = calculateCompatibilityScore({
             severityScore,
             specializationScore,
             languageScore,
             availabilityScore,
         });
-        const capacityRatio = 0;
+        const capacityRatio = 0; // Placeholder for future logic
         return {
             therapist: {
                 id: therapist.id,
                 displayName: `${therapist.firstName} ${therapist.lastName}`.trim(),
-                specializations: [],
-                languages: [],
-                yearsOfExperience: 0,
-                averageRating: 0,
+                specializations: therapistSpecializations.slice(0, 3),
+                languages: therapistLanguages,
+                yearsOfExperience: profile?.yearsOfExperience || 0,
+                averageRating: profile?.averageRating || 0,
             },
-            compatibilityScore,
+            matchScore,
             scoreBreakdown: {
                 severity: Number((severityScore * 100).toFixed(2)),
                 specialization: Number((specializationScore * 100).toFixed(2)),
@@ -385,8 +398,8 @@ const getMyTherapistMatches = async (userId, query) => {
         };
     })
         .sort((a, b) => {
-        if (b.compatibilityScore !== a.compatibilityScore) {
-            return b.compatibilityScore - a.compatibilityScore;
+        if (b.matchScore !== a.matchScore) {
+            return b.matchScore - a.matchScore;
         }
         if (b.capacityRatio !== a.capacityRatio) {
             return b.capacityRatio - a.capacityRatio;

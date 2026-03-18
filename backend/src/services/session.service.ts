@@ -5,8 +5,14 @@ import { publishPlaceholderNotificationEvent } from './notification.service';
 import { buildPaginationMeta, normalizePagination } from '../utils/pagination';
 import { decryptSessionNote, encryptSessionNote } from '../utils/encryption';
 import { analyticsService } from './analytics.service';
+import { transcribeSession } from './aiService';
 import { createClient } from 'redis';
 import { env } from '../config/env';
+import PDFDocument from 'pdfkit';
+import path from 'path';
+import fs from 'fs';
+import { s3Client } from './s3.service';
+import { PutObjectCommand, ServerSideEncryption } from '@aws-sdk/client-s3';
 
 const db = prisma as any;
 
@@ -34,6 +40,7 @@ interface TherapistSessionHistoryQuery {
 
 interface TherapistSessionStatusPayload {
 	status: 'confirmed' | 'cancelled' | 'completed';
+	recordingUrl?: string;
 }
 
 interface TherapistSessionNotePayload {
@@ -58,16 +65,87 @@ const buildBookingReferenceId = (): string => {
 	return `${prefix}-${datePart}-${randomPart}`;
 };
 
+const deriveRecordingFileName = (recordingUrl: string): string => {
+	try {
+		const parsedUrl = new URL(recordingUrl);
+		const candidate = parsedUrl.pathname.split('/').filter(Boolean).pop();
+		if (candidate && candidate.length > 0) return candidate;
+	} catch {
+		// Keep fallback below when URL parsing fails.
+	}
+
+	return 'session-recording.webm';
+};
+
+const fetchRecordingAudio = async (recordingUrl: string): Promise<{ buffer: Buffer; fileName: string; mimeType: string }> => {
+	const response = await fetch(recordingUrl);
+	if (!response.ok) {
+		throw new Error(`Failed to fetch recording (${response.status})`);
+	}
+
+	const fileName = deriveRecordingFileName(recordingUrl);
+	const mimeType = String(response.headers.get('content-type') || 'audio/webm');
+	const arrayBuffer = await response.arrayBuffer();
+
+	return {
+		buffer: Buffer.from(arrayBuffer),
+		fileName,
+		mimeType,
+	};
+};
+
+const triggerSessionTranscription = async (sessionId: string, recordingUrl?: string): Promise<void> => {
+	if (!recordingUrl) return;
+
+	try {
+		const audio = await fetchRecordingAudio(recordingUrl);
+		const transcriptResult = await transcribeSession(audio.buffer, audio.fileName, audio.mimeType);
+		const transcriptText = transcriptResult.transcriptWithTimestamps || transcriptResult.transcript;
+
+		if (!transcriptText) return;
+
+		await prisma.therapySession.update({
+			where: { id: sessionId },
+			data: { transcript: transcriptText },
+		});
+	} catch (error) {
+		console.error('[session] transcription_failed', {
+			sessionId,
+			errorType: (error as any)?.name || 'UnknownError',
+			error: (error as any)?.message || String(error),
+		});
+	}
+};
+
+const ensurePatientProfile = async (userId: string) => {
+	const patientProfile = await db.patientProfile.findUnique({ where: { userId }, select: { id: true } });
+	if (patientProfile) return patientProfile;
+
+	const created = await db.patientProfile.create({
+		data: {
+			userId,
+			age: 25,
+			gender: 'prefer_not_to_say',
+			emergencyContact: {
+				name: 'Not provided',
+				relation: 'Not provided',
+				phone: 'Not provided',
+			},
+		},
+		select: { id: true },
+	}).catch(() => null);
+
+	if (!created) {
+		throw new AppError('Patient profile unavailable', 500);
+	}
+
+	return created;
+};
+
 const getSlotMinuteOfDay = (date: Date): number => date.getHours() * 60 + date.getMinutes();
 
 export const bookPatientSession = async (userId: string, input: BookSessionInput) => {
-	const patientProfile = await db.patientProfile.findUnique({
-		where: { userId },
-		select: { id: true },
-	});
-	if (!patientProfile) {
-		throw new AppError('Patient profile not found. Please create profile first.', 404);
-	}
+	const patientProfile = await ensurePatientProfile(userId);
 
 	const therapist = await db.user.findUnique({
 		where: { id: input.therapistId },
@@ -161,10 +239,7 @@ export const bookPatientSession = async (userId: string, input: BookSessionInput
 };
 
 export const getMySessionHistory = async (userId: string, query: SessionHistoryQuery) => {
-	const patientProfile = await db.patientProfile.findUnique({ where: { userId }, select: { id: true } });
-	if (!patientProfile) {
-		throw new AppError('Patient profile not found. Please create profile first.', 404);
-	}
+	const patientProfile = await ensurePatientProfile(userId);
 
 	const pagination = normalizePagination(
 		{ page: query.page, limit: query.limit },
@@ -191,7 +266,7 @@ export const getMySessionHistory = async (userId: string, query: SessionHistoryQ
 		prisma.therapySession.count({ where: prismaFilter }),
 		prisma.therapySession.findMany({
 			where: prismaFilter,
-			select: { id: true, bookingReferenceId: true, therapistProfileId: true, dateTime: true, status: true, createdAt: true },
+			select: { id: true, bookingReferenceId: true, therapistProfileId: true, dateTime: true, status: true, isLocked: true, createdAt: true },
 			orderBy: { dateTime: 'desc' },
 			skip: pagination.skip,
 			take: pagination.limit,
@@ -218,6 +293,7 @@ export const getMySessionHistory = async (userId: string, query: SessionHistoryQ
 			bookingReferenceId: session.bookingReferenceId,
 			dateTime: sessionDate,
 			status: String(session.status).toLowerCase(),
+			isLocked: Boolean(session.isLocked),
 			timing: sessionDate < now ? 'past' : 'upcoming',
 			therapist: {
 				id: String(session.therapistProfileId),
@@ -588,6 +664,10 @@ export const updateMyTherapistSessionStatus = async (
 		// ignore
 	}
 
+	if (payload.status === 'completed') {
+		void triggerSessionTranscription(String(updated.id), payload.recordingUrl);
+	}
+
 	return {
 		sessionId: String(updated.id),
 		bookingReferenceId: updated.bookingReferenceId,
@@ -640,6 +720,123 @@ export const saveMyTherapistSessionNote = async (
 		},
 		updatedAt: updated.updatedAt,
 	};
+};
+
+/**
+ * Generates and uploads a PDF document for a signed therapist session note.
+ * Pulls patientId (User UUID) from the database to ensure correct folder mapping.
+ */
+export const uploadSessionDocument = async (noteId: string) => {
+	const note = await prisma.therapistSessionNote.findUnique({
+		where: { id: noteId },
+		include: {
+			patient: {
+				select: {
+					userId: true,
+				},
+			},
+			therapist: {
+				select: {
+					firstName: true,
+					lastName: true,
+					name: true,
+				},
+			},
+			session: {
+				select: {
+					dateTime: true,
+					durationMinutes: true,
+				},
+			},
+		},
+	});
+
+	if (!note) return;
+	if (String(note.status || '').toLowerCase() !== 'signed') return;
+
+	try {
+		const doc = new PDFDocument({ margin: 50 });
+		const fileName = `note-${note.id}-${Date.now()}.pdf`;
+		const exportDir = path.join(process.cwd(), 'exports', 'notes');
+		await fs.promises.mkdir(exportDir, { recursive: true });
+		const tmpPath = path.join(exportDir, fileName);
+		const stream = fs.createWriteStream(tmpPath);
+
+		doc.pipe(stream);
+		doc.fontSize(20).text('Clinical Note', { align: 'center' });
+		doc.moveDown();
+
+		const providerName = `${note.therapist.firstName || ''} ${note.therapist.lastName || ''}`.trim() || note.therapist.name || 'Provider';
+		doc.fontSize(12).text(`Therapist: ${providerName}`);
+		doc.text(`Patient ID: ${note.patientId}`);
+		doc.text(`Session Date: ${note.session.dateTime.toISOString()}`);
+		doc.moveDown();
+
+		doc.fontSize(12).text('Subjective');
+		doc.fontSize(10).text(note.subjective || '');
+		doc.moveDown();
+
+		doc.fontSize(12).text('Objective');
+		doc.fontSize(10).text(note.objective || '');
+		doc.moveDown();
+
+		doc.fontSize(12).text('Assessment');
+		doc.fontSize(10).text(note.assessment || '');
+		doc.moveDown();
+
+		doc.fontSize(12).text('Plan');
+		doc.fontSize(10).text(note.plan || '');
+		doc.end();
+
+		await new Promise<void>((resolve, reject) => {
+			stream.on('finish', () => resolve());
+			stream.on('error', (err) => reject(err));
+		});
+
+		const buffer = await fs.promises.readFile(tmpPath);
+
+		// Pull the User UUID (patientUserId) from the patient profile relation
+		const patientUserId = note.patient.userId;
+		const objectKey = `patient-documents/${patientUserId}/${fileName}`;
+
+		await s3Client.send(new PutObjectCommand({
+			Bucket: env.awsS3Bucket,
+			Key: objectKey,
+			Body: buffer,
+			ContentType: 'application/pdf',
+			ServerSideEncryption: env.awsS3DisableServerSideEncryption ? undefined : ('AES256' as ServerSideEncryption),
+		}));
+
+		const createdDoc = await prisma.patientDocument.create({
+			data: {
+				patientId: patientUserId,
+				title: `Signed Note — ${note.sessionType}`,
+				source: 'session-note',
+				sourceId: note.id,
+				s3ObjectKey: objectKey,
+			},
+		});
+
+		// Trigger real-time notification
+		try {
+			const { notifyPatientDocument } = await import('../routes/gps.routes');
+			notifyPatientDocument(patientUserId, {
+				id: createdDoc.id,
+				title: createdDoc.title,
+				date: createdDoc.createdAt,
+				category: 'session',
+				s3ObjectKey: createdDoc.s3ObjectKey,
+			});
+		} catch (e) {
+			console.warn('Real-time notify failed', e);
+		}
+
+		// Cleanup local tmp file
+		await fs.promises.unlink(tmpPath).catch(() => {});
+	} catch (e) {
+		console.error('Session note PDF generation/upload failed:', e);
+		throw e;
+	}
 };
 
 export const addResponseNote = async (

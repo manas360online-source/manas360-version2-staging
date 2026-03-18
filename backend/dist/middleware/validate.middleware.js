@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.validateAdminListSubscriptionsQuery = exports.validateTherapistProfileIdParam = exports.validateAdminGetUserIdParam = exports.validateAdminListUsersQuery = exports.validateTherapistEarningsQuery = exports.validateTherapistSessionNoteRequest = exports.validateTherapistLeadsQuery = exports.validateUploadTherapistDocumentRequest = exports.uploadTherapistDocumentMiddleware = exports.validateCreatePsychiatristFollowUpRequest = exports.validateCreateMedicationHistoryRequest = exports.validateDrugInteractionCheckRequest = exports.validateCreatePrescriptionRequest = exports.validateCreatePsychiatricAssessmentRequest = exports.validateCreateTherapistProfileRequest = exports.validateUpdateTherapistSessionStatusRequest = exports.validateTherapistSessionHistoryQuery = exports.validatePatientSessionHistoryQuery = exports.validateBookSessionRequest = exports.validateTherapistMatchQuery = exports.validatePatientMoodHistoryQuery = exports.validatePatientAssessmentHistoryQuery = exports.validateCreatePatientAssessmentRequest = exports.validateCreatePatientProfileRequest = exports.validateSessionIdParam = exports.validateChangePasswordRequest = exports.uploadProfilePhotoMiddleware = exports.validateUpdateMeRequest = exports.asyncHandler = void 0;
+exports.validateCreateDailyCheckInRequest = exports.validateAdminListSubscriptionsQuery = exports.validateTherapistProfileIdParam = exports.validateAdminGetUserIdParam = exports.validateAdminListUsersQuery = exports.validateTherapistEarningsQuery = exports.validateTherapistSessionNoteRequest = exports.validateTherapistLeadsQuery = exports.validateUploadTherapistDocumentRequest = exports.uploadTherapistDocumentMiddleware = exports.validateCreatePsychiatristFollowUpRequest = exports.validateCreateMedicationHistoryRequest = exports.validateDrugInteractionCheckRequest = exports.validateCreatePrescriptionRequest = exports.validateCreatePsychiatricAssessmentRequest = exports.validateCreateTherapistProfileRequest = exports.validateUpdateTherapistSessionStatusRequest = exports.validateTherapistSessionHistoryQuery = exports.validatePatientSessionHistoryQuery = exports.validateBookSessionRequest = exports.validateTherapistMatchQuery = exports.validatePatientMoodHistoryQuery = exports.validatePatientAssessmentHistoryQuery = exports.validateCreatePatientAssessmentRequest = exports.validateCreatePatientProfileRequest = exports.validateSessionIdParam = exports.validateChangePasswordRequest = exports.uploadProfilePhotoMiddleware = exports.validateUpdateMeRequest = exports.asyncHandler = void 0;
 const multer_1 = __importStar(require("multer"));
 const express_validator_1 = require("express-validator");
 const error_middleware_1 = require("./error.middleware");
@@ -162,15 +162,20 @@ exports.validateSessionIdParam = [
     (req, _res, next) => applyValidationResult(req, next),
 ];
 const extractValidatedPatientProfile = (req, _res, next) => {
+    const hasEmergencyContact = !!req.body.emergencyContact && typeof req.body.emergencyContact === 'object';
+    const carrier = typeof req.body.carrier === 'string' ? req.body.carrier.trim() : undefined;
     req.validatedPatientProfile = {
         age: Number(req.body.age),
         gender: req.body.gender,
         medicalHistory: typeof req.body.medicalHistory === 'string' ? req.body.medicalHistory.trim() : undefined,
-        emergencyContact: {
-            name: String(req.body.emergencyContact?.name ?? '').trim(),
-            relation: String(req.body.emergencyContact?.relation ?? '').trim(),
-            phone: String(req.body.emergencyContact?.phone ?? '').trim(),
-        },
+        carrier: carrier || undefined,
+        emergencyContact: hasEmergencyContact
+            ? {
+                name: String(req.body.emergencyContact?.name ?? '').trim(),
+                relation: String(req.body.emergencyContact?.relation ?? '').trim(),
+                phone: String(req.body.emergencyContact?.phone ?? '').trim(),
+            }
+            : undefined,
     };
     next();
 };
@@ -180,14 +185,17 @@ exports.validateCreatePatientProfileRequest = [
         .isIn(['male', 'female', 'other', 'prefer_not_to_say'])
         .withMessage('gender must be one of male, female, other, prefer_not_to_say'),
     (0, express_validator_1.body)('medicalHistory').optional().isString().trim().isLength({ max: 2000 }).withMessage('medicalHistory max length is 2000'),
-    (0, express_validator_1.body)('emergencyContact').isObject().withMessage('emergencyContact is required'),
-    (0, express_validator_1.body)('emergencyContact.name').isString().trim().isLength({ min: 2, max: 100 }).withMessage('emergencyContact.name must be 2-100 characters'),
+    (0, express_validator_1.body)('carrier').optional().isString().trim().isLength({ max: 100 }).withMessage('carrier max length is 100'),
+    (0, express_validator_1.body)('emergencyContact').optional().isObject().withMessage('emergencyContact must be an object'),
+    (0, express_validator_1.body)('emergencyContact.name').optional().isString().trim().isLength({ min: 2, max: 100 }).withMessage('emergencyContact.name must be 2-100 characters'),
     (0, express_validator_1.body)('emergencyContact.relation')
+        .optional()
         .isString()
         .trim()
         .isLength({ min: 2, max: 50 })
         .withMessage('emergencyContact.relation must be 2-50 characters'),
     (0, express_validator_1.body)('emergencyContact.phone')
+        .optional()
         .isString()
         .trim()
         .matches(/^\+?[1-9]\d{1,14}$/)
@@ -375,11 +383,15 @@ exports.validateTherapistSessionHistoryQuery = [
 const extractValidatedTherapistSessionStatusPayload = (req, _res, next) => {
     req.validatedTherapistSessionStatusPayload = {
         status: req.body.status,
+        recordingUrl: typeof req.body.recordingUrl === 'string' && req.body.recordingUrl.trim().length > 0
+            ? req.body.recordingUrl.trim()
+            : undefined,
     };
     next();
 };
 exports.validateUpdateTherapistSessionStatusRequest = [
     (0, express_validator_1.body)('status').isIn(['confirmed', 'cancelled', 'completed']).withMessage('status must be confirmed, cancelled, or completed'),
+    (0, express_validator_1.body)('recordingUrl').optional().isString().isLength({ max: 2000 }).withMessage('recordingUrl must be a valid string up to 2000 characters'),
     (req, _res, next) => applyValidationResult(req, next),
     extractValidatedTherapistSessionStatusPayload,
 ];
@@ -677,4 +689,109 @@ exports.validateAdminListSubscriptionsQuery = [
     (0, express_validator_1.query)('limit').optional().isInt({ min: 1, max: 50 }).withMessage('limit must be between 1 and 50'),
     (req, _res, next) => applyValidationResult(req, next),
     extractValidatedAdminListSubscriptionsQuery,
+];
+const extractValidatedDailyCheckIn = (req, _res, next) => {
+    const body = req.body;
+    const type = String(body.type || '').toUpperCase();
+    const mapStringToValue = (val) => {
+        if (val === undefined || val === null)
+            return undefined;
+        if (typeof val === 'number')
+            return val;
+        const s = String(val).toLowerCase();
+        if (s.includes('low'))
+            return 2;
+        if (s.includes('medium'))
+            return 3;
+        if (s.includes('high'))
+            return 4;
+        if (s.includes('great'))
+            return 5;
+        if (s.includes('very low'))
+            return 1;
+        if (s.includes('very high'))
+            return 5;
+        // Sleep ranges
+        if (s.includes('4') && s.includes('6'))
+            return 2;
+        if (s.includes('6') && s.includes('8'))
+            return 3;
+        if (s.includes('8') && s.includes('10'))
+            return 4;
+        if (s.includes('less than 4'))
+            return 1;
+        if (s.includes('more than 10'))
+            return 5;
+        const parsed = parseInt(s, 10);
+        return isNaN(parsed) ? undefined : parsed;
+    };
+    req.validatedDailyCheckIn = {
+        date: body.date ? String(body.date) : new Date().toISOString(),
+        type,
+        mood: Number(body.mood),
+        energy: mapStringToValue(body.energy),
+        sleep: mapStringToValue(body.sleep),
+        context: Array.isArray(body.context) ? body.context : [],
+        intention: String(body.intention || ''),
+        reflectionGood: String(body.reflectionGood || ''),
+        reflectionBad: String(body.reflectionBad || ''),
+        stressLevel: body.stressLevel !== undefined ? Number(body.stressLevel) : undefined,
+        gratitude: String(body.gratitude || ''),
+    };
+    next();
+};
+exports.validateCreateDailyCheckInRequest = [
+    (0, express_validator_1.body)('date').optional().isISO8601().withMessage('date must be a valid ISO8601 date'),
+    (0, express_validator_1.body)('type').isString().toLowerCase().isIn(['morning', 'evening']).withMessage('type must be morning or evening'),
+    (0, express_validator_1.body)('mood').isInt({ min: 1, max: 5 }).withMessage('mood must be an integer between 1 and 5'),
+    (0, express_validator_1.body)('energy').optional().custom((val) => typeof val === 'string' || (typeof val === 'number' && val >= 1 && val <= 5)),
+    (0, express_validator_1.body)('sleep').optional().custom((val) => typeof val === 'string' || (typeof val === 'number' && val >= 1 && val <= 5)),
+    (0, express_validator_1.body)('context').optional().isArray().withMessage('context must be an array of strings'),
+    (0, express_validator_1.body)('context.*').optional().isString().trim().isLength({ min: 1, max: 100 }).withMessage('each context item must be 1-100 characters'),
+    (0, express_validator_1.body)('intention').optional().isString().trim().isLength({ min: 1, max: 500 }).withMessage('intention must be 1-500 characters'),
+    (0, express_validator_1.body)('reflectionGood').optional().isString().trim().isLength({ min: 1, max: 500 }).withMessage('reflectionGood must be 1-500 characters'),
+    (0, express_validator_1.body)('reflectionBad').optional().isString().trim().isLength({ min: 1, max: 500 }).withMessage('reflectionBad must be 1-500 characters'),
+    (0, express_validator_1.body)('stressLevel').optional().isInt({ min: 1, max: 5 }).withMessage('stressLevel must be an integer between 1 and 5'),
+    (0, express_validator_1.body)('gratitude').optional().isString().trim().isLength({ min: 1, max: 500 }).withMessage('gratitude must be 1-500 characters'),
+    (0, express_validator_1.body)().custom((body) => {
+        const type = String(body.type || '').toUpperCase();
+        if (type === 'MORNING') {
+            // Morning check-in validation
+            if (body.energy === undefined) {
+                throw new Error('energy is required for morning check-in');
+            }
+            if (body.sleep === undefined) {
+                throw new Error('sleep is required for morning check-in');
+            }
+            if (body.intention === undefined || String(body.intention || '').trim().length === 0) {
+                throw new Error('intention is required for morning check-in');
+            }
+            // Evening fields should not be present
+            if (body.reflectionGood !== undefined || body.reflectionBad !== undefined || body.stressLevel !== undefined || body.gratitude !== undefined) {
+                throw new Error('evening fields should not be present in morning check-in');
+            }
+        }
+        else if (type === 'EVENING') {
+            // Evening check-in validation
+            if (body.reflectionGood === undefined || String(body.reflectionGood || '').trim().length === 0) {
+                throw new Error('reflectionGood is required for evening check-in');
+            }
+            if (body.reflectionBad === undefined || String(body.reflectionBad || '').trim().length === 0) {
+                throw new Error('reflectionBad is required for evening check-in');
+            }
+            if (body.stressLevel === undefined) {
+                throw new Error('stressLevel is required for evening check-in');
+            }
+            if (body.gratitude === undefined || String(body.gratitude || '').trim().length === 0) {
+                throw new Error('gratitude is required for evening check-in');
+            }
+            // Morning fields should not be present
+            if (body.energy !== undefined || body.sleep !== undefined || body.intention !== undefined) {
+                throw new Error('morning fields should not be present in evening check-in');
+            }
+        }
+        return true;
+    }),
+    (req, _res, next) => applyValidationResult(req, next),
+    extractValidatedDailyCheckIn,
 ];

@@ -587,7 +587,7 @@ const seedCorporateDemoData = async (companyKey = DEFAULT_COMPANY_KEY): Promise<
   const workshops = [
     { title: 'Mindfulness Workshop', provider: 'Dr. Naina Rao', department: 'Engineering', date: '2026-03-16', attendees: 62 },
     { title: 'Leadership Stress Training', provider: 'Dr. Rajeev Sinha', department: 'Operations', date: '2026-03-19', attendees: 36 },
-    { title: 'Burnout Awareness', provider: 'Dr. Meera AI', department: 'Sales & Marketing', date: '2026-03-22', attendees: 29 },
+    { title: 'Burnout Awareness', provider: 'Anytime Buddy AI', department: 'Sales & Marketing', date: '2026-03-22', attendees: 29 },
     { title: 'Emotional Intelligence', provider: 'Dr. Kavya Iyer', department: 'Customer Support', date: '2026-03-27', attendees: 24 },
   ];
 

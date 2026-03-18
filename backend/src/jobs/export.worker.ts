@@ -5,11 +5,18 @@ import { env } from '../config/env';
 import { prisma } from '../config/db';
 
 const REDIS_URL = process.env.REDIS_URL || env.redisUrl || 'redis://127.0.0.1:6379';
+const isTestEnv = process.env.NODE_ENV === 'test';
 
-export const exportQueue = new Queue('session-exports', { connection: { url: REDIS_URL } });
+export const exportQueue = isTestEnv
+  ? ({
+      add: async (_name: string, data: any) => ({ id: `test-job-${Date.now()}`, data }),
+    } as any)
+  : new Queue('session-exports', { connection: { url: REDIS_URL } });
 
 // Worker to process export jobs
-export const exportWorker = new Worker(
+export const exportWorker = isTestEnv
+  ? null
+  : new Worker(
   'session-exports',
   async (job: any) => {
     const { sessionId, format, requestorId, uploadToS3 } = job.data as any;
@@ -52,6 +59,8 @@ export const exportWorker = new Worker(
   { connection: { url: REDIS_URL }, concurrency: 2 }
 );
 
-exportWorker.on('failed', (job: any, err: any) => {
-  console.error('[exportWorker] job failed', job.id, err);
-});
+if (exportWorker) {
+  exportWorker.on('failed', (job: any, err: any) => {
+    console.error('[exportWorker] job failed', job.id, err);
+  });
+}

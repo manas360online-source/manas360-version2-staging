@@ -1,5 +1,5 @@
 import { prisma } from '../config/db';
-import * as PDFDocument from 'pdfkit';
+import PDFDocument from 'pdfkit';
 import { createWriteStream, readFileSync } from 'fs';
 import { join } from 'path';
 import * as csv from 'fast-csv';
@@ -59,7 +59,7 @@ export class SessionExportService {
     doc.pipe(createWriteStream(filePath));
 
     // Header
-    doc.fontSize(24).font('Helvetica-Bold').text('CBT Session Report', { align: 'center' });
+    doc.fontSize(24).font('Helvetica-Bold').text('Session Report', { align: 'center' });
     doc.fontSize(10).fillColor('#666').text('Confidential - For Clinical Use Only', { align: 'center' });
     doc.moveDown(0.5);
     // Metadata: therapist, patient, date, version

@@ -32,9 +32,6 @@ describe('Session analytics integration', () => {
 				`DELETE FROM analytics.dim_organization WHERE organization_id LIKE $1`,
 				`${seedPrefix}-%`,
 			);
-			await prisma.$executeRawUnsafe(
-				`DELETE FROM analytics.dim_date WHERE date_key IN (20260110, 20260111, 20260112, 20260113)`,
-			);
 		}
 		await disconnectTestDb();
 	});

@@ -6,10 +6,15 @@ import { adminAnalyticsExportService, type AdminAnalyticsExportPayload } from '.
 import { prisma } from '../config/db';
 
 const REDIS_URL = process.env.REDIS_URL || env.redisUrl || 'redis://127.0.0.1:6379';
+const isTestEnv = process.env.NODE_ENV === 'test';
 
-export const adminAnalyticsExportQueue = new Queue('admin-analytics-exports', {
-	connection: { url: REDIS_URL },
-});
+export const adminAnalyticsExportQueue = isTestEnv
+	? ({
+			add: async (_name: string, data: any) => ({ id: `test-admin-export-${Date.now()}`, data }),
+	  } as any)
+	: new Queue('admin-analytics-exports', {
+			connection: { url: REDIS_URL },
+	  });
 
 type AdminAnalyticsExportJobData = {
 	exportJobKey: number;
@@ -49,7 +54,9 @@ const updateStatus = async (exportJobKey: number, status: 'running' | 'completed
 	);
 };
 
-export const adminAnalyticsExportWorker = new Worker(
+export const adminAnalyticsExportWorker = isTestEnv
+	? null
+	: new Worker(
 	'admin-analytics-exports',
 	async (job: any) => {
 		const data = job.data as AdminAnalyticsExportJobData;
@@ -78,6 +85,8 @@ export const adminAnalyticsExportWorker = new Worker(
 	{ connection: { url: REDIS_URL }, concurrency: 2 },
 );
 
-adminAnalyticsExportWorker.on('failed', (job: any, error: any) => {
-	console.error('[adminAnalyticsExportWorker] job failed', job?.id, error);
-});
+if (adminAnalyticsExportWorker) {
+	adminAnalyticsExportWorker.on('failed', (job: any, error: any) => {
+		console.error('[adminAnalyticsExportWorker] job failed', job?.id, error);
+	});
+}

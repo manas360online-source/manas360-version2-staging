@@ -8,12 +8,15 @@ const app_1 = __importDefault(require("./app"));
 const db_1 = require("./config/db");
 const env_1 = require("./config/env");
 const socket_1 = __importDefault(require("./socket"));
-const analyticsRollup_job_1 = require("./jobs/analyticsRollup.job");
 require("./jobs/admin-analytics-export.worker");
 const dailyMoodPrediction_1 = require("./cron/dailyMoodPrediction");
 const chatRetention_job_1 = require("./jobs/chatRetention.job");
+const subscriptionCron_1 = require("./jobs/subscriptionCron");
+const providerLeadCron_1 = require("./cron/providerLeadCron");
 const sso_service_1 = require("./services/sso.service");
 const sso_service_2 = require("./services/sso.service");
+const gps_routes_1 = require("./routes/gps.routes");
+const paymentReconciliation_1 = require("./cron/paymentReconciliation");
 const startServer = async () => {
     await (0, db_1.connectDatabase)();
     // ensure SSO tables exist
@@ -42,11 +45,22 @@ const startServer = async () => {
         }
     });
     // initialize socket.io (non-blocking)
-    void (0, socket_1.default)(server).then(() => console.log('Socket server initialized')).catch((err) => console.error('Socket init failed', err));
+    void (0, socket_1.default)(server).then((io) => {
+        console.log('Socket server initialized');
+        if (io)
+            (0, gps_routes_1.setSocketIO)(io);
+    }).catch((err) => console.error('Socket init failed', err));
     // start analytics rollup job
-    void (0, analyticsRollup_job_1.startAnalyticsRollup)();
+    // void startAnalyticsRollup(); // Commented out - references missing patient_sessions table
     (0, dailyMoodPrediction_1.startDailyMoodPredictionJob)();
     (0, chatRetention_job_1.startChatRetentionJob)();
+    (0, subscriptionCron_1.initSubscriptionCron)();
+    (0, providerLeadCron_1.initProviderLeadCron)();
+    // startPatientSharedReportCleanupJob(); // Commented out - references psychologist_reports table
+    // PhonePe reconciliation CRON (every 30s)
+    setInterval(() => {
+        (0, paymentReconciliation_1.reconcilePendingPayments)().catch(err => console.error('[CRON] Reconciliation failed', err));
+    }, 30000);
     const shutdown = async (signal) => {
         console.log(`${signal} received. Shutting down gracefully...`);
         server.close(async () => {

@@ -72,6 +72,31 @@ export type TherapistSessionNoteItem = {
 	history?: Array<{ at: string; event: string }>;
 };
 
+export type AiClinicalSummary = {
+	moodAnalysis: {
+		emotionalTone: string;
+		energyLevel: string;
+		riskSignals: string;
+	};
+	moodSentiment?: {
+		primaryEmotionalState: string;
+		emotionalVolatilityScore: number;
+		anxietyLevelScore: number;
+		keywords: string[];
+	};
+	soapNote: {
+		subjective: string;
+		objective: string;
+		assessment: string;
+		plan: string;
+	};
+	actionItems?: string[];
+	status?: string;
+	updatedAt?: string;
+	noteId?: string;
+	sessionId?: string;
+};
+
 export type TherapistExerciseItem = {
 	id: string;
 	patientId?: string;
@@ -223,6 +248,10 @@ export const therapistApi = {
 	upsertStructuredSessionNote: async (sessionId: string, payload: Record<string, any>): Promise<any> => {
 		const res = await http.put(`/v1/therapists/me/session-notes/${encodeURIComponent(sessionId)}`, payload);
 		return unwrap<any>(res.data);
+	},
+	generateAiSessionNote: async (sessionId: string): Promise<AiClinicalSummary> => {
+		const res = await http.post(`/v1/therapists/session/${encodeURIComponent(sessionId)}/generate-ai-note`);
+		return unwrap<AiClinicalSummary>(res.data);
 	},
 	getExercises: async (): Promise<{ items: TherapistExerciseItem[] }> => {
 		const res = await http.get('/v1/therapists/me/exercises');

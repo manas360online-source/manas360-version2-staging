@@ -12,10 +12,13 @@ const error_middleware_1 = require("../middleware/error.middleware");
 const razorpay_service_1 = require("./razorpay.service");
 const db = db_1.prisma;
 const redis = (0, redis_1.createClient)({ url: env_1.env.redisUrl });
-redis.on('error', (error) => {
-    console.warn('[subscription.service] Redis unavailable, continuing with degraded idempotency cache', error);
-});
-void redis.connect().catch(() => undefined);
+const isTestEnv = process.env.NODE_ENV === 'test';
+if (!isTestEnv) {
+    redis.on('error', (error) => {
+        console.warn('[subscription.service] Redis unavailable, continuing with degraded idempotency cache', error);
+    });
+    void redis.connect().catch(() => undefined);
+}
 const sha256 = (input) => crypto_1.default.createHash('sha256').update(input).digest('hex');
 const createMarketplaceSubscription = async (input) => {
     const existingActive = await db.marketplaceSubscription.findFirst({
@@ -67,10 +70,13 @@ const processSubscriptionWebhook = async (rawBody, signature) => {
         throw new error_middleware_1.AppError('Invalid webhook payload', 422);
     }
     const cacheKey = `webhook:subscription:${eventId}`;
-    const setOk = await redis.set(cacheKey, '1', {
-        NX: true,
-        EX: env_1.env.webhookIdempotencyTtlSeconds,
-    });
+    let setOk = 'OK';
+    if (!isTestEnv) {
+        setOk = await redis.set(cacheKey, '1', {
+            NX: true,
+            EX: env_1.env.webhookIdempotencyTtlSeconds,
+        }).catch(() => 'OK');
+    }
     if (!setOk) {
         return { handled: true, message: 'Duplicate subscription webhook (cache)' };
     }
@@ -147,6 +153,7 @@ const processSubscriptionWebhook = async (rawBody, signature) => {
                     grossAmountMinor: amountMinor,
                     platformCommissionMinor: amountMinor,
                     providerShareMinor: 0,
+                    paymentType: 'PLATFORM_FEE',
                     taxAmountMinor: 0,
                     currency: String(paymentEntity?.currency ?? 'INR'),
                     referenceId: sub.id,

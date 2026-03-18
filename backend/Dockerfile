@@ -1,4 +1,4 @@
-# Production Dockerfile for MANAS360 backend (Node.js + Prisma + PostgreSQL)
+#Production Dockerfile for MANAS360 backend (Node.js + Prisma + PostgreSQL)
 FROM node:20-alpine as build
 WORKDIR /app
 COPY package*.json ./

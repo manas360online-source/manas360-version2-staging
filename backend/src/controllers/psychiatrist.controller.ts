@@ -61,6 +61,15 @@ export const getMyPsychiatricAssessmentsController = async (req: Request, res: R
 export const postMyPrescriptionController = async (req: Request, res: Response): Promise<void> => {
   const data = await createPrescription(authUserId(req), req.body || {});
   sendSuccess(res, data, 'Prescription created', 201);
+  // generate prescription PDF and notify patient (async)
+  void (async () => {
+    try {
+      const { publishPrescriptionDocument } = await import('../services/documents.service');
+      if (data?.id) await publishPrescriptionDocument(String(data.id));
+    } catch (e) {
+      console.warn('prescription publish failed', e);
+    }
+  })();
 };
 
 export const getMyPrescriptionsController = async (req: Request, res: Response): Promise<void> => {

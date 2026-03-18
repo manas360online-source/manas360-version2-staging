@@ -7,8 +7,13 @@ import { startAnalyticsRollup } from './jobs/analyticsRollup.job';
 import './jobs/admin-analytics-export.worker';
 import { startDailyMoodPredictionJob } from './cron/dailyMoodPrediction';
 import { startChatRetentionJob } from './jobs/chatRetention.job';
+import { initSubscriptionCron } from './jobs/subscriptionCron';
+import { initProviderLeadCron } from './cron/providerLeadCron';
+import { startPatientSharedReportCleanupJob } from './jobs/patientSharedReportCleanup.job';
 import { ensureSsoTables } from './services/sso.service';
 import { createOrEnsureTenant, azureTemplate, googleTemplate, oktaTemplate } from './services/sso.service';
+import { setSocketIO } from './routes/gps.routes';
+import { reconcilePendingPayments } from './cron/paymentReconciliation';
 
 const startServer = async (): Promise<void> => {
 	await connectDatabase();
@@ -41,12 +46,23 @@ const startServer = async (): Promise<void> => {
 	});
 
 	// initialize socket.io (non-blocking)
-	void initSocket(server).then(() => console.log('Socket server initialized')).catch((err) => console.error('Socket init failed', err));
+	void initSocket(server).then((io) => {
+		console.log('Socket server initialized');
+		if (io) setSocketIO(io);
+	}).catch((err) => console.error('Socket init failed', err));
 
 	// start analytics rollup job
-	void startAnalyticsRollup();
+	// void startAnalyticsRollup(); // Commented out - references missing patient_sessions table
 	startDailyMoodPredictionJob();
 	startChatRetentionJob();
+	initSubscriptionCron();
+	initProviderLeadCron();
+	// startPatientSharedReportCleanupJob(); // Commented out - references psychologist_reports table
+
+	// PhonePe reconciliation CRON (every 30s)
+	setInterval(() => {
+		reconcilePendingPayments().catch(err => console.error('[CRON] Reconciliation failed', err));
+	}, 30000);
 
 	const shutdown = async (signal: string): Promise<void> => {
 		console.log(`${signal} received. Shutting down gracefully...`);
@@ -77,4 +93,3 @@ const startServer = async (): Promise<void> => {
 };
 
 void startServer();
-

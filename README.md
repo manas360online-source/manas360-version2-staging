@@ -13,7 +13,7 @@ Prerequisites: Node 18+, npm (or yarn), Docker (optional, for Postgres/Redis), a
 - Start Postgres and Redis (Docker examples):
 
 	```bash
-	docker run -d --name manas-postgres -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=manas -p 5432:5432 postgres:15
+	docker run -d --name manas-postgres -e POSTGRES_USER=manas360 -e POSTGRES_PASSWORD=manas360 -e POSTGRES_DB=manas360 -p 5432:5432 postgres:15
 	docker run -d --name manas-redis -p 6379:6379 redis:7
 	```
 
@@ -66,6 +66,15 @@ Prerequisites: Node 18+, npm (or yarn), Docker (optional, for Postgres/Redis), a
 - If database/connectivity errors appear, verify `DATABASE_URL` and `REDIS_URL` and that Postgres/Redis are reachable.
 - If Prisma schema changed, run `npx prisma generate` and `npx prisma migrate dev` before starting backend.
 - If exports fail, ensure AWS S3 credentials are present and that `REDIS_URL` is configured for the queue.
+
+**Development Bypass Modes (local testing only)**
+
+- Backend supports two dev-only toggles in `backend/.env`:
+	- `DEV_VERIFICATION_BYPASS=true`: skips OTP verification gating for local email/phone auth testing.
+	- `DEV_PAYMENT_BYPASS=true`: skips Razorpay payment signature validation for local booking tests.
+- These toggles are intended only for `NODE_ENV=development` and must stay disabled outside local development.
+- Frontend booking page shows a `Paid (Dev)` button automatically in Vite dev mode (`import.meta.env.DEV`).
+	- Flow: create booking intent -> simulate payment verify -> continue to patient sessions.
 
 ---
 

@@ -46,6 +46,17 @@ export const webhookRateLimiter = rateLimit({
 	},
 });
 
+export const screeningPublicRateLimiter = rateLimit({
+	windowMs: 10 * 60 * 1000,
+	max: 25,
+	standardHeaders: true,
+	legacyHeaders: false,
+	message: {
+		success: false,
+		message: 'Too many screening requests. Please try again in a few minutes.',
+	},
+});
+
 export const adminAnalyticsExportRateLimiter = rateLimit({
 	windowMs: 10 * 60 * 1000,
 	max: 10,
@@ -55,6 +66,17 @@ export const adminAnalyticsExportRateLimiter = rateLimit({
 	message: {
 		success: false,
 		message: 'Too many analytics export requests. Try again in a few minutes.',
+	},
+});
+
+export const documentsRateLimiter = rateLimit({
+	windowMs: 10 * 60 * 1000,
+	max: 50,
+	standardHeaders: true,
+	legacyHeaders: false,
+	message: {
+		success: false,
+		message: 'Too many document requests. Please try again in a few minutes.',
 	},
 });
 

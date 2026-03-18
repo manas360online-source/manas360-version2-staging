@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.middleware';
-import { requireRole } from '../middleware/rbac.middleware';
+import { requireRole, requirePermission } from '../middleware/rbac.middleware';
 import {
 	validateAdminListUsersQuery,
 	validateAdminGetUserIdParam,
@@ -8,7 +8,7 @@ import {
 	validateAdminListSubscriptionsQuery,
 	asyncHandler,
 } from '../middleware/validate.middleware';
-import { listUsersController, getUserController, verifyTherapistController, getMetricsController, listSubscriptionsController } from '../controllers/admin.controller';
+import { listUsersController, getUserController, verifyProviderController, verifyTherapistController, approveProviderController, getMetricsController, listSubscriptionsController } from '../controllers/admin.controller';
 import {
 	getAdminAnalyticsSummaryController,
 	getAdminMostUsedTemplatesController,
@@ -20,6 +20,25 @@ import {
 } from '../controllers/admin-analytics.controller';
 import { getAdminModuleSummaryController } from '../controllers/admin-module.controller';
 import { adminAnalyticsExportRateLimiter } from '../middleware/rateLimiter.middleware';
+import {
+	getAdminPricingConfigController,
+	updateAdminPricingConfigController,
+} from '../controllers/pricing.controller';
+import {
+	createQuestionOptionAdminController,
+	createScreeningTemplateAdminController,
+	createTemplateQuestionAdminController,
+	ensureScreeningTemplateDefaultAdminController,
+	listAllProviderExtraQuestionsAdminController,
+	listScoringBandsAdminController,
+	listScreeningTemplatesAdminController,
+	listTemplateQuestionsAdminController,
+	replaceScoringBandsAdminController,
+	simulateTemplateScoringController,
+	updateQuestionOptionAdminController,
+	updateScreeningTemplateAdminController,
+	updateTemplateQuestionAdminController,
+} from '../controllers/free-screening-admin.controller';
 
 const router = Router();
 
@@ -32,7 +51,7 @@ const router = Router();
  *   - page: pagination page number (default: 1)
  *   - limit: items per page (default: 10, max: 50)
  */
-router.get('/users', requireAuth, requireRole('admin'), ...validateAdminListUsersQuery, asyncHandler(listUsersController));
+router.get('/users', requireAuth, requireRole('admin'), requirePermission('manage_users'), ...validateAdminListUsersQuery, asyncHandler(listUsersController));
 
 /**
  * GET /api/v1/admin/users/:id
@@ -40,7 +59,7 @@ router.get('/users', requireAuth, requireRole('admin'), ...validateAdminListUser
  * Route parameters:
  *   - id: user identifier
  */
-router.get('/users/:id', requireAuth, requireRole('admin'), ...validateAdminGetUserIdParam, asyncHandler(getUserController));
+router.get('/users/:id', requireAuth, requireRole('admin'), requirePermission('read_all_profiles'), ...validateAdminGetUserIdParam, asyncHandler(getUserController));
 
 /**
  * PATCH /api/v1/admin/therapists/:id/verify
@@ -54,8 +73,32 @@ router.patch(
 	'/therapists/:id/verify',
 	requireAuth,
 	requireRole('admin'),
+	requirePermission('manage_therapists'),
 	...validateTherapistProfileIdParam,
 	asyncHandler(verifyTherapistController),
+);
+
+router.post(
+	'/verify-provider/:id',
+	requireAuth,
+	requireRole('admin'),
+	requirePermission('manage_therapists'),
+	...validateTherapistProfileIdParam,
+	asyncHandler(verifyProviderController),
+);
+
+/**
+ * POST /api/v1/admin/approve-provider/:id
+ * Approve provider onboarding — sets isVerified, onboardingStatus = COMPLETED
+ * Route parameters:
+ *   - id: provider user ID
+ */
+router.post(
+	'/approve-provider/:id',
+	requireAuth,
+	requireRole('admin'),
+	requirePermission('manage_therapists'),
+	asyncHandler(approveProviderController),
 );
 
 /**
@@ -70,7 +113,7 @@ router.patch(
  *   - totalRevenue: Sum of all transaction amounts
  *   - activeSubscriptions: Count of therapists with active patients
  */
-router.get('/metrics', requireAuth, requireRole('admin'), asyncHandler(getMetricsController));
+router.get('/metrics', requireAuth, requireRole('admin'), requirePermission('view_analytics'), asyncHandler(getMetricsController));
 
 /**
  * GET /api/v1/admin/subscriptions
@@ -83,6 +126,27 @@ router.get('/metrics', requireAuth, requireRole('admin'), asyncHandler(getMetric
  * Response: Paginated list of subscriptions with user and plan details
  */
 router.get('/subscriptions', requireAuth, requireRole('admin'), ...validateAdminListSubscriptionsQuery, asyncHandler(listSubscriptionsController));
+
+router.get('/pricing', requireAuth, requireRole('admin'), asyncHandler(getAdminPricingConfigController));
+router.put('/pricing', requireAuth, requireRole('admin'), asyncHandler(updateAdminPricingConfigController));
+router.patch('/pricing', requireAuth, requireRole('admin'), asyncHandler(updateAdminPricingConfigController));
+
+router.get('/screening/templates', requireAuth, requireRole('admin'), asyncHandler(listScreeningTemplatesAdminController));
+router.post('/screening/templates', requireAuth, requireRole('admin'), asyncHandler(createScreeningTemplateAdminController));
+router.post('/screening/templates/defaults/:templateKey/ensure', requireAuth, requireRole('admin'), asyncHandler(ensureScreeningTemplateDefaultAdminController));
+router.put('/screening/templates/:templateId', requireAuth, requireRole('admin'), asyncHandler(updateScreeningTemplateAdminController));
+
+router.get('/screening/templates/:templateId/questions', requireAuth, requireRole('admin'), asyncHandler(listTemplateQuestionsAdminController));
+router.post('/screening/templates/:templateId/questions', requireAuth, requireRole('admin'), asyncHandler(createTemplateQuestionAdminController));
+router.put('/screening/questions/:questionId', requireAuth, requireRole('admin'), asyncHandler(updateTemplateQuestionAdminController));
+
+router.post('/screening/questions/:questionId/options', requireAuth, requireRole('admin'), asyncHandler(createQuestionOptionAdminController));
+router.put('/screening/options/:optionId', requireAuth, requireRole('admin'), asyncHandler(updateQuestionOptionAdminController));
+
+router.get('/screening/templates/:templateId/scoring-bands', requireAuth, requireRole('admin'), asyncHandler(listScoringBandsAdminController));
+router.put('/screening/templates/:templateId/scoring-bands', requireAuth, requireRole('admin'), asyncHandler(replaceScoringBandsAdminController));
+router.post('/screening/templates/:templateId/simulate', requireAuth, requireRole('admin'), asyncHandler(simulateTemplateScoringController));
+router.get('/screening/provider-questions', requireAuth, requireRole('admin'), asyncHandler(listAllProviderExtraQuestionsAdminController));
 
 /**
  * GET /api/v1/admin/modules/:module/summary
@@ -98,7 +162,7 @@ router.get('/modules/:module/summary', requireAuth, requireRole('admin'), asyncH
  *   - organizationKey: bigint (required)
  *   - therapistId: string (optional)
  */
-router.get('/analytics/summary', requireAuth, requireRole('admin'), asyncHandler(getAdminAnalyticsSummaryController));
+router.get('/analytics/summary', requireAuth, requireRole('admin'), requirePermission('view_analytics'), asyncHandler(getAdminAnalyticsSummaryController));
 
 /**
  * GET /api/v1/admin/analytics/templates
@@ -134,7 +198,7 @@ router.get('/analytics/utilization', requireAuth, requireRole('admin'), asyncHan
  *   - includeChartsSnapshot?: boolean
  *   - chartSnapshots?: string[] (data URL images; optional)
  */
-router.post('/analytics/export', requireAuth, requireRole('admin'), adminAnalyticsExportRateLimiter, asyncHandler(exportAdminAnalyticsReportController));
+router.post('/analytics/export', requireAuth, requireRole('admin'), requirePermission('view_analytics'), adminAnalyticsExportRateLimiter, asyncHandler(exportAdminAnalyticsReportController));
 
 /**
  * POST /api/v1/admin/analytics/export/async
@@ -152,6 +216,111 @@ router.get('/analytics/export/:exportJobKey/status', requireAuth, requireRole('a
  * GET /api/v1/admin/analytics/export/:exportJobKey/download
  * Download completed async export output.
  */
-router.get('/analytics/export/:exportJobKey/download', requireAuth, requireRole('admin'), asyncHandler(downloadAdminAnalyticsExportController));
+/**
+ * POST /api/v1/admin/waive-subscription
+ * Admin grants a subscription without charging the user (free access).
+ * Skips PhonePe entirely. Logs as ADMIN_WAIVER_GRANTED.
+ * Generates a dummy transaction audit record.
+ */
+router.post('/waive-subscription', requireAuth, requireRole('admin'), asyncHandler(async (req: any, res: any) => {
+	const { prisma } = await import('../config/db');
+	const { logger } = await import('../utils/logger');
+	const { randomUUID } = await import('crypto');
+
+	const adminId = req.auth?.userId;
+	const userId = String(req.body.userId ?? '').trim();
+	const planKey = String(req.body.planKey ?? 'basic').trim();
+	const durationDays = Number(req.body.durationDays) || 30;
+	const reason = String(req.body.reason ?? 'Admin waiver').trim();
+
+	if (!userId) {
+		return res.status(422).json({ success: false, message: 'userId is required' });
+	}
+
+	const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, role: true } });
+	if (!user) {
+		return res.status(404).json({ success: false, message: 'User not found' });
+	}
+
+	const role = String(user.role || '').toUpperCase();
+	const expiryDate = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000);
+	const dummyTxId = `WAIVER_${Date.now()}_${randomUUID().substring(0, 8)}`;
+
+	// Create a financial record for audit trail
+	await prisma.financialPayment.create({
+		data: {
+			id: randomUUID(),
+			razorpayPaymentId: dummyTxId,
+			status: 'CAPTURED',
+			amountMinor: 0,
+			currency: 'INR',
+			patientId: role === 'PATIENT' ? userId : undefined,
+			providerId: role !== 'PATIENT' ? userId : undefined,
+			metadata: { 
+				action: 'ADMIN_WAIVER', 
+				adminId, 
+                reason, 
+                planKey, 
+                durationDays 
+            }
+		}
+	});
+
+	if (['THERAPIST', 'PSYCHIATRIST', 'PSYCHOLOGIST', 'COACH'].includes(role)) {
+		await prisma.providerSubscription.upsert({
+			where: { providerId: userId },
+			create: {
+				providerId: userId,
+				plan: planKey,
+				status: 'active',
+				startDate: new Date(),
+				expiryDate,
+				leadsUsedThisWeek: 0,
+			},
+			update: {
+				plan: planKey,
+				status: 'active',
+				startDate: new Date(),
+				expiryDate,
+				leadsUsedThisWeek: 0,
+			},
+		});
+	} else {
+		await prisma.patientSubscription.upsert({
+			where: { userId },
+			create: {
+				userId,
+				planName: planKey,
+				price: 0,
+				status: 'active',
+				autoRenew: false,
+				renewalDate: expiryDate,
+			},
+			update: {
+				planName: planKey,
+				price: 0,
+				status: 'active',
+				autoRenew: false,
+				renewalDate: expiryDate,
+			},
+		});
+	}
+
+	logger.info('[AdminWaiver] ADMIN_WAIVER_GRANTED', {
+		adminId,
+		userId,
+		role,
+		planKey,
+		durationDays,
+		expiryDate: expiryDate.toISOString(),
+		reason,
+		dummyTxId
+	});
+
+	res.status(200).json({
+		success: true,
+		message: `Subscription waived for user ${userId}. Plan: ${planKey}, Duration: ${durationDays} days. Record: ${dummyTxId}`,
+	});
+}));
 
 export default router;

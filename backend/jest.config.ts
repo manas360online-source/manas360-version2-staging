@@ -13,6 +13,7 @@ const config: Config = {
 	],
 	clearMocks: true,
 	setupFiles: ['<rootDir>/tests/setup.ts'],
+	setupFilesAfterEnv: ['<rootDir>/tests/setup.after-env.ts'],
 	globals: {
 		'ts-jest': {
 			tsconfig: '<rootDir>/tsconfig.test.json',

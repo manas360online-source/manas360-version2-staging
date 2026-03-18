@@ -4,7 +4,6 @@ import patientRoutes from './patient.routes';
 import therapistRoutes from './therapist.routes';
 import userRoutes from './user.routes';
 import adminRoutes from './admin.routes';
-import cbtSessionRoutes from './cbt-session.routes';
 import presenceRoutes from './presence.routes';
 import dashboardRoutes from './dashboard.routes';
 import paymentRoutes from './payment.routes';
@@ -18,8 +17,16 @@ import landingRoutes from './landing.routes';
 import chatRoutes from './chat.routes';
 import riskAnalyticsRoutes from './riskAnalytics.routes';
 import psychiatristRoutes from './psychiatrist.routes';
+// import psychologistRoutes from './psychologist.routes'; // Commented out - not implementing psychologist functionality
 import corporateRoutes from './corporate.routes';
 import ssoRoutes from './sso.routes';
+import pricingRoutes from './pricing.routes';
+import patientJourneyRoutes from './patient-journey.routes';
+import freeScreeningRoutes from './free-screening.routes';
+import gpsRoutes from './gps.routes';
+import providerRoutes from './provider.routes';
+import soundRoutes from './sound.routes';
+import systemStatusRoutes from './system-status.routes';
 
 const router = Router();
 
@@ -33,6 +40,8 @@ router.get('/health', (_req, res) => {
 	});
 });
 
+router.use('/v1/system-status', systemStatusRoutes);
+
 router.use('/auth', authRoutes);
 router.use('/v1/auth', authRoutes);
 router.use('/v1', patientV1Routes);
@@ -43,14 +52,19 @@ router.use('/v1/therapists', therapistRoutes);
 router.use('/v1/therapist', therapistRoutes);
 router.use('/v1/admin', adminRoutes);
 router.use('/v1/corporate', corporateRoutes);
-router.use('/v1/cbt-sessions', cbtSessionRoutes);
 router.use('/v1/presence', presenceRoutes);
 router.use('/v1/therapist/dashboard', dashboardRoutes);
 router.use('/v1/therapists/dashboard', dashboardRoutes);
 router.use('/v1/psychiatrist', psychiatristRoutes);
+// router.use('/v1/psychologist', psychologistRoutes); // Commented out - not implementing psychologist functionality
+router.use('/v1/provider', providerRoutes);
 router.use('/v1/payments', paymentRoutes);
 router.use('/v1/sso', ssoRoutes);
 router.use('/v1/subscriptions', subscriptionRoutes);
+router.use('/v1/pricing', pricingRoutes);
+router.use('/pricing', pricingRoutes);
+router.use('/v1/patient-journey', patientJourneyRoutes);
+router.use('/v1', freeScreeningRoutes);
 router.use('/v1/leads', leadRoutes);
 router.use('/certifications', certificationRoutes);
 router.use('/v1/certifications', certificationRoutes);
@@ -58,7 +72,10 @@ router.use('/landing', landingRoutes);
 router.use('/v1/landing', landingRoutes);
 router.use('/webhooks', webhookRoutes);
 router.use('/chat', chatRoutes);
+router.use('/sounds', soundRoutes);
+router.use('/v1/sounds', soundRoutes);
 router.use('/v1', riskAnalyticsRoutes);
+router.use('/v1/gps', gpsRoutes);
 
 export default router;
 

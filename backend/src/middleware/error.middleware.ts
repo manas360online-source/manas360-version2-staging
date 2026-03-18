@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import { MulterError } from 'multer';
+import { logger } from '../utils/logger';
 
 interface ErrorPayload {
 	message: string;
@@ -29,8 +30,16 @@ export const errorHandler = (
 	res: Response,
 	_next: NextFunction,
 ): void => {
-	if (process.env.NODE_ENV !== 'production') {
-		console.error('[errorHandler]', error);
+	// Always log 500s or native unhandled errors via Winston
+	if (!(error instanceof AppError) || error.statusCode >= 500) {
+		logger.error('[GlobalErrorHandler] Unhandled Exception', {
+			path: _req.path,
+			method: _req.method,
+			error: error instanceof Error ? { message: error.message, stack: error.stack } : error,
+		});
+	} else {
+		// Log 4xx errors as unhandled warnings
+		logger.warn(`[GlobalErrorHandler] API Rejection: ${(error as AppError).message}`, { path: _req.path, statusCode: (error as AppError).statusCode });
 	}
 
 	if (error instanceof MulterError) {

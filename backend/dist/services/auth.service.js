@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.revokeSession = exports.getActiveSessions = exports.verifyAndEnableMfa = exports.setupMfa = exports.resetPassword = exports.requestPasswordReset = exports.logoutSession = exports.refreshAuthTokens = exports.loginWithGoogle = exports.loginWithPassword = exports.verifyPhoneOtp = exports.registerWithPhone = exports.verifyEmailOtp = exports.registerWithEmail = void 0;
+exports.revokeSession = exports.getActiveSessions = exports.verifyAndEnableMfa = exports.setupMfa = exports.resetPassword = exports.requestPasswordReset = exports.logoutSession = exports.refreshAuthTokens = exports.loginWithGoogle = exports.loginWithPassword = exports.verifyPhoneOtp = exports.registerWithPhone = exports.verifyEmailOtp = exports.registerProviderProfile = exports.registerWithEmail = void 0;
 const crypto_1 = require("crypto");
 const otplib_1 = require("otplib");
 const google_auth_library_1 = require("google-auth-library");
@@ -132,8 +132,9 @@ const registerWithEmail = async (input, meta) => {
         throw new error_middleware_1.AppError('Email already registered', 409);
     }
     const passwordHash = await (0, hash_1.hashPassword)(input.password);
-    const otp = (0, hash_1.generateNumericOtp)();
-    const otpHash = await (0, hash_1.hashOtp)(otp);
+    const shouldBypassVerification = env_1.env.allowDevVerificationBypass && env_1.env.nodeEnv === 'development';
+    const otp = shouldBypassVerification ? null : (0, hash_1.generateNumericOtp)();
+    const otpHash = otp ? await (0, hash_1.hashOtp)(otp) : null;
     const prismaRole = toPrismaUserRole(input.role);
     const supportedRoles = await getSupportedUserRoles();
     if (!supportedRoles.has(prismaRole)) {
@@ -144,7 +145,8 @@ const registerWithEmail = async (input, meta) => {
             email: input.email.toLowerCase(),
             passwordHash,
             emailVerificationOtpHash: otpHash,
-            emailVerificationOtpExpiresAt: nowPlusMinutes(env_1.env.otpTtlMinutes),
+            emailVerificationOtpExpiresAt: otp ? nowPlusMinutes(env_1.env.otpTtlMinutes) : null,
+            emailVerified: shouldBypassVerification,
             provider: 'LOCAL',
             role: prismaRole,
             name: input.name,
@@ -156,11 +158,116 @@ const registerWithEmail = async (input, meta) => {
     return {
         userId: String(user.id),
         email: user.email,
-        message: 'Registration successful. Verify your email OTP.',
-        devOtp: env_1.env.nodeEnv !== 'production' ? otp : undefined,
+        message: shouldBypassVerification
+            ? 'Registration successful. Email verification is bypassed in development.'
+            : 'Registration successful. Verify your email OTP.',
+        devOtp: env_1.env.nodeEnv !== 'production' && otp ? otp : undefined,
     };
 };
 exports.registerWithEmail = registerWithEmail;
+const toProviderDisplayName = (displayName) => {
+    const normalized = String(displayName || '').trim();
+    return normalized || 'Provider';
+};
+const registerProviderProfile = async (userId, input) => {
+    const normalizedRegistrationNum = input.registrationNum.trim().toUpperCase();
+    return db.$transaction(async (tx) => {
+        const user = await tx.user.findUnique({
+            where: { id: userId },
+            select: {
+                id: true,
+                role: true,
+                firstName: true,
+                lastName: true,
+                name: true,
+            },
+        });
+        if (!user) {
+            throw new error_middleware_1.AppError('User not found', 404);
+        }
+        const userRole = String(user.role || '').toUpperCase();
+        const allowedRoles = new Set(['THERAPIST', 'PSYCHIATRIST', 'PSYCHOLOGIST', 'COACH']);
+        if (!allowedRoles.has(userRole)) {
+            throw new error_middleware_1.AppError('Provider role required', 403);
+        }
+        const existingProfile = await tx.therapistProfile.findUnique({ where: { userId: user.id } });
+        if (existingProfile) {
+            throw new error_middleware_1.AppError('Onboarding already in progress', 400);
+        }
+        const duplicateRegistration = await tx.therapistProfile.findFirst({
+            where: {
+                registrationNum: normalizedRegistrationNum,
+                isDeleted: false,
+            },
+            select: { id: true },
+        });
+        if (duplicateRegistration) {
+            throw new error_middleware_1.AppError('Registration number already exists', 400);
+        }
+        const displayName = toProviderDisplayName(input.displayName || String(user.name || `${user.firstName || ''} ${user.lastName || ''}`));
+        const profile = await tx.therapistProfile.create({
+            data: {
+                userId: user.id,
+                displayName,
+                professionalType: userRole,
+                registrationType: input.registrationType || 'OTHER',
+                registrationNum: normalizedRegistrationNum,
+                education: input.highestQual.trim(),
+                highestQual: input.highestQual.trim(),
+                licenseRci: input.registrationType === 'RCI' ? normalizedRegistrationNum : undefined,
+                licenseNmc: input.registrationType === 'NMC' ? normalizedRegistrationNum : undefined,
+                clinicalCategories: [],
+                specializations: Array.from(new Set((input.specializations || []).map((item) => String(item).trim()).filter(Boolean))),
+                languages: Array.from(new Set((input.languages || []).map((item) => String(item).trim()).filter(Boolean))),
+                corporateReady: false,
+                shiftPreferences: [],
+                yearsExperience: Math.max(0, Number(input.yearsExperience || 0)),
+                yearsOfExperience: Math.max(0, Number(input.yearsExperience || 0)),
+                hourlyRate: Math.max(0, Number(input.hourlyRate || 0)),
+                consultationFee: Math.max(0, Number(input.hourlyRate || 0)),
+                bio: input.bio?.trim() || undefined,
+                onboardingCompleted: false,
+                isVerified: false,
+                averageRating: 0,
+                documents: input.documents?.length
+                    ? {
+                        create: input.documents.map((document) => ({
+                            userId: user.id,
+                            documentType: document.documentType,
+                            url: String(document.url).trim(),
+                        })),
+                    }
+                    : undefined,
+            },
+            select: {
+                id: true,
+                userId: true,
+                displayName: true,
+                registrationType: true,
+                registrationNum: true,
+                yearsExperience: true,
+                highestQual: true,
+                hourlyRate: true,
+                isVerified: true,
+                documents: {
+                    select: {
+                        documentType: true,
+                        url: true,
+                    },
+                },
+                createdAt: true,
+            },
+        });
+        await tx.user.update({
+            where: { id: user.id },
+            data: {
+                onboardingStatus: 'PENDING',
+            },
+        });
+        return profile;
+    });
+};
+exports.registerProviderProfile = registerProviderProfile;
 const verifyEmailOtp = async (input) => {
     const user = await db.user.findUnique({ where: { email: input.email.toLowerCase() } });
     if (!user || !user.emailVerificationOtpHash || !user.emailVerificationOtpExpiresAt) {
@@ -191,13 +298,15 @@ const registerWithPhone = async (input) => {
         }
         throw new error_middleware_1.AppError('Phone already registered', 409);
     }
-    const otp = (0, hash_1.generateNumericOtp)();
-    const otpHash = await (0, hash_1.hashOtp)(otp);
+    const shouldBypassVerification = env_1.env.allowDevVerificationBypass && env_1.env.nodeEnv === 'development';
+    const otp = shouldBypassVerification ? null : (0, hash_1.generateNumericOtp)();
+    const otpHash = otp ? await (0, hash_1.hashOtp)(otp) : null;
     const user = await db.user.create({
         data: {
             phone: input.phone,
             phoneVerificationOtpHash: otpHash,
-            phoneVerificationOtpExpiresAt: nowPlusMinutes(env_1.env.otpTtlMinutes),
+            phoneVerificationOtpExpiresAt: otp ? nowPlusMinutes(env_1.env.otpTtlMinutes) : null,
+            phoneVerified: shouldBypassVerification,
             provider: 'PHONE',
             role: 'PATIENT',
             firstName: '',
@@ -207,8 +316,10 @@ const registerWithPhone = async (input) => {
     return {
         userId: String(user.id),
         phone: user.phone,
-        message: 'Phone OTP sent.',
-        devOtp: env_1.env.nodeEnv !== 'production' ? otp : undefined,
+        message: shouldBypassVerification
+            ? 'Registration successful. Phone verification is bypassed in development.'
+            : 'Phone OTP sent.',
+        devOtp: env_1.env.nodeEnv !== 'production' && otp ? otp : undefined,
     };
 };
 exports.registerWithPhone = registerWithPhone;
@@ -271,7 +382,8 @@ const loginWithPassword = async (input, meta) => {
         await audit('LOGIN_FAILED', 'failure', meta, { userId: user.id, email: user.email });
         throw new error_middleware_1.AppError('Invalid credentials', 401);
     }
-    if (user.email && !user.emailVerified) {
+    const shouldEnforceEmailVerification = !(env_1.env.allowDevVerificationBypass && env_1.env.nodeEnv === 'development');
+    if (shouldEnforceEmailVerification && user.email && !user.emailVerified) {
         await audit('LOGIN_BLOCKED_EMAIL_UNVERIFIED', 'failure', meta, { userId: user.id, email: user.email });
         throw new error_middleware_1.AppError('Email verification required before login', 403);
     }
@@ -289,6 +401,10 @@ const loginWithPassword = async (input, meta) => {
         },
     });
     const tokenPair = await issueSessionTokens(String(user.id), meta);
+    const therapistProfile = await db.therapistProfile.findUnique({
+        where: { userId: String(user.id) },
+        select: { onboardingCompleted: true, isVerified: true },
+    });
     const companyAdminMeta = await resolveUserCompanyMeta(String(user.id), user.email);
     await audit('LOGIN_SUCCESS', 'success', meta, { userId: user.id, email: user.email, phone: user.phone });
     return {
@@ -300,6 +416,10 @@ const loginWithPassword = async (input, meta) => {
             emailVerified: user.emailVerified,
             phoneVerified: user.phoneVerified,
             mfaEnabled: user.mfaEnabled,
+            isTherapistVerified: Boolean(user.isTherapistVerified),
+            therapistVerifiedAt: user.therapistVerifiedAt ?? null,
+            providerOnboardingCompleted: Boolean(therapistProfile?.onboardingCompleted),
+            providerProfileVerified: Boolean(therapistProfile?.isVerified),
             ...companyAdminMeta,
         },
         ...tokenPair,
@@ -351,6 +471,10 @@ const loginWithGoogle = async (input, meta) => {
         });
     }
     const tokenPair = await issueSessionTokens(String(user.id), meta);
+    const therapistProfile = await db.therapistProfile.findUnique({
+        where: { userId: String(user.id) },
+        select: { onboardingCompleted: true, isVerified: true },
+    });
     const companyAdminMeta = await resolveUserCompanyMeta(String(user.id), user.email);
     await audit('LOGIN_SUCCESS', 'success', meta, { userId: user.id, email: user.email });
     return {
@@ -362,6 +486,10 @@ const loginWithGoogle = async (input, meta) => {
             emailVerified: user.emailVerified,
             phoneVerified: user.phoneVerified,
             mfaEnabled: user.mfaEnabled,
+            isTherapistVerified: Boolean(user.isTherapistVerified),
+            therapistVerifiedAt: user.therapistVerifiedAt ?? null,
+            providerOnboardingCompleted: Boolean(therapistProfile?.onboardingCompleted),
+            providerProfileVerified: Boolean(therapistProfile?.isVerified),
             ...companyAdminMeta,
         },
         ...tokenPair,

@@ -5,10 +5,13 @@ import { AppError } from './error.middleware';
 
 const REDIS_URL = process.env.REDIS_URL || env.redisUrl || 'redis://127.0.0.1:6379';
 const client = createClient({ url: REDIS_URL });
-client.on('error', (error) => {
-  console.warn('[exportRateLimiter] Redis unavailable, failing open', error);
-});
-client.connect().catch(() => {});
+const isTestEnv = process.env.NODE_ENV === 'test';
+if (!isTestEnv) {
+  client.on('error', (error) => {
+    console.warn('[exportRateLimiter] Redis unavailable, failing open', error);
+  });
+  void client.connect().catch(() => {});
+}
 
 /**
  * Simple Redis-backed rate limiter for export endpoints.

@@ -16,7 +16,7 @@ import {
 const router = Router();
 
 router.use(requireAuth);
-router.use(requireRole(['patient', 'therapist', 'psychiatrist', 'coach', 'admin', 'superadmin']));
+router.use(requireRole(['patient', 'therapist', 'psychologist', 'psychiatrist', 'coach', 'admin', 'superadmin']));
 
 router.get('/risk/:userId/current', asyncHandler(getCurrentRiskController));
 router.get('/risk/:userId/history', asyncHandler(getRiskHistoryController));

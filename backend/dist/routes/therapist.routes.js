@@ -13,6 +13,8 @@ const session_controller_1 = require("../controllers/session.controller");
 const exportRateLimiter_middleware_1 = require("../middleware/exportRateLimiter.middleware");
 const therapist_dashboard_controller_1 = require("../controllers/therapist-dashboard.controller");
 const therapist_modules_controller_1 = require("../controllers/therapist-modules.controller");
+const free_screening_provider_controller_1 = require("../controllers/free-screening-provider.controller");
+const smart_match_controller_1 = require("../controllers/smart-match.controller");
 const router = (0, express_1.Router)();
 router.post('/profile', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, ...validate_middleware_1.validateCreateTherapistProfileRequest, (0, validate_middleware_1.asyncHandler)(therapist_controller_1.createTherapistProfileController));
 router.get('/me/profile', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, (0, validate_middleware_1.asyncHandler)(therapist_controller_1.getMyTherapistProfileController));
@@ -25,14 +27,12 @@ router.get('/me/patients', auth_middleware_1.requireAuth, rbac_middleware_1.requ
 router.get('/me/notes', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, (0, validate_middleware_1.asyncHandler)(therapist_dashboard_controller_1.getMyTherapistSessionNotesController));
 router.get('/me/session-notes', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, (0, validate_middleware_1.asyncHandler)(therapist_modules_controller_1.getMyTherapistStructuredSessionNotesController));
 router.put('/me/session-notes/:sessionId', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, (0, validate_middleware_1.asyncHandler)(therapist_modules_controller_1.putMyTherapistStructuredSessionNoteController));
+router.post('/session/:sessionId/generate-ai-note', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, ...validate_middleware_1.validateSessionIdParam, (0, validate_middleware_1.asyncHandler)(therapist_modules_controller_1.postGenerateAiSessionNoteController));
 router.get('/me/exercises', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, (0, validate_middleware_1.asyncHandler)(therapist_modules_controller_1.getMyTherapistExercisesController));
 router.post('/me/exercises', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, (0, validate_middleware_1.asyncHandler)(therapist_modules_controller_1.postMyTherapistExerciseController));
 router.patch('/me/exercises/:id', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, (0, validate_middleware_1.asyncHandler)(therapist_modules_controller_1.patchMyTherapistExerciseController));
 router.post('/me/exercises/:id/track', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, (0, validate_middleware_1.asyncHandler)(therapist_modules_controller_1.postMyTherapistExerciseTrackController));
 router.delete('/me/exercises/:id', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, (0, validate_middleware_1.asyncHandler)(therapist_modules_controller_1.deleteMyTherapistExerciseController));
-router.get('/me/cbt-modules', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, (0, validate_middleware_1.asyncHandler)(therapist_modules_controller_1.getMyTherapistCbtModulesController));
-router.post('/me/cbt-modules', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, (0, validate_middleware_1.asyncHandler)(therapist_modules_controller_1.postMyTherapistCbtModuleController));
-router.delete('/me/cbt-modules/:id', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, (0, validate_middleware_1.asyncHandler)(therapist_modules_controller_1.deleteMyTherapistCbtModuleController));
 router.get('/me/assessments', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, (0, validate_middleware_1.asyncHandler)(therapist_modules_controller_1.getMyTherapistAssessmentsController));
 router.post('/me/assessments', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, (0, validate_middleware_1.asyncHandler)(therapist_modules_controller_1.postMyTherapistAssessmentController));
 router.get('/me/resources', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, (0, validate_middleware_1.asyncHandler)(therapist_modules_controller_1.getMyTherapistResourcesController));
@@ -51,6 +51,11 @@ router.post('/me/sessions/:id/actions/reschedule', auth_middleware_1.requireAuth
 router.post('/me/sessions/:id/actions/cancel', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, ...validate_middleware_1.validateSessionIdParam, (0, validate_middleware_1.asyncHandler)(therapist_actions_controller_1.cancelSessionController));
 router.post('/me/sessions/:id/actions/remind', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, ...validate_middleware_1.validateSessionIdParam, (0, validate_middleware_1.asyncHandler)(therapist_actions_controller_1.sendReminderController));
 router.post('/me/sessions/:id/actions/start-live', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, ...validate_middleware_1.validateSessionIdParam, (0, validate_middleware_1.asyncHandler)(therapist_actions_controller_1.startLiveSessionController));
+router.post('/me/appointments/propose-slot', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, (0, validate_middleware_1.asyncHandler)(therapist_actions_controller_1.therapistProposeAppointmentSlotController));
+// Smart Match appointment booking
+router.get('/me/appointments/pending', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, (0, validate_middleware_1.asyncHandler)(therapist_dashboard_controller_1.getMyTherapistPendingAppointmentRequestsController));
+router.post('/me/appointments/accept', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, (0, validate_middleware_1.asyncHandler)(smart_match_controller_1.acceptAppointmentController));
+router.post('/me/appointments/reject', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, (0, validate_middleware_1.asyncHandler)(smart_match_controller_1.rejectAppointmentController));
 // Analytics
 router.get('/me/analytics/summary', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, (0, validate_middleware_1.asyncHandler)(analytics_controller_1.analyticsController.getSummary.bind(analytics_controller_1.analyticsController)));
 router.get('/me/analytics/sessions', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, (0, validate_middleware_1.asyncHandler)(analytics_controller_1.analyticsController.getTimeSeries.bind(analytics_controller_1.analyticsController)));
@@ -64,5 +69,8 @@ router.put('/me/sessions/:id/responses/:responseId/notes/:noteId', auth_middlewa
 router.delete('/me/sessions/:id/responses/:responseId/notes/:noteId', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, ...validate_middleware_1.validateSessionIdParam, (0, validate_middleware_1.asyncHandler)(session_controller_1.deleteMyTherapistResponseNoteController));
 router.post('/me/documents', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, validate_middleware_1.uploadTherapistDocumentMiddleware, ...validate_middleware_1.validateUploadTherapistDocumentRequest, (0, validate_middleware_1.asyncHandler)(therapist_controller_1.uploadMyTherapistDocumentController));
 // Template actions
-router.post('/me/templates/:id/actions/duplicate', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, (0, validate_middleware_1.asyncHandler)(therapist_actions_controller_1.duplicateTemplateController));
+router.get('/me/free-screening/questions', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, (0, validate_middleware_1.asyncHandler)(free_screening_provider_controller_1.listProviderExtraQuestionsController));
+router.post('/me/free-screening/questions', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, (0, validate_middleware_1.asyncHandler)(free_screening_provider_controller_1.createProviderExtraQuestionController));
+router.post('/me/free-screening/questions/:questionId/assign', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, (0, validate_middleware_1.asyncHandler)(free_screening_provider_controller_1.assignProviderQuestionController));
+router.get('/me/free-screening/assignments', auth_middleware_1.requireAuth, rbac_middleware_1.requireTherapistRole, (0, validate_middleware_1.asyncHandler)(free_screening_provider_controller_1.listProviderQuestionAssignmentsController));
 exports.default = router;

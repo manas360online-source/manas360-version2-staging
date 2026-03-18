@@ -5,7 +5,7 @@ const mockDb = {
 	user: { findUnique: jest.fn() },
 	aIConversation: { findFirst: jest.fn(), create: jest.fn(), update: jest.fn(), count: jest.fn() },
 	chatMessage: { findMany: jest.fn(), createMany: jest.fn(), count: jest.fn() },
-	patientSubscription: { findUnique: jest.fn() },
+	patientSubscription: { findUnique: jest.fn(), findFirst: jest.fn() },
 };
 
 const mockGenerateAIResponse = jest.fn();
@@ -77,6 +77,7 @@ describe('POST /chat/message route', () => {
 		mockDb.chatMessage.createMany.mockResolvedValue({ count: 2 });
 		mockDb.chatMessage.count.mockResolvedValue(0);
 		mockDb.patientSubscription.findUnique.mockResolvedValue({ planName: 'Basic Plan' });
+		mockDb.patientSubscription.findFirst.mockResolvedValue(null);
 		mockDb.aIConversation.count.mockResolvedValue(0);
 		mockGenerateAIResponse.mockResolvedValue({
 			text: 'I hear you and I am here with you.',
@@ -106,7 +107,7 @@ describe('POST /chat/message route', () => {
 		expect(res.status).toBe(200);
 		expect(res.body.success).toBe(true);
 		expect(res.body.data.bot_type).toBe('mood_ai');
-		expect(res.body.data.bot_name).toBe('dr meera');
+		expect(res.body.data.bot_name).toBe('Anytime Buddy');
 	});
 
 	it('blocks patient from clinical_ai', async () => {

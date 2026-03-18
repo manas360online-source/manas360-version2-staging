@@ -14,7 +14,7 @@ export default function TherapistMessagesPage() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [botName, setBotName] = useState("Dr. Meera 'Ai · Clinical Assistant");
+  const [botName, setBotName] = useState('Anytime Buddy AI · Clinical Assistant');
   const [responseStyle, setResponseStyle] = useState<'concise' | 'detailed'>('concise');
   const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
   const [speechLang, setSpeechLang] = useState('en-IN');
@@ -42,7 +42,7 @@ export default function TherapistMessagesPage() {
     try {
       const res = await chatApi.sendMessage({ message, bot_type: 'clinical_ai', response_style: responseStyle });
       const payload: any = (res as any)?.data ?? res;
-      setBotName(`${payload?.bot_name || "Dr. Meera 'Ai"} · Clinical Assistant`);
+      setBotName(`${payload?.bot_name || 'Anytime Buddy AI'} · Clinical Assistant`);
       const messages = Array.isArray(payload?.messages) ? payload.messages : [];
       if (!messages.length) {
         setThread((prev) => [...prev, { role: 'assistant', content: String(payload?.response || CHAT_FALLBACK_MESSAGE) }]);
@@ -69,7 +69,7 @@ export default function TherapistMessagesPage() {
   const lastAssistantMessage = [...thread].reverse().find((row) => row.role === 'assistant')?.content || '';
 
   return (
-    <TherapistPageShell title="Dr. Meera 'Ai" subtitle="Dr. Meera 'Ai helps with clinical workflow and platform guidance.">
+    <TherapistPageShell title="Anytime Buddy AI" subtitle="Anytime Buddy AI helps with clinical workflow and platform guidance.">
       {error ? (
         <TherapistErrorState title="Could not load assistant" description={error} onRetry={() => setError(null)} />
       ) : null}
@@ -98,7 +98,7 @@ export default function TherapistMessagesPage() {
               <span>{row.content}</span>
             </div>
           ))}
-          {loading ? <p className="text-xs text-ink-500">Dr. Meera 'Ai is typing...</p> : null}
+          {loading ? <p className="text-xs text-ink-500">Anytime Buddy AI is typing...</p> : null}
         </div>
 
         <div className="border-t border-ink-100 px-4 py-3">
@@ -140,7 +140,7 @@ export default function TherapistMessagesPage() {
           <div className="flex flex-col gap-2 sm:flex-row">
             <input
               type="text"
-              placeholder="Ask Dr. Meera 'Ai about workflow or clinical insights..."
+              placeholder="Ask Anytime Buddy AI about workflow or clinical insights..."
               value={input}
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={(event) => {

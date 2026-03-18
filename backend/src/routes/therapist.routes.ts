@@ -27,7 +27,7 @@ import {
 	cancelSessionController,
 	sendReminderController,
 	startLiveSessionController,
-	duplicateTemplateController,
+	therapistProposeAppointmentSlotController,
 } from '../controllers/therapist.actions.controller';
 import { analyticsController } from '../controllers/analytics.controller';
 import { requireSessionOwnership } from '../middleware/ownership.middleware';
@@ -48,32 +48,41 @@ import { exportRateLimiter } from '../middleware/exportRateLimiter.middleware';
 import {
 	getMyTherapistDashboardController,
 	getMyTherapistMessagesController,
+	getMyTherapistPendingAppointmentRequestsController,
 	getMyTherapistPatientsController,
 	getMyTherapistPayoutHistoryController,
 	getMyTherapistSessionNotesController,
 } from '../controllers/therapist-dashboard.controller';
 import {
 	deleteMyTherapistCareTeamController,
-	deleteMyTherapistCbtModuleController,
 	deleteMyTherapistExerciseController,
 	deleteMyTherapistResourceController,
 	getMyTherapistAssessmentsController,
 	getMyTherapistCareTeamController,
-	getMyTherapistCbtModulesController,
 	getMyTherapistExercisesController,
 	getMyTherapistResourcesController,
 	getMyTherapistStructuredSessionNotesController,
+	postGenerateAiSessionNoteController,
 	patchMyTherapistCareTeamController,
 	patchMyTherapistExerciseController,
 	postMyTherapistAssessmentController,
 	postMyTherapistCareTeamController,
-	postMyTherapistCbtModuleController,
 	postMyTherapistExerciseController,
 	postMyTherapistExerciseTrackController,
 	postMyTherapistResourceController,
 	postMyTherapistResourceTrackController,
 	putMyTherapistStructuredSessionNoteController,
 } from '../controllers/therapist-modules.controller';
+import {
+	assignProviderQuestionController,
+	createProviderExtraQuestionController,
+	listProviderExtraQuestionsController,
+	listProviderQuestionAssignmentsController,
+} from '../controllers/free-screening-provider.controller';
+import {
+	acceptAppointmentController,
+	rejectAppointmentController,
+} from '../controllers/smart-match.controller';
 
 const router = Router();
 
@@ -88,16 +97,13 @@ router.get('/me/patients', requireAuth, requireTherapistRole, asyncHandler(getMy
 router.get('/me/notes', requireAuth, requireTherapistRole, asyncHandler(getMyTherapistSessionNotesController));
 router.get('/me/session-notes', requireAuth, requireTherapistRole, asyncHandler(getMyTherapistStructuredSessionNotesController));
 router.put('/me/session-notes/:sessionId', requireAuth, requireTherapistRole, asyncHandler(putMyTherapistStructuredSessionNoteController));
+router.post('/session/:sessionId/generate-ai-note', requireAuth, requireTherapistRole, ...validateSessionIdParam, asyncHandler(postGenerateAiSessionNoteController));
 
 router.get('/me/exercises', requireAuth, requireTherapistRole, asyncHandler(getMyTherapistExercisesController));
 router.post('/me/exercises', requireAuth, requireTherapistRole, asyncHandler(postMyTherapistExerciseController));
 router.patch('/me/exercises/:id', requireAuth, requireTherapistRole, asyncHandler(patchMyTherapistExerciseController));
 router.post('/me/exercises/:id/track', requireAuth, requireTherapistRole, asyncHandler(postMyTherapistExerciseTrackController));
 router.delete('/me/exercises/:id', requireAuth, requireTherapistRole, asyncHandler(deleteMyTherapistExerciseController));
-
-router.get('/me/cbt-modules', requireAuth, requireTherapistRole, asyncHandler(getMyTherapistCbtModulesController));
-router.post('/me/cbt-modules', requireAuth, requireTherapistRole, asyncHandler(postMyTherapistCbtModuleController));
-router.delete('/me/cbt-modules/:id', requireAuth, requireTherapistRole, asyncHandler(deleteMyTherapistCbtModuleController));
 
 router.get('/me/assessments', requireAuth, requireTherapistRole, asyncHandler(getMyTherapistAssessmentsController));
 router.post('/me/assessments', requireAuth, requireTherapistRole, asyncHandler(postMyTherapistAssessmentController));
@@ -119,6 +125,11 @@ router.post('/me/sessions/:id/actions/reschedule', requireAuth, requireTherapist
 router.post('/me/sessions/:id/actions/cancel', requireAuth, requireTherapistRole, ...validateSessionIdParam, asyncHandler(cancelSessionController));
 router.post('/me/sessions/:id/actions/remind', requireAuth, requireTherapistRole, ...validateSessionIdParam, asyncHandler(sendReminderController));
 router.post('/me/sessions/:id/actions/start-live', requireAuth, requireTherapistRole, ...validateSessionIdParam, asyncHandler(startLiveSessionController));
+router.post('/me/appointments/propose-slot', requireAuth, requireTherapistRole, asyncHandler(therapistProposeAppointmentSlotController));
+// Smart Match appointment booking
+router.get('/me/appointments/pending', requireAuth, requireTherapistRole, asyncHandler(getMyTherapistPendingAppointmentRequestsController));
+router.post('/me/appointments/accept', requireAuth, requireTherapistRole, asyncHandler(acceptAppointmentController));
+router.post('/me/appointments/reject', requireAuth, requireTherapistRole, asyncHandler(rejectAppointmentController));
 // Analytics
 router.get('/me/analytics/summary', requireAuth, requireTherapistRole, asyncHandler(analyticsController.getSummary.bind(analyticsController)));
 router.get('/me/analytics/sessions', requireAuth, requireTherapistRole, asyncHandler(analyticsController.getTimeSeries.bind(analyticsController)));
@@ -140,6 +151,10 @@ router.post(
 );
 
 // Template actions
-router.post('/me/templates/:id/actions/duplicate', requireAuth, requireTherapistRole, asyncHandler(duplicateTemplateController));
+
+router.get('/me/free-screening/questions', requireAuth, requireTherapistRole, asyncHandler(listProviderExtraQuestionsController));
+router.post('/me/free-screening/questions', requireAuth, requireTherapistRole, asyncHandler(createProviderExtraQuestionController));
+router.post('/me/free-screening/questions/:questionId/assign', requireAuth, requireTherapistRole, asyncHandler(assignProviderQuestionController));
+router.get('/me/free-screening/assignments', requireAuth, requireTherapistRole, asyncHandler(listProviderQuestionAssignmentsController));
 
 export default router;

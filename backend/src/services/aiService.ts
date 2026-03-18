@@ -26,18 +26,54 @@ type GenerateAiResponseResult = {
 	error?: string;
 };
 
+export type SessionTranscriptSegment = {
+	startSeconds: number;
+	endSeconds: number;
+	text: string;
+};
+
+export type SessionTranscriptResult = {
+	transcript: string;
+	transcriptWithTimestamps: string;
+	segments: SessionTranscriptSegment[];
+	language: string | null;
+	durationSeconds: number | null;
+	cleanedWithClaude: boolean;
+};
+
+export type ClinicalSummaryResult = {
+	moodAnalysis: {
+		emotionalTone: string;
+		energyLevel: string;
+		riskSignals: string;
+	};
+	soapNote: {
+		subjective: string;
+		objective: string;
+		assessment: string;
+		plan: string;
+	};
+};
+
 type ClaudeConversationMessage = {
 	role: 'user' | 'assistant';
 	content: string;
 };
 
-const DEFAULT_MODEL = process.env.CLAUDE_MODEL || 'claude-3-haiku';
-const DEFAULT_MAX_TOKENS = Number(process.env.CLAUDE_MAX_TOKENS || 512);
+// BEFORE:
+// const DEFAULT_MODEL = process.env.CLAUDE_MODEL || 'claude-3-haiku';
+
+// AFTER:
+const DEFAULT_MODEL = process.env.CLAUDE_MODEL || 'claude-haiku-4-5-20251001';
+const DEFAULT_MAX_TOKENS = Number(process.env.CLAUDE_MAX_TOKENS || 1024);
 const DEFAULT_TIMEOUT_MS = Number(process.env.CLAUDE_TIMEOUT_MS || 12000);
 const DAILY_TOKEN_BUDGET = Number(process.env.CLAUDE_DAILY_TOKEN_BUDGET || 0);
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
+const OPENAI_TRANSCRIPTION_API_URL = 'https://api.openai.com/v1/audio/transcriptions';
 const MAX_CONTEXT_MESSAGES = 10;
-const MAX_ALLOWED_TOKENS = 1024;
+const MAX_ALLOWED_TOKENS = 2048;
+const TRANSCRIPTION_TIMEOUT_MS = Number(process.env.OPENAI_TRANSCRIPTION_TIMEOUT_MS || 120000);
+const ENABLE_CLAUDE_TRANSCRIPT_CLEANUP = String(process.env.ENABLE_CLAUDE_TRANSCRIPT_CLEANUP || 'true').toLowerCase() !== 'false';
 
 const db = prisma as any;
 
@@ -61,9 +97,11 @@ const getDayKey = (): string => {
 };
 
 const getBudgetForToday = (): number => {
-	if (process.env.NODE_ENV === 'development') return 0;
-	if (!Number.isFinite(DAILY_TOKEN_BUDGET) || DAILY_TOKEN_BUDGET <= 0) return 0;
-	return Math.floor(DAILY_TOKEN_BUDGET);
+  if (process.env.NODE_ENV === 'development') return 0;
+  if (!Number.isFinite(DAILY_TOKEN_BUDGET) || DAILY_TOKEN_BUDGET <= 0) return 0;
+  // Ignore suspiciously low budgets to prevent misconfiguration killing chat
+  if (DAILY_TOKEN_BUDGET < 10000) return 0;
+  return Math.floor(DAILY_TOKEN_BUDGET);
 };
 
 const estimateInputTokens = (messages: ClaudeConversationMessage[], systemPrompt: string): number => {
@@ -152,6 +190,193 @@ const finalizeReservedTokens = async (
 
 const releaseReservedTokens = async (reservation: TokenBudgetReservation | null): Promise<void> => {
 	await finalizeReservedTokens(reservation, 0);
+};
+
+const formatTimestamp = (secondsValue: number): string => {
+	const totalSeconds = Math.max(0, Math.floor(Number(secondsValue) || 0));
+	const hours = Math.floor(totalSeconds / 3600);
+	const minutes = Math.floor((totalSeconds % 3600) / 60);
+	const seconds = totalSeconds % 60;
+
+	const hh = String(hours).padStart(2, '0');
+	const mm = String(minutes).padStart(2, '0');
+	const ss = String(seconds).padStart(2, '0');
+
+	return `${hh}:${mm}:${ss}`;
+};
+
+const buildTimestampedTranscript = (segments: SessionTranscriptSegment[], fallbackText: string): string => {
+	if (!segments.length) return fallbackText;
+
+	return segments
+		.map((segment) => {
+			const text = String(segment.text || '').trim();
+			if (!text) return null;
+			return `[${formatTimestamp(segment.startSeconds)} - ${formatTimestamp(segment.endSeconds)}] ${text}`;
+		})
+		.filter((line): line is string => Boolean(line))
+		.join('\n');
+};
+
+const cleanTranscriptWithClaude = async (rawTranscriptWithTimestamps: string): Promise<string> => {
+	const hasClaude = String(process.env.CLAUDE_API_KEY || '').trim().length > 0;
+	if (!hasClaude || !ENABLE_CLAUDE_TRANSCRIPT_CLEANUP) return rawTranscriptWithTimestamps;
+
+	const response = await generateAIResponse({
+		role: 'provider',
+		maxTokens: 1024,
+		messages: [
+			{
+				role: 'system',
+				content:
+					'You are a clinical transcript editor. Clean grammar and punctuation only. Preserve meaning exactly. Keep every timestamp line and do not invent content.',
+			},
+			{
+				role: 'user',
+				content: `Clean this session transcript while preserving all timestamps and line boundaries:\n\n${rawTranscriptWithTimestamps}`,
+			},
+		],
+	});
+
+	if (response.fallback) return rawTranscriptWithTimestamps;
+	const cleaned = String(response.text || '').trim();
+	return cleaned.length > 0 ? cleaned : rawTranscriptWithTimestamps;
+};
+
+const extractJsonObject = (value: string): string => {
+	const text = String(value || '').trim();
+	if (!text) throw new Error('Empty AI response for clinical summary');
+
+	const fencedMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+	const candidate = fencedMatch ? fencedMatch[1].trim() : text;
+
+	const firstBrace = candidate.indexOf('{');
+	const lastBrace = candidate.lastIndexOf('}');
+	if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
+		throw new Error('Clinical summary response is not valid JSON');
+	}
+
+	return candidate.slice(firstBrace, lastBrace + 1);
+};
+
+export const generateClinicalSummary = async (transcript: string): Promise<ClinicalSummaryResult> => {
+	const inputTranscript = String(transcript || '').trim();
+	if (!inputTranscript) {
+		throw new Error('Transcript is required to generate clinical summary');
+	}
+
+	const systemPrompt =
+		"You are a professional clinical scribe. Analyze the provided therapy transcript. Perform two tasks:\n1. Mood Analysis: Identify the patient's emotional tone, energy level, and any risk signals (anxiety, distress).\n2. SOAP Note: Draft a structured note including Subjective (patient's reported feelings), Objective (observed patterns), Assessment (clinical impression), and Plan (next steps mentioned).\nFormat the output as a JSON object so I can save it directly into the Session Notes fields.";
+
+	const result = await generateAIResponse({
+		role: 'provider',
+		maxTokens: 1200,
+		messages: [
+			{ role: 'system', content: systemPrompt },
+			{
+				role: 'user',
+				content:
+					`Return only JSON with this exact shape: {\n  \"moodAnalysis\": { \"emotionalTone\": \"\", \"energyLevel\": \"\", \"riskSignals\": \"\" },\n  \"soapNote\": { \"subjective\": \"\", \"objective\": \"\", \"assessment\": \"\", \"plan\": \"\" }\n}\n\nTranscript:\n${inputTranscript}`,
+			},
+		],
+	});
+
+	if (result.fallback) {
+		throw new Error(result.error || 'Failed to generate clinical summary');
+	}
+
+	const jsonText = extractJsonObject(result.text || '');
+	const parsed = JSON.parse(jsonText) as Partial<ClinicalSummaryResult>;
+
+	return {
+		moodAnalysis: {
+			emotionalTone: String(parsed.moodAnalysis?.emotionalTone || '').trim(),
+			energyLevel: String(parsed.moodAnalysis?.energyLevel || '').trim(),
+			riskSignals: String(parsed.moodAnalysis?.riskSignals || '').trim(),
+		},
+		soapNote: {
+			subjective: String(parsed.soapNote?.subjective || '').trim(),
+			objective: String(parsed.soapNote?.objective || '').trim(),
+			assessment: String(parsed.soapNote?.assessment || '').trim(),
+			plan: String(parsed.soapNote?.plan || '').trim(),
+		},
+	};
+};
+
+export const transcribeSession = async (
+	audioFile: Buffer,
+	fileName = 'session-recording.webm',
+	mimeType = 'audio/webm',
+): Promise<SessionTranscriptResult> => {
+	const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
+	if (!apiKey) {
+		throw new Error('OPENAI_API_KEY not configured');
+	}
+
+	if (!audioFile || audioFile.length === 0) {
+		throw new Error('Audio file is required for transcription');
+	}
+
+	const formData = new FormData();
+	formData.append('model', 'whisper-1');
+	formData.append('response_format', 'verbose_json');
+	formData.append('timestamp_granularities[]', 'segment');
+	const audioBytes = new Uint8Array(audioFile);
+	formData.append('file', new Blob([audioBytes], { type: mimeType }), fileName);
+
+	const timeoutMs = Number.isFinite(TRANSCRIPTION_TIMEOUT_MS)
+		? Math.max(10000, Math.min(TRANSCRIPTION_TIMEOUT_MS, 300000))
+		: 120000;
+	const abortController = new AbortController();
+	const timeout = setTimeout(() => abortController.abort(), timeoutMs);
+
+	try {
+		const response = await fetch(OPENAI_TRANSCRIPTION_API_URL, {
+			method: 'POST',
+			headers: {
+				Authorization: `Bearer ${apiKey}`,
+			},
+			body: formData,
+			signal: abortController.signal,
+		});
+
+		if (!response.ok) {
+			const bodyText = await response.text();
+			throw new Error(`Whisper API error ${response.status}: ${bodyText.slice(0, 300)}`);
+		}
+
+		const body = (await response.json()) as {
+			text?: string;
+			language?: string;
+			duration?: number;
+			segments?: Array<{ start?: number; end?: number; text?: string }>;
+		};
+
+		const segments: SessionTranscriptSegment[] = Array.isArray(body.segments)
+			? body.segments
+					.map((segment) => ({
+						startSeconds: Number(segment?.start || 0),
+						endSeconds: Number(segment?.end || 0),
+						text: String(segment?.text || '').trim(),
+					}))
+					.filter((segment) => segment.text.length > 0)
+			: [];
+
+		const transcript = String(body.text || '').trim();
+		const transcriptWithTimestamps = buildTimestampedTranscript(segments, transcript);
+		const cleanedTranscript = await cleanTranscriptWithClaude(transcriptWithTimestamps);
+
+		return {
+			transcript,
+			transcriptWithTimestamps: cleanedTranscript,
+			segments,
+			language: body.language ? String(body.language) : null,
+			durationSeconds: Number.isFinite(Number(body.duration)) ? Number(body.duration) : null,
+			cleanedWithClaude: cleanedTranscript !== transcriptWithTimestamps,
+		};
+	} finally {
+		clearTimeout(timeout);
+	}
 };
 
 export const generateAIResponse = async (

@@ -113,7 +113,7 @@ export const triggerCrisisEscalationWorkflow = async (input: TriggerInput): Prom
 
 	// Tier 3: Backup therapist if not acknowledged in 10 minutes
 	if (backupTherapistId) {
-		setTimeout(() => {
+		const backupTimer = setTimeout(() => {
 			void (async () => {
 				const latest = await db.crisisEscalation.findUnique({ where: { id: escalation.id } }).catch(() => null);
 				if (!latest || latest.therapistAckAt || latest.status !== 'OPEN') return;
@@ -131,6 +131,7 @@ export const triggerCrisisEscalationWorkflow = async (input: TriggerInput): Prom
 				console.warn('[crisis] backup_escalation_dispatched', { escalationId: escalation.id, channel: 'voice-auto-dial' });
 			})();
 		}, 10 * 60 * 1000);
+		backupTimer.unref();
 	}
 
 	return escalation.id;

@@ -27,9 +27,9 @@ const quickGroups: { title: string; items: QuickItem[] }[] = [
       {
         key: 'meera',
         emoji: '👩‍⚕️',
-        label: 'Dr. Meera AI',
+        label: 'Anytime Buddy AI',
         subtitle: 'AR therapy guide, 24/7 available',
-        ariaLabel: 'Dr. Meera quick access',
+        ariaLabel: 'Anytime Buddy quick access',
         route: '/ai-chat',
         badge: 'AI',
         tone: 'rose',

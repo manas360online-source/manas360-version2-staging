@@ -9,6 +9,7 @@ import {
 	logoutSession,
 	refreshAuthTokens,
 	registerWithEmail,
+	registerProviderProfile,
 	registerWithPhone,
 	requestPasswordReset,
 	resetPassword,
@@ -98,6 +99,47 @@ export const registerController = async (req: Request, res: Response): Promise<v
 	sendSuccess(res, result, 'Registration successful', 201);
 };
 
+export const providerRegisterController = async (req: Request, res: Response): Promise<void> => {
+	const userId = req.auth?.userId;
+	if (!userId) {
+		throw new AppError('Authentication required', 401);
+	}
+
+	const requiredString = (value: unknown, field: string): string => {
+		const normalized = typeof value === 'string' ? value.trim() : '';
+		if (!normalized) {
+			throw new AppError(`${field} is required`, 400);
+		}
+		return normalized;
+	};
+
+	const result = await registerProviderProfile(userId, {
+		displayName: requiredString(req.body.fullName ?? req.body.displayName, 'displayName'),
+		registrationType: (typeof req.body.registrationType === 'string'
+			? req.body.registrationType.trim().toUpperCase()
+			: typeof req.body.licenseRci === 'string' && req.body.licenseRci.trim()
+				? 'RCI'
+				: typeof req.body.licenseNmc === 'string' && req.body.licenseNmc.trim()
+					? 'NMC'
+					: 'OTHER') as 'RCI' | 'NMC' | 'STATE_COUNCIL' | 'OTHER',
+		registrationNum: requiredString(req.body.registrationNum, 'registrationNum'),
+		yearsExperience: Number(req.body.yearsOfExperience ?? req.body.yearsExperience ?? 0),
+		highestQual: requiredString(req.body.education ?? req.body.highestQual, 'highestQual'),
+		specializations: Array.isArray(req.body.specializations) ? req.body.specializations.map(String) : [],
+		languages: Array.isArray(req.body.languages) ? req.body.languages.map(String) : [],
+		hourlyRate: Number(req.body.consultationFee ?? req.body.hourlyRate ?? 0),
+		bio: typeof req.body.bio === 'string' ? req.body.bio : undefined,
+		documents: Array.isArray(req.body.documents)
+			? req.body.documents.map((document: Record<string, unknown>) => ({
+				documentType: requiredString(document?.documentType, 'documents.documentType') as 'DEGREE' | 'ID_PROOF' | 'LICENSE',
+				url: requiredString(document?.url, 'documents.url'),
+			}))
+			: [],
+	});
+
+	sendSuccess(res, result, 'Provider onboarding submitted', 201);
+};
+
 export const meController = async (req: Request, res: Response): Promise<void> => {
 	if (!req.auth?.userId) {
 		throw new AppError('Authentication required', 401);
@@ -115,6 +157,15 @@ export const meController = async (req: Request, res: Response): Promise<void> =
 			emailVerified: true,
 			phoneVerified: true,
 			mfaEnabled: true,
+			isTherapistVerified: true,
+			therapistVerifiedAt: true,
+			onboardingStatus: true,
+			therapistProfile: {
+				select: {
+					onboardingCompleted: true,
+					isVerified: true,
+				},
+			},
 		},
 	});
 
@@ -140,6 +191,11 @@ export const meController = async (req: Request, res: Response): Promise<void> =
 			emailVerified: user.emailVerified,
 			phoneVerified: user.phoneVerified,
 			mfaEnabled: user.mfaEnabled,
+			isTherapistVerified: Boolean((user as any).isTherapistVerified),
+			therapistVerifiedAt: (user as any).therapistVerifiedAt ?? null,
+			onboardingStatus: (user as any).onboardingStatus ?? null,
+			providerOnboardingCompleted: Boolean((user as any).therapistProfile?.onboardingCompleted),
+			providerProfileVerified: Boolean((user as any).therapistProfile?.isVerified),
 			companyKey: companyMeta.company_key,
 			company_key: companyMeta.company_key,
 			isCompanyAdmin: Boolean(companyMeta.is_company_admin),

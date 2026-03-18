@@ -1,15 +1,52 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { getApiErrorMessage } from '../../api/auth';
+import { patientApi } from '../../api/patient';
 import LoginForm from '../../components/auth/LoginForm';
 import { getPostLoginRoute, useAuth } from '../../context/AuthContext';
+
+const isSubscriptionActive = (subscription: any): boolean => {
+	if (!subscription) return false;
+
+	const status = String(subscription?.status || '').toLowerCase();
+	if (status === 'active' || status === 'trialing') return true;
+	if (subscription?.isActive === true || subscription?.active === true) return true;
+
+	return false;
+};
 
 export default function LoginPage() {
 	const { user, isAuthenticated, login } = useAuth();
 	const navigate = useNavigate();
 	const location = useLocation();
-	const from = (location.state as { from?: string } | null)?.from;
+	const from = (location.state as { from?: string; afterLogin?: string } | null)?.from;
+	const afterLogin = (location.state as { from?: string; afterLogin?: string } | null)?.afterLogin;
 	const next = new URLSearchParams(location.search).get('next');
+
+
+	const resolvePostLoginRouteWithSubscription = async (candidate: string | null, role: string | undefined) => {
+		if (!candidate || candidate.startsWith('/auth/')) {
+			return getPostLoginRoute(user);
+		}
+
+		const normalizedRole = String(role || '').toLowerCase();
+		const isPricingTarget = candidate.startsWith('/patient/pricing');
+		if (normalizedRole !== 'patient' || !isPricingTarget) {
+			return candidate;
+		}
+
+		try {
+			const subscriptionResponse = await patientApi.getSubscription();
+			const subscriptionPayload = (subscriptionResponse as any)?.data ?? subscriptionResponse;
+			if (isSubscriptionActive(subscriptionPayload)) {
+				return '/patient/dashboard';
+			}
+		} catch {
+			// If subscription check fails, keep original target.
+		}
+
+		return candidate;
+	};
 
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -19,16 +56,20 @@ export default function LoginPage() {
 			return;
 		}
 
-		const postLoginRoute = from || next || getPostLoginRoute(user);
-		navigate(postLoginRoute, { replace: true });
-	}, [from, isAuthenticated, navigate, next, user]);
+		const candidate = from || afterLogin || next || null;
+		void (async () => {
+			const postLoginRoute = await resolvePostLoginRouteWithSubscription(candidate, user.role);
+			navigate(postLoginRoute, { replace: true });
+		})();
+	}, [afterLogin, from, isAuthenticated, navigate, next, user]);
 
 	const onSubmit = async (identifier: string, password: string) => {
 		setError(null);
 		setLoading(true);
 		try {
 			const loggedInUser = await login(identifier, password);
-			const postLoginRoute = from || next || getPostLoginRoute(loggedInUser);
+			const candidate = from || afterLogin || next || null;
+			const postLoginRoute = await resolvePostLoginRouteWithSubscription(candidate, loggedInUser.role);
 			navigate(postLoginRoute, { replace: true });
 		} catch (err) {
 			setError(getApiErrorMessage(err, 'Login failed'));

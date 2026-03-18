@@ -20,7 +20,8 @@ interface PatientProfilePayload {
 	age: number;
 	gender: 'male' | 'female' | 'other' | 'prefer_not_to_say';
 	medicalHistory?: string;
-	emergencyContact: {
+	carrier?: string;
+	emergencyContact?: {
 		name: string;
 		relation: string;
 		phone: string;
@@ -99,6 +100,7 @@ interface TherapistSessionHistoryQuery {
 
 interface TherapistSessionStatusPayload {
 	status: 'confirmed' | 'cancelled' | 'completed';
+	recordingUrl?: string;
 }
 
 interface TherapistSessionNotePayload {
@@ -124,6 +126,20 @@ interface AdminListSubscriptionsQuery {
 	status?: string;
 	page: number;
 	limit: number;
+}
+
+interface DailyCheckInPayload {
+	date: string;
+	type: 'MORNING' | 'EVENING';
+	mood: number;
+	energy?: number;
+	sleep?: number;
+	context: string[];
+	intention?: string;
+	reflectionGood?: string;
+	reflectionBad?: string;
+	stressLevel?: number;
+	gratitude?: string;
 }
 
 declare global {
@@ -155,6 +171,7 @@ declare global {
 			validatedAdminListSubscriptionsQuery?: AdminListSubscriptionsQuery;
 			validatedUserId?: string;
 			validatedTherapistProfileId?: string;
+			validatedDailyCheckIn?: DailyCheckInPayload;
 		}
 	}
 }

@@ -186,8 +186,9 @@ export const registerWithEmail = async (input: RegisterEmailInput, meta: Request
 	}
 
 	const passwordHash = await hashPassword(input.password);
-	const otp = generateNumericOtp();
-	const otpHash = await hashOtp(otp);
+	const shouldBypassVerification = env.allowDevVerificationBypass && env.nodeEnv === 'development';
+	const otp = shouldBypassVerification ? null : generateNumericOtp();
+	const otpHash = otp ? await hashOtp(otp) : null;
 	const prismaRole = toPrismaUserRole(input.role);
 	const supportedRoles = await getSupportedUserRoles();
 
@@ -200,7 +201,8 @@ export const registerWithEmail = async (input: RegisterEmailInput, meta: Request
 			email: input.email.toLowerCase(),
 			passwordHash,
 			emailVerificationOtpHash: otpHash,
-			emailVerificationOtpExpiresAt: nowPlusMinutes(env.otpTtlMinutes),
+			emailVerificationOtpExpiresAt: otp ? nowPlusMinutes(env.otpTtlMinutes) : null,
+			emailVerified: shouldBypassVerification,
 			provider: 'LOCAL',
 			role: prismaRole,
 			name: input.name,
@@ -214,9 +216,141 @@ export const registerWithEmail = async (input: RegisterEmailInput, meta: Request
 	return {
 		userId: String(user.id),
 		email: user.email,
-		message: 'Registration successful. Verify your email OTP.',
-		devOtp: env.nodeEnv !== 'production' ? otp : undefined,
+		message: shouldBypassVerification
+			? 'Registration successful. Email verification is bypassed in development.'
+			: 'Registration successful. Verify your email OTP.',
+		devOtp: env.nodeEnv !== 'production' && otp ? otp : undefined,
 	};
+};
+
+type ProviderRegisterInput = {
+	displayName: string;
+	registrationNum: string;
+	registrationType?: 'RCI' | 'NMC' | 'STATE_COUNCIL' | 'OTHER';
+	yearsExperience: number;
+	highestQual: string;
+	specializations: string[];
+	languages: string[];
+	hourlyRate: number;
+	bio?: string;
+	documents?: Array<{
+		documentType: 'DEGREE' | 'ID_PROOF' | 'LICENSE';
+		url: string;
+	}>;
+};
+
+const toProviderDisplayName = (displayName: string): string => {
+	const normalized = String(displayName || '').trim();
+	return normalized || 'Provider';
+};
+
+export const registerProviderProfile = async (userId: string, input: ProviderRegisterInput) => {
+	const normalizedRegistrationNum = input.registrationNum.trim().toUpperCase();
+
+	return db.$transaction(async (tx: any) => {
+		const user = await tx.user.findUnique({
+			where: { id: userId },
+			select: {
+				id: true,
+				role: true,
+				firstName: true,
+				lastName: true,
+				name: true,
+			},
+		});
+
+		if (!user) {
+			throw new AppError('User not found', 404);
+		}
+
+		const userRole = String(user.role || '').toUpperCase();
+		const allowedRoles = new Set(['THERAPIST', 'PSYCHIATRIST', 'PSYCHOLOGIST', 'COACH']);
+		if (!allowedRoles.has(userRole)) {
+			throw new AppError('Provider role required', 403);
+		}
+
+		const existingProfile = await tx.therapistProfile.findUnique({ where: { userId: user.id } });
+		if (existingProfile) {
+			throw new AppError('Onboarding already in progress', 400);
+		}
+
+		const duplicateRegistration = await tx.therapistProfile.findFirst({
+			where: {
+				registrationNum: normalizedRegistrationNum,
+				isDeleted: false,
+			},
+			select: { id: true },
+		});
+
+		if (duplicateRegistration) {
+			throw new AppError('Registration number already exists', 400);
+		}
+
+		const displayName = toProviderDisplayName(input.displayName || String(user.name || `${user.firstName || ''} ${user.lastName || ''}`));
+
+		const profile = await tx.therapistProfile.create({
+			data: {
+				userId: user.id,
+				displayName,
+				professionalType: userRole,
+				registrationType: input.registrationType || 'OTHER',
+				registrationNum: normalizedRegistrationNum,
+				education: input.highestQual.trim(),
+				highestQual: input.highestQual.trim(),
+				licenseRci: input.registrationType === 'RCI' ? normalizedRegistrationNum : undefined,
+				licenseNmc: input.registrationType === 'NMC' ? normalizedRegistrationNum : undefined,
+				clinicalCategories: [],
+				specializations: Array.from(new Set((input.specializations || []).map((item) => String(item).trim()).filter(Boolean))),
+				languages: Array.from(new Set((input.languages || []).map((item) => String(item).trim()).filter(Boolean))),
+				corporateReady: false,
+				shiftPreferences: [],
+				yearsExperience: Math.max(0, Number(input.yearsExperience || 0)),
+				yearsOfExperience: Math.max(0, Number(input.yearsExperience || 0)),
+				hourlyRate: Math.max(0, Number(input.hourlyRate || 0)),
+				consultationFee: Math.max(0, Number(input.hourlyRate || 0)),
+				bio: input.bio?.trim() || undefined,
+				onboardingCompleted: false,
+				isVerified: false,
+				averageRating: 0,
+				documents: input.documents?.length
+					? {
+						create: input.documents.map((document) => ({
+							userId: user.id,
+							documentType: document.documentType,
+							url: String(document.url).trim(),
+						})),
+					}
+					: undefined,
+			},
+			select: {
+				id: true,
+				userId: true,
+				displayName: true,
+				registrationType: true,
+				registrationNum: true,
+				yearsExperience: true,
+				highestQual: true,
+				hourlyRate: true,
+				isVerified: true,
+				documents: {
+					select: {
+						documentType: true,
+						url: true,
+					},
+				},
+				createdAt: true,
+			},
+		});
+
+		await tx.user.update({
+			where: { id: user.id },
+			data: {
+				onboardingStatus: 'PENDING',
+			},
+		});
+
+		return profile;
+	});
 };
 
 export const verifyEmailOtp = async (input: VerifyEmailOtpInput): Promise<void> => {
@@ -254,14 +388,16 @@ export const registerWithPhone = async (input: RegisterPhoneInput) => {
 		throw new AppError('Phone already registered', 409);
 	}
 
-	const otp = generateNumericOtp();
-	const otpHash = await hashOtp(otp);
+	const shouldBypassVerification = env.allowDevVerificationBypass && env.nodeEnv === 'development';
+	const otp = shouldBypassVerification ? null : generateNumericOtp();
+	const otpHash = otp ? await hashOtp(otp) : null;
 
 	const user = await db.user.create({
 		data: {
 			phone: input.phone,
 			phoneVerificationOtpHash: otpHash,
-			phoneVerificationOtpExpiresAt: nowPlusMinutes(env.otpTtlMinutes),
+			phoneVerificationOtpExpiresAt: otp ? nowPlusMinutes(env.otpTtlMinutes) : null,
+			phoneVerified: shouldBypassVerification,
 			provider: 'PHONE',
 			role: 'PATIENT',
 			firstName: '',
@@ -272,8 +408,10 @@ export const registerWithPhone = async (input: RegisterPhoneInput) => {
 	return {
 		userId: String(user.id),
 		phone: user.phone,
-		message: 'Phone OTP sent.',
-		devOtp: env.nodeEnv !== 'production' ? otp : undefined,
+		message: shouldBypassVerification
+			? 'Registration successful. Phone verification is bypassed in development.'
+			: 'Phone OTP sent.',
+		devOtp: env.nodeEnv !== 'production' && otp ? otp : undefined,
 	};
 };
 
@@ -345,7 +483,8 @@ export const loginWithPassword = async (input: LoginInput, meta: RequestMeta) =>
 		throw new AppError('Invalid credentials', 401);
 	}
 
-	if (user.email && !user.emailVerified) {
+	const shouldEnforceEmailVerification = !(env.allowDevVerificationBypass && env.nodeEnv === 'development');
+	if (shouldEnforceEmailVerification && user.email && !user.emailVerified) {
 		await audit('LOGIN_BLOCKED_EMAIL_UNVERIFIED', 'failure', meta, { userId: user.id, email: user.email });
 		throw new AppError('Email verification required before login', 403);
 	}
@@ -366,6 +505,10 @@ export const loginWithPassword = async (input: LoginInput, meta: RequestMeta) =>
 	});
 
 	const tokenPair = await issueSessionTokens(String(user.id), meta);
+	const therapistProfile = await db.therapistProfile.findUnique({
+		where: { userId: String(user.id) },
+		select: { onboardingCompleted: true, isVerified: true },
+	});
 	const companyAdminMeta = await resolveUserCompanyMeta(String(user.id), user.email);
 	await audit('LOGIN_SUCCESS', 'success', meta, { userId: user.id, email: user.email, phone: user.phone });
 
@@ -378,6 +521,10 @@ export const loginWithPassword = async (input: LoginInput, meta: RequestMeta) =>
 			emailVerified: user.emailVerified,
 			phoneVerified: user.phoneVerified,
 			mfaEnabled: user.mfaEnabled,
+			isTherapistVerified: Boolean((user as any).isTherapistVerified),
+			therapistVerifiedAt: (user as any).therapistVerifiedAt ?? null,
+			providerOnboardingCompleted: Boolean((therapistProfile as any)?.onboardingCompleted),
+			providerProfileVerified: Boolean((therapistProfile as any)?.isVerified),
 			...companyAdminMeta,
 		},
 		...tokenPair,
@@ -434,6 +581,10 @@ export const loginWithGoogle = async (input: GoogleLoginInput, meta: RequestMeta
 	}
 
 	const tokenPair = await issueSessionTokens(String(user.id), meta);
+	const therapistProfile = await db.therapistProfile.findUnique({
+		where: { userId: String(user.id) },
+		select: { onboardingCompleted: true, isVerified: true },
+	});
 	const companyAdminMeta = await resolveUserCompanyMeta(String(user.id), user.email);
 	await audit('LOGIN_SUCCESS', 'success', meta, { userId: user.id, email: user.email });
 
@@ -446,6 +597,10 @@ export const loginWithGoogle = async (input: GoogleLoginInput, meta: RequestMeta
 			emailVerified: user.emailVerified,
 			phoneVerified: user.phoneVerified,
 			mfaEnabled: user.mfaEnabled,
+			isTherapistVerified: Boolean((user as any).isTherapistVerified),
+			therapistVerifiedAt: (user as any).therapistVerifiedAt ?? null,
+			providerOnboardingCompleted: Boolean((therapistProfile as any)?.onboardingCompleted),
+			providerProfileVerified: Boolean((therapistProfile as any)?.isVerified),
 			...companyAdminMeta,
 		},
 		...tokenPair,

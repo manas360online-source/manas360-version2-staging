@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { http } from '../lib/http';
+import { theme } from '../theme/theme';
 
 interface AssessmentProps {
   onSubmit: (data: any, isCritical: boolean) => void;
@@ -7,67 +9,90 @@ interface AssessmentProps {
 
 export const Assessment: React.FC<AssessmentProps> = ({ onSubmit }) => {
   const navigate = useNavigate();
-  const [symptoms, setSymptoms] = useState<string[]>([]);
-  const [impact, setImpact] = useState<string>('');
-  const [selfHarm, setSelfHarm] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string>('');
+  const [attemptId, setAttemptId] = useState<string>('');
+  const [attemptToken, setAttemptToken] = useState<string>('');
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [questions, setQuestions] = useState<Array<{
+    questionId: string;
+    prompt: string;
+    sectionKey: string;
+    options: Array<{ optionIndex: number; label: string }>;
+  }>>([]);
+  const [answers, setAnswers] = useState<Record<string, number>>({});
 
-  const toggleSymptom = (option: string) => {
-    if (symptoms.includes(option)) {
-      setSymptoms(symptoms.filter((s) => s !== option));
-    } else {
-      setSymptoms([...symptoms, option]);
-    }
+  useEffect(() => {
+    const loadAssessment = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const res = await http.post('/v1/free-screening/start', {});
+        const payload = res?.data?.data || res?.data || {};
+        setAttemptId(String(payload.attemptId || ''));
+        setAttemptToken(String(payload.attemptToken || ''));
+        setQuestions(Array.isArray(payload.questions) ? payload.questions : []);
+        setCurrentQuestionIndex(0);
+      } catch (err: any) {
+        setError(err?.response?.data?.message || 'Unable to load assessment. Please refresh and try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void loadAssessment();
+  }, []);
+
+  const setAnswer = (questionId: string, optionIndex: number) => {
+    setAnswers((prev) => ({ ...prev, [questionId]: optionIndex }));
+
+    setCurrentQuestionIndex((prev) => {
+      const lastIndex = Math.max(questions.length - 1, 0);
+      return prev < lastIndex ? prev + 1 : prev;
+    });
   };
 
-  const handleFinish = () => {
-    if (!selfHarm || !impact) {
-      alert("Please answer all required questions.");
+  const handleFinish = async () => {
+    if (!attemptId || !attemptToken || questions.length === 0) {
+      setError('Assessment is not ready yet. Please refresh and try again.');
       return;
     }
 
-    const isCritical = selfHarm === "Yes, and I have a plan";
-    
-    onSubmit({
-      symptoms,
-      impact,
-      selfHarm
-    }, isCritical);
-    
-    if (isCritical) {
-      navigate('/crisis');
-    } else {
-      navigate('/results');
+    const answersPayload = questions.map((question) => ({
+      questionId: question.questionId,
+      optionIndex: Number(answers[question.questionId]),
+    }));
+
+    const hasMissing = answersPayload.some((answer) => Number.isNaN(answer.optionIndex));
+    if (hasMissing) {
+      setError('Please answer all questions before submitting.');
+      return;
+    }
+
+    setSubmitting(true);
+    setError('');
+    try {
+      const res = await http.post(`/v1/free-screening/${encodeURIComponent(attemptId)}/submit`, {
+        attemptToken,
+        answers: answersPayload,
+      });
+
+      const result = res?.data?.data || res?.data || {};
+      const isCritical = String(result.severityLevel || '').toLowerCase() === 'severe';
+
+      onSubmit(result, isCritical);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Unable to submit assessment. Please try again.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const symptomsOptions = [
-    "Feeling down, sad, or hopeless",
-    "Little interest in things you enjoy",
-    "Constant worry or nervousness",
-    "Racing thoughts or can't focus",
-    "Nightmares or disturbing memories",
-    "Avoiding people or situations",
-    "Sudden mood swings (high to low)",
-    "Intrusive thoughts you can't control",
-    "Hearing/seeing things others don't",
-    "Trouble sleeping or sleeping too much",
-    "Can't sit still or restless energy",
-    "Forget things or lose track easily"
-  ];
-
-  const impactOptions = [
-    "Not at all",
-    "A little",
-    "Moderately",
-    "Severely",
-    "Extremely"
-  ];
-
-  const selfHarmOptions = [
-    "No",
-    "Sometimes, but no plan",
-    "Yes, and I have a plan"
-  ];
+  const currentQuestion = questions[currentQuestionIndex];
+  const progressPercent = questions.length > 0
+    ? ((currentQuestionIndex + 1) / questions.length) * 100
+    : 0;
 
   return (
     <div className="responsive-page bg-wellness-bg animate-fadeIn">
@@ -83,104 +108,105 @@ export const Assessment: React.FC<AssessmentProps> = ({ onSubmit }) => {
       </div>
 
       <div className="w-full max-w-screen-md mx-auto section-stack gap-12 sm:gap-16 lg:gap-20">
-        
-        {/* Question 1 */}
-        <section>
-          <h2 className="font-serif text-2xl sm:text-3xl text-wellness-text mb-8 leading-tight font-light">
-            In the past 2 weeks, which of these have you experienced?
-            <span className="block text-sm font-sans text-wellness-muted font-normal mt-3 tracking-wide">Select all that apply</span>
-          </h2>
-          <div className="flex flex-wrap gap-3">
-            {symptomsOptions.map((option) => {
-              const isSelected = symptoms.includes(option);
-              return (
-                <button
-                  key={option}
-                  onClick={() => toggleSymptom(option)}
-                  className={`
-                    px-6 py-3.5 rounded-full text-base font-medium transition-smooth border-2
-                    ${isSelected 
-                      ? 'bg-calm-sage text-white border-calm-sage shadow-soft-md transform scale-[1.02]' 
-                      : 'bg-white text-wellness-text border-calm-sage/20 hover:border-calm-sage/40 hover:bg-calm-sage/5'
-                    }
-                  `}
-                >
-                  {option}
-                </button>
-              );
-            })}
-          </div>
-        </section>
+        {loading ? (
+          <section>
+            <h2 className="font-serif text-2xl sm:text-3xl text-wellness-text mb-2 leading-tight font-light">Loading your assessment...</h2>
+            <p className="text-sm text-wellness-muted">Preparing questions</p>
+          </section>
+        ) : null}
 
-        {/* Question 2 */}
-        <section>
-          <h2 className="font-serif text-2xl sm:text-3xl text-wellness-text mb-8 leading-tight font-light">
-            How much do these affect your daily life?
-          </h2>
-          <div className="flex flex-wrap gap-3">
-            {impactOptions.map((option) => {
-              const isSelected = impact === option;
-              return (
-                <button
-                  key={option}
-                  onClick={() => setImpact(option)}
-                  className={`
-                    flex-1 min-w-[120px] px-5 py-3.5 rounded-full text-base font-medium transition-smooth border-2 text-center whitespace-nowrap
-                    ${isSelected 
-                      ? 'bg-gentle-blue text-white border-gentle-blue shadow-soft-md' 
-                      : 'bg-white text-wellness-text border-gentle-blue/20 hover:border-gentle-blue/40 hover:bg-gentle-blue/5'
-                    }
-                  `}
-                >
-                  {option}
-                </button>
-              );
-            })}
-          </div>
-        </section>
+        {!loading && currentQuestion ? (
+          <section key={currentQuestion.questionId}>
+            <div className="mb-6">
+              <p className="text-sm font-medium text-wellness-muted">
+                Question {currentQuestionIndex + 1} of {questions.length}
+              </p>
+              <div className="mt-2 h-2 w-full rounded-full bg-calm-sage/15">
+                <div
+                  className="h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${progressPercent}%`, backgroundColor: theme.colors.brandTopbar }}
+                />
+              </div>
+            </div>
 
-        {/* Question 3 */}
-        <section>
-          <h2 className="font-serif text-2xl sm:text-3xl text-wellness-text mb-8 leading-tight font-light">
-            Have you thought about hurting yourself?
-          </h2>
-          <div className="flex flex-col gap-3 max-w-md w-full">
-            {selfHarmOptions.map((option) => {
-              const isSelected = selfHarm === option;
-              return (
-                <button
-                  key={option}
-                  onClick={() => setSelfHarm(option)}
-                  className={`
-                    w-full px-7 py-4 rounded-2xl text-base font-medium transition-smooth border-2 text-left flex justify-between items-center
-                    ${isSelected 
-                      ? 'bg-soft-lavender text-white border-soft-lavender shadow-soft-md' 
-                      : 'bg-white text-wellness-text border-soft-lavender/20 hover:border-soft-lavender/40 hover:bg-soft-lavender/5'
-                    }
-                  `}
-                >
-                  {option}
-                  {isSelected && <span className="text-xl">✓</span>}
-                </button>
-              );
-            })}
+            <h2 className="font-serif text-2xl sm:text-3xl text-wellness-text mb-8 leading-tight font-light">
+              {currentQuestionIndex + 1}. {currentQuestion.prompt}
+            </h2>
+
+            <div className="flex flex-col gap-3 max-w-xl w-full">
+              {currentQuestion.options.map((option) => {
+                const isSelected = answers[currentQuestion.questionId] === option.optionIndex;
+                return (
+                  <button
+                    key={`${currentQuestion.questionId}-${option.optionIndex}`}
+                    onClick={() => setAnswer(currentQuestion.questionId, option.optionIndex)}
+                    className={`
+                      w-full px-7 py-4 rounded-2xl text-base font-medium transition-smooth border-2 text-left flex justify-between items-center
+                      ${isSelected
+                        ? 'text-white shadow-soft-md'
+                        : 'bg-white text-wellness-text border-calm-sage/20 hover:border-calm-sage/40 hover:bg-calm-sage/5'
+                      }
+                    `}
+                    style={isSelected ? { backgroundColor: theme.colors.brandTopbar, borderColor: theme.colors.brandTopbar } : undefined}
+                  >
+                    {option.label}
+                    {isSelected && <span className="text-xl">✓</span>}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-6 flex items-center justify-between max-w-xl">
+              <button
+                type="button"
+                onClick={() => setCurrentQuestionIndex((prev) => Math.max(prev - 1, 0))}
+                disabled={currentQuestionIndex === 0}
+                className={`rounded-full px-5 py-2 text-sm font-medium transition-smooth ${
+                  currentQuestionIndex === 0
+                    ? 'bg-wellness-surface text-wellness-muted cursor-not-allowed'
+                    : 'bg-white border border-calm-sage/30 text-wellness-text hover:bg-calm-sage/5'
+                }`}
+              >
+                Previous
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCurrentQuestionIndex((prev) => Math.min(prev + 1, questions.length - 1))}
+                disabled={currentQuestionIndex >= questions.length - 1}
+                className={`rounded-full px-5 py-2 text-sm font-medium transition-smooth ${
+                  currentQuestionIndex >= questions.length - 1
+                    ? 'bg-wellness-surface text-wellness-muted cursor-not-allowed'
+                    : 'text-white hover:opacity-90'
+                }`}
+                style={currentQuestionIndex >= questions.length - 1 ? undefined : { backgroundColor: theme.colors.brandTopbar }}
+              >
+                Next
+              </button>
+            </div>
+          </section>
+        ) : null}
+
+        {error ? (
+          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
           </div>
-        </section>
+        ) : null}
 
         {/* Submit */}
         <div className="pt-8 pb-20">
           <button
             onClick={handleFinish}
-            disabled={!selfHarm || !impact}
+            disabled={loading || submitting || questions.length === 0 || Object.keys(answers).length !== questions.length}
             className={`
               responsive-action-btn w-full rounded-full text-lg font-semibold tracking-wide transition-smooth shadow-soft-md
-              ${(!selfHarm || !impact)
+              ${(loading || submitting || questions.length === 0 || Object.keys(answers).length !== questions.length)
                 ? 'bg-wellness-surface text-wellness-muted cursor-not-allowed'
                 : 'bg-gradient-calm text-white hover:shadow-soft-lg hover:-translate-y-1'
               }
             `}
           >
-            Submit • Analyze My Results
+            {submitting ? 'Submitting...' : 'Submit • Analyze My Results'}
           </button>
         </div>
 

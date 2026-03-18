@@ -20,7 +20,7 @@ type SpeakOptions = {
 };
 
 const INDIAN_VOICE_PATTERN = /(india|indian|en-in|hi-in|ta-in|te-in|kn-in|ml-in|mr-in)/i;
-const MIC_ACCESS_PAUSED = true;
+const MIC_ACCESS_PAUSED = false; // ← FIXED: was `true`, which disabled mic entirely
 
 export const useSpeechAssistant = () => {
   const recognitionRef = useRef<any>(null);

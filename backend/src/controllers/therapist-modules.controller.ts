@@ -4,14 +4,12 @@ import { sendSuccess } from '../utils/response';
 import {
   listTherapistStructuredSessionNotes,
   upsertTherapistStructuredSessionNote,
+  generateTherapistAiSessionNote,
   listTherapistExercises,
   createTherapistExercise,
   updateTherapistExercise,
   bumpTherapistExerciseCompletion,
   deleteTherapistExercise,
-  listTherapistCbtModules,
-  createTherapistCbtModule,
-  deleteTherapistCbtModule,
   listTherapistAssessmentRecords,
   createTherapistAssessmentRecord,
   listTherapistResources,
@@ -41,6 +39,14 @@ export const putMyTherapistStructuredSessionNoteController = async (req: Request
 
   const data = await upsertTherapistStructuredSessionNote(authUserId(req), sessionId, req.body || {});
   sendSuccess(res, data, 'Therapist structured session note saved');
+};
+
+export const postGenerateAiSessionNoteController = async (req: Request, res: Response): Promise<void> => {
+  const sessionId = String(req.params.sessionId || '').trim();
+  if (!sessionId) throw new AppError('sessionId is required', 400);
+
+  const data = await generateTherapistAiSessionNote(authUserId(req), sessionId);
+  sendSuccess(res, data, 'AI clinical note generated');
 };
 
 export const getMyTherapistExercisesController = async (req: Request, res: Response): Promise<void> => {
@@ -76,24 +82,6 @@ export const deleteMyTherapistExerciseController = async (req: Request, res: Res
 
   const data = await deleteTherapistExercise(authUserId(req), id);
   sendSuccess(res, data, 'Therapist exercise deleted');
-};
-
-export const getMyTherapistCbtModulesController = async (req: Request, res: Response): Promise<void> => {
-  const data = await listTherapistCbtModules(authUserId(req));
-  sendSuccess(res, data, 'Therapist CBT modules fetched');
-};
-
-export const postMyTherapistCbtModuleController = async (req: Request, res: Response): Promise<void> => {
-  const data = await createTherapistCbtModule(authUserId(req), req.body || {});
-  sendSuccess(res, data, 'Therapist CBT module created', 201);
-};
-
-export const deleteMyTherapistCbtModuleController = async (req: Request, res: Response): Promise<void> => {
-  const id = String(req.params.id || '').trim();
-  if (!id) throw new AppError('id is required', 400);
-
-  const data = await deleteTherapistCbtModule(authUserId(req), id);
-  sendSuccess(res, data, 'Therapist CBT module deleted');
 };
 
 export const getMyTherapistAssessmentsController = async (req: Request, res: Response): Promise<void> => {

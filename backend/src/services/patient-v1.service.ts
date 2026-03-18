@@ -1,10 +1,23 @@
 import crypto from 'crypto';
+import { env } from '../config/env';
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/error.middleware';
 import { decryptSessionNote } from '../utils/encryption';
 import { createSessionPayment } from './payment.service';
 import { verifyRazorpayPaymentSignature } from './razorpay.service';
 import { processChatMessage } from './chat.service';
+import {
+	buildDailyCheckInInsights,
+	buildDailyCheckInNote,
+	formatDailyCheckInTag,
+	getThreeDayLowMoodTrend,
+	parseDailyCheckInNote,
+} from './dailyCheckIn.service';
+import { syncTreatmentPlanFromAssessment } from './treatment-plan.service';
+import { getSessionQuote } from './pricing.service';
+import { getActivePlatformPlan } from './pricing.service';
+import { scoreGAD7, scorePHQ9 } from './riskScoring';
+import { sendSubscriptionActivationEmail } from './email.service';
 
 const db = prisma as any;
 
@@ -13,12 +26,54 @@ type ProviderFilters = {
 	language?: string;
 	minPrice?: number;
 	maxPrice?: number;
+	role?: string;
 	page?: number;
 	limit?: number;
 };
 
 const DEFAULT_SESSION_FEE_MINOR = 150000;
 const DEFAULT_DURATION_MINUTES = 50;
+const PAYMENT_DEADLINE_HOURS = 12;
+const PROVIDER_ROLES = ['THERAPIST', 'PSYCHOLOGIST', 'PSYCHIATRIST', 'COACH'] as const;
+const SLOT_INTERVAL_MINUTES = 60;
+
+type AvailabilitySlot = {
+	dayOfWeek: number;
+	startMinute: number;
+	endMinute: number;
+	isAvailable: boolean;
+};
+
+const normalizeProviderRole = (role: string | null | undefined): 'THERAPIST' | 'PSYCHOLOGIST' | 'PSYCHIATRIST' | 'COACH' | null => {
+	const normalized = String(role || '').trim().toUpperCase();
+	if (normalized === 'THERAPIST' || normalized === 'PSYCHOLOGIST' || normalized === 'PSYCHIATRIST' || normalized === 'COACH') {
+		return normalized;
+	}
+	return null;
+};
+
+const roleToProviderType = (role: string | null | undefined): 'specialized-therapist' | 'clinical-psychologist' | 'psychiatrist' => {
+	const normalized = normalizeProviderRole(role);
+	if (normalized === 'PSYCHOLOGIST') return 'clinical-psychologist';
+	if (normalized === 'PSYCHIATRIST') return 'psychiatrist';
+	return 'specialized-therapist';
+};
+
+const roleLabel = (role: string | null | undefined): string => {
+	const normalized = normalizeProviderRole(role);
+	if (normalized === 'PSYCHOLOGIST') return 'Psychologist';
+	if (normalized === 'PSYCHIATRIST') return 'Psychiatrist';
+	if (normalized === 'COACH') return 'Coach';
+	return 'Therapist';
+};
+
+const defaultFeeByRoleMinor = (role: string | null | undefined): number => {
+	const normalized = normalizeProviderRole(role);
+	if (normalized === 'PSYCHOLOGIST') return 69900;
+	if (normalized === 'PSYCHIATRIST') return 99900;
+	if (normalized === 'COACH') return 49900;
+	return DEFAULT_SESSION_FEE_MINOR;
+};
 
 const normalizePagination = (page = 1, limit = 10) => {
 	const safePage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
@@ -26,10 +81,209 @@ const normalizePagination = (page = 1, limit = 10) => {
 	return { page: safePage, limit: safeLimit, skip: (safePage - 1) * safeLimit };
 };
 
+const normalizeAvailabilitySlots = (value: unknown): AvailabilitySlot[] => {
+	if (!Array.isArray(value)) return [];
+
+	return value
+		.map((entry) => {
+			const slot = entry as Record<string, unknown>;
+			const dayOfWeek = Number(slot.dayOfWeek);
+			const startMinute = Number(slot.startMinute);
+			const endMinute = Number(slot.endMinute);
+			const isAvailable = Boolean(slot.isAvailable);
+
+			if (
+				!Number.isInteger(dayOfWeek)
+				|| dayOfWeek < 0
+				|| dayOfWeek > 6
+				|| !Number.isFinite(startMinute)
+				|| !Number.isFinite(endMinute)
+			) {
+				return null;
+			}
+
+			return {
+				dayOfWeek,
+				startMinute: Math.max(0, Math.min(24 * 60, Math.floor(startMinute))),
+				endMinute: Math.max(0, Math.min(24 * 60, Math.floor(endMinute))),
+				isAvailable,
+			};
+		})
+		.filter((slot): slot is AvailabilitySlot => slot !== null && slot.endMinute > slot.startMinute);
+};
+
+const buildAvailableSlotsFromAvailability = (
+	availability: AvailabilitySlot[],
+	blocked: Set<string>,
+	now: Date,
+	durationMinutes = DEFAULT_DURATION_MINUTES,
+): string[] => {
+	const availableSlots: string[] = [];
+
+	for (let dayOffset = 0; dayOffset < 7; dayOffset += 1) {
+		const currentDay = new Date(now);
+		currentDay.setDate(now.getDate() + dayOffset);
+		currentDay.setSeconds(0, 0);
+		const daySlots = availability.filter((slot) => slot.isAvailable && slot.dayOfWeek === currentDay.getDay());
+
+		for (const daySlot of daySlots) {
+			for (
+				let minuteOfDay = daySlot.startMinute;
+				minuteOfDay + durationMinutes <= daySlot.endMinute;
+				minuteOfDay += SLOT_INTERVAL_MINUTES
+			) {
+				const slot = new Date(currentDay);
+				slot.setHours(Math.floor(minuteOfDay / 60), minuteOfDay % 60, 0, 0);
+				if (slot <= now) continue;
+				if (!blocked.has(slot.toISOString())) availableSlots.push(slot.toISOString());
+			}
+		}
+	}
+
+	return availableSlots;
+};
+
+const isWithinProviderAvailability = (scheduledAt: Date, availability: AvailabilitySlot[], durationMinutes: number): boolean => {
+	const daySlot = availability.find((slot) => slot.isAvailable && slot.dayOfWeek === scheduledAt.getDay());
+	if (!daySlot) return false;
+
+	const startMinute = scheduledAt.getHours() * 60 + scheduledAt.getMinutes();
+	const endMinute = startMinute + durationMinutes;
+	return startMinute >= daySlot.startMinute && endMinute <= daySlot.endMinute;
+};
+
+const mapMoodRow = (row: { id: string; mood: number; note?: string | null; created_at: Date | string; metadata?: any }) => {
+	const parsed = parseDailyCheckInNote(row.note);
+	return {
+		id: row.id,
+		mood: Number(row.mood || 0),
+		note: parsed.journal,
+		metadata: row.metadata || parsed.metadata,
+		created_at: row.created_at,
+	};
+};
+
+const markDailyCheckInTaskComplete = async (patientProfileId: string) => {
+	const task = await db.therapyPlanActivity.findFirst({
+		where: {
+			activityType: 'MOOD_CHECKIN',
+			status: 'PENDING',
+			plan: { patientId: patientProfileId, status: 'ACTIVE' },
+		},
+		select: { id: true },
+	}).catch(() => null);
+
+	if (!task?.id) return;
+
+	await db.therapyPlanActivity.update({
+		where: { id: task.id },
+		data: { status: 'COMPLETED', completedAt: new Date() },
+	}).catch(() => null);
+};
+
+const maybeCreateLowMoodAlert = async (userId: string, patientProfileId: string) => {
+	const history = await getMoodHistory(userId);
+	const trend = getThreeDayLowMoodTrend(history);
+	if (!trend) return;
+
+	const [assignments, activePlan, patientUser] = await Promise.all([
+		db.careTeamAssignment.findMany({
+			where: { patientId: userId, status: 'ACTIVE' },
+			select: { providerId: true },
+		}).catch(() => []),
+		db.therapyPlan.findFirst({
+			where: { patientId: patientProfileId, status: 'ACTIVE', therapistId: { not: null } },
+			select: { therapistId: true },
+		}).catch(() => null),
+		db.user.findUnique({
+			where: { id: userId },
+			select: { name: true, firstName: true, lastName: true, email: true },
+		}).catch(() => null),
+	]);
+
+	const providerIds = [...new Set([
+		...assignments.map((item: any) => String(item.providerId || '').trim()).filter(Boolean),
+		activePlan?.therapistId ? String(activePlan.therapistId).trim() : '',
+	].filter(Boolean))];
+
+	if (!providerIds.length) return;
+
+	const patientName = String(
+		patientUser?.name
+			|| `${patientUser?.firstName || ''} ${patientUser?.lastName || ''}`.trim()
+			|| patientUser?.email
+			|| 'Your patient',
+	);
+	const dayStart = new Date();
+	dayStart.setHours(0, 0, 0, 0);
+	const tagSummary = [...new Set(trend.recentDays.flatMap((entry) => entry.tags))].slice(0, 2).map(formatDailyCheckInTag);
+	const message = tagSummary.length
+		? `${patientName} has reported sad or awful daily check-ins for 3 consecutive days. Recent context includes ${tagSummary.join(' and ')}.`
+		: `${patientName} has reported sad or awful daily check-ins for 3 consecutive days. Consider a proactive outreach.`;
+
+	await Promise.allSettled(
+		providerIds.map(async (providerId) => {
+			const existing = await db.notification.findMany({
+				where: {
+					userId: providerId,
+					type: 'PATIENT_MOOD_DECLINE_ALERT',
+					createdAt: { gte: dayStart },
+				},
+				select: { payload: true },
+			}).catch(() => []);
+
+			const alreadySent = existing.some((item: any) => String(item?.payload?.patientUserId || '') === userId);
+			if (alreadySent) return;
+
+			await db.notification.create({
+				data: {
+					userId: providerId,
+					type: 'PATIENT_MOOD_DECLINE_ALERT',
+					title: `${patientName}'s mood is trending downward`,
+					message,
+					payload: {
+						patientUserId: userId,
+						patientName,
+						pattern: 'three-low-days',
+						recentDays: trend.recentDays,
+					},
+				},
+			});
+		}),
+	);
+};
+
 const getPatientProfile = async (userId: string) => {
 	const profile = await db.patientProfile.findUnique({ where: { userId }, select: { id: true } });
-	if (!profile) throw new AppError('Patient profile not found. Please complete onboarding.', 404);
-	return profile;
+	if (profile) return profile;
+
+	const created = await db.patientProfile.create({
+		data: {
+			userId,
+			age: 25,
+			gender: 'prefer_not_to_say',
+			emergencyContact: {
+				name: 'Not provided',
+				relation: 'Not provided',
+				phone: 'Not provided',
+			},
+		},
+		select: { id: true },
+	}).catch(() => null);
+
+	if (!created) {
+		throw new AppError('Patient profile unavailable', 500);
+	}
+
+	return created;
+};
+
+const assertPaymentDeadlineWindow = (scheduledAt: Date): void => {
+	const now = Date.now();
+	const threshold = scheduledAt.getTime() - PAYMENT_DEADLINE_HOURS * 60 * 60 * 1000;
+	if (now > threshold) {
+		throw new AppError(`Session payment must be completed at least ${PAYMENT_DEADLINE_HOURS} hours before start time`, 409);
+	}
 };
 
 const mapSeverity = (score: number): 'Mild' | 'Moderate' | 'Severe' => {
@@ -38,38 +292,173 @@ const mapSeverity = (score: number): 'Mild' | 'Moderate' | 'Severe' => {
 	return 'Severe';
 };
 
-const toProviderListItem = async (user: any) => {
-	// TODO: Replace therapist mock data once therapist module is integrated.
-	const categories = await db.cBTSessionTemplate.findMany({
-		where: { therapistId: user.id, status: 'PUBLISHED' },
-		select: { category: true },
-		take: 10,
-	});
-	const specializations = [...new Set(categories.map((c: any) => String(c.category || '').trim()).filter(Boolean))];
-	const completedSessions = await db.therapySession.count({ where: { therapistProfileId: user.id, status: 'COMPLETED' } });
+type JourneyPathway = 'SELF_CARE' | 'THERAPIST' | 'PSYCHIATRIST' | 'CRISIS_SUPPORT';
+type JourneyUrgency = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+
+type JourneyRecommendation = {
+	pathway: JourneyPathway;
+	urgency: JourneyUrgency;
+	recommendedProvider: 'self-guided' | 'therapist' | 'psychiatrist' | 'crisis-team';
+	followUpDays: number;
+	rationale: string[];
+	actions: string[];
+};
+
+const buildJourneyRecommendation = (input: { type: string; score: number; answers: number[] }): JourneyRecommendation => {
+	const type = String(input.type || '').toUpperCase();
+
+	if (type === 'PHQ-9') {
+		const phq = scorePHQ9(input.answers.length ? input.answers : [input.score]);
+		if (phq.q9Score >= 3) {
+			return {
+				pathway: 'CRISIS_SUPPORT',
+				urgency: 'CRITICAL',
+				recommendedProvider: 'crisis-team',
+				followUpDays: 0,
+				rationale: ['PHQ-9 item 9 indicates frequent self-harm thoughts.', `PHQ-9 total ${phq.total} (${phq.severity}).`],
+				actions: ['Contact immediate crisis support now.', 'Enable urgent care-team outreach.', 'Schedule same-day clinical review.'],
+			};
+		}
+
+		if (phq.q9Score > 0 || phq.total >= 20) {
+			return {
+				pathway: 'PSYCHIATRIST',
+				urgency: 'HIGH',
+				recommendedProvider: 'psychiatrist',
+				followUpDays: 1,
+				rationale: ['Elevated depression severity and safety risk factors.', `PHQ-9 total ${phq.total} (${phq.severity}).`],
+				actions: ['Book psychiatrist consult within 24 hours.', 'Assign therapist follow-up session this week.', 'Continue daily mood and safety check-ins.'],
+			};
+		}
+
+		if (phq.total >= 10) {
+			return {
+				pathway: 'THERAPIST',
+				urgency: 'MEDIUM',
+				recommendedProvider: 'therapist',
+				followUpDays: 3,
+				rationale: [`PHQ-9 indicates ${phq.severity} depressive symptoms.`],
+				actions: ['Book therapist session this week.', 'Track mood and sleep for 7 days.'],
+			};
+		}
+
+		return {
+			pathway: 'SELF_CARE',
+			urgency: 'LOW',
+			recommendedProvider: 'self-guided',
+			followUpDays: 7,
+			rationale: [`PHQ-9 indicates ${phq.severity} symptoms.`],
+			actions: ['Continue self-care routines.', 'Repeat assessment in one week.', 'Use breathing and sleep hygiene exercises.'],
+		};
+	}
+
+	if (type === 'GAD-7') {
+		const gad = scoreGAD7(input.answers.length ? input.answers : [input.score]);
+		if (gad.total >= 15) {
+			return {
+				pathway: 'THERAPIST',
+				urgency: 'HIGH',
+				recommendedProvider: 'therapist',
+				followUpDays: 2,
+				rationale: [`GAD-7 indicates severe anxiety (${gad.total}).`],
+				actions: ['Book therapist session within 48 hours.', 'Apply anxiety grounding protocol daily.', 'Reduce known high-trigger situations this week.'],
+			};
+		}
+
+		if (gad.total >= 10) {
+			return {
+				pathway: 'THERAPIST',
+				urgency: 'MEDIUM',
+				recommendedProvider: 'therapist',
+				followUpDays: 4,
+				rationale: [`GAD-7 indicates ${gad.severity} anxiety.`],
+				actions: ['Schedule therapist follow-up this week.', 'Continue relaxation routines.', 'Track anxiety triggers in daily journal.'],
+			};
+		}
+
+		return {
+			pathway: 'SELF_CARE',
+			urgency: 'LOW',
+			recommendedProvider: 'self-guided',
+			followUpDays: 7,
+			rationale: [`GAD-7 indicates ${gad.severity} anxiety.`],
+			actions: ['Maintain self-care and breathwork.', 'Repeat anxiety check next week.', 'Follow your current therapy-plan tasks.'],
+		};
+	}
+
+	if (input.score >= 15) {
+		return {
+			pathway: 'THERAPIST',
+			urgency: 'MEDIUM',
+			recommendedProvider: 'therapist',
+			followUpDays: 3,
+			rationale: [`Assessment score ${input.score} indicates elevated distress.`],
+			actions: ['Schedule therapist follow-up this week.', 'Continue mood tracking daily.', 'Prioritize sleep and routine stabilization.'],
+		};
+	}
+
 	return {
-		id: user.id,
-		name: String(user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Therapist'),
-		specialization: specializations[0] || 'General Wellness',
-		specializations,
-		experience_years: 3,
-		session_rate: DEFAULT_SESSION_FEE_MINOR,
-		bio: user.bio || 'Experienced mental wellness professional.',
-		languages: ['English', 'Hindi'],
-		rating_avg: completedSessions > 0 ? 4.6 : 4.4,
-		is_active: true,
+		pathway: 'SELF_CARE',
+		urgency: 'LOW',
+		recommendedProvider: 'self-guided',
+		followUpDays: 7,
+		rationale: [`Assessment score ${input.score} suggests manageable symptoms.`],
+		actions: ['Continue self-care plan.', 'Reassess in 7 days.', 'Keep routine mood logs.'],
 	};
+};
+
+const toProviderListItem = async (user: any) => {
+	try {
+		// 1. Ensure TherapistProfile exists, or fetch it if omitted
+		const profile = user.therapistProfile || await db.therapistProfile.findUnique({ where: { userId: user.id } }).catch(() => null);
+
+		// 2. Base specializations based on profile
+		const profileSpecializations = Array.isArray(profile?.specializations) ? profile.specializations : [];
+		const allSpecializations = [...new Set([...profileSpecializations])];
+
+		// 3. Aggregate Stats
+		const therapistProfile = profile || await db.therapistProfile.findUnique({ where: { userId: user.id } }).catch(() => null);
+		const completedSessions = therapistProfile ? await db.therapySession.count({ where: { therapistProfileId: therapistProfile.id, status: 'COMPLETED' } }) : 0;
+		const providerType = roleToProviderType(user.role);
+		
+		// Default fallbacks
+		const fallbackSpecialization = providerType === 'psychiatrist'
+			? 'Medication & Clinical Psychiatry'
+			: providerType === 'clinical-psychologist'
+				? 'Clinical Psychology'
+				: normalizeProviderRole(user.role) === 'COACH'
+					? 'Wellness Coaching'
+					: 'General Wellness Therapy';
+
+		return {
+			id: user.id,
+			name: String(profile?.displayName || user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Provider'),
+			role: roleLabel(user.role),
+			providerType,
+			specialization: allSpecializations[0] || fallbackSpecialization,
+			specializations: allSpecializations.length ? allSpecializations : [fallbackSpecialization],
+			experience_years: profile?.yearsOfExperience || 1,
+			session_rate: profile?.consultationFee || defaultFeeByRoleMinor(user.role),
+			bio: profile?.bio || 'Experienced mental wellness professional dedicated to holistic care and evidence-based practices.',
+			languages: Array.isArray(profile?.languages) && profile.languages.length > 0 ? profile.languages : ['English'],
+			rating_avg: profile?.averageRating && profile.averageRating > 0 ? profile.averageRating : (completedSessions > 0 ? 4.8 : 4.5),
+			is_active: !user.isDeleted && user.status === 'ACTIVE',
+		};
+	} catch (error) {
+		console.error('Error in toProviderListItem:', error);
+		throw error;
+	}
 };
 
 export const getPatientDashboard = async (userId: string) => {
 	const patientProfile = await getPatientProfile(userId);
 	const now = new Date();
 
-	const [user, upcomingRaw, recentSessionsRaw, lastAssessment, recentMoodRaw, therapistUsers, exercises, progress] = await Promise.all([
+	const [user, upcomingRaw, recentSessionsRaw, lastAssessment, recentMoodRaw, therapistUsers, exercises, progress, recentPrescriptionsRaw] = await Promise.all([
 		db.user.findUnique({
 			where: { id: userId },
 			select: { id: true, name: true, firstName: true, lastName: true, email: true, role: true, createdAt: true },
-		}),
+		}).catch(() => null),
 		db.therapySession.findMany({
 			where: {
 				patientProfileId: patientProfile.id,
@@ -84,9 +473,9 @@ export const getPatientDashboard = async (userId: string) => {
 				dateTime: true,
 				status: true,
 				agoraChannel: true,
-				therapistProfile: { select: { id: true, firstName: true, lastName: true, name: true } },
+				therapistProfileId: true,
 			},
-		}),
+		}).catch(() => []),
 		db.therapySession.findMany({
 			where: { patientProfileId: patientProfile.id },
 			orderBy: { dateTime: 'desc' },
@@ -96,29 +485,37 @@ export const getPatientDashboard = async (userId: string) => {
 				dateTime: true,
 				status: true,
 				sessionFeeMinor: true,
-				therapistProfile: { select: { id: true, firstName: true, lastName: true, name: true } },
+				therapistProfileId: true,
 			},
-		}),
+		}).catch(() => []),
 		db.patientAssessment.findFirst({
 			where: { patientId: patientProfile.id },
 			orderBy: { createdAt: 'desc' },
 			select: { type: true, totalScore: true, severityLevel: true, createdAt: true },
-		}),
+		}).catch(() => null),
 		db.patientMoodEntry.findMany({
 			where: { patientId: patientProfile.id },
 			orderBy: { date: 'desc' },
 			take: 7,
 			select: { id: true, moodScore: true, note: true, date: true },
-		}),
+		}).catch(() => []),
 		db.user.findMany({
-			where: { role: 'THERAPIST', isDeleted: false },
-			select: { id: true, firstName: true, lastName: true, name: true },
+			where: { role: { in: PROVIDER_ROLES as any }, isDeleted: false },
+			select: { 
+				id: true, 
+				firstName: true, 
+				lastName: true, 
+				name: true, 
+				role: true, 
+				status: true,
+				therapistProfile: true 
+			},
 			take: 8,
-		}),
+		}).catch(() => []),
 		db.patientExercise.findMany({
 			where: { patientId: patientProfile.id },
 			orderBy: { createdAt: 'desc' },
-			take: 6,
+			take: 12,
 			select: { id: true, title: true, assignedBy: true, duration: true, status: true, createdAt: true },
 		}).catch(() => []),
 		db.patientProgress.findUnique({
@@ -132,9 +529,64 @@ export const getPatientDashboard = async (userId: string) => {
 				phqCurrent: true,
 			},
 		}).catch(() => null),
+		db.prescription.findMany({
+			where: { patientId: userId },
+			orderBy: { prescribedDate: 'desc' },
+			take: 5,
+			select: {
+				id: true,
+				drugName: true,
+				dosage: true,
+				prescribedDate: true,
+				provider: {
+					select: {
+						user: {
+							select: { firstName: true, lastName: true },
+						},
+					},
+				},
+			},
+		}).catch(() => []),
 	]);
 
-	const recommendedProviders = await Promise.all(therapistUsers.map((u: any) => toProviderListItem(u)));
+	const sessionProviderIds = Array.from(
+		new Set(
+			[...upcomingRaw, ...recentSessionsRaw]
+				.map((session: any) => String(session.therapistProfileId || '').trim())
+				.filter(Boolean),
+		),
+	);
+
+	const sessionProviders = sessionProviderIds.length
+		? await db.user
+				.findMany({
+					where: { id: { in: sessionProviderIds } },
+					select: { id: true, name: true, firstName: true, lastName: true },
+				})
+				.catch(() => [])
+		: [];
+
+	const providerMap = new Map(
+		sessionProviders.map((provider: any) => [
+			provider.id,
+			String(provider.name || `${provider.firstName || ''} ${provider.lastName || ''}`.trim() || 'Therapist'),
+		]),
+	);
+
+	const mapSessionProvider = (session: any) => {
+		const providerId = String(session?.therapistProfileId || '').trim() || null;
+		return {
+			id: providerId,
+			name: providerId ? providerMap.get(providerId) || 'Therapist' : 'Therapist',
+		};
+	};
+
+	const recommendedProviderResults = await Promise.allSettled(
+		therapistUsers.map((u: any) => toProviderListItem(u)),
+	);
+	const recommendedProviders = recommendedProviderResults
+		.filter((item: PromiseSettledResult<any>) => item.status === 'fulfilled')
+		.map((item: PromiseSettledResult<any>) => (item as PromiseFulfilledResult<any>).value);
 	const userName = String(user?.name || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Patient');
 	const moodTrend = [...recentMoodRaw]
 		.reverse()
@@ -147,6 +599,8 @@ export const getPatientDashboard = async (userId: string) => {
 	const avgMood = moodTrend.length
 		? moodTrend.reduce((sum: number, entry: any) => sum + Number(entry.score || 0), 0) / moodTrend.length
 		: 3;
+	const completedWellnessActivities = exercises.filter((item: any) => String(item.status || '').toUpperCase() === 'COMPLETED').length;
+	const exerciseBoost = Math.min(20, completedWellnessActivities * 10);
 
 	const completedSessions = recentSessionsRaw.filter((row: any) => String(row.status) === 'COMPLETED').length;
 	const totalSessions = Math.max(completedSessions + upcomingRaw.length, progress?.totalSessions || 0);
@@ -157,10 +611,7 @@ export const getPatientDashboard = async (userId: string) => {
 			scheduledAt: upcomingRaw[0].dateTime,
 			status: String(upcomingRaw[0].status).toLowerCase(),
 			agoraChannel: upcomingRaw[0].agoraChannel,
-			provider: {
-				id: upcomingRaw[0].therapistProfile.id,
-				name: String(upcomingRaw[0].therapistProfile.name || `${upcomingRaw[0].therapistProfile.firstName || ''} ${upcomingRaw[0].therapistProfile.lastName || ''}`.trim() || 'Therapist'),
-			},
+			provider: mapSessionProvider(upcomingRaw[0]),
 		}
 		: null;
 
@@ -169,9 +620,21 @@ export const getPatientDashboard = async (userId: string) => {
 			id: `session-${session.id}`,
 			type: 'session',
 			title: `Session ${String(session.status).toLowerCase()}`,
-			description: String(session.therapistProfile?.name || `${session.therapistProfile?.firstName || ''} ${session.therapistProfile?.lastName || ''}`.trim() || 'Therapist'),
+			description: String(providerMap.get(String(session.therapistProfileId || '')) || 'Therapist'),
 			date: session.dateTime,
 		})),
+		...recentPrescriptionsRaw.slice(0, 3).map((prescription: any) => {
+			const providerName = prescription.provider
+				? `${prescription.provider.firstName || ''} ${prescription.provider.lastName || ''}`.trim()
+				: 'Provider';
+			return {
+				id: `prescription-${prescription.id}`,
+				type: 'prescription',
+				title: `Prescription issued: ${prescription.drugName}`,
+				description: `${prescription.dosage} • ${providerName}`,
+				date: prescription.prescribedDate,
+			};
+		}),
 		...recentMoodRaw.slice(0, 3).map((mood: any, index: number) => ({
 			id: `mood-${mood.id || mood.date || index}-${index}`,
 			type: 'mood',
@@ -179,6 +642,16 @@ export const getPatientDashboard = async (userId: string) => {
 			description: mood.note ? String(mood.note) : `Mood score ${mood.moodScore}/5`,
 			date: mood.date,
 		})),
+		...exercises
+			.filter((item: any) => String(item.status || '').toUpperCase() === 'COMPLETED')
+			.slice(0, 4)
+			.map((exercise: any) => ({
+				id: `wellness-${exercise.id}`,
+				type: 'wellness',
+				title: 'Wellness library session completed',
+				description: `${String(exercise.title || 'Self-care activity')} • +10 Wellness Points`,
+				date: exercise.createdAt,
+			})),
 	]
 		.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
 		.slice(0, 8);
@@ -209,7 +682,7 @@ export const getPatientDashboard = async (userId: string) => {
 			role: String(user?.role || 'PATIENT').toLowerCase(),
 			createdAt: user?.createdAt,
 		},
-		wellnessScore: Math.max(0, Math.min(100, Math.round((avgMood / 5) * 100))),
+		wellnessScore: Math.max(0, Math.min(100, Math.round((avgMood / 5) * 80 + exerciseBoost))),
 		sessionsCompleted: progressPayload.sessionsCompleted,
 		totalSessions: progressPayload.totalSessions,
 		streak: moodTrend.length,
@@ -224,10 +697,7 @@ export const getPatientDashboard = async (userId: string) => {
 			scheduledAt: s.dateTime,
 			status: String(s.status).toLowerCase(),
 			agoraChannel: s.agoraChannel,
-			provider: {
-				id: s.therapistProfile.id,
-				name: String(s.therapistProfile.name || `${s.therapistProfile.firstName || ''} ${s.therapistProfile.lastName || ''}`.trim() || 'Therapist'),
-			},
+			provider: mapSessionProvider(s),
 		})),
 		lastAssessment: lastAssessment
 			? {
@@ -252,17 +722,46 @@ export const getPatientDashboard = async (userId: string) => {
 const ensureSubscriptionRecord = async (userId: string) => {
 	let subscription = await db.patientSubscription.findUnique({ where: { userId } }).catch(() => null);
 	if (!subscription) {
+		const activePlan = await getActivePlatformPlan();
+		const renewalDate = new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000);
 		subscription = await db.patientSubscription.create({
 			data: {
 				userId,
-				planName: 'Premium Plan',
-				price: 2499,
+				planName: activePlan.name,
+				price: activePlan.price,
 				billingCycle: 'monthly',
-				status: 'active',
-				autoRenew: true,
-				renewalDate: new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000),
+				status: 'inactive',
+				autoRenew: false,
+				renewalDate,
 			},
 		}).catch(() => null);
+	} else if (
+		String(subscription.status || '').toLowerCase() === 'active'
+		&& subscription.autoRenew
+		&& new Date(subscription.renewalDate).getTime() <= Date.now()
+	) {
+		const activePlan = await getActivePlatformPlan();
+		const renewalDays = String(subscription.billingCycle || '').toLowerCase() === 'yearly' ? 365 : 30;
+		const nextRenewalDate = new Date(Date.now() + renewalDays * 24 * 60 * 60 * 1000);
+
+		subscription = await db.patientSubscription.update({
+			where: { userId },
+			data: {
+				planName: activePlan.name,
+				price: activePlan.price,
+				renewalDate: nextRenewalDate,
+			},
+		}).catch(() => subscription);
+
+		await db.$executeRawUnsafe(
+			`INSERT INTO user_subscriptions (id, user_id, plan_id, start_date, end_date, status, price_snapshot, created_at, updated_at)
+			 VALUES ($1, $2, $3, CURRENT_DATE, $4::date, 'active', $5, NOW(), NOW())`,
+			crypto.randomUUID(),
+			userId,
+			activePlan.key,
+			nextRenewalDate,
+			activePlan.price,
+		).catch(() => null);
 	}
 	return subscription;
 };
@@ -270,12 +769,18 @@ const ensureSubscriptionRecord = async (userId: string) => {
 export const getPatientSubscription = async (userId: string) => {
 	const subscription = await ensureSubscriptionRecord(userId);
 	if (!subscription) throw new AppError('Subscription data unavailable', 500);
-	return subscription;
+	const activePlan = await getActivePlatformPlan();
+	return {
+		...subscription,
+		nextRenewalPrice: activePlan.price,
+		priceLockedUntil: subscription.renewalDate,
+	};
 };
 
 export const updatePatientSubscriptionPlan = async (userId: string, action: 'upgrade' | 'downgrade') => {
 	const subscription = await ensureSubscriptionRecord(userId);
 	if (!subscription) throw new AppError('Subscription data unavailable', 500);
+	const activePlan = await getActivePlatformPlan();
 
 	const planOrder = ['basic', 'premium', 'pro'];
 	const current = String(subscription.planName || 'premium').toLowerCase().replace(' plan', '');
@@ -284,12 +789,12 @@ export const updatePatientSubscriptionPlan = async (userId: string, action: 'upg
 		? Math.min(planOrder.length - 1, currentIndex + 1)
 		: Math.max(0, currentIndex - 1);
 	const nextPlan = planOrder[nextIndex];
-	const price = nextPlan === 'basic' ? 999 : nextPlan === 'premium' ? 2499 : 4999;
+	const price = activePlan.price;
 
-	return db.patientSubscription.update({
+	const updated = await db.patientSubscription.update({
 		where: { userId },
 		data: {
-			planName: `${nextPlan[0].toUpperCase()}${nextPlan.slice(1)} Plan`,
+			planName: activePlan.name || `${nextPlan[0].toUpperCase()}${nextPlan.slice(1)} Plan`,
 			price,
 			billingCycle: nextPlan === 'pro' ? 'yearly' : 'monthly',
 			status: 'active',
@@ -297,6 +802,18 @@ export const updatePatientSubscriptionPlan = async (userId: string, action: 'upg
 			renewalDate: new Date(new Date().getTime() + (nextPlan === 'pro' ? 365 : 30) * 24 * 60 * 60 * 1000),
 		},
 	});
+
+	if (String(updated.status || '').toLowerCase() === 'active') {
+		const user = await db.user.findUnique({ where: { id: userId }, select: { email: true, name: true, firstName: true, lastName: true } }).catch(() => null);
+		await sendSubscriptionActivationEmail({
+			to: String(user?.email || ''),
+			name: String(user?.name || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || ''),
+			planName: String(updated.planName || 'Standard Plan'),
+			priceInr: Math.round(Number(updated.price || 0) / 100),
+		});
+	}
+
+	return updated;
 };
 
 export const cancelPatientSubscription = async (userId: string) => {
@@ -312,14 +829,27 @@ export const cancelPatientSubscription = async (userId: string) => {
 
 export const reactivatePatientSubscription = async (userId: string) => {
 	await ensureSubscriptionRecord(userId);
-	return db.patientSubscription.update({
+	const activePlan = await getActivePlatformPlan();
+	const updated = await db.patientSubscription.update({
 		where: { userId },
 		data: {
+			planName: activePlan.name,
+			price: activePlan.price,
 			status: 'active',
 			autoRenew: true,
 			renewalDate: new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000),
 		},
 	});
+
+	const user = await db.user.findUnique({ where: { id: userId }, select: { email: true, name: true, firstName: true, lastName: true } }).catch(() => null);
+	await sendSubscriptionActivationEmail({
+		to: String(user?.email || ''),
+		name: String(user?.name || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || ''),
+		planName: String(updated.planName || activePlan.name || 'Standard Plan'),
+		priceInr: Math.round(Number(updated.price || activePlan.price || 0) / 100),
+	});
+
+	return updated;
 };
 
 export const setPatientSubscriptionAutoRenew = async (userId: string, autoRenew: boolean) => {
@@ -382,16 +912,51 @@ export const completePatientExercise = async (userId: string, exerciseId: string
 	return { id: exerciseId, status: 'COMPLETED' };
 };
 
+export const logWellnessLibraryActivity = async (
+	userId: string,
+	input: { title: string; duration?: number; category?: string; kind?: string },
+) => {
+	const patientProfile = await getPatientProfile(userId);
+	const title = String(input.title || '').trim();
+	if (!title) throw new AppError('title is required', 422);
+
+	const duration = Number.isFinite(input.duration) ? Math.max(1, Math.min(180, Math.round(Number(input.duration)))) : 5;
+	const kind = String(input.kind || 'resource').trim().toUpperCase() || 'RESOURCE';
+	const category = String(input.category || 'General').trim() || 'General';
+
+	const created = await db.patientExercise.create({
+		data: {
+			patientId: patientProfile.id,
+			title,
+			assignedBy: `WELLNESS_LIBRARY:${kind}:${category}`,
+			duration,
+			status: 'COMPLETED',
+		},
+	});
+
+	return {
+		id: created.id,
+		title: created.title,
+		status: created.status,
+		createdAt: created.createdAt,
+		wellnessPoints: 10,
+	};
+};
+
 export const listProviders = async (filters: ProviderFilters) => {
 	const { page, limit, skip } = normalizePagination(filters.page, filters.limit);
+	const requestedRole = normalizeProviderRole(filters.role);
+	const roleFilter = requestedRole
+		? [requestedRole]
+		: [...PROVIDER_ROLES];
 	const therapists = await db.user.findMany({
-		where: { role: 'THERAPIST', isDeleted: false },
-		select: { id: true, firstName: true, lastName: true, name: true },
+		where: { role: { in: roleFilter as any }, isDeleted: false },
+		select: { id: true, firstName: true, lastName: true, name: true, role: true, isDeleted: true, status: true, therapistProfile: true },
 		orderBy: { createdAt: 'desc' },
 		skip,
 		take: limit,
 	});
-	const total = await db.user.count({ where: { role: 'THERAPIST', isDeleted: false } });
+	const total = await db.user.count({ where: { role: { in: roleFilter as any }, isDeleted: false } });
 	let items = await Promise.all(therapists.map((u: any) => toProviderListItem(u)));
 
 	if (filters.specialization) {
@@ -411,14 +976,12 @@ export const listProviders = async (filters: ProviderFilters) => {
 	};
 };
 
-const slotCandidateMinutes = [10 * 60, 12 * 60, 16 * 60, 18 * 60];
-
 export const getProviderById = async (providerId: string) => {
 	const therapist = await db.user.findUnique({
 		where: { id: providerId },
-		select: { id: true, firstName: true, lastName: true, name: true, role: true, isDeleted: true },
+		select: { id: true, firstName: true, lastName: true, name: true, role: true, isDeleted: true, status: true, therapistProfile: true },
 	});
-	if (!therapist || therapist.isDeleted || String(therapist.role) !== 'THERAPIST') throw new AppError('Provider not found', 404);
+	if (!therapist || therapist.isDeleted || !normalizeProviderRole(String(therapist.role))) throw new AppError('Provider not found', 404);
 
 	const profile = await toProviderListItem(therapist);
 	const now = new Date();
@@ -427,20 +990,9 @@ export const getProviderById = async (providerId: string) => {
 		where: { therapistProfileId: providerId, dateTime: { gte: now, lte: end }, status: { in: ['PENDING', 'CONFIRMED'] } },
 		select: { dateTime: true },
 	});
-	const blocked = new Set(existing.map((s: any) => new Date(s.dateTime).toISOString()));
-	const availableSlots: string[] = [];
-
-	for (let day = 0; day < 7; day += 1) {
-		const d = new Date(now);
-		d.setDate(now.getDate() + day);
-		d.setSeconds(0, 0);
-		for (const minuteOfDay of slotCandidateMinutes) {
-			const slot = new Date(d);
-			slot.setHours(Math.floor(minuteOfDay / 60), minuteOfDay % 60, 0, 0);
-			if (slot <= now) continue;
-			if (!blocked.has(slot.toISOString())) availableSlots.push(slot.toISOString());
-		}
-	}
+	const blocked: Set<string> = new Set(existing.map((s: any) => new Date(s.dateTime).toISOString()));
+	const availability = normalizeAvailabilitySlots(therapist.therapistProfile?.availability);
+	const availableSlots = buildAvailableSlotsFromAvailability(availability, blocked, now);
 
 	return {
 		...profile,
@@ -459,15 +1011,48 @@ const generateAgoraDetails = (sessionId: string, scheduledAt: Date, durationMinu
 	return { channel, token, expireAt };
 };
 
-export const initiateSessionBooking = async (userId: string, input: { providerId: string; scheduledAt: Date; durationMinutes?: number; amountMinor?: number }) => {
+export const initiateSessionBooking = async (
+	userId: string,
+	input: {
+		providerId: string;
+		scheduledAt: Date;
+		durationMinutes?: number;
+		amountMinor?: number;
+		providerType?: string;
+		preferredTime?: boolean;
+		preferredWindow?: string;
+	},
+) => {
 	await getPatientProfile(userId);
-	const provider = await db.user.findUnique({ where: { id: input.providerId }, select: { id: true, role: true, isDeleted: true } });
-	if (!provider || provider.isDeleted || String(provider.role) !== 'THERAPIST') throw new AppError('Provider not found', 404);
+	const provider = await db.user.findUnique({
+		where: { id: input.providerId },
+		select: {
+			id: true,
+			role: true,
+			isDeleted: true,
+			therapistProfile: {
+				select: {
+					availability: true,
+				},
+			},
+		},
+	});
+	if (!provider || provider.isDeleted || !normalizeProviderRole(String(provider.role))) throw new AppError('Provider not found', 404);
 
 	const scheduledAt = new Date(input.scheduledAt);
 	if (Number.isNaN(scheduledAt.getTime()) || scheduledAt <= new Date()) throw new AppError('scheduledAt must be a future datetime', 422);
+	assertPaymentDeadlineWindow(scheduledAt);
 	const duration = input.durationMinutes && input.durationMinutes > 0 ? Math.min(180, Math.floor(input.durationMinutes)) : DEFAULT_DURATION_MINUTES;
-	const amountMinor = input.amountMinor && input.amountMinor > 0 ? Math.floor(input.amountMinor) : DEFAULT_SESSION_FEE_MINOR;
+	const availability = normalizeAvailabilitySlots(provider.therapistProfile?.availability);
+	if (!isWithinProviderAvailability(scheduledAt, availability, duration)) {
+		throw new AppError('Selected slot is outside provider working hours', 409);
+	}
+	const quote = await getSessionQuote({
+		providerType: input.providerType || roleToProviderType(provider.role),
+		durationMinutes: duration,
+		preferredTime: Boolean(input.preferredTime),
+	});
+	const amountMinor = quote.finalPrice;
 
 	const conflict = await db.therapySession.findFirst({
 		where: { therapistProfileId: input.providerId, dateTime: scheduledAt, status: { in: ['PENDING', 'CONFIRMED'] } },
@@ -485,18 +1070,27 @@ export const initiateSessionBooking = async (userId: string, input: { providerId
 			durationMinute: duration,
 			amountMinor,
 			currency: 'INR',
-			razorpayOrderId: payment.razorpayOrderId,
+			razorpayOrderId: payment.transactionId,
 			status: 'PENDING',
 		},
 	});
 
 	return {
-		order_id: payment.razorpayOrderId,
+		order_id: payment.transactionId,
 		amount: amountMinor,
 		currency: 'INR',
 		provider_id: input.providerId,
 		scheduled_at: scheduledAt.toISOString(),
-		duration_minutes: duration,
+		duration_minutes: quote.durationMinutes,
+		pricing: {
+			provider_type: quote.providerType,
+			provider_role: roleLabel(provider.role),
+			base_price: quote.basePrice,
+			surcharge_percent: quote.surchargePercent,
+			preferred_time: quote.preferredTime,
+			preferred_window: input.preferredWindow || null,
+			final_price: quote.finalPrice,
+		},
 	};
 };
 
@@ -504,20 +1098,44 @@ export const verifySessionPaymentAndCreateSession = async (
 	userId: string,
 	input: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string },
 ) => {
-	const secret = process.env.RAZORPAY_KEY_SECRET;
-	if (!secret) throw new AppError('Razorpay key secret not configured', 500);
+	const allowDevBypass = env.allowDevPaymentBypass && env.nodeEnv === 'development';
+	if (!allowDevBypass) {
+		const secret = process.env.RAZORPAY_KEY_SECRET;
+		if (!secret) throw new AppError('Razorpay key secret not configured', 500);
 
-	const isValid = verifyRazorpayPaymentSignature(input.razorpay_order_id, input.razorpay_payment_id, input.razorpay_signature, secret);
-	if (!isValid) throw new AppError('Invalid Razorpay signature', 401);
+		const isValid = verifyRazorpayPaymentSignature(
+			input.razorpay_order_id,
+			input.razorpay_payment_id,
+			input.razorpay_signature,
+			secret,
+		);
+		if (!isValid) throw new AppError('Invalid Razorpay signature', 401);
+	}
 
 	const intent = await db.sessionBookingIntent.findUnique({ where: { razorpayOrderId: input.razorpay_order_id } });
 	if (!intent || String(intent.patientId) !== userId) throw new AppError('Booking intent not found', 404);
+	assertPaymentDeadlineWindow(new Date(intent.scheduledAt));
 	if (String(intent.status) === 'CONFIRMED' && intent.sessionId) {
 		const existing = await db.therapySession.findUnique({ where: { id: intent.sessionId } });
 		if (existing) return { sessionId: existing.id, status: 'confirmed', agora_channel: existing.agoraChannel, agora_token: existing.agoraToken };
 	}
 
 	const patientProfile = await getPatientProfile(userId);
+	const provider = await db.user.findUnique({
+		where: { id: intent.providerId },
+		select: {
+			id: true,
+			therapistProfile: {
+				select: {
+					availability: true,
+				},
+			},
+		},
+	});
+	const availability = normalizeAvailabilitySlots(provider?.therapistProfile?.availability);
+	if (!isWithinProviderAvailability(new Date(intent.scheduledAt), availability, Number(intent.durationMinute) || DEFAULT_DURATION_MINUTES)) {
+		throw new AppError('Selected slot is outside provider working hours', 409);
+	}
 	const conflict = await db.therapySession.findFirst({
 		where: { therapistProfileId: intent.providerId, dateTime: intent.scheduledAt, status: { in: ['PENDING', 'CONFIRMED'] } },
 		select: { id: true },
@@ -610,6 +1228,157 @@ export const verifySessionPaymentAndCreateSession = async (
 	};
 };
 
+export const therapistProposeAppointmentSlot = async (
+	therapistId: string,
+	input: { requestRef: string; proposedStartAt: string; note?: string },
+) => {
+	const requestRef = String(input.requestRef || '').trim();
+	const proposedStartAt = new Date(input.proposedStartAt);
+	if (!requestRef) throw new AppError('requestRef is required', 422);
+	if (Number.isNaN(proposedStartAt.getTime()) || proposedStartAt <= new Date()) {
+		throw new AppError('proposedStartAt must be a future datetime', 422);
+	}
+
+	const providerRequests = await db.notification.findMany({
+		where: { userId: therapistId, type: 'APPOINTMENT_REQUEST' },
+		orderBy: { createdAt: 'desc' },
+		take: 100,
+	});
+	const requestNotification = providerRequests.find((item: any) => String(item?.payload?.requestRef || '') === requestRef);
+	if (!requestNotification) {
+		throw new AppError('Appointment request not found for this provider', 404);
+	}
+
+	const patientId = String(requestNotification?.payload?.patientId || '').trim();
+	if (!patientId) throw new AppError('Appointment request is invalid', 422);
+
+	await db.notification.update({
+		where: { id: requestNotification.id },
+		data: {
+			payload: {
+				...(requestNotification.payload || {}),
+				requestStatus: 'PROPOSED_SLOT',
+				proposedStartAt: proposedStartAt.toISOString(),
+				note: input.note || null,
+			},
+		},
+	});
+
+	await db.notification.create({
+		data: {
+			userId: patientId,
+			type: 'APPOINTMENT_SLOT_PROPOSED',
+			title: 'Provider proposed a new slot',
+			message: 'Your selected provider proposed a slot. Confirm to continue to payment and final booking.',
+			payload: {
+				requestRef,
+				providerId: therapistId,
+				proposedStartAt: proposedStartAt.toISOString(),
+				note: input.note || null,
+				requestStatus: 'WAITING_PATIENT_CONFIRMATION',
+			},
+			sentAt: new Date(),
+		},
+	});
+
+	return {
+		requestRef,
+		providerId: therapistId,
+		proposedStartAt: proposedStartAt.toISOString(),
+		status: 'waiting_patient_confirmation',
+	};
+};
+
+export const patientConfirmProposedAppointmentSlot = async (
+	patientUserId: string,
+	input: { requestRef: string; providerId: string; proposedStartAt?: string; accept: boolean },
+) => {
+	const requestRef = String(input.requestRef || '').trim();
+	const providerId = String(input.providerId || '').trim();
+	if (!requestRef || !providerId) {
+		throw new AppError('requestRef and providerId are required', 422);
+	}
+
+	const proposals = await db.notification.findMany({
+		where: { userId: patientUserId, type: 'APPOINTMENT_SLOT_PROPOSED' },
+		orderBy: { createdAt: 'desc' },
+		take: 100,
+	});
+	const proposal = proposals.find(
+		(item: any) => String(item?.payload?.requestRef || '') === requestRef && String(item?.payload?.providerId || '') === providerId,
+	);
+	if (!proposal) {
+		throw new AppError('Proposed appointment slot not found', 404);
+	}
+
+	if (!input.accept) {
+		await db.notification.create({
+			data: {
+				userId: providerId,
+				type: 'APPOINTMENT_SLOT_REJECTED',
+				title: 'Patient declined proposed slot',
+				message: 'Patient declined the proposed slot. Please offer another suitable time.',
+				payload: { requestRef, patientId: patientUserId },
+				sentAt: new Date(),
+			},
+		});
+
+		await db.notification.update({ where: { id: proposal.id }, data: { isRead: true } });
+		return { requestRef, status: 'declined' };
+	}
+
+	const proposedStartAtIso = String(input.proposedStartAt || proposal?.payload?.proposedStartAt || '').trim();
+	const proposedStartAt = new Date(proposedStartAtIso);
+	if (!proposedStartAtIso || Number.isNaN(proposedStartAt.getTime())) {
+		throw new AppError('Valid proposedStartAt is required', 422);
+	}
+
+	const booking = await initiateSessionBooking(patientUserId, {
+		providerId,
+		scheduledAt: proposedStartAt,
+		preferredTime: false,
+		preferredWindow: 'Provider proposed slot',
+	});
+
+	await db.notification.createMany({
+		data: [
+			{
+				userId: patientUserId,
+				type: 'APPOINTMENT_SLOT_CONFIRMED',
+				title: 'Slot confirmed - payment pending',
+				message: `Complete payment before ${PAYMENT_DEADLINE_HOURS} hours of the session start to finalize your booking.`,
+				payload: {
+					requestRef,
+					providerId,
+					scheduledAt: proposedStartAt.toISOString(),
+					orderId: booking.order_id,
+				},
+				sentAt: new Date(),
+			},
+			{
+				userId: providerId,
+				type: 'APPOINTMENT_SLOT_ACCEPTED',
+				title: 'Patient accepted proposed slot',
+				message: 'Patient accepted your proposed slot and is proceeding to payment.',
+				payload: {
+					requestRef,
+					patientId: patientUserId,
+					scheduledAt: proposedStartAt.toISOString(),
+				},
+				sentAt: new Date(),
+			},
+		],
+	});
+
+	await db.notification.update({ where: { id: proposal.id }, data: { isRead: true } });
+
+	return {
+		requestRef,
+		status: 'accepted',
+		booking,
+	};
+};
+
 export const getUpcomingSessions = async (userId: string) => {
 	const patientProfile = await getPatientProfile(userId);
 	const now = new Date();
@@ -621,6 +1390,7 @@ export const getUpcomingSessions = async (userId: string) => {
 			bookingReferenceId: true,
 			dateTime: true,
 			status: true,
+			isLocked: true,
 			durationMinutes: true,
 			sessionFeeMinor: true,
 			agoraChannel: true,
@@ -633,6 +1403,7 @@ export const getUpcomingSessions = async (userId: string) => {
 		booking_reference: s.bookingReferenceId,
 		scheduled_at: s.dateTime,
 		status: String(s.status).toLowerCase(),
+		is_locked: Boolean(s.isLocked),
 		duration_minutes: s.durationMinutes,
 		session_fee: Number(s.sessionFeeMinor),
 		agora_channel: s.agoraChannel,
@@ -651,6 +1422,7 @@ export const getSessionHistory = async (userId: string) => {
 			bookingReferenceId: true,
 			dateTime: true,
 			status: true,
+			isLocked: true,
 			durationMinutes: true,
 			sessionFeeMinor: true,
 			paymentStatus: true,
@@ -662,6 +1434,7 @@ export const getSessionHistory = async (userId: string) => {
 		booking_reference: s.bookingReferenceId,
 		scheduled_at: s.dateTime,
 		status: String(s.status).toLowerCase(),
+		is_locked: Boolean(s.isLocked),
 		duration_minutes: s.durationMinutes,
 		session_fee: Number(s.sessionFeeMinor),
 		payment_status: s.paymentStatus,
@@ -827,6 +1600,7 @@ export const submitAssessment = async (userId: string, input: { type: string; sc
 	const computedScore = typeof input.score === 'number' ? Math.max(0, Math.floor(input.score)) : (input.answers || []).reduce((a, b) => a + Number(b || 0), 0);
 	const answers = Array.isArray(input.answers) && input.answers.length > 0 ? input.answers.map((v) => Number(v || 0)) : [computedScore];
 	const severity = mapSeverity(computedScore);
+	const journey = buildJourneyRecommendation({ type: input.type, score: computedScore, answers });
 	const created = await db.patientAssessment.create({
 		data: {
 			patientId: patientProfile.id,
@@ -848,11 +1622,18 @@ export const submitAssessment = async (userId: string, input: { type: string; sc
 		},
 	});
 
+	await syncTreatmentPlanFromAssessment(userId, {
+		assessmentType: input.type,
+		score: created.totalScore,
+		severity: created.severityLevel,
+	}).catch(() => null);
+
 	return {
 		id: created.id,
 		type: created.type,
 		score: created.totalScore,
 		result_level: created.severityLevel,
+		journey,
 		recommendation:
 			severity === 'Severe'
 				? 'Please schedule a therapist session within 24 hours.'
@@ -862,11 +1643,95 @@ export const submitAssessment = async (userId: string, input: { type: string; sc
 	};
 };
 
-export const createMoodLog = async (userId: string, input: { mood: number; note?: string }) => {
+export const submitPHQ9Assessment = async (userId: string, answers: number[]) => {
+	const patientProfile = await getPatientProfile(userId);
+	const scored = scorePHQ9(answers);
+	
+	const created = await db.pHQ9Assessment.create({
+		data: {
+			userId: patientProfile.userId,
+			answers,
+			totalScore: scored.total,
+			q9Score: scored.q9Score,
+			severity: scored.severity,
+			riskWeight: scored.riskWeight,
+			q9CrisisFlag: scored.q9CrisisFlag,
+		},
+	});
+
+	if (scored.q9CrisisFlag) {
+		await db.notification.create({
+			data: {
+				userId,
+				type: 'CRISIS_ALERT',
+				title: 'Safety check needed',
+				message: 'Your recent check-in indicated you may be struggling with safety. Please contact support.',
+				payload: { assessmentId: created.id, severity: scored.severity, urgent: true },
+				sentAt: new Date(),
+			},
+		});
+	}
+
+	return {
+		id: created.id,
+		score: created.totalScore,
+		severity: created.severity,
+		crisisFlag: created.q9CrisisFlag,
+	};
+};
+
+export const getLatestJourneyRecommendation = async (userId: string) => {
+	const patientProfile = await getPatientProfile(userId);
+	const latest = await db.patientAssessment.findFirst({
+		where: { patientId: patientProfile.id },
+		orderBy: { createdAt: 'desc' },
+		select: {
+			id: true,
+			type: true,
+			answers: true,
+			totalScore: true,
+			severityLevel: true,
+			createdAt: true,
+		},
+	});
+
+	if (!latest) {
+		throw new AppError('No assessments found for journey recommendation', 404);
+	}
+
+	const answers = Array.isArray(latest.answers) ? latest.answers.map((value: number) => Number(value || 0)) : [];
+	const score = Number(latest.totalScore || 0);
+
+	return {
+		assessment: {
+			id: latest.id,
+			type: latest.type,
+			score,
+			severityLevel: latest.severityLevel,
+			createdAt: latest.createdAt,
+		},
+		journey: buildJourneyRecommendation({
+			type: latest.type,
+			score,
+			answers,
+		}),
+	};
+};
+
+export const createMoodLog = async (userId: string, input: { mood: number; note?: string; intensity?: number; tags?: string[]; energy?: string; sleepHours?: string }) => {
 	const patientProfile = await getPatientProfile(userId);
 	if (!Number.isFinite(input.mood) || input.mood < 1 || input.mood > 5) throw new AppError('mood must be between 1 and 5', 422);
+	if (input.intensity !== undefined && (!Number.isFinite(input.intensity) || Number(input.intensity) < 1 || Number(input.intensity) > 10)) {
+		throw new AppError('intensity must be between 1 and 10', 422);
+	}
 	const moodValue = Math.floor(input.mood);
-	const note = input.note?.trim() || null;
+	const note = buildDailyCheckInNote({
+		journal: input.note,
+		tags: input.tags,
+		intensity: input.intensity,
+		energy: input.energy,
+		sleepHours: input.sleepHours,
+	});
 	const now = new Date();
 
 	let created: any | null = null;
@@ -900,34 +1765,61 @@ export const createMoodLog = async (userId: string, input: { mood: number; note?
 			.catch(() => null);
 	}
 
-	return {
+	await Promise.allSettled([
+		markDailyCheckInTaskComplete(patientProfile.id),
+		maybeCreateLowMoodAlert(userId, patientProfile.id),
+	]);
+
+	const mapped = mapMoodRow({
 		id: created?.id || moodLog?.id,
 		mood: Number(created?.moodScore ?? moodLog?.moodValue ?? moodValue),
 		note: created?.note ?? moodLog?.note ?? note,
 		created_at: created?.createdAt ?? moodLog?.createdAt ?? now,
-	};
+	});
+
+	return mapped;
 };
 
 export const getMoodHistory = async (userId: string) => {
 	const patientProfile = await getPatientProfile(userId);
-	const patientMoodModel = db.patientMoodEntry;
-	if (patientMoodModel && typeof patientMoodModel.findMany === 'function') {
-		const rows = await patientMoodModel.findMany({ where: { patientId: patientProfile.id }, orderBy: { date: 'desc' }, take: 60 });
-		return rows.map((r: any) => ({ id: r.id, mood: r.moodScore, note: r.note, created_at: r.createdAt }));
-	}
+	const [patientMoodRows, moodLogRows, dailyCheckIns] = await Promise.all([
+		db.patientMoodEntry.findMany({
+			where: { patientId: patientProfile.id },
+			orderBy: { date: 'desc' },
+			take: 60,
+		}).catch(() => []),
+		db.moodLog.findMany({
+			where: { userId },
+			orderBy: { loggedAt: 'desc' },
+			take: 60,
+		}).catch(() => []),
+		db.dailyCheckIn.findMany({
+			where: { patientId: userId },
+			orderBy: { date: 'desc' },
+			take: 60,
+		}).catch(() => []),
+	]);
 
-	const moodLogModel = db.moodLog;
-	if (!moodLogModel || typeof moodLogModel.findMany !== 'function') {
-		return [];
-	}
+	const unified: any[] = [
+		...patientMoodRows.map((r: any) => mapMoodRow({ id: r.id, mood: r.moodScore, note: r.note, created_at: r.createdAt || r.date })),
+		...moodLogRows.map((r: any) => mapMoodRow({ id: r.id, mood: Number(r.moodValue || 0), note: r.note, created_at: r.createdAt || r.loggedAt })),
+		...dailyCheckIns.map((r: any) => mapMoodRow({
+			id: r.id,
+			mood: Number(r.mood || 0),
+			note: r.reflectionGood || r.intention || '',
+			created_at: r.createdAt || r.date,
+			metadata: {
+				tags: r.context || [],
+				energy: r.energy ? (['low', 'medium', 'high'][r.energy - 1] || 'medium') : undefined,
+				sleepHours: r.sleep ? String(r.sleep) : undefined,
+				stressLevel: r.stressLevel || undefined,
+			},
+		})),
+	];
 
-	const moodLogRows = await moodLogModel.findMany({ where: { userId }, orderBy: { loggedAt: 'desc' }, take: 60 }).catch(() => []);
-	return moodLogRows.map((row: any) => ({
-		id: row.id,
-		mood: Number(row.moodValue || 0),
-		note: row.note,
-		created_at: row.createdAt || row.loggedAt,
-	}));
+	return unified
+		.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+		.slice(0, 60);
 };
 
 export const getMoodToday = async (userId: string) => {
@@ -951,37 +1843,31 @@ export const getMoodToday = async (userId: string) => {
 
 export const getMoodStats = async (userId: string) => {
 	const history = await getMoodHistory(userId);
+	const emptyStats = {
+		totalCheckins: 0,
+		averageMood: 0,
+		last7DaysAverage: 0,
+		last30DaysAverage: 0,
+		currentStreak: 0,
+		longestStreak: 0,
+		highestMood: 0,
+		lowestMood: 0,
+		insights: [] as string[],
+	};
 	if (!history.length) {
-		return {
-			totalCheckins: 0,
-			averageMood: 0,
-			last7DaysAverage: 0,
-			last30DaysAverage: 0,
-			currentStreak: 0,
-			longestStreak: 0,
-			highestMood: 0,
-			lowestMood: 0,
-		};
+		return emptyStats;
 	}
 
 	const rows = history
 		.map((entry: any) => ({
 			mood: Number(entry.mood || 0),
 			createdAt: new Date(entry.created_at),
+			metadata: entry.metadata || { tags: [] },
 		}))
 		.filter((entry: any) => Number.isFinite(entry.mood) && !Number.isNaN(entry.createdAt.getTime()));
 
 	if (!rows.length) {
-		return {
-			totalCheckins: 0,
-			averageMood: 0,
-			last7DaysAverage: 0,
-			last30DaysAverage: 0,
-			currentStreak: 0,
-			longestStreak: 0,
-			highestMood: 0,
-			lowestMood: 0,
-		};
+		return emptyStats;
 	}
 
 	const average = (items: any[]) =>
@@ -1047,12 +1933,13 @@ export const getMoodStats = async (userId: string) => {
 		longestStreak,
 		highestMood: Math.max(...rows.map((entry: any) => entry.mood)),
 		lowestMood: Math.min(...rows.map((entry: any) => entry.mood)),
+		insights: buildDailyCheckInInsights(history),
 	};
 };
 
 export const getPatientProgressAnalytics = async (userId: string) => {
 	const patientProfile = await getPatientProfile(userId);
-	const [sessions, exercises, assessments, moodHistory] = await Promise.all([
+	const [sessions, exercises, legacyAssessments, phqAssessments, gadAssessments, moodHistory] = await Promise.all([
 		db.therapySession.findMany({
 			where: { patientProfileId: patientProfile.id },
 			select: { id: true, status: true, dateTime: true },
@@ -1069,8 +1956,26 @@ export const getPatientProgressAnalytics = async (userId: string) => {
 			orderBy: { createdAt: 'asc' },
 			take: 20,
 		}),
+		db.pHQ9Assessment.findMany({
+			where: { userId: patientProfile.userId },
+			select: { id: true, totalScore: true, severity: true, createdAt: true },
+			orderBy: { createdAt: 'asc' },
+			take: 20,
+		}).catch(() => []),
+		db.gAD7Assessment.findMany({
+			where: { userId: patientProfile.userId },
+			select: { id: true, totalScore: true, severity: true, createdAt: true },
+			orderBy: { createdAt: 'asc' },
+			take: 20,
+		}).catch(() => []),
 		getMoodHistory(userId),
 	]);
+
+	const assessments: any[] = [
+		...legacyAssessments,
+		...phqAssessments.map(a => ({ id: a.id, type: 'PHQ-9', totalScore: a.totalScore, severityLevel: a.severity, createdAt: a.createdAt })),
+		...gadAssessments.map(a => ({ id: a.id, type: 'GAD-7', totalScore: a.totalScore, severityLevel: a.severity, createdAt: a.createdAt })),
+	].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
 	const totalSessions = sessions.length;
 	const completedSessions = sessions.filter((session: any) => String(session.status).toUpperCase() === 'COMPLETED').length;
@@ -1133,6 +2038,352 @@ export const getPatientProgressAnalytics = async (userId: string) => {
 	};
 };
 
+export const getPatientInsights = async (userId: string) => {
+	const analytics = await getPatientProgressAnalytics(userId);
+	const assessmentRows = Array.isArray(analytics.assessmentTrend) ? analytics.assessmentTrend : [];
+	const moodRows = Array.isArray(analytics.moodTrend) ? analytics.moodTrend : [];
+
+	const assessmentTrendMap = new Map<string, { date: string; phq9Score: number; gad7Score: number }>();
+	for (const row of assessmentRows) {
+		const dateKey = new Date(row.createdAt).toISOString().slice(0, 10);
+		const current = assessmentTrendMap.get(dateKey) || { date: dateKey, phq9Score: 0, gad7Score: 0 };
+		if (String(row.type || '').toUpperCase() === 'PHQ-9') current.phq9Score = Number(row.score || 0);
+		if (String(row.type || '').toUpperCase() === 'GAD-7') current.gad7Score = Number(row.score || 0);
+		assessmentTrendMap.set(dateKey, current);
+	}
+
+	const gad7Rows = assessmentRows.filter((row: any) => String(row.type || '').toUpperCase() === 'GAD-7');
+	const firstGad7 = gad7Rows[0] ? Number(gad7Rows[0].score || 0) : 0;
+	const latestGad7 = gad7Rows.length ? Number(gad7Rows[gad7Rows.length - 1].score || 0) : 0;
+	const anxietyReduction = firstGad7 > 0 ? Math.max(0, Math.round(((firstGad7 - latestGad7) / firstGad7) * 100)) : 0;
+
+	const recommendations: string[] = [];
+	if (analytics.summary.sessionCompletionRate < 70) recommendations.push('Try to keep a fixed weekly session slot to improve continuity.');
+	if (analytics.summary.exerciseCompletionRate < 60) recommendations.push('Complete at least one therapeutic exercise every two days for steady progress.');
+	if (anxietyReduction < 10 && gad7Rows.length >= 2) recommendations.push('Discuss anxiety coping strategies with your therapist in the next session.');
+	if (!recommendations.length) recommendations.push('Great momentum. Continue your current therapy plan and mood check-ins.');
+
+	return {
+		moodImprovement: Math.max(0, Math.min(100, Math.round((Number(moodRows[moodRows.length - 1]?.averageMood || 0) / 5) * 100))),
+		sessionAttendance: Number(analytics.summary.sessionCompletionRate || 0),
+		exerciseCompletion: Number(analytics.summary.exerciseCompletionRate || 0),
+		anxietyReduction,
+		moodTrend: moodRows.map((row: any) => ({ date: row.week, score: Number(row.averageMood || 0) })),
+		assessmentTrend: [...assessmentTrendMap.values()].sort((a, b) => a.date.localeCompare(b.date)),
+		recommendations,
+	};
+};
+
+export const getPatientReports = async (userId: string) => {
+	const patientProfile = await getPatientProfile(userId);
+
+	const [legacyAssessments, phqAssessments, gadAssessments, sessions] = await Promise.all([
+		db.patientAssessment.findMany({
+			where: { patientId: patientProfile.id },
+			orderBy: { createdAt: 'desc' },
+			take: 12,
+			select: { id: true, type: true, totalScore: true, severityLevel: true, createdAt: true },
+		}),
+		db.pHQ9Assessment.findMany({
+			where: { userId: patientProfile.userId },
+			orderBy: { createdAt: 'desc' },
+			take: 12,
+			select: { id: true, totalScore: true, severity: true, createdAt: true },
+		}).catch(() => []),
+		db.gAD7Assessment.findMany({
+			where: { userId: patientProfile.userId },
+			orderBy: { createdAt: 'desc' },
+			take: 12,
+			select: { id: true, totalScore: true, severity: true, createdAt: true },
+		}).catch(() => []),
+		db.therapySession.findMany({
+			where: { patientProfileId: patientProfile.id, status: 'COMPLETED' },
+			orderBy: { dateTime: 'desc' },
+			take: 8,
+			select: {
+				id: true,
+				dateTime: true,
+				therapistProfile: { select: { firstName: true, lastName: true, name: true, role: true } },
+			},
+		}),
+	]);
+
+	const assessments = [
+		...legacyAssessments,
+		...phqAssessments.map(a => ({ id: a.id, type: 'PHQ-9', totalScore: a.totalScore, severityLevel: a.severity, createdAt: a.createdAt })),
+		...gadAssessments.map(a => ({ id: a.id, type: 'GAD-7', totalScore: a.totalScore, severityLevel: a.severity, createdAt: a.createdAt })),
+	].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+	const assessmentReports = assessments.map((item: any) => ({
+		id: `assessment-${item.id}`,
+		type: 'assessment',
+		bucket: 'clinical_assessments',
+		title: `${String(item.type || 'Assessment')} Report`,
+		createdAt: item.createdAt,
+		summary: `Score ${Number(item.totalScore || 0)} (${String(item.severityLevel || 'unknown')}).`,
+		providerName: 'MANAS360 Clinical Engine',
+	}));
+
+	const sessionReports = sessions.map((session: any) => ({
+		id: `session-${session.id}`,
+		type: 'session_summary',
+		bucket: 'session_notes',
+		title: 'Session Summary',
+		createdAt: session.dateTime,
+		summary: 'Completed therapy session summary available for review.',
+		providerName: String(session.therapistProfile?.name || `${session.therapistProfile?.firstName || ''} ${session.therapistProfile?.lastName || ''}`.trim() || 'Therapist'),
+		providerRole: String(session.therapistProfile?.role || '').toLowerCase(),
+	}));
+
+	const officialLetters = sessions
+		.filter((session: any) => String(session.therapistProfile?.role || '').toLowerCase() === 'psychiatrist')
+		.slice(0, 4)
+		.map((session: any) => ({
+			id: `letter-${session.id}`,
+			type: 'official_letter',
+			bucket: 'prescriptions_letters',
+			title: 'Psychiatric Prescription / Letter',
+			createdAt: session.dateTime,
+			summary: 'Official psychiatrist document record.',
+			providerName: String(session.therapistProfile?.name || `${session.therapistProfile?.firstName || ''} ${session.therapistProfile?.lastName || ''}`.trim() || 'Psychiatrist'),
+			providerRole: 'psychiatrist',
+		}));
+
+	return [...officialLetters, ...assessmentReports, ...sessionReports]
+		.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+		.slice(0, 24);
+};
+
+type RecordAccessPayload = {
+	userId: string;
+	recordId: string;
+	action: 'view' | 'download' | 'share';
+	exp: number;
+};
+
+const encodeRecordToken = (payload: RecordAccessPayload): string => {
+	const raw = Buffer.from(JSON.stringify(payload)).toString('base64url');
+	const sig = crypto.createHmac('sha256', env.jwtAccessSecret).update(raw).digest('base64url');
+	return `${raw}.${sig}`;
+};
+
+const decodeRecordToken = (token: string): RecordAccessPayload => {
+	const [raw, sig] = String(token || '').split('.');
+	if (!raw || !sig) throw new AppError('Invalid access token', 401);
+	const expected = crypto.createHmac('sha256', env.jwtAccessSecret).update(raw).digest('base64url');
+	if (expected !== sig) throw new AppError('Invalid access token', 401);
+	const parsed = JSON.parse(Buffer.from(raw, 'base64url').toString('utf-8')) as RecordAccessPayload;
+	if (!parsed.exp || Date.now() > parsed.exp) throw new AppError('Access token expired', 401);
+	return parsed;
+};
+
+export const resolveClinicalRecord = async (userId: string, recordId: string) => {
+	const patientProfile = await getPatientProfile(userId);
+	const rawId = String(recordId || '').trim();
+
+	if (rawId.startsWith('session-')) {
+		const sessionId = rawId.replace('session-', '');
+		const session = await db.therapySession.findFirst({
+			where: { id: sessionId, patientProfileId: patientProfile.id },
+			select: {
+				id: true,
+				dateTime: true,
+				status: true,
+				durationMinutes: true,
+				bookingReferenceId: true,
+				therapistProfile: { select: { firstName: true, lastName: true, name: true, role: true } },
+			},
+		});
+		if (!session) throw new AppError('Record not found', 404);
+		return {
+			kind: 'session' as const,
+			recordId: rawId,
+			title: 'Session Summary',
+			date: session.dateTime,
+			sessionId,
+			providerName: String(session.therapistProfile?.name || `${session.therapistProfile?.firstName || ''} ${session.therapistProfile?.lastName || ''}`.trim() || 'Therapist'),
+			status: session.status,
+			durationMinutes: Number(session.durationMinutes || 0),
+		};
+	}
+
+	if (rawId.startsWith('assessment-')) {
+		const assessmentId = rawId.replace('assessment-', '');
+		const assessment = await db.patientAssessment.findFirst({
+			where: { id: assessmentId, patientId: patientProfile.id },
+			select: { id: true, type: true, totalScore: true, severityLevel: true, createdAt: true },
+		});
+		if (!assessment) throw new AppError('Record not found', 404);
+		return {
+			kind: 'assessment' as const,
+			recordId: rawId,
+			title: `${String(assessment.type || 'Assessment')} Report`,
+			date: assessment.createdAt,
+			assessmentId,
+			type: String(assessment.type || 'Assessment'),
+			totalScore: Number(assessment.totalScore || 0),
+			severityLevel: String(assessment.severityLevel || 'unknown'),
+		};
+	}
+
+	throw new AppError('Unsupported record type', 422);
+};
+
+export const createSecureRecordToken = (
+	userId: string,
+	recordId: string,
+	action: 'view' | 'download' | 'share',
+	ttlSeconds: number,
+) => {
+	const exp = Date.now() + Math.max(30, ttlSeconds) * 1000;
+	const token = encodeRecordToken({ userId, recordId, action, exp });
+	return { token, expiresAt: new Date(exp).toISOString() };
+};
+
+export const verifySecureRecordToken = (token: string) => decodeRecordToken(token);
+
+export const getCompleteHealthSummaryData = async (userId: string) => {
+	const patientProfile = await getPatientProfile(userId);
+	const [moodStats, moodHistory, careTeam, assessments, sessions] = await Promise.all([
+		getMoodStats(userId).catch(() => null),
+		getMoodHistory(userId).catch(() => []),
+		getMyCareTeamProviders(userId).catch(() => []),
+		db.patientAssessment.findMany({
+			where: { patientId: patientProfile.id },
+			orderBy: { createdAt: 'desc' },
+			take: 10,
+			select: { type: true, totalScore: true, severityLevel: true, createdAt: true },
+		}),
+		db.therapySession.findMany({
+			where: { patientProfileId: patientProfile.id, status: 'COMPLETED' },
+			orderBy: { dateTime: 'desc' },
+			take: 10,
+			select: { id: true, dateTime: true },
+		}),
+	]);
+
+	const latestPhq9 = assessments.find((a: any) => String(a.type || '').toUpperCase() === 'PHQ-9') || null;
+	const latestGad7 = assessments.find((a: any) => String(a.type || '').toUpperCase() === 'GAD-7') || null;
+
+	const recentMoodRows = (Array.isArray(moodHistory) ? moodHistory : [])
+		.map((row: any) => ({
+			date: new Date(row.created_at || row.createdAt || row.date),
+			mood: Number(row.mood || 0),
+		}))
+		.filter((row: any) => !Number.isNaN(row.date.getTime()))
+		.sort((a: any, b: any) => a.date.getTime() - b.date.getTime())
+		.slice(-30);
+
+	return {
+		patientName: String(patientProfile.user?.name || `${patientProfile.user?.firstName || ''} ${patientProfile.user?.lastName || ''}`.trim() || 'Patient'),
+		generatedAt: new Date().toISOString(),
+		latestPhq9,
+		latestGad7,
+		careTeam: Array.isArray(careTeam) ? careTeam : [],
+		sessionsCompletedLast30Days: sessions.filter((s: any) => new Date(s.dateTime).getTime() >= Date.now() - 30 * 24 * 60 * 60 * 1000).length,
+		moodStats: moodStats || {},
+		recentMoodRows,
+	};
+};
+
+export const getMyCareTeamProviders = async (userId: string) => {
+	const patientProfile = await getPatientProfile(userId);
+	const lastPhq9 = await db.pHQ9Assessment.findFirst({
+		where: { userId },   // userId is the User.id FK — use it directly, not patientProfile.userId (undefined)
+		orderBy: { assessedAt: 'desc' },
+		select: { severity: true, totalScore: true, assessedAt: true }
+	}).catch(() => null);
+	const sessions = await db.therapySession.findMany({
+		where: { patientProfileId: patientProfile.id },
+		orderBy: { dateTime: 'desc' },
+		select: {
+			id: true,
+			dateTime: true,
+			status: true,
+			therapistProfileId: true,
+			therapistProfile: { select: { id: true, firstName: true, lastName: true, name: true, role: true } },
+		},
+		take: 60,
+	});
+
+	const now = new Date();
+	const providerIds = Array.from(new Set<string>(sessions.map((s: any) => String(s.therapistProfileId || '')).filter(Boolean)));
+	if (!providerIds.length) return [];
+
+	const providerUsers = await db.user.findMany({
+		where: { id: { in: providerIds } },
+		select: { id: true, firstName: true, lastName: true, name: true, role: true },
+	});
+	const providerMeta = new Map<string, any>();
+	for (const user of providerUsers) {
+		providerMeta.set(String(user.id), await toProviderListItem(user));
+	}
+
+	return providerIds.map((therapistProfileId: string) => {
+		const providerSessions = sessions
+			.filter((s: any) => String(s.therapistProfileId) === therapistProfileId)
+			.sort((a: any, b: any) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
+		const nextSession = providerSessions.find((s: any) => new Date(s.dateTime) >= now);
+		const latest = providerSessions[providerSessions.length - 1];
+		const userId = therapistProfileId;
+		const meta = userId ? providerMeta.get(String(userId)) : null;
+
+		const providerName = String(latest?.therapistProfile?.name || `${latest?.therapistProfile?.firstName || ''} ${latest?.therapistProfile?.lastName || ''}`.trim() || 'Provider');
+		let latestPhq9Assessment: string | null = null;
+		if (lastPhq9) {
+			const formattedDate = new Date(lastPhq9.assessedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+			latestPhq9Assessment = `> 📊 PHQ-9 Score: ${lastPhq9.severity} (${lastPhq9.totalScore}/27) — Shared with ${providerName} on ${formattedDate}`;
+		}
+
+		return {
+			id: userId,
+			name: providerName,
+			role: roleLabel(latest?.therapistProfile?.role || meta?.role),
+			nextSession: nextSession
+				? {
+					date: new Date(nextSession.dateTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+					time: new Date(nextSession.dateTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+				}
+				: undefined,
+			latestPhq9Assessment,
+			specialization: Array.isArray(meta?.specializations) && meta.specializations.length ? meta.specializations : [meta?.specialization || 'General Wellness'],
+			canMessage: true,
+		};
+	});
+};
+
+export const listAvailableProvidersForPatient = async (
+	userId: string,
+	filters: ProviderFilters & { search?: string },
+) => {
+	await getPatientProfile(userId);
+	const result = await listProviders(filters);
+	let items = result.items.map((provider: any) => ({
+		id: provider.id,
+		name: provider.name,
+		role: provider.role || 'Therapist',
+		specialization: Array.isArray(provider.specializations) && provider.specializations.length
+			? provider.specializations
+			: [provider.specialization].filter(Boolean),
+		experience: Number(provider.experience_years || 0),
+		rating: Number(provider.rating_avg || 0),
+		reviewsCount: 0,
+		sessionPrice: Math.round(Number(provider.session_rate || 0) / 100),
+		language: Array.isArray(provider.languages) ? provider.languages : ['English'],
+		availability: 'Available this week',
+		location: 'Online',
+		bio: provider.bio || '',
+		providerType: provider.providerType || roleToProviderType(provider.role),
+	}));
+
+	if (filters.search) {
+		const q = filters.search.trim().toLowerCase();
+		items = items.filter((item: any) => item.name.toLowerCase().includes(q) || item.specialization.some((s: string) => s.toLowerCase().includes(q)));
+	}
+
+	return items;
+};
+
 export const chatWithAi = async (userId: string, input: { message: string }) => {
 	const message = String(input.message || '').trim();
 	if (!message) throw new AppError('message is required', 422);
@@ -1168,6 +2419,109 @@ export const markNotificationRead = async (userId: string, notificationId: strin
 	return { id: notificationId, is_read: true };
 };
 
+export const requestAppointmentWithPreferredProviders = async (
+	userId: string,
+	input: {
+		providerIds: string[];
+		preferredLanguage?: string;
+		preferredTime?: string;
+		preferredSpecialization?: string;
+		carePath?: string;
+		urgency?: string;
+		note?: string;
+	},
+) => {
+	const providerIds = Array.from(new Set((input.providerIds || []).map((id) => String(id || '').trim()).filter(Boolean)));
+	if (!providerIds.length) {
+		throw new AppError('At least one provider is required', 422);
+	}
+	if (providerIds.length > 3) {
+		throw new AppError('You can select up to 3 preferred providers', 422);
+	}
+
+	const [patientUser, providers] = await Promise.all([
+		db.user.findUnique({
+			where: { id: userId },
+			select: { id: true, name: true, firstName: true, lastName: true, email: true },
+		}),
+		db.user.findMany({
+			where: {
+				id: { in: providerIds },
+				isDeleted: false,
+				role: { in: ['THERAPIST', 'PSYCHIATRIST', 'COACH', 'PSYCHOLOGIST'] },
+			},
+			select: { id: true, name: true, firstName: true, lastName: true, role: true },
+		}),
+	]);
+
+	if (!patientUser) {
+		throw new AppError('Patient account not found', 404);
+	}
+	if (!providers.length) {
+		throw new AppError('No valid providers found for appointment request', 422);
+	}
+
+	const patientName = String(patientUser.name || `${patientUser.firstName || ''} ${patientUser.lastName || ''}`.trim() || 'Patient');
+	const requestRef = `APR-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+
+	await Promise.all([
+		...providers.map((provider: any) =>
+			db.notification.create({
+				data: {
+					userId: String(provider.id),
+					type: 'APPOINTMENT_REQUEST',
+					title: 'New Appointment Request',
+					message: `${patientName} selected you as a preferred provider.`,
+					payload: {
+						requestRef,
+						patientId: userId,
+						patientName,
+						carePath: input.carePath || 'direct-selection',
+						urgency: input.urgency || 'routine',
+						preferredLanguage: input.preferredLanguage || null,
+						preferredTime: input.preferredTime || null,
+						preferredSpecialization: input.preferredSpecialization || null,
+						note: input.note || null,
+						requestStatus: 'PENDING_PROVIDER_RESPONSE',
+					},
+					sentAt: new Date(),
+				},
+			}),
+		),
+		db.notification.create({
+			data: {
+				userId,
+				type: 'APPOINTMENT_REQUEST_SUBMITTED',
+				title: 'Appointment request submitted',
+				message: `Your request was sent to ${providers.length} preferred provider${providers.length > 1 ? 's' : ''}.`,
+				payload: {
+					requestRef,
+					providerIds: providers.map((provider: any) => String(provider.id)),
+					carePath: input.carePath || 'direct-selection',
+					urgency: input.urgency || 'routine',
+					preferredLanguage: input.preferredLanguage || null,
+					preferredTime: input.preferredTime || null,
+					preferredSpecialization: input.preferredSpecialization || null,
+					requestStatus: 'PENDING_PROVIDER_RESPONSE',
+				},
+				sentAt: new Date(),
+			},
+		}),
+	]);
+
+	return {
+		requestRef,
+		requestedAt: new Date().toISOString(),
+		providerCount: providers.length,
+		providers: providers.map((provider: any) => ({
+			id: String(provider.id),
+			name: String(provider.name || `${provider.firstName || ''} ${provider.lastName || ''}`.trim() || 'Provider'),
+			role: String(provider.role || '').toLowerCase(),
+		})),
+		nextStep: 'Providers can propose or confirm available slots. You can confirm the altered slot from your notifications before final booking.',
+	};
+};
+
 export const getPatientSettings = async (userId: string) => {
 	const [latestSnapshot, patientProfile, user] = await Promise.all([
 		db.notification.findFirst({
@@ -1189,11 +2543,15 @@ export const getPatientSettings = async (userId: string) => {
 
 	const mergedSettings = {
 		...(payloadSettings || {}),
+		profile: {
+			...((payloadSettings as any)?.profile || {}),
+			carrier: String((emergencyContact as any)?.carrier || (payloadSettings as any)?.profile?.carrier || ''),
+		},
 		therapy: {
 			...((payloadSettings as any)?.therapy || {}),
 			emergencyName: String((emergencyContact as any)?.name || (payloadSettings as any)?.therapy?.emergencyName || ''),
 			emergencyPhone: String((emergencyContact as any)?.phone || (payloadSettings as any)?.therapy?.emergencyPhone || ''),
-			emergencyRelationship: String((emergencyContact as any)?.relationship || (payloadSettings as any)?.therapy?.emergencyRelationship || ''),
+			emergencyRelationship: String((emergencyContact as any)?.relation || (emergencyContact as any)?.relationship || (payloadSettings as any)?.therapy?.emergencyRelationship || ''),
 		},
 		security: {
 			...((payloadSettings as any)?.security || {}),
@@ -1213,6 +2571,7 @@ export const updatePatientSettings = async (userId: string, settings: Record<str
 	const emergencyName = String(settings?.therapy?.emergencyName || '').trim();
 	const emergencyPhone = String(settings?.therapy?.emergencyPhone || '').trim();
 	const emergencyRelationship = String(settings?.therapy?.emergencyRelationship || '').trim();
+	const carrier = String(settings?.profile?.carrier || '').trim();
 
 	await Promise.all([
 		db.notification.create({
@@ -1238,7 +2597,8 @@ export const updatePatientSettings = async (userId: string, settings: Record<str
 				emergencyContact: {
 					name: emergencyName,
 					phone: emergencyPhone,
-					relationship: emergencyRelationship,
+					relation: emergencyRelationship,
+					carrier,
 				},
 			},
 		}).catch(() => ({ count: 0 })),

@@ -8,6 +8,7 @@ import { env } from '../config/env';
 import { prisma } from '../config/db';
 import client from 'prom-client';
 import os from 'os';
+import { sendDirectMessage, markConversationRead } from '../services/messaging.service';
 
 type JwtPayload = {
   sub: string;
@@ -203,99 +204,180 @@ export async function initSocket(server: http.Server) {
     });
 
     // example: patient submits answer -> server persists and notifies therapist
-    socket.on('answer_submitted', async (data: { sessionId: string; questionId: string; answer: any; messageId?: string }) => {
-      const start = Date.now();
-      if (!(await (socket as any).allowEvent(1))) return socket.emit('error', { code: 'RATE_LIMIT' });
-      const { sessionId, questionId, answer } = data;
-      let { messageId } = data as { messageId?: string };
-      try {
-        const ok = await authorizeJoin(sessionId, user.id, user.role);
-        if (!ok) return socket.emit('error', { code: 'NOT_AUTHORIZED' });
-
-        if (!messageId) messageId = randomUUID();
-        const payload = { messageId, from: user.id, questionId, answer, at: Date.now(), sessionId };
-
-        // Idempotent persist: if messageId exists, return DUPLICATE ack
-        try {
-          const existing = await prisma.patientSessionResponse.findUnique({ where: { messageId } });
-          if (existing) {
-            // already persisted - reply with DUPLICATE ack
-            const pendingDelivery = !existing.deliveredToStream;
-            socket.emit('answer_ack', { messageId, questionId, status: 'DUPLICATE', pendingDelivery });
-            return;
-          }
-        } catch (e) {
-          console.warn('findUnique messageId error', e);
-        }
-
-        // Persist to DB first for durability
-        try {
-          await prisma.patientSessionResponse.create({ data: { sessionId, patientId: user.role === 'patient' ? user.id : undefined, questionId, responseData: answer, messageId, acknowledgedAt: new Date() } as any });
-        } catch (e: any) {
-          // handle unique constraint race - if message was created concurrently, fallback to duplicate ack
-          if (String(e).includes('Unique') || String(e).includes('unique')) {
-            const existing = await prisma.patientSessionResponse.findUnique({ where: { messageId } });
-            const pendingDelivery = existing ? !existing.deliveredToStream : true;
-            socket.emit('answer_ack', { messageId, questionId, status: 'DUPLICATE', pendingDelivery });
-            return;
-          }
-          socket.emit('error', { code: 'PERSIST_FAIL', message: String(e) });
-          return;
-        }
-
-        // Try to append to Redis Stream for durable cross-node delivery
-        let addedToStream = false;
-        if (redisAvailable) {
-          try {
-            await pubClient.sendCommand(['XADD', STREAM_KEY, '*', 'messageId', messageId, 'payload', JSON.stringify(payload)]);
-            addedToStream = true;
-          } catch (e) {
-            console.warn('XADD failed, marking redis unavailable', e);
-            redisAvailable = false;
-            redisUp.set(0);
-          }
-        }
-
-        // mark deliveredToStream if we managed to enqueue
-        try {
-          if (addedToStream) {
-            await prisma.patientSessionResponse.update({ where: { messageId }, data: { deliveredToStream: true } as any });
-          }
-          await prisma.patientSessionResponse.update({ where: { messageId }, data: { acknowledgedAt: new Date() } as any });
-        } catch (e) {
-          console.warn('update deliveredToStream/acknowledgedAt failed', e);
-        }
-
-        // Immediate local emit for low-latency feedback; cross-node delivery guaranteed by stream consumer
-        socket.to(sessionId).emit('answer_received', payload);
-        socket.emit('answer_ack', { messageId, questionId, status: 'ACCEPTED', pendingDelivery: !addedToStream });
-        // observe latency
-        try {
-          const seconds = (Date.now() - start) / 1000;
-          messageLatency.labels(os.hostname(), user?.role || 'unknown').observe(seconds);
-        } catch (e) {}
-      } catch (err) {
-        socket.emit('error', { code: 'SERVER_ERROR', message: String(err) });
-      }
-    });
+    // socket.on('answer_submitted', async (data: { sessionId: string; questionId: string; answer: any; messageId?: string }) => {
+    //   // Commented out - references missing patientSessionResponse table
+    // });
 
     socket.on('typing', (data: { sessionId: string; isTyping: boolean }) => {
       if (!(socket as any).consume(0.2)) return;
       socket.to(data.sessionId).emit('typing', { userId: user.id, isTyping: data.isTyping });
     });
 
-    socket.on('sync_state', async (data: { sessionId: string }) => {
-      // allow clients to request latest persisted state
+    // socket.on('sync_state', async (data: { sessionId: string }) => {
+    //   // Commented out - references missing patientSessionResponse table
+    // });
+
+    // ── Direct Messaging Events ─────────────────────────────────────────────
+    // Patients join their personal inbox room on connect so they receive
+    // new_message events pushed by providers in real time.
+    socket.on('join_inbox', async () => {
       try {
-        const responses = await prisma.patientSessionResponse.findMany({ where: { sessionId: data.sessionId }, orderBy: { answeredAt: 'asc' } });
-        socket.emit('state_snapshot', { responses });
-      } catch (e) {
-        socket.emit('error', { code: 'SNAPSHOT_FAIL' });
+        const inboxRoom = `inbox:${user.id}`;
+        await socket.join(inboxRoom);
+
+        // Track online presence in Redis (TTL 60s, refreshed on heartbeat)
+        if (redisAvailable) {
+          await pubClient.setEx(`presence:user:${user.id}`, 60, JSON.stringify({ userId: user.id, role: user.role, ts: Date.now() }));
+        }
+        socket.emit('inbox_joined', { room: inboxRoom });
+      } catch (err) {
+        socket.emit('error', { code: 'JOIN_INBOX_FAIL', message: String(err) });
       }
     });
 
+    // Heartbeat to keep presence alive
+    socket.on('presence_heartbeat', async () => {
+      try {
+        if (redisAvailable) {
+          await pubClient.setEx(`presence:user:${user.id}`, 60, JSON.stringify({ userId: user.id, role: user.role, ts: Date.now() }));
+        }
+      } catch { /* noop */ }
+    });
+
+    // Query whether a specific user is currently online
+    socket.on('check_presence', async (payload: { userId: string }) => {
+      try {
+        if (!redisAvailable) return socket.emit('presence_status', { userId: payload.userId, online: false });
+        const raw = await pubClient.get(`presence:user:${payload.userId}`);
+        if (!raw) return socket.emit('presence_status', { userId: payload.userId, online: false });
+        const data = JSON.parse(raw);
+        const staleSecs = (Date.now() - data.ts) / 1000;
+        socket.emit('presence_status', { userId: payload.userId, online: staleSecs < 55 });
+      } catch {
+        socket.emit('presence_status', { userId: payload.userId, online: false });
+      }
+    });
+
+    // Join a specific conversation room to get typing indicators
+    socket.on('join_conversation', async (payload: { conversationId: string }) => {
+      try {
+        if (!(await (socket as any).allowEvent(1))) return socket.emit('error', { code: 'RATE_LIMIT' });
+        const { conversationId } = payload;
+
+        // Verify participant
+        const conv = await prisma.directConversation.findUnique({ where: { id: conversationId } });
+        if (!conv) return socket.emit('error', { code: 'CONVERSATION_NOT_FOUND' });
+        const isParticipant = conv.patientId === user.id || conv.providerId === user.id;
+        if (!isParticipant) return socket.emit('error', { code: 'NOT_AUTHORIZED' });
+
+        await socket.join(`conv:${conversationId}`);
+        socket.emit('conversation_joined', { conversationId });
+      } catch (err) {
+        socket.emit('error', { code: 'JOIN_CONV_FAIL', message: String(err) });
+      }
+    });
+
+    // Typing indicator — broadcast to conversation room (except sender)
+    socket.on('dm_typing', (payload: { conversationId: string; isTyping: boolean }) => {
+      socket.to(`conv:${payload.conversationId}`).emit('dm_typing', {
+        userId: user.id,
+        role: user.role,
+        conversationId: payload.conversationId,
+        isTyping: payload.isTyping,
+      });
+    });
+
+    // Send direct message via socket (in addition to REST endpoint)
+    socket.on('dm_send', async (payload: { conversationId: string; content: string; clientMsgId?: string }) => {
+      if (!(await (socket as any).allowEvent(1))) return socket.emit('error', { code: 'RATE_LIMIT' });
+      try {
+        const senderRole = user.role === 'patient' ? 'patient' : 'provider';
+        const msg = await sendDirectMessage(payload.conversationId, user.id, senderRole, payload.content);
+
+        // Emit to all participants in the conversation room
+        io.to(`conv:${payload.conversationId}`).emit('new_message', { ...msg, clientMsgId: payload.clientMsgId });
+
+        // Also push to the recipient's inbox room for notification
+        const conv = await prisma.directConversation.findUnique({ where: { id: payload.conversationId } });
+        if (conv) {
+          const recipientId = senderRole === 'patient' ? conv.providerId : conv.patientId;
+          io.to(`inbox:${recipientId}`).emit('new_message_notification', {
+            conversationId: payload.conversationId,
+            message: msg,
+          });
+        }
+      } catch (err) {
+        socket.emit('dm_error', { code: 'SEND_FAIL', message: String(err), clientMsgId: payload.clientMsgId });
+      }
+    });
+
+    // Mark messages as read
+    socket.on('dm_mark_read', async (payload: { conversationId: string }) => {
+      try {
+        await markConversationRead(payload.conversationId, user.id);
+        // Notify sender that messages were read (for double-tick UX)
+        socket.to(`conv:${payload.conversationId}`).emit('messages_read', {
+          conversationId: payload.conversationId,
+          readBy: user.id,
+          readAt: new Date().toISOString(),
+        });
+      } catch { /* noop */ }
+    });
+    // ── End Direct Messaging Events ─────────────────────────────────────────
+
+    // ── Therapeutic GPS Events ───────────────────────────────────────────────
+    // The Python AI Engine pushes GPS updates to the Node backend via HTTP POST
+    // (see /v1/gps/internal/push). The socket handler here relays them to the
+    // specific therapist who is in the live session room.
+
+    /**
+     * gps:join – therapist client registers for GPS updates for a session.
+     * Payload: { sessionId: string, monitoringId: string }
+     */
+    socket.on('gps:join', async (payload: { sessionId: string; monitoringId: string }) => {
+      try {
+        if (user?.role !== 'therapist') {
+          return socket.emit('error', { code: 'GPS_FORBIDDEN', message: 'Only therapists can join GPS rooms' });
+        }
+        const gpsRoom = `gps:${payload.sessionId}`;
+        await socket.join(gpsRoom);
+        socket.emit('gps:joined', { sessionId: payload.sessionId, monitoringId: payload.monitoringId });
+      } catch (err) {
+        socket.emit('error', { code: 'GPS_JOIN_FAIL', message: String(err) });
+      }
+    });
+
+    /**
+     * gps:leave – therapist leaves the GPS room (session ended / tab closed).
+     */
+    socket.on('gps:leave', async (payload: { sessionId: string }) => {
+      await socket.leave(`gps:${payload.sessionId}`);
+      socket.emit('gps:left', { sessionId: payload.sessionId });
+    });
+
+    /**
+     * gps:push – internal event pushed by the AI Engine bridge (server-side only).
+     * This is NOT exposed to untrusted clients; validated by the internal API key.
+     * Payload: { sessionId, type: 'gps_update'|'crisis_alert', data: {...} }
+     */
+    socket.on('gps:push', (payload: { sessionId: string; type: string; data: unknown }) => {
+      // Only allow internal service sockets (identified by role='internal')
+      if (user?.role !== 'internal') return;
+      io.to(`gps:${payload.sessionId}`).emit('gps:update', {
+        type: payload.type,
+        data: payload.data,
+        timestamp: new Date().toISOString(),
+      });
+    });
+    // ── End Therapeutic GPS Events ───────────────────────────────────────────
+
     socket.on('disconnecting', () => {
-      // optionally emit presence changes after disconnect
+      // clean up presence for direct messaging rooms
+      for (const room of socket.rooms) {
+        if (room.startsWith('inbox:')) {
+          // nothing special needed - just let the room empty
+        }
+      }
     });
     socket.on('disconnect', (reason) => {
       try { activeConnections.labels(os.hostname()).dec(); } catch (e) {}
@@ -385,7 +467,7 @@ export async function initSocket(server: http.Server) {
     }
   }
 
-  void drainPendingResponses();
+  // void drainPendingResponses(); // Commented out - references missing patientSessionResponse table
 
   // Presence cleanup: check zset entries older than TTL and mark offline in DB
   const PRESENCE_TTL_MS = 60 * 1000; // 60s

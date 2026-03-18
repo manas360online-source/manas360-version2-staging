@@ -5,7 +5,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: manas360
-      POSTGRES_PASSWORD: changeme
+      POSTGRES_PASSWORD: manas360
       POSTGRES_DB: manas360
     ports:
       - "5432:5432"
@@ -37,6 +37,23 @@ services:
     command: ["sh", "-c", "npx prisma@4.16.2 migrate deploy && npx prisma@4.16.2 generate && node dist/server.js"]
     volumes:
       - ./backend:/app
+
+  ai_engine:
+    build:
+      context: ./backend/ai_engine
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      AI_ENGINE_SECRET: ${AI_ENGINE_SECRET}
+      NODE_BACKEND_URL: http://backend:5000
+      AI_ENGINE_HOST: 0.0.0.0
+      AI_ENGINE_PORT: 8765
+    depends_on:
+      - backend
+    ports:
+      - "8765:8765"
 
   frontend:
     build:

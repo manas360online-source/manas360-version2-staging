@@ -4,7 +4,7 @@ const mockDb = {
 	user: { findUnique: jest.fn() },
 	aIConversation: { findFirst: jest.fn(), create: jest.fn(), update: jest.fn(), count: jest.fn() },
 	chatMessage: { findMany: jest.fn(), createMany: jest.fn(), count: jest.fn() },
-	patientSubscription: { findUnique: jest.fn() },
+	patientSubscription: { findUnique: jest.fn(), findFirst: jest.fn() },
 };
 
 const mockGenerateAIResponse = jest.fn();
@@ -42,6 +42,7 @@ describe('chat system scenarios', () => {
 		mockDb.chatMessage.createMany.mockResolvedValue({ count: 2 });
 		mockDb.chatMessage.count.mockResolvedValue(0);
 		mockDb.patientSubscription.findUnique.mockResolvedValue({ planName: 'Basic Plan' });
+		mockDb.patientSubscription.findFirst.mockResolvedValue(null);
 		mockDb.aIConversation.count.mockResolvedValue(0);
 		mockGenerateAIResponse.mockResolvedValue({
 			text: 'I hear you. Let us take one steady step together.',
@@ -56,7 +57,7 @@ describe('chat system scenarios', () => {
 		const result = await processChatMessage({ userId: 'u1', message: 'I feel overwhelmed and anxious', botType: 'mood_ai' });
 
 		expect(result.bot_type).toBe('mood_ai');
-		expect(result.bot_name).toBe('dr meera');
+		expect(result.bot_name).toBe('Anytime Buddy');
 		expect(result.response).toContain('steady step');
 		expect(result.crisis_detected).toBe(false);
 		expect(mockGenerateAIResponse).toHaveBeenCalledTimes(1);
@@ -90,6 +91,7 @@ describe('chat system scenarios', () => {
 
 	it('4) free user exceeding 3 daily chats is blocked', async () => {
 		mockDb.patientSubscription.findUnique.mockResolvedValue({ planName: 'Basic Plan' });
+		mockDb.patientSubscription.findFirst.mockResolvedValue(null);
 		mockDb.chatMessage.count.mockResolvedValue(3);
 
 		const req: any = { auth: { userId: 'u1', role: 'patient' } };
@@ -105,6 +107,7 @@ describe('chat system scenarios', () => {
 
 	it('5) premium user has unlimited chat access', async () => {
 		mockDb.patientSubscription.findUnique.mockResolvedValue({ planName: 'Premium Plan' });
+		mockDb.patientSubscription.findFirst.mockResolvedValue({ status: 'ACTIVE' });
 
 		const req: any = { auth: { userId: 'u1', role: 'patient' } };
 		const next = jest.fn();

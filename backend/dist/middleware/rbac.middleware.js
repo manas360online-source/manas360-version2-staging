@@ -11,6 +11,7 @@ const db = db_1.prisma;
 exports.roleHierarchy = {
     patient: 1,
     therapist: 2,
+    psychologist: 2,
     psychiatrist: 2,
     coach: 2,
     admin: 3,
@@ -247,18 +248,29 @@ const requirePermission = (requiredPermissions) => {
         // TODO: Map roles to permissions and check
         // For now, map roles directly to permissions
         const rolePermissions = {
-            patient: ['read_own_profile', 'book_session', 'view_therapists'],
-            therapist: ['read_own_profile', 'manage_sessions', 'view_earnings'],
-            psychiatrist: ['read_own_profile', 'manage_sessions', 'view_earnings'],
-            coach: ['read_own_profile', 'manage_sessions', 'view_earnings'],
-            admin: ['read_all_profiles', 'manage_users', 'manage_therapists', 'view_analytics'],
+            patient: ['read_own_profile', 'book_session', 'view_therapists', 'submit_assessments', 'view_own_sessions'],
+            therapist: ['read_own_profile', 'manage_sessions', 'view_earnings', 'build_templates', 'view_assigned_patients'],
+            psychologist: ['read_own_profile', 'manage_assessments', 'manage_reports', 'view_assigned_patients', 'manage_risk'],
+            psychiatrist: ['read_own_profile', 'manage_sessions', 'view_earnings', 'view_assigned_patients'],
+            coach: ['read_own_profile', 'manage_sessions', 'view_earnings', 'view_assigned_patients'],
+            admin: [
+                'read_all_profiles',
+                'manage_users',
+                'manage_therapists',
+                'view_analytics',
+                'manage_corporate',
+                'view_system_logs'
+            ],
             superadmin: [
                 'read_all_profiles',
                 'manage_users',
                 'manage_therapists',
                 'view_analytics',
+                'manage_corporate',
+                'view_system_logs',
                 'manage_roles',
                 'manage_permissions',
+                'system_config',
             ],
         };
         const userPermissions = rolePermissions[userDetails.role] || [];
