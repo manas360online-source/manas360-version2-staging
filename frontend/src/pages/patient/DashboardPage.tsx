@@ -68,33 +68,31 @@ export default function DashboardPage() {
     const dashboardRes = await patientApi.getDashboardV2();
     const dashboardData = dashboardRes?.data ?? dashboardRes;
 
-    // Ensure wellnessScore is meaningful. Some backend responses for new
-    // users may contain a placeholder/default value (e.g. 48). If the
-    // returned value is missing or looks like the placeholder, try to
-    // derive a wellness score from mood stats as a fallback.
+    // Wellness should be driven by daily check-ins/mood stats, not defaults.
+    // For users without any check-ins, show 0.
     let finalDashboard = dashboardData || null;
     try {
-      const reported = (dashboardData as any)?.wellnessScore;
-      let wellness = typeof reported === 'number' ? reported : null;
+      const statsResp = await patientApi.getMoodStats();
+      const stats = statsResp?.data ?? statsResp;
+      const totalCheckins = Number(stats?.totalCheckins ?? 0);
+      const avgMood = Number(stats?.last7DaysAverage ?? stats?.averageMood ?? 0);
 
-      const looksLikePlaceholder = wellness === null || wellness === undefined || wellness === 48;
-      if (looksLikePlaceholder) {
-        try {
-          const statsResp = await patientApi.getMoodStats();
-          const stats = statsResp?.data ?? statsResp;
-          const avg = Number(stats?.last7DaysAverage ?? stats?.averageMood ?? NaN);
-          if (!Number.isNaN(avg) && avg > 0) {
-            // Map 1-5 mood scale to 0-100 wellness score
-            wellness = Math.round((avg / 5) * 100);
-          }
-        } catch (err) {
-          // ignore and keep whatever dashboard provided
-        }
+      let wellness = 0;
+      if (totalCheckins > 0 && Number.isFinite(avgMood) && avgMood > 0) {
+        // Map 1-5 mood scale to 0-100 wellness score.
+        wellness = Math.max(0, Math.min(100, Math.round((avgMood / 5) * 100)));
       }
 
-      if (finalDashboard) finalDashboard = { ...(finalDashboard as any), wellnessScore: wellness ?? (finalDashboard as any).wellnessScore };
+      if (finalDashboard) {
+        finalDashboard = { ...(finalDashboard as any), wellnessScore: wellness };
+      }
     } catch (err) {
-      // non-fatal
+      // If stats endpoint fails, keep backend value but avoid placeholder defaults.
+      const reported = Number((dashboardData as any)?.wellnessScore);
+      const safeWellness = Number.isFinite(reported) && reported !== 48 ? reported : 0;
+      if (finalDashboard) {
+        finalDashboard = { ...(finalDashboard as any), wellnessScore: safeWellness };
+      }
     }
 
     setDashboard(finalDashboard);
@@ -362,7 +360,7 @@ export default function DashboardPage() {
               <div>
                 <p className="text-xs uppercase tracking-wider text-charcoal/50 font-semibold mb-1">Wellness</p>
                 <p className="text-3xl font-display font-bold text-calm-sage">
-                  {dashboard?.wellnessScore || 65}
+                  {dashboard?.wellnessScore ?? 0}
                 </p>
                 <p className="text-xs text-ink-400 mt-1">Out of 100</p>
               </div>
