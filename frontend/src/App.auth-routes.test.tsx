@@ -1,5 +1,6 @@
 /** @vitest-environment jsdom */
-import { render, screen, cleanup } from '@testing-library/react';
+import { render as rtlRender, screen, cleanup } from '@testing-library/react';
+// renderWithProviders not used in this test
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import App from './App';
@@ -14,7 +15,7 @@ afterEach(() => {
 
 describe('App auth route redirects', () => {
 	it('redirects /login to /auth/login', async () => {
-		render(
+		rtlRender(
 			<MemoryRouter initialEntries={['/login']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
 				<App />
 			</MemoryRouter>,
@@ -24,7 +25,7 @@ describe('App auth route redirects', () => {
 	});
 
 	it('redirects /register to /auth/signup', async () => {
-		render(
+		rtlRender(
 			<MemoryRouter initialEntries={['/register']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
 				<App />
 			</MemoryRouter>,

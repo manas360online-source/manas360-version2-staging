@@ -131,11 +131,13 @@ export default function DocumentsPage() {
       }
     };
 
-    // run one immediate poll after mount
+    // run one immediate poll after mount and then poll periodically
     void poll();
+    const intervalId = setInterval(poll, 16000);
 
     return () => {
       mounted = false;
+      clearInterval(intervalId);
     };
   }, [/* docs intentionally excluded to avoid re-registering */]);
 

@@ -1272,6 +1272,39 @@ export const getPatientOverview = async (req: Request, res: Response): Promise<v
 		.slice(0, 3)
 		.map(({ timestamp, ...rest }) => rest);
 
+	// Fetch recent mood entries for this patient and compute simple mood stats
+	const moodRowsRaw = await prisma.patientMoodEntry.findMany({
+		where: { patient: { userId: patientId } },
+		orderBy: { date: 'desc' },
+		take: 30,
+		select: { moodScore: true, date: true, metadata: true },
+	}).catch(() => []);
+
+	const moodRows = Array.isArray(moodRowsRaw)
+		? moodRowsRaw.map((r) => ({ mood: Number(r.moodScore || 0), date: new Date(r.date), metadata: r.metadata || {} }))
+		: [];
+
+	const totalCheckins = moodRows.length;
+	const averageMood = totalCheckins ? Number((moodRows.reduce((s, r) => s + r.mood, 0) / totalCheckins).toFixed(2)) : 0;
+	const sevenDaysAgoForPatient = new Date();
+	sevenDaysAgoForPatient.setDate(sevenDaysAgoForPatient.getDate() - 7);
+	const last7Rows = moodRows.filter((r) => r.date >= sevenDaysAgoForPatient);
+	const last7DaysAverage = last7Rows.length ? Number((last7Rows.reduce((s, r) => s + r.mood, 0) / last7Rows.length).toFixed(2)) : 0;
+
+	// compute current streak (consecutive days with at least one check-in up to today)
+	let currentStreak = 0;
+	{
+		const seenDays = new Set(moodRows.map((r) => r.date.toISOString().slice(0, 10)));
+		let cursor = new Date();
+		while (true) {
+			const key = cursor.toISOString().slice(0, 10);
+			if (seenDays.has(key)) {
+				currentStreak += 1;
+				cursor.setDate(cursor.getDate() - 1);
+			} else break;
+		}
+	}
+
 	const patientName = toPatientName(patient.firstName, patient.lastName, patient.name);
 	const diagnosis = String(patient.patientProfile.medicalHistory || '').trim() || 'Evaluation Pending';
 
@@ -1297,6 +1330,13 @@ export const getPatientOverview = async (req: Request, res: Response): Promise<v
 			: null,
 		recentAssessments,
 		recentActivity: activityEvents,
+		moodStats: {
+			totalCheckins,
+			averageMood,
+			last7DaysAverage,
+			currentStreak,
+			recent: moodRows.slice(0, 10).map((r) => ({ mood: r.mood, date: r.date.toISOString(), metadata: r.metadata })),
+		},
 	};
 
 	sendSuccess(res, responseData, 'Patient overview fetched');

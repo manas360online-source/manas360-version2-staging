@@ -26,7 +26,6 @@ import freeScreeningRoutes from './free-screening.routes';
 import gpsRoutes from './gps.routes';
 import providerRoutes from './provider.routes';
 import soundRoutes from './sound.routes';
-import systemStatusRoutes from './system-status.routes';
 
 const router = Router();
 
@@ -40,7 +39,6 @@ router.get('/health', (_req, res) => {
 	});
 });
 
-router.use('/v1/system-status', systemStatusRoutes);
 
 router.use('/auth', authRoutes);
 router.use('/v1/auth', authRoutes);

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -145,6 +145,11 @@ export default function ProgressPage() {
       patientApi.getMoodHistoryV2().catch(() => []),
       patientApi.getMoodStats().catch(() => null),
     ]);
+    try {
+      console.log('[ProgressPage] fetched mood data', { historyRes, statsRes });
+    } catch (e) {
+      /* ignore logging errors */
+    }
     return {
       history: asPayload<any[]>(historyRes) || [],
       stats: asPayload<any>(statsRes) || {},
@@ -158,6 +163,11 @@ export default function ProgressPage() {
         patientApi.getStructuredAssessmentHistory().catch(() => []),
         patientApi.getInsights().catch(() => null),
       ]);
+      try {
+        console.log('[ProgressPage] fetched clinical data', { historyRes, insightsRes });
+      } catch (e) {
+        /* ignore logging errors */
+      }
       return {
         structured: asPayload<any[]>(historyRes) || [],
         insights: asPayload<any>(insightsRes) || {},
@@ -175,6 +185,11 @@ export default function ProgressPage() {
         patientApi.getExercises().catch(() => []),
         patientApi.getMoodHistoryV2().catch(() => []),
       ]);
+      try {
+        console.log('[ProgressPage] fetched habits data', { progressRes, sessionsRes, exercisesRes, moodHistoryRes });
+      } catch (e) {
+        /* ignore logging errors */
+      }
       return {
         progress: asPayload<any>(progressRes) || {},
         sessions: asPayload<any[]>(sessionsRes) || [],
@@ -184,6 +199,14 @@ export default function ProgressPage() {
     },
     { enabled: activeTab === 'habits' },
   );
+
+  useEffect(() => {
+    try {
+      console.log('[ProgressPage] mount/render', { activeTab });
+    } catch (e) {
+      /* ignore */
+    }
+  }, [activeTab]);
 
   const moodHistory = useMemo(() => {
     const rows = Array.isArray(moodQuery.data?.history) ? moodQuery.data?.history : [];

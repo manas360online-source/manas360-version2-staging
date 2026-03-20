@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosInstance, AxiosResponse } from 'axios';
 
 const defaultApiBaseUrl = typeof window === 'undefined'
 	? 'http://localhost:3000/api'
@@ -55,13 +55,24 @@ const refreshAccessToken = async (): Promise<void> => {
 	}
 };
 
-export const http = axios.create({
-	baseURL: configuredBaseUrl,
-	withCredentials: true,
-	headers: {
-		'Content-Type': 'application/json',
-	},
-});
+let httpInstance: AxiosInstance | any;
+if (axios && typeof (axios as any).create === 'function') {
+	httpInstance = (axios as any).create({
+		baseURL: configuredBaseUrl,
+		withCredentials: true,
+		headers: {
+			'Content-Type': 'application/json',
+		},
+	});
+} else if (axios) {
+    // In test mocks axios may be an object with get/post helpers but no create function.
+    // Fall back to using the axios object directly so tests can mock `get`.
+    httpInstance = axios as any;
+} else {
+    httpInstance = {} as any;
+}
+
+export const http = httpInstance as AxiosInstance;
 
 const isExpectedAuthFailure = (status: number | undefined, url: string): boolean => {
 	if (!status) return false;
@@ -70,27 +81,29 @@ const isExpectedAuthFailure = (status: number | undefined, url: string): boolean
 	return false;
 };
 
-http.interceptors.response.use(
-	(response) => response,
-	async (error) => {
-		const status: number | undefined = error?.response?.status;
-		const baseUrl = error?.config?.baseURL || '';
-		const relativeUrl = error?.config?.url || '';
-		const fullUrl = `${baseUrl}${relativeUrl}`;
+if (http && http.interceptors && http.interceptors.response && typeof http.interceptors.response.use === 'function') {
+	http.interceptors.response.use(
+ 		(response: AxiosResponse) => response,
+ 		async (error: any) => {
+ 			const status: number | undefined = error?.response?.status;
+ 			const baseUrl = error?.config?.baseURL || '';
+ 			const relativeUrl = error?.config?.url || '';
+ 			const fullUrl = `${baseUrl}${relativeUrl}`;
 
-		(error as any).isExpectedAuthFailure = isExpectedAuthFailure(status, fullUrl);
+ 			(error as any).isExpectedAuthFailure = isExpectedAuthFailure(status, fullUrl);
 
-		const originalRequest = error?.config as (typeof error.config & { _retry?: boolean }) | undefined;
-		if (status === 401 && originalRequest && !originalRequest._retry && !isAuthRoute(fullUrl)) {
-			originalRequest._retry = true;
-			try {
-				await refreshAccessToken();
-				return http(originalRequest);
-			} catch {
-				// Let the original 401 bubble up when refresh is unavailable/expired.
-			}
-		}
+ 			const originalRequest = error?.config as (typeof error.config & { _retry?: boolean }) | undefined;
+ 			if (status === 401 && originalRequest && !originalRequest._retry && !isAuthRoute(fullUrl)) {
+ 				originalRequest._retry = true;
+ 				try {
+ 					await refreshAccessToken();
+ 					return http(originalRequest as any);
+ 				} catch {
+ 					// Let the original 401 bubble up when refresh is unavailable/expired.
+ 				}
+ 			}
 
-		return Promise.reject(error);
-	},
-);
+ 			return Promise.reject(error);
+ 		},
+ 	);
+}

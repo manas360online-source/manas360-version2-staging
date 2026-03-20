@@ -1,4 +1,4 @@
-import { useState, useEffect, Suspense, lazy } from 'react';
+import { useState, Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { GlobalFallbackLoader } from './components/ui/FallbackLoader';
@@ -6,8 +6,6 @@ import ScrollToTop from './components/common/ScrollToTop';
 import { GlobalAudioProvider } from './context/GlobalAudioContext';
 import GlobalAudioPlayerConsole from './components/audio/GlobalAudioPlayerConsole';
 const LandingPage = lazy(() => import('./pages/LandingPage'));
-import ClinicalLaunchScreen from './pages/ClinicalLaunchScreen';
-import { getSystemStatus } from './api/system-status.api';
 import { AuthProvider, getPostLoginRoute, useAuth } from './context/AuthContext';
 import { Assessment } from './pages/Assessment'
 import { ResultsPage } from './pages/Results'
@@ -66,6 +64,7 @@ const ClinicalAssistantPage = lazy(() => import('./pages/admin/ClinicalAssistant
 const AdminSectionPage = lazy(() => import('./pages/admin/AdminSectionPage'));
 const AdminTemplatesPage = lazy(() => import('./pages/admin/Templates'));
 const CertificationsPage = lazy(() => import('./pages/CertificationsPage'));
+const CertificationLandingPage = lazy(() => import('./pages/CertificationLandingPage'));
 const CancellationRefundPolicyPage = lazy(() => import('./pages/legal/CancellationRefundPolicyPage'));
 const TermsOfUsePage = lazy(() => import('./pages/legal/TermsOfUsePage'));
 const PrivacyPolicyPage = lazy(() => import('./pages/legal/PrivacyPolicyPage'));
@@ -104,6 +103,22 @@ const LabOrders = lazy(() => import('./pages/provider/Patients/Tabs/LabOrders'))
 const GoalsAndHabits = lazy(() => import('./pages/provider/Patients/Tabs/GoalsAndHabits'));
 const CareTeamTab = lazy(() => import('./pages/provider/Patients/Tabs/CareTeamTab'));
 
+// Certification Pages
+const CertificationLayout = lazy(() => import('./components/CertificationLayout'));
+const MyCertificationsPage = lazy(() => import('./pages/MyCertificationsPage'));
+const CheckoutPage = lazy(() => import('./pages/CertificationCheckoutPage').then(m => ({ default: m.CheckoutPage })));
+const EnrollmentRegistrationPage = lazy(() => import('./pages/EnrollmentRegistrationPage'));
+const PaymentSuccessPage = lazy(() => import('./pages/PaymentSuccessPage'));
+const PaymentFailedPage = lazy(() => import('./pages/PaymentFailedPage'));
+const JourneyWireframePage = lazy(() => import('./pages/JourneyWireframePage'));
+const EnrollmentConfirmedPage = lazy(() => import('./pages/EnrollmentConfirmedPage'));
+const CertificationDetailsPage = lazy(() => import('./pages/CertificationDetailsPage').then(m => ({ default: m.CertificationDetailsPage })));
+const CertificationModulesPage = lazy(() => import('./pages/CertificationModulesPage').then(m => ({ default: m.CertificationModulesPage })));
+const CertificationLessonPage = lazy(() => import('./pages/CertificationLessonPage').then(m => ({ default: m.CertificationLessonPage })));
+const CertificationAssignmentPage = lazy(() => import('./pages/CertificationAssignmentPage').then(m => ({ default: m.CertificationAssignmentPage })));
+const CertificationQuizPage = lazy(() => import('./pages/CertificationQuizPage').then(m => ({ default: m.CertificationQuizPage })));
+const LeadBoastDashboard = lazy(() => import('./pages/LeadBoastDashboard'));
+
 interface AssessmentData {
   symptoms?: string[];
   impact?: string;
@@ -121,22 +136,8 @@ function DashboardRedirect() {
 }
 
 function App() {
-  const [isLive, setIsLive] = useState<boolean | null>(null);
   const [assessmentData, setAssessmentData] = useState<AssessmentData | null>(null);
   const [userName, setUserName] = useState<string>('');
-
-  useEffect(() => {
-    const checkStatus = async () => {
-      try {
-        const status = await getSystemStatus();
-        setIsLive(status.isLive);
-      } catch (error) {
-        console.error('Failed to fetch system status:', error);
-        setIsLive(false); 
-      }
-    };
-    checkStatus();
-  }, []);
 
   const handleAssessmentSubmit = (data: AssessmentData, isCritical: boolean) => {
     setAssessmentData(data);
@@ -151,14 +152,6 @@ function App() {
     setUserName(data.firstName);
     window.location.href = '/#/onboarding/email';
   };
-
-  if (isLive === null) {
-    return <GlobalFallbackLoader />;
-  }
-
-  if (isLive === false) {
-    return <ClinicalLaunchScreen onActivated={() => setIsLive(true)} />;
-  }
 
   return (
     <AuthProvider>
@@ -187,7 +180,26 @@ function App() {
         <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/assessment" element={<Assessment onSubmit={handleAssessmentSubmit} />} />
-      <Route path="/certifications" element={<CertificationsPage />} />
+
+      {/* Certification Sub-App */}
+      <Route element={<CertificationLayout />}>
+        <Route path="/certifications" element={<CertificationLandingPage />} />
+        <Route path="/certifications/:slug" element={<CertificationDetailsPage />} />
+        <Route path="/certifications/details" element={<CertificationsPage />} />
+        <Route path="/my-certifications" element={<MyCertificationsPage />} />
+        <Route path="/checkout/:slug" element={<CheckoutPage />} />
+        <Route path="/registration" element={<EnrollmentRegistrationPage />} />
+        <Route path="/payment-success" element={<PaymentSuccessPage />} />
+        <Route path="/payment-failed" element={<PaymentFailedPage />} />
+        <Route path="/journey" element={<JourneyWireframePage />} />
+        <Route path="/confirmed" element={<EnrollmentConfirmedPage />} />
+        <Route path="/certifications/modules/:enrollmentId" element={<CertificationModulesPage />} />
+        <Route path="/certifications/lessons/:lessonId" element={<CertificationLessonPage />} />
+        <Route path="/certifications/assignments/:assignmentId" element={<CertificationAssignmentPage />} />
+        <Route path="/certifications/quiz/:enrollmentId" element={<CertificationQuizPage />} />
+        <Route path="/dashboard" element={<LeadBoastDashboard />} />
+      </Route>
+
       <Route path="/results" element={<ResultsPage data={assessmentData} />} />
       <Route path="/crisis" element={<CrisisPage />} />
       <Route path="/onboarding/name" element={<OnboardingName onNext={handleOnboardingName} />} />

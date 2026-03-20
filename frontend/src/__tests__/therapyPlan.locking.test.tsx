@@ -1,4 +1,5 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { renderWithProviders as render } from '@/test-utils.tsx';
+import { screen, waitFor } from '@testing-library/react';
 
 import { vi, describe, it, beforeEach, afterEach } from 'vitest';
 import TherapyPlanPage from '../pages/patient/TherapyPlanPage';

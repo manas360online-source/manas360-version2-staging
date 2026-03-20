@@ -207,7 +207,8 @@ export function useBackgroundSync() {
   const [syncSupported, setSyncSupported] = useState(false);
 
   useEffect(() => {
-    setSyncSupported('serviceWorker' in navigator && 'sync' in (window as any).ServiceWorkerRegistration?.prototype);
+    const hasSync = 'serviceWorker' in navigator && !!(window as any).ServiceWorkerRegistration?.prototype?.sync;
+    setSyncSupported(hasSync);
   }, []);
 
   const registerSync = useCallback(async (tag: string) => {

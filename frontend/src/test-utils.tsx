@@ -1,6 +1,58 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import '@testing-library/jest-dom';
+import { MemoryRouter } from 'react-router-dom';
 import { vi } from 'vitest';
+import axios from 'axios';
+import { ErrorProvider } from './components/ErrorProvider';
+import { AuthProvider } from './context/AuthContext';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+// Provide a simple localStorage mock for tests that access it.
+if (typeof globalThis.localStorage === 'undefined' || !globalThis.localStorage) {
+  const store: Record<string, string> = {};
+  // @ts-ignore
+  globalThis.localStorage = {
+    getItem(key: string) {
+      return Object.prototype.hasOwnProperty.call(store, key) ? store[key] : null;
+    },
+    setItem(key: string, value: string) {
+      store[key] = String(value);
+    },
+    removeItem(key: string) {
+      delete store[key];
+    },
+    clear() {
+      for (const k of Object.keys(store)) delete store[k];
+    },
+  } as any;
+}
+
+// Mock axios module and provide a spyable axios instance for tests.
+vi.mock('axios');
+const axiosMock = (axios as any) || {};
+axiosMock.interceptors = axiosMock.interceptors || { response: { use: vi.fn() } };
+axiosMock.get = axiosMock.get || vi.fn().mockResolvedValue({ data: { data: {} } });
+axiosMock.post = axiosMock.post || vi.fn().mockResolvedValue({ data: {} });
+axiosMock.put = axiosMock.put || vi.fn().mockResolvedValue({ data: {} });
+axiosMock.delete = axiosMock.delete || vi.fn().mockResolvedValue({ data: {} });
+axiosMock.create = axiosMock.create || (() => axiosMock);
+
+export const mockedAxios = axiosMock as any;
+
+  // Mock react-hot-toast with a Toaster component and a mock toast function.
+const mockToast = {
+  success: vi.fn(),
+  error: vi.fn(),
+} as any;
+
+vi.mock('react-hot-toast', () => {
+  const Toaster = (props: any) => <div data-testid="toaster" {...props} />;
+  return { default: mockToast, toast: mockToast, Toaster };
+});
+
+// Export toast mock so tests can assert calls deterministically
+export { mockToast };
 
 // Mock implementations for common dependencies
 export const mockApi = {
@@ -26,6 +78,10 @@ export const mockAuth = {
   
 };
 
+// Provide a `jest` global mapped to Vitest's `vi` to support tests written
+// using Jest globals (many existing tests use `jest.fn()` or `jest.useFakeTimers`).
+(global as any).jest = vi;
+
 // Custom render function with providers
 export function renderWithProviders(
   component: React.ReactElement,
@@ -43,8 +99,20 @@ export function renderWithProviders(
     writable: true,
   });
 
-  return render(component);
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+  return render(
+    <MemoryRouter initialEntries={[initialRoute]}>
+      <QueryClientProvider client={queryClient}>
+        <ErrorProvider>
+          <AuthProvider>{component}</AuthProvider>
+        </ErrorProvider>
+      </QueryClientProvider>
+    </MemoryRouter>
+  );
 }
+
+// Note: we mock the module above; no runtime override needed here.
 
 // Test utilities
 export const testUtils = {
@@ -124,6 +192,7 @@ export const testUtils = {
 
 // Custom matchers
 declare global {
+// eslint-disable-next-line @typescript-eslint/no-namespace
   namespace jest {
     interface Matchers<R> {
       toBeAccessible(): R;

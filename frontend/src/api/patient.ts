@@ -119,6 +119,16 @@ export type CbtAssignmentDetail = {
   updatedAt: string;
 };
 
+export type ProgressPayload = {
+  completedSessions: number;
+  totalSessions: number;
+  exercisesCompleted: number;
+  totalExercises: number;
+  streakDays: number;
+  improvementPercent: number;
+  lastAssessmentScore: number | null;
+};
+
 const unwrapPayload = <T = any>(value: any): T => {
   if (value && typeof value === 'object') {
     if (value.data !== undefined) {
@@ -279,7 +289,7 @@ export const patientApi = {
   selectJourneyPathway: async (payload: JourneySelectPathwayRequest): Promise<JourneySelectPathwayResponse> =>
     (await http.post('/v1/patient-journey/select-pathway', payload)).data,
   addMood: async (payload: { mood: number; note?: string }) => (await http.post('/v1/mood', payload)).data,
-  getMoodHistory: async () => (await http.get('/v1/mood/history')).data,
+  getMoodHistory: async () => (await http.get('/v1/patient/mood/history')).data,
   getMoodLogs: async () => (await http.get('/patient/mood')).data,
   getMoodToday: async () =>
     withV1Fallback(
@@ -289,13 +299,13 @@ export const patientApi = {
   getMoodHistoryV2: async () =>
     withV1Fallback(
       async () => (await http.get('/patient/mood/history')).data,
-      async () => (await http.get('/v1/mood/history')).data,
+      async () => (await http.get('/v1/patient/mood/history')).data,
     ),
   getMoodStats: async () =>
     withV1Fallback(
       async () => (await http.get('/patient/mood/stats')).data,
       async () => {
-        const history = (await http.get('/v1/mood/history')).data as any[];
+        const history = (await http.get('/v1/patient/mood/history')).data as any[];
         const rows = Array.isArray(history) ? history : [];
         const avg = rows.length
           ? Number((rows.reduce((sum, item) => sum + Number(item?.mood || 0), 0) / rows.length).toFixed(2))
@@ -366,8 +376,61 @@ export const patientApi = {
       async () => (await http.post('/patient/daily-checkin', legacyPayload)).data,
     ]);
   },
-  getProgress: async () =>
-    withFallbackChain([
+  getProgress: async () => {
+    const normalize = (raw: any): ProgressPayload => {
+      if (!raw) return {
+        completedSessions: 0,
+        totalSessions: 0,
+        exercisesCompleted: 0,
+        totalExercises: 0,
+        streakDays: 0,
+        improvementPercent: 0,
+        lastAssessmentScore: null,
+      };
+
+      // If payload is a wrapper { data: { ... } }
+      const payload = raw?.data ?? raw;
+
+      // If the payload already looks like a progress object
+      if (typeof payload.completedSessions !== 'undefined' || typeof payload.sessionsCompleted !== 'undefined') {
+        return {
+          completedSessions: Number(payload.completedSessions ?? payload.sessionsCompleted ?? 0),
+          totalSessions: Number(payload.totalSessions ?? 0),
+          exercisesCompleted: Number(payload.exercisesCompleted ?? payload.completedExercises ?? 0),
+          totalExercises: Number(payload.totalExercises ?? 0),
+          streakDays: Number(payload.streakDays ?? payload.streak ?? 0),
+          improvementPercent: Number(payload.improvementPercent ?? payload.improvement ?? 0),
+          lastAssessmentScore: payload.lastAssessmentScore ?? payload.phqCurrent ?? null,
+        };
+      }
+
+      // If payload is a full dashboard that contains `progress` key
+      if (payload?.progress) {
+        const p = payload.progress;
+        return {
+          completedSessions: Number(p.completedSessions ?? p.sessionsCompleted ?? 0),
+          totalSessions: Number(p.totalSessions ?? 0),
+          exercisesCompleted: Number(p.exercisesCompleted ?? p.completedExercises ?? 0),
+          totalExercises: Number(p.totalExercises ?? 0),
+          streakDays: Number(p.streakDays ?? p.streak ?? 0),
+          improvementPercent: Number(p.improvementPercent ?? p.improvement ?? 0),
+          lastAssessmentScore: p.lastAssessmentScore ?? p.phqCurrent ?? null,
+        };
+      }
+
+      // Fallback empty shape
+      return {
+        completedSessions: 0,
+        totalSessions: 0,
+        exercisesCompleted: 0,
+        totalExercises: 0,
+        streakDays: 0,
+        improvementPercent: 0,
+        lastAssessmentScore: null,
+      };
+    };
+
+    const tryChain = await withFallbackChain<any>([
       async () => (await http.get('/patient/progress')).data,
       async () => (await http.get('/v1/patient/progress')).data,
       async () => {
@@ -375,14 +438,13 @@ export const patientApi = {
           async () => (await http.get('/patient/dashboard')).data,
           async () => (await http.get('/v1/patient/dashboard')).data,
         ]);
-        return dashboard?.progress ?? {
-          completedSessions: 0,
-          streakDays: 0,
-          improvementPercent: 0,
-          lastAssessmentScore: null,
-        };
+        return dashboard;
       },
-    ]),
+    ]);
+
+    // tryChain may be either a progress object or a full dashboard; normalize and return
+    return { progress: normalize(tryChain) } as any;
+  },
   createProfile: async (payload: {
     age: number;
     gender: 'male' | 'female' | 'other' | 'prefer_not_to_say';

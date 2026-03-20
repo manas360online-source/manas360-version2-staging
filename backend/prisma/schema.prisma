@@ -1867,15 +1867,6 @@ model ProviderPlanConfig {
   @@map("provider_plan_configs")
 }
 
-model SystemStatus {
-  id         Int       @id @default(1)
-  isLive     Boolean   @default(false)
-  launchedBy String?
-  launchedAt DateTime?
-
-  @@map("system_status")
-}
-
 model SSOTenant {
   id              Int      @id @default(autoincrement())
   key             String   @unique

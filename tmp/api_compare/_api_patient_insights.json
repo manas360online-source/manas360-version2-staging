@@ -1,0 +1,1 @@
+{"success":true,"message":"Patient insights fetched","data":{"moodImprovement":80,"sessionAttendance":0,"exerciseCompletion":0,"anxietyReduction":0,"moodTrend":[{"date":"2026-03-15","score":4}],"assessmentTrend":[],"recommendations":["Try to keep a fixed weekly session slot to improve continuity.","Complete at least one therapeutic exercise every two days for steady progress."]}}

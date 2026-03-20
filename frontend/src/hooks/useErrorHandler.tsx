@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useRef } from 'react';
 
 export type AppError = {
   id: string;
@@ -33,11 +33,13 @@ export const useErrorHandler = () => {
 
 export const ErrorProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [errors, setErrors] = useState<AppError[]>([]);
+  const idRef = useRef(0);
 
   const addError = (error: Omit<AppError, 'id' | 'timestamp'>) => {
+    const newId = `error-${++idRef.current}`;
     const newError: AppError = {
       ...error,
-      id: `error-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: newId,
       timestamp: Date.now(),
     };
     setErrors(prev => [...prev, newError]);
@@ -58,11 +60,18 @@ export const ErrorProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setErrors([]);
   };
 
-  const retryError = (id: string) => {
+  const retryError = async (id: string) => {
     const error = errors.find(e => e.id === id);
-    if (error?.action) {
-      error.action();
+    if (!error || !error.action) return;
+
+    try {
+      await Promise.resolve(error.action());
+      // Remove only on successful retry
       removeError(id);
+    } catch (err) {
+      // Keep the error if retry fails
+      // Intentionally swallow here; tests expect the error to remain
+      return;
     }
   };
 

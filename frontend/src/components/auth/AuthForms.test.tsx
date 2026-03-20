@@ -1,5 +1,6 @@
 /** @vitest-environment jsdom */
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render as rtlRender, screen } from '@testing-library/react';
+import { renderWithProviders as render } from '@/test-utils.tsx';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import LoginForm from './LoginForm';
@@ -13,7 +14,7 @@ afterEach(() => {
 describe('Auth form components', () => {
 	it('renders login form with forgot password link', () => {
 		const onSubmit = vi.fn().mockResolvedValue(undefined);
-		render(
+		rtlRender(
 			<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
 				<LoginForm onSubmit={onSubmit} />
 			</MemoryRouter>,
@@ -26,7 +27,7 @@ describe('Auth form components', () => {
 
 	it('renders register form with role selection', () => {
 		const onSubmit = vi.fn().mockResolvedValue(undefined);
-		render(
+		rtlRender(
 			<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
 				<RegisterForm onSubmit={onSubmit} />
 			</MemoryRouter>,
