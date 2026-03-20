@@ -68,7 +68,36 @@ export default function DashboardPage() {
     const dashboardRes = await patientApi.getDashboardV2();
     const dashboardData = dashboardRes?.data ?? dashboardRes;
 
-    setDashboard(dashboardData || null);
+    // Ensure wellnessScore is meaningful. Some backend responses for new
+    // users may contain a placeholder/default value (e.g. 48). If the
+    // returned value is missing or looks like the placeholder, try to
+    // derive a wellness score from mood stats as a fallback.
+    let finalDashboard = dashboardData || null;
+    try {
+      const reported = (dashboardData as any)?.wellnessScore;
+      let wellness = typeof reported === 'number' ? reported : null;
+
+      const looksLikePlaceholder = wellness === null || wellness === undefined || wellness === 48;
+      if (looksLikePlaceholder) {
+        try {
+          const statsResp = await patientApi.getMoodStats();
+          const stats = statsResp?.data ?? statsResp;
+          const avg = Number(stats?.last7DaysAverage ?? stats?.averageMood ?? NaN);
+          if (!Number.isNaN(avg) && avg > 0) {
+            // Map 1-5 mood scale to 0-100 wellness score
+            wellness = Math.round((avg / 5) * 100);
+          }
+        } catch (err) {
+          // ignore and keep whatever dashboard provided
+        }
+      }
+
+      if (finalDashboard) finalDashboard = { ...(finalDashboard as any), wellnessScore: wellness ?? (finalDashboard as any).wellnessScore };
+    } catch (err) {
+      // non-fatal
+    }
+
+    setDashboard(finalDashboard);
 
     const todayStr = localDateKey();
     const todaysMood = dashboardData?.moodTrend?.find((m: any) => isSameLocalDay(m.date, todayStr));
