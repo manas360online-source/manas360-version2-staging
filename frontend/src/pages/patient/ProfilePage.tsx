@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { http } from '../../lib/http';
+import { patientApi } from '../../api/patient';
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState<any>(null);
@@ -11,6 +12,7 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [moodStats, setMoodStats] = useState<any>(null);
 
   useEffect(() => {
     (async () => {
@@ -36,6 +38,19 @@ export default function ProfilePage() {
         setError(err?.response?.data?.message || 'Failed to load settings. Please try again.');
       } finally {
         setLoading(false);
+      }
+    })();
+
+
+
+
+    // load simple mood stats for quick account insights
+    (async () => {
+      try {
+        const stats = await patientApi.getMoodStats();
+        setMoodStats((stats as any)?.data ?? stats);
+      } catch {
+        // ignore
       }
     })();
   }, []);
@@ -129,6 +144,31 @@ export default function ProfilePage() {
           Keep your profile details and privacy preferences updated so your care team interactions stay aligned with your comfort level.
         </div>
       </div>
+
+      {moodStats && (
+        <div className="responsive-card section-stack">
+          <h2 className="text-lg sm:text-xl font-semibold text-slate-900">My Progress (Quick)</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Average Mood (This Week)</p>
+              <p className="mt-2 text-2xl font-semibold text-slate-900">{moodStats.last7DaysAverage ?? (moodStats.averageMood ?? '—')}</p>
+              <p className="mt-1 text-xs text-slate-600">Daily Check-in average</p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Current Streak</p>
+              <p className="mt-2 text-2xl font-semibold text-slate-900">{moodStats.currentStreak ?? 0}</p>
+              <p className="mt-1 text-xs text-slate-600">Consecutive check-in days</p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Today's Wellness Score</p>
+              <p className="mt-2 text-2xl font-semibold text-slate-900">{Math.round(((moodStats.averageMood ?? 0) / 5) * 100)} / 100</p>
+              <p className="mt-1 text-xs text-slate-600">Based on recent check-ins</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-col sm:flex-row gap-4 justify-center sm:justify-end">
         <button
