@@ -42,7 +42,7 @@ const CountdownTimer: React.FC<{ targetDate: string }> = ({ targetDate }) => {
 };
 
 export const LeadBoostDashboard: React.FC = () => {
-    const [leads, setLeads] = useState<Lead[]>(MOCK_LEADS as Lead[]);
+    const [leads, setLeads] = useState<Lead[]>([...MOCK_LEADS] as Lead[]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {

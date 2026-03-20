@@ -1,14 +1,26 @@
-import { render, waitFor } from '@testing-library/react';
+import { renderWithProviders as render, mockedAxios, mockToast } from '@/test-utils.tsx';
+vi.mock('../api/patient', () => ({
+  patientApi: {
+    getDocuments: vi.fn(),
+  },
+}));
+import { waitFor } from '@testing-library/react';
 import { vi, describe, it, beforeEach, afterEach } from 'vitest';
-import axios from 'axios';
 import DocumentsPage from '../pages/patient/DocumentsPage';
 
-vi.mock('axios');
 
 describe('DocumentsPage polling', () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    (axios.get as any).mockResolvedValue({ data: { data: [] } });
+    mockedAxios.get.mockResolvedValue({ data: { data: [] } });
+    // Ensure a predictable localStorage for this test
+    (globalThis as any).localStorage = {
+      _store: {} as Record<string, string>,
+      getItem(key: string) { return Object.prototype.hasOwnProperty.call(this._store, key) ? this._store[key] : null; },
+      setItem(key: string, value: string) { this._store[key] = String(value); },
+      removeItem(key: string) { delete this._store[key]; },
+      clear() { this._store = {}; },
+    };
   });
 
   afterEach(() => {
@@ -17,13 +29,21 @@ describe('DocumentsPage polling', () => {
   });
 
   it('shows notification when new session docs appear', async () => {
-    const toastSpy = vi.spyOn(require('react-hot-toast'), 'default');
+    const toastFn = mockToast.success;
 
-    // initial call returns empty
-    (axios.get as any).mockResolvedValueOnce({ data: { data: [] } });
+    // Mock the patient API directly to control getDocuments for this test
+    const patientApiModule = await import('../api/patient');
+    let callCount = 0;
+    // the mocked module exports `{ patientApi }` so ensure we override the
+    // `patientApi.getDocuments` implementation specifically.
+    (patientApiModule as any).patientApi.getDocuments = vi.fn().mockImplementation(() => {
+      callCount += 1;
+      if (callCount === 1) return Promise.resolve([]);
+      if (callCount === 2) return Promise.resolve([{ id: 'd1', title: 'Session A', date: new Date().toISOString(), category: 'session', fileUrl: '' }]);
+      return Promise.resolve([]);
+    });
 
-    // second poll will return a new session doc
-    (axios.get as any).mockResolvedValueOnce({ data: { data: [{ id: 'd1', title: 'Session A', date: new Date().toISOString(), category: 'session', fileUrl: '' }] } });
+    // Note: patientApi module is mocked via vi.mock at the top of this file.
 
     render(<DocumentsPage />);
 
@@ -31,7 +51,7 @@ describe('DocumentsPage polling', () => {
     vi.advanceTimersByTime(16000);
 
     await waitFor(() => {
-      expect(toastSpy).toHaveBeenCalled();
+      expect(toastFn).toHaveBeenCalled();
     });
   });
 });

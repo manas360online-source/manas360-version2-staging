@@ -69,7 +69,7 @@ interface AppProps {
   initialPath?: string;
 }
 
-const App: React.FC<AppProps> = ({ basePath = '/', initialPath = '/' }) => {
+const App: React.FC<AppProps> = ({ basePath: _basePath = '/', initialPath = '/' }) => {
   return (
     <Router initialEntries={[initialPath]} initialIndex={0}>
       <Routes>

@@ -546,7 +546,7 @@ function showPhase(phaseId) {
   document.getElementById('screenCount').textContent = count + '–' + (count + phase.screens.length - 1);
 
   // Update phase nav active state
-  var btns = document.querySelectorAll('.phase-nav border-bottom .phase-btn');
+  var btns = document.querySelectorAll('.phase-nav .phase-btn');
   // Since we are using an iframe, we need to handle button states within the script
   var allBtns = document.querySelectorAll('.phase-btn');
   allBtns.forEach(btn => btn.classList.remove('active'));
