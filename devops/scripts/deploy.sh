@@ -7,6 +7,22 @@ FRONTEND_DIR="$ROOT_DIR/frontend"
 TARGET_REMOTE="${TARGET_REMOTE:-origin}"
 BRANCH_NAME="${BRANCH_NAME:-develop}"
 
+require_command() {
+	local cmd="$1"
+	if ! command -v "$cmd" >/dev/null 2>&1; then
+		echo "Required command not found: $cmd"
+		exit 1
+	fi
+}
+
+ensure_dir() {
+	local dir="$1"
+	if [ ! -d "$dir" ]; then
+		echo "Required directory not found: $dir"
+		exit 1
+	fi
+}
+
 resolve_remote_ref() {
 	local remote="$1"
 	local branch="$2"
@@ -25,6 +41,11 @@ resolve_remote_ref() {
 	echo ""
 }
 
+require_command git
+require_command npm
+require_command sudo
+ensure_dir "$ROOT_DIR"
+
 cd "$ROOT_DIR"
 git fetch "$TARGET_REMOTE" --prune
 
@@ -37,6 +58,9 @@ fi
 git checkout "$DEPLOY_BRANCH" || git checkout -b "$DEPLOY_BRANCH" "$TARGET_REMOTE/$DEPLOY_BRANCH"
 git reset --hard "$TARGET_REMOTE/$DEPLOY_BRANCH"
 
+ensure_dir "$BACKEND_DIR"
+ensure_dir "$FRONTEND_DIR"
+
 cd "$BACKEND_DIR"
 npm ci
 npm run prisma:generate
@@ -47,9 +71,11 @@ cd "$FRONTEND_DIR"
 npm ci
 npm run build
 
+require_command pm2
 pm2 restart manas360-backend || pm2 start "$BACKEND_DIR/dist/server.js" --name manas360-backend --time --log /var/log/backend.log
-pm2 save
+pm2 save || true
+
 sudo nginx -t
-sudo systemctl reload nginx
+sudo systemctl reload nginx || sudo service nginx reload
 
 echo "Staging deployment completed successfully."
