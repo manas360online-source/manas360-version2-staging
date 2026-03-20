@@ -1,19 +1,46 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="/var/www/manas360"
+ROOT_DIR="${ROOT_DIR:-/var/www/manas360}"
 BACKEND_DIR="$ROOT_DIR/backend"
 FRONTEND_DIR="$ROOT_DIR/frontend"
+TARGET_REMOTE="${TARGET_REMOTE:-origin}"
+BRANCH_NAME="${BRANCH_NAME:-develop}"
+
+resolve_remote_ref() {
+	local remote="$1"
+	local branch="$2"
+	if git ls-remote --exit-code --heads "$remote" "$branch" >/dev/null 2>&1; then
+		echo "$branch"
+		return 0
+	fi
+
+	for fallback in main master develop; do
+		if git ls-remote --exit-code --heads "$remote" "$fallback" >/dev/null 2>&1; then
+			echo "$fallback"
+			return 0
+		fi
+	done
+
+	echo ""
+}
 
 cd "$ROOT_DIR"
-git fetch origin develop
-git checkout develop
-git pull origin develop
+git fetch "$TARGET_REMOTE" --prune
+
+DEPLOY_BRANCH="$(resolve_remote_ref "$TARGET_REMOTE" "$BRANCH_NAME")"
+if [ -z "$DEPLOY_BRANCH" ]; then
+	echo "No deployable branch found on remote '$TARGET_REMOTE'"
+	exit 1
+fi
+
+git checkout "$DEPLOY_BRANCH" || git checkout -b "$DEPLOY_BRANCH" "$TARGET_REMOTE/$DEPLOY_BRANCH"
+git reset --hard "$TARGET_REMOTE/$DEPLOY_BRANCH"
 
 cd "$BACKEND_DIR"
 npm ci
-npx prisma generate
-npx prisma migrate deploy
+npm run prisma:generate
+npm run prisma:migrate:deploy
 npm run build
 
 cd "$FRONTEND_DIR"

@@ -4,6 +4,15 @@ on:
   push:
     branches:
       - develop
+      - main
+      - master
+      - staging
+      - sync/staging-docker
+  workflow_dispatch:
+
+concurrency:
+  group: staging-deploy
+  cancel-in-progress: true
 
 jobs:
   deploy:
@@ -38,7 +47,7 @@ jobs:
           key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
           script: |
             cd /var/www/manas360
-            ./devops/scripts/deploy.sh
+            BRANCH_NAME='${{ github.ref_name }}' ROOT_DIR='${{ vars.STAGING_APP_DIR || '/var/www/manas360' }}' bash ./devops/scripts/deploy.sh
 
       - name: Seed staging database
         if: ${{ vars.RUN_STAGING_SEED == 'true' }}
@@ -49,4 +58,4 @@ jobs:
           key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
           script: |
             cd /var/www/manas360
-            ./devops/scripts/seed.sh
+            ROOT_DIR='${{ vars.STAGING_APP_DIR || '/var/www/manas360' }}' bash ./devops/scripts/seed.sh

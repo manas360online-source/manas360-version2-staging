@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="/var/www/manas360"
+ROOT_DIR="${ROOT_DIR:-/var/www/manas360}"
 BACKEND_DIR="$ROOT_DIR/backend"
 
 cd "$BACKEND_DIR"
