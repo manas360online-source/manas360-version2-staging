@@ -15,7 +15,54 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate required staging secrets and vars
+        env:
+          LIGHTSAIL_HOST: ${{ secrets.LIGHTSAIL_HOST }}
+          LIGHTSAIL_USER: ${{ secrets.LIGHTSAIL_USER }}
+          LIGHTSAIL_SSH_KEY: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          STAGING_APP_DIR: ${{ vars.STAGING_APP_DIR }}
+        run: |
+          set -euo pipefail
+
+          missing=0
+
+          if [ -z "${LIGHTSAIL_HOST}" ]; then
+            echo "::error::Missing required secret: LIGHTSAIL_HOST"
+            missing=1
+          fi
+
+          if [ -z "${LIGHTSAIL_USER}" ]; then
+            echo "::error::Missing required secret: LIGHTSAIL_USER"
+            missing=1
+          fi
+
+          if [ -z "${LIGHTSAIL_SSH_KEY}" ]; then
+            echo "::error::Missing required secret: LIGHTSAIL_SSH_KEY"
+            missing=1
+          fi
+
+          if [ -z "${STAGING_APP_DIR}" ]; then
+            echo "::warning::Repository variable STAGING_APP_DIR is not set. Default '/var/www/manas360' will be used."
+          fi
+
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Validate deploy script syntax
+        run: |
+          set -euo pipefail
+          bash -n devops/scripts/deploy.sh
+          bash -n devops/scripts/seed.sh
+
   deploy:
+    needs: preflight
     runs-on: ubuntu-latest
 
     steps:
