@@ -3,7 +3,8 @@ FROM node:20-alpine as build
 WORKDIR /app
 COPY package*.json ./
 RUN apk add --no-cache openssl openssl-dev python3 build-base
-RUN npm ci
+RUN npm install -g npm@latest
+RUN npm install --legacy-peer-deps
 COPY . .
 RUN npm run build && npx prisma generate
 
