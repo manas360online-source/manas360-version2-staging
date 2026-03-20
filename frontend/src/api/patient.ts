@@ -289,7 +289,7 @@ export const patientApi = {
   selectJourneyPathway: async (payload: JourneySelectPathwayRequest): Promise<JourneySelectPathwayResponse> =>
     (await http.post('/v1/patient-journey/select-pathway', payload)).data,
   addMood: async (payload: { mood: number; note?: string }) => (await http.post('/v1/mood', payload)).data,
-  getMoodHistory: async () => (await http.get('/v1/mood/history')).data,
+  getMoodHistory: async () => (await http.get('/v1/patient/mood/history')).data,
   getMoodLogs: async () => (await http.get('/patient/mood')).data,
   getMoodToday: async () =>
     withV1Fallback(
@@ -299,13 +299,13 @@ export const patientApi = {
   getMoodHistoryV2: async () =>
     withV1Fallback(
       async () => (await http.get('/patient/mood/history')).data,
-      async () => (await http.get('/v1/mood/history')).data,
+      async () => (await http.get('/v1/patient/mood/history')).data,
     ),
   getMoodStats: async () =>
     withV1Fallback(
       async () => (await http.get('/patient/mood/stats')).data,
       async () => {
-        const history = (await http.get('/v1/mood/history')).data as any[];
+        const history = (await http.get('/v1/patient/mood/history')).data as any[];
         const rows = Array.isArray(history) ? history : [];
         const avg = rows.length
           ? Number((rows.reduce((sum, item) => sum + Number(item?.mood || 0), 0) / rows.length).toFixed(2))
