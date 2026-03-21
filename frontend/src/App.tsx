@@ -21,10 +21,13 @@ import PlatformAdminRoute from './components/PlatformAdminRoute'
 import CorporateRoute from './components/CorporateRoute'
 const PatientDashboardLayout = lazy(() => import('./components/layout/PatientDashboardLayout'));
 const DashboardPage = lazy(() => import('./pages/patient/DashboardPage'));
+const BookSessionPage = lazy(() => import('./pages/patient/BookSessionPage'));
 const SessionsPage = lazy(() => import('./pages/patient/SessionsPage'));
+const PatientSessionDetailPage = lazy(() => import('./pages/patient/SessionDetailPage'));
 const AIChatPage = lazy(() => import('./pages/patient/AIChatPage'));
 const ProfilePage = lazy(() => import('./pages/patient/ProfilePage'));
 const SettingsPage = lazy(() => import('./pages/patient/SettingsPage'));
+const LiveSessionPage = lazy(() => import('./pages/patient/LiveSessionPage'));
 const DocumentsPage = lazy(() => import('./pages/patient/DocumentsPage'));
 const ProgressPage = lazy(() => import('./pages/patient/ProgressPage'));
 const SupportPage = lazy(() => import('./pages/patient/SupportPage'));
@@ -37,14 +40,11 @@ const NotificationsPage = lazy(() => import('./pages/patient/NotificationsPage')
 const SoundTherapyPage = lazy(() => import('./pages/patient/SoundTherapyPage'));
 const SleepTherapyPage = lazy(() => import('./pages/patient/SleepTherapyPage'));
 const WellnessLibraryPage = lazy(() => import('./pages/patient/WellnessLibraryPage'));
-const DigitalPetsHubPage = lazy(() => import('./pages/patient/DigitalPetsHubPage'));
-const PetVrSanctuaryPage = lazy(() => import('./pages/patient/PetVrSanctuaryPage'));
 const BuddyChatPage = lazy(() => import('./pages/patient/BuddyChatPage'));
 const ProviderMessagesPage = lazy(() => import('./pages/patient/ProviderMessagesPage'));
 const PatientOnboardingPage = lazy(() => import('./pages/patient/PatientOnboardingPage'));
 const DailyCheckInPage = lazy(() => import('./pages/patient/DailyCheckInPage'));
 const VideoSessionPage = lazy(() => import('./pages/shared/VideoSessionPage'));
-const PaymentStatusPage = lazy(() => import('./pages/shared/PaymentStatus'));
 const AdminPortalLoginPage = lazy(() => import('./pages/admin/AdminPortalLoginPage'));
 const AdminDashboardPage = lazy(() => import('./pages/admin/Dashboard'));
 const AdminShellLayout = lazy(() => import('./components/admin/AdminShellLayout'));
@@ -60,7 +60,6 @@ const AdminPendingProvidersPage = lazy(() => import('./pages/admin/PendingProvid
 const AdminRevenuePage = lazy(() => import('./pages/admin/Revenue'));
 const AdminSettingsPage = lazy(() => import('./pages/admin/Settings'));
 const AdminPricingManagementPage = lazy(() => import('./pages/admin/PricingManagement'));
-const AdminPaymentReliabilityPage = lazy(() => import('./pages/admin/PaymentReliability'));
 const ClinicalAssistantPage = lazy(() => import('./pages/admin/ClinicalAssistantPage'));
 const AdminSectionPage = lazy(() => import('./pages/admin/AdminSectionPage'));
 const AdminTemplatesPage = lazy(() => import('./pages/admin/Templates'));
@@ -90,19 +89,16 @@ const ProviderSettingsPage = lazy(() => import('./pages/provider/Settings'));
 const ProviderDashboard = lazy(() => import('./pages/provider/Dashboard/ProviderDashboard'));
 const ProviderOnboardingPage = lazy(() => import('./pages/provider/ProviderOnboardingPage'));
 const ProviderVerificationPendingPage = lazy(() => import('./pages/provider/ProviderVerificationPendingPage'));
-const AppointmentRequestsPage = lazy(() => import('./pages/provider/AppointmentRequests'));
-const ProviderSubscriptionPage = lazy(() => import('./pages/provider/ProviderSubscriptionPage'));
-const TherapistLiveSessionPage = lazy(() => import('./pages/therapist/TherapistLiveSessionPage'));
 const HubLayout = lazy(() => import('./components/layout/HubLayout'));
 const PatientList = lazy(() => import('./pages/provider/Patients/PatientList'));
 const PatientChartLayout = lazy(() => import('./components/layout/PatientChartLayout'));
 const ChartOverview = lazy(() => import('./pages/provider/Patients/Tabs/ChartOverview'));
 const SessionNotes = lazy(() => import('./pages/provider/Patients/Tabs/SessionNotes'));
 const Assessments = lazy(() => import('./pages/provider/Patients/Tabs/Assessments'));
+const PlanStudio = lazy(() => import('./pages/provider/Patients/Tabs/PlanStudio'));
 const Prescriptions = lazy(() => import('./pages/provider/Patients/Tabs/Prescriptions'));
 const LabOrders = lazy(() => import('./pages/provider/Patients/Tabs/LabOrders'));
 const GoalsAndHabits = lazy(() => import('./pages/provider/Patients/Tabs/GoalsAndHabits'));
-const CareTeamTab = lazy(() => import('./pages/provider/Patients/Tabs/CareTeamTab'));
 
 // Certification Pages
 const CertificationLayout = lazy(() => import('./components/CertificationLayout'));
@@ -118,6 +114,8 @@ const CertificationModulesPage = lazy(() => import('./pages/CertificationModules
 const CertificationLessonPage = lazy(() => import('./pages/CertificationLessonPage').then(m => ({ default: m.CertificationLessonPage })));
 const CertificationAssignmentPage = lazy(() => import('./pages/CertificationAssignmentPage').then(m => ({ default: m.CertificationAssignmentPage })));
 const CertificationQuizPage = lazy(() => import('./pages/CertificationQuizPage').then(m => ({ default: m.CertificationQuizPage })));
+const CertificationCertificatePage = lazy(() => import('./pages/CertificationCertificatePage'));
+const CertificateVerificationPage = lazy(() => import('./pages/CertificateVerificationPage'));
 const LeadBoastDashboard = lazy(() => import('./pages/LeadBoastDashboard'));
 
 interface AssessmentData {
@@ -157,374 +155,268 @@ function App() {
   return (
     <AuthProvider>
       <GlobalAudioProvider>
-      <Toaster
-        position="top-center"
-        toastOptions={{
-          duration: 3500,
-          style: {
-            borderRadius: '16px',
-            background: '#F8FCFA',
-            color: '#23313A',
-            border: '1px solid #D8EAE1',
-            boxShadow: '0 12px 32px rgba(23, 39, 54, 0.12)',
-          },
-          success: {
-            iconTheme: {
-              primary: '#2F7A5F',
-              secondary: '#F8FCFA',
+        <Toaster
+          position="top-center"
+          toastOptions={{
+            duration: 3500,
+            style: {
+              borderRadius: '16px',
+              background: '#F8FCFA',
+              color: '#23313A',
+              border: '1px solid #D8EAE1',
+              boxShadow: '0 12px 32px rgba(23, 39, 54, 0.12)',
             },
-          },
-        }}
-      />
-      <Suspense fallback={<GlobalFallbackLoader />}>
-        <ScrollToTop />
-        <Routes>
-      <Route path="/" element={<LandingPage />} />
-      <Route path="/assessment" element={<Assessment onSubmit={handleAssessmentSubmit} />} />
+            success: {
+              iconTheme: {
+                primary: '#2F7A5F',
+                secondary: '#F8FCFA',
+              },
+            },
+          }}
+        />
+        <Suspense fallback={<GlobalFallbackLoader />}>
+          <ScrollToTop />
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/assessment" element={<Assessment onSubmit={handleAssessmentSubmit} />} />
 
-      {/* Certification Sub-App */}
-      <Route element={<CertificationLayout />}>
-        <Route path="/certifications" element={<CertificationLandingPage />} />
-        <Route path="/certifications/:slug" element={<CertificationDetailsPage />} />
-        <Route path="/certifications/details" element={<CertificationsPage />} />
-        <Route path="/my-certifications" element={<MyCertificationsPage />} />
-        <Route path="/checkout/:slug" element={<CheckoutPage />} />
-        <Route path="/registration" element={<EnrollmentRegistrationPage />} />
-        <Route path="/payment-success" element={<PaymentSuccessPage />} />
-        <Route path="/payment-failed" element={<PaymentFailedPage />} />
-        <Route path="/journey" element={<JourneyWireframePage />} />
-        <Route path="/confirmed" element={<EnrollmentConfirmedPage />} />
-        <Route path="/certifications/modules/:enrollmentId" element={<CertificationModulesPage />} />
-        <Route path="/certifications/lessons/:lessonId" element={<CertificationLessonPage />} />
-        <Route path="/certifications/assignments/:assignmentId" element={<CertificationAssignmentPage />} />
-        <Route path="/certifications/quiz/:enrollmentId" element={<CertificationQuizPage />} />
-        <Route path="/dashboard" element={<LeadBoastDashboard />} />
-      </Route>
+            {/* ── Certification Sub-App ── */}
+            <Route element={<CertificationLayout />}>
+              <Route path="/certifications" element={<CertificationLandingPage />} />
+              <Route path="/certifications/:slug" element={<CertificationDetailsPage />} />
+              <Route path="/certifications/details" element={<CertificationsPage />} />
+              <Route path="/my-certifications" element={<MyCertificationsPage />} />
+              <Route path="/checkout/:slug" element={<CheckoutPage />} />
+              <Route path="/registration" element={<EnrollmentRegistrationPage />} />
+              <Route path="/payment-success" element={<PaymentSuccessPage />} />
+              <Route path="/payment-failed" element={<PaymentFailedPage />} />
+              <Route path="/journey" element={<JourneyWireframePage />} />
 
-      <Route path="/results" element={<ResultsPage data={assessmentData} />} />
-      <Route path="/crisis" element={<CrisisPage />} />
-      <Route path="/onboarding/name" element={<OnboardingName onNext={handleOnboardingName} />} />
-      <Route path="/onboarding/email" element={<OnboardingEmail userName={userName} />} />
-        <Route
-          path="/therapist-dashboard"
-          element={
-            <ProtectedRoute>
-              <Navigate to="/provider/dashboard" replace />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/provider"
-          element={
-            <ProtectedRoute allowedRoles={['therapist', 'psychiatrist', 'psychologist', 'coach']}>
-              <HubLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<Navigate to="dashboard" replace />} />
-          <Route path="dashboard" element={<ProviderDashboard />} />
-          <Route path="patients" element={<PatientList />} />
-          <Route path="patient/:patientId" element={<PatientChartLayout />}>
-            <Route index element={<Navigate to="overview" replace />} />
-            <Route path="overview" element={<ChartOverview />} />
-            <Route path="notes" element={<SessionNotes />} />
-            <Route path="session-notes" element={<Navigate to="../notes" replace />} />
-            <Route path="assessments" element={<Assessments />} />
-            <Route path="care-team" element={<CareTeamTab />} />
-            <Route path="plan-builder" element={<Navigate to="../overview" replace />} />
-            <Route path="goals" element={<GoalsAndHabits />} />
-            <Route path="prescriptions" element={<Prescriptions />} />
-            <Route path="labs" element={<LabOrders />} />
-            <Route path="lab-orders" element={<Navigate to="../labs" replace />} />
-            <Route path="clinical-notes" element={<SessionNotes />} />
-          </Route>
-          <Route path="calendar" element={<ProviderCalendarPage />} />
-          <Route path="notes" element={<Navigate to="patient/123/notes" replace />} />
-          <Route path="assessments" element={<Navigate to="patient/123/assessments" replace />} />
-          <Route path="prescriptions" element={<Navigate to="patient/123/prescriptions" replace />} />
-          <Route path="labs" element={<Navigate to="patient/123/labs" replace />} />
-          <Route path="goals" element={<Navigate to="patient/123/goals" replace />} />
-          <Route path="earnings" element={<ProviderEarningsPage />} />
-          <Route path="messages" element={<ProviderInboxPage />} />
-          <Route path="settings" element={<ProviderSettingsPage />} />
-          <Route path="appointments" element={<AppointmentRequestsPage />} />
-          <Route path="subscription" element={<ProviderSubscriptionPage />} />
-        </Route>
-        <Route
-          path="/onboarding/provider-setup"
-          element={
-            <ProtectedRoute allowedRoles={['therapist', 'psychiatrist', 'psychologist', 'coach']}>
-              <ProviderOnboardingPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="/provider/onboarding" element={<Navigate to="/onboarding/provider-setup" replace />} />
-        <Route
-          path="/provider/verification-pending"
-          element={
-            <ProtectedRoute allowedRoles={['therapist', 'psychiatrist', 'psychologist', 'coach']}>
-              <ProviderVerificationPendingPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/therapist/live-session/:sessionId"
-          element={
-            <ProtectedRoute allowedRoles={['therapist', 'psychiatrist', 'psychologist', 'coach']}>
-              <TherapistLiveSessionPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="/auth/login" element={<LoginPage />} />
-        <Route path="/therapist/*" element={<Navigate to="/provider/dashboard" replace />} />
-        <Route path="/psychiatrist/*" element={<Navigate to="/provider/dashboard" replace />} />
-        <Route path="/psychologist/*" element={<Navigate to="/provider/dashboard" replace />} />
-        <Route path="/auth/signup" element={<SignupPage />} />
-        <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
-        <Route path="/admin-portal/login" element={<AdminPortalLoginPage />} />
-        <Route path="/corporate/login" element={<Navigate to="/auth/login" replace />} />
-        <Route path="/payment/status" element={<PaymentStatusPage />} />
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <DashboardRedirect />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/video-session/:sessionId"
-          element={
-            <ProtectedRoute allowedRoles={['patient', 'therapist', 'psychiatrist', 'psychologist', 'coach']}>
-              <VideoSessionPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/provider/live-session/:sessionId"
-          element={
-            <ProtectedRoute allowedRoles={['therapist', 'psychiatrist', 'psychologist', 'coach']}>
-              <TherapistLiveSessionPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin"
-          element={
-            <PlatformAdminRoute>
-              <AdminEntryGate />
-            </PlatformAdminRoute>
-          }
-        >
-          <Route element={<AdminShellLayout />}>
-          <Route index element={<Navigate to="dashboard" replace />} />
-          <Route path="dashboard" element={<AdminDashboardPage />} />
-          <Route path="platform-analytics" element={<AdminSectionPage title="Platform Analytics" description="Growth, monetization, retention, and operational analytics across the platform." bullets={['User growth by role', 'Revenue trends and cohorts', 'Session completion and drop rates', 'Subscription funnel and churn intelligence']} />} />
+              {/* ── Both /confirmed (legacy) and /enrollment-confirmed point to same page ── */}
+              <Route path="/confirmed" element={<EnrollmentConfirmedPage />} />
+              <Route path="/enrollment-confirmed" element={<EnrollmentConfirmedPage />} />
 
-          <Route path="user-approvals" element={<AdminSectionPage title="User Approvals" description="Approve, reject, and monitor pending user onboarding requests." bullets={['Pending approval queue', 'KYC validation status', 'Approval SLA tracking', 'Escalation workflow']} />} />
-          <Route path="therapist-verification" element={<AdminVerificationPage />} />
-          <Route path="pending-providers" element={<AdminPendingProvidersPage />} />
-          <Route path="users" element={<AdminUsersPage />} />
-          <Route path="roles" element={<AdminRolesPage />} />
+              <Route path="/certifications/modules/:enrollmentId" element={<CertificationModulesPage />} />
+              <Route path="/certifications/lessons/:lessonId" element={<CertificationLessonPage />} />
+              <Route path="/certifications/assignments/:assignmentId" element={<CertificationAssignmentPage />} />
+              <Route path="/certifications/quiz/:enrollmentId" element={<CertificationQuizPage />} />
+              <Route path="/certifications/certificate/:enrollmentId" element={<CertificationCertificatePage />} />
+              <Route path="/dashboard" element={<LeadBoastDashboard />} />
+            </Route>
 
-          <Route path="companies" element={<AdminCompaniesPage />} />
-          <Route path="company-subscriptions" element={<AdminCompanySubscriptionsPage />} />
-          <Route path="company-reports" element={<AdminCompanyReportsPage />} />
-
-          <Route path="live-sessions" element={<AdminSectionPage title="Live Sessions" description="Monitor active sessions, disruptions, and quality metrics in real-time." bullets={['Live session monitor', 'Drop/disconnect alerts', 'Therapist capacity overview', 'Session intervention controls']} />} />
-          <Route path="templates" element={<AdminTemplatesPage />} />
-          <Route path="crisis-alerts" element={<AdminSectionPage title="Crisis Alerts" description="Triage and escalate high-risk events with defined safety protocols." bullets={['Suicide risk alerts', 'Escalate to psychiatrist', 'Emergency protocol status', 'Resolution timeline']} />} />
-
-          <Route path="revenue" element={<AdminRevenuePage />} />
-          <Route path="payment-reliability" element={<AdminPaymentReliabilityPage />} />
-          <Route path="pricing-management" element={<AdminPricingManagementPage />} />
-          <Route path="payouts" element={<AdminSectionPage title="Payouts" description="Review provider payouts, schedules, holds, and reconciliation exceptions." bullets={['Scheduled payout runs', 'Manual adjustments', 'Failed transfer handling', 'Payout audit log']} />} />
-          <Route path="invoices" element={<AdminSectionPage title="Invoices" description="Track invoices, collections, refunds, and payment disputes." bullets={['Invoice lifecycle tracking', 'Corporate and individual invoices', 'Refund analytics', 'Collection status by segment']} />} />
-
-          <Route path="user-growth" element={<AdminSectionPage title="User Growth Analytics" description="Analyze growth trends across patients, therapists, corporate users, and partners." bullets={['Monthly active users by role', 'Acquisition vs activation', 'Retention cohorts', 'Regional growth patterns']} />} />
-          <Route path="session-analytics" element={<AdminSectionPage title="Session Analytics" description="Track platform-wide session quality, throughput, and completion metrics." bullets={['Sessions per day/week/month', 'Completion and dropout rates', 'Average session duration', 'Service line distribution']} />} />
-          <Route path="therapist-performance" element={<AdminSectionPage title="Therapist Performance" description="Benchmark provider outcomes, ratings, and engagement effectiveness." bullets={['Sessions completed', 'Patient ratings', 'Improvement score trend', 'Retention and revisit rates']} />} />
-          <Route path="mental-health-trends" element={<AdminSectionPage title="Mental Health Trends" description="Monitor category-level trends to plan interventions and workforce readiness." bullets={['Depression and anxiety trends', 'Sleep and stress categories', 'High-risk cluster detection', 'Program outcome comparisons']} />} />
-
-          <Route path="support-tickets" element={<AdminSectionPage title="Support Tickets" description="Operational support queue with category insights and SLA compliance." bullets={['Open vs resolved volume', 'Ticket category analytics', 'Average resolution time', 'Satisfaction tracking']} />} />
-          <Route path="feedback" element={<AdminSectionPage title="Feedback" description="Collect and analyze user and provider feedback loops for product quality." bullets={['NPS and CSAT trends', 'Feedback themes', 'Feature request clusters', 'Escalation tagging']} />} />
-
-          <Route path="audit-logs" element={<AdminSectionPage title="Audit Logs" description="Security-grade activity timeline for admin actions and sensitive operations." bullets={['User login and role changes', 'Account suspension events', 'Payment and billing actions', 'Immutable audit export']} />} />
-          <Route path="compliance" element={<AdminSectionPage title="Compliance" description="Track DPDPA/HIPAA controls, policy adherence, and privacy operations." bullets={['Consent lifecycle logs', 'Data access events', 'Compliance readiness status', 'Policy exception management']} />} />
-          <Route path="data-requests" element={<AdminSectionPage title="Data Requests" description="Manage export, deletion, and data-subject requests with approvals." bullets={['Export requests', 'Deletion requests', 'Legal hold checks', 'Request SLA and closure']} />} />
-
-          <Route path="platform-health" element={<AdminPlatformHealthPage />} />
-          <Route path="ai-monitoring" element={<AdminSectionPage title="AI Monitoring" description="Supervise AI safety, moderation outcomes, and risk alert precision." bullets={['Self-harm detection quality', 'Prompt/response moderation', 'Flagged response queue', 'Model safety policy controls']} />} />
-          <Route path="clinical-assistant" element={<ClinicalAssistantPage />} />
-          <Route path="settings" element={<AdminSettingsPage />} />
-
-          </Route>
-        </Route>
-        <Route
-          path="/corporate/dashboard"
-          element={
-            <CorporateRoute>
-              <CorporateDashboardPage />
-            </CorporateRoute>
-          }
-        />
-        <Route path="/corporate" element={<CorporateOnboardingPage />} />
-        <Route
-          path="/corporate/analytics"
-          element={
-            <CorporateRoute>
-              <CorporateAnalyticsPage />
-            </CorporateRoute>
-          }
-        />
-        <Route
-          path="/corporate/employees/directory"
-          element={
-            <CorporateRoute>
-              <CorporateEmployeeDirectoryPage />
-            </CorporateRoute>
-          }
-        />
-        <Route
-          path="/corporate/employees/enrollment"
-          element={
-            <CorporateRoute>
-              <CorporateEnrollmentPage />
-            </CorporateRoute>
-          }
-        />
-        <Route
-          path="/corporate/employees/allocation"
-          element={
-            <CorporateRoute>
-              <CorporateSessionAllocationPage />
-            </CorporateRoute>
-          }
-        />
-        <Route
-          path="/corporate/reports/utilization"
-          element={
-            <CorporateRoute>
-              <CorporateUtilizationReportsPage />
-            </CorporateRoute>
-          }
-        />
-        <Route
-          path="/corporate/reports/wellbeing"
-          element={
-            <CorporateRoute>
-              <CorporateWellbeingReportsPage />
-            </CorporateRoute>
-          }
-        />
-        <Route
-          path="/corporate/reports/engagement"
-          element={
-            <CorporateRoute>
-              <CorporateEngagementReportsPage />
-            </CorporateRoute>
-          }
-        />
-        <Route
-          path="/corporate/billing/invoices"
-          element={
-            <CorporateRoute>
-              <CorporateInvoicesPage />
-            </CorporateRoute>
-          }
-        />
-        <Route
-          path="/corporate/billing/payment-methods"
-          element={
-            <CorporateRoute>
-              <CorporatePaymentMethodsPage />
-            </CorporateRoute>
-          }
-        />
-        <Route
-          path="/corporate/billing/plan"
-          element={
-            <CorporateRoute>
-              <CorporatePlanPage />
-            </CorporateRoute>
-          }
-        />
-        <Route
-          path="/corporate/account/help"
-          element={
-            <CorporateRoute>
-              <CorporateHelpPage />
-            </CorporateRoute>
-          }
-        />
-        <Route
-          path="/corporate/sso"
-          element={
-            <CorporateRoute>
-              <SSOSettingsPage />
-            </CorporateRoute>
-          }
-        />
-        <Route path="/login" element={<Navigate to="/auth/login" replace />} />
-        <Route path="/register" element={<Navigate to="/auth/signup" replace />} />
-        <Route path="/subscribe" element={<Navigate to="/patient/pricing" replace />} />
-
-        <Route
-          path="/patient"
-          element={
-            <ProtectedRoute allowedRoles={['patient']}>
-              <PatientDashboardLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<Navigate to="dashboard" replace />} />
-          <Route path="dashboard" element={<DashboardPage />} />
-          <Route path="onboarding" element={<PatientOnboardingPage />} />
-          <Route path="therapy-plan" element={<TherapyPlanPage />} />
-          <Route path="care-team" element={<Navigate to="/patient/sessions" replace />} />
-          <Route path="providers" element={<Navigate to="/patient/sessions" replace />} />
-          <Route path="providers/:id" element={<Navigate to="/patient/sessions" replace />} />
-          <Route path="sessions" element={<SessionsPage />} />
-          <Route path="exercises" element={<Navigate to="/patient/check-in?tab=daily-mood" replace />} />
-          <Route path="mood" element={<Navigate to="/patient/check-in?tab=daily-mood" replace />} />
-          <Route path="wellness-library" element={<WellnessLibraryPage />} />
-          <Route path="digital-pets" element={<DigitalPetsHubPage />} />
-          <Route path="vr-sanctuary" element={<PetVrSanctuaryPage />} />
-          <Route path="sleep-therapy" element={<SleepTherapyPage />} />
-          <Route path="sound-therapy" element={<SoundTherapyPage />} />
-          <Route path="buddy/:mode" element={<BuddyChatPage />} />
-          <Route path="provider-messages" element={<ProviderMessagesPage />} />
-          <Route path="provider-messages/:providerId" element={<ProviderMessagesPage />} />
-          <Route path="messages" element={<AIChatPage />} />
-          <Route path="profile" element={<ProfilePage />} />
-          <Route path="settings" element={<SettingsPage />} />
-          <Route path="assessment-reports" element={<Navigate to="/patient/progress?tab=clinical" replace />} />
-          <Route path="billing" element={<Navigate to="/patient/settings?section=billing" replace />} />
-          <Route path="documents" element={<DocumentsPage />} />
-          <Route path="support" element={<SupportPage />} />
-          <Route path="timeline" element={<PatientTimelinePage />} />
-          <Route path="insights" element={<Navigate to="/patient/progress?tab=mood" replace />} />
-          <Route path="progress" element={<ProgressPage />} />
-          <Route path="reports" element={<ReportsPage />} />
-          <Route path="reports/shared/:id" element={<PatientReportDownloadPage />} />
-          <Route path="notifications" element={<NotificationsPage />} />
-          <Route path="pricing" element={<PricingPage />} />
-          <Route path="check-in" element={<DailyCheckInPage />} />
-        </Route>
-        <Route path="/providers/:id" element={<Navigate to="/patient/sessions" replace />} />
-        <Route path="/sessions" element={<Navigate to="/patient/sessions" replace />} />
-        <Route path="/ai-chat" element={<Navigate to="/patient/messages" replace />} />
-        <Route path="/pet" element={<Navigate to="/patient/digital-pets" replace />} />
-        <Route path="/profile" element={<Navigate to="/patient/profile" replace />} />
-        <Route path="/settings" element={<Navigate to="/patient/settings" replace />} />
-        <Route path="/terms" element={<TermsOfUsePage />} />
-        <Route path="/privacy" element={<PrivacyPolicyPage />} />
-        <Route path="/refunds" element={<CancellationRefundPolicyPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-      </Suspense>
-      <GlobalAudioPlayerConsole />
+            <Route path="/results" element={<ResultsPage data={assessmentData} />} />
+            <Route path="/crisis" element={<CrisisPage />} />
+            <Route path="/onboarding/name" element={<OnboardingName onNext={handleOnboardingName} />} />
+            <Route path="/onboarding/email" element={<OnboardingEmail userName={userName} />} />
+            <Route
+              path="/therapist-dashboard"
+              element={
+                <ProtectedRoute>
+                  <Navigate to="/provider/dashboard" replace />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/provider"
+              element={
+                <ProtectedRoute allowedRoles={['therapist', 'psychiatrist', 'psychologist', 'coach']}>
+                  <HubLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<Navigate to="dashboard" replace />} />
+              <Route path="dashboard" element={<ProviderDashboard />} />
+              <Route path="patients" element={<PatientList />} />
+              <Route path="patient/:patientId" element={<PatientChartLayout />}>
+                <Route index element={<Navigate to="overview" replace />} />
+                <Route path="overview" element={<ChartOverview />} />
+                <Route path="notes" element={<SessionNotes />} />
+                <Route path="session-notes" element={<Navigate to="../notes" replace />} />
+                <Route path="assessments" element={<Assessments />} />
+                <Route path="plan-builder" element={<PlanStudio />} />
+                <Route path="goals" element={<GoalsAndHabits />} />
+                <Route path="prescriptions" element={<Prescriptions />} />
+                <Route path="labs" element={<LabOrders />} />
+                <Route path="lab-orders" element={<Navigate to="../labs" replace />} />
+                <Route path="clinical-notes" element={<SessionNotes />} />
+              </Route>
+              <Route path="calendar" element={<ProviderCalendarPage />} />
+              <Route path="notes" element={<Navigate to="patient/123/notes" replace />} />
+              <Route path="assessments" element={<Navigate to="patient/123/assessments" replace />} />
+              <Route path="prescriptions" element={<Navigate to="patient/123/prescriptions" replace />} />
+              <Route path="labs" element={<Navigate to="patient/123/labs" replace />} />
+              <Route path="goals" element={<Navigate to="patient/123/goals" replace />} />
+              <Route path="earnings" element={<ProviderEarningsPage />} />
+              <Route path="messages" element={<ProviderInboxPage />} />
+              <Route path="settings" element={<ProviderSettingsPage />} />
+            </Route>
+            <Route
+              path="/onboarding/provider-setup"
+              element={
+                <ProtectedRoute allowedRoles={['therapist', 'psychiatrist', 'psychologist', 'coach']}>
+                  <ProviderOnboardingPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/provider/onboarding" element={<Navigate to="/onboarding/provider-setup" replace />} />
+            <Route
+              path="/provider/verification-pending"
+              element={
+                <ProtectedRoute allowedRoles={['therapist', 'psychiatrist', 'psychologist', 'coach']}>
+                  <ProviderVerificationPendingPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/auth/login" element={<LoginPage />} />
+            <Route path="/therapist/*" element={<Navigate to="/provider/dashboard" replace />} />
+            <Route path="/psychiatrist/*" element={<Navigate to="/provider/dashboard" replace />} />
+            <Route path="/psychologist/*" element={<Navigate to="/provider/dashboard" replace />} />
+            <Route path="/auth/signup" element={<SignupPage />} />
+            <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/admin-portal/login" element={<AdminPortalLoginPage />} />
+            <Route path="/corporate/login" element={<Navigate to="/auth/login" replace />} />
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <DashboardRedirect />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/video-session/:sessionId"
+              element={
+                <ProtectedRoute allowedRoles={['patient', 'therapist', 'psychiatrist', 'psychologist', 'coach']}>
+                  <VideoSessionPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <PlatformAdminRoute>
+                  <AdminEntryGate />
+                </PlatformAdminRoute>
+              }
+            >
+              <Route element={<AdminShellLayout />}>
+                <Route index element={<Navigate to="dashboard" replace />} />
+                <Route path="dashboard" element={<AdminDashboardPage />} />
+                <Route path="platform-analytics" element={<AdminSectionPage title="Platform Analytics" description="Growth, monetization, retention, and operational analytics across the platform." bullets={['User growth by role', 'Revenue trends and cohorts', 'Session completion and drop rates', 'Subscription funnel and churn intelligence']} />} />
+                <Route path="user-approvals" element={<AdminSectionPage title="User Approvals" description="Approve, reject, and monitor pending user onboarding requests." bullets={['Pending approval queue', 'KYC validation status', 'Approval SLA tracking', 'Escalation workflow']} />} />
+                <Route path="therapist-verification" element={<AdminVerificationPage />} />
+                <Route path="pending-providers" element={<AdminPendingProvidersPage />} />
+                <Route path="users" element={<AdminUsersPage />} />
+                <Route path="roles" element={<AdminRolesPage />} />
+                <Route path="companies" element={<AdminCompaniesPage />} />
+                <Route path="company-subscriptions" element={<AdminCompanySubscriptionsPage />} />
+                <Route path="company-reports" element={<AdminCompanyReportsPage />} />
+                <Route path="live-sessions" element={<AdminSectionPage title="Live Sessions" description="Monitor active sessions, disruptions, and quality metrics in real-time." bullets={['Live session monitor', 'Drop/disconnect alerts', 'Therapist capacity overview', 'Session intervention controls']} />} />
+                <Route path="templates" element={<AdminTemplatesPage />} />
+                <Route path="crisis-alerts" element={<AdminSectionPage title="Crisis Alerts" description="Triage and escalate high-risk events with defined safety protocols." bullets={['Suicide risk alerts', 'Escalate to psychiatrist', 'Emergency protocol status', 'Resolution timeline']} />} />
+                <Route path="revenue" element={<AdminRevenuePage />} />
+                <Route path="pricing-management" element={<AdminPricingManagementPage />} />
+                <Route path="payouts" element={<AdminSectionPage title="Payouts" description="Review provider payouts, schedules, holds, and reconciliation exceptions." bullets={['Scheduled payout runs', 'Manual adjustments', 'Failed transfer handling', 'Payout audit log']} />} />
+                <Route path="invoices" element={<AdminSectionPage title="Invoices" description="Track invoices, collections, refunds, and payment disputes." bullets={['Invoice lifecycle tracking', 'Corporate and individual invoices', 'Refund analytics', 'Collection status by segment']} />} />
+                <Route path="user-growth" element={<AdminSectionPage title="User Growth Analytics" description="Analyze growth trends across patients, therapists, corporate users, and partners." bullets={['Monthly active users by role', 'Acquisition vs activation', 'Retention cohorts', 'Regional growth patterns']} />} />
+                <Route path="session-analytics" element={<AdminSectionPage title="Session Analytics" description="Track platform-wide session quality, throughput, and completion metrics." bullets={['Sessions per day/week/month', 'Completion and dropout rates', 'Average session duration', 'Service line distribution']} />} />
+                <Route path="therapist-performance" element={<AdminSectionPage title="Therapist Performance" description="Benchmark provider outcomes, ratings, and engagement effectiveness." bullets={['Sessions completed', 'Patient ratings', 'Improvement score trend', 'Retention and revisit rates']} />} />
+                <Route path="mental-health-trends" element={<AdminSectionPage title="Mental Health Trends" description="Monitor category-level trends to plan interventions and workforce readiness." bullets={['Depression and anxiety trends', 'Sleep and stress categories', 'High-risk cluster detection', 'Program outcome comparisons']} />} />
+                <Route path="support-tickets" element={<AdminSectionPage title="Support Tickets" description="Operational support queue with category insights and SLA compliance." bullets={['Open vs resolved volume', 'Ticket category analytics', 'Average resolution time', 'Satisfaction tracking']} />} />
+                <Route path="feedback" element={<AdminSectionPage title="Feedback" description="Collect and analyze user and provider feedback loops for product quality." bullets={['NPS and CSAT trends', 'Feedback themes', 'Feature request clusters', 'Escalation tagging']} />} />
+                <Route path="audit-logs" element={<AdminSectionPage title="Audit Logs" description="Security-grade activity timeline for admin actions and sensitive operations." bullets={['User login and role changes', 'Account suspension events', 'Payment and billing actions', 'Immutable audit export']} />} />
+                <Route path="compliance" element={<AdminSectionPage title="Compliance" description="Track DPDPA/HIPAA controls, policy adherence, and privacy operations." bullets={['Consent lifecycle logs', 'Data access events', 'Compliance readiness status', 'Policy exception management']} />} />
+                <Route path="data-requests" element={<AdminSectionPage title="Data Requests" description="Manage export, deletion, and data-subject requests with approvals." bullets={['Export requests', 'Deletion requests', 'Legal hold checks', 'Request SLA and closure']} />} />
+                <Route path="platform-health" element={<AdminPlatformHealthPage />} />
+                <Route path="ai-monitoring" element={<AdminSectionPage title="AI Monitoring" description="Supervise AI safety, moderation outcomes, and risk alert precision." bullets={['Self-harm detection quality', 'Prompt/response moderation', 'Flagged response queue', 'Model safety policy controls']} />} />
+                <Route path="clinical-assistant" element={<ClinicalAssistantPage />} />
+                <Route path="settings" element={<AdminSettingsPage />} />
+              </Route>
+            </Route>
+            <Route
+              path="/corporate/dashboard"
+              element={
+                <CorporateRoute>
+                  <CorporateDashboardPage />
+                </CorporateRoute>
+              }
+            />
+            <Route path="/corporate" element={<CorporateOnboardingPage />} />
+            <Route path="/corporate/analytics" element={<CorporateRoute><CorporateAnalyticsPage /></CorporateRoute>} />
+            <Route path="/corporate/employees/directory" element={<CorporateRoute><CorporateEmployeeDirectoryPage /></CorporateRoute>} />
+            <Route path="/corporate/employees/enrollment" element={<CorporateRoute><CorporateEnrollmentPage /></CorporateRoute>} />
+            <Route path="/corporate/employees/allocation" element={<CorporateRoute><CorporateSessionAllocationPage /></CorporateRoute>} />
+            <Route path="/corporate/reports/utilization" element={<CorporateRoute><CorporateUtilizationReportsPage /></CorporateRoute>} />
+            <Route path="/corporate/reports/wellbeing" element={<CorporateRoute><CorporateWellbeingReportsPage /></CorporateRoute>} />
+            <Route path="/corporate/reports/engagement" element={<CorporateRoute><CorporateEngagementReportsPage /></CorporateRoute>} />
+            <Route path="/corporate/billing/invoices" element={<CorporateRoute><CorporateInvoicesPage /></CorporateRoute>} />
+            <Route path="/corporate/billing/payment-methods" element={<CorporateRoute><CorporatePaymentMethodsPage /></CorporateRoute>} />
+            <Route path="/corporate/billing/plan" element={<CorporateRoute><CorporatePlanPage /></CorporateRoute>} />
+            <Route path="/corporate/account/help" element={<CorporateRoute><CorporateHelpPage /></CorporateRoute>} />
+            <Route path="/corporate/sso" element={<CorporateRoute><SSOSettingsPage /></CorporateRoute>} />
+            <Route path="/login" element={<Navigate to="/auth/login" replace />} />
+            <Route path="/register" element={<Navigate to="/auth/signup" replace />} />
+            <Route
+              path="/patient"
+              element={
+                <ProtectedRoute allowedRoles={['patient']}>
+                  <PatientDashboardLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<Navigate to="dashboard" replace />} />
+              <Route path="dashboard" element={<DashboardPage />} />
+              <Route path="onboarding" element={<PatientOnboardingPage />} />
+              <Route path="therapy-plan" element={<TherapyPlanPage />} />
+              <Route path="care-team" element={<Navigate to="/patient/sessions" replace />} />
+              <Route path="providers" element={<Navigate to="/patient/sessions" replace />} />
+              <Route path="providers/:id" element={<Navigate to="/patient/sessions" replace />} />
+              <Route path="book/:providerId" element={<BookSessionPage />} />
+              <Route path="sessions" element={<SessionsPage />} />
+              <Route path="sessions/:id" element={<PatientSessionDetailPage />} />
+              <Route path="exercises" element={<Navigate to="/patient/check-in?tab=daily-mood" replace />} />
+              <Route path="sessions/:id/live" element={<LiveSessionPage />} />
+              <Route path="mood" element={<Navigate to="/patient/check-in?tab=daily-mood" replace />} />
+              <Route path="wellness-library" element={<WellnessLibraryPage />} />
+              <Route path="sleep-therapy" element={<SleepTherapyPage />} />
+              <Route path="sound-therapy" element={<SoundTherapyPage />} />
+              <Route path="buddy/:mode" element={<BuddyChatPage />} />
+              <Route path="provider-messages" element={<ProviderMessagesPage />} />
+              <Route path="provider-messages/:providerId" element={<ProviderMessagesPage />} />
+              <Route path="messages" element={<AIChatPage />} />
+              <Route path="profile" element={<ProfilePage />} />
+              <Route path="settings" element={<SettingsPage />} />
+              <Route path="assessments" element={<Navigate to="/patient/care-team" replace />} />
+              <Route path="assessment-reports" element={<Navigate to="/patient/progress?tab=clinical" replace />} />
+              <Route path="billing" element={<Navigate to="/patient/settings?section=billing" replace />} />
+              <Route path="documents" element={<DocumentsPage />} />
+              <Route path="support" element={<SupportPage />} />
+              <Route path="timeline" element={<PatientTimelinePage />} />
+              <Route path="insights" element={<Navigate to="/patient/progress?tab=mood" replace />} />
+              <Route path="progress" element={<ProgressPage />} />
+              <Route path="reports" element={<ReportsPage />} />
+              <Route path="reports/shared/:id" element={<PatientReportDownloadPage />} />
+              <Route path="notifications" element={<NotificationsPage />} />
+              <Route path="pricing" element={<PricingPage />} />
+              <Route path="check-in" element={<DailyCheckInPage />} />
+            </Route>
+            <Route path="/providers/:id" element={<Navigate to="/patient/sessions" replace />} />
+            <Route path="/book/:providerId" element={<Navigate to="/patient/sessions" replace />} />
+            <Route path="/sessions" element={<Navigate to="/patient/sessions" replace />} />
+            <Route path="/sessions/:id/live" element={<Navigate to="/patient/sessions" replace />} />
+            <Route path="/ai-chat" element={<Navigate to="/patient/messages" replace />} />
+            <Route path="/profile" element={<Navigate to="/patient/profile" replace />} />
+            <Route path="/settings" element={<Navigate to="/patient/settings" replace />} />
+            <Route path="/terms" element={<TermsOfUsePage />} />
+            <Route path="/privacy" element={<PrivacyPolicyPage />} />
+            <Route path="/refunds" element={<CancellationRefundPolicyPage />} />
+            {/* Certificate verification — standalone, no layout, accessible via QR scan */}
+            <Route path="/verify/:certId" element={<CertificateVerificationPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
+        <GlobalAudioPlayerConsole />
       </GlobalAudioProvider>
     </AuthProvider>
   )

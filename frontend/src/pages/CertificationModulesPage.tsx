@@ -2,7 +2,8 @@ import React, { useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useEnrollmentStore } from "../store/CertificationEnrollmentStore";
 import { getModulesByCertification, ModuleData } from "../utils/certificationLessonUtils";
-import { ClipboardCheck } from "lucide-react";
+import { useCertificationProgress } from "../store/useCertificationProgress";
+import { ClipboardCheck, Lock } from "lucide-react";
 
 type ModuleStatus = "complete" | "in_progress" | "locked";
 
@@ -10,16 +11,46 @@ export const CertificationModulesPage: React.FC = () => {
   const { enrollmentId } = useParams<{ enrollmentId: string }>();
   const navigate = useNavigate();
   const { enrollments } = useEnrollmentStore();
+  const { isModuleCompleted, isQuizUnlocked } = useCertificationProgress();
 
-  const enrollment = useMemo(() => 
+  const enrollment = useMemo(() =>
     enrollments.find((e: any) => e.id === enrollmentId),
-  [enrollments, enrollmentId]);
+    [enrollments, enrollmentId]);
 
+  const baseModules: ModuleData[] = useMemo(() =>
+    getModulesByCertification(enrollment?.certificationName),
+    [enrollment]);
+
+  /**
+   * Derive the live status of each module:
+   * - Module is "complete"     if its ID is in completedModules for this enrollment
+   * - Module is "in_progress"  if it's the first one that's NOT yet complete AND
+   *                              all previous ones ARE complete (i.e. it's unlocked)
+   * - Module is "locked"       otherwise
+   */
   const modules: ModuleData[] = useMemo(() => {
-    return getModulesByCertification(enrollment?.certificationName);
-  }, [enrollment]);
+    if (!enrollmentId) return baseModules;
 
-  // Updated styles to include interactive cursor and hover states
+    return baseModules.map((module, index) => {
+      if (isModuleCompleted(enrollmentId, module.id)) {
+        return { ...module, status: "complete", progress: 100 };
+      }
+
+      // A module is unlocked if it's the first module OR all previous modules are complete
+      const allPreviousComplete = baseModules
+        .slice(0, index)
+        .every((m) => isModuleCompleted(enrollmentId, m.id));
+
+      if (allPreviousComplete) {
+        return { ...module, status: "in_progress", progress: 0 };
+      }
+
+      return { ...module, status: "locked", progress: 0 };
+    });
+  }, [baseModules, enrollmentId, isModuleCompleted]);
+
+  const quizUnlocked = enrollmentId ? isQuizUnlocked(enrollmentId) : false;
+
   const getStatusStyles = (status: ModuleStatus) => {
     switch (status) {
       case "complete":
@@ -32,7 +63,7 @@ export const CertificationModulesPage: React.FC = () => {
         };
       case "in_progress":
         return {
-          wrapper: "border-l-[6px] border-blue-500 opacity-100 shadow-md cursor-pointer hover:shadow-lg hover:-translate-y-1", 
+          wrapper: "border-l-[6px] border-blue-500 opacity-100 shadow-md cursor-pointer hover:shadow-lg hover:-translate-y-1",
           icon: "🔄 In Progress",
           barColor: "bg-blue-500",
           barTrack: "bg-blue-100",
@@ -41,7 +72,7 @@ export const CertificationModulesPage: React.FC = () => {
       case "locked":
       default:
         return {
-          wrapper: "border-l-[6px] border-slate-200 opacity-60 bg-slate-50 cursor-not-allowed",
+          wrapper: "border-l-[6px] border-slate-200 opacity-50 bg-slate-50 cursor-not-allowed",
           icon: "🔒 Locked",
           barColor: "bg-transparent",
           barTrack: "bg-transparent",
@@ -50,22 +81,22 @@ export const CertificationModulesPage: React.FC = () => {
     }
   };
 
-  // Click handler for the cards
   const handleModuleClick = (status: ModuleStatus, moduleId: string) => {
     if (status !== "locked") {
       navigate(`/certifications/lessons/${moduleId}`);
     }
   };
 
-  // Navigate to quiz page for the certification
   const handleQuizClick = () => {
-    navigate(`/certifications/quiz/${enrollmentId}`);
+    if (quizUnlocked) {
+      navigate(`/certifications/quiz/${enrollmentId}`);
+    }
   };
 
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-800 p-6 font-sans">
       <div className="max-w-3xl mx-auto">
-        
+
         {/* Header Section */}
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold text-slate-900 mb-2 font-serif">
@@ -108,34 +139,51 @@ export const CertificationModulesPage: React.FC = () => {
                     )}
                   </div>
 
-                  {module.status !== "locked" && (
+                  {module.status !== "locked" ? (
                     <div className="flex-shrink-0 flex items-center gap-4">
                       {(module.score || module.progressText) && (
                         <span className={`inline-block px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide ${styles.badge}`}>
                           {module.score || module.progressText}
                         </span>
                       )}
-                      {/* Subtle arrow to indicate clickability */}
                       <span className="text-slate-400 font-bold text-lg">→</span>
+                    </div>
+                  ) : (
+                    <div className="flex-shrink-0">
+                      <Lock size={18} className="text-slate-300" />
                     </div>
                   )}
                 </div>
-
               </div>
             );
           })}
         </div>
 
-        {/* Global Attend the Quiz Button */}
+        {/* Attend the Quiz Button */}
         {modules.length > 0 && (
-          <div className="flex justify-center mt-8 mb-12">
+          <div className="flex flex-col items-center mt-8 mb-12 gap-3">
             <button
               onClick={handleQuizClick}
-              className="flex items-center justify-center gap-3 px-8 py-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold text-lg rounded-2xl shadow-xl hover:shadow-2xl hover:from-purple-700 hover:to-blue-700 transform hover:scale-[1.03] transition-all duration-300"
+              disabled={!quizUnlocked}
+              className={`flex items-center justify-center gap-3 px-8 py-4 font-bold text-lg rounded-2xl shadow-xl transition-all duration-300
+                ${quizUnlocked
+                  ? "bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:shadow-2xl hover:from-purple-700 hover:to-blue-700 transform hover:scale-[1.03] cursor-pointer"
+                  : "bg-slate-200 text-slate-400 cursor-not-allowed shadow-none"
+                }`}
             >
-              <ClipboardCheck size={24} />
+              {quizUnlocked ? (
+                <ClipboardCheck size={24} />
+              ) : (
+                <Lock size={24} />
+              )}
               Attend Certification Quiz
             </button>
+
+            {!quizUnlocked && (
+              <p className="text-xs text-slate-400 text-center">
+                Complete all modules to unlock the certification quiz.
+              </p>
+            )}
           </div>
         )}
 

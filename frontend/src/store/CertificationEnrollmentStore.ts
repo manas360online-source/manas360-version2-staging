@@ -12,6 +12,7 @@ const devtoolsTyped = devtools as any;
 interface EnrollmentState {
   enrollments: Enrollment[];
   addEnrollment: (enrollment: Enrollment) => void;
+  updateEnrollment: (id: string, patch: Partial<Enrollment>) => void; // ← ADDED
   updateProgress: (id: string, progress: number) => void;
   payInstallment: (id: string) => void;
   clearEnrollments: () => void;
@@ -30,11 +31,24 @@ export const useEnrollmentStore = create<EnrollmentState>(
           }));
         },
 
+        // ── ADDED ──────────────────────────────────────────────────────────────
+        // Merges `patch` into the matching enrollment by id.
+        // Used by CertificationCertificatePage to stamp certId onto the record
+        // so the verification page can do an exact lookup.
+        updateEnrollment: (id: string, patch: Partial<Enrollment>) => {
+          set((state: EnrollmentState) => ({
+            enrollments: state.enrollments.map((e: Enrollment) =>
+              e.id === id ? { ...e, ...patch } : e
+            ),
+          }));
+        },
+        // ───────────────────────────────────────────────────────────────────────
+
         updateProgress: (id: string, progress: number) => {
           set((state: EnrollmentState) => ({
             enrollments: state.enrollments.map((e: Enrollment) =>
-              e.id === id ? { 
-                ...e, 
+              e.id === id ? {
+                ...e,
                 completionPercentage: Math.min(100, Math.max(0, progress)),
                 modulesCompleted: Math.floor((progress / 100) * 10)
               } : e
@@ -49,7 +63,7 @@ export const useEnrollmentStore = create<EnrollmentState>(
 
             const nextPaidCount = enrollment.installmentsPaidCount + 1;
             const isFullyPaid = nextPaidCount >= 3;
-            
+
             const nextDue = new Date();
             nextDue.setDate(nextDue.getDate() + 30);
 
