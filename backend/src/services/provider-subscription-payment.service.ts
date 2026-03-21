@@ -62,6 +62,7 @@ export const initiateProviderSubscriptionPayment = async (providerId: string, pl
 	const transactionId = `PROV_SUB_${providerId}_${planKey}_${Date.now()}`;
 	const shouldBypass = env.allowDevPaymentBypass && env.nodeEnv === 'development';
 	const frontendBaseUrl = env.frontendUrl;
+	const callbackUrl = `${env.apiUrl}${env.apiPrefix}/v1/payments/phonepe/webhook`;
 	const cycleKey = new Date().toISOString().slice(0, 10);
 	const subscriptionIdempotencyKey = `prov_sub_init:${providerId}:${planKey}:${cycleKey}`;
 
@@ -71,7 +72,7 @@ export const initiateProviderSubscriptionPayment = async (providerId: string, pl
 			transactionId,
 			userId: providerId,
 			amountInPaise: plan.price * 100,
-			callbackUrl: `${env.apiPrefix}/v1/payments/phonepe/webhook`,
+			callbackUrl,
 			redirectUrl: `${frontendBaseUrl}/payment/status?id=${transactionId}&status=SUCCESS`,
 			metadata: { plan: planKey },
 		});

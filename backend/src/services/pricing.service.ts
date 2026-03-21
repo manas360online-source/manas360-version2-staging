@@ -241,10 +241,15 @@ export const getSessionQuote = async (input: { providerType?: string; durationMi
 	return { providerType: type, durationMinutes: duration, basePrice, surchargePercent, preferredTime: !!input.preferredTime, finalPrice };
 };
 
-export const getActivePlatformPlan = async (planKey: string = 'monthly') => {
+export const getActivePlatformPlan = async (planKey?: string) => {
 	await ensurePricingTables();
-	const row = (await db.$queryRawUnsafe(`SELECT * FROM platform_subscription WHERE plan_key = $1 AND active = TRUE`, planKey)) as any[];
-	if (!row?.[0]) return { key: 'free', name: 'Free Tier', price: 0 };
+	const resolvedPlanKey = String(planKey || 'monthly');
+	const row = (await db.$queryRawUnsafe(`SELECT * FROM platform_subscription WHERE plan_key = $1 AND active = TRUE`, resolvedPlanKey)) as any[];
+	if (!row?.[0]) {
+		// Keep legacy fallback only for default lookups; explicit keys should fail validation upstream.
+		if (planKey) return null;
+		return { key: 'free', name: 'Free Tier', price: 0 };
+	}
 	return { key: row[0].plan_key, name: row[0].plan_name, price: row[0].price };
 };
 

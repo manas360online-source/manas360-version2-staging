@@ -12,4 +12,7 @@ router.post('/sessions/:id/complete', auth_middleware_1.requireAuth, (0, rbac_mi
 // PhonePe specific routes
 router.post('/phonepe/webhook', (0, validate_middleware_1.asyncHandler)(payment_controller_1.phonepeWebhookController));
 router.get('/phonepe/status/:transactionId', auth_middleware_1.requireAuth, (0, validate_middleware_1.asyncHandler)(payment_controller_1.getPhonePeStatusController));
+// Refund routes
+router.post('/refund', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('patient'), rateLimiter_middleware_1.paymentRateLimiter, (0, validate_middleware_1.asyncHandler)(payment_controller_1.initiateRefundController));
+router.get('/refund/:refundId/status', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('patient'), (0, validate_middleware_1.asyncHandler)(payment_controller_1.getRefundStatusController));
 exports.default = router;

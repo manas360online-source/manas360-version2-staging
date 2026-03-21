@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { AppError } from '../middleware/error.middleware';
 import { sendSuccess } from '../utils/response';
 import { env } from '../config/env';
+import { prisma } from '../config/db';
 import {
 	createSessionPayment,
 	processRazorpayWebhook,
@@ -9,7 +10,19 @@ import {
 	releaseSessionEarnings,
 } from '../services/payment.service';
 import { processSubscriptionWebhook } from '../services/subscription.service';
-import { verifyPhonePeWebhook, checkPhonePeStatus } from '../services/phonepe.service';
+import { 
+	verifyPhonePeWebhook, 
+	checkPhonePeStatus, 
+	initiatePhonePeRefund, 
+	checkPhonePeRefundStatus,
+	verifyPhonePeWebhookAuth,
+	isPhonePeWebhookIP,
+	getClientIpFromRequest,
+} from '../services/phonepe.service';
+import { 
+	trackWebhookEvent,
+	processPhonePeWebhookEvent,
+} from '../services/phonepeWebhook.service';
 import crypto from 'crypto';
 import { logger } from '../utils/logger';
 
@@ -89,43 +102,124 @@ export const phonepeWebhookController = async (req: Request, res: Response): Pro
 		return;
 	}
 
-	// 1. Mandatory BasicAuth validation (UAT compliance)
-	const authHeader = String(req.headers['authorization'] ?? '');
-	if (env.phonePeWebhookUsername && env.phonePeWebhookPassword) {
-		const expectedAuth = 'Basic ' + Buffer.from(`${env.phonePeWebhookUsername}:${env.phonePeWebhookPassword}`).toString('base64');
-		if (authHeader !== expectedAuth) {
+	// ========== IP WHITELIST VALIDATION ==========
+	const clientIp = getClientIpFromRequest(req);
+	if (!isPhonePeWebhookIP(clientIp)) {
+		logger.warn('[PhonePeWebhook] Request from unauthorized IP', { clientIp });
+		// Don't throw error - IP whitelisting is optional, just log
+		// In production with strict firewall rules, this layer provides defense-in-depth
+	}
+
+	// ========== AUTHORIZATION HEADER VALIDATION ==========
+	// PhonePe doc: "Authorization: SHA256(username:password)"
+	const authHeader = String(req.headers['authorization'] ?? '').trim();
+	const webhookUsername = String(env.phonePeWebhookUsername ?? '').trim();
+	const webhookPassword = String(env.phonePeWebhookPassword ?? '').trim();
+
+	if (webhookUsername && webhookPassword) {
+		const isAuthValid = verifyPhonePeWebhookAuth(authHeader, webhookUsername, webhookPassword);
+		if (!isAuthValid) {
 			throw new AppError('Invalid webhook authorization', 401);
 		}
+		logger.debug('[PhonePeWebhook] Authorization header verified');
+	} else if (authHeader) {
+		logger.warn('[PhonePeWebhook] Authorization header provided but credentials not configured');
 	}
 
-	// 2. Existing X-VERIFY signature check
-	const xVerify = String(req.headers['x-verify'] ?? '');
-	if (!xVerify) {
-		throw new AppError('Missing x-verify header', 400);
+	// ========== PAYLOAD PARSING ==========
+	// Support both new event format and legacy base64 format
+	let webhookBody: any;
+	const rawBodyString = String(req.body?.response || '').trim();
+	const eventFromBody = req.body?.event;
+
+	if (rawBodyString) {
+		// Legacy format: base64-encoded payload with X-VERIFY signature
+		const xVerify = String(req.headers['x-verify'] ?? '').trim();
+		if (!xVerify) {
+			throw new AppError('Missing x-verify header for base64 payload', 400);
+		}
+
+		const isValid = verifyPhonePeWebhook(rawBodyString, xVerify);
+		if (!isValid) {
+			throw new AppError('Invalid PhonePe signature', 401);
+		}
+
+		try {
+			webhookBody = JSON.parse(Buffer.from(rawBodyString, 'base64').toString('utf-8'));
+		} catch (error: any) {
+			logger.error('[PhonePeWebhook] Failed to parse base64 payload', { error: error?.message });
+			throw new AppError('Invalid payload format', 400);
+		}
+	} else if (eventFromBody) {
+		// New format: Direct JSON payload with event field
+		webhookBody = req.body;
+	} else {
+		throw new AppError('Missing webhook payload', 400);
 	}
 
-	const body = String(req.body?.response || '').trim(); // The base64 response string from PhonePe
-	if (!body) {
-		throw new AppError('Missing response body in PhonePe webhook', 400);
+	// ========== IDEMPOTENCY CHECK ==========
+	// Generate event ID: use combination of event type, merchant order/refund ID, and timestamp
+	const payload = webhookBody.payload || webhookBody;
+	const event = webhookBody.event
+		|| webhookBody.type
+		|| (
+			payload?.merchantRefundId || payload?.refundId
+				? payload?.state === 'FAILED'
+					? 'pg.refund.failed'
+					: 'pg.refund.completed'
+				: payload?.state === 'FAILED'
+					? 'checkout.order.failed'
+					: 'checkout.order.completed'
+		);
+	let eventId: string;
+
+	if (event?.startsWith('checkout.order')) {
+		const orderId = payload?.merchantOrderId || payload?.orderId;
+		const timestamp = payload?.timestamp || payload?.expireAt;
+		eventId = `${event}_${orderId}_${timestamp}`;
+	} else if (event?.startsWith('pg.refund')) {
+		const refundId = payload?.merchantRefundId || payload?.refundId || payload?.originalMerchantOrderId;
+		const timestamp = payload?.timestamp;
+		eventId = `${event}_${refundId}_${timestamp}`;
+	} else {
+		eventId = `${event}_${Date.now()}`;
 	}
 
-	// Make sure we preserve raw payload shape to avoid parser normalization mismatches.
-	const isValid = verifyPhonePeWebhook(body, xVerify);
-	if (!isValid) {
-		throw new AppError('Invalid PhonePe signature', 401);
+	// Check if already processed (idempotency)
+	const isNewEvent = await trackWebhookEvent(eventId, event);
+	if (!isNewEvent) {
+		// Already processed - return success to avoid PhonePe retry
+		logger.info('[PhonePeWebhook] Duplicate webhook, returning success', { eventId });
+		res.status(200).json({ success: true, message: 'Webhook acknowledged (duplicate)', handled: false });
+		return;
 	}
 
-	let decoded: any;
+	// ========== EVENT ROUTING ==========
 	try {
-		decoded = JSON.parse(Buffer.from(body, 'base64').toString('utf-8'));
+		// Route based on event type
+		if (!event) {
+			throw new AppError('Missing event type', 400);
+		}
+
+		await processPhonePeWebhookEvent(event, payload);
+
+		logger.info('[PhonePeWebhook] Webhook processed successfully', { eventId, event });
+		res.status(200).json({ success: true, handled: true, message: 'Webhook processed' });
 	} catch (error: any) {
-		logger.error('[PaymentController] Failed to parse PhonePe webhook body', { error: error?.message, body });
-		throw new AppError('Invalid PhonePe webhook payload format', 400);
+		logger.error('[PhonePeWebhook] Failed to process event', {
+			eventId,
+			event: webhookBody.event,
+			error: error?.message,
+		});
+
+		// Return 200 anyway to prevent PhonePe retries, but log the error
+		res.status(200).json({
+			success: true,
+			handled: false,
+			message: 'Webhook received but processing failed',
+			error: error?.message,
+		});
 	}
-
-	const result = await processPhonePeWebhook(decoded);
-
-	res.status(200).json({ success: true, ...result });
 };
 
 export const getPhonePeStatusController = async (req: Request, res: Response): Promise<void> => {
@@ -140,4 +234,160 @@ export const getPhonePeStatusController = async (req: Request, res: Response): P
 	}
 
 	res.status(200).json({ success: true, data: status });
+};
+
+export const initiateRefundController = async (req: Request, res: Response): Promise<void> => {
+	const patientId = getAuthUserId(req);
+	const paymentId = String(req.body.paymentId ?? '').trim();
+	const reason = String(req.body.reason ?? 'Customer requested').trim();
+
+	if (!paymentId) {
+		throw new AppError('paymentId is required', 422);
+	}
+
+	// Verify payment exists and belongs to the patient
+	const payment = await prisma.financialPayment.findUnique({
+		where: { id: paymentId },
+		include: {
+			session: {
+				select: { patientId: true },
+			},
+		},
+	});
+
+	if (!payment) {
+		throw new AppError('Payment not found', 404);
+	}
+
+	if (payment.session?.patientId !== patientId) {
+		throw new AppError('Unauthorized to refund this payment', 403);
+	}
+
+	if (payment.status !== 'CAPTURED') {
+		throw new AppError('Only captured payments can be refunded', 422);
+	}
+
+	// Check if refund already exists
+	const existingRefund = await prisma.financialRefund.findFirst({
+		where: { paymentId },
+	});
+
+	if (existingRefund && existingRefund.status !== 'FAILED') {
+		throw new AppError('Refund already initiated for this payment', 422);
+	}
+
+	// Generate merchant refund ID
+	const merchantRefundId = `${paymentId}-${Date.now()}`;
+
+	try {
+		// Initiate PhonePe refund
+		const refundResult = await initiatePhonePeRefund({
+			merchantRefundId,
+			originalMerchantOrderId: payment.razorpayOrderId,
+			amountInPaise: Number(payment.amountMinor),
+		});
+
+		// Create or update refund record
+		const refund = await prisma.financialRefund.upsert({
+			where: { merchantRefundId },
+			create: {
+				paymentId,
+				merchantRefundId,
+				originalMerchantOrderId: payment.razorpayOrderId,
+				phonePeRefundId: refundResult.refundId,
+				status: 'PENDING',
+				amountMinor: payment.amountMinor,
+				currency: payment.currency,
+				reason,
+				responseData: refundResult.responseData,
+			},
+			update: {
+				phonePeRefundId: refundResult.refundId || undefined,
+				status: 'PENDING',
+				responseData: refundResult.responseData,
+				retryCount: 0,
+				updatedAt: new Date(),
+			},
+		});
+
+		sendSuccess(res, refund, 'Refund initiated successfully', 201);
+	} catch (error: any) {
+		if (error instanceof AppError) throw error;
+
+		// Log error and create failed refund record
+		logger.error('[Payment] Refund initiation failed', {
+			paymentId,
+			error: error?.message,
+		});
+
+		throw new AppError('Failed to initiate refund: ' + error?.message, 502);
+	}
+};
+
+export const getRefundStatusController = async (req: Request, res: Response): Promise<void> => {
+	const refundId = String(req.params.refundId ?? '').trim();
+
+	if (!refundId) {
+		throw new AppError('refundId is required', 422);
+	}
+
+	// Verify refund exists
+	const refund = await prisma.financialRefund.findUnique({
+		where: { id: refundId },
+		include: {
+			payment: {
+				select: {
+					session: {
+						select: { patientId: true },
+					},
+				},
+			},
+		},
+	});
+
+	if (!refund) {
+		throw new AppError('Refund not found', 404);
+	}
+
+	const patientId = getAuthUserId(req);
+	if (refund.payment?.session?.patientId !== patientId) {
+		throw new AppError('Unauthorized to view this refund', 403);
+	}
+
+	try {
+		// Get latest status from PhonePe if refund is still pending
+		if (refund.status === 'PENDING' && refund.merchantRefundId) {
+			const statusData = await checkPhonePeRefundStatus(refund.merchantRefundId);
+
+			if (statusData?.data?.state) {
+				const newStatus = statusData.data.state === 'COMPLETED' ? 'COMPLETED' : 
+					               statusData.data.state === 'CONFIRMED' ? 'CONFIRMED' :
+					               statusData.data.state === 'FAILED' ? 'FAILED' :
+					               'PENDING';
+
+				// Update refund record with latest status
+				const updatedRefund = await prisma.financialRefund.update({
+					where: { id: refundId },
+					data: {
+						status: newStatus,
+						responseData: statusData,
+						...(newStatus === 'COMPLETED' && { completedAt: new Date() }),
+						...(newStatus === 'FAILED' && { failedAt: new Date() }),
+					},
+				});
+
+				sendSuccess(res, updatedRefund, 'Refund status retrieved', 200);
+				return;
+			}
+		}
+
+		sendSuccess(res, refund, 'Refund status retrieved', 200);
+	} catch (error: any) {
+		logger.error('[Payment] Refund status check failed', {
+			refundId,
+			error: error?.message,
+		});
+
+		throw new AppError('Failed to fetch refund status: ' + error?.message, 502);
+	}
 };

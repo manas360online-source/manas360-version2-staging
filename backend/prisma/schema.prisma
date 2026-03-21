@@ -1070,6 +1070,7 @@ model FinancialPayment {
   session               FinancialSession?      @relation("SessionPayments", fields: [sessionId], references: [id])
   revenueLedger         RevenueLedger[]        @relation("PaymentRevenueLedger")
   walletTransactions    WalletTransaction[]    @relation("PaymentWalletTransactions")
+  refunds               FinancialRefund[]      @relation("PaymentRefunds")
 
   @@index([sessionId, status])
   @@index([providerId, status])
@@ -1078,6 +1079,35 @@ model FinancialPayment {
   @@index([razorpayOrderId])
   @@index([createdAt])
   @@map("financial_payments")
+}
+
+model FinancialRefund {
+  id                       String                  @id @default(uuid())
+  paymentId                String?
+  merchantRefundId         String                  @unique
+  originalMerchantOrderId  String
+  phonePeRefundId          String?                 @unique
+  status                   FinancialRefundStatus   @default(PENDING)
+  amountMinor              BigInt
+  currency                 String                  @default("INR")
+  reason                   String?
+  responseData             Json?
+  retrievedAt              DateTime?
+  completedAt              DateTime?
+  failedAt                 DateTime?
+  failureReason            String?
+  retryCount               Int                     @default(0)
+  nextRetryAt              DateTime?
+  createdAt                DateTime                @default(now())
+  updatedAt                DateTime                @updatedAt
+  payment                  FinancialPayment?       @relation("PaymentRefunds", fields: [paymentId], references: [id])
+
+  @@index([paymentId, status])
+  @@index([status, nextRetryAt])
+  @@index([merchantRefundId])
+  @@index([originalMerchantOrderId])
+  @@index([createdAt])
+  @@map("financial_refunds")
 }
 
 model ProviderWallet {
@@ -1744,6 +1774,14 @@ enum FinancialPaymentStatus {
 enum FinancialPaymentType {
   PLATFORM_FEE
   PROVIDER_FEE
+}
+
+enum FinancialRefundStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  FAILED
+  CANCELLED
 }
 
 enum SubscriptionChangeReason {

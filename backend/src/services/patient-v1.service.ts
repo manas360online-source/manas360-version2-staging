@@ -822,7 +822,7 @@ export const getPatientDashboard = async (userId: string) => {
 const ensureSubscriptionRecord = async (userId: string) => {
 	let subscription = await db.patientSubscription.findUnique({ where: { userId } }).catch(() => null);
 	if (!subscription) {
-		const activePlan = await getActivePlatformPlan();
+		const activePlan = (await getActivePlatformPlan()) || { key: 'free', name: 'Free Tier', price: 0 };
 		const renewalDate = new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000);
 		subscription = await db.patientSubscription.create({
 			data: {
@@ -868,7 +868,7 @@ const ensureSubscriptionRecord = async (userId: string) => {
 			return current || subscription;
 		}
 
-		const activePlan = await getActivePlatformPlan();
+		const activePlan = (await getActivePlatformPlan()) || { key: 'free', name: 'Free Tier', price: 0 };
 		const renewalDays = String(current.billingCycle || '').toLowerCase() === 'yearly' ? 365 : 30;
 		const nextRenewalDate = new Date(Date.now() + renewalDays * 24 * 60 * 60 * 1000);
 
@@ -919,7 +919,7 @@ const ensureSubscriptionRecord = async (userId: string) => {
 export const getPatientSubscription = async (userId: string) => {
 	const subscription = await ensureSubscriptionRecord(userId);
 	if (!subscription) throw new AppError('Subscription data unavailable', 500);
-	const activePlan = await getActivePlatformPlan();
+	const activePlan = (await getActivePlatformPlan()) || { key: 'free', name: 'Free Tier', price: 0 };
 	return {
 		...subscription,
 		nextRenewalPrice: activePlan.price,
@@ -930,7 +930,7 @@ export const getPatientSubscription = async (userId: string) => {
 export const updatePatientSubscriptionPlan = async (userId: string, action: 'upgrade' | 'downgrade') => {
 	const updated = await withPatientSubscriptionLock(userId, async (subscription) => {
 		if (!subscription) throw new AppError('Subscription data unavailable', 500);
-		const activePlan = await getActivePlatformPlan();
+		const activePlan = (await getActivePlatformPlan()) || { key: 'free', name: 'Free Tier', price: 0 };
 
 		const planOrder = ['basic', 'premium', 'pro'];
 		const current = String(subscription.planName || 'premium').toLowerCase().replace(' plan', '');
@@ -1013,7 +1013,7 @@ export const cancelPatientSubscription = async (userId: string) => {
 
 export const reactivatePatientSubscription = async (userId: string, paymentId?: string) => {
 	const updated = await withPatientSubscriptionLock(userId, async (subscription) => {
-		const activePlan = await getActivePlatformPlan();
+		const activePlan = (await getActivePlatformPlan()) || { key: 'free', name: 'Free Tier', price: 0 };
 		const next = await db.patientSubscription.update({
 			where: { userId },
 			data: {
