@@ -111,19 +111,10 @@ export const phonepeWebhookController = async (req: Request, res: Response): Pro
 	}
 
 	// ========== AUTHORIZATION HEADER VALIDATION ==========
-	// PhonePe doc: "Authorization: SHA256(username:password)"
-	const authHeader = String(req.headers['authorization'] ?? '').trim();
-	const webhookUsername = String(env.phonePeWebhookUsername ?? '').trim();
-	const webhookPassword = String(env.phonePeWebhookPassword ?? '').trim();
-
-	if (webhookUsername && webhookPassword) {
-		const isAuthValid = verifyPhonePeWebhookAuth(authHeader, webhookUsername, webhookPassword);
-		if (!isAuthValid) {
-			throw new AppError('Invalid webhook authorization', 401);
-		}
-		logger.debug('[PhonePeWebhook] Authorization header verified');
-	} else if (authHeader) {
-		logger.warn('[PhonePeWebhook] Authorization header provided but credentials not configured');
+	// NOTE: PhonePe webhook authentication is done via X-VERIFY checksum.
+	// Legacy username/password auth is intentionally disabled because PhonePe does not send this header.
+	if (env.phonePeWebhookUsername || env.phonePeWebhookPassword) {
+		logger.warn('[PhonePeWebhook] PHONEPE_WEBHOOK_USERNAME/PASSWORD configured but webhook auth is ignored for compatibility');
 	}
 
 	// ========== PAYLOAD PARSING ==========
