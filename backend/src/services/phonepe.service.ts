@@ -4,22 +4,25 @@ import { env } from '../config/env';
 import { AppError } from '../middleware/error.middleware';
 import { logger } from '../utils/logger';
 
-const PHONEPE_MERCHANT_ID = process.env.PHONEPE_MERCHANT_ID || 'PGCHECKOUT';
-const PHONEPE_SALT_KEY = process.env.PHONEPE_SALT_KEY || '';
-const PHONEPE_SALT_INDEX = process.env.PHONEPE_SALT_INDEX || '1';
+const PHONEPE_MERCHANT_ID = String(process.env.PHONEPE_MERCHANT_ID || 'PGCHECKOUT').trim();
+const PHONEPE_SALT_KEY = String(process.env.PHONEPE_SALT_KEY || '').trim();
+const PHONEPE_SALT_INDEX = String(process.env.PHONEPE_SALT_INDEX || '1').trim();
 
 // Automated Base URL selection: Use pg-sandbox (simulator) for PGCHECKOUT, otherwise assume UAT/Prod (hermes)
 const GET_PHONEPE_BASE_URL = () => {
-	if (process.env.PHONEPE_BASE_URL) return process.env.PHONEPE_BASE_URL;
+	if (process.env.PHONEPE_BASE_URL) return String(process.env.PHONEPE_BASE_URL).trim();
 	return PHONEPE_MERCHANT_ID === 'PGCHECKOUT' 
 		? 'https://api-preprod.phonepe.com/apis/pg-sandbox' 
 		: 'https://api-preprod.phonepe.com/apis/hermes';
 };
 
-const PHONEPE_BASE_URL = GET_PHONEPE_BASE_URL();
+const PHONEPE_BASE_URL = GET_PHONEPE_BASE_URL().replace(/\/+$/, '');
 
 if (!PHONEPE_SALT_KEY) {
-	logger.warn('[PhonePe] PHONEPE_SALT_KEY is not set. Payment signing will fail in production.');
+	logger.error('[PhonePe] PHONEPE_SALT_KEY is not set. Payment signing and verification will fail.');
+	if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging') {
+		throw new Error('Missing PHONEPE_SALT_KEY in production/staging environment');
+	}
 }
 
 const sha256 = (input: string): string => crypto.createHash('sha256').update(input).digest('hex');
@@ -97,28 +100,54 @@ export const initiatePhonePePayment = async (input: {
 	} catch (error: any) {
 		if (error instanceof AppError) throw error;
 
+		const upstreamCode = String(error?.response?.data?.code || '').trim();
+		const upstreamMessage = String(error?.response?.data?.message || error?.message || 'PhonePe request failed').trim();
+
 		logger.error('[PhonePe] Payment Initiation Failed', {
 			transactionId: input.transactionId,
 			status: error?.response?.status,
 			data: error?.response?.data,
 			message: error?.message,
 		});
-		throw new AppError('PhonePe Payment Initiation Failed', 502);
+
+		const detailed = upstreamCode
+			? `PhonePe Payment Initiation Failed (${upstreamCode}): ${upstreamMessage}`
+			: `PhonePe Payment Initiation Failed: ${upstreamMessage}`;
+		const withHint = upstreamCode === 'KEY_NOT_CONFIGURED'
+			? `${detailed}. Verify PHONEPE_MERCHANT_ID=${PHONEPE_MERCHANT_ID} and PHONEPE_SALT_INDEX=${PHONEPE_SALT_INDEX} are activated in PhonePe preprod.`
+			: detailed;
+		throw new AppError(withHint, 502);
 	}
 };
 
-export const verifyPhonePeWebhook = (reqBody: any, xVerify: string): boolean => {
-	const expected = sha256(reqBody + PHONEPE_SALT_KEY) + '###' + PHONEPE_SALT_INDEX;
-	const isValid = expected === xVerify;
-
-	if (!isValid) {
-		logger.error('[PhonePe] Webhook signature verification FAILED', {
-			expected: expected.substring(0, 20) + '...',
-			received: xVerify.substring(0, 20) + '...',
-		});
+export const verifyPhonePeWebhook = (reqBody: string, xVerify: string): boolean => {
+	if (!reqBody || !xVerify) {
+		logger.error('[PhonePe] Webhook signature verification missing data', { reqBody, xVerify });
+		return false;
 	}
 
-	return isValid;
+	const expected = sha256(reqBody + PHONEPE_SALT_KEY) + '###' + PHONEPE_SALT_INDEX;
+
+	try {
+		const expectedBuf = Buffer.from(expected);
+		const actualBuf = Buffer.from(xVerify);
+		if (expectedBuf.length !== actualBuf.length) {
+			throw new Error('signature length mismatch');
+		}
+
+		const isValid = crypto.timingSafeEqual(expectedBuf, actualBuf);
+		if (!isValid) {
+			logger.error('[PhonePe] Webhook signature verification FAILED', {
+				expected: expected.slice(0, 30) + '...',
+				received: xVerify.slice(0, 30) + '...',
+			});
+		}
+
+		return isValid;
+	} catch (error: any) {
+		logger.error('[PhonePe] Webhook signature verification failed', { error: error?.message, expected, received: xVerify });
+		return false;
+	}
 };
 
 export const checkPhonePeStatus = async (merchantTransactionId: string) => {

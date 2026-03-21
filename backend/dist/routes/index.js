@@ -73,6 +73,7 @@ router.use('/webhooks', webhook_routes_1.default);
 router.use('/chat', chat_routes_1.default);
 router.use('/sounds', sound_routes_1.default);
 router.use('/v1/sounds', sound_routes_1.default);
-router.use('/v1', riskAnalytics_routes_1.default);
+// Mount GPS before broad /v1 middleware routes so internal bridge can remain unauthenticated.
 router.use('/v1/gps', gps_routes_1.default);
+router.use('/v1', riskAnalytics_routes_1.default);
 exports.default = router;

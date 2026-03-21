@@ -60,6 +60,7 @@ const AdminPendingProvidersPage = lazy(() => import('./pages/admin/PendingProvid
 const AdminRevenuePage = lazy(() => import('./pages/admin/Revenue'));
 const AdminSettingsPage = lazy(() => import('./pages/admin/Settings'));
 const AdminPricingManagementPage = lazy(() => import('./pages/admin/PricingManagement'));
+const AdminPaymentReliabilityPage = lazy(() => import('./pages/admin/PaymentReliability'));
 const ClinicalAssistantPage = lazy(() => import('./pages/admin/ClinicalAssistantPage'));
 const AdminSectionPage = lazy(() => import('./pages/admin/AdminSectionPage'));
 const AdminTemplatesPage = lazy(() => import('./pages/admin/Templates'));
@@ -91,13 +92,13 @@ const ProviderOnboardingPage = lazy(() => import('./pages/provider/ProviderOnboa
 const ProviderVerificationPendingPage = lazy(() => import('./pages/provider/ProviderVerificationPendingPage'));
 const AppointmentRequestsPage = lazy(() => import('./pages/provider/AppointmentRequests'));
 const ProviderSubscriptionPage = lazy(() => import('./pages/provider/ProviderSubscriptionPage'));
+const TherapistLiveSessionPage = lazy(() => import('./pages/therapist/TherapistLiveSessionPage'));
 const HubLayout = lazy(() => import('./components/layout/HubLayout'));
 const PatientList = lazy(() => import('./pages/provider/Patients/PatientList'));
 const PatientChartLayout = lazy(() => import('./components/layout/PatientChartLayout'));
 const ChartOverview = lazy(() => import('./pages/provider/Patients/Tabs/ChartOverview'));
 const SessionNotes = lazy(() => import('./pages/provider/Patients/Tabs/SessionNotes'));
 const Assessments = lazy(() => import('./pages/provider/Patients/Tabs/Assessments'));
-const PlanStudio = lazy(() => import('./pages/provider/Patients/Tabs/PlanStudio'));
 const Prescriptions = lazy(() => import('./pages/provider/Patients/Tabs/Prescriptions'));
 const LabOrders = lazy(() => import('./pages/provider/Patients/Tabs/LabOrders'));
 const GoalsAndHabits = lazy(() => import('./pages/provider/Patients/Tabs/GoalsAndHabits'));
@@ -230,7 +231,7 @@ function App() {
             <Route path="session-notes" element={<Navigate to="../notes" replace />} />
             <Route path="assessments" element={<Assessments />} />
             <Route path="care-team" element={<CareTeamTab />} />
-            <Route path="plan-builder" element={<PlanStudio />} />
+            <Route path="plan-builder" element={<Navigate to="../overview" replace />} />
             <Route path="goals" element={<GoalsAndHabits />} />
             <Route path="prescriptions" element={<Prescriptions />} />
             <Route path="labs" element={<LabOrders />} />
@@ -266,6 +267,14 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/therapist/live-session/:sessionId"
+          element={
+            <ProtectedRoute allowedRoles={['therapist', 'psychiatrist', 'psychologist', 'coach']}>
+              <TherapistLiveSessionPage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/auth/login" element={<LoginPage />} />
         <Route path="/therapist/*" element={<Navigate to="/provider/dashboard" replace />} />
         <Route path="/psychiatrist/*" element={<Navigate to="/provider/dashboard" replace />} />
@@ -289,6 +298,14 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={['patient', 'therapist', 'psychiatrist', 'psychologist', 'coach']}>
               <VideoSessionPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/provider/live-session/:sessionId"
+          element={
+            <ProtectedRoute allowedRoles={['therapist', 'psychiatrist', 'psychologist', 'coach']}>
+              <TherapistLiveSessionPage />
             </ProtectedRoute>
           }
         />
@@ -320,6 +337,7 @@ function App() {
           <Route path="crisis-alerts" element={<AdminSectionPage title="Crisis Alerts" description="Triage and escalate high-risk events with defined safety protocols." bullets={['Suicide risk alerts', 'Escalate to psychiatrist', 'Emergency protocol status', 'Resolution timeline']} />} />
 
           <Route path="revenue" element={<AdminRevenuePage />} />
+          <Route path="payment-reliability" element={<AdminPaymentReliabilityPage />} />
           <Route path="pricing-management" element={<AdminPricingManagementPage />} />
           <Route path="payouts" element={<AdminSectionPage title="Payouts" description="Review provider payouts, schedules, holds, and reconciliation exceptions." bullets={['Scheduled payout runs', 'Manual adjustments', 'Failed transfer handling', 'Payout audit log']} />} />
           <Route path="invoices" element={<AdminSectionPage title="Invoices" description="Track invoices, collections, refunds, and payment disputes." bullets={['Invoice lifecycle tracking', 'Corporate and individual invoices', 'Refund analytics', 'Collection status by segment']} />} />
@@ -450,6 +468,7 @@ function App() {
         />
         <Route path="/login" element={<Navigate to="/auth/login" replace />} />
         <Route path="/register" element={<Navigate to="/auth/signup" replace />} />
+        <Route path="/subscribe" element={<Navigate to="/patient/pricing" replace />} />
 
         <Route
           path="/patient"

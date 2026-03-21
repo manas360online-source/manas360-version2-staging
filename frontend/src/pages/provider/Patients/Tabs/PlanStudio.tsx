@@ -237,7 +237,7 @@ export default function PlanStudio() {
       <header className="rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Plan Studio</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Plan Builder</p>
             <h2 className="mt-1 text-2xl font-semibold text-[#1E293B]">Clinical Curriculum Workspace</h2>
             <p className="mt-1 text-sm text-slate-500">Build day-by-day patient programs from master templates and publish when ready.</p>
           </div>

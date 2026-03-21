@@ -25,14 +25,12 @@ const tabConfig: Record<ProviderKind, TabItem[]> = {
     { label: 'Session Notes', path: 'notes' },
     { label: 'Assessments', path: 'assessments' },
     { label: 'Care Team', path: 'care-team' },
-    { label: 'Plan Studio', path: 'plan-builder' },
   ],
   PSYCHOLOGIST: [
     { label: 'Overview', path: 'overview' },
     { label: 'Session Notes', path: 'notes' },
     { label: 'Assessments', path: 'assessments' },
     { label: 'Care Team', path: 'care-team' },
-    { label: 'Plan Studio', path: 'plan-builder' },
   ],
   COACH: [
     { label: 'Overview', path: 'overview' },
@@ -40,7 +38,6 @@ const tabConfig: Record<ProviderKind, TabItem[]> = {
     { label: 'Assessments', path: 'assessments' },
     { label: 'Goals & Habits', path: 'goals' },
     { label: 'Care Team', path: 'care-team' },
-    { label: 'Plan Studio', path: 'plan-builder' },
   ],
   PSYCHIATRIST: [
     { label: 'Overview', path: 'overview' },
@@ -48,7 +45,6 @@ const tabConfig: Record<ProviderKind, TabItem[]> = {
     { label: 'Lab Orders', path: 'labs' },
     { label: 'Care Team', path: 'care-team' },
     { label: 'Clinical Notes', path: 'clinical-notes' },
-    { label: 'Plan Studio', path: 'plan-builder' },
   ],
 };
 

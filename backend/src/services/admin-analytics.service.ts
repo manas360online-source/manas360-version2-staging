@@ -1,6 +1,8 @@
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/error.middleware';
 
+const db = prisma as any;
+
 const MAX_PAGE_SIZE = 100;
 
 export interface AdminAnalyticsRange {
@@ -363,6 +365,77 @@ export class AdminAnalyticsService {
 			failedPayments: failedLeadPayments + failedSessionPayments,
 			pendingPayments,
 			expiredSubscriptions,
+		};
+	}
+
+	async getPaymentReliabilityMetrics(days = 30) {
+		const safeDays = Math.min(365, Math.max(1, Number(days) || 30));
+		const from = new Date(Date.now() - safeDays * 24 * 60 * 60 * 1000);
+
+		const daily = await db.dailyPaymentMetric.findMany({
+			where: { date: { gte: new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate())) } },
+			orderBy: { date: 'asc' },
+		});
+
+		const totals = daily.reduce((acc: any, row: any) => {
+			acc.total += Number(row.totalPayments || 0);
+			acc.success += Number(row.successCount || 0);
+			acc.failed += Number(row.failedCount || 0);
+			acc.retryAttempts += Number(row.retryAttemptCount || 0);
+			acc.retrySuccess += Number(row.retrySuccessCount || 0);
+			acc.revenueMinor += Number(row.revenueMinor || 0);
+			return acc;
+		}, { total: 0, success: 0, failed: 0, retryAttempts: 0, retrySuccess: 0, revenueMinor: 0 });
+
+		const failureReasonRows = await db.financialPayment.groupBy({
+			by: ['failureReason'],
+			where: {
+				status: { in: ['FAILED', 'EXPIRED'] },
+				failedAt: { gte: from },
+			},
+			_count: { _all: true },
+			orderBy: { _count: { failureReason: 'desc' } },
+			take: 10,
+		});
+
+		const capturedRows = await db.financialPayment.findMany({
+			where: {
+				status: 'CAPTURED',
+				capturedAt: { gte: from },
+			},
+			select: {
+				amountMinor: true,
+				metadata: true,
+			},
+		});
+
+		const revenueByPlan: Record<string, number> = {};
+		for (const row of capturedRows as any[]) {
+			const plan = String(row?.metadata?.plan || 'unmapped');
+			revenueByPlan[plan] = Number(revenueByPlan[plan] || 0) + Number(row?.amountMinor || 0);
+		}
+
+		return {
+			windowDays: safeDays,
+			totalPayments: totals.total,
+			successRate: totals.total > 0 ? Number(((totals.success / totals.total) * 100).toFixed(2)) : 0,
+			retrySuccessRate: totals.retryAttempts > 0 ? Number(((totals.retrySuccess / totals.retryAttempts) * 100).toFixed(2)) : 0,
+			revenueMinor: totals.revenueMinor,
+			revenueInr: Number((totals.revenueMinor / 100).toFixed(2)),
+			failureReasons: (failureReasonRows || []).map((row: any) => ({
+				reason: String(row.failureReason || 'UNKNOWN'),
+				count: Number(row._count?._all || 0),
+			})),
+			revenuePerPlanMinor: revenueByPlan,
+			daily: (daily || []).map((row: any) => ({
+				date: new Date(row.date).toISOString().slice(0, 10),
+				total: Number(row.totalPayments || 0),
+				success: Number(row.successCount || 0),
+				failed: Number(row.failedCount || 0),
+				retryAttempts: Number(row.retryAttemptCount || 0),
+				retrySuccess: Number(row.retrySuccessCount || 0),
+				revenueMinor: Number(row.revenueMinor || 0),
+			})),
 		};
 	}
 }

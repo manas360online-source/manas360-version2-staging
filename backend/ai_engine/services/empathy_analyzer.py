@@ -45,7 +45,7 @@ async def analyze_empathy(transcript_window: list[dict]) -> int:
 
     Falls back to a heuristic score if the API is unavailable.
     """
-    api_key = os.getenv('ANTHROPIC_API_KEY')
+    api_key = os.getenv('ANTHROPIC_API_KEY') or os.getenv('CLAUDE_API_KEY')
     if not api_key or not transcript_window:
         return _heuristic_empathy(transcript_window)
 
@@ -60,7 +60,7 @@ async def analyze_empathy(transcript_window: list[dict]) -> int:
 
         client = anthropic.Anthropic(api_key=api_key)
         message = client.messages.create(
-            model='claude-sonnet-4-5',
+            model=os.getenv('CLAUDE_MODEL', 'claude-sonnet-4-5'),
             max_tokens=256,
             messages=[{'role': 'user', 'content': prompt}],
         )

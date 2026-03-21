@@ -142,7 +142,7 @@ export default function ProgressPage() {
 
   const moodQuery = useQuery(['my-progress', 'mood'], async () => {
     const [historyRes, statsRes] = await Promise.all([
-      patientApi.getMoodHistoryV2().catch(() => []),
+      patientApi.getMoodHistory().catch(() => []),
       patientApi.getMoodStats().catch(() => null),
     ]);
     try {
@@ -159,18 +159,20 @@ export default function ProgressPage() {
   const clinicalQuery = useQuery(
     ['my-progress', 'clinical'],
     async () => {
-      const [historyRes, insightsRes] = await Promise.all([
+      const [historyRes, insightsRes, progressRes] = await Promise.all([
         patientApi.getStructuredAssessmentHistory().catch(() => []),
         patientApi.getInsights().catch(() => null),
+        patientApi.getProgress().catch(() => null),
       ]);
       try {
-        console.log('[ProgressPage] fetched clinical data', { historyRes, insightsRes });
+        console.log('[ProgressPage] fetched clinical data', { historyRes, insightsRes, progressRes });
       } catch (e) {
         /* ignore logging errors */
       }
       return {
         structured: asPayload<any[]>(historyRes) || [],
         insights: asPayload<any>(insightsRes) || {},
+        progress: asPayload<any>(progressRes) || {},
       };
     },
     { enabled: activeTab === 'clinical' },
@@ -183,7 +185,7 @@ export default function ProgressPage() {
         patientApi.getProgress().catch(() => null),
         patientApi.getSessionHistory().catch(() => []),
         patientApi.getExercises().catch(() => []),
-        patientApi.getMoodHistoryV2().catch(() => []),
+        patientApi.getMoodHistory().catch(() => []),
       ]);
       try {
         console.log('[ProgressPage] fetched habits data', { progressRes, sessionsRes, exercisesRes, moodHistoryRes });
@@ -212,7 +214,7 @@ export default function ProgressPage() {
     const rows = Array.isArray(moodQuery.data?.history) ? moodQuery.data?.history : [];
     return rows
       .map((entry: any) => {
-        const date = parseDate(entry?.createdAt || entry?.date);
+        const date = parseDate(entry?.createdAt || entry?.created_at || entry?.date);
         if (!date) return null;
         const mood = Number(entry?.mood || 0);
         const metadata = entry?.metadata || {};
@@ -493,11 +495,29 @@ export default function ProgressPage() {
   }, [moodHistory]);
 
   const clinicalRows = useMemo(() => {
+    type ClinicalRow = {
+      attemptId?: string;
+      date: Date;
+      dateLabel: string;
+      type: string;
+      score: number;
+      severity: string;
+      interpretation: string;
+    };
+
     const structured = Array.isArray(clinicalQuery.data?.structured) ? clinicalQuery.data?.structured : [];
-    return structured
+    const insightsTrend = Array.isArray(clinicalQuery.data?.insights?.assessmentTrend)
+      ? clinicalQuery.data?.insights?.assessmentTrend
+      : [];
+    const progressTrend = Array.isArray(clinicalQuery.data?.progress?.assessmentTrend)
+      ? clinicalQuery.data?.progress?.assessmentTrend
+      : [];
+    const mergedTrend = [...insightsTrend, ...progressTrend];
+
+    const structuredRows = structured
       .map((item: any) => {
         const key = String(item?.templateKey || item?.template?.key || '').toLowerCase();
-        const type = item?.type || (key.includes('phq-9') ? 'PHQ-9' : key.includes('gad-7') ? 'GAD-7' : String(item?.templateTitle || 'Assessment'));
+        const type = item?.type || (key.includes('phq') ? 'PHQ-9' : key.includes('gad') ? 'GAD-7' : String(item?.templateTitle || 'Assessment'));
         const date = parseDate(item?.submittedAt || item?.createdAt);
         if (!date) return null;
         return {
@@ -510,8 +530,42 @@ export default function ProgressPage() {
           interpretation: String(item?.interpretation || ''),
         };
       })
-      .filter(Boolean) as Array<{ attemptId?: string; date: Date; dateLabel: string; type: string; score: number; severity: string; interpretation: string }>;
-  }, [clinicalQuery.data?.structured]);
+
+    const trendRows = mergedTrend
+      .flatMap((item: any) => {
+          const date = parseDate(item?.date || item?.createdAt);
+          if (!date) return [] as ClinicalRow[];
+          const phq = Number(item?.phq9Score || 0);
+          const gad = Number(item?.gad7Score || 0);
+          if (!phq && !gad) return [] as ClinicalRow[];
+          const rows: ClinicalRow[] = [];
+          if (phq) {
+            rows.push({
+              attemptId: undefined,
+              date,
+              dateLabel: formatDay(date),
+              type: 'PHQ-9',
+              score: phq,
+              severity: 'Recorded',
+              interpretation: '',
+            });
+          }
+          if (gad) {
+            rows.push({
+              attemptId: undefined,
+              date,
+              dateLabel: formatDay(date),
+              type: 'GAD-7',
+              score: gad,
+              severity: 'Recorded',
+              interpretation: '',
+            });
+          }
+          return rows;
+        });
+
+    return [...structuredRows, ...trendRows].filter(Boolean) as ClinicalRow[];
+  }, [clinicalQuery.data?.structured, clinicalQuery.data?.insights?.assessmentTrend, clinicalQuery.data?.progress?.assessmentTrend]);
 
   const filteredClinicalRows = useMemo(() => {
     const now = new Date();
@@ -579,7 +633,7 @@ export default function ProgressPage() {
     for (const row of moodRows) {
       const mood = Number(row?.mood || 0);
       if (!mood) continue;
-      const date = parseDate(row?.createdAt || row?.date);
+      const date = parseDate(row?.createdAt || row?.created_at || row?.date);
       if (!date) continue;
       const key = weekKey(date);
       if (!weeklyMood[key]) weeklyMood[key] = { total: 0, count: 0 };

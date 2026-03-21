@@ -2,7 +2,91 @@ import { AppError } from '../middleware/error.middleware';
 import { prisma } from '../config/db';
 import { PROVIDER_PLANS, type ProviderPlanKey } from '../config/providerPlans';
 
-const db = prisma;
+const db = prisma as any;
+const SUBSCRIPTION_LOCK_TIMEOUT_MS = 5 * 60 * 1000;
+
+const recordProviderSubscriptionHistory = async (input: {
+	providerId: string;
+	subscriptionRefId?: string;
+	oldPlan?: string;
+	newPlan?: string;
+	oldStatus?: string;
+	newStatus?: string;
+	oldPrice?: number;
+	newPrice?: number;
+	paymentId?: string;
+	transactionId?: string;
+	reason: 'PROVIDER_PLAN_ACTIVATED' | 'PROVIDER_MANUAL_CANCEL' | 'PAYMENT_SUCCESS' | 'OTHER';
+	metadata?: Record<string, unknown>;
+}) => {
+	await (db as any).subscriptionHistory.create({
+		data: {
+			subscriptionType: 'PROVIDER',
+			subscriptionRefId: input.subscriptionRefId,
+			providerId: input.providerId,
+			oldPlan: input.oldPlan,
+			newPlan: input.newPlan,
+			oldStatus: input.oldStatus,
+			newStatus: input.newStatus,
+			oldPrice: input.oldPrice,
+			newPrice: input.newPrice,
+			paymentId: input.paymentId,
+			transactionId: input.transactionId || input.paymentId,
+			reason: input.reason,
+			metadata: input.metadata || undefined,
+		},
+	}).catch(() => null);
+};
+
+const withProviderSubscriptionLock = async <T>(providerId: string, handler: (current: any) => Promise<T>): Promise<T> => {
+	let current = await db.providerSubscription.findUnique({ where: { providerId } });
+	const staleCutoff = new Date(Date.now() - SUBSCRIPTION_LOCK_TIMEOUT_MS);
+	const lockStartedAt = new Date();
+
+	if (!current) {
+		// Seed a row so lock-based updates are deterministic for first-time activation.
+		current = await db.providerSubscription.create({
+			data: {
+				providerId,
+				plan: 'free',
+				price: 0,
+				leadsPerWeek: 0,
+				startDate: new Date(),
+				expiryDate: new Date('2099-12-31'),
+				status: 'inactive',
+				autoRenew: false,
+				processing: true,
+				processingStartedAt: lockStartedAt,
+			},
+		});
+	} else {
+		const lock = await db.providerSubscription.updateMany({
+			where: {
+				providerId,
+				OR: [
+					{ processing: false },
+					{ processing: true, processingStartedAt: { lt: staleCutoff } },
+				],
+			},
+			data: { processing: true, processingStartedAt: lockStartedAt },
+		});
+
+		if (!lock?.count) {
+			throw new AppError('Provider subscription is currently being processed. Please retry shortly.', 409);
+		}
+
+		current = await db.providerSubscription.findUnique({ where: { providerId } });
+	}
+
+	try {
+		return await handler(current);
+	} finally {
+		await db.providerSubscription.updateMany({
+			where: { providerId },
+			data: { processing: false, processingStartedAt: null },
+		}).catch(() => null);
+	}
+};
 
 /** Calculate expiry date from now based on plan duration */
 const calculateExpiry = (durationDays: number): Date => {
@@ -47,56 +131,70 @@ export const activateProviderSubscription = async (
 	const plan = PROVIDER_PLANS[planKey];
 	if (!plan) throw new AppError('Invalid provider plan', 422);
 
-	if (planKey === 'free') {
-		// Free plan: upsert with no expiry
-		return db.providerSubscription.upsert({
-			where: { providerId },
-			create: {
+	return withProviderSubscriptionLock(providerId, async (current) => {
+		if (planKey === 'free') {
+			const next = await db.providerSubscription.update({
+				where: { providerId },
+				data: {
+					plan: planKey,
+					price: 0,
+					leadsPerWeek: 0,
+					startDate: new Date(),
+					expiryDate: new Date('2099-12-31'),
+					status: 'active',
+					autoRenew: false,
+					paymentId: paymentId || undefined,
+				},
+			});
+
+			await recordProviderSubscriptionHistory({
 				providerId,
+				subscriptionRefId: String(next.id),
+				oldPlan: String(current?.plan || ''),
+				newPlan: String(next.plan || ''),
+				oldStatus: String(current?.status || ''),
+				newStatus: String(next.status || ''),
+				oldPrice: Number(current?.price || 0),
+				newPrice: Number(next.price || 0),
+				paymentId,
+				transactionId: paymentId,
+				reason: 'PROVIDER_PLAN_ACTIVATED',
+				metadata: { autoRenew: false },
+			});
+
+			return next;
+		}
+
+		const next = await db.providerSubscription.update({
+			where: { providerId },
+			data: {
 				plan: planKey,
-				price: 0,
-				leadsPerWeek: 0,
+				price: plan.price,
+				leadsPerWeek: plan.leadsPerWeek,
 				startDate: new Date(),
-				expiryDate: new Date('2099-12-31'),
+				expiryDate: calculateExpiry(plan.durationDays),
 				status: 'active',
-				autoRenew: false,
-			},
-			update: {
-				plan: planKey,
-				price: 0,
-				leadsPerWeek: 0,
-				startDate: new Date(),
-				expiryDate: new Date('2099-12-31'),
-				status: 'active',
-				autoRenew: false,
+				autoRenew: true,
 				paymentId: paymentId || undefined,
 			},
 		});
-	}
 
-	return db.providerSubscription.upsert({
-		where: { providerId },
-		create: {
+		await recordProviderSubscriptionHistory({
 			providerId,
-			plan: planKey,
-			price: plan.price,
-			leadsPerWeek: plan.leadsPerWeek,
-			startDate: new Date(),
-			expiryDate: calculateExpiry(plan.durationDays),
-			status: 'active',
-			autoRenew: true,
-			paymentId: paymentId || undefined,
-		},
-		update: {
-			plan: planKey,
-			price: plan.price,
-			leadsPerWeek: plan.leadsPerWeek,
-			startDate: new Date(),
-			expiryDate: calculateExpiry(plan.durationDays),
-			status: 'active',
-			autoRenew: true,
-			paymentId: paymentId || undefined,
-		},
+			subscriptionRefId: String(next.id),
+			oldPlan: String(current?.plan || ''),
+			newPlan: String(next.plan || ''),
+			oldStatus: String(current?.status || ''),
+			newStatus: String(next.status || ''),
+			oldPrice: Number(current?.price || 0),
+			newPrice: Number(next.price || 0),
+			paymentId,
+			transactionId: paymentId,
+			reason: 'PROVIDER_PLAN_ACTIVATED',
+			metadata: { autoRenew: true },
+		});
+
+		return next;
 	});
 };
 
@@ -105,9 +203,25 @@ export const cancelProviderSubscription = async (providerId: string) => {
 	const sub = await db.providerSubscription.findUnique({ where: { providerId } });
 	if (!sub) throw new AppError('No active subscription found', 404);
 
-	return db.providerSubscription.update({
-		where: { providerId },
-		data: { status: 'cancelled', autoRenew: false },
+	return withProviderSubscriptionLock(providerId, async (current) => {
+		const next = await db.providerSubscription.update({
+			where: { providerId },
+			data: { status: 'cancelled', autoRenew: false },
+		});
+
+		await recordProviderSubscriptionHistory({
+			providerId,
+			subscriptionRefId: String(next.id),
+			oldPlan: String(current?.plan || ''),
+			newPlan: String(next.plan || ''),
+			oldStatus: String(current?.status || ''),
+			newStatus: String(next.status || ''),
+			oldPrice: Number(current?.price || 0),
+			newPrice: Number(next.price || 0),
+			reason: 'PROVIDER_MANUAL_CANCEL',
+		});
+
+		return next;
 	});
 };
 

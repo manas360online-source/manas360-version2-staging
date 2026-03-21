@@ -198,7 +198,7 @@ export const requirePatientRole = requireRole('patient') as (
  * Backward compatibility: Require therapist role
  * @deprecated Use requireRole('therapist') instead
  */
-export const requireTherapistRole = requireRole(['therapist', 'psychiatrist', 'coach']) as (
+export const requireTherapistRole = requireRole(['therapist', 'psychiatrist', 'psychologist', 'coach']) as (
 	req: Request,
 	_res: Response,
 	next: NextFunction,
@@ -324,6 +324,7 @@ export const requirePermission = (
 				'read_all_profiles', 
 				'manage_users', 
 				'manage_therapists', 
+				'manage_payments',
 				'view_analytics', 
 				'manage_corporate', 
 				'view_system_logs'
@@ -332,6 +333,7 @@ export const requirePermission = (
 				'read_all_profiles',
 				'manage_users',
 				'manage_therapists',
+				'manage_payments',
 				'view_analytics',
 				'manage_corporate',
 				'view_system_logs',

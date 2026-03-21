@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.processRazorpayWebhook = exports.releaseSessionEarnings = exports.processPhonePeWebhook = exports.createSessionPayment = void 0;
+exports.retryPaymentManually = exports.processRazorpayWebhook = exports.releaseSessionEarnings = exports.processPhonePeWebhook = exports.createSessionPayment = void 0;
 const crypto_1 = __importStar(require("crypto"));
 const redis_1 = require("redis");
 const env_1 = require("../config/env");
@@ -41,6 +41,7 @@ const db_1 = require("../config/db");
 const error_middleware_1 = require("../middleware/error.middleware");
 const razorpay_service_1 = require("./razorpay.service");
 const phonepe_service_1 = require("./phonepe.service");
+const payment_metrics_service_1 = require("./payment-metrics.service");
 const logger_1 = require("../utils/logger");
 const redis = (0, redis_1.createClient)({ url: env_1.env.redisUrl });
 const isTestEnv = process.env.NODE_ENV === 'test';
@@ -80,24 +81,48 @@ const createSessionPayment = async (input) => {
     if (!amountMinor) {
         throw new error_middleware_1.AppError('amountMinor must be greater than zero', 422);
     }
-    const idempotencyKey = (0, crypto_1.randomUUID)();
+    const idempotencyKey = String(input.idempotencyKey || (0, crypto_1.randomUUID)()).trim();
+    if (!idempotencyKey) {
+        throw new error_middleware_1.AppError('idempotencyKey is required for payment creation', 422);
+    }
+    const existing = await db.financialSession.findUnique({ where: { idempotencyKey } });
+    if (existing) {
+        const payment = await db.financialPayment.findFirst({ where: { sessionId: existing.id } });
+        if (payment) {
+            return {
+                sessionId: existing.id,
+                paymentId: payment.id,
+                paymentType: 'provider_fee',
+                transactionId: existing.razorpayOrderId,
+                redirectUrl: '',
+                amountMinor: existing.expectedAmountMinor,
+                currency: existing.currency,
+                feeBreakdown: {
+                    platformFeeMinor: Math.round(existing.expectedAmountMinor * platformShareRatio),
+                    providerFeeMinor: Math.floor(existing.expectedAmountMinor * providerShareRatio),
+                },
+                idempotencyKey,
+            };
+        }
+    }
     const transactionId = `SESS_${Date.now()}_${idempotencyKey.slice(0, 8)}`;
     const shouldBypass = env_1.env.allowDevPaymentBypass && env_1.env.nodeEnv === 'development';
+    const frontendBaseUrl = env_1.env.frontendUrl;
     let redirectUrl;
     try {
         redirectUrl = await (0, phonepe_service_1.initiatePhonePePayment)({
             transactionId,
             userId: input.patientId,
             amountInPaise: amountMinor,
-            callbackUrl: `${env_1.env.apiPrefix}/payment/phonepe/webhook`,
-            redirectUrl: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/payment-status`,
+            callbackUrl: `${env_1.env.apiPrefix}/v1/payments/phonepe/webhook`,
+            redirectUrl: `${frontendBaseUrl}/payment/status?id=${transactionId}`,
         });
     }
     catch (error) {
         if (!shouldBypass) {
             throw new error_middleware_1.AppError(error?.message || 'Failed to initiate PhonePe payment', 500);
         }
-        redirectUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/payment-status?id=${transactionId}`;
+        redirectUrl = `${frontendBaseUrl}/payment/status?id=${transactionId}`;
     }
     const created = await db.$transaction(async (tx) => {
         await assertPaymentActors(tx, input.patientId, input.providerId);
@@ -155,25 +180,45 @@ const processPhonePeWebhook = async (decoded) => {
     }
     if (success && code === 'PAYMENT_SUCCESS') {
         if (merchantTransactionId.startsWith('SESS_')) {
+            let capturedPayment = null;
+            let capturedAmountMinor = 0;
             await db.$transaction(async (tx) => {
                 const payment = await tx.financialPayment.findFirst({
                     where: { razorpayOrderId: merchantTransactionId },
                 });
-                if (!payment || payment.status === 'CAPTURED')
+                if (!payment) {
+                    logger_1.logger.error('[PaymentService] PhonePe webhook with unknown transaction', { merchantTransactionId });
                     return;
-                const amountMinor = Number(data.amount);
-                const therapistShareMinor = Math.floor(amountMinor * providerShareRatio);
-                const platformShareMinor = amountMinor - therapistShareMinor;
+                }
+                if (payment.status === 'CAPTURED') {
+                    logger_1.logger.debug('[PaymentService] PhonePe webhook duplicate capture ignored', { merchantTransactionId, paymentId: payment.id });
+                    capturedPayment = payment;
+                    capturedAmountMinor = Number(payment.amountMinor || 0);
+                    return;
+                }
+                const payloadAmountMinor = Number(data.amount);
+                if (!Number.isFinite(payloadAmountMinor) || payloadAmountMinor <= 0) {
+                    logger_1.logger.error('[PaymentService] Invalid amount in PhonePe webhook', { merchantTransactionId, amount: data.amount });
+                    throw new error_middleware_1.AppError('Invalid amount in PhonePe webhook', 422);
+                }
+                const therapistShareMinor = Math.floor(payloadAmountMinor * providerShareRatio);
+                const platformShareMinor = payloadAmountMinor - therapistShareMinor;
                 await tx.financialPayment.update({
                     where: { id: payment.id },
                     data: {
                         status: 'CAPTURED',
                         razorpayPaymentId: String(data.transactionId),
                         capturedAt: new Date(),
+                        retryCount: 0,
+                        nextRetryAt: null,
+                        failedAt: null,
+                        failureReason: null,
                         therapistShareMinor,
                         platformShareMinor,
                     },
                 });
+                capturedPayment = payment;
+                capturedAmountMinor = payloadAmountMinor;
                 await tx.financialSession.update({
                     where: { id: payment.sessionId },
                     data: { status: 'CONFIRMED', confirmedAt: new Date() },
@@ -181,7 +226,7 @@ const processPhonePeWebhook = async (decoded) => {
                 await tx.revenueLedger.create({
                     data: {
                         type: 'SESSION',
-                        grossAmountMinor: amountMinor,
+                        grossAmountMinor: payloadAmountMinor,
                         platformCommissionMinor: platformShareMinor,
                         providerShareMinor: therapistShareMinor,
                         paymentType: 'PROVIDER_FEE',
@@ -193,6 +238,16 @@ const processPhonePeWebhook = async (decoded) => {
                     },
                 });
             });
+            if (capturedPayment?.id) {
+                await (0, payment_metrics_service_1.recordPaymentCapturedMetric)({
+                    paymentId: String(capturedPayment.id),
+                    transactionId: merchantTransactionId,
+                    userId: String(capturedPayment.patientId || ''),
+                    amountMinor: capturedAmountMinor,
+                    retryCount: Number(capturedPayment.retryCount || 0),
+                    channel: 'session',
+                });
+            }
             logger_1.logger.info(`[PaymentService] Session payment processed and capture recorded`, { merchantTransactionId });
             return { handled: true, message: 'PhonePe session payment processed' };
         }
@@ -200,6 +255,13 @@ const processPhonePeWebhook = async (decoded) => {
             const parts = merchantTransactionId.split('_');
             const userId = parts[1];
             const planKey = data.metadata?.plan || parts[2];
+            const payment = await db.financialPayment.findFirst({
+                where: { razorpayOrderId: merchantTransactionId },
+                orderBy: { createdAt: 'desc' },
+            });
+            if (payment?.status === 'CAPTURED') {
+                return { handled: true, message: 'Patient subscription payment already captured' };
+            }
             const { checkPhonePeStatus } = await Promise.resolve().then(() => __importStar(require('./phonepe.service')));
             const verify = await checkPhonePeStatus(merchantTransactionId);
             if (!verify || !verify.success || verify.code !== 'PAYMENT_SUCCESS' || verify.data?.state !== 'COMPLETED') {
@@ -213,7 +275,37 @@ const processPhonePeWebhook = async (decoded) => {
                 return { handled: true, message: 'Patient subscription already processed' };
             }
             const { reactivatePatientSubscription } = await Promise.resolve().then(() => __importStar(require('./patient-v1.service')));
-            await reactivatePatientSubscription(userId);
+            const activated = await reactivatePatientSubscription(userId, merchantTransactionId);
+            if (payment?.id) {
+                await db.financialPayment.update({
+                    where: { id: payment.id },
+                    data: {
+                        status: 'CAPTURED',
+                        razorpayPaymentId: String(data?.transactionId || payment.razorpayPaymentId || ''),
+                        capturedAt: new Date(),
+                        retryCount: 0,
+                        nextRetryAt: null,
+                        failedAt: null,
+                        failureReason: null,
+                        metadata: {
+                            ...(payment.metadata || {}),
+                            type: 'patient_subscription',
+                            plan: planKey,
+                            subscriptionId: String(activated?.id || ''),
+                            paymentVerifiedAt: new Date().toISOString(),
+                        },
+                    },
+                });
+                await (0, payment_metrics_service_1.recordPaymentCapturedMetric)({
+                    paymentId: String(payment.id),
+                    transactionId: merchantTransactionId,
+                    userId,
+                    planId: String(planKey || ''),
+                    amountMinor: Number(payment.amountMinor || 0),
+                    retryCount: Number(payment.retryCount || 0),
+                    channel: 'patient_subscription',
+                });
+            }
             logger_1.logger.info(`[PaymentService] Patient subscription activated successfully`, { merchantTransactionId, userId, planKey });
             return { handled: true, message: 'PhonePe subscription payment processed' };
         }
@@ -223,6 +315,13 @@ const processPhonePeWebhook = async (decoded) => {
             const providerId = parts[2];
             // Fix 7: Get plan from metadata payload (fallback to URL param)
             const planKey = data.metadata?.plan || parts[3];
+            const payment = await db.financialPayment.findFirst({
+                where: { razorpayOrderId: merchantTransactionId },
+                orderBy: { createdAt: 'desc' },
+            });
+            if (payment?.status === 'CAPTURED') {
+                return { handled: true, message: 'Provider subscription payment already captured' };
+            }
             const { checkPhonePeStatus } = await Promise.resolve().then(() => __importStar(require('./phonepe.service')));
             const verify = await checkPhonePeStatus(merchantTransactionId);
             if (!verify || !verify.success || verify.code !== 'PAYMENT_SUCCESS' || verify.data?.state !== 'COMPLETED') {
@@ -236,7 +335,37 @@ const processPhonePeWebhook = async (decoded) => {
                 return { handled: true, message: 'Provider subscription already processed' };
             }
             const { activateProviderSubscription } = await Promise.resolve().then(() => __importStar(require('./provider-subscription.service')));
-            await activateProviderSubscription(providerId, planKey, merchantTransactionId);
+            const activated = await activateProviderSubscription(providerId, planKey, merchantTransactionId);
+            if (payment?.id) {
+                await db.financialPayment.update({
+                    where: { id: payment.id },
+                    data: {
+                        status: 'CAPTURED',
+                        razorpayPaymentId: String(data?.transactionId || payment.razorpayPaymentId || ''),
+                        capturedAt: new Date(),
+                        retryCount: 0,
+                        nextRetryAt: null,
+                        failedAt: null,
+                        failureReason: null,
+                        metadata: {
+                            ...(payment.metadata || {}),
+                            type: 'provider_subscription',
+                            plan: planKey,
+                            subscriptionId: String(activated?.id || ''),
+                            paymentVerifiedAt: new Date().toISOString(),
+                        },
+                    },
+                });
+                await (0, payment_metrics_service_1.recordPaymentCapturedMetric)({
+                    paymentId: String(payment.id),
+                    transactionId: merchantTransactionId,
+                    userId: providerId,
+                    planId: String(planKey || ''),
+                    amountMinor: Number(payment.amountMinor || 0),
+                    retryCount: Number(payment.retryCount || 0),
+                    channel: 'provider_subscription',
+                });
+            }
             logger_1.logger.info(`[PaymentService] Provider subscription activated successfully`, { merchantTransactionId, providerId, planKey });
             return { handled: true, message: 'PhonePe provider subscription payment processed' };
         }
@@ -413,3 +542,78 @@ const processRazorpayWebhook = async (rawBody, signature) => {
     return { handled: false, message: `Unhandled event: ${eventType}` };
 };
 exports.processRazorpayWebhook = processRazorpayWebhook;
+/**
+ * Manual Payment Retry (Admin Recovery Tool)
+ *
+ * Allows admin/support to manually trigger payment retry for failed payments.
+ * Used after customer updates payment method or during system recovery.
+ *
+ * Resets retry state and schedules immediate retry via reconciliation worker.
+ */
+const retryPaymentManually = async (paymentId, adminUserId) => {
+    const payment = await db.financialPayment.findUnique({
+        where: { id: paymentId },
+        select: {
+            id: true,
+            status: true,
+            retryCount: true,
+            nextRetryAt: true,
+            patientId: true,
+            providerId: true,
+            failureReason: true,
+            metadata: true,
+        },
+    });
+    if (!payment) {
+        throw new error_middleware_1.AppError('Payment not found', 404);
+    }
+    // Already successful — no retry needed
+    if (payment.status === 'CAPTURED') {
+        throw new error_middleware_1.AppError('Payment already captured successfully', 400);
+    }
+    // Attempting to retry an expired payment — check if we should allow
+    if (payment.status === 'EXPIRED') {
+        logger_1.logger.warn('[ManualRetry] Attempting to retry expired payment', {
+            paymentId,
+            adminUserId,
+        });
+        // Allow retry, but it will require re-initiation from gateway
+    }
+    // Reset retry counter and schedule immediate retry
+    const updatedPayment = await db.financialPayment.update({
+        where: { id: paymentId },
+        data: {
+            retryCount: 0,
+            nextRetryAt: new Date(), // Immediate retry
+            metadata: {
+                ...(typeof payment.metadata === 'object' && payment.metadata ? payment.metadata : {}),
+                manualRetryTriggeredAt: new Date().toISOString(),
+                manualRetryTriggeredBy: adminUserId,
+                previousStatus: payment.status,
+                previousFailureReason: payment.failureReason,
+            },
+        },
+        select: {
+            id: true,
+            status: true,
+            retryCount: true,
+            nextRetryAt: true,
+        },
+    });
+    logger_1.logger.info('MANUAL_PAYMENT_RETRY_TRIGGERED', {
+        paymentId,
+        adminUserId,
+        previousStatus: payment.status,
+        previousRetryCount: Number(payment.retryCount || 0),
+        newRetryCount: Number(updatedPayment.retryCount || 0),
+        nextRetryAt: updatedPayment.nextRetryAt,
+        patientId: payment.patientId,
+        providerId: payment.providerId,
+    });
+    return {
+        success: true,
+        message: 'Payment retry scheduled for immediate processing',
+        payment: updatedPayment,
+    };
+};
+exports.retryPaymentManually = retryPaymentManually;

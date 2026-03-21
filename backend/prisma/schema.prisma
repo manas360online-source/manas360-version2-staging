@@ -1061,6 +1061,8 @@ model FinancialPayment {
   capturedAt            DateTime?
   failedAt              DateTime?
   failureReason         String?
+  retryCount            Int                    @default(0)
+  nextRetryAt           DateTime?
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
   paymentType           FinancialPaymentType   @default(PROVIDER_FEE)
@@ -1072,6 +1074,7 @@ model FinancialPayment {
   @@index([sessionId, status])
   @@index([providerId, status])
   @@index([paymentType, status])
+  @@index([status, nextRetryAt])
   @@index([razorpayOrderId])
   @@index([createdAt])
   @@map("financial_payments")
@@ -1202,13 +1205,57 @@ model PatientSubscription {
   status       String
   paymentId    String?
   autoRenew    Boolean  @default(true)
+  processing   Boolean  @default(false)
+  processingStartedAt DateTime?
   renewalDate  DateTime
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([status])
+  @@index([status, processing])
   @@map("patient_subscriptions")
+}
+
+model SubscriptionHistory {
+  id                String   @id @default(uuid())
+  subscriptionType  String
+  subscriptionRefId String?
+  patientUserId     String?
+  providerId        String?
+  oldPlan           String?
+  newPlan           String?
+  oldStatus         String?
+  newStatus         String?
+  oldPrice          Int?
+  newPrice          Int?
+  paymentId         String?
+  transactionId     String?
+  reason            SubscriptionChangeReason
+  metadata          Json?
+  changedAt         DateTime @default(now())
+  createdAt         DateTime @default(now())
+
+  @@index([subscriptionType, changedAt])
+  @@index([patientUserId, changedAt])
+  @@index([providerId, changedAt])
+  @@map("subscription_history")
+}
+
+model DailyPaymentMetric {
+  id                String   @id @default(uuid())
+  date              DateTime @unique
+  totalPayments     Int      @default(0)
+  successCount      Int      @default(0)
+  failedCount       Int      @default(0)
+  retryAttemptCount Int      @default(0)
+  retrySuccessCount Int      @default(0)
+  revenueMinor      BigInt   @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([date])
+  @@map("daily_payment_metrics")
 }
 
 model PatientPaymentMethod {
@@ -1689,6 +1736,7 @@ enum FinancialPaymentStatus {
   PENDING_CAPTURE
   CAPTURED
   FAILED
+  EXPIRED
   REFUNDED
   PARTIAL_REFUNDED
 }
@@ -1696,6 +1744,20 @@ enum FinancialPaymentStatus {
 enum FinancialPaymentType {
   PLATFORM_FEE
   PROVIDER_FEE
+}
+
+enum SubscriptionChangeReason {
+  PAYMENT_SUCCESS
+  AUTO_RENEWAL
+  MANUAL_UPGRADE
+  MANUAL_DOWNGRADE
+  MANUAL_CANCEL
+  PAYMENT_REACTIVATION
+  AUTO_RENEW_ENABLED
+  AUTO_RENEW_DISABLED
+  PROVIDER_PLAN_ACTIVATED
+  PROVIDER_MANUAL_CANCEL
+  OTHER
 }
 
 enum WalletTxnType {
@@ -1831,12 +1893,15 @@ model ProviderSubscription {
   expiryDate    DateTime
   status        String       // "active" | "expired" | "cancelled"
   autoRenew     Boolean      @default(false)
+  processing    Boolean      @default(false)
+  processingStartedAt DateTime?
   paymentId     String?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
   provider      User         @relation(fields: [providerId], references: [id], onDelete: Cascade)
 
   @@index([status])
+  @@index([status, processing])
   @@map("provider_subscriptions")
 }
 

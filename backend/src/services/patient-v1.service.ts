@@ -20,6 +20,80 @@ import { scoreGAD7, scorePHQ9 } from './riskScoring';
 import { sendSubscriptionActivationEmail } from './email.service';
 
 const db = prisma as any;
+const SUBSCRIPTION_LOCK_TIMEOUT_MS = 5 * 60 * 1000;
+
+const recordPatientSubscriptionHistory = async (input: {
+	userId: string;
+	subscriptionRefId?: string;
+	oldPlan?: string;
+	newPlan?: string;
+	oldStatus?: string;
+	newStatus?: string;
+	oldPrice?: number;
+	newPrice?: number;
+	paymentId?: string;
+	transactionId?: string;
+	reason:
+		| 'PAYMENT_SUCCESS'
+		| 'AUTO_RENEWAL'
+		| 'MANUAL_UPGRADE'
+		| 'MANUAL_DOWNGRADE'
+		| 'MANUAL_CANCEL'
+		| 'PAYMENT_REACTIVATION'
+		| 'AUTO_RENEW_ENABLED'
+		| 'AUTO_RENEW_DISABLED'
+		| 'OTHER';
+	metadata?: Record<string, unknown>;
+}) => {
+	await db.subscriptionHistory.create({
+		data: {
+			subscriptionType: 'PATIENT',
+			subscriptionRefId: input.subscriptionRefId,
+			patientUserId: input.userId,
+			oldPlan: input.oldPlan,
+			newPlan: input.newPlan,
+			oldStatus: input.oldStatus,
+			newStatus: input.newStatus,
+			oldPrice: input.oldPrice,
+			newPrice: input.newPrice,
+			paymentId: input.paymentId,
+			transactionId: input.transactionId || input.paymentId,
+			reason: input.reason,
+			metadata: input.metadata || undefined,
+		},
+	}).catch(() => null);
+};
+
+const withPatientSubscriptionLock = async <T>(userId: string, handler: (current: any) => Promise<T>): Promise<T> => {
+	await ensureSubscriptionRecord(userId);
+	const staleCutoff = new Date(Date.now() - SUBSCRIPTION_LOCK_TIMEOUT_MS);
+	const lockStartedAt = new Date();
+
+	const lock = await db.patientSubscription.updateMany({
+		where: {
+			userId,
+			OR: [
+				{ processing: false },
+				{ processing: true, processingStartedAt: { lt: staleCutoff } },
+			],
+		},
+		data: { processing: true, processingStartedAt: lockStartedAt },
+	});
+
+	if (!lock?.count) {
+		throw new AppError('Subscription is currently being processed. Please retry shortly.', 409);
+	}
+
+	try {
+		const current = await db.patientSubscription.findUnique({ where: { userId } });
+		return await handler(current);
+	} finally {
+		await db.patientSubscription.updateMany({
+			where: { userId },
+			data: { processing: false, processingStartedAt: null },
+		}).catch(() => null);
+	}
+};
 
 type ProviderFilters = {
 	specialization?: string;
@@ -454,7 +528,10 @@ export const getPatientDashboard = async (userId: string) => {
 	const patientProfile = await getPatientProfile(userId);
 	const now = new Date();
 
-	const [user, upcomingRaw, recentSessionsRaw, lastAssessment, recentMoodRaw, therapistUsers, exercises, progress, recentPrescriptionsRaw] = await Promise.all([
+	// Get unified mood history from all sources
+	const moodHistory = await getMoodHistory(userId).catch(() => []);
+
+	const [user, upcomingRaw, recentSessionsRaw, lastAssessment, therapistUsers, exercises, progress, recentPrescriptionsRaw] = await Promise.all([
 		db.user.findUnique({
 			where: { id: userId },
 			select: { id: true, name: true, firstName: true, lastName: true, email: true, role: true, createdAt: true },
@@ -493,12 +570,6 @@ export const getPatientDashboard = async (userId: string) => {
 			orderBy: { createdAt: 'desc' },
 			select: { type: true, totalScore: true, severityLevel: true, createdAt: true },
 		}).catch(() => null),
-		db.patientMoodEntry.findMany({
-			where: { patientId: patientProfile.id },
-			orderBy: { date: 'desc' },
-			take: 7,
-			select: { id: true, moodScore: true, note: true, date: true },
-		}).catch(() => []),
 		db.user.findMany({
 			where: { role: { in: PROVIDER_ROLES as any }, isDeleted: false },
 			select: { 
@@ -588,11 +659,12 @@ export const getPatientDashboard = async (userId: string) => {
 		.filter((item: PromiseSettledResult<any>) => item.status === 'fulfilled')
 		.map((item: PromiseSettledResult<any>) => (item as PromiseFulfilledResult<any>).value);
 	const userName = String(user?.name || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Patient');
-	const moodTrend = [...recentMoodRaw]
+	const moodTrend = moodHistory
+		.slice(0, 7)
 		.reverse()
 		.map((entry: any) => ({
-			date: entry.date,
-			score: Number(entry.moodScore || 0),
+			date: entry.created_at,
+			score: Number(entry.mood || 0),
 			note: entry.note || null,
 		}));
 
@@ -601,6 +673,33 @@ export const getPatientDashboard = async (userId: string) => {
 		: 3;
 	const completedWellnessActivities = exercises.filter((item: any) => String(item.status || '').toUpperCase() === 'COMPLETED').length;
 	const exerciseBoost = Math.min(20, completedWellnessActivities * 10);
+
+	// Calculate consecutive check-in streak
+	const sortedDays = [...new Set(moodTrend.map((entry: any) => {
+		const d = new Date(entry.date);
+		return d.toISOString().slice(0, 10);
+	}))] as string[];
+	sortedDays.sort((a, b) => b.localeCompare(a));
+	let currentStreak = 0;
+	let cursorDate = new Date();
+	cursorDate.setHours(0, 0, 0, 0);
+	for (const day of sortedDays) {
+		const cursorKey = cursorDate.toISOString().slice(0, 10);
+		if (day === cursorKey) {
+			currentStreak += 1;
+			cursorDate.setDate(cursorDate.getDate() - 1);
+			continue;
+		}
+		if (currentStreak === 0) {
+			cursorDate.setDate(cursorDate.getDate() - 1);
+			if (day === cursorDate.toISOString().slice(0, 10)) {
+				currentStreak += 1;
+				cursorDate.setDate(cursorDate.getDate() - 1);
+				continue;
+			}
+		}
+		break;
+	}
 
 	const completedSessions = recentSessionsRaw.filter((row: any) => String(row.status) === 'COMPLETED').length;
 	const totalSessions = Math.max(completedSessions + upcomingRaw.length, progress?.totalSessions || 0);
@@ -635,12 +734,12 @@ export const getPatientDashboard = async (userId: string) => {
 				date: prescription.prescribedDate,
 			};
 		}),
-		...recentMoodRaw.slice(0, 3).map((mood: any, index: number) => ({
-			id: `mood-${mood.id || mood.date || index}-${index}`,
+		...moodHistory.slice(0, 3).map((mood: any) => ({
+			id: `mood-${mood.id}`,
 			type: 'mood',
 			title: 'Mood check-in saved',
-			description: mood.note ? String(mood.note) : `Mood score ${mood.moodScore}/5`,
-			date: mood.date,
+			description: mood.note ? String(mood.note) : `Mood score ${mood.mood}/5`,
+			date: mood.created_at,
 		})),
 		...exercises
 			.filter((item: any) => String(item.status || '').toUpperCase() === 'COMPLETED')
@@ -685,7 +784,8 @@ export const getPatientDashboard = async (userId: string) => {
 		wellnessScore: Math.max(0, Math.min(100, Math.round((avgMood / 5) * 80 + exerciseBoost))),
 		sessionsCompleted: progressPayload.sessionsCompleted,
 		totalSessions: progressPayload.totalSessions,
-		streak: moodTrend.length,
+		streak: currentStreak,
+		currentStreak: currentStreak,
 		moodTrend,
 		upcomingSession,
 		progress: progressPayload,
@@ -707,7 +807,7 @@ export const getPatientDashboard = async (userId: string) => {
 				createdAt: lastAssessment.createdAt,
 			}
 			: null,
-		recentMoodLogs: recentMoodRaw,
+		recentMoodLogs: moodHistory.slice(0, 7),
 		recommendedProviders: recommendedProviders.slice(0, 4),
 		suggestedContent: [
 			...exercises.map((exercise: any) => ({
@@ -740,18 +840,68 @@ const ensureSubscriptionRecord = async (userId: string) => {
 		&& subscription.autoRenew
 		&& new Date(subscription.renewalDate).getTime() <= Date.now()
 	) {
+		const staleCutoff = new Date(Date.now() - SUBSCRIPTION_LOCK_TIMEOUT_MS);
+		const lockStartedAt = new Date();
+		const lock = await db.patientSubscription.updateMany({
+			where: {
+				userId,
+				OR: [
+					{ processing: false },
+					{ processing: true, processingStartedAt: { lt: staleCutoff } },
+				],
+			},
+			data: { processing: true, processingStartedAt: lockStartedAt },
+		}).catch(() => ({ count: 0 }));
+
+		if (!lock?.count) {
+			return subscription;
+		}
+
+		const current = await db.patientSubscription.findUnique({ where: { userId } }).catch(() => subscription);
+		if (
+			!current
+			|| String(current.status || '').toLowerCase() !== 'active'
+			|| !current.autoRenew
+			|| new Date(current.renewalDate).getTime() > Date.now()
+		) {
+			await db.patientSubscription.updateMany({ where: { userId }, data: { processing: false, processingStartedAt: null } }).catch(() => null);
+			return current || subscription;
+		}
+
 		const activePlan = await getActivePlatformPlan();
-		const renewalDays = String(subscription.billingCycle || '').toLowerCase() === 'yearly' ? 365 : 30;
+		const renewalDays = String(current.billingCycle || '').toLowerCase() === 'yearly' ? 365 : 30;
 		const nextRenewalDate = new Date(Date.now() + renewalDays * 24 * 60 * 60 * 1000);
 
-		subscription = await db.patientSubscription.update({
-			where: { userId },
-			data: {
-				planName: activePlan.name,
-				price: activePlan.price,
-				renewalDate: nextRenewalDate,
-			},
-		}).catch(() => subscription);
+		try {
+			subscription = await db.patientSubscription.update({
+				where: { userId },
+				data: {
+					planName: activePlan.name,
+					price: activePlan.price,
+					renewalDate: nextRenewalDate,
+				},
+			}).catch(() => current);
+
+			if (subscription) {
+				await recordPatientSubscriptionHistory({
+					userId,
+					subscriptionRefId: String(subscription.id),
+					oldPlan: String(current.planName || ''),
+					newPlan: String(subscription.planName || ''),
+					oldStatus: String(current.status || ''),
+					newStatus: String(subscription.status || ''),
+					oldPrice: Number(current.price || 0),
+					newPrice: Number(subscription.price || 0),
+					reason: 'AUTO_RENEWAL',
+					metadata: {
+						billingCycle: String(subscription.billingCycle || ''),
+						renewalDate: nextRenewalDate.toISOString(),
+					},
+				});
+			}
+		} finally {
+			await db.patientSubscription.updateMany({ where: { userId }, data: { processing: false, processingStartedAt: null } }).catch(() => null);
+		}
 
 		await db.$executeRawUnsafe(
 			`INSERT INTO user_subscriptions (id, user_id, plan_id, start_date, end_date, status, price_snapshot, created_at, updated_at)
@@ -778,29 +928,48 @@ export const getPatientSubscription = async (userId: string) => {
 };
 
 export const updatePatientSubscriptionPlan = async (userId: string, action: 'upgrade' | 'downgrade') => {
-	const subscription = await ensureSubscriptionRecord(userId);
-	if (!subscription) throw new AppError('Subscription data unavailable', 500);
-	const activePlan = await getActivePlatformPlan();
+	const updated = await withPatientSubscriptionLock(userId, async (subscription) => {
+		if (!subscription) throw new AppError('Subscription data unavailable', 500);
+		const activePlan = await getActivePlatformPlan();
 
-	const planOrder = ['basic', 'premium', 'pro'];
-	const current = String(subscription.planName || 'premium').toLowerCase().replace(' plan', '');
-	const currentIndex = Math.max(planOrder.indexOf(current), 0);
-	const nextIndex = action === 'upgrade'
-		? Math.min(planOrder.length - 1, currentIndex + 1)
-		: Math.max(0, currentIndex - 1);
-	const nextPlan = planOrder[nextIndex];
-	const price = activePlan.price;
+		const planOrder = ['basic', 'premium', 'pro'];
+		const current = String(subscription.planName || 'premium').toLowerCase().replace(' plan', '');
+		const currentIndex = Math.max(planOrder.indexOf(current), 0);
+		const nextIndex = action === 'upgrade'
+			? Math.min(planOrder.length - 1, currentIndex + 1)
+			: Math.max(0, currentIndex - 1);
+		const nextPlan = planOrder[nextIndex];
+		const price = activePlan.price;
 
-	const updated = await db.patientSubscription.update({
-		where: { userId },
-		data: {
-			planName: activePlan.name || `${nextPlan[0].toUpperCase()}${nextPlan.slice(1)} Plan`,
-			price,
-			billingCycle: nextPlan === 'pro' ? 'yearly' : 'monthly',
-			status: 'active',
-			autoRenew: true,
-			renewalDate: new Date(new Date().getTime() + (nextPlan === 'pro' ? 365 : 30) * 24 * 60 * 60 * 1000),
-		},
+		const nextRenewalDate = new Date(new Date().getTime() + (nextPlan === 'pro' ? 365 : 30) * 24 * 60 * 60 * 1000);
+		const nextPlanName = activePlan.name || `${nextPlan[0].toUpperCase()}${nextPlan.slice(1)} Plan`;
+
+		const next = await db.patientSubscription.update({
+			where: { userId },
+			data: {
+				planName: nextPlanName,
+				price,
+				billingCycle: nextPlan === 'pro' ? 'yearly' : 'monthly',
+				status: 'active',
+				autoRenew: true,
+				renewalDate: nextRenewalDate,
+			},
+		});
+
+		await recordPatientSubscriptionHistory({
+			userId,
+			subscriptionRefId: String(next.id),
+			oldPlan: String(subscription.planName || ''),
+			newPlan: String(next.planName || ''),
+			oldStatus: String(subscription.status || ''),
+			newStatus: String(next.status || ''),
+			oldPrice: Number(subscription.price || 0),
+			newPrice: Number(next.price || 0),
+			reason: action === 'upgrade' ? 'MANUAL_UPGRADE' : 'MANUAL_DOWNGRADE',
+			metadata: { billingCycle: String(next.billingCycle || '') },
+		});
+
+		return next;
 	});
 
 	if (String(updated.status || '').toLowerCase() === 'active') {
@@ -817,46 +986,96 @@ export const updatePatientSubscriptionPlan = async (userId: string, action: 'upg
 };
 
 export const cancelPatientSubscription = async (userId: string) => {
-	await ensureSubscriptionRecord(userId);
-	return db.patientSubscription.update({
-		where: { userId },
-		data: {
-			status: 'cancelled',
-			autoRenew: false,
-		},
+	return withPatientSubscriptionLock(userId, async (subscription) => {
+		const next = await db.patientSubscription.update({
+			where: { userId },
+			data: {
+				status: 'cancelled',
+				autoRenew: false,
+			},
+		});
+
+		await recordPatientSubscriptionHistory({
+			userId,
+			subscriptionRefId: String(next.id),
+			oldPlan: String(subscription?.planName || ''),
+			newPlan: String(next.planName || ''),
+			oldStatus: String(subscription?.status || ''),
+			newStatus: String(next.status || ''),
+			oldPrice: Number(subscription?.price || 0),
+			newPrice: Number(next.price || 0),
+			reason: 'MANUAL_CANCEL',
+		});
+
+		return next;
 	});
 };
 
-export const reactivatePatientSubscription = async (userId: string) => {
-	await ensureSubscriptionRecord(userId);
-	const activePlan = await getActivePlatformPlan();
-	const updated = await db.patientSubscription.update({
-		where: { userId },
-		data: {
-			planName: activePlan.name,
-			price: activePlan.price,
-			status: 'active',
-			autoRenew: true,
-			renewalDate: new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000),
-		},
+export const reactivatePatientSubscription = async (userId: string, paymentId?: string) => {
+	const updated = await withPatientSubscriptionLock(userId, async (subscription) => {
+		const activePlan = await getActivePlatformPlan();
+		const next = await db.patientSubscription.update({
+			where: { userId },
+			data: {
+				planName: activePlan.name,
+				price: activePlan.price,
+				status: 'active',
+				autoRenew: true,
+				paymentId: paymentId || undefined,
+				renewalDate: new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000),
+			},
+		});
+
+		await recordPatientSubscriptionHistory({
+			userId,
+			subscriptionRefId: String(next.id),
+			oldPlan: String(subscription?.planName || ''),
+			newPlan: String(next.planName || ''),
+			oldStatus: String(subscription?.status || ''),
+			newStatus: String(next.status || ''),
+			oldPrice: Number(subscription?.price || 0),
+			newPrice: Number(next.price || 0),
+			paymentId,
+			transactionId: paymentId,
+			reason: 'PAYMENT_REACTIVATION',
+			metadata: { renewalDate: next.renewalDate?.toISOString?.() || undefined },
+		});
+
+		return next;
 	});
 
 	const user = await db.user.findUnique({ where: { id: userId }, select: { email: true, name: true, firstName: true, lastName: true } }).catch(() => null);
 	await sendSubscriptionActivationEmail({
 		to: String(user?.email || ''),
 		name: String(user?.name || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || ''),
-		planName: String(updated.planName || activePlan.name || 'Standard Plan'),
-		priceInr: Math.round(Number(updated.price || activePlan.price || 0) / 100),
+		planName: String(updated.planName || 'Standard Plan'),
+		priceInr: Math.round(Number(updated.price || 0) / 100),
 	});
 
 	return updated;
 };
 
 export const setPatientSubscriptionAutoRenew = async (userId: string, autoRenew: boolean) => {
-	await ensureSubscriptionRecord(userId);
-	return db.patientSubscription.update({
-		where: { userId },
-		data: { autoRenew },
+	return withPatientSubscriptionLock(userId, async (subscription) => {
+		const next = await db.patientSubscription.update({
+			where: { userId },
+			data: { autoRenew },
+		});
+
+		await recordPatientSubscriptionHistory({
+			userId,
+			subscriptionRefId: String(next.id),
+			oldPlan: String(subscription?.planName || ''),
+			newPlan: String(next.planName || ''),
+			oldStatus: String(subscription?.status || ''),
+			newStatus: String(next.status || ''),
+			oldPrice: Number(subscription?.price || 0),
+			newPrice: Number(next.price || 0),
+			reason: autoRenew ? 'AUTO_RENEW_ENABLED' : 'AUTO_RENEW_DISABLED',
+			metadata: { autoRenew },
+		});
+
+		return next;
 	});
 };
 

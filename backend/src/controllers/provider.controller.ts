@@ -2389,31 +2389,39 @@ export const getPatientGoals = async (req: Request, res: Response): Promise<void
 		throw new AppError('Patient id is required', 400);
 	}
 
-	await ensureProviderPatientAccess(providerId, patientId);
+	const { patientProfileId } = await ensureProviderPatientAccess(providerId, patientId);
 
-	const activities = await prisma.therapyPlanActivity.findMany({
+	const plans = await prisma.therapyPlan.findMany({
 		where: {
-			plan: {
-				patient: {
-					userId: patientId,
-				},
-			},
+			patientId: patientProfileId,
+			status: 'ACTIVE',
 		},
-		orderBy: { updatedAt: 'desc' },
 		select: {
 			id: true,
-			title: true,
-			activityType: true,
-			status: true,
-			createdAt: true,
-			completedAt: true,
-			plan: {
-				select: {
-					startDate: true,
-				},
-			},
+			startDate: true,
 		},
 	});
+
+	const planIds = plans.map((plan) => plan.id);
+	const startDateByPlanId = new Map(plans.map((plan) => [plan.id, plan.startDate] as const));
+
+	const activities = planIds.length
+		? await prisma.therapyPlanActivity.findMany({
+				where: {
+					planId: { in: planIds },
+				},
+				orderBy: { updatedAt: 'desc' },
+				select: {
+					id: true,
+					title: true,
+					activityType: true,
+					status: true,
+					createdAt: true,
+					completedAt: true,
+					planId: true,
+				},
+			})
+		: [];
 
 	if (activities.length === 0) {
 		sendSuccess(res, [
@@ -2445,7 +2453,7 @@ export const getPatientGoals = async (req: Request, res: Response): Promise<void
 			id: activity.id,
 			title: activity.title,
 			category: getGoalCategory(activity.title, String(activity.activityType)),
-			startDate: (activity.plan?.startDate || activity.createdAt).toISOString(),
+			startDate: (startDateByPlanId.get(activity.planId) || activity.createdAt).toISOString(),
 			streak: calculateStreak(weeklyTracker),
 			completionRate: calculateCompletionRate(weeklyTracker),
 			weeklyTracker,

@@ -292,7 +292,7 @@ export default function ChartOverview() {
               type="button"
               onClick={() => {
                 if (effectiveUpcomingSession?.id) {
-                  navigate(`/video-session/${effectiveUpcomingSession.id}`);
+                  navigate(`/provider/live-session/${effectiveUpcomingSession.id}`);
                 } else {
                   toast.error('No session scheduled for today.');
                 }

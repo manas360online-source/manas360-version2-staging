@@ -162,7 +162,7 @@ exports.requirePatientRole = (0, exports.requireRole)('patient');
  * Backward compatibility: Require therapist role
  * @deprecated Use requireRole('therapist') instead
  */
-exports.requireTherapistRole = (0, exports.requireRole)(['therapist', 'psychiatrist', 'coach']);
+exports.requireTherapistRole = (0, exports.requireRole)(['therapist', 'psychiatrist', 'psychologist', 'coach']);
 /**
  * Backward compatibility: Require admin role
  * @deprecated Use requireRole('admin') instead
@@ -257,6 +257,7 @@ const requirePermission = (requiredPermissions) => {
                 'read_all_profiles',
                 'manage_users',
                 'manage_therapists',
+                'manage_payments',
                 'view_analytics',
                 'manage_corporate',
                 'view_system_logs'
@@ -265,6 +266,7 @@ const requirePermission = (requiredPermissions) => {
                 'read_all_profiles',
                 'manage_users',
                 'manage_therapists',
+                'manage_payments',
                 'view_analytics',
                 'manage_corporate',
                 'view_system_logs',

@@ -2,12 +2,25 @@ import axios, { AxiosInstance, AxiosResponse } from 'axios';
 
 const defaultApiBaseUrl = typeof window === 'undefined'
 	? 'http://localhost:3000/api'
-	: `${window.location.protocol}//${window.location.hostname}:3000/api`;
+	: '/api';
 
-const configuredBaseUrl =
+const rawBaseUrl =
 	import.meta.env.VITE_API_BASE_URL?.trim() ||
 	import.meta.env.VITE_API_URL?.trim() ||
 	defaultApiBaseUrl;
+
+const configuredBaseUrl = (() => {
+	if (typeof window === 'undefined') {
+		return rawBaseUrl;
+	}
+
+	// Avoid mixed-content when frontend is HTTPS and API URL is HTTP.
+	if (window.location.protocol === 'https:' && rawBaseUrl.startsWith('http://')) {
+		return rawBaseUrl.replace(/^http:\/\//, 'https://');
+	}
+
+	return rawBaseUrl;
+})();
 
 const getCookieValue = (cookieName: string): string | null => {
 	if (typeof document === 'undefined') {

@@ -331,13 +331,15 @@ export async function initSocket(server: http.Server) {
     // specific therapist who is in the live session room.
 
     /**
-     * gps:join – therapist client registers for GPS updates for a session.
+     * gps:join – provider client registers for GPS updates for a session.
      * Payload: { sessionId: string, monitoringId: string }
      */
     socket.on('gps:join', async (payload: { sessionId: string; monitoringId: string }) => {
       try {
-        if (user?.role !== 'therapist') {
-          return socket.emit('error', { code: 'GPS_FORBIDDEN', message: 'Only therapists can join GPS rooms' });
+        const allowedProviderRoles = new Set(['therapist', 'psychiatrist', 'psychologist', 'coach']);
+        const normalizedRole = String(user?.role || '').toLowerCase();
+        if (!allowedProviderRoles.has(normalizedRole)) {
+          return socket.emit('error', { code: 'GPS_FORBIDDEN', message: 'Only providers can join GPS rooms' });
         }
         const gpsRoom = `gps:${payload.sessionId}`;
         await socket.join(gpsRoom);

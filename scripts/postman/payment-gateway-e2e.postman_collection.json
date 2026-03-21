@@ -1,0 +1,247 @@
+{
+  "info": {
+    "name": "MANAS360 Payment Gateway E2E",
+    "description": "End-to-end operational checks for payment reliability, retries, RBAC, and analytics.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Analytics Baseline",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{adminToken}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/admin/analytics/payments?days={{days}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "admin",
+            "analytics",
+            "payments"
+          ],
+          "query": [
+            {
+              "key": "days",
+              "value": "{{days}}"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('analytics returns 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Manual Retry (admin)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{adminToken}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/admin/payments/{{failedPaymentId}}/retry",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "admin",
+            "payments",
+            "{{failedPaymentId}}",
+            "retry"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('manual retry returns 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Manual Retry on Captured Payment (expects 400)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{adminToken}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/admin/payments/{{capturedPaymentId}}/retry",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "admin",
+            "payments",
+            "{{capturedPaymentId}}",
+            "retry"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('retry on captured payment returns 400', function () {",
+              "  pm.response.to.have.status(400);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Manual Retry RBAC (non-admin expects 403)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{nonAdminToken}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/admin/payments/{{failedPaymentId}}/retry",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "admin",
+            "payments",
+            "{{failedPaymentId}}",
+            "retry"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('non-admin receives 403', function () {",
+              "  pm.response.to.have.status(403);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Simulate Webhook Success",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"code\": \"PAYMENT_SUCCESS\",\n  \"data\": {\n    \"merchantTransactionId\": \"{{merchantTransactionId}}\",\n    \"state\": \"COMPLETED\",\n    \"transactionId\": \"{{gatewayTransactionId}}\",\n    \"amount\": {{amountMinor}}\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/payments/webhook/phonepe",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "payments",
+            "webhook",
+            "phonepe"
+          ]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "days",
+      "value": "30"
+    },
+    {
+      "key": "adminToken",
+      "value": ""
+    },
+    {
+      "key": "nonAdminToken",
+      "value": ""
+    },
+    {
+      "key": "failedPaymentId",
+      "value": ""
+    },
+    {
+      "key": "capturedPaymentId",
+      "value": ""
+    },
+    {
+      "key": "merchantTransactionId",
+      "value": "SESS_TEST_001"
+    },
+    {
+      "key": "gatewayTransactionId",
+      "value": "TXN_TEST_001"
+    },
+    {
+      "key": "amountMinor",
+      "value": "10000"
+    }
+  ]
+}

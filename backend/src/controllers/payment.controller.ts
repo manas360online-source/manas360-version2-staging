@@ -11,6 +11,7 @@ import {
 import { processSubscriptionWebhook } from '../services/subscription.service';
 import { verifyPhonePeWebhook, checkPhonePeStatus } from '../services/phonepe.service';
 import crypto from 'crypto';
+import { logger } from '../utils/logger';
 
 const getAuthUserId = (req: Request): string => {
 	const userId = req.auth?.userId;
@@ -79,6 +80,15 @@ export const razorpayWebhookController = async (req: Request, res: Response): Pr
 };
 
 export const phonepeWebhookController = async (req: Request, res: Response): Promise<void> => {
+	const shouldAllowProbeBypass = env.isDevelopment
+		&& env.allowDevPhonePeWebhookProbeBypass
+		&& !req.headers['x-verify'];
+
+	if (shouldAllowProbeBypass) {
+		res.status(200).json({ success: true, handled: true, message: 'PhonePe webhook probe accepted (dev bypass)' });
+		return;
+	}
+
 	// 1. Mandatory BasicAuth validation (UAT compliance)
 	const authHeader = String(req.headers['authorization'] ?? '');
 	if (env.phonePeWebhookUsername && env.phonePeWebhookPassword) {
@@ -94,14 +104,25 @@ export const phonepeWebhookController = async (req: Request, res: Response): Pro
 		throw new AppError('Missing x-verify header', 400);
 	}
 
-	const body = req.body.response; // The base64 response string from PhonePe
+	const body = String(req.body?.response || '').trim(); // The base64 response string from PhonePe
+	if (!body) {
+		throw new AppError('Missing response body in PhonePe webhook', 400);
+	}
+
+	// Make sure we preserve raw payload shape to avoid parser normalization mismatches.
 	const isValid = verifyPhonePeWebhook(body, xVerify);
-	
 	if (!isValid) {
 		throw new AppError('Invalid PhonePe signature', 401);
 	}
 
-	const decoded = JSON.parse(Buffer.from(body, 'base64').toString('utf-8'));
+	let decoded: any;
+	try {
+		decoded = JSON.parse(Buffer.from(body, 'base64').toString('utf-8'));
+	} catch (error: any) {
+		logger.error('[PaymentController] Failed to parse PhonePe webhook body', { error: error?.message, body });
+		throw new AppError('Invalid PhonePe webhook payload format', 400);
+	}
+
 	const result = await processPhonePeWebhook(decoded);
 
 	res.status(200).json({ success: true, ...result });
