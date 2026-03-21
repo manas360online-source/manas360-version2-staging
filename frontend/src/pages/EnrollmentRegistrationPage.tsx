@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ShieldCheck, CheckCircle, ArrowLeft, User, Mail, Phone, MapPin, GraduationCap, MessageSquare } from 'lucide-react';
+import {
+  ShieldCheck, CheckCircle, ArrowLeft,
+  User, Mail, Phone, MapPin, GraduationCap, MessageSquare,
+  AlertCircle, Loader2,
+} from 'lucide-react';
 
 interface FormData {
   fullName: string;
@@ -14,116 +18,157 @@ interface FormData {
 const EnrollmentRegistrationPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+
   const certName = (location.state as any)?.certName || 'Certification Program';
   const price = (location.state as any)?.price || 'Free';
+  const slug = (location.state as any)?.slug;
 
-  const [step] = useState<'form' | 'success'>('form');
   const [processing, setProcessing] = useState(false);
+  const [generalError, setGeneralError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof FormData, string>>>({});
+
   const [form, setForm] = useState<FormData>({
     fullName: '', email: '', mobile: '',
     city: '', education: '', motivation: '',
   });
 
-  const enrollmentId = `ENR-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 90000) + 10000)}`;
+  const validate = (): boolean => {
+    const errors: Partial<Record<keyof FormData, string>> = {};
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    if (!form.fullName.trim())
+      errors.fullName = 'Full name is required.';
+
+    if (!form.email.trim())
+      errors.email = 'Email is required.';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
+      errors.email = 'Please enter a valid email address.';
+
+    if (!form.mobile.trim())
+      errors.mobile = 'Mobile number is required.';
+    else if (form.mobile.replace(/\D/g, '').length < 10)
+      errors.mobile = 'Please enter a valid 10-digit mobile number.';
+
+    if (!form.city.trim())
+      errors.city = 'City is required.';
+
+    if (!form.education)
+      errors.education = 'Please select your education level.';
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    setForm(prev => ({ ...prev, [name]: value }));
+    if (fieldErrors[name as keyof FormData]) {
+      setFieldErrors(prev => ({ ...prev, [name]: undefined }));
+    }
+    setGeneralError(null);
+  };
+
+  /**
+   * Navigate to the checkout page with form data in state.
+   * Enrollment is NOT saved here — CheckoutPage handles that
+   * after payment is confirmed, preventing the "already enrolled"
+   * redirect that was firing before.
+   */
+  const navigateToCheckout = () => {
+    navigate(`/checkout/${slug}`, {
+      state: {
+        fullName: form.fullName.trim(),
+        email: form.email.trim(),
+        mobile: form.mobile.trim(),
+        city: form.city.trim(),
+        education: form.education,
+        motivation: form.motivation.trim(),
+        certName,
+        slug,
+        price,
+      },
+    });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!validate()) return;
+
     setProcessing(true);
-    setTimeout(() => {
+    setGeneralError(null);
+
+    try {
+      const response = await fetch('/api/enrollment/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: form.fullName.trim(),
+          email: form.email.trim().toLowerCase(),
+          mobile: form.mobile.trim(),
+          city: form.city.trim(),
+          education: form.education,
+          motivation: form.motivation.trim(),
+          certName,
+          certSlug: slug ?? null,
+          price: price ?? null,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        navigateToCheckout();
+        return;
+      }
+
+      if (response.status === 409) {
+        const isPhone = data.message?.toLowerCase().includes('phone');
+        setFieldErrors(prev => ({
+          ...prev,
+          [isPhone ? 'mobile' : 'email']: data.message,
+        }));
         setProcessing(false);
-        const slug = (location.state as any)?.slug;
-        console.log('DEBUG slug:', slug);
-        console.log('DEBUG state:', location.state);
-        if (slug) {
-            navigate(`/checkout/${slug}`);
-        } else {
-            navigate('/enrollment-confirmed', {
-                state: {
-                    certName: (location.state as any)?.certName || 'Certification Program',
-                    enrollmentId: `ENR-${Date.now()}`,
-                }
-            });
-        }
-    }, 1500);
-};
+        return;
+      }
 
-  if (step === 'success') {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-12">
-        <div className="bg-white rounded-2xl shadow-xl border border-slate-100 p-8 max-w-md w-full text-center">
-          {/* Success Icon */}
-          <div className="w-20 h-20 bg-gradient-to-br from-teal-400 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-6 text-4xl shadow-lg">
-            🎉
-          </div>
+      if (response.status === 400) {
+        setGeneralError(data.message || 'Please check your details and try again.');
+        setProcessing(false);
+        return;
+      }
 
-          <div className="inline-block px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full uppercase tracking-wide mb-3">
-            Enrollment Confirmed
-          </div>
+      throw new Error(data.message || 'Server error');
 
-          <h2 className="text-2xl font-serif font-bold text-slate-900 mb-2">
-            Welcome, Coach-in-Training!
-          </h2>
-          <p className="text-slate-500 text-sm mb-6">{certName}</p>
+    } catch (err: any) {
+      const isRouteNotFound =
+        err?.message?.toLowerCase().includes('route not found') ||
+        err?.message?.toLowerCase().includes('404') ||
+        err instanceof TypeError;
 
-          {/* Enrollment Card */}
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-5 text-left">
-            <div className="mb-3">
-              <p className="text-xs text-slate-500 mb-1">Enrollment ID</p>
-              <p className="font-bold text-amber-700 text-base">{enrollmentId}</p>
-            </div>
-            <div className="flex gap-6">
-              <div>
-                <p className="text-xs text-slate-500">Start Date</p>
-                <p className="text-sm font-semibold text-slate-800 mt-0.5">Immediate Access</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-500">Est. Completion</p>
-                <p className="text-sm font-semibold text-slate-800 mt-0.5">8–12 weeks</p>
-              </div>
-            </div>
-          </div>
+      if (isRouteNotFound) {
+        // Backend not wired up yet — go straight to checkout
+        navigateToCheckout();
+        return;
+      }
 
-          {/* Confirmations */}
-          <div className="space-y-2 mb-6 text-left">
-            {[
-              { icon: '📱', text: `SMS confirmation sent to +91 ${form.mobile || 'your number'}` },
-              { icon: '📧', text: 'Welcome email with program guide sent' },
-              { icon: '💬', text: 'Added to WhatsApp cohort group' },
-            ].map((item, i) => (
-              <div key={i} className="flex items-center gap-3 text-sm text-slate-600 py-2 border-b border-slate-100 last:border-0">
-                <span>{item.icon}</span>
-                <span>{item.text}</span>
-              </div>
-            ))}
-          </div>
+      setGeneralError('Something went wrong. Please try again.');
+    } finally {
+      setProcessing(false);
+    }
+  };
 
-          {/* Buttons */}
-          <button
-            onClick={() => navigate('/journey-wireframe')}
-            className="w-full bg-gradient-to-r from-teal-500 to-purple-600 text-white font-bold py-3.5 rounded-xl shadow-md hover:shadow-lg hover:scale-[1.02] transition-all text-sm mb-3"
-          >
-            Start Module 1 →
-          </button>
-          <button
-            onClick={() => navigate('/')}
-            className="w-full border border-slate-200 text-slate-600 font-semibold py-3 rounded-xl hover:bg-slate-50 transition text-sm"
-          >
-            View Program Overview
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const inputClass = (field: keyof FormData) =>
+    `w-full pl-9 pr-4 py-2.5 border rounded-lg text-sm text-slate-800 placeholder-slate-400
+     focus:outline-none focus:ring-1 transition
+     ${fieldErrors[field]
+      ? 'border-red-400 focus:border-red-400 focus:ring-red-200'
+      : 'border-slate-200 focus:border-purple-400 focus:ring-purple-200'}`;
 
   return (
     <div className="min-h-screen bg-slate-50 py-12 px-4">
       <div className="max-w-lg mx-auto">
 
-        {/* Back Button */}
         <button
           onClick={() => navigate(-1)}
           className="flex items-center gap-2 text-slate-500 hover:text-slate-800 transition mb-6 text-sm font-medium"
@@ -135,78 +180,110 @@ const EnrollmentRegistrationPage: React.FC = () => {
 
           {/* Header */}
           <div className="bg-gradient-to-r from-teal-500 to-purple-600 p-6 text-white">
-            <p className="text-teal-100 text-xs font-bold uppercase tracking-widest mb-1">Program Registration</p>
+            <p className="text-teal-100 text-xs font-bold uppercase tracking-widest mb-1">
+              Program Registration
+            </p>
             <h1 className="text-xl font-bold">{certName}</h1>
             <p className="text-teal-100 text-sm mt-1">Complete your enrollment below</p>
           </div>
 
           <div className="p-6">
-            <form onSubmit={handleSubmit} className="space-y-4">
+
+            {generalError && (
+              <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl p-3 mb-5">
+                <AlertCircle size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-red-700 font-medium">{generalError}</p>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
 
               {/* Full Name */}
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Full Name</label>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">
+                  Full Name
+                </label>
                 <div className="relative">
                   <User size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     type="text" name="fullName" required
                     placeholder="Enter your full name"
                     value={form.fullName} onChange={handleChange}
-                    className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-200 transition"
+                    className={inputClass('fullName')}
                   />
                 </div>
+                {fieldErrors.fullName && (
+                  <p className="text-red-500 text-xs mt-1">{fieldErrors.fullName}</p>
+                )}
               </div>
 
               {/* Email */}
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Email</label>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">
+                  Email
+                </label>
                 <div className="relative">
                   <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     type="email" name="email" required
                     placeholder="your@email.com"
                     value={form.email} onChange={handleChange}
-                    className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-200 transition"
+                    className={inputClass('email')}
                   />
                 </div>
+                {fieldErrors.email && (
+                  <p className="text-red-500 text-xs mt-1">{fieldErrors.email}</p>
+                )}
               </div>
 
               {/* Mobile */}
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Mobile</label>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">
+                  Mobile
+                </label>
                 <div className="relative">
                   <Phone size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     type="tel" name="mobile" required
                     placeholder="+91 XXXXX XXXXX"
                     value={form.mobile} onChange={handleChange}
-                    className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-200 transition"
+                    className={inputClass('mobile')}
                   />
                 </div>
+                {fieldErrors.mobile && (
+                  <p className="text-red-500 text-xs mt-1">{fieldErrors.mobile}</p>
+                )}
               </div>
 
               {/* City + Education */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">City</label>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">
+                    City
+                  </label>
                   <div className="relative">
                     <MapPin size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                       type="text" name="city" required
                       placeholder="Your city"
                       value={form.city} onChange={handleChange}
-                      className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-200 transition"
+                      className={inputClass('city')}
                     />
                   </div>
+                  {fieldErrors.city && (
+                    <p className="text-red-500 text-xs mt-1">{fieldErrors.city}</p>
+                  )}
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Education</label>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">
+                    Education
+                  </label>
                   <div className="relative">
                     <GraduationCap size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <select
                       name="education" required
                       value={form.education} onChange={handleChange}
-                      className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-200 transition appearance-none bg-white"
+                      className={`${inputClass('education')} appearance-none bg-white`}
                     >
                       <option value="" disabled>Select</option>
                       <option value="undergraduate">Undergraduate</option>
@@ -216,13 +293,17 @@ const EnrollmentRegistrationPage: React.FC = () => {
                       <option value="other">Other</option>
                     </select>
                   </div>
+                  {fieldErrors.education && (
+                    <p className="text-red-500 text-xs mt-1">{fieldErrors.education}</p>
+                  )}
                 </div>
               </div>
 
               {/* Motivation */}
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">
-                  Why do you want to become a coach? <span className="text-slate-400 normal-case font-normal">(optional)</span>
+                  Why do you want to become a coach?{' '}
+                  <span className="text-slate-400 normal-case font-normal">(optional)</span>
                 </label>
                 <div className="relative">
                   <MessageSquare size={15} className="absolute left-3 top-3 text-slate-400" />
@@ -260,16 +341,25 @@ const EnrollmentRegistrationPage: React.FC = () => {
               {/* Money Back */}
               <div className="flex items-start gap-3 bg-blue-50 p-3 rounded-xl border border-blue-100">
                 <ShieldCheck size={16} className="text-blue-500 flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-blue-700 font-medium">30-Day Money Back Guarantee — No questions asked.</p>
+                <p className="text-xs text-blue-700 font-medium">
+                  30-Day Money Back Guarantee — No questions asked.
+                </p>
               </div>
 
               {/* Submit */}
               <button
                 type="submit"
                 disabled={processing}
-                className="w-full bg-gradient-to-r from-teal-500 to-purple-600 text-white font-bold py-4 rounded-xl shadow-md hover:shadow-lg hover:scale-[1.01] transition-all text-sm disabled:opacity-60 disabled:cursor-not-allowed disabled:scale-100"
+                className="w-full bg-gradient-to-r from-teal-500 to-purple-600 text-white font-bold py-4 rounded-xl shadow-md hover:shadow-lg hover:scale-[1.01] transition-all text-sm disabled:opacity-60 disabled:cursor-not-allowed disabled:scale-100 flex items-center justify-center gap-2"
               >
-                {processing ? 'Processing...' : `Pay ${price} & Enroll →`}
+                {processing ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Saving your details...
+                  </>
+                ) : (
+                  `Pay ${price} & Enroll →`
+                )}
               </button>
 
             </form>

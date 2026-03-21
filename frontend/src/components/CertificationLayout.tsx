@@ -27,7 +27,7 @@ export const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) =
 
   return (
     <div className="min-h-screen flex flex-col font-sans bg-slate-50">
-      <nav className="bg-white/90 backdrop-blur-md border-b border-slate-100 sticky top-0 z-50 transition-all">
+      <nav className="no-print bg-white/90 backdrop-blur-md border-b border-slate-100 sticky top-0 z-50 transition-all">
         <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-12">
           <div className="flex justify-between h-14 md:h-20 items-center">
 
@@ -108,7 +108,7 @@ export const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) =
         {children || <Outlet />}
       </main>
 
-      <footer className="bg-white border-t border-slate-100 py-8 mt-auto">
+      <footer className="no-print bg-white border-t border-slate-100 py-8 mt-auto">
         <div className="max-w-7xl mx-auto px-6 text-center">
           <p className="font-serif text-lg mb-1 text-slate-800 font-bold">MANAS360</p>
           <p className="text-xs text-slate-400">© 2024 Certification Platform. Professional Demo.</p>
