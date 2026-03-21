@@ -108,13 +108,14 @@ const createSessionPayment = async (input) => {
     const transactionId = `SESS_${Date.now()}_${idempotencyKey.slice(0, 8)}`;
     const shouldBypass = env_1.env.allowDevPaymentBypass && env_1.env.nodeEnv === 'development';
     const frontendBaseUrl = env_1.env.frontendUrl;
+    const callbackUrl = `${env_1.env.apiUrl}${env_1.env.apiPrefix}/v1/payments/phonepe/webhook`;
     let redirectUrl;
     try {
         redirectUrl = await (0, phonepe_service_1.initiatePhonePePayment)({
             transactionId,
             userId: input.patientId,
             amountInPaise: amountMinor,
-            callbackUrl: `${env_1.env.apiPrefix}/v1/payments/phonepe/webhook`,
+            callbackUrl,
             redirectUrl: `${frontendBaseUrl}/payment/status?id=${transactionId}`,
         });
     }

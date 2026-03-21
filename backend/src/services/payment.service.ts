@@ -97,6 +97,7 @@ export const createSessionPayment = async (input: CreateFinancialSessionInput) =
 	const transactionId = `SESS_${Date.now()}_${idempotencyKey.slice(0, 8)}`;
 	const shouldBypass = env.allowDevPaymentBypass && env.nodeEnv === 'development';
 	const frontendBaseUrl = env.frontendUrl;
+	const callbackUrl = `${env.apiUrl}${env.apiPrefix}/v1/payments/phonepe/webhook`;
 
 	let redirectUrl: string;
 	try {
@@ -104,7 +105,7 @@ export const createSessionPayment = async (input: CreateFinancialSessionInput) =
 			transactionId,
 			userId: input.patientId,
 			amountInPaise: amountMinor,
-			callbackUrl: `${env.apiPrefix}/v1/payments/phonepe/webhook`,
+			callbackUrl,
 			redirectUrl: `${frontendBaseUrl}/payment/status?id=${transactionId}`,
 		});
 	} catch (error: any) {

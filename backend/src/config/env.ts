@@ -58,6 +58,15 @@ const parseFrontendUrl = (value: string | undefined, corsOrigins: string[]): str
 	return 'http://localhost:5173';
 };
 
+const parseApiUrl = (value: string | undefined, port: number): string => {
+	const explicit = String(value ?? '').trim();
+	if (explicit.length > 0) {
+		return explicit.replace(/\/+$/, '');
+	}
+
+	return `http://localhost:${port}`;
+};
+
 const JWT_ACCESS_FALLBACK = 'change-access-secret';
 const JWT_REFRESH_FALLBACK = 'change-refresh-secret';
 
@@ -66,6 +75,7 @@ export interface EnvConfig {
 	isDevelopment: boolean;
 	port: number;
 	apiPrefix: string;
+	apiUrl: string;
 	corsOrigins: string[];
 	frontendUrl: string;
 	databaseUrl?: string;
@@ -121,6 +131,7 @@ export const env: EnvConfig = Object.freeze({
 	isDevelopment: parseNodeEnv(process.env.NODE_ENV) === 'development',
 	port: parsePort(process.env.PORT),
 	apiPrefix: process.env.API_PREFIX ?? '/api',
+	apiUrl: parseApiUrl(process.env.API_URL, parsePort(process.env.PORT)),
 	corsOrigins: parsedCorsOrigins,
 	frontendUrl: parseFrontendUrl(process.env.FRONTEND_URL, parsedCorsOrigins),
 	databaseUrl: process.env.DATABASE_URL,
