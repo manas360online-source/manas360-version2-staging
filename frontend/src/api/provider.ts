@@ -102,22 +102,6 @@ export interface CBTModuleData {
   completedAt: string | null;
 }
 
-export interface CbtAssignmentTemplateOption {
-  templateType: string;
-  title: string;
-  description: string;
-  stepCount: number;
-}
-
-export interface QuickAssignedCbtTask {
-  id: string;
-  templateType: string;
-  status: string;
-  title: string;
-  description: string;
-  createdAt: string;
-}
-
 export type PrescriptionStatus = 'Active' | 'Discontinued';
 
 export interface PrescriptionData {
@@ -479,22 +463,6 @@ export const scheduleNextSession = async (
 export const fetchPatientCBTModules = async (patientId: string): Promise<CBTModuleData[]> => {
   const response = await http.get<Envelope<CBTModuleData[]>>(`/v1/provider/patient/${patientId}/cbt`);
   return unwrap<CBTModuleData[]>(response.data);
-};
-
-export const fetchCbtAssignmentTemplates = async (): Promise<CbtAssignmentTemplateOption[]> => {
-  const response = await http.get<Envelope<CbtAssignmentTemplateOption[]>>('/v1/provider/cbt-assignments/templates');
-  return unwrap<CbtAssignmentTemplateOption[]>(response.data);
-};
-
-export const quickAssignCbtTemplate = async (
-  patientId: string,
-  templateType: string,
-): Promise<QuickAssignedCbtTask> => {
-  const response = await http.post<Envelope<QuickAssignedCbtTask>>(
-    `/v1/provider/patient/${patientId}/cbt-assignments`,
-    { templateType },
-  );
-  return unwrap<QuickAssignedCbtTask>(response.data);
 };
 
 export const reviewCBTModule = async (

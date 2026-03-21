@@ -1,5 +1,5 @@
 import { useState, Suspense, lazy } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { GlobalFallbackLoader } from './components/ui/FallbackLoader';
 import ScrollToTop from './components/common/ScrollToTop';
@@ -134,6 +134,11 @@ function DashboardRedirect() {
   return <Navigate to={getPostLoginRoute(user)} replace />;
 }
 
+function LegacyProviderLiveSessionRedirect() {
+  const { sessionId = '' } = useParams<{ sessionId: string }>();
+  return <Navigate to={`/provider/live-session/${sessionId}`} replace />;
+}
+
 function App() {
   const [assessmentData, setAssessmentData] = useState<AssessmentData | null>(null);
   const [userName, setUserName] = useState<string>('');
@@ -249,6 +254,7 @@ function App() {
               <Route path="earnings" element={<ProviderEarningsPage />} />
               <Route path="messages" element={<ProviderInboxPage />} />
               <Route path="settings" element={<ProviderSettingsPage />} />
+              <Route path="live-session/:sessionId" element={<VideoSessionPage />} />
             </Route>
             <Route
               path="/onboarding/provider-setup"
@@ -292,6 +298,9 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route path="/therapist/live-session/:sessionId" element={<LegacyProviderLiveSessionRedirect />} />
+            <Route path="/psychiatrist/live-session/:sessionId" element={<LegacyProviderLiveSessionRedirect />} />
+            <Route path="/psychologist/live-session/:sessionId" element={<LegacyProviderLiveSessionRedirect />} />
             <Route
               path="/admin"
               element={

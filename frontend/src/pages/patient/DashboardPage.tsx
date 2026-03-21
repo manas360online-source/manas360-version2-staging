@@ -19,7 +19,6 @@ import { isOnboardingRequiredError, patientApi } from '../../api/patient';
 import type { ActiveCbtAssignment } from '../../api/patient';
 import { DashboardSkeletons } from '../../components/ui/Skeleton';
 import DashboardCard from '../../components/ui/DashboardCard';
-import { useTherapyData } from '../../hooks/useTherapyData';
 
 const moodEmojiMap: Record<number, string> = {
   1: '😢',

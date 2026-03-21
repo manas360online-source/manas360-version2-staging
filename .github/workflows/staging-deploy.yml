@@ -75,6 +75,10 @@ jobs:
   deploy:
     needs: preflight
     runs-on: ubuntu-latest
+    env:
+      LIGHTSAIL_HOST: ${{ secrets.LIGHTSAIL_HOST }}
+      LIGHTSAIL_USER: ${{ secrets.LIGHTSAIL_USER }}
+      LIGHTSAIL_SSH_KEY: ${{ secrets.LIGHTSAIL_SSH_KEY }}
 
     steps:
       - name: Checkout
@@ -100,9 +104,9 @@ jobs:
       - name: Deploy to AWS Lightsail via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.LIGHTSAIL_HOST }}
-          username: ${{ secrets.LIGHTSAIL_USER }}
-          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          host: ${{ env.LIGHTSAIL_HOST }}
+          username: ${{ env.LIGHTSAIL_USER }}
+          key: ${{ env.LIGHTSAIL_SSH_KEY }}
           script: |
             cd /var/www/manas360
             BRANCH_NAME='${{ github.ref_name }}' ROOT_DIR='${{ needs.preflight.outputs.staging-dir }}' bash ./devops/scripts/deploy.sh
@@ -111,9 +115,9 @@ jobs:
         if: ${{ vars.RUN_STAGING_SEED == 'true' }}
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.LIGHTSAIL_HOST }}
-          username: ${{ secrets.LIGHTSAIL_USER }}
-          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          host: ${{ env.LIGHTSAIL_HOST }}
+          username: ${{ env.LIGHTSAIL_USER }}
+          key: ${{ env.LIGHTSAIL_SSH_KEY }}
           script: |
             cd /var/www/manas360
             ROOT_DIR='${{ needs.preflight.outputs.staging-dir }}' bash ./devops/scripts/seed.sh

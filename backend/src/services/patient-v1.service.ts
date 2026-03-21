@@ -670,7 +670,7 @@ export const getPatientDashboard = async (userId: string) => {
 
 	const avgMood = moodTrend.length
 		? moodTrend.reduce((sum: number, entry: any) => sum + Number(entry.score || 0), 0) / moodTrend.length
-		: 3;
+		: 0;
 	const completedWellnessActivities = exercises.filter((item: any) => String(item.status || '').toUpperCase() === 'COMPLETED').length;
 	const exerciseBoost = Math.min(20, completedWellnessActivities * 10);
 

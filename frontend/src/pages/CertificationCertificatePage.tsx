@@ -1,4 +1,4 @@
-import React, { useRef, useMemo, useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useEnrollmentStore } from '../store/CertificationEnrollmentStore';
 import { Enrollment } from '../CertificationTypes';

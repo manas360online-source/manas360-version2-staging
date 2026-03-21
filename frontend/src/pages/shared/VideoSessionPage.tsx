@@ -1,24 +1,25 @@
-import { Brain, CheckCircle2, Info, Minimize2, Sparkles, StickyNote, X } from 'lucide-react';
+import { Brain, CheckCircle2, Info, Minimize2, Sparkles, StickyNote, X, AlertCircle, Mic, Video } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   createPatientNote,
-  fetchCbtAssignmentTemplates,
   fetchPatientOverview,
-  quickAssignCbtTemplate,
-  type CbtAssignmentTemplateOption,
   type PatientOverviewData,
   updatePatientNote,
 } from '../../api/provider';
 import { therapistApi, type AiClinicalSummary } from '../../api/therapist.api';
 import { generateMeetingLink, type MeetingLinkResponse } from '../../api/videoSession';
 import VideoRoom from '../../components/jitsi/VideoRoom';
+import GPSDashboard from '../../components/therapist/GPSDashboard';
 import { useAuth } from '../../context/AuthContext';
 import { useVideoSession } from '../../context/VideoSessionContext';
+import useAuthToken from '../../hooks/useAuthToken';
+import { http } from '../../lib/http';
 
 const providerRoles = new Set(['therapist', 'psychiatrist', 'psychologist', 'coach']);
 const MIN_AUDIO_CAPTURE_SECONDS = 300;
 type WorkspaceTab = 'patient-info' | 'clinical-notes' | 'ai-insights';
+type SessionViewMode = 'split' | 'video' | 'workspace';
 
 const formatSessionDate = (value?: string | null): string => {
   if (!value) return 'Not available';
@@ -30,7 +31,9 @@ const formatSessionDate = (value?: string | null): string => {
 export default function VideoSessionPage() {
   const { sessionId = '' } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
+  const { token: accessToken } = useAuthToken();
   const { startSession, endSession, setIsMinimized, elapsedSeconds } = useVideoSession();
 
   const [meetingData, setMeetingData] = useState<MeetingLinkResponse | null>(null);
@@ -48,16 +51,16 @@ export default function VideoSessionPage() {
   const [showSavedIndicator, setShowSavedIndicator] = useState(false);
   const [isGeneratingAiDraft, setIsGeneratingAiDraft] = useState(false);
   const [aiInsights, setAiInsights] = useState<AiClinicalSummary | null>(null);
-  const [cbtTemplateOptions, setCbtTemplateOptions] = useState<CbtAssignmentTemplateOption[]>([]);
-  const [selectedTemplateType, setSelectedTemplateType] = useState('');
-  const [isAssigningCbtTemplate, setIsAssigningCbtTemplate] = useState(false);
-  const [quickAssignFeedback, setQuickAssignFeedback] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<WorkspaceTab>('patient-info');
   const [isOverviewOverlayOpen, setIsOverviewOverlayOpen] = useState(false);
+  const [monitoringId, setMonitoringId] = useState<string>('');
+  const [viewMode, setViewMode] = useState<SessionViewMode>('split');
+  const [mediaPermissionStatus, setMediaPermissionStatus] = useState<'checking' | 'granted' | 'denied' | 'unknown'>('checking');
 
   const saveInFlightRef = useRef(false);
   const lastSavedPayloadRef = useRef('');
   const savedIndicatorTimerRef = useRef<number | null>(null);
+  const gpsStopCalledRef = useRef(false);
 
   const normalizedRole = String(user?.role || '').toLowerCase();
   const isProvider = providerRoles.has(normalizedRole);
@@ -65,6 +68,52 @@ export default function VideoSessionPage() {
     const full = `${String(user?.firstName || '').trim()} ${String(user?.lastName || '').trim()}`.trim();
     return full || String(user?.email || 'Provider');
   }, [user?.email, user?.firstName, user?.lastName]);
+
+  const isFocusMode = searchParams.get('focus') === '1';
+
+  const toggleFocusMode = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    if (isFocusMode) {
+      next.delete('focus');
+    } else {
+      next.set('focus', '1');
+    }
+    setSearchParams(next, { replace: true });
+  }, [isFocusMode, searchParams, setSearchParams]);
+
+  const checkMediaPermissions = useCallback(async () => {
+    try {
+      setMediaPermissionStatus('checking');
+      const permissionStatus = await navigator.permissions.query({ name: 'camera' as any });
+      if (permissionStatus.state === 'denied') {
+        setMediaPermissionStatus('denied');
+      } else if (permissionStatus.state === 'granted') {
+        setMediaPermissionStatus('granted');
+      } else {
+        setMediaPermissionStatus('unknown');
+      }
+    } catch {
+      setMediaPermissionStatus('unknown');
+    }
+  }, []);
+
+  const requestMediaAccess = useCallback(async () => {
+    try {
+      setMediaPermissionStatus('checking');
+      await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+      setMediaPermissionStatus('granted');
+    } catch (err: any) {
+      if (err?.name === 'NotAllowedError' || err?.message?.includes('denied')) {
+        setMediaPermissionStatus('denied');
+      } else {
+        setMediaPermissionStatus('unknown');
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    void checkMediaPermissions();
+  }, [checkMediaPermissions]);
 
   useEffect(() => {
     let active = true;
@@ -126,6 +175,45 @@ export default function VideoSessionPage() {
     };
   }, [hasAuthError, isProvider, sessionId, startSession]);
 
+  const stopGpsMonitoring = useCallback(async () => {
+    if (!sessionId || gpsStopCalledRef.current) return;
+    gpsStopCalledRef.current = true;
+    try {
+      await http.post(`/v1/gps/sessions/${sessionId}/end`);
+    } catch {
+      // Ignore GPS teardown errors on exit paths.
+    }
+  }, [sessionId]);
+
+  useEffect(() => {
+    let active = true;
+
+    if (hasAuthError || !isProvider || !sessionId) {
+      return () => {
+        active = false;
+      };
+    }
+
+    const startGpsMonitoring = async () => {
+      try {
+        gpsStopCalledRef.current = false;
+        const response = await http.post<{ monitoringId: string }>(`/v1/gps/sessions/${sessionId}/start`);
+        if (!active) return;
+        setMonitoringId(String(response.data?.monitoringId || ''));
+      } catch {
+        if (!active) return;
+        setMonitoringId('');
+      }
+    };
+
+    void startGpsMonitoring();
+
+    return () => {
+      active = false;
+      void stopGpsMonitoring();
+    };
+  }, [hasAuthError, isProvider, sessionId, stopGpsMonitoring]);
+
   useEffect(() => {
     let active = true;
 
@@ -170,35 +258,6 @@ export default function VideoSessionPage() {
       }
     };
   }, []);
-
-  useEffect(() => {
-    let active = true;
-
-    if (hasAuthError || !isProvider) {
-      return () => {
-        active = false;
-      };
-    }
-
-    const loadTemplateOptions = async () => {
-      try {
-        const templates = await fetchCbtAssignmentTemplates();
-        if (!active) return;
-        const options = Array.isArray(templates) ? templates : [];
-        setCbtTemplateOptions(options);
-        setSelectedTemplateType((current) => current || options[0]?.templateType || '');
-      } catch {
-        if (!active) return;
-        setCbtTemplateOptions([]);
-      }
-    };
-
-    void loadTemplateOptions();
-
-    return () => {
-      active = false;
-    };
-  }, [hasAuthError, isProvider]);
 
   const autosaveNotes = useCallback(async () => {
     if (hasAuthError) return;
@@ -336,36 +395,16 @@ export default function VideoSessionPage() {
     }
   };
 
-  const handleQuickAssignTemplate = async () => {
-    if (hasAuthError) return;
-    if (!meetingData?.patientId) {
-      setQuickAssignFeedback('Unable to identify patient for assignment.');
-      return;
-    }
-    if (!selectedTemplateType || isAssigningCbtTemplate) {
-      return;
-    }
-
-    setIsAssigningCbtTemplate(true);
-    setQuickAssignFeedback(null);
-    try {
-      const result = await quickAssignCbtTemplate(meetingData.patientId, selectedTemplateType);
-      setQuickAssignFeedback(`Assigned: ${result.title} to the patient Daily Check-in Hub.`);
-    } catch (requestError: any) {
-      if (requestError?.response?.status === 401) {
-        setHasAuthError(true);
-        return;
-      }
-      setQuickAssignFeedback(String(requestError?.response?.data?.message || requestError?.message || 'Failed to assign template.'));
-    } finally {
-      setIsAssigningCbtTemplate(false);
-    }
-  };
-
   const handleOpenDashboardInPip = () => {
     setIsMinimized(true);
     navigate('/provider/dashboard');
   };
+
+  const handleEndCall = useCallback(async () => {
+    await stopGpsMonitoring();
+    endSession();
+    navigate('/provider/dashboard');
+  }, [endSession, navigate, stopGpsMonitoring]);
 
   if (loading) {
     return (
@@ -391,15 +430,53 @@ export default function VideoSessionPage() {
     );
   }
 
+  const showVideoSection = viewMode === 'split' || viewMode === 'video';
+  const showWorkspaceSection = viewMode === 'split' || viewMode === 'workspace';
+
   return (
-    <div className="grid h-[calc(100vh-2rem)] grid-cols-1 gap-4 xl:grid-cols-[minmax(0,65%)_minmax(0,35%)]">
-      <section className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-slate-950 shadow-sm">
-        <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3 text-white">
+    <div className="flex flex-col h-[calc(100vh-2rem)] gap-4">
+      {mediaPermissionStatus === 'denied' ? (
+        <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <AlertCircle className="h-5 w-5 flex-shrink-0 text-amber-600" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-amber-900">Camera and microphone access denied</p>
+            <p className="text-xs text-amber-800">Grant permission in browser settings to use video features.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void requestMediaAccess()}
+            className="inline-flex flex-shrink-0 items-center gap-1 rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-500"
+          >
+            <Mic className="h-3.5 w-3.5" />
+            <Video className="h-3.5 w-3.5" />
+            Retry
+          </button>
+        </div>
+      ) : null}
+
+      <div className={`grid flex-1 grid-cols-1 gap-4 ${viewMode === 'split' ? 'xl:grid-cols-[minmax(0,65%)_minmax(0,35%)]' : ''}`}>
+        {showVideoSection ? (
+        <section className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-slate-950 shadow-sm">
+          <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3 text-white">
           <div>
             <p className="text-sm font-semibold">Live Session</p>
             <p className="text-[11px] text-slate-300">Room: {meetingData.meetingRoomName}</p>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={toggleFocusMode}
+              className="inline-flex items-center gap-1 rounded-md border border-white/20 bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-white"
+            >
+              {isFocusMode ? 'Exit Focus' : 'Focus Mode'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode(viewMode === 'video' ? 'split' : 'video')}
+              className="inline-flex items-center gap-1 rounded-md border border-white/20 bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-white"
+            >
+              {viewMode === 'video' ? 'Show Split' : 'Video Only'}
+            </button>
             <button
               type="button"
               onClick={handleOpenDashboardInPip}
@@ -411,8 +488,7 @@ export default function VideoSessionPage() {
             <button
               type="button"
               onClick={() => {
-                endSession();
-                navigate('/provider/dashboard');
+                void handleEndCall();
               }}
               className="inline-flex items-center gap-1 rounded-md bg-rose-600 px-2.5 py-1.5 text-xs font-semibold text-white"
             >
@@ -429,20 +505,30 @@ export default function VideoSessionPage() {
             jitsiJwt={meetingData.jitsiJwt}
             className="h-full w-full"
             onEndCall={() => {
-              endSession();
-              navigate('/provider/dashboard');
+              void handleEndCall();
             }}
           />
         </div>
       </section>
+        ) : null}
 
+      {showWorkspaceSection ? (
       <section className="relative flex min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <header className="border-b border-slate-200 px-4 py-3">
           <div className="flex items-center justify-between gap-2">
             <p className="text-sm font-semibold text-slate-800">Clinical Workspace</p>
-            <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
-              {canGenerateAiDraft ? 'AI draft unlocked' : `AI draft unlocks in ${aiUnlockCountdown}s`}
-            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setViewMode(viewMode === 'workspace' ? 'split' : 'workspace')}
+                className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700"
+              >
+                {viewMode === 'workspace' ? 'Show Split' : 'Workspace Only'}
+              </button>
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                {canGenerateAiDraft ? 'AI draft unlocked' : `AI draft unlocks in ${aiUnlockCountdown}s`}
+              </span>
+            </div>
           </div>
           <div className="mt-3 grid grid-cols-3 gap-2">
             <button
@@ -489,40 +575,13 @@ export default function VideoSessionPage() {
                 Live patient context for quick reference.
               </div>
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-[180px] flex-1">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Session Protocol Tips</p>
-                    <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-slate-700">
-                      <li>Reflect and validate first before reframing.</li>
-                      <li>Anchor one practical CBT task before ending session.</li>
-                    </ul>
-                  </div>
-                  <div className="w-full max-w-[240px] space-y-2">
-                    <label className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Quick Assign</label>
-                    <select
-                      value={selectedTemplateType}
-                      onChange={(event) => setSelectedTemplateType(event.target.value)}
-                      className="w-full rounded-md border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-700"
-                    >
-                      {cbtTemplateOptions.map((template) => (
-                        <option key={template.templateType} value={template.templateType}>
-                          {template.title}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => void handleQuickAssignTemplate()}
-                      disabled={!selectedTemplateType || isAssigningCbtTemplate}
-                      className="w-full rounded-md bg-slate-900 px-2.5 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {isAssigningCbtTemplate ? 'Assigning...' : 'Quick Assign'}
-                    </button>
-                  </div>
+                <div className="min-w-[180px] flex-1">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Session Protocol Tips</p>
+                  <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-slate-700">
+                    <li>Reflect and validate first before reframing.</li>
+                    <li>Anchor one practical CBT task before ending session.</li>
+                  </ul>
                 </div>
-                {quickAssignFeedback ? (
-                  <p className="mt-2 text-[11px] text-slate-600">{quickAssignFeedback}</p>
-                ) : null}
               </div>
               <div className="space-y-2 rounded-xl border border-slate-200 p-3 text-xs text-slate-700">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Clinical Summary</p>
@@ -615,6 +674,15 @@ export default function VideoSessionPage() {
 
           {activeTab === 'ai-insights' ? (
             <div className="space-y-3">
+              {monitoringId && accessToken ? (
+                <div className="rounded-xl border border-slate-200 bg-white p-2">
+                  <GPSDashboard
+                    sessionId={sessionId}
+                    monitoringId={monitoringId}
+                    accessToken={accessToken}
+                  />
+                </div>
+              ) : null}
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">Mood Monitor</p>
@@ -729,6 +797,8 @@ export default function VideoSessionPage() {
           </div>
         ) : null}
       </section>
+      ) : null}
+      </div>
     </div>
   );
 }
