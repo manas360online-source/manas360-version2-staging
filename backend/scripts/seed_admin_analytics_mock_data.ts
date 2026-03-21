@@ -52,6 +52,24 @@ function buildDateDimRow(date: Date): DateDimRow {
 	};
 }
 
+async function ensureDateDimensionSchema() {
+	await prisma.$executeRawUnsafe(
+		`ALTER TABLE analytics.dim_date
+			ADD COLUMN IF NOT EXISTS week_of_year smallint NOT NULL DEFAULT 0;
+		 ALTER TABLE analytics.dim_date
+			ADD COLUMN IF NOT EXISTS month_of_year smallint NOT NULL DEFAULT 0;
+		 ALTER TABLE analytics.dim_date
+			ADD COLUMN IF NOT EXISTS quarter_of_year smallint NOT NULL DEFAULT 0;
+		 ALTER TABLE analytics.dim_date
+			ADD COLUMN IF NOT EXISTS year_num integer NOT NULL DEFAULT 0;
+		 ALTER TABLE analytics.dim_date
+			ADD COLUMN IF NOT EXISTS week_start_date date NOT NULL DEFAULT '1970-01-01';
+		 ALTER TABLE analytics.dim_date
+			ADD COLUMN IF NOT EXISTS month_start_date date NOT NULL DEFAULT '1970-01-01';
+		`,
+	);
+}
+
 async function ensureDateDimension(start: Date, end: Date) {
 	for (
 		let d = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()));
@@ -92,6 +110,7 @@ async function run() {
 	];
 
 	console.log('Seeding admin analytics mock data...');
+	await ensureDateDimensionSchema();
 	await ensureDateDimension(rangeStart, rangeEnd);
 
 	const organizationRows = (await prisma.$queryRawUnsafe(
