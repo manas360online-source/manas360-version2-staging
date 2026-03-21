@@ -23,7 +23,7 @@ export default function PricingPage() {
       .catch(() => {});
   }, []);
 
-  const onStartSubscription = async (planKey: string) => {
+  const onStartSubscription = async (planKey: string, planPrice: number) => {
     setSubscribing(true);
     try {
       const response = await patientApi.upgradeSubscription({ planKey });
@@ -32,11 +32,22 @@ export default function PricingPage() {
         window.location.href = payload.redirectUrl;
         return;
       }
+
+      if (planPrice > 0) {
+        toast.error('Payment gateway link was not returned. Please try again.');
+        return;
+      }
+
       toast.success('Subscription activated successfully.');
       setHasActiveSubscription(true);
       setTimeout(() => navigate('/patient/dashboard', { replace: true }), 1000);
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Could not initiate subscription.');
+      const status = Number(error?.response?.status || 0);
+      if (status === 409) {
+        toast.error(error?.response?.data?.message || 'A subscription update is already in progress. Please retry shortly.');
+      } else {
+        toast.error(error?.response?.data?.message || 'Could not initiate subscription.');
+      }
     } finally {
       setSubscribing(false);
     }
@@ -121,7 +132,7 @@ export default function PricingPage() {
                     <td className="px-5 py-4">
                       <button
                         type="button"
-                        onClick={() => void onStartSubscription(plan.key)}
+                        onClick={() => void onStartSubscription(plan.key, plan.rawPrice)}
                         disabled={subscribing || (hasActiveSubscription && plan.rawPrice === 0)}
                         className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-indigo-500 disabled:opacity-50"
                       >

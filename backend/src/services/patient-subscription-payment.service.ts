@@ -56,6 +56,7 @@ export const initiatePatientSubscriptionPayment = async (userId: string, planKey
 	const transactionId = `SUB_${userId}_${planKey}_${Date.now()}`;
 	const shouldBypass = env.allowDevPaymentBypass && env.nodeEnv === 'development';
 	const frontendBaseUrl = env.frontendUrl;
+	const callbackUrl = `${env.apiUrl}${env.apiPrefix}/v1/payments/phonepe/webhook`;
 	const cycleKey = new Date().toISOString().slice(0, 10);
 	const subscriptionIdempotencyKey = `sub_init:${userId}:${planKey}:${cycleKey}`;
 
@@ -65,7 +66,7 @@ export const initiatePatientSubscriptionPayment = async (userId: string, planKey
 			transactionId,
 			userId,
 			amountInPaise: plan.price,
-			callbackUrl: `${env.apiPrefix}/v1/payments/phonepe/webhook`,
+			callbackUrl,
 			redirectUrl: `${frontendBaseUrl}/payment/status?id=${transactionId}&status=SUCCESS`,
 		});
 	} catch (error: any) {

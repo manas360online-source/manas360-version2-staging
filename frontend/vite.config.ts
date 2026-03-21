@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import path from 'path'
 import react from '@vitejs/plugin-react'
 
@@ -32,7 +32,10 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
-    minify: 'terser',
+    // Use esbuild minifier which is faster and avoids some terser hoisting bugs
+    // that can surface as "Cannot access 'l' before initialization" in bundled
+    // vendor chunks for certain chart libraries.
+    minify: 'esbuild',
     cssMinify: true,
     rollupOptions: {
       onwarn(warning, warn) {
@@ -49,10 +52,12 @@ export default defineConfig({
       },
       output: {
         manualChunks(id) {
-          if (id.includes('node_modules')) {
+            if (id.includes('node_modules')) {
             if (id.includes('agora-rtc-sdk-ng')) return 'vendor-agora'
             if (id.includes('lucide-react')) return 'vendor-icons'
-            if (id.includes('recharts') || id.includes('chart.js')) return 'vendor-charts'
+            // Avoid creating a separate 'vendor-charts' chunk — keep chart libraries
+            // in the generic vendor bundle to prevent problematic minification
+            // ordering that can cause runtime ReferenceErrors in certain builds.
             if (id.includes('socket.io') || id.includes('engine.io')) return 'vendor-realtime'
             if (id.includes('pdfkit')) return 'vendor-pdf'
             return 'vendor'

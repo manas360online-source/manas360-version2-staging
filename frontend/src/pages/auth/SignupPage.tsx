@@ -28,11 +28,16 @@ export default function SignupPage() {
 			await register(payload.email, payload.password, payload.name, payload.role);
 			if (payload.role === 'patient') {
 				await login(payload.email, payload.password);
-				const subscriptionResponse = await patientApi.upgradeSubscription({ planKey: 'free' });
-				
-				if (subscriptionResponse?.redirectUrl) {
-					window.location.href = subscriptionResponse.redirectUrl;
-					return;
+				const selectedPlan = payload.selectedPlan || 'free';
+				const subscriptionResponse = await patientApi.upgradeSubscription({ planKey: selectedPlan });
+
+				if (selectedPlan !== 'free') {
+					if (subscriptionResponse?.redirectUrl) {
+						window.location.href = subscriptionResponse.redirectUrl;
+						return;
+					}
+
+					throw new Error('Payment gateway link was not returned. Please retry.');
 				}
 
 				setSuccess('Registration and platform activation successful. Redirecting to care...');

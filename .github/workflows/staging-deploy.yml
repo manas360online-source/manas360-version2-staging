@@ -18,8 +18,8 @@ jobs:
   preflight:
     runs-on: ubuntu-latest
     outputs:
-      lightsail-host: ${{ steps.validate.outputs.lightsail-host }}
-      lightsail-user: ${{ steps.validate.outputs.lightsail-user }}
+      ec2-host: ${{ steps.validate.outputs.ec2-host }}
+      ec2-user: ${{ steps.validate.outputs.ec2-user }}
       staging-dir: ${{ steps.validate.outputs.staging-dir }}
     steps:
       - name: Checkout
@@ -28,27 +28,27 @@ jobs:
       - name: Validate required staging secrets and vars
         id: validate
         env:
-          LIGHTSAIL_HOST: ${{ secrets.LIGHTSAIL_HOST }}
-          LIGHTSAIL_USER: ${{ secrets.LIGHTSAIL_USER }}
-          LIGHTSAIL_SSH_KEY: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
           STAGING_APP_DIR: ${{ vars.STAGING_APP_DIR }}
         run: |
           set -euo pipefail
 
           missing=0
 
-          if [ -z "${LIGHTSAIL_HOST}" ]; then
-            echo "::error::Missing required secret: LIGHTSAIL_HOST"
+          if [ -z "${EC2_HOST}" ]; then
+            echo "::error::Missing required secret: EC2_HOST"
             missing=1
           fi
 
-          if [ -z "${LIGHTSAIL_USER}" ]; then
-            echo "::error::Missing required secret: LIGHTSAIL_USER"
+          if [ -z "${EC2_USER}" ]; then
+            echo "::error::Missing required secret: EC2_USER"
             missing=1
           fi
 
-          if [ -z "${LIGHTSAIL_SSH_KEY}" ]; then
-            echo "::error::Missing required secret: LIGHTSAIL_SSH_KEY"
+          if [ -z "${EC2_SSH_KEY}" ]; then
+            echo "::error::Missing required secret: EC2_SSH_KEY"
             missing=1
           fi
 
@@ -62,8 +62,8 @@ jobs:
           fi
           
           # Output to job outputs for use in deploy job
-          echo "lightsail-host=${LIGHTSAIL_HOST}" >> $GITHUB_OUTPUT
-          echo "lightsail-user=${LIGHTSAIL_USER}" >> $GITHUB_OUTPUT
+          echo "ec2-host=${EC2_HOST}" >> $GITHUB_OUTPUT
+          echo "ec2-user=${EC2_USER}" >> $GITHUB_OUTPUT
           echo "staging-dir=${STAGING_APP_DIR}" >> $GITHUB_OUTPUT
 
       - name: Validate deploy script syntax
@@ -76,9 +76,10 @@ jobs:
     needs: preflight
     runs-on: ubuntu-latest
     env:
-      LIGHTSAIL_HOST: ${{ secrets.LIGHTSAIL_HOST }}
-      LIGHTSAIL_USER: ${{ secrets.LIGHTSAIL_USER }}
-      LIGHTSAIL_SSH_KEY: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+      EC2_HOST: ${{ secrets.EC2_HOST }}
+      EC2_USER: ${{ secrets.EC2_USER }}
+      EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+      STAGING_APP_DIR: ${{ vars.STAGING_APP_DIR }}
 
     steps:
       - name: Checkout
@@ -101,23 +102,23 @@ jobs:
           npm ci
           npm run build
 
-      - name: Deploy to AWS Lightsail via SSH
+      - name: Deploy to EC2 via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ env.LIGHTSAIL_HOST }}
-          username: ${{ env.LIGHTSAIL_USER }}
-          key: ${{ env.LIGHTSAIL_SSH_KEY }}
+          host: ${{ env.EC2_HOST }}
+          username: ${{ env.EC2_USER }}
+          key: ${{ env.EC2_SSH_KEY }}
           script: |
-            cd /var/www/manas360
+            cd ${{ env.STAGING_APP_DIR }}
             BRANCH_NAME='${{ github.ref_name }}' ROOT_DIR='${{ needs.preflight.outputs.staging-dir }}' bash ./devops/scripts/deploy.sh
 
       - name: Seed staging database
         if: ${{ vars.RUN_STAGING_SEED == 'true' }}
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ env.LIGHTSAIL_HOST }}
-          username: ${{ env.LIGHTSAIL_USER }}
-          key: ${{ env.LIGHTSAIL_SSH_KEY }}
+          host: ${{ env.EC2_HOST }}
+          username: ${{ env.EC2_USER }}
+          key: ${{ env.EC2_SSH_KEY }}
           script: |
-            cd /var/www/manas360
+            cd ${{ env.STAGING_APP_DIR }}
             ROOT_DIR='${{ needs.preflight.outputs.staging-dir }}' bash ./devops/scripts/seed.sh
