@@ -106,6 +106,7 @@ export default function TherapistLiveSessionPage() {
           isTherapist: true,
           aiEngineUrl: AI_ENGINE_WS_URL,
           sessionId,
+          monitoringId: mId,
         });
 
         managerRef.current = mgr;
@@ -138,17 +139,6 @@ export default function TherapistLiveSessionPage() {
     await endSession();
     navigate('/therapist/sessions');
   }, [endSession, navigate]);
-
-  if (status === 'loading') {
-    return (
-      <div className="flex h-screen items-center justify-center bg-slate-900 text-white">
-        <div className="text-center">
-          <div className="mb-4 h-10 w-10 animate-spin rounded-full border-4 border-white border-t-transparent mx-auto" />
-          <p className="text-sm text-slate-300">Starting live session…</p>
-        </div>
-      </div>
-    );
-  }
 
   if (status === 'error') {
     return (
@@ -188,6 +178,16 @@ export default function TherapistLiveSessionPage() {
     <div className="relative h-screen w-full overflow-hidden bg-black">
       {/* Jitsi iframe container */}
       <div ref={jitsiContainerRef} className="absolute inset-0 h-full w-full" />
+
+      {/* Loading overlay while Jitsi + monitoring start */}
+      {status === 'loading' && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-slate-900/92 text-white">
+          <div className="text-center">
+            <div className="mb-4 h-10 w-10 animate-spin rounded-full border-4 border-white border-t-transparent mx-auto" />
+            <p className="text-sm text-slate-300">Starting live session…</p>
+          </div>
+        </div>
+      )}
 
       {/* GPS Dashboard overlay — therapist only, top-right */}
       {monitoringId && accessToken && (

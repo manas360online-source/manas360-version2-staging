@@ -17,6 +17,8 @@ import {
 	enqueueAdminAnalyticsExportController,
 	getAdminAnalyticsExportStatusController,
 	downloadAdminAnalyticsExportController,
+	getAdminPaymentReliabilityController,
+	retryPaymentManuallyController,
 } from '../controllers/admin-analytics.controller';
 import { getAdminModuleSummaryController } from '../controllers/admin-module.controller';
 import { adminAnalyticsExportRateLimiter } from '../middleware/rateLimiter.middleware';
@@ -187,6 +189,29 @@ router.get('/analytics/templates', requireAuth, requireRole('admin'), asyncHandl
  *   - lastTherapistKey: bigint (optional, keyset cursor)
  */
 router.get('/analytics/utilization', requireAuth, requireRole('admin'), asyncHandler(getAdminTherapistUtilizationController));
+
+/**
+ * GET /api/v1/admin/analytics/payments
+ * Query params:
+ *   - days: number (optional, default 30)
+ */
+router.get('/analytics/payments', requireAuth, requireRole('admin'), requirePermission('view_analytics'), asyncHandler(getAdminPaymentReliabilityController));
+
+/**
+ * POST /api/v1/admin/payments/:paymentId/retry
+ * Manual payment retry endpoint (admin/support tool)
+ * 
+ * Resets retry counter and schedules immediate reconciliation
+ * Use when customer updates payment method to trigger re-attempt
+ * 
+ * Route params:
+ *   - paymentId: string (financial_payment.id)
+ * 
+ * Response: { success: boolean, message: string, payment: { id, status, retryCount, nextRetryAt } }
+ * 
+ * Requires: admin role + manage_payments permission
+ */
+router.post('/payments/:paymentId/retry', requireAuth, requireRole('admin'), requirePermission('manage_payments'), asyncHandler(retryPaymentManuallyController));
 
 /**
  * POST /api/v1/admin/analytics/export

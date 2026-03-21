@@ -380,6 +380,27 @@ const addDailyCheckInController = async (req, res) => {
             gratitude: checkInData.gratitude,
         },
     });
+    // Mark today's mood check-in task complete on any active therapy plan (best-effort)
+    try {
+        const patientProfile = await db_1.prisma.patientProfile.findUnique({ where: { userId } });
+        if (patientProfile && patientProfile.id) {
+            const task = await db_1.prisma.therapyPlanActivity.findFirst({
+                where: {
+                    activityType: 'MOOD_CHECKIN',
+                    status: 'PENDING',
+                    plan: { patientId: patientProfile.id, status: 'ACTIVE' },
+                },
+                select: { id: true },
+            }).catch(() => null);
+            if (task?.id) {
+                await db_1.prisma.therapyPlanActivity.update({ where: { id: task.id }, data: { status: 'COMPLETED', completedAt: new Date() } }).catch(() => null);
+            }
+        }
+    }
+    catch (err) {
+        // swallow any errors here to avoid failing the check-in save; this is non-critical
+        console.warn('Failed to mark mood check-in task complete:', err);
+    }
     (0, response_1.sendSuccess)(res, dailyCheckIn, 'Daily check-in recorded', 201);
 };
 exports.addDailyCheckInController = addDailyCheckInController;

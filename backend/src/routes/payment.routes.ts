@@ -4,6 +4,8 @@ import {
 	createSessionPaymentController,
 	phonepeWebhookController,
 	getPhonePeStatusController,
+	initiateRefundController,
+	getRefundStatusController,
 } from '../controllers/payment.controller';
 import { requireAuth } from '../middleware/auth.middleware';
 import { requireRole } from '../middleware/rbac.middleware';
@@ -18,5 +20,9 @@ router.post('/sessions/:id/complete', requireAuth, requireRole('therapist'), pay
 // PhonePe specific routes
 router.post('/phonepe/webhook', asyncHandler(phonepeWebhookController));
 router.get('/phonepe/status/:transactionId', requireAuth, asyncHandler(getPhonePeStatusController));
+
+// Refund routes
+router.post('/refund', requireAuth, requireRole('patient'), paymentRateLimiter, asyncHandler(initiateRefundController));
+router.get('/refund/:refundId/status', requireAuth, requireRole('patient'), asyncHandler(getRefundStatusController));
 
 export default router;

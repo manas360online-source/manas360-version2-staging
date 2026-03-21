@@ -28,7 +28,7 @@ const cookieDomain = resolveCookieDomain();
 const tokenCookieOptions = {
     httpOnly: true,
     secure: env_1.env.cookieSecure,
-    sameSite: 'strict',
+    sameSite: 'lax',
     domain: cookieDomain,
     path: '/',
 };
@@ -44,7 +44,7 @@ const setAuthCookies = (res, accessToken, refreshToken) => {
     res.cookie(env_1.env.csrfCookieName, (0, crypto_1.randomBytes)(24).toString('hex'), {
         httpOnly: false,
         secure: env_1.env.cookieSecure,
-        sameSite: 'strict',
+        sameSite: 'lax',
         domain: cookieDomain,
         path: '/',
         maxAge: 7 * 24 * 60 * 60 * 1000,

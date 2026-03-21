@@ -505,6 +505,28 @@ export default function SessionsPage() {
     setAssessmentDraft(loadAssessmentDraft());
   }, []);
 
+  useEffect(() => {
+    const refreshSessions = () => {
+      void fetchData();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshSessions();
+      }
+    };
+
+    const intervalId = window.setInterval(refreshSessions, 45000);
+    window.addEventListener('focus', refreshSessions);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', refreshSessions);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
   const assessmentResumeCopy = useMemo(() => {
     if (!assessmentDraft) return null;
 

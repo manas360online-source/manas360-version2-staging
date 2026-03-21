@@ -8,6 +8,7 @@ import {
 	verifyRazorpayWebhookSignature,
 } from './razorpay.service';
 import { initiatePhonePePayment } from './phonepe.service';
+import { recordPaymentCapturedMetric } from './payment-metrics.service';
 import { logger } from '../utils/logger';
 
 const redis = createClient({ url: env.redisUrl });
@@ -37,6 +38,7 @@ export interface CreateFinancialSessionInput {
 	providerId: string;
 	amountMinor: number;
 	currency?: string;
+	idempotencyKey?: string;
 }
 
 const assertPaymentActors = async (tx: any, patientId: string, providerId: string): Promise<void> => {
@@ -66,9 +68,35 @@ export const createSessionPayment = async (input: CreateFinancialSessionInput) =
 		throw new AppError('amountMinor must be greater than zero', 422);
 	}
 
-	const idempotencyKey = randomUUID();
+	const idempotencyKey = String(input.idempotencyKey || randomUUID()).trim();
+	if (!idempotencyKey) {
+		throw new AppError('idempotencyKey is required for payment creation', 422);
+	}
+
+	const existing = await db.financialSession.findUnique({ where: { idempotencyKey } });
+	if (existing) {
+		const payment = await db.financialPayment.findFirst({ where: { sessionId: existing.id } });
+		if (payment) {
+			return {
+				sessionId: existing.id,
+				paymentId: payment.id,
+				paymentType: 'provider_fee',
+				transactionId: existing.razorpayOrderId,
+				redirectUrl: '',
+				amountMinor: existing.expectedAmountMinor,
+				currency: existing.currency,
+				feeBreakdown: {
+					platformFeeMinor: Math.round(existing.expectedAmountMinor * platformShareRatio),
+					providerFeeMinor: Math.floor(existing.expectedAmountMinor * providerShareRatio),
+				},
+				idempotencyKey,
+			};
+		}
+	}
+
 	const transactionId = `SESS_${Date.now()}_${idempotencyKey.slice(0, 8)}`;
 	const shouldBypass = env.allowDevPaymentBypass && env.nodeEnv === 'development';
+	const frontendBaseUrl = env.frontendUrl;
 
 	let redirectUrl: string;
 	try {
@@ -76,15 +104,15 @@ export const createSessionPayment = async (input: CreateFinancialSessionInput) =
 			transactionId,
 			userId: input.patientId,
 			amountInPaise: amountMinor,
-			callbackUrl: `${env.apiPrefix}/payment/phonepe/webhook`,
-			redirectUrl: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/payment-status`,
+			callbackUrl: `${env.apiPrefix}/v1/payments/phonepe/webhook`,
+			redirectUrl: `${frontendBaseUrl}/payment/status?id=${transactionId}`,
 		});
 	} catch (error: any) {
 		if (!shouldBypass) {
 			throw new AppError(error?.message || 'Failed to initiate PhonePe payment', 500);
 		}
 
-		redirectUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/payment-status?id=${transactionId}`;
+		redirectUrl = `${frontendBaseUrl}/payment/status?id=${transactionId}`;
 	}
 
 	const created = await db.$transaction(async (tx: any) => {
@@ -151,16 +179,33 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 
 	if (success && code === 'PAYMENT_SUCCESS') {
 		if (merchantTransactionId.startsWith('SESS_')) {
+			let capturedPayment: any = null;
+			let capturedAmountMinor = 0;
 			await db.$transaction(async (tx: any) => {
 				const payment = await tx.financialPayment.findFirst({
 					where: { razorpayOrderId: merchantTransactionId },
 				});
 
-				if (!payment || payment.status === 'CAPTURED') return;
+				if (!payment) {
+					logger.error('[PaymentService] PhonePe webhook with unknown transaction', { merchantTransactionId });
+					return;
+				}
 
-				const amountMinor = Number(data.amount);
-				const therapistShareMinor = Math.floor(amountMinor * providerShareRatio);
-				const platformShareMinor = amountMinor - therapistShareMinor;
+				if (payment.status === 'CAPTURED') {
+					logger.debug('[PaymentService] PhonePe webhook duplicate capture ignored', { merchantTransactionId, paymentId: payment.id });
+					capturedPayment = payment;
+					capturedAmountMinor = Number(payment.amountMinor || 0);
+					return;
+				}
+
+				const payloadAmountMinor = Number(data.amount);
+				if (!Number.isFinite(payloadAmountMinor) || payloadAmountMinor <= 0) {
+					logger.error('[PaymentService] Invalid amount in PhonePe webhook', { merchantTransactionId, amount: data.amount });
+					throw new AppError('Invalid amount in PhonePe webhook', 422);
+				}
+
+				const therapistShareMinor = Math.floor(payloadAmountMinor * providerShareRatio);
+				const platformShareMinor = payloadAmountMinor - therapistShareMinor;
 
 				await tx.financialPayment.update({
 					where: { id: payment.id },
@@ -168,10 +213,17 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 						status: 'CAPTURED',
 						razorpayPaymentId: String(data.transactionId),
 						capturedAt: new Date(),
+						retryCount: 0,
+						nextRetryAt: null,
+						failedAt: null,
+						failureReason: null,
 						therapistShareMinor,
 						platformShareMinor,
 					},
 				});
+
+				capturedPayment = payment;
+				capturedAmountMinor = payloadAmountMinor;
 
 				await tx.financialSession.update({
 					where: { id: payment.sessionId },
@@ -181,7 +233,7 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 				await tx.revenueLedger.create({
 					data: {
 						type: 'SESSION',
-						grossAmountMinor: amountMinor,
+						grossAmountMinor: payloadAmountMinor,
 						platformCommissionMinor: platformShareMinor,
 						providerShareMinor: therapistShareMinor,
 						paymentType: 'PROVIDER_FEE',
@@ -193,6 +245,18 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 					},
 				});
 			});
+
+			if (capturedPayment?.id) {
+				await recordPaymentCapturedMetric({
+					paymentId: String(capturedPayment.id),
+					transactionId: merchantTransactionId,
+					userId: String(capturedPayment.patientId || ''),
+					amountMinor: capturedAmountMinor,
+					retryCount: Number(capturedPayment.retryCount || 0),
+					channel: 'session',
+				});
+			}
+
 			logger.info(`[PaymentService] Session payment processed and capture recorded`, { merchantTransactionId });
 			return { handled: true, message: 'PhonePe session payment processed' };
 		}
@@ -201,6 +265,14 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 			const parts = merchantTransactionId.split('_');
 			const userId = parts[1];
 			const planKey = data.metadata?.plan || parts[2];
+
+			const payment = await db.financialPayment.findFirst({
+				where: { razorpayOrderId: merchantTransactionId },
+				orderBy: { createdAt: 'desc' },
+			});
+			if (payment?.status === 'CAPTURED') {
+				return { handled: true, message: 'Patient subscription payment already captured' };
+			}
 
 			const { checkPhonePeStatus } = await import('./phonepe.service');
 			const verify = await checkPhonePeStatus(merchantTransactionId);
@@ -217,7 +289,39 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 			}
 
 			const { reactivatePatientSubscription } = await import('./patient-v1.service');
-			await reactivatePatientSubscription(userId);
+			const activated = await reactivatePatientSubscription(userId, merchantTransactionId);
+
+			if (payment?.id) {
+				await db.financialPayment.update({
+					where: { id: payment.id },
+					data: {
+						status: 'CAPTURED',
+						razorpayPaymentId: String(data?.transactionId || payment.razorpayPaymentId || ''),
+						capturedAt: new Date(),
+						retryCount: 0,
+						nextRetryAt: null,
+						failedAt: null,
+						failureReason: null,
+						metadata: {
+							...(payment.metadata || {}),
+							type: 'patient_subscription',
+							plan: planKey,
+							subscriptionId: String(activated?.id || ''),
+							paymentVerifiedAt: new Date().toISOString(),
+						},
+					},
+				});
+
+				await recordPaymentCapturedMetric({
+					paymentId: String(payment.id),
+					transactionId: merchantTransactionId,
+					userId,
+					planId: String(planKey || ''),
+					amountMinor: Number(payment.amountMinor || 0),
+					retryCount: Number(payment.retryCount || 0),
+					channel: 'patient_subscription',
+				});
+			}
 			
 			logger.info(`[PaymentService] Patient subscription activated successfully`, { merchantTransactionId, userId, planKey });
 			return { handled: true, message: 'PhonePe subscription payment processed' };
@@ -230,6 +334,14 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 			
 			// Fix 7: Get plan from metadata payload (fallback to URL param)
 			const planKey = data.metadata?.plan || parts[3];
+
+			const payment = await db.financialPayment.findFirst({
+				where: { razorpayOrderId: merchantTransactionId },
+				orderBy: { createdAt: 'desc' },
+			});
+			if (payment?.status === 'CAPTURED') {
+				return { handled: true, message: 'Provider subscription payment already captured' };
+			}
 
 			const { checkPhonePeStatus } = await import('./phonepe.service');
 			const verify = await checkPhonePeStatus(merchantTransactionId);
@@ -246,7 +358,39 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 			}
 
 			const { activateProviderSubscription } = await import('./provider-subscription.service');
-			await activateProviderSubscription(providerId, planKey as any, merchantTransactionId);
+			const activated = await activateProviderSubscription(providerId, planKey as any, merchantTransactionId);
+
+			if (payment?.id) {
+				await db.financialPayment.update({
+					where: { id: payment.id },
+					data: {
+						status: 'CAPTURED',
+						razorpayPaymentId: String(data?.transactionId || payment.razorpayPaymentId || ''),
+						capturedAt: new Date(),
+						retryCount: 0,
+						nextRetryAt: null,
+						failedAt: null,
+						failureReason: null,
+						metadata: {
+							...(payment.metadata || {}),
+							type: 'provider_subscription',
+							plan: planKey,
+							subscriptionId: String(activated?.id || ''),
+							paymentVerifiedAt: new Date().toISOString(),
+						},
+					},
+				});
+
+				await recordPaymentCapturedMetric({
+					paymentId: String(payment.id),
+					transactionId: merchantTransactionId,
+					userId: providerId,
+					planId: String(planKey || ''),
+					amountMinor: Number(payment.amountMinor || 0),
+					retryCount: Number(payment.retryCount || 0),
+					channel: 'provider_subscription',
+				});
+			}
 
 			logger.info(`[PaymentService] Provider subscription activated successfully`, { merchantTransactionId, providerId, planKey });
 			return { handled: true, message: 'PhonePe provider subscription payment processed' };
@@ -455,4 +599,93 @@ export const processRazorpayWebhook = async (rawBody: string, signature: string)
 	}
 
 	return { handled: false, message: `Unhandled event: ${eventType}` };
+};
+/**
+ * Manual Payment Retry (Admin Recovery Tool)
+ *
+ * Allows admin/support to manually trigger payment retry for failed payments.
+ * Used after customer updates payment method or during system recovery.
+ *
+ * Resets retry state and schedules immediate retry via reconciliation worker.
+ */
+export const retryPaymentManually = async (paymentId: string, adminUserId: string): Promise<{
+	success: boolean;
+	message: string;
+	payment: {
+		id: string;
+		status: string;
+		retryCount: number;
+		nextRetryAt: Date | null;
+	};
+}> => {
+	const payment = await db.financialPayment.findUnique({
+		where: { id: paymentId },
+		select: {
+			id: true,
+			status: true,
+			retryCount: true,
+			nextRetryAt: true,
+			patientId: true,
+			providerId: true,
+			failureReason: true,
+			metadata: true,
+		},
+	});
+
+	if (!payment) {
+		throw new AppError('Payment not found', 404);
+	}
+
+	// Already successful — no retry needed
+	if (payment.status === 'CAPTURED') {
+		throw new AppError('Payment already captured successfully', 400);
+	}
+
+	// Attempting to retry an expired payment — check if we should allow
+	if (payment.status === 'EXPIRED') {
+		logger.warn('[ManualRetry] Attempting to retry expired payment', {
+			paymentId,
+			adminUserId,
+		});
+		// Allow retry, but it will require re-initiation from gateway
+	}
+
+	// Reset retry counter and schedule immediate retry
+	const updatedPayment = await db.financialPayment.update({
+		where: { id: paymentId },
+		data: {
+			retryCount: 0,
+			nextRetryAt: new Date(), // Immediate retry
+			metadata: {
+				...(typeof payment.metadata === 'object' && payment.metadata ? payment.metadata : {}),
+				manualRetryTriggeredAt: new Date().toISOString(),
+				manualRetryTriggeredBy: adminUserId,
+				previousStatus: payment.status,
+				previousFailureReason: payment.failureReason,
+			},
+		},
+		select: {
+			id: true,
+			status: true,
+			retryCount: true,
+			nextRetryAt: true,
+		},
+	});
+
+	logger.info('MANUAL_PAYMENT_RETRY_TRIGGERED', {
+		paymentId,
+		adminUserId,
+		previousStatus: payment.status,
+		previousRetryCount: Number(payment.retryCount || 0),
+		newRetryCount: Number(updatedPayment.retryCount || 0),
+		nextRetryAt: updatedPayment.nextRetryAt,
+		patientId: payment.patientId,
+		providerId: payment.providerId,
+	});
+
+	return {
+		success: true,
+		message: 'Payment retry scheduled for immediate processing',
+		payment: updatedPayment,
+	};
 };

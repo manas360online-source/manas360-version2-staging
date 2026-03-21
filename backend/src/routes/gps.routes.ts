@@ -69,11 +69,14 @@ async function assertTherapistOwnsSession(
 ): Promise<void> {
   const userId = (req as any).auth?.userId;
   const rows: any[] = await db.$queryRawUnsafe(
-    `SELECT therapist_id FROM sessions WHERE id = $1::uuid LIMIT 1`,
+    `SELECT "therapistProfileId" AS therapist_profile_id
+       FROM "therapy_sessions"
+      WHERE "id" = $1
+      LIMIT 1`,
     sessionId,
   );
   if (!rows.length) throw new AppError('Session not found', 404);
-  if (rows[0].therapist_id !== userId) throw new AppError('Forbidden', 403);
+  if (rows[0].therapist_profile_id !== userId) throw new AppError('Forbidden', 403);
 }
 
 // ── POST /sessions/:sessionId/start ──────────────────────────────────────────
@@ -84,12 +87,16 @@ router.post('/sessions/:sessionId/start', requireAuth, async (req: Request, res:
     await assertTherapistOwnsSession(req, sessionId);
 
     const sessionRows: any[] = await db.$queryRawUnsafe(
-      `SELECT therapist_id, patient_id FROM sessions WHERE id = $1::uuid LIMIT 1`,
+      `SELECT "therapistProfileId" AS therapist_profile_id,
+              "patientProfileId" AS patient_profile_id
+         FROM "therapy_sessions"
+        WHERE "id" = $1
+        LIMIT 1`,
       sessionId,
     );
-    const { therapist_id, patient_id } = sessionRows[0];
+    const { therapist_profile_id, patient_profile_id } = sessionRows[0];
 
-    const monitoringId = await initSessionMonitoring(sessionId, therapist_id, patient_id);
+    const monitoringId = await initSessionMonitoring(sessionId, therapist_profile_id, patient_profile_id);
     res.status(201).json({ monitoringId });
   } catch (err) {
     next(err);

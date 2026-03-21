@@ -19,7 +19,6 @@ import { isOnboardingRequiredError, patientApi } from '../../api/patient';
 import type { ActiveCbtAssignment } from '../../api/patient';
 import { DashboardSkeletons } from '../../components/ui/Skeleton';
 import DashboardCard from '../../components/ui/DashboardCard';
-import { useTherapyData } from '../../hooks/useTherapyData';
 
 const moodEmojiMap: Record<number, string> = {
   1: '😢',
@@ -61,40 +60,13 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeAssignments, setActiveAssignments] = useState<ActiveCbtAssignment[]>([]);
 
-  // Use shared therapy data hook for streak synchronization
-  const { streak } = useTherapyData();
-
   const fetchDashboardData = async () => {
     const dashboardRes = await patientApi.getDashboardV2();
     const dashboardData = dashboardRes?.data ?? dashboardRes;
 
-    // Wellness should be driven by daily check-ins/mood stats, not defaults.
-    // For users without any check-ins, show 0.
-    let finalDashboard = dashboardData || null;
-    try {
-      const statsResp = await patientApi.getMoodStats();
-      const stats = statsResp?.data ?? statsResp;
-      const totalCheckins = Number(stats?.totalCheckins ?? 0);
-      const avgMood = Number(stats?.last7DaysAverage ?? stats?.averageMood ?? 0);
-
-      let wellness = 0;
-      if (totalCheckins > 0 && Number.isFinite(avgMood) && avgMood > 0) {
-        // Map 1-5 mood scale to 0-100 wellness score.
-        wellness = Math.max(0, Math.min(100, Math.round((avgMood / 5) * 100)));
-      }
-
-      if (finalDashboard) {
-        finalDashboard = { ...(finalDashboard as any), wellnessScore: wellness };
-      }
-    } catch (err) {
-      // If stats endpoint fails, keep backend value but avoid placeholder defaults.
-      const reported = Number((dashboardData as any)?.wellnessScore);
-      const safeWellness = Number.isFinite(reported) && reported !== 48 ? reported : 0;
-      if (finalDashboard) {
-        finalDashboard = { ...(finalDashboard as any), wellnessScore: safeWellness };
-      }
-    }
-
+    // Use the dashboard data as-is. The API correctly calculates
+    // wellness and streak based on mood entries and therapy sessions.
+    const finalDashboard = dashboardData || null;
     setDashboard(finalDashboard);
 
     const todayStr = localDateKey();
@@ -352,7 +324,7 @@ export default function DashboardPage() {
               <div>
                 <p className="text-xs uppercase tracking-wider text-charcoal/50 font-semibold mb-1">Streak</p>
                 <p className="text-3xl font-display font-bold text-charcoal flex items-center gap-2">
-                  <span className="text-warm-terracotta">🔥</span> {streak}
+                  <span className="text-warm-terracotta">🔥</span> {dashboard?.streak ?? 0}
                 </p>
                 <p className="text-xs text-ink-400 mt-1">Days active</p>
               </div>

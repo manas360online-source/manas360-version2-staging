@@ -42,7 +42,7 @@ export const putMyTherapistStructuredSessionNoteController = async (req: Request
 };
 
 export const postGenerateAiSessionNoteController = async (req: Request, res: Response): Promise<void> => {
-  const sessionId = String(req.params.sessionId || '').trim();
+  const sessionId = String(req.params.sessionId || req.params.id || '').trim();
   if (!sessionId) throw new AppError('sessionId is required', 400);
 
   const data = await generateTherapistAiSessionNote(authUserId(req), sessionId);

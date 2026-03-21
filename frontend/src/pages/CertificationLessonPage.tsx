@@ -1,23 +1,56 @@
+import React, { useRef, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useEnrollmentStore } from "../store/CertificationEnrollmentStore";
+import { getModulesByCertification } from "../utils/certificationLessonUtils";
+import { useCertificationProgress } from "../store/useCertificationProgress";
 
 export const CertificationLessonPage: React.FC = () => {
   const { lessonId } = useParams<{ lessonId: string }>();
   const navigate = useNavigate();
+  const videoRef = useRef<HTMLVideoElement>(null);
 
+  // ── Resolve enrollmentId from URL state or store ──────────────────────────
+  // The modules page navigates here as: navigate(`/certifications/lessons/${moduleId}`)
+  // We need the enrollmentId to call markModuleComplete.
+  // Best practice: pass it via router state. If not available, fall back to
+  // searching enrollments for a match.
+  const { enrollments } = useEnrollmentStore();
+  const { markModuleComplete } = useCertificationProgress();
+
+  // Try to get enrollmentId from router location state (set by modules page)
+  // If not present we find the enrollment whose module list includes this lessonId
+  const enrollmentId = useMemo(() => {
+    // Walk all enrollments and find the one whose module list contains lessonId
+    for (const enrollment of enrollments) {
+      const modules = getModulesByCertification((enrollment as any).certificationName);
+      if (modules.some((m) => m.id === lessonId)) {
+        return (enrollment as any).id as string;
+      }
+    }
+    return null;
+  }, [enrollments, lessonId]);
+
+  const allModuleIds = useMemo(() => {
+    if (!enrollmentId) return [];
+    const enrollment = enrollments.find((e: any) => e.id === enrollmentId);
+    return getModulesByCertification((enrollment as any)?.certificationName).map((m) => m.id);
+  }, [enrollmentId, enrollments]);
+
+  // ── Video completion handler ──────────────────────────────────────────────
+  const handleVideoEnded = useCallback(() => {
+    if (!enrollmentId || !lessonId) return;
+    markModuleComplete(enrollmentId, lessonId, allModuleIds);
+  }, [enrollmentId, lessonId, allModuleIds, markModuleComplete]);
+
+  // ── Helpers (unchanged from original) ────────────────────────────────────
   const isOpeningSession = lessonId === "ATMT-OPENING";
-  
-  const getLessonTitle = () => {
-    if (lessonId?.startsWith("ATMT-E")) {
-      return lessonId.replace("ATMT-E", "Executive Module ");
-    }
-    if (lessonId?.startsWith("ATMT-MD")) {
-      return lessonId.replace("ATMT-MD", "MD Module ");
-    }
-    if (lessonId?.startsWith("ATMT-C")) {
-      return lessonId.replace("ATMT-C", "NLP Module ");
-    }
 
-    switch(lessonId) {
+  const getLessonTitle = () => {
+    if (lessonId?.startsWith("ATMT-E")) return lessonId.replace("ATMT-E", "Executive Module ");
+    if (lessonId?.startsWith("ATMT-MD")) return lessonId.replace("ATMT-MD", "MD Module ");
+    if (lessonId?.startsWith("ATMT-C")) return lessonId.replace("ATMT-C", "NLP Module ");
+
+    switch (lessonId) {
       case "ATMT-OPENING": return "Opening Session";
       case "ATMT-1": return "Onboarding Module 1";
       case "ATMT-2": return "Module 2";
@@ -42,23 +75,20 @@ export const CertificationLessonPage: React.FC = () => {
       if (lessonId === "ATMT-E1") return "/ATMT-E1_Aatman_Engineering.pptx.mp4";
       return `/${lessonId}-Executive.mp4`;
     }
-    if (lessonId?.startsWith("ATMT-MD")) {
-      return `/${lessonId}-Psychiatrist.mp4`;
-    }
-    
-    // Explicit mapping for Behavioral Science NLP modules
-    switch(lessonId) {
+    if (lessonId?.startsWith("ATMT-MD")) return `/${lessonId}-Psychiatrist.mp4`;
+
+    switch (lessonId) {
       case "ATMT-C1.1": return "/ATMT-C1.1-Behavioral Science NLP.mp4";
-      case "ATMT-C1.2": return "/ATMT-C1.2--Behavioral Science NLP.mp4"; // note double dash
+      case "ATMT-C1.2": return "/ATMT-C1.2--Behavioral Science NLP.mp4";
       case "ATMT-C1.3": return "/ATMT-C1.3-Behavioral Science NLP.mp4";
       case "ATMT-C2.1": return "/ATMT-C2.1-Behavioral Science NLP.mp4";
       case "ATMT-C2.2": return "/ATMT-C2.2-Behavioral Science NLP.mp4";
-      case "ATMT-C4":   return "/ATMT-C4-Integrated_Meta_NAC_Protocol.mp4";
+      case "ATMT-C4": return "/ATMT-C4-Integrated_Meta_NAC_Protocol.mp4";
       case "ATMT-C5.1": return "/ATMT-C5.1-Behavioral Science NLP.mp4";
       case "ATMT-C5.2": return "/ATMT-C5.2-Behavioral Science NLP.mp4";
     }
 
-    switch(lessonId) {
+    switch (lessonId) {
       case "ATMT-OPENING": return "/ATMT-OPENING.mp4";
       case "ATMT-1": return "/ATMT1-5WHYs.mp4";
       case "ATMT-2": return "/ATMT2-5WHYs.mp4";
@@ -70,7 +100,7 @@ export const CertificationLessonPage: React.FC = () => {
       case "ATMT-P5.1": return "/ATMT-P5.1-Psychologist.mp4";
       case "ATMT-P5.2": return "/ATMT-P5.2-Psychologist.mp4";
       case "ATMT-P5.3": return "/ATMT-P5.3-Psychologist.mp4";
-      case "ATMT-P5.4": return "/ATMT-P5.4--Psychologist.mp4"; // Note the double dash
+      case "ATMT-P5.4": return "/ATMT-P5.4--Psychologist.mp4";
       case "ATMT-ASHA": return "/MANAS360_ASHA_Training_Virtual.pptx.mp4";
       default: return `/${lessonId}.mp4`;
     }
@@ -79,7 +109,7 @@ export const CertificationLessonPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-800 p-6 font-sans pb-20">
       <div className="max-w-4xl mx-auto">
-        
+
         {/* Top Navigation */}
         <div className="mb-6 flex items-center justify-between">
           <button
@@ -98,27 +128,26 @@ export const CertificationLessonPage: React.FC = () => {
           {currentTitle}
         </h1>
 
-        {/* Native HTML5 Video Player to bypass Google Drive Login Wall */}
+        {/* Video Player — onEnded triggers module unlock */}
         <div className="bg-black rounded-2xl overflow-hidden shadow-md mb-8 relative aspect-video w-full">
-          <video 
+          <video
+            ref={videoRef}
             key={lessonId}
-            controls 
+            controls
             controlsList="nodownload"
             className="absolute top-0 left-0 w-full h-full object-contain"
             preload="auto"
+            onEnded={handleVideoEnded}
           >
-            <source 
-              src={getVideoSrc()}   
-              type="video/mp4" 
-            />
+            <source src={getVideoSrc()} type="video/mp4" />
             Your browser does not support the video tag.
           </video>
         </div>
 
-        {/* Content Section - Split into Notes and Resources */}
+        {/* Content Section */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-          
-          {/* Lesson Notes (Takes up 2/3 width on desktop) */}
+
+          {/* Lesson Notes */}
           <div className="md:col-span-2 bg-white rounded-2xl p-6 shadow-sm border-l-[6px] border-emerald-500">
             <h2 className="text-lg font-bold text-slate-900 mb-4 font-serif flex items-center gap-2">
               📝 Lesson Notes
@@ -143,51 +172,39 @@ export const CertificationLessonPage: React.FC = () => {
                 <>
                   <li className="flex items-start gap-3">
                     <span className="text-emerald-500 mt-0.5 text-lg">•</span>
-                    The 5-Why technique uncovers root emotional triggers rather than
-                    surface-level complaints.
+                    The 5-Why technique uncovers root emotional triggers rather than surface-level complaints.
                   </li>
                   <li className="flex items-start gap-3">
                     <span className="text-emerald-500 mt-0.5 text-lg">•</span>
-                    Never ask "why" judgmentally — use a curious, open tone to avoid
-                    making the patient defensive.
+                    Never ask "why" judgmentally — use a curious, open tone to avoid making the patient defensive.
                   </li>
                   <li className="flex items-start gap-3">
                     <span className="text-emerald-500 mt-0.5 text-lg">•</span>
-                    Pause 3-5 seconds after each answer before asking the next "why"
-                    to allow the patient time to process their emotions.
+                    Pause 3-5 seconds after each answer before asking the next "why" to allow the patient time to process.
                   </li>
                 </>
               )}
             </ul>
           </div>
 
-          {/* Downloadable Resources (Takes up 1/3 width on desktop) */}
+          {/* Downloadable Resources */}
           <div className="bg-white rounded-2xl p-6 shadow-sm border-l-[6px] border-blue-500">
             <h2 className="text-lg font-bold text-slate-900 mb-4 font-serif flex items-center gap-2">
               📎 Resources
             </h2>
             <ul className="space-y-4 text-sm font-medium">
               <li>
-                <a
-                  href="#"
-                  className="flex items-center gap-2 text-blue-600 hover:text-blue-800 hover:underline transition-colors"
-                >
+                <a href="#" className="flex items-center gap-2 text-blue-600 hover:text-blue-800 hover:underline transition-colors">
                   📄 5-Why Worksheet (PDF)
                 </a>
               </li>
               <li>
-                <a
-                  href="#"
-                  className="flex items-center gap-2 text-blue-600 hover:text-blue-800 hover:underline transition-colors"
-                >
+                <a href="#" className="flex items-center gap-2 text-blue-600 hover:text-blue-800 hover:underline transition-colors">
                   📑 Practice Scenarios Deck
                 </a>
               </li>
               <li>
-                <a
-                  href="#"
-                  className="flex items-center gap-2 text-blue-600 hover:text-blue-800 hover:underline transition-colors"
-                >
+                <a href="#" className="flex items-center gap-2 text-blue-600 hover:text-blue-800 hover:underline transition-colors">
                   🗣️ Role-Play Script Guide
                 </a>
               </li>
@@ -200,7 +217,6 @@ export const CertificationLessonPage: React.FC = () => {
           <button className="px-6 py-3 bg-white text-slate-600 border border-slate-200 font-medium text-sm rounded-full hover:bg-slate-50 transition-colors shadow-sm">
             Mark for Review
           </button>
-          
           <button
             onClick={() => navigate(`/certifications/assignments/${lessonId}`)}
             className="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-full transition-all shadow-md transform hover:scale-105"
@@ -208,6 +224,7 @@ export const CertificationLessonPage: React.FC = () => {
             Practice Assignment →
           </button>
         </div>
+
       </div>
     </div>
   );

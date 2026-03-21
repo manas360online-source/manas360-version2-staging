@@ -34,14 +34,27 @@ const parseCorsOrigins = (value) => {
         .map((origin) => origin.trim())
         .filter((origin) => origin.length > 0);
 };
+const parseFrontendUrl = (value, corsOrigins) => {
+    const explicit = String(value ?? '').trim();
+    if (explicit.length > 0) {
+        return explicit.replace(/\/+$/, '');
+    }
+    const firstCors = String(corsOrigins[0] ?? '').trim();
+    if (firstCors.length > 0) {
+        return firstCors.replace(/\/+$/, '');
+    }
+    return 'http://localhost:5173';
+};
 const JWT_ACCESS_FALLBACK = 'change-access-secret';
 const JWT_REFRESH_FALLBACK = 'change-refresh-secret';
+const parsedCorsOrigins = parseCorsOrigins(process.env.CORS_ORIGIN);
 exports.env = Object.freeze({
     nodeEnv: parseNodeEnv(process.env.NODE_ENV),
     isDevelopment: parseNodeEnv(process.env.NODE_ENV) === 'development',
     port: parsePort(process.env.PORT),
     apiPrefix: process.env.API_PREFIX ?? '/api',
-    corsOrigins: parseCorsOrigins(process.env.CORS_ORIGIN),
+    corsOrigins: parsedCorsOrigins,
+    frontendUrl: parseFrontendUrl(process.env.FRONTEND_URL, parsedCorsOrigins),
     databaseUrl: process.env.DATABASE_URL,
     jwtAccessSecret: process.env.JWT_ACCESS_SECRET ?? JWT_ACCESS_FALLBACK,
     jwtRefreshSecret: process.env.JWT_REFRESH_SECRET ?? JWT_REFRESH_FALLBACK,
@@ -84,9 +97,13 @@ exports.env = Object.freeze({
     secretEncryptionKey: process.env.SECRET_ENCRYPTION_KEY ?? undefined,
     allowDevVerificationBypass: parseBoolean(process.env.DEV_VERIFICATION_BYPASS, parseNodeEnv(process.env.NODE_ENV) === 'development'),
     allowDevPaymentBypass: parseBoolean(process.env.DEV_PAYMENT_BYPASS, parseNodeEnv(process.env.NODE_ENV) === 'development'),
+    allowDevPhonePeWebhookProbeBypass: parseBoolean(process.env.PHONEPE_WEBHOOK_PROBE_BYPASS, false),
     freesoundApiKey: process.env.FREESOUND_API_KEY,
 });
 if ((exports.env.nodeEnv === 'production' || exports.env.nodeEnv === 'staging')
     && (exports.env.jwtAccessSecret === JWT_ACCESS_FALLBACK || exports.env.jwtRefreshSecret === JWT_REFRESH_FALLBACK)) {
     throw new Error('JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must be configured for staging/production');
+}
+if ((exports.env.nodeEnv === 'production' || exports.env.nodeEnv === 'staging') && (!process.env.PHONEPE_SALT_KEY || !process.env.PHONEPE_MERCHANT_ID || !process.env.PHONEPE_SALT_INDEX)) {
+    throw new Error('PHONEPE_SALT_KEY, PHONEPE_MERCHANT_ID and PHONEPE_SALT_INDEX must be configured for staging/production');
 }

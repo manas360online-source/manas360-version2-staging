@@ -66,7 +66,7 @@ export const getModulesByCertification = (certName: string | undefined): ModuleD
 
   if (certName === "Certified ASHA Mental Wellness Champion") {
     return [
-      { id: "ATMT-ASHA", title: "ASHA Training", lessons: 1, duration: "60 mins", status: "in_progress", progress: 0 }
+      { id: "ATMT-ASHA", title: "ASHA Training", lessons: 1, duration: "7 mins", status: "in_progress", progress: 0 }
     ];
   }
 
@@ -86,10 +86,10 @@ export const getModulesByCertification = (certName: string | undefined): ModuleD
 export const getNextLessonId = (currentId: string, certName: string | undefined): string | null => {
   const modules = getModulesByCertification(certName);
   const currentIndex = modules.findIndex(m => m.id === currentId);
-  
+
   if (currentIndex !== -1 && currentIndex < modules.length - 1) {
     return modules[currentIndex + 1].id;
   }
-  
+
   return null;
 };

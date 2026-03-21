@@ -95,7 +95,7 @@ export default function MoodTrackerPage() {
   const load = async () => {
     const [todayRes, historyRes, statsRes, therapyPlanRes] = await Promise.all([
       patientApi.getMoodToday(),
-      patientApi.getMoodHistoryV2(),
+      patientApi.getMoodHistory(),
       patientApi.getMoodStats(),
       patientApi.getTherapyPlan().catch(() => null),
     ]);

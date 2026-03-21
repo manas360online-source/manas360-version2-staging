@@ -155,6 +155,27 @@ router.get('/analytics/templates', auth_middleware_1.requireAuth, (0, rbac_middl
  */
 router.get('/analytics/utilization', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, validate_middleware_1.asyncHandler)(admin_analytics_controller_1.getAdminTherapistUtilizationController));
 /**
+ * GET /api/v1/admin/analytics/payments
+ * Query params:
+ *   - days: number (optional, default 30)
+ */
+router.get('/analytics/payments', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('view_analytics'), (0, validate_middleware_1.asyncHandler)(admin_analytics_controller_1.getAdminPaymentReliabilityController));
+/**
+ * POST /api/v1/admin/payments/:paymentId/retry
+ * Manual payment retry endpoint (admin/support tool)
+ *
+ * Resets retry counter and schedules immediate reconciliation
+ * Use when customer updates payment method to trigger re-attempt
+ *
+ * Route params:
+ *   - paymentId: string (financial_payment.id)
+ *
+ * Response: { success: boolean, message: string, payment: { id, status, retryCount, nextRetryAt } }
+ *
+ * Requires: admin role + manage_payments permission
+ */
+router.post('/payments/:paymentId/retry', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('manage_payments'), (0, validate_middleware_1.asyncHandler)(admin_analytics_controller_1.retryPaymentManuallyController));
+/**
  * POST /api/v1/admin/analytics/export
  * Body:
  *   - format: 'csv' | 'pdf'

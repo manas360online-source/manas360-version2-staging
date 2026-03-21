@@ -316,3 +316,27 @@ export const getAdminSystemHealthController = async (req: Request, res: Response
 	const result = await adminAnalyticsService.getSystemHealthMetrics();
 	sendSuccess(res, result, 'Admin system health fetched successfully');
 };
+
+export const getAdminPaymentReliabilityController = async (req: Request, res: Response): Promise<void> => {
+	const days = typeof req.query.days === 'string' ? Number(req.query.days) : undefined;
+	const result = await adminAnalyticsService.getPaymentReliabilityMetrics(days);
+	sendSuccess(res, result, 'Admin payment reliability metrics fetched successfully');
+};
+
+export const retryPaymentManuallyController = async (req: Request, res: Response): Promise<void> => {
+	const paymentId = typeof req.params.paymentId === 'string' ? req.params.paymentId.trim() : '';
+	const adminUserId = req.auth?.userId;
+
+	if (!paymentId) {
+		throw new AppError('paymentId is required', 400);
+	}
+
+	if (!adminUserId) {
+		throw new AppError('Authentication required', 401);
+	}
+
+	const { retryPaymentManually } = await import('../services/payment.service');
+	const result = await retryPaymentManually(paymentId, adminUserId);
+
+	sendSuccess(res, result, 'Payment retry scheduled successfully');
+};

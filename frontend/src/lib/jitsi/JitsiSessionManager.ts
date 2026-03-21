@@ -155,6 +155,7 @@ export class JitsiSessionManager {
     this.aiClient = new AIEngineClient({
       url: aiEngineUrl,
       sessionId,
+      monitoringId: this.opts.monitoringId,
       userRole: 'therapist',
     });
 

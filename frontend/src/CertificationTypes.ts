@@ -52,6 +52,8 @@ export interface Enrollment {
   completionPercentage: number;
   modulesCompleted: number;
   nextInstallmentDue?: string;
+  userName?: string;
+  certId?: string;
 }
 
 export interface Lead {

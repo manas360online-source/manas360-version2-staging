@@ -479,6 +479,28 @@ export type AdminSystemHealthMetrics = {
 	expiredSubscriptions: number;
 };
 
+export type AdminPaymentReliabilityDaily = {
+	date: string;
+	total: number;
+	success: number;
+	failed: number;
+	retryAttempts: number;
+	retrySuccess: number;
+	revenueMinor: number;
+};
+
+export type AdminPaymentReliabilityMetrics = {
+	windowDays: number;
+	totalPayments: number;
+	successRate: number;
+	retrySuccessRate: number;
+	revenueMinor: number;
+	revenueInr: number;
+	failureReasons: Array<{ reason: string; count: number }>;
+	revenuePerPlanMinor: Record<string, number>;
+	daily: AdminPaymentReliabilityDaily[];
+};
+
 export const getAdminRevenueAnalytics = async (): Promise<ApiEnvelope<AdminRevenueAnalytics>> => {
 	return (await client.get<ApiEnvelope<AdminRevenueAnalytics>>('/v1/admin/analytics/revenue')).data;
 };
@@ -497,4 +519,8 @@ export const getAdminMarketplaceMetrics = async (): Promise<ApiEnvelope<AdminMar
 
 export const getAdminSystemHealth = async (): Promise<ApiEnvelope<AdminSystemHealthMetrics>> => {
 	return (await client.get<ApiEnvelope<AdminSystemHealthMetrics>>('/v1/admin/analytics/health')).data;
+};
+
+export const getAdminPaymentReliabilityMetrics = async (days = 30): Promise<ApiEnvelope<AdminPaymentReliabilityMetrics>> => {
+	return (await client.get<ApiEnvelope<AdminPaymentReliabilityMetrics>>(`/v1/admin/analytics/payments?days=${encodeURIComponent(String(days))}`)).data;
 };

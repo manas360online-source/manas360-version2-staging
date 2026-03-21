@@ -82,7 +82,7 @@ export const Header: React.FC = () => {
 
           <div className="flex items-center gap-2 sm:gap-3">
             <Link
-              to="/subscribe"
+              to="/patient/pricing"
               className="hidden rounded-full px-4 py-2 text-xs font-medium tracking-wide text-cream/75 transition-all duration-300 hover:text-cream sm:inline-flex md:text-sm"
             >
               Subscribe

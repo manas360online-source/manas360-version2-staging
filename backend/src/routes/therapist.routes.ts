@@ -97,7 +97,7 @@ router.get('/me/patients', requireAuth, requireTherapistRole, asyncHandler(getMy
 router.get('/me/notes', requireAuth, requireTherapistRole, asyncHandler(getMyTherapistSessionNotesController));
 router.get('/me/session-notes', requireAuth, requireTherapistRole, asyncHandler(getMyTherapistStructuredSessionNotesController));
 router.put('/me/session-notes/:sessionId', requireAuth, requireTherapistRole, asyncHandler(putMyTherapistStructuredSessionNoteController));
-router.post('/session/:sessionId/generate-ai-note', requireAuth, requireTherapistRole, ...validateSessionIdParam, asyncHandler(postGenerateAiSessionNoteController));
+router.post('/session/:id/generate-ai-note', requireAuth, requireTherapistRole, ...validateSessionIdParam, asyncHandler(postGenerateAiSessionNoteController));
 
 router.get('/me/exercises', requireAuth, requireTherapistRole, asyncHandler(getMyTherapistExercisesController));
 router.post('/me/exercises', requireAuth, requireTherapistRole, asyncHandler(postMyTherapistExerciseController));

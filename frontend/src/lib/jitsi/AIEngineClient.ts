@@ -22,6 +22,7 @@ interface AIEngineClientOptions {
   /** Full WebSocket URL, e.g. wss://api.manas360.com/ai-engine */
   url: string;
   sessionId: string;
+  monitoringId?: string;
   userRole: 'therapist' | 'patient';
   /** Reconnect delay in ms (default: 5000) */
   reconnectDelayMs?: number;
@@ -44,6 +45,7 @@ export class AIEngineClient {
     this.opts = {
       reconnectDelayMs: 5000,
       maxReconnects: 0,
+      monitoringId: '',
       ...options,
     };
   }
@@ -109,6 +111,7 @@ export class AIEngineClient {
         this._send({
           type: 'init',
           sessionId: this.opts.sessionId,
+          monitoringId: this.opts.monitoringId,
           userRole: this.opts.userRole,
         });
       };

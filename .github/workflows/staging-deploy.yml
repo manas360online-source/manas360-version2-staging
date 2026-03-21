@@ -17,11 +17,16 @@ concurrency:
 jobs:
   preflight:
     runs-on: ubuntu-latest
+    outputs:
+      lightsail-host: ${{ steps.validate.outputs.lightsail-host }}
+      lightsail-user: ${{ steps.validate.outputs.lightsail-user }}
+      staging-dir: ${{ steps.validate.outputs.staging-dir }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Validate required staging secrets and vars
+        id: validate
         env:
           LIGHTSAIL_HOST: ${{ secrets.LIGHTSAIL_HOST }}
           LIGHTSAIL_USER: ${{ secrets.LIGHTSAIL_USER }}
@@ -49,11 +54,17 @@ jobs:
 
           if [ -z "${STAGING_APP_DIR}" ]; then
             echo "::warning::Repository variable STAGING_APP_DIR is not set. Default '/var/www/manas360' will be used."
+            STAGING_APP_DIR="/var/www/manas360"
           fi
 
           if [ "$missing" -ne 0 ]; then
             exit 1
           fi
+          
+          # Output to job outputs for use in deploy job
+          echo "lightsail-host=${LIGHTSAIL_HOST}" >> $GITHUB_OUTPUT
+          echo "lightsail-user=${LIGHTSAIL_USER}" >> $GITHUB_OUTPUT
+          echo "staging-dir=${STAGING_APP_DIR}" >> $GITHUB_OUTPUT
 
       - name: Validate deploy script syntax
         run: |
@@ -64,6 +75,10 @@ jobs:
   deploy:
     needs: preflight
     runs-on: ubuntu-latest
+    env:
+      LIGHTSAIL_HOST: ${{ secrets.LIGHTSAIL_HOST }}
+      LIGHTSAIL_USER: ${{ secrets.LIGHTSAIL_USER }}
+      LIGHTSAIL_SSH_KEY: ${{ secrets.LIGHTSAIL_SSH_KEY }}
 
     steps:
       - name: Checkout
@@ -89,20 +104,20 @@ jobs:
       - name: Deploy to AWS Lightsail via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.LIGHTSAIL_HOST }}
-          username: ${{ secrets.LIGHTSAIL_USER }}
-          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          host: ${{ env.LIGHTSAIL_HOST }}
+          username: ${{ env.LIGHTSAIL_USER }}
+          key: ${{ env.LIGHTSAIL_SSH_KEY }}
           script: |
             cd /var/www/manas360
-            BRANCH_NAME='${{ github.ref_name }}' ROOT_DIR='${{ vars.STAGING_APP_DIR || '/var/www/manas360' }}' bash ./devops/scripts/deploy.sh
+            BRANCH_NAME='${{ github.ref_name }}' ROOT_DIR='${{ needs.preflight.outputs.staging-dir }}' bash ./devops/scripts/deploy.sh
 
       - name: Seed staging database
         if: ${{ vars.RUN_STAGING_SEED == 'true' }}
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.LIGHTSAIL_HOST }}
-          username: ${{ secrets.LIGHTSAIL_USER }}
-          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          host: ${{ env.LIGHTSAIL_HOST }}
+          username: ${{ env.LIGHTSAIL_USER }}
+          key: ${{ env.LIGHTSAIL_SSH_KEY }}
           script: |
             cd /var/www/manas360
-            ROOT_DIR='${{ vars.STAGING_APP_DIR || '/var/www/manas360' }}' bash ./devops/scripts/seed.sh
+            ROOT_DIR='${{ needs.preflight.outputs.staging-dir }}' bash ./devops/scripts/seed.sh

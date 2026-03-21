@@ -5,7 +5,8 @@ import { AppError } from '../middleware/error.middleware';
 import { transcribeSession } from './aiService';
 
 const LOCAL_AUDIO_PREFIX = 'local://';
-const OPENAI_CHAT_COMPLETIONS_API_URL = 'https://api.openai.com/v1/chat/completions';
+const CLAUDE_MESSAGES_API_URL = 'https://api.anthropic.com/v1/messages';
+const CLAUDE_MODEL = String(process.env.CLAUDE_MODEL || process.env.CLAUDE_SONNET_MODEL || 'claude-3-5-sonnet-20241022').trim();
 
 export type ClinicalSummaryResult = {
   moodSentiment: {
@@ -32,7 +33,7 @@ const normalizeScore = (value: unknown): number => {
 const extractStrictJson = (rawText: string): string => {
   const text = String(rawText || '').trim();
   if (!text) {
-    throw new AppError('Empty response from GPT-4o clinical summary', 502);
+    throw new AppError('Empty response from Claude clinical summary', 502);
   }
 
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
@@ -41,7 +42,7 @@ const extractStrictJson = (rawText: string): string => {
   const firstBrace = candidate.indexOf('{');
   const lastBrace = candidate.lastIndexOf('}');
   if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
-    throw new AppError('GPT-4o response is not valid JSON', 502);
+    throw new AppError('Claude response is not valid JSON', 502);
   }
 
   return candidate.slice(firstBrace, lastBrace + 1);
@@ -53,26 +54,27 @@ export const generateSummary = async (transcript: string): Promise<ClinicalSumma
     throw new AppError('Transcript is required for clinical summary generation', 400);
   }
 
-  const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
+  const apiKey = String(process.env.CLAUDE_API_KEY || process.env.ANTHROPIC_API_KEY || '').trim();
   if (!apiKey) {
-    throw new AppError('OPENAI_API_KEY is not configured', 500);
+    throw new AppError('CLAUDE_API_KEY (or ANTHROPIC_API_KEY) is not configured', 500);
   }
 
   const systemPrompt =
     "You are a Clinical AI Scribe specialized in Mental Health. Analyze the following transcript between a provider and a patient.\n\n### TASK 1: MOOD & SENTIMENT ANALYSIS\n- Detect: Primary emotional state (e.g., Anxious, Depressed, Guarded).\n- Intensity: Provide a score from 1-10 for 'Emotional Volatility' and 'Anxiety Level'.\n- Keywords: Extract 3-5 clinical keywords that describe the patient's state (e.g., \"Flat affect\", \"Rapid speech\").\n\n### TASK 2: STRUCTURED SOAP NOTE\n- Subjective: Summarize the patient’s reported concerns, symptoms, and feelings.\n- Objective: Identify observable behaviors or patterns mentioned.\n- Assessment: Draft a clinical impression based on the conversation.\n- Plan: List all treatment steps, homework, or next-session goals mentioned.\n\n### TASK 3: ACTION ITEMS\n- Extract any specific goals (e.g., \"Walk for 10 minutes\") to be converted into tasks.\n\nReturn the result as a strictly valid JSON object.";
 
-  const response = await fetch(OPENAI_CHAT_COMPLETIONS_API_URL, {
+  const response = await fetch(CLAUDE_MESSAGES_API_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'gpt-4o',
+      model: CLAUDE_MODEL,
+      max_tokens: 1200,
       temperature: 0.2,
-      response_format: { type: 'json_object' },
+      system: systemPrompt,
       messages: [
-        { role: 'system', content: systemPrompt },
         {
           role: 'user',
           content:
@@ -84,14 +86,20 @@ export const generateSummary = async (transcript: string): Promise<ClinicalSumma
 
   if (!response.ok) {
     const bodyText = await response.text();
-    throw new AppError(`GPT-4o summary generation failed (${response.status}): ${bodyText.slice(0, 300)}`, 502);
+    throw new AppError(`Claude summary generation failed (${response.status}): ${bodyText.slice(0, 300)}`, 502);
   }
 
   const body = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
+    content?: Array<{ type?: string; text?: string }>;
   };
 
-  const modelText = String(body?.choices?.[0]?.message?.content || '').trim();
+  const modelText = (Array.isArray(body?.content)
+    ? body.content
+        .filter((item) => String(item?.type || '').toLowerCase() === 'text')
+        .map((item) => String(item?.text || ''))
+        .join('\n')
+    : '').trim();
+
   const parsed = JSON.parse(extractStrictJson(modelText)) as Partial<ClinicalSummaryResult>;
 
   const keywords = Array.isArray(parsed.moodSentiment?.keywords)

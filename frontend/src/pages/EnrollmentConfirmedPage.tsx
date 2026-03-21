@@ -1,11 +1,41 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useEnrollmentStore } from '../store/CertificationEnrollmentStore';
+import { Enrollment } from '../CertificationTypes';
 
 const EnrollmentConfirmedPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { addEnrollment, enrollments } = useEnrollmentStore();
+
   const certName = (location.state as any)?.certName || 'Certification Program';
   const enrollmentId = (location.state as any)?.enrollmentId || `ENR-${Date.now()}`;
+  const fullName = (location.state as any)?.fullName;
+  const slug = (location.state as any)?.slug || certName.toLowerCase().replace(/ /g, '-');
+
+  // Register enrollment in store if not already present
+  React.useEffect(() => {
+    if (!enrollments.find((e: Enrollment) => e.id === enrollmentId)) {
+      const newEnrollment: Enrollment = {
+        id: enrollmentId,
+        certificationId: slug || 'cert-free',
+        certificationName: certName,
+        slug,
+        badgeColor: 'blue',
+        enrollmentDate: new Date().toISOString().split('T')[0],
+        paymentStatus: 'Paid',
+        paymentPlan: 'full',
+        amountPaid: 0,
+        totalAmount: 0,
+        installmentsPaidCount: 1,
+        completionPercentage: 0,
+        modulesCompleted: 0,
+        userName: fullName,
+        certId: Math.random().toString(36).substring(2, 8).toUpperCase(),
+      };
+      addEnrollment(newEnrollment);
+    }
+  }, [enrollmentId, enrollments, addEnrollment, certName, slug, fullName]);
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-12">
@@ -59,13 +89,15 @@ const EnrollmentConfirmedPage: React.FC = () => {
 
         {/* Buttons */}
         <button
-          onClick={() => navigate('/journey-wireframe')}
+          onClick={() => navigate(`/certifications/modules/${enrollmentId}`)}
           className="w-full bg-gradient-to-r from-teal-500 to-purple-600 text-white font-bold py-3.5 rounded-xl shadow-md hover:shadow-lg hover:scale-[1.02] transition-all text-sm mb-3"
         >
           Start Module 1 →
         </button>
+
+        {/* ── Fixed: use navigate() instead of window.location.hash ── */}
         <button
-          onClick={() => window.location.hash = '#/my-certifications'}
+          onClick={() => navigate('/my-certifications')}
           className="w-full border-2 border-slate-800 text-slate-800 bg-white font-bold py-3.5 rounded-xl shadow-md hover:bg-slate-800 hover:text-white hover:shadow-lg hover:scale-[1.02] active:scale-[0.97] transition-all duration-200 text-sm"
         >
           View My Certifications

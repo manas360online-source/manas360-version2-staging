@@ -16,6 +16,16 @@ const patientSeeds = [
   { email: 'patient1@manas360.local', firstName: 'Priya', lastName: 'Kumar' },
   { email: 'patient2@manas360.local', firstName: 'Asha', lastName: 'Nair' },
   { email: 'patient3@manas360.local', firstName: 'Rohan', lastName: 'Mehta' },
+  { email: 'patient4@manas360.local', firstName: 'Zara', lastName: 'Singh' },
+  { email: 'patient5@manas360.local', firstName: 'Aditya', lastName: 'Verma' },
+  { email: 'patient6@manas360.local', firstName: 'Sneha', lastName: 'Gupta' },
+  { email: 'patient7@manas360.local', firstName: 'Arjun', lastName: 'Patel' },
+  { email: 'patient8@manas360.local', firstName: 'Divya', lastName: 'Iyer' },
+  { email: 'patient9@manas360.local', firstName: 'Karan', lastName: 'Malhotra' },
+  { email: 'patient10@manas360.local', firstName: 'Sophia', lastName: 'Deshmukh' },
+  { email: 'patient11@manas360.local', firstName: 'Nikhil', lastName: 'Chandra' },
+  { email: 'patient12@manas360.local', firstName: 'Anjali', lastName: 'Reddy' },
+  { email: 'patient13@manas360.local', firstName: 'Vipul', lastName: 'Sharma' },
 ];
 
 const therapistSeeds = [

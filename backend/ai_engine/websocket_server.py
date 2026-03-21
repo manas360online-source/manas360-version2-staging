@@ -43,6 +43,7 @@ from datetime import datetime
 from typing import Optional
 
 import numpy as np
+import aiohttp
 import websockets
 from dotenv import load_dotenv
 
@@ -64,6 +65,8 @@ logger = logging.getLogger('ai_engine')
 # ---------------------------------------------------------------------------
 HOST = os.getenv('AI_ENGINE_HOST', '0.0.0.0')
 PORT = int(os.getenv('AI_ENGINE_PORT', '8765'))
+NODE_API_URL = os.getenv('NODE_API_URL', 'http://localhost:3000/api')
+AI_ENGINE_SECRET = os.getenv('AI_ENGINE_SECRET', '')
 
 # Audio chunk buffer flush interval (seconds)
 AUDIO_FLUSH_INTERVAL = 1.0
@@ -83,6 +86,31 @@ SAMPLE_RATE = 16000  # Hz expected from client
 #   'patient_ws': websocket | None,
 # }
 sessions: dict[str, dict] = {}
+
+
+async def push_to_node(session_id: str, monitoring_id: str, payload: dict) -> None:
+    """Forward GPS updates/crisis alerts to Node API for persistence + socket relay."""
+    if not monitoring_id:
+        return
+
+    url = NODE_API_URL.rstrip('/') + '/v1/gps/internal/push'
+    body = {
+        'sessionId': session_id,
+        'monitoringId': monitoring_id,
+        'type': payload.get('type'),
+        'data': payload.get('metrics') if payload.get('type') == 'gps_update' else payload.get('alert'),
+    }
+    headers = {'Content-Type': 'application/json'}
+    if AI_ENGINE_SECRET:
+        headers['x-ai-engine-secret'] = AI_ENGINE_SECRET
+
+    try:
+        async with aiohttp.ClientSession() as client:
+            async with client.post(url, json=body, headers=headers, timeout=4) as resp:
+                if resp.status >= 300:
+                    logger.warning('[%s] internal push failed: status=%s', session_id, resp.status)
+    except Exception as exc:
+        logger.warning('[%s] internal push error: %s', session_id, exc)
 
 # ---------------------------------------------------------------------------
 # Per-session processor
@@ -275,6 +303,7 @@ async def handle_connection(websocket: websockets.WebSocketServerProtocol) -> No
             if msg_type == 'init':
                 session_id = str(data.get('sessionId', ''))
                 user_role = str(data.get('userRole', 'patient'))
+                monitoring_id = str(data.get('monitoringId', '') or '')
 
                 if not session_id:
                     await websocket.send(json.dumps({'type': 'error', 'message': 'sessionId required'}))
@@ -289,6 +318,7 @@ async def handle_connection(websocket: websockets.WebSocketServerProtocol) -> No
 
                 if user_role == 'therapist':
                     sessions[session_id]['therapist_ws'] = websocket
+                    sessions[session_id]['monitoring_id'] = monitoring_id
                 else:
                     sessions[session_id]['patient_ws'] = websocket
 
@@ -311,6 +341,9 @@ async def handle_connection(websocket: websockets.WebSocketServerProtocol) -> No
                 result = await processor.process_audio_chunk(audio_b64)
 
                 if result:
+                    monitoring_id = str(sessions[session_id].get('monitoring_id') or '')
+                    await push_to_node(session_id, monitoring_id, result)
+
                     # Send ONLY to therapist WebSocket
                     therapist_ws = sessions[session_id].get('therapist_ws')
                     if therapist_ws and therapist_ws.open:

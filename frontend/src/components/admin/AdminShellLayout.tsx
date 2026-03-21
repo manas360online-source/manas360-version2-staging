@@ -19,6 +19,7 @@ const navItems: NavItem[] = [
 	{ to: '/admin/templates', label: 'Template Management', shortLabel: 'TM', section: 'OPERATIONS' },
 	{ to: '/admin/crisis-alerts', label: 'Crisis Alerts', shortLabel: 'CA', section: 'OPERATIONS' },
 	{ to: '/admin/revenue', label: 'Revenue', shortLabel: 'Re', section: 'FINANCE' },
+	{ to: '/admin/payment-reliability', label: 'Payment Reliability', shortLabel: 'PR', section: 'FINANCE' },
 	{ to: '/admin/pricing-management', label: 'Pricing Management', shortLabel: 'PM', section: 'FINANCE' },
 	{ to: '/admin/payouts', label: 'Payouts', shortLabel: 'Po', section: 'FINANCE' },
 	{ to: '/admin/invoices', label: 'Invoices', shortLabel: 'In', section: 'FINANCE' },
