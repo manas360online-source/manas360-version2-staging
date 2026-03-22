@@ -115,14 +115,21 @@ jobs:
             git fetch origin
             git reset --hard origin/${{ github.ref_name }}
 
-            echo "Stopping containers cleanly..."
-            docker-compose down --remove-orphans
+            echo "Stopping containers cleanly (staging project)..."
+            docker-compose -p manas360-version2-staging down -v --remove-orphans || true
+
+            echo "Force remove stale service containers if still exist..."
+            docker rm -f manas360-version2-staging_backend_1 manas360-version2-staging_redis_1 manas360-version2-staging_db_1 || true
+
+            echo "Force remove compose-managed stale services..."
+            docker-compose -p manas360-version2-staging rm -f -s -v || true
 
             echo "Cleaning leftover containers..."
-            docker container prune -f
+            docker system prune -af || true
+            docker volume prune -f || true
 
             echo "Starting fresh containers..."
-            docker-compose up -d --build
+            docker compose -p manas360-version2-staging up -d --build
 
             echo "Waiting for backend health..."
             until curl -f http://localhost:5000/health > /dev/null 2>&1; do
