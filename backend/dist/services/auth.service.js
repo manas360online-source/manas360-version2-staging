@@ -9,6 +9,7 @@ const db_1 = require("../config/db");
 const error_middleware_1 = require("../middleware/error.middleware");
 const hash_1 = require("../utils/hash");
 const jwt_1 = require("../utils/jwt");
+const logger_1 = require("../utils/logger");
 const googleClient = new google_auth_library_1.OAuth2Client(env_1.env.googleClientId);
 const db = db_1.prisma;
 const nowPlusMinutes = (minutes) => new Date(Date.now() + minutes * 60 * 1000);
@@ -86,18 +87,28 @@ const getSupportedUserRoles = async () => {
     return supportedUserRolesCache;
 };
 const audit = async (event, status, meta, context = {}) => {
-    await db.authAuditLog.create({
-        data: {
+    try {
+        await db.authAuditLog.create({
+            data: {
+                event,
+                status,
+                ipAddress: meta.ipAddress,
+                userAgent: meta.userAgent,
+                ...(context.userId ? { userId: String(context.userId) } : {}),
+                email: typeof context.email === 'string' ? context.email : null,
+                phone: typeof context.phone === 'string' ? context.phone : null,
+                metadata: context,
+            },
+        });
+    }
+    catch (error) {
+        // Auth flows must not fail when audit persistence is unavailable.
+        logger_1.logger.warn('[AuthService] Audit write failed', {
             event,
             status,
-            ipAddress: meta.ipAddress,
-            userAgent: meta.userAgent,
-            ...(context.userId ? { userId: String(context.userId) } : {}),
-            email: typeof context.email === 'string' ? context.email : null,
-            phone: typeof context.phone === 'string' ? context.phone : null,
-            metadata: context,
-        },
-    });
+            error: error?.message || 'unknown_error',
+        });
+    }
 };
 const issueSessionTokens = async (userId, meta) => {
     const createdSession = await db.authSession.create({

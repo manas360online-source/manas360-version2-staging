@@ -276,7 +276,7 @@ const processPhonePeWebhook = async (decoded) => {
                 return { handled: true, message: 'Patient subscription already processed' };
             }
             const { reactivatePatientSubscription } = await Promise.resolve().then(() => __importStar(require('./patient-v1.service')));
-            const activated = await reactivatePatientSubscription(userId, merchantTransactionId);
+            const activated = await reactivatePatientSubscription(userId, merchantTransactionId, String(planKey || ''));
             if (payment?.id) {
                 await db.financialPayment.update({
                     where: { id: payment.id },
