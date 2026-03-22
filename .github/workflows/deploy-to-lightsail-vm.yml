@@ -119,7 +119,19 @@ jobs:
             fi
             # If docker-compose is present, rebuild containers
             if [ -f docker-compose.yml ]; then
-              docker-compose pull || true
-              docker-compose up -d --build
+              which docker-compose || true
+              docker-compose version || true
+              which docker || true
+              docker compose version || true
+
+              if command -v docker-compose >/dev/null 2>&1; then
+                DC="docker-compose"
+              else
+                DC="docker compose"
+              fi
+
+              echo "Using compose command: ${DC}"
+              $DC pull || true
+              $DC up -d --build
             fi
           REMOTE_SCRIPT

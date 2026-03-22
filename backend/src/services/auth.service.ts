@@ -13,6 +13,7 @@ import {
 	verifyPassword,
 } from '../utils/hash';
 import { createTokenPair, verifyRefreshToken } from '../utils/jwt';
+import { logger } from '../utils/logger';
 import type {
 	GoogleLoginInput,
 	LoginInput,
@@ -133,18 +134,27 @@ const audit = async (
 	meta: RequestMeta,
 	context: Record<string, unknown> = {},
 ): Promise<void> => {
-	await db.authAuditLog.create({
-		data: {
-		event,
-		status,
-		ipAddress: meta.ipAddress,
-		userAgent: meta.userAgent,
-			...(context.userId ? { userId: String(context.userId) } : {}),
-			email: typeof context.email === 'string' ? context.email : null,
-			phone: typeof context.phone === 'string' ? context.phone : null,
-			metadata: context,
-		},
-	});
+	try {
+		await db.authAuditLog.create({
+			data: {
+			event,
+			status,
+			ipAddress: meta.ipAddress,
+			userAgent: meta.userAgent,
+				...(context.userId ? { userId: String(context.userId) } : {}),
+				email: typeof context.email === 'string' ? context.email : null,
+				phone: typeof context.phone === 'string' ? context.phone : null,
+				metadata: context,
+			},
+		});
+	} catch (error: any) {
+		// Auth flows must not fail when audit persistence is unavailable.
+		logger.warn('[AuthService] Audit write failed', {
+			event,
+			status,
+			error: error?.message || 'unknown_error',
+		});
+	}
 };
 
 const issueSessionTokens = async (userId: string, meta: RequestMeta) => {

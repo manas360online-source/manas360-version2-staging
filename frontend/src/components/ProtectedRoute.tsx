@@ -37,6 +37,13 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
 	}
 
 	if (isProviderRole) {
+		const isProductionBuild = import.meta.env.PROD === true || String(import.meta.env.MODE || '').toLowerCase() === 'production';
+		const skipFlagEnabled = (import.meta.env.VITE_SKIP_ONBOARDING || '').toString() === 'true';
+		const skipOnboarding = import.meta.env.DEV === true || (!isProductionBuild && skipFlagEnabled);
+		if (skipOnboarding) {
+			return <>{children}</>;
+		}
+
 		const onboardingStatus = String(user?.onboardingStatus || '').toUpperCase();
 		const onboardingRoute = '/onboarding/provider-setup';
 		const verificationRoute = '/provider/verification-pending';
