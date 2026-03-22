@@ -49,20 +49,40 @@ const resolveCookieDomain = (): string | undefined => {
 	return rawDomain;
 };
 
-const cookieDomain = resolveCookieDomain();
+const configuredCookieDomain = resolveCookieDomain();
+
+const resolveRuntimeCookieDomain = (hostname?: string): string | undefined => {
+	if (configuredCookieDomain) {
+		return configuredCookieDomain;
+	}
+
+	const host = String(hostname || '').split(':')[0].trim().toLowerCase();
+	if (!host) {
+		return undefined;
+	}
+
+	if (env.nodeEnv === 'production' || env.nodeEnv === 'staging') {
+		if (host === 'manas360.com' || host.endsWith('.manas360.com')) {
+			return '.manas360.com';
+		}
+	}
+
+	return undefined;
+};
 
 const shouldUseSecureCookies = env.cookieSecure || (env.nodeEnv !== 'development' && env.nodeEnv !== 'test');
 const cookieSameSite = shouldUseSecureCookies ? 'none' as const : 'lax' as const;
 
-const tokenCookieOptions = {
+const buildTokenCookieOptions = (req: Request) => ({
 	httpOnly: true,
 	secure: shouldUseSecureCookies,
 	sameSite: cookieSameSite,
-	domain: cookieDomain,
+	domain: resolveRuntimeCookieDomain(req.hostname),
 	path: '/',
-};
+});
 
-const setAuthCookies = (res: Response, accessToken: string, refreshToken: string): void => {
+const setAuthCookies = (req: Request, res: Response, accessToken: string, refreshToken: string): void => {
+	const tokenCookieOptions = buildTokenCookieOptions(req);
 	res.cookie('access_token', accessToken, {
 		...tokenCookieOptions,
 		maxAge: 15 * 60 * 1000,
@@ -77,7 +97,7 @@ const setAuthCookies = (res: Response, accessToken: string, refreshToken: string
 		httpOnly: false,
 		secure: shouldUseSecureCookies,
 		sameSite: cookieSameSite,
-		domain: cookieDomain,
+		domain: tokenCookieOptions.domain,
 		path: '/',
 		maxAge: 7 * 24 * 60 * 60 * 1000,
 	});
@@ -263,7 +283,7 @@ export const loginController = async (req: Request, res: Response): Promise<void
 		getRequestMeta(req),
 	);
 
-	setAuthCookies(res, result.accessToken, result.refreshToken);
+	setAuthCookies(req, res, result.accessToken, result.refreshToken);
 	sendSuccess(res, { user: result.user, sessionId: result.sessionId }, 'Login successful');
 };
 
@@ -274,7 +294,7 @@ export const googleLoginController = async (req: Request, res: Response): Promis
 
 	const result = await loginWithGoogle({ idToken: req.body.idToken.trim() }, getRequestMeta(req));
 
-	setAuthCookies(res, result.accessToken, result.refreshToken);
+	setAuthCookies(req, res, result.accessToken, result.refreshToken);
 	sendSuccess(res, { user: result.user, sessionId: result.sessionId }, 'Google login successful');
 };
 
@@ -285,7 +305,7 @@ export const refreshTokenController = async (req: Request, res: Response): Promi
 	}
 
 	const result = await refreshAuthTokens({ refreshToken }, getRequestMeta(req));
-	setAuthCookies(res, result.accessToken, result.refreshToken);
+	setAuthCookies(req, res, result.accessToken, result.refreshToken);
 
 	sendSuccess(res, { sessionId: result.sessionId }, 'Token refreshed');
 };
@@ -347,13 +367,15 @@ export const logoutController = async (req: Request, res: Response): Promise<voi
 
 	await logoutSession(req.auth.sessionId, req.auth.userId, getRequestMeta(req));
 
+	const tokenCookieOptions = buildTokenCookieOptions(req);
+
 	res.clearCookie('access_token', tokenCookieOptions);
 	res.clearCookie(env.refreshCookieName, tokenCookieOptions);
 	res.clearCookie(env.csrfCookieName, {
 		httpOnly: false,
-		secure: env.cookieSecure,
-		sameSite: 'strict',
-		domain: cookieDomain,
+		secure: shouldUseSecureCookies,
+		sameSite: cookieSameSite,
+		domain: tokenCookieOptions.domain,
 		path: '/',
 	});
 
