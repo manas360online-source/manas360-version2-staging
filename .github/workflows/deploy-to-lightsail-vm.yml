@@ -133,5 +133,14 @@ jobs:
               echo "Using compose command: ${DC}"
               $DC pull || true
               $DC up -d --build
+
+              echo "Applying database schema (migrate deploy, fallback to db push for baseline DBs)..."
+              BACKEND_ID="$($DC ps -q backend)"
+              if [ -n "${BACKEND_ID}" ]; then
+                docker exec "${BACKEND_ID}" sh -lc 'npx prisma migrate deploy || npx prisma db push --accept-data-loss'
+              else
+                echo "Backend container not found; cannot apply schema"
+                exit 1
+              fi
             fi
           REMOTE_SCRIPT
