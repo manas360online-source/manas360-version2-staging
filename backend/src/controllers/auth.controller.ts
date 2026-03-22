@@ -51,10 +51,13 @@ const resolveCookieDomain = (): string | undefined => {
 
 const cookieDomain = resolveCookieDomain();
 
+const shouldUseSecureCookies = env.cookieSecure || (env.nodeEnv !== 'development' && env.nodeEnv !== 'test');
+const cookieSameSite = shouldUseSecureCookies ? 'none' as const : 'lax' as const;
+
 const tokenCookieOptions = {
 	httpOnly: true,
-	secure: env.cookieSecure,
-	sameSite: 'none' as const,
+	secure: shouldUseSecureCookies,
+	sameSite: cookieSameSite,
 	domain: cookieDomain,
 	path: '/',
 };
@@ -72,8 +75,8 @@ const setAuthCookies = (res: Response, accessToken: string, refreshToken: string
 
 	res.cookie(env.csrfCookieName, randomBytes(24).toString('hex'), {
 		httpOnly: false,
-		secure: env.cookieSecure,
-		sameSite: 'none',
+		secure: shouldUseSecureCookies,
+		sameSite: cookieSameSite,
 		domain: cookieDomain,
 		path: '/',
 		maxAge: 7 * 24 * 60 * 60 * 1000,
