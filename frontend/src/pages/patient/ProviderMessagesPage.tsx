@@ -49,7 +49,8 @@ type DirectMessage = {
 function getSocketOrigin(): string {
   const envUrl = (import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? '').trim();
   if (envUrl) return envUrl.replace(/\/api\/?$/, '');
-  return `${window.location.protocol}//${window.location.hostname}:3000`;
+  const productionHost = window.location.hostname === 'manas360.com' ? 'www.manas360.com' : window.location.hostname;
+  return `${window.location.protocol}//${productionHost}:3000`;
 }
 
 function relativeTime(dateStr?: string): string {
