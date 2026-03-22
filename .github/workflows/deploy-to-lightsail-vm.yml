@@ -41,15 +41,21 @@ jobs:
           HOST: ${{ secrets.LIGHTSAIL_HOST }}
           REMOTE_DIR: ${{ secrets.REMOTE_APP_DIR }}
           BRANCH_NAME: ${{ github.ref_name }}
+          RUN_STAGING_SEED: ${{ vars.RUN_STAGING_SEED }}
+          STAGING_SEED_COMMAND: ${{ vars.STAGING_SEED_COMMAND }}
         run: |
           if [ -z "$REMOTE_DIR" ]; then REMOTE_DIR="/home/ubuntu/manas360-version2-staging"; fi
           if [ -z "$BRANCH_NAME" ]; then BRANCH_NAME="sync/staging-docker"; fi
+          if [ -z "$RUN_STAGING_SEED" ]; then RUN_STAGING_SEED="false"; fi
+          if [ -z "$STAGING_SEED_COMMAND" ]; then STAGING_SEED_COMMAND="npm run seed:templates"; fi
           echo "Deploying to $SSH_USER@$HOST:$REMOTE_DIR"
           echo "Deploying branch: $BRANCH_NAME"
-          ssh -o StrictHostKeyChecking=no "$SSH_USER@$HOST" "bash -s -- '$REMOTE_DIR' '$BRANCH_NAME'" <<'REMOTE_SCRIPT'
+          ssh -o StrictHostKeyChecking=no "$SSH_USER@$HOST" "bash -s -- '$REMOTE_DIR' '$BRANCH_NAME' '$RUN_STAGING_SEED' '$STAGING_SEED_COMMAND'" <<'REMOTE_SCRIPT'
             set -e
             REMOTE_DIR="$1"
             BRANCH_NAME="$2"
+            RUN_STAGING_SEED="$3"
+            STAGING_SEED_COMMAND="$4"
             if [ -z "$REMOTE_DIR" ]; then
               echo "REMOTE_DIR is empty"
               exit 1
@@ -138,6 +144,12 @@ jobs:
               BACKEND_ID="$($DC ps -q backend)"
               if [ -n "${BACKEND_ID}" ]; then
                 docker exec "${BACKEND_ID}" sh -lc 'npx prisma migrate deploy || npx prisma db push --accept-data-loss'
+                if [ "${RUN_STAGING_SEED:-false}" = "true" ]; then
+                  echo "Running staging seed command: ${STAGING_SEED_COMMAND}"
+                  docker exec "${BACKEND_ID}" sh -lc "${STAGING_SEED_COMMAND}"
+                else
+                  echo "Staging seed skipped (RUN_STAGING_SEED != true)"
+                fi
               else
                 echo "Backend container not found; cannot apply schema"
                 exit 1

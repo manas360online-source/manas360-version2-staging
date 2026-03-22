@@ -79,6 +79,8 @@ jobs:
       EC2_USER: ${{ secrets.EC2_USER }}
       EC2_KEY: ${{ secrets.EC2_KEY }}
       STAGING_APP_DIR: ${{ vars.STAGING_APP_DIR }}
+      RUN_STAGING_SEED: ${{ vars.RUN_STAGING_SEED }}
+      STAGING_SEED_COMMAND: ${{ vars.STAGING_SEED_COMMAND }}
 
     steps:
       - name: Checkout
@@ -152,6 +154,14 @@ jobs:
             else
               echo "Backend container not found; cannot apply schema"
               exit 1
+            fi
+
+            if [ "${RUN_STAGING_SEED:-false}" = "true" ]; then
+              SEED_CMD="${STAGING_SEED_COMMAND:-npm run seed:templates}"
+              echo "Running staging seed command: ${SEED_CMD}"
+              docker exec "${BACKEND_ID}" sh -lc "${SEED_CMD}"
+            else
+              echo "Staging seed skipped (RUN_STAGING_SEED != true)"
             fi
 
             echo "Waiting for backend health..."
