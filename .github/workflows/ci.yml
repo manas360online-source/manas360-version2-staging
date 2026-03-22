@@ -122,26 +122,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy via SSH to EC2
+      - name: Deploy to EC2
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            cd /var/www/manas360 || cd ~/manas360-version2-staging || mkdir -p ~/manas360-version2-staging && cd ~/manas360-version2-staging
-            
-            # Clone or update repo
-            if [ -d .git ]; then
-              git fetch origin
-              git checkout ${{ github.ref_name }}
-              git pull origin ${{ github.ref_name }}
-            else
-              git clone -b ${{ github.ref_name }} https://github.com/manas360online-source/manas360-version2-staging.git .
-            fi
-            
-            # Build and start services
+            cd ~/manas360-version2-staging
+            git pull origin main
             docker-compose down
             docker-compose up -d --build
-            
             echo "✅ Deployment completed on $(date)"
