@@ -125,10 +125,11 @@ jobs:
             docker-compose -p manas360-version2-staging rm -f -s -v || true
 
             echo "Cleaning leftover containers..."
-            docker container prune -f || true
+            docker system prune -af || true
+            docker volume prune -f || true
 
             echo "Starting fresh containers..."
-            docker-compose -p manas360-version2-staging up -d --build
+            docker compose -p manas360-version2-staging up -d --build
 
             echo "Waiting for backend health..."
             until curl -f http://localhost:5000/health > /dev/null 2>&1; do
