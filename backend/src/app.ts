@@ -22,19 +22,31 @@ Sentry.setupExpressErrorHandler(app);
 
 app.disable('x-powered-by');
 app.use(helmet());
+const allowedCorsOrigins = Array.from(new Set([
+	...env.corsOrigins,
+	'https://www.manas360.com',
+	'https://manas360.com',
+	'http://www.manas360.com',
+]));
+
 app.use(cors({
-	origin: [
-		'https://www.manas360.com',
-		'http://localhost:3000',
-	],
+	origin: (origin, callback) => {
+		if (!origin || allowedCorsOrigins.includes(origin)) {
+			return callback(null, true);
+		}
+
+		logger.warn(`Blocked by CORS origin: ${origin}`);
+		return callback(new Error('Not allowed by CORS'), false);
+	},
 	methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
 	allowedHeaders: [
 		'Content-Type',
 		'Authorization',
 		'x-csrf-token',
-		'x-requested-with'
+		'x-requested-with',
 	],
 	credentials: true,
+	optionsSuccessStatus: 204,
 }));
 
 app.options('*', cors());
