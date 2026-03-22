@@ -13,6 +13,27 @@ export default function SignupPage() {
 	const [error, setError] = useState<string | null>(null);
 	const [success, setSuccess] = useState<string | null>(null);
 
+	const continueAfterPatientLogin = async (
+		email: string,
+		password: string,
+		selectedPlan: 'free' | 'monthly' | 'quarterly' | 'premium_monthly' | 'premium_annual',
+	) => {
+		await login(email, password);
+		const subscriptionResponse = await patientApi.upgradeSubscription({ planKey: selectedPlan });
+
+		if (selectedPlan !== 'free') {
+			if (subscriptionResponse?.redirectUrl) {
+				window.location.href = subscriptionResponse.redirectUrl;
+				return;
+			}
+
+			throw new Error('Payment gateway link was not returned. Please retry.');
+		}
+
+		setSuccess('Registration and platform activation successful. Redirecting to care...');
+		navigate('/patient/onboarding?next=/patient/sessions', { replace: true });
+	};
+
 	const onSubmit = async (payload: {
 		name: string;
 		email: string;
@@ -27,27 +48,28 @@ export default function SignupPage() {
 		try {
 			await register(payload.email, payload.password, payload.name, payload.role);
 			if (payload.role === 'patient') {
-				await login(payload.email, payload.password);
 				const selectedPlan = payload.selectedPlan || 'free';
-				const subscriptionResponse = await patientApi.upgradeSubscription({ planKey: selectedPlan });
-
-				if (selectedPlan !== 'free') {
-					if (subscriptionResponse?.redirectUrl) {
-						window.location.href = subscriptionResponse.redirectUrl;
-						return;
-					}
-
-					throw new Error('Payment gateway link was not returned. Please retry.');
-				}
-
-				setSuccess('Registration and platform activation successful. Redirecting to care...');
-				navigate('/patient/onboarding?next=/patient/sessions', { replace: true });
+				await continueAfterPatientLogin(payload.email, payload.password, selectedPlan);
 			} else {
 				const providerSetupRoute = '/onboarding/provider-setup';
 				setSuccess('Registration successful. Verify your email OTP, then continue to provider setup.');
 				navigate(`/auth/login?next=${encodeURIComponent(providerSetupRoute)}`, { replace: true });
 			}
-		} catch (err) {
+		} catch (err: any) {
+			const status = Number(err?.response?.status || 0);
+			const message = String(err?.response?.data?.message || err?.message || '');
+
+			if (payload.role === 'patient' && status === 409 && /email already registered/i.test(message)) {
+				try {
+					const selectedPlan = payload.selectedPlan || 'free';
+					await continueAfterPatientLogin(payload.email, payload.password, selectedPlan);
+					return;
+				} catch (loginErr: any) {
+					setError(getApiErrorMessage(loginErr, 'Email already exists. Please login to continue your subscription.'));
+					return;
+				}
+			}
+
 			setError(getApiErrorMessage(err, 'Registration failed.'));
 		} finally {
 			setLoading(false);
