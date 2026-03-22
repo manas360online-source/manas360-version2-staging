@@ -14,6 +14,13 @@ const normalizeBaseUrl = (url: string): string => {
 	if (normalized.startsWith('https://manas360.com')) {
 		normalized = normalized.replace('https://manas360.com', 'https://www.manas360.com');
 	}
+
+	if (typeof window !== 'undefined' && /^https:\/\/(www\.)?manas360\.com\/api(\/v1)?/i.test(normalized)) {
+		// Keep API calls on the exact same origin that served the app to avoid host-only cookie mismatches.
+		const path = normalized.includes('/api/v1') ? '/api/v1' : '/api';
+		return `${window.location.origin}${path}`;
+	}
+
 	return normalized.replace(/\/+$/, '');
 };
 
