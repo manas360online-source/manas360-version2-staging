@@ -35,7 +35,7 @@ const cookieDomain = resolveCookieDomain();
 const authCookieOptions = {
     httpOnly: true,
     secure: env.cookieSecure,
-        sameSite: 'lax' as const,
+        sameSite: 'none' as const,
     domain: cookieDomain,
     path: '/',
 };
@@ -54,7 +54,7 @@ const setAuthCookies = (res: Response, accessToken: string, refreshToken: string
     res.cookie(env.csrfCookieName, randomBytes(24).toString('hex'), {
         httpOnly: false,
         secure: env.cookieSecure,
-            sameSite: 'lax',
+            sameSite: 'none',
         domain: cookieDomain,
         path: '/',
         maxAge: 7 * 24 * 60 * 60 * 1000,
@@ -77,7 +77,7 @@ export const authorizeController = async (req: Request, res: Response): Promise<
     res.cookie(`sso_state_${tenantKey}`, state, {
         httpOnly: true,
         secure: env.cookieSecure,
-        sameSite: 'lax',
+        sameSite: 'none',
         domain: cookieDomain,
         path: '/',
         maxAge: 5 * 60 * 1000,
@@ -85,7 +85,7 @@ export const authorizeController = async (req: Request, res: Response): Promise<
     res.cookie(`sso_nonce_${tenantKey}`, nonce, {
         httpOnly: true,
         secure: env.cookieSecure,
-        sameSite: 'lax',
+        sameSite: 'none',
         domain: cookieDomain,
         path: '/',
         maxAge: 5 * 60 * 1000,

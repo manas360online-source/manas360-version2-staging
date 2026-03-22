@@ -603,6 +603,11 @@ export const getPatientSubscriptionController = async (req: Request, res: Respon
 };
 
 export const upgradePatientSubscriptionController = async (req: Request, res: Response): Promise<void> => {
+	// ✅ AUTH SAFETY: Explicitly verify user is authenticated
+	if (!req.auth?.userId) {
+		throw new AppError('Authentication required - invalid or missing credentials', 401);
+	}
+
 	const userId = authUserId(req);
 	const { planKey } = req.body;
 
