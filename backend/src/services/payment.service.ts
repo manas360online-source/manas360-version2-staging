@@ -290,7 +290,7 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 			}
 
 			const { reactivatePatientSubscription } = await import('./patient-v1.service');
-			const activated = await reactivatePatientSubscription(userId, merchantTransactionId);
+			const activated = await reactivatePatientSubscription(userId, merchantTransactionId, String(planKey || ''));
 
 			if (payment?.id) {
 				await db.financialPayment.update({

@@ -1011,18 +1011,20 @@ export const cancelPatientSubscription = async (userId: string) => {
 	});
 };
 
-export const reactivatePatientSubscription = async (userId: string, paymentId?: string) => {
+export const reactivatePatientSubscription = async (userId: string, paymentId?: string, planKey?: string) => {
 	const updated = await withPatientSubscriptionLock(userId, async (subscription) => {
-		const activePlan = (await getActivePlatformPlan()) || { key: 'free', name: 'Free Tier', price: 0 };
+		const activePlan = (await getActivePlatformPlan(planKey)) || { key: 'free', name: 'Free Tier', price: 0 };
+		const isFreePlan = Number(activePlan.price || 0) <= 0;
 		const next = await db.patientSubscription.update({
 			where: { userId },
 			data: {
 				planName: activePlan.name,
 				price: activePlan.price,
 				status: 'active',
-				autoRenew: true,
+				autoRenew: !isFreePlan,
 				paymentId: paymentId || undefined,
 				renewalDate: new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000),
+				billingCycle: isFreePlan ? 'none' : undefined,
 			},
 		});
 
