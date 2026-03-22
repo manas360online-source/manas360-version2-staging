@@ -176,12 +176,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [checkAuth]);
 
   const login = useCallback(async (identifier: string, password: string) => {
-    const loggedInUser = await loginApi({ identifier, password });
-    setUser(loggedInUser);
-    if (typeof window !== 'undefined') {
-      window.sessionStorage.removeItem(authProbeBlockKey);
+    await loginApi({ identifier, password });
+
+    // Confirm session cookies are accepted by browser before marking user as authenticated.
+    try {
+      const currentUser = await meApi();
+      setUser(currentUser);
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.removeItem(authProbeBlockKey);
+      }
+      return currentUser;
+    } catch (error: any) {
+      setUser(null);
+      clearSessionHint();
+      throw new Error(
+        'Login succeeded but session could not be established. Please enable cookies and retry.',
+      );
     }
-    return loggedInUser;
   }, [authProbeBlockKey]);
 
   const register = useCallback(async (email: string, password: string, name: string, role: 'patient' | 'therapist' | 'psychiatrist' | 'coach') => {
