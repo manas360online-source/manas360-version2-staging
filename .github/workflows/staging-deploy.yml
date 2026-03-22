@@ -119,7 +119,10 @@ jobs:
             docker-compose -p manas360-version2-staging down -v --remove-orphans || true
 
             echo "Force remove stale service containers if still exist..."
-            docker rm -f manas360-version2-staging_redis_1 manas360-version2-staging_db_1 || true
+            docker rm -f manas360-version2-staging_backend_1 manas360-version2-staging_redis_1 manas360-version2-staging_db_1 || true
+
+            echo "Force remove compose-managed stale services..."
+            docker-compose -p manas360-version2-staging rm -f -s -v || true
 
             echo "Cleaning leftover containers..."
             docker container prune -f || true
