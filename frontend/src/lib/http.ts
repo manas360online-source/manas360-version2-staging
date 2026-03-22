@@ -9,17 +9,33 @@ const rawBaseUrl =
 	import.meta.env.VITE_API_URL?.trim() ||
 	defaultApiBaseUrl;
 
+const normalizeBaseUrl = (url: string): string => {
+	let normalized = url.trim();
+	if (normalized.startsWith('https://manas360.com')) {
+		normalized = normalized.replace('https://manas360.com', 'https://www.manas360.com');
+	}
+	return normalized.replace(/\/+$/, '');
+};
+
+const normalizeApiPath = (baseUrl: string, path: string): string => {
+	if (!path.startsWith('/v1/')) {
+		return path;
+	}
+
+	return baseUrl.endsWith('/api/v1') ? path.replace(/^\/v1/, '') : path;
+};
+
 const configuredBaseUrl = (() => {
 	if (typeof window === 'undefined') {
-		return rawBaseUrl;
+		return normalizeBaseUrl(rawBaseUrl);
 	}
 
 	// Avoid mixed-content when frontend is HTTPS and API URL is HTTP.
 	if (window.location.protocol === 'https:' && rawBaseUrl.startsWith('http://')) {
-		return rawBaseUrl.replace(/^http:\/\//, 'https://');
+		return normalizeBaseUrl(rawBaseUrl.replace(/^http:\/\//, 'https://'));
 	}
 
-	return rawBaseUrl;
+	return normalizeBaseUrl(rawBaseUrl);
 })();
 
 const getCookieValue = (cookieName: string): string | null => {
@@ -95,6 +111,13 @@ const isExpectedAuthFailure = (status: number | undefined, url: string): boolean
 };
 
 if (http && http.interceptors && http.interceptors.response && typeof http.interceptors.response.use === 'function') {
+	http.interceptors.request.use((config: any) => {
+		if (typeof config?.url === 'string') {
+			config.url = normalizeApiPath(String(config.baseURL || configuredBaseUrl), config.url);
+		}
+		return config;
+	});
+
 	http.interceptors.response.use(
  		(response: AxiosResponse) => response,
  		async (error: any) => {

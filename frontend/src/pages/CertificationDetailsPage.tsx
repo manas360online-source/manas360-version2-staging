@@ -43,7 +43,7 @@ export const CertificationDetailsPage: React.FC = () => {
         "provider": {
             "@type": "Organization",
             "name": "MANAS360",
-            "sameAs": "https://manas360.com"
+            "sameAs": "https://www.manas360.com"
         }
     } : undefined;
 
