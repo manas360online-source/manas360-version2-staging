@@ -110,9 +110,14 @@ jobs:
           script: |
             set -e
             cd ~/manas360-version2-staging
-            git pull origin ${{ github.ref_name }}
+            
+            echo "Syncing with GitHub..."
+            git fetch origin
+            git reset --hard origin/${{ github.ref_name }}
+            
             docker-compose down
             docker-compose up -d --build
+            
             echo "✅ Deployment complete"
 
       # Optional: Seed staging database if needed

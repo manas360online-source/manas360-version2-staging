@@ -130,11 +130,12 @@ jobs:
           key: ${{ secrets.EC2_KEY }}
           script: |
             set -e
-            echo "Connected to EC2"
-            
             cd ~/manas360-version2-staging
             
-            git pull origin main
+            echo "Syncing with GitHub..."
+            git fetch origin
+            git reset --hard origin/main
+            
             docker-compose down
             docker-compose up -d --build
             
