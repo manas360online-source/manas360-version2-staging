@@ -28,7 +28,12 @@ app.use(cors({
 		'http://localhost:3000',
 	],
 	methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-	allowedHeaders: ['Content-Type', 'Authorization', 'x-csrf-token', 'x-requested-with'],
+	allowedHeaders: [
+		'Content-Type',
+		'Authorization',
+		'x-csrf-token',
+		'x-requested-with'
+	],
 	credentials: true,
 }));
 
@@ -44,6 +49,11 @@ app.use(
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(requestLogger);
+
+// Health check endpoint
+app.get('/health', (_req, res) => {
+	res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
 
 app.use(env.apiPrefix, apiRoutes);
 
