@@ -7,8 +7,28 @@ on:
     branches: [ main, master, develop, staging ]
 
 jobs:
+  validate-lockfiles:
+    runs-on: ubuntu-latest
+    name: Validate Lockfile Sync
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Check backend lockfile sync
+        working-directory: backend
+        run: npm install --package-lock-only --dry-run && echo "✅ Backend lockfile is in sync"
+
+      - name: Check frontend lockfile sync
+        working-directory: frontend
+        run: npm install --package-lock-only --dry-run && echo "✅ Frontend lockfile is in sync"
+
   backend:
     runs-on: ubuntu-latest
+    needs: validate-lockfiles
     services:
       postgres:
         image: postgres:15
@@ -92,3 +112,36 @@ jobs:
       - name: Frontend build
         working-directory: frontend
         run: npm run build
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging')
+    name: Deploy to EC2
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy via SSH to EC2
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /var/www/manas360 || cd ~/manas360-version2-staging || mkdir -p ~/manas360-version2-staging && cd ~/manas360-version2-staging
+            
+            # Clone or update repo
+            if [ -d .git ]; then
+              git fetch origin
+              git checkout ${{ github.ref_name }}
+              git pull origin ${{ github.ref_name }}
+            else
+              git clone -b ${{ github.ref_name }} https://github.com/manas360online-source/manas360-version2-staging.git .
+            fi
+            
+            # Build and start services
+            docker-compose down
+            docker-compose up -d --build
+            
+            echo "✅ Deployment completed on $(date)"
