@@ -114,7 +114,14 @@ jobs:
             cd ~/manas360-version2-staging
 
             echo "Syncing code with GitHub..."
-            git fetch origin
+            git remote set-url origin https://github.com/manas360online-source/manas360-version2-staging.git
+            git remote prune origin || true
+            if ! git fetch --prune origin; then
+              echo "git fetch failed; attempting ref cleanup..."
+              rm -f .git/refs/remotes/origin/main || true
+              git gc --prune=now || true
+              git fetch --prune origin
+            fi
             git reset --hard origin/${{ github.ref_name }}
 
             echo "Detecting docker compose command..."
