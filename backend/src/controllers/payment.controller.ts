@@ -78,10 +78,12 @@ export const phonepeWebhookController = async (req: Request, res: Response): Pro
 
 	// 1. IP Whitelisting
 	const { isPhonePeWebhookIP, verifyPhonePeWebhookAuth } = require('../services/phonepe.service');
+	const xForwardedFor = req.headers['x-forwarded-for'];
+	const xForwardedForString = Array.isArray(xForwardedFor) ? xForwardedFor[0] : xForwardedFor;
 	const clientIp =
-		req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
-		req.headers['x-real-ip'] ||
-		req.headers['cf-connecting-ip'] ||
+		(xForwardedForString ? xForwardedForString.split(',')[0].trim() : '') ||
+		req.headers['x-real-ip'] as string ||
+		req.headers['cf-connecting-ip'] as string ||
 		req.ip ||
 		req.socket?.remoteAddress ||
 		req.connection?.remoteAddress || '';
