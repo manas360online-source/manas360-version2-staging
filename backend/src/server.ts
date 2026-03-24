@@ -14,6 +14,7 @@ import { ensureSsoTables } from './services/sso.service';
 import { createOrEnsureTenant, azureTemplate, googleTemplate, oktaTemplate } from './services/sso.service';
 import { setSocketIO } from './routes/gps.routes';
 import { reconcilePendingPayments } from './cron/paymentReconciliation';
+import { initLeadDistributionCrons } from './cron/lead-distribution.cron';
 
 const startServer = async (): Promise<void> => {
 	await connectDatabase();
@@ -57,6 +58,7 @@ const startServer = async (): Promise<void> => {
 	startChatRetentionJob();
 	initSubscriptionCron();
 	initProviderLeadCron();
+	initLeadDistributionCrons();
 	// startPatientSharedReportCleanupJob(); // Commented out - references psychologist_reports table
 
 	// PhonePe reconciliation CRON (every 30s)

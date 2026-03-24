@@ -21,25 +21,36 @@ const app = express();
 Sentry.setupExpressErrorHandler(app);
 
 app.disable('x-powered-by');
+app.set('trust proxy', 1);
 app.use(helmet());
-app.use(
-	cors({
-		origin: (origin, callback) => {
-			if (!origin) {
-				callback(null, true);
-				return;
-			}
+const allowedCorsOrigins = Array.from(new Set([
+	...env.corsOrigins,
+	'https://www.manas360.com',
+	'https://manas360.com',
+	'http://www.manas360.com',
+]));
 
-			if (env.corsOrigins.includes(origin)) {
-				callback(null, true);
-				return;
-			}
+app.use(cors({
+	origin: (origin, callback) => {
+		if (!origin || allowedCorsOrigins.includes(origin)) {
+			return callback(null, true);
+		}
 
-			callback(new Error('Not allowed by CORS'));
-		},
-		credentials: true,
-	}),
-);
+		logger.warn(`Blocked by CORS origin: ${origin}`);
+		return callback(new Error('Not allowed by CORS'), false);
+	},
+	methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+	allowedHeaders: [
+		'Content-Type',
+		'Authorization',
+		'x-csrf-token',
+		'x-requested-with',
+	],
+	credentials: true,
+	optionsSuccessStatus: 204,
+}));
+
+// app.options('*', cors());
 app.use(
 	express.json({
 		limit: '1mb',
@@ -51,6 +62,11 @@ app.use(
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(requestLogger);
+
+// Health check endpoint
+app.get('/health', (_req, res) => {
+	res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
 
 app.use(env.apiPrefix, apiRoutes);
 

@@ -77,7 +77,7 @@ export const LandingPage: React.FC = () => {
           content="Get a 60-second mental health assessment and connect with licensed therapists."
         />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://manas360.com" />
+        <meta property="og:url" content="https://www.manas360.com" />
 
         {/* Twitter Card */}
         <meta name="twitter:card" content="summary_large_image" />
@@ -96,8 +96,8 @@ export const LandingPage: React.FC = () => {
             '@context': 'https://schema.org',
             '@type': 'Organization',
             name: 'MANAS360',
-            url: 'https://manas360.com',
-            logo: 'https://manas360.com/logo.png',
+            url: 'https://www.manas360.com',
+            logo: 'https://www.manas360.com/logo.png',
             description:
               'Mental health support platform connecting users with licensed therapists',
             sameAs: [

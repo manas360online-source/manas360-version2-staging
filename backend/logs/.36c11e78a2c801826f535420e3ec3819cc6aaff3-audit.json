@@ -6,24 +6,14 @@
     "auditLog": "/Users/chandu/Project/MANAS360_version2/backend/logs/.36c11e78a2c801826f535420e3ec3819cc6aaff3-audit.json",
     "files": [
         {
-            "date": 1773837419232,
-            "name": "/Users/chandu/Project/MANAS360_version2/backend/logs/combined-2026-03-18.log",
-            "hash": "9cb03199a1b4e9eaa461cbb9ec928c8a9b9c9c08fdf9e46dfa469084a2837b06"
+            "date": 1774194000073,
+            "name": "/Users/chandu/Project/MANAS360_version2/backend/logs/combined-2026-03-22.log",
+            "hash": "fa29955b945b1e15bc149f5062522eb6d346a8a738cf0b756dd5348cad64ccb4"
         },
         {
-            "date": 1773896140974,
-            "name": "/Users/chandu/Project/MANAS360_version2/backend/logs/combined-2026-03-19.log",
-            "hash": "bf364258c009da2a8707c7f412fd9fe3e26f71f0e704c4b440552355f14615be"
-        },
-        {
-            "date": 1773974893325,
-            "name": "/Users/chandu/Project/MANAS360_version2/backend/logs/combined-2026-03-20.log",
-            "hash": "c9c745568b985beb487360ed71c5c2c93af294121d6e2d92cb3f6e7d0b538684"
-        },
-        {
-            "date": 1774035000271,
-            "name": "/Users/chandu/Project/MANAS360_version2/backend/logs/combined-2026-03-21.log",
-            "hash": "07d07059f908562ed3dc59d0792c555498976deea98596349d2aa24debbb1b91"
+            "date": 1774315135497,
+            "name": "/Users/chandu/Project/MANAS360_version2/backend/logs/combined-2026-03-24.log",
+            "hash": "f00d4b0230e5a1478ccf7477b6bb9313a99371d92319b736b9d1c0d86470ef45"
         }
     ],
     "hashType": "sha256"

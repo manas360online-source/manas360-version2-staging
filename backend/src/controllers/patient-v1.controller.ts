@@ -603,6 +603,11 @@ export const getPatientSubscriptionController = async (req: Request, res: Respon
 };
 
 export const upgradePatientSubscriptionController = async (req: Request, res: Response): Promise<void> => {
+	// ✅ AUTH SAFETY: Explicitly verify user is authenticated
+	if (!req.auth?.userId) {
+		throw new AppError('Authentication required - invalid or missing credentials', 401);
+	}
+
 	const userId = authUserId(req);
 	const { planKey } = req.body;
 
@@ -619,7 +624,7 @@ export const upgradePatientSubscriptionController = async (req: Request, res: Re
 
 	// Free plan: activate immediately using legacy logic
 	if (plan.price === 0) {
-		const data = await updatePatientSubscriptionPlan(userId, 'upgrade');
+		const data = await reactivatePatientSubscription(userId, undefined, plan.key);
 		sendSuccess(res, data, 'Free plan activated');
 		return;
 	}

@@ -73,8 +73,10 @@ export const getPostLoginRoute = (user: AuthUser | null | undefined): string => 
   }
 
   if (isProviderRole(user.role)) {
-    // Dev/testing bypass: when VITE_SKIP_ONBOARDING=true or running in Vite dev, skip onboarding redirect.
-    const skipOnboarding = (import.meta.env.VITE_SKIP_ONBOARDING || '').toString() === 'true' || import.meta.env.DEV === true;
+    // Dev/testing bypass only: never allow onboarding skip in production builds.
+    const isProductionBuild = import.meta.env.PROD === true || String(import.meta.env.MODE || '').toLowerCase() === 'production';
+    const skipFlagEnabled = (import.meta.env.VITE_SKIP_ONBOARDING || '').toString() === 'true';
+    const skipOnboarding = import.meta.env.DEV === true || (!isProductionBuild && skipFlagEnabled);
     if (skipOnboarding) return '/provider/dashboard';
     const onboardingStatus = String(user.onboardingStatus || '').toUpperCase();
 
@@ -176,12 +178,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [checkAuth]);
 
   const login = useCallback(async (identifier: string, password: string) => {
-    const loggedInUser = await loginApi({ identifier, password });
-    setUser(loggedInUser);
-    if (typeof window !== 'undefined') {
-      window.sessionStorage.removeItem(authProbeBlockKey);
+    await loginApi({ identifier, password });
+
+    // Confirm session cookies are accepted by browser before marking user as authenticated.
+    try {
+      const currentUser = await meApi();
+      setUser(currentUser);
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.removeItem(authProbeBlockKey);
+      }
+      return currentUser;
+    } catch (error: any) {
+      setUser(null);
+      clearSessionHint();
+      throw new Error(
+        'Login succeeded but session could not be established. Please enable cookies and retry.',
+      );
     }
-    return loggedInUser;
   }, [authProbeBlockKey]);
 
   const register = useCallback(async (email: string, password: string, name: string, role: 'patient' | 'therapist' | 'psychiatrist' | 'coach') => {

@@ -8,6 +8,7 @@ console.log('Seed script starting...');
 const DEMO_PASSWORD = 'Manas@123';
 
 async function upsertUser({ email, role, firstName, lastName }, passwordHash) {
+	const isProvider = role === 'THERAPIST' || role === 'PSYCHIATRIST' || role === 'PSYCHOLOGIST' || role === 'COACH';
   return prisma.user.upsert({
     where: { email },
     update: {
@@ -22,6 +23,13 @@ async function upsertUser({ email, role, firstName, lastName }, passwordHash) {
       firstName,
       lastName,
       name: `${firstName} ${lastName}`,
+		...(isProvider
+			? {
+				onboardingStatus: 'COMPLETED',
+				isTherapistVerified: true,
+				therapistVerifiedAt: new Date(),
+			}
+			: {}),
     },
     create: {
       email,
@@ -33,6 +41,13 @@ async function upsertUser({ email, role, firstName, lastName }, passwordHash) {
       firstName,
       lastName,
       name: `${firstName} ${lastName}`,
+		...(isProvider
+			? {
+				onboardingStatus: 'COMPLETED',
+				isTherapistVerified: true,
+				therapistVerifiedAt: new Date(),
+			}
+			: {}),
     },
     select: { id: true, email: true, role: true },
   });
@@ -78,6 +93,9 @@ async function ensureTherapistProfile(userId, firstName, lastName) {
       yearsOfExperience: 5,
       consultationFee: 1500,
       availability: ['Mon-Fri 10:00-18:00'],
+		onboardingCompleted: true,
+		isVerified: true,
+		verifiedAt: new Date(),
     },
     create: {
       userId,
@@ -88,6 +106,9 @@ async function ensureTherapistProfile(userId, firstName, lastName) {
       yearsOfExperience: 5,
       consultationFee: 1500,
       availability: ['Mon-Fri 10:00-18:00'],
+		onboardingCompleted: true,
+		isVerified: true,
+		verifiedAt: new Date(),
     },
   });
 }

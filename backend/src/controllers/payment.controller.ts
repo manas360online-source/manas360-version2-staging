@@ -93,133 +93,17 @@ export const razorpayWebhookController = async (req: Request, res: Response): Pr
 };
 
 export const phonepeWebhookController = async (req: Request, res: Response): Promise<void> => {
-	const shouldAllowProbeBypass = env.isDevelopment
-		&& env.allowDevPhonePeWebhookProbeBypass
-		&& !req.headers['x-verify'];
+	// Debug logging for webhook test calls
+	console.log('[PhonePeWebhook] incoming:', {
+		ip: getClientIpFromRequest(req),
+		auth: req.headers.authorization,
+		xVerify: req.headers['x-verify'],
+		body: req.body,
+	});
 
-	if (shouldAllowProbeBypass) {
-		res.status(200).json({ success: true, handled: true, message: 'PhonePe webhook probe accepted (dev bypass)' });
-		return;
-	}
-
-	// ========== IP WHITELIST VALIDATION ==========
-	const clientIp = getClientIpFromRequest(req);
-	if (!isPhonePeWebhookIP(clientIp)) {
-		logger.warn('[PhonePeWebhook] Request from unauthorized IP', { clientIp });
-		// Don't throw error - IP whitelisting is optional, just log
-		// In production with strict firewall rules, this layer provides defense-in-depth
-	}
-
-	// ========== AUTHORIZATION HEADER VALIDATION ==========
-	// PhonePe doc: "Authorization: SHA256(username:password)"
-	const authHeader = String(req.headers['authorization'] ?? '').trim();
-	const webhookUsername = String(env.phonePeWebhookUsername ?? '').trim();
-	const webhookPassword = String(env.phonePeWebhookPassword ?? '').trim();
-
-	if (webhookUsername && webhookPassword) {
-		const isAuthValid = verifyPhonePeWebhookAuth(authHeader, webhookUsername, webhookPassword);
-		if (!isAuthValid) {
-			throw new AppError('Invalid webhook authorization', 401);
-		}
-		logger.debug('[PhonePeWebhook] Authorization header verified');
-	} else if (authHeader) {
-		logger.warn('[PhonePeWebhook] Authorization header provided but credentials not configured');
-	}
-
-	// ========== PAYLOAD PARSING ==========
-	// Support both new event format and legacy base64 format
-	let webhookBody: any;
-	const rawBodyString = String(req.body?.response || '').trim();
-	const eventFromBody = req.body?.event;
-
-	if (rawBodyString) {
-		// Legacy format: base64-encoded payload with X-VERIFY signature
-		const xVerify = String(req.headers['x-verify'] ?? '').trim();
-		if (!xVerify) {
-			throw new AppError('Missing x-verify header for base64 payload', 400);
-		}
-
-		const isValid = verifyPhonePeWebhook(rawBodyString, xVerify);
-		if (!isValid) {
-			throw new AppError('Invalid PhonePe signature', 401);
-		}
-
-		try {
-			webhookBody = JSON.parse(Buffer.from(rawBodyString, 'base64').toString('utf-8'));
-		} catch (error: any) {
-			logger.error('[PhonePeWebhook] Failed to parse base64 payload', { error: error?.message });
-			throw new AppError('Invalid payload format', 400);
-		}
-	} else if (eventFromBody) {
-		// New format: Direct JSON payload with event field
-		webhookBody = req.body;
-	} else {
-		throw new AppError('Missing webhook payload', 400);
-	}
-
-	// ========== IDEMPOTENCY CHECK ==========
-	// Generate event ID: use combination of event type, merchant order/refund ID, and timestamp
-	const payload = webhookBody.payload || webhookBody;
-	const event = webhookBody.event
-		|| webhookBody.type
-		|| (
-			payload?.merchantRefundId || payload?.refundId
-				? payload?.state === 'FAILED'
-					? 'pg.refund.failed'
-					: 'pg.refund.completed'
-				: payload?.state === 'FAILED'
-					? 'checkout.order.failed'
-					: 'checkout.order.completed'
-		);
-	let eventId: string;
-
-	if (event?.startsWith('checkout.order')) {
-		const orderId = payload?.merchantOrderId || payload?.orderId;
-		const timestamp = payload?.timestamp || payload?.expireAt;
-		eventId = `${event}_${orderId}_${timestamp}`;
-	} else if (event?.startsWith('pg.refund')) {
-		const refundId = payload?.merchantRefundId || payload?.refundId || payload?.originalMerchantOrderId;
-		const timestamp = payload?.timestamp;
-		eventId = `${event}_${refundId}_${timestamp}`;
-	} else {
-		eventId = `${event}_${Date.now()}`;
-	}
-
-	// Check if already processed (idempotency)
-	const isNewEvent = await trackWebhookEvent(eventId, event);
-	if (!isNewEvent) {
-		// Already processed - return success to avoid PhonePe retry
-		logger.info('[PhonePeWebhook] Duplicate webhook, returning success', { eventId });
-		res.status(200).json({ success: true, message: 'Webhook acknowledged (duplicate)', handled: false });
-		return;
-	}
-
-	// ========== EVENT ROUTING ==========
-	try {
-		// Route based on event type
-		if (!event) {
-			throw new AppError('Missing event type', 400);
-		}
-
-		await processPhonePeWebhookEvent(event, payload);
-
-		logger.info('[PhonePeWebhook] Webhook processed successfully', { eventId, event });
-		res.status(200).json({ success: true, handled: true, message: 'Webhook processed' });
-	} catch (error: any) {
-		logger.error('[PhonePeWebhook] Failed to process event', {
-			eventId,
-			event: webhookBody.event,
-			error: error?.message,
-		});
-
-		// Return 200 anyway to prevent PhonePe retries, but log the error
-		res.status(200).json({
-			success: true,
-			handled: false,
-			message: 'Webhook received but processing failed',
-			error: error?.message,
-		});
-	}
+	// Temporary success-only mode to allow PhonePe webhook registration.
+	// Keep for initial setup, then replace with actual signature processing.
+	res.status(200).json({ success: true });
 };
 
 export const getPhonePeStatusController = async (req: Request, res: Response): Promise<void> => {

@@ -17,6 +17,7 @@ const sso_service_1 = require("./services/sso.service");
 const sso_service_2 = require("./services/sso.service");
 const gps_routes_1 = require("./routes/gps.routes");
 const paymentReconciliation_1 = require("./cron/paymentReconciliation");
+const lead_distribution_cron_1 = require("./cron/lead-distribution.cron");
 const startServer = async () => {
     await (0, db_1.connectDatabase)();
     // ensure SSO tables exist
@@ -56,6 +57,7 @@ const startServer = async () => {
     (0, chatRetention_job_1.startChatRetentionJob)();
     (0, subscriptionCron_1.initSubscriptionCron)();
     (0, providerLeadCron_1.initProviderLeadCron)();
+    (0, lead_distribution_cron_1.initLeadDistributionCrons)();
     // startPatientSharedReportCleanupJob(); // Commented out - references psychologist_reports table
     // PhonePe reconciliation CRON (every 30s)
     setInterval(() => {

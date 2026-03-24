@@ -24,15 +24,33 @@ const resolveCookieDomain = () => {
     }
     return rawDomain;
 };
-const cookieDomain = resolveCookieDomain();
-const tokenCookieOptions = {
-    httpOnly: true,
-    secure: env_1.env.cookieSecure,
-    sameSite: 'lax',
-    domain: cookieDomain,
-    path: '/',
+const configuredCookieDomain = resolveCookieDomain();
+const resolveRuntimeCookieDomain = (hostname) => {
+    if (configuredCookieDomain) {
+        return configuredCookieDomain;
+    }
+    const host = String(hostname || '').split(':')[0].trim().toLowerCase();
+    if (!host) {
+        return undefined;
+    }
+    if (env_1.env.nodeEnv === 'production' || env_1.env.nodeEnv === 'staging') {
+        if (host === 'manas360.com' || host.endsWith('.manas360.com')) {
+            return '.manas360.com';
+        }
+    }
+    return undefined;
 };
-const setAuthCookies = (res, accessToken, refreshToken) => {
+const shouldUseSecureCookies = env_1.env.cookieSecure || (env_1.env.nodeEnv !== 'development' && env_1.env.nodeEnv !== 'test');
+const cookieSameSite = shouldUseSecureCookies ? 'none' : 'lax';
+const buildTokenCookieOptions = (req) => ({
+    httpOnly: true,
+    secure: shouldUseSecureCookies,
+    sameSite: cookieSameSite,
+    domain: resolveRuntimeCookieDomain(req.hostname),
+    path: '/',
+});
+const setAuthCookies = (req, res, accessToken, refreshToken) => {
+    const tokenCookieOptions = buildTokenCookieOptions(req);
     res.cookie('access_token', accessToken, {
         ...tokenCookieOptions,
         maxAge: 15 * 60 * 1000,
@@ -43,9 +61,9 @@ const setAuthCookies = (res, accessToken, refreshToken) => {
     });
     res.cookie(env_1.env.csrfCookieName, (0, crypto_1.randomBytes)(24).toString('hex'), {
         httpOnly: false,
-        secure: env_1.env.cookieSecure,
-        sameSite: 'lax',
-        domain: cookieDomain,
+        secure: shouldUseSecureCookies,
+        sameSite: cookieSameSite,
+        domain: tokenCookieOptions.domain,
         path: '/',
         maxAge: 7 * 24 * 60 * 60 * 1000,
     });
@@ -199,7 +217,7 @@ const loginController = async (req, res) => {
         password: (0, auth_validator_1.validatePassword)(req.body.password),
         mfaCode: req.body.mfaCode ? (0, auth_validator_1.validateOtp)(req.body.mfaCode) : undefined,
     }, getRequestMeta(req));
-    setAuthCookies(res, result.accessToken, result.refreshToken);
+    setAuthCookies(req, res, result.accessToken, result.refreshToken);
     (0, response_1.sendSuccess)(res, { user: result.user, sessionId: result.sessionId }, 'Login successful');
 };
 exports.loginController = loginController;
@@ -208,7 +226,7 @@ const googleLoginController = async (req, res) => {
         throw new error_middleware_1.AppError('idToken is required', 400);
     }
     const result = await (0, auth_service_1.loginWithGoogle)({ idToken: req.body.idToken.trim() }, getRequestMeta(req));
-    setAuthCookies(res, result.accessToken, result.refreshToken);
+    setAuthCookies(req, res, result.accessToken, result.refreshToken);
     (0, response_1.sendSuccess)(res, { user: result.user, sessionId: result.sessionId }, 'Google login successful');
 };
 exports.googleLoginController = googleLoginController;
@@ -218,7 +236,7 @@ const refreshTokenController = async (req, res) => {
         throw new error_middleware_1.AppError('Refresh token is required', 401);
     }
     const result = await (0, auth_service_1.refreshAuthTokens)({ refreshToken }, getRequestMeta(req));
-    setAuthCookies(res, result.accessToken, result.refreshToken);
+    setAuthCookies(req, res, result.accessToken, result.refreshToken);
     (0, response_1.sendSuccess)(res, { sessionId: result.sessionId }, 'Token refreshed');
 };
 exports.refreshTokenController = refreshTokenController;
@@ -268,13 +286,14 @@ const logoutController = async (req, res) => {
         throw new error_middleware_1.AppError('Authentication required', 401);
     }
     await (0, auth_service_1.logoutSession)(req.auth.sessionId, req.auth.userId, getRequestMeta(req));
+    const tokenCookieOptions = buildTokenCookieOptions(req);
     res.clearCookie('access_token', tokenCookieOptions);
     res.clearCookie(env_1.env.refreshCookieName, tokenCookieOptions);
     res.clearCookie(env_1.env.csrfCookieName, {
         httpOnly: false,
-        secure: env_1.env.cookieSecure,
-        sameSite: 'strict',
-        domain: cookieDomain,
+        secure: shouldUseSecureCookies,
+        sameSite: cookieSameSite,
+        domain: tokenCookieOptions.domain,
         path: '/',
     });
     (0, response_1.sendSuccess)(res, null, 'Logged out');

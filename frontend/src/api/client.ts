@@ -23,11 +23,37 @@ const configuredBase =
 	import.meta.env.VITE_API_URL?.trim() ||
 	defaultApiBase;
 
+const normalizeBaseUrl = (url: string): string => {
+	let normalized = url.trim();
+	if (normalized.startsWith('https://manas360.com')) {
+		normalized = normalized.replace('https://manas360.com', 'https://www.manas360.com');
+	}
+
+	if (typeof window !== 'undefined' && /^https:\/\/(www\.)?manas360\.com\/api(\/v1)?/i.test(normalized)) {
+		// Keep API calls on the same origin as the loaded app so cookies are always sent reliably.
+		const path = normalized.includes('/api/v1') ? '/api/v1' : '/api';
+		return `${window.location.origin}${path}`;
+	}
+
+	return normalized.replace(/\/+$/, '');
+};
+
+const normalizeApiPath = (baseUrl: string, path: string): string => {
+	if (!path.startsWith('/v1/')) {
+		return path;
+	}
+
+	return baseUrl.endsWith('/api/v1') ? path.replace(/^\/v1/, '') : path;
+};
+
+const normalizedBase = normalizeBaseUrl(configuredBase);
+
 const joinUrl = (path: string): string => {
 	if (path.startsWith('http://') || path.startsWith('https://')) return path;
-	if (configuredBase.endsWith('/') && path.startsWith('/')) return `${configuredBase.slice(0, -1)}${path}`;
-	if (!configuredBase.endsWith('/') && !path.startsWith('/')) return `${configuredBase}/${path}`;
-	return `${configuredBase}${path}`;
+	const normalizedPath = normalizeApiPath(normalizedBase, path);
+	if (normalizedBase.endsWith('/') && normalizedPath.startsWith('/')) return `${normalizedBase.slice(0, -1)}${normalizedPath}`;
+	if (!normalizedBase.endsWith('/') && !normalizedPath.startsWith('/')) return `${normalizedBase}/${normalizedPath}`;
+	return `${normalizedBase}${normalizedPath}`;
 };
 
 const isExpectedAuthFailure = (status: number, url: string): boolean => {

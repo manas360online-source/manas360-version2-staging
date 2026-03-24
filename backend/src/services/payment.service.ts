@@ -79,7 +79,7 @@ export const createSessionPayment = async (input: CreateFinancialSessionInput) =
 		if (payment) {
 			return {
 				sessionId: existing.id,
-				paymentId: payment.id,
+				
 				paymentType: 'provider_fee',
 				transactionId: existing.razorpayOrderId,
 				redirectUrl: '',
@@ -242,7 +242,7 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 						currency: payment.currency,
 						referenceId: payment.sessionId,
 						sessionId: payment.sessionId,
-						paymentId: payment.id,
+						
 					},
 				});
 			});
@@ -290,7 +290,7 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 			}
 
 			const { reactivatePatientSubscription } = await import('./patient-v1.service');
-			const activated = await reactivatePatientSubscription(userId, merchantTransactionId);
+			const activated = await reactivatePatientSubscription(userId, merchantTransactionId, String(planKey || ''));
 
 			if (payment?.id) {
 				await db.financialPayment.update({
@@ -476,7 +476,7 @@ export const releaseSessionEarnings = async (sessionId: string, actorTherapistId
 				balanceBeforeMinor: before,
 				balanceAfterMinor: after,
 				sessionId,
-				paymentId: payment.id,
+				
 				referenceKey: releaseReferenceKey,
 			},
 		});

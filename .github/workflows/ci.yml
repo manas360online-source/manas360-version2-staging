@@ -7,8 +7,28 @@ on:
     branches: [ main, master, develop, staging ]
 
 jobs:
+  validate-lockfiles:
+    runs-on: ubuntu-latest
+    name: Validate Lockfile Sync
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Check backend lockfile sync
+        working-directory: backend
+        run: npm install --package-lock-only --dry-run && echo "✅ Backend lockfile is in sync"
+
+      - name: Check frontend lockfile sync
+        working-directory: frontend
+        run: npm install --package-lock-only --dry-run && echo "✅ Frontend lockfile is in sync"
+
   backend:
     runs-on: ubuntu-latest
+    needs: validate-lockfiles
     services:
       postgres:
         image: postgres:15
@@ -92,3 +112,43 @@ jobs:
       - name: Frontend build
         working-directory: frontend
         run: npm run build
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging')
+    name: Deploy to EC2
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            set -e
+            cd ~/manas360-version2-staging
+
+            echo "Syncing code with GitHub..."
+            git fetch origin
+            git reset --hard origin/main
+
+            echo "Stopping containers cleanly..."
+            docker-compose down --remove-orphans
+
+            echo "Cleaning leftover containers..."
+            docker container prune -f
+
+            echo "Starting fresh containers..."
+            docker-compose up -d --build
+
+            echo "Waiting for backend health..."
+            until curl -f http://localhost:5000/health > /dev/null 2>&1; do
+              echo "  Waiting for backend..."
+              sleep 2
+            done
+
+            echo "✅ Deployment complete"

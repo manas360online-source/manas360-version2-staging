@@ -32,10 +32,13 @@ const resolveCookieDomain = (): string | undefined => {
 
 const cookieDomain = resolveCookieDomain();
 
+const shouldUseSecureCookies = env.cookieSecure || (env.nodeEnv !== 'development' && env.nodeEnv !== 'test');
+const cookieSameSite = shouldUseSecureCookies ? 'none' as const : 'lax' as const;
+
 const authCookieOptions = {
     httpOnly: true,
-    secure: env.cookieSecure,
-        sameSite: 'lax' as const,
+    secure: shouldUseSecureCookies,
+        sameSite: cookieSameSite,
     domain: cookieDomain,
     path: '/',
 };
@@ -53,8 +56,8 @@ const setAuthCookies = (res: Response, accessToken: string, refreshToken: string
 
     res.cookie(env.csrfCookieName, randomBytes(24).toString('hex'), {
         httpOnly: false,
-        secure: env.cookieSecure,
-            sameSite: 'lax',
+        secure: shouldUseSecureCookies,
+            sameSite: cookieSameSite,
         domain: cookieDomain,
         path: '/',
         maxAge: 7 * 24 * 60 * 60 * 1000,
@@ -76,16 +79,16 @@ export const authorizeController = async (req: Request, res: Response): Promise<
     // store state/nonce in cookie for callback validation
     res.cookie(`sso_state_${tenantKey}`, state, {
         httpOnly: true,
-        secure: env.cookieSecure,
-        sameSite: 'lax',
+        secure: shouldUseSecureCookies,
+        sameSite: cookieSameSite,
         domain: cookieDomain,
         path: '/',
         maxAge: 5 * 60 * 1000,
     });
     res.cookie(`sso_nonce_${tenantKey}`, nonce, {
         httpOnly: true,
-        secure: env.cookieSecure,
-        sameSite: 'lax',
+        secure: shouldUseSecureCookies,
+        sameSite: cookieSameSite,
         domain: cookieDomain,
         path: '/',
         maxAge: 5 * 60 * 1000,

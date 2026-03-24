@@ -263,20 +263,20 @@ const processPhonePeWebhook = async (decoded) => {
             if (payment?.status === 'CAPTURED') {
                 return { handled: true, message: 'Patient subscription payment already captured' };
             }
-            const { checkPhonePeStatus } = await Promise.resolve().then(() => __importStar(require('./phonepe.service')));
+            const { checkPhonePeStatus } = await import('./phonepe.service');
             const verify = await checkPhonePeStatus(merchantTransactionId);
             if (!verify || !verify.success || verify.code !== 'PAYMENT_SUCCESS' || verify.data?.state !== 'COMPLETED') {
                 throw new error_middleware_1.AppError("Patient payment not verified", 400);
             }
             // Fix 8: Idempotency check for patient
-            const { prisma } = await Promise.resolve().then(() => __importStar(require('../config/db')));
+            const { prisma } = await import('../config/db');
             const existingSub = await prisma.patientSubscription.findUnique({ where: { userId } });
             if (existingSub?.paymentId === merchantTransactionId) {
                 logger_1.logger.debug(`[PaymentService] Patient subscription webhook bypassed (Idempotency)`, { merchantTransactionId });
                 return { handled: true, message: 'Patient subscription already processed' };
             }
-            const { reactivatePatientSubscription } = await Promise.resolve().then(() => __importStar(require('./patient-v1.service')));
-            const activated = await reactivatePatientSubscription(userId, merchantTransactionId);
+            const { reactivatePatientSubscription } = await import('./patient-v1.service');
+            const activated = await reactivatePatientSubscription(userId, merchantTransactionId, String(planKey || ''));
             if (payment?.id) {
                 await db.financialPayment.update({
                     where: { id: payment.id },
@@ -323,19 +323,19 @@ const processPhonePeWebhook = async (decoded) => {
             if (payment?.status === 'CAPTURED') {
                 return { handled: true, message: 'Provider subscription payment already captured' };
             }
-            const { checkPhonePeStatus } = await Promise.resolve().then(() => __importStar(require('./phonepe.service')));
+            const { checkPhonePeStatus } = await import('./phonepe.service');
             const verify = await checkPhonePeStatus(merchantTransactionId);
             if (!verify || !verify.success || verify.code !== 'PAYMENT_SUCCESS' || verify.data?.state !== 'COMPLETED') {
                 throw new error_middleware_1.AppError("Provider payment not verified or not completed", 400);
             }
             // Fix 8: Idempotency check for provider
-            const { prisma } = await Promise.resolve().then(() => __importStar(require('../config/db')));
+            const { prisma } = await import('../config/db');
             const existingSub = await prisma.providerSubscription.findUnique({ where: { providerId } });
             if (existingSub?.paymentId === merchantTransactionId) {
                 logger_1.logger.debug(`[PaymentService] Provider subscription webhook bypassed (Idempotency)`, { merchantTransactionId });
                 return { handled: true, message: 'Provider subscription already processed' };
             }
-            const { activateProviderSubscription } = await Promise.resolve().then(() => __importStar(require('./provider-subscription.service')));
+            const { activateProviderSubscription } = await import('./provider-subscription.service');
             const activated = await activateProviderSubscription(providerId, planKey, merchantTransactionId);
             if (payment?.id) {
                 await db.financialPayment.update({
