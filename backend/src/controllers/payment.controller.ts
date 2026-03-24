@@ -76,6 +76,29 @@ export const phonepeWebhookController = async (req: Request, res: Response): Pro
 	const rawBody = req.rawBody ?? JSON.stringify(req.body ?? {});
 	const xVerify = String(req.headers['x-verify'] ?? '').trim();
 
+	// 1. IP Whitelisting
+	const { isPhonePeWebhookIP, verifyPhonePeWebhookAuth } = require('../services/phonepe.service');
+	const xForwardedFor = req.headers['x-forwarded-for'];
+	const xForwardedForString = Array.isArray(xForwardedFor) ? xForwardedFor[0] : xForwardedFor;
+	const clientIp =
+		(xForwardedForString ? xForwardedForString.split(',')[0].trim() : '') ||
+		req.headers['x-real-ip'] as string ||
+		req.headers['cf-connecting-ip'] as string ||
+		req.ip ||
+		req.socket?.remoteAddress ||
+		req.connection?.remoteAddress || '';
+	if (!isPhonePeWebhookIP(clientIp)) {
+		throw new AppError('Unauthorized source IP for PhonePe webhook', 403);
+	}
+
+	// 2. Authorization Header
+	const authHeader = String(req.headers['authorization'] ?? '').trim();
+	const { PHONEPE_WEBHOOK_USERNAME, PHONEPE_WEBHOOK_PASSWORD } = process.env;
+	if (!verifyPhonePeWebhookAuth(authHeader, PHONEPE_WEBHOOK_USERNAME, PHONEPE_WEBHOOK_PASSWORD)) {
+		throw new AppError('Invalid PhonePe webhook authorization', 401);
+	}
+
+	// 3. Signature Verification
 	if (!xVerify || !verifyPhonePeWebhook(rawBody, xVerify)) {
 		throw new AppError('Invalid PhonePe webhook signature', 401);
 	}
