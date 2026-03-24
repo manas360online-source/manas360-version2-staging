@@ -342,8 +342,8 @@ export const logoutController = async (req: Request, res: Response): Promise<voi
 	res.clearCookie(env.refreshCookieName, tokenCookieOptions);
 	res.clearCookie(env.csrfCookieName, {
 		httpOnly: false,
-		secure: shouldUseSecureCookies,
-		sameSite: cookieSameSite,
+		secure: tokenCookieOptions.secure,
+		sameSite: tokenCookieOptions.sameSite,
 		domain: tokenCookieOptions.domain,
 		path: '/',
 	});
