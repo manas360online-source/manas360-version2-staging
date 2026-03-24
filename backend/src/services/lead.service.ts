@@ -77,7 +77,7 @@ export const getMyTherapistLeads = async (userId: string, query: TherapistLeadsQ
 				tier: true,
 				visibleAt: true,
 				paymentStatus: true,
-				razorpayOrderId: true,
+				merchantTransactionId: true,
 				matchScore: true,
 				amountMinor: true,
 				currency: true,
@@ -115,7 +115,7 @@ export const initiateMyTherapistLeadPurchase = async (userId: string, leadId: st
 				expiresAt: true,
 				patientAcceptanceUntil: true,
 				paymentStatus: true,
-				razorpayOrderId: true,
+				merchantTransactionId: true,
 			},
 		});
 
@@ -169,7 +169,7 @@ export const initiateMyTherapistLeadPurchase = async (userId: string, leadId: st
 				providerId: true,
 				status: true,
 				paymentStatus: true,
-				razorpayOrderId: true,
+					merchantTransactionId: true,
 			},
 		});
 	});
@@ -296,7 +296,7 @@ export const confirmMyTherapistLeadPurchase = async (
 				purchasedAt: true,
 				amountMinor: true,
 				currency: true,
-				razorpayOrderId: true,
+				merchantTransactionId: true,
 				razorpayPaymentId: true,
 			},
 		});

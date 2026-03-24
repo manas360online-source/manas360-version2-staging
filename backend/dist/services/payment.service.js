@@ -91,14 +91,7 @@ const createSessionPayment = async (input) => {
             return {
                 sessionId: existing.id,
                 paymentType: 'provider_fee',
-                transactionId: existing.razorpayOrderId,
-                redirectUrl: '',
-                amountMinor: existing.expectedAmountMinor,
-                currency: existing.currency,
-                feeBreakdown: {
-                    platformFeeMinor: Math.round(existing.expectedAmountMinor * platformShareRatio),
-                    providerFeeMinor: Math.floor(existing.expectedAmountMinor * providerShareRatio),
-                },
+                transactionId: existing.merchantTransactionId,
                 idempotencyKey,
             };
         }
@@ -138,14 +131,14 @@ const createSessionPayment = async (input) => {
                 expectedAmountMinor: amountMinor,
                 currency: input.currency ?? 'INR',
                 idempotencyKey,
-                razorpayOrderId: transactionId,
+                merchantTransactionId: transactionId,
             },
         });
         const payment = await tx.financialPayment.create({
             data: {
                 sessionId: session.id,
                 providerId: input.providerId,
-                razorpayOrderId: transactionId,
+                merchantTransactionId: transactionId,
                 status: 'PENDING_CAPTURE',
                 amountMinor,
                 currency: input.currency ?? 'INR',
@@ -183,7 +176,7 @@ const processPhonePeWebhook = async (decoded) => {
             let capturedAmountMinor = 0;
             await db.$transaction(async (tx) => {
                 const payment = await tx.financialPayment.findFirst({
-                    where: { razorpayOrderId: merchantTransactionId },
+                    where: { merchantTransactionId: merchantTransactionId },
                 });
                 if (!payment) {
                     logger_1.logger.error('[PaymentService] PhonePe webhook with unknown transaction', { merchantTransactionId });
@@ -254,7 +247,7 @@ const processPhonePeWebhook = async (decoded) => {
             const userId = parts[1];
             const planKey = data.metadata?.plan || parts[2];
             const payment = await db.financialPayment.findFirst({
-                where: { razorpayOrderId: merchantTransactionId },
+                where: { merchantTransactionId: merchantTransactionId },
                 orderBy: { createdAt: 'desc' },
             });
             if (payment?.status === 'CAPTURED') {
@@ -314,7 +307,7 @@ const processPhonePeWebhook = async (decoded) => {
             // Fix 7: Get plan from metadata payload (fallback to URL param)
             const planKey = data.metadata?.plan || parts[3];
             const payment = await db.financialPayment.findFirst({
-                where: { razorpayOrderId: merchantTransactionId },
+                where: { merchantTransactionId: merchantTransactionId },
                 orderBy: { createdAt: 'desc' },
             });
             if (payment?.status === 'CAPTURED') {

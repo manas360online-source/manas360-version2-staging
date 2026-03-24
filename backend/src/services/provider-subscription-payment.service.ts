@@ -45,7 +45,7 @@ export const initiateProviderSubscriptionPayment = async (providerId: string, pl
 		const redirectUrl = String(latestAttempt?.metadata?.redirectUrl || '').trim();
 		if (redirectUrl && ageMs <= 15 * 60 * 1000) {
 			return {
-				transactionId: String(latestAttempt.razorpayOrderId),
+				transactionId: String(latestAttempt.merchantTransactionId),
 				redirectUrl,
 				planName: planKey,
 				price: plan.price,
@@ -94,7 +94,7 @@ export const initiateProviderSubscriptionPayment = async (providerId: string, pl
 	try {
 		await prisma.financialPayment.create({
 			data: {
-				razorpayOrderId: transactionId,
+				merchantTransactionId: transactionId,
 				providerId,
 				amountMinor: plan.price * 100,
 				currency: 'INR',
@@ -121,7 +121,7 @@ export const initiateProviderSubscriptionPayment = async (providerId: string, pl
 		const existingRedirect = String(existing?.metadata?.redirectUrl || '').trim();
 		if (existing && existingRedirect) {
 			return {
-				transactionId: String(existing.razorpayOrderId),
+				transactionId: String(existing.merchantTransactionId),
 				redirectUrl: existingRedirect,
 				planName: planKey,
 				price: plan.price,
