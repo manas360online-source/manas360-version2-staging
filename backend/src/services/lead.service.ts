@@ -2,7 +2,6 @@ import { AppError } from '../middleware/error.middleware';
 import { prisma } from '../config/db';
 import { env } from '../config/env';
 import { buildPaginationMeta, normalizePagination } from '../utils/pagination';
-import { createRazorpayOrder, verifyRazorpayPaymentSignature } from './razorpay.service';
 import { randomUUID } from 'crypto';
 
 const db = prisma as any;
@@ -78,7 +77,7 @@ export const getMyTherapistLeads = async (userId: string, query: TherapistLeadsQ
 				tier: true,
 				visibleAt: true,
 				paymentStatus: true,
-				razorpayOrderId: true,
+				merchantTransactionId: true,
 				matchScore: true,
 				amountMinor: true,
 				currency: true,
@@ -116,7 +115,7 @@ export const initiateMyTherapistLeadPurchase = async (userId: string, leadId: st
 				expiresAt: true,
 				patientAcceptanceUntil: true,
 				paymentStatus: true,
-				razorpayOrderId: true,
+				merchantTransactionId: true,
 			},
 		});
 
@@ -170,7 +169,7 @@ export const initiateMyTherapistLeadPurchase = async (userId: string, leadId: st
 				providerId: true,
 				status: true,
 				paymentStatus: true,
-				razorpayOrderId: true,
+					merchantTransactionId: true,
 			},
 		});
 	});
@@ -179,20 +178,7 @@ export const initiateMyTherapistLeadPurchase = async (userId: string, leadId: st
 		throw new AppError('Unable to reserve lead for payment', 409, { leadId });
 	}
 
-	if (!env.razorpayKeyId || !env.razorpayKeySecret) {
-		throw new AppError('Razorpay credentials are not configured', 500);
-	}
-
-	const order = await createRazorpayOrder({
-		amountMinor: Number(reservedLead.amountMinor),
-		currency: String(reservedLead.currency ?? 'INR'),
-		receipt: `lead_${Date.now()}_${leadId.slice(0, 8)}`,
-		notes: {
-			leadId,
-			therapistId: userId,
-			flow: 'lead_purchase',
-		},
-	});
+	// Note: Order creation removed (was Razorpay)
 
 	await db.lead.updateMany({
 		where: {
@@ -202,7 +188,7 @@ export const initiateMyTherapistLeadPurchase = async (userId: string, leadId: st
 			paymentStatus: 'INITIATED',
 		},
 		data: {
-			razorpayOrderId: order.id,
+			merchantTransactionId: `LEAD_${Date.now()}_${leadId.slice(0, 8)}`,
 		},
 	});
 
@@ -211,32 +197,18 @@ export const initiateMyTherapistLeadPurchase = async (userId: string, leadId: st
 		paymentRequired: true,
 		amountMinor: Number(reservedLead.amountMinor),
 		currency: String(reservedLead.currency ?? 'INR'),
-		razorpayOrderId: order.id,
-		razorpayKeyId: env.razorpayKeyId,
+		merchantTransactionId: `LEAD_${Date.now()}_${leadId.slice(0, 8)}`,
 	};
 };
 
 export const confirmMyTherapistLeadPurchase = async (
 	userId: string,
 	leadId: string,
-	input: { razorpayOrderId: string; razorpayPaymentId: string; razorpaySignature: string },
+	input: { merchantTransactionId: string; transactionId: string; signature: string },
 ) => {
 	await assertTherapistUser(userId);
 
-	if (!env.razorpayKeySecret) {
-		throw new AppError('Razorpay credentials are not configured', 500);
-	}
-
-	const isValid = verifyRazorpayPaymentSignature(
-		input.razorpayOrderId,
-		input.razorpayPaymentId,
-		input.razorpaySignature,
-		env.razorpayKeySecret,
-	);
-
-	if (!isValid) {
-		throw new AppError('Invalid Razorpay payment signature', 401);
-	}
+	// Note: PhonePe uses webhook for verification, signature check removed
 
 	const now = new Date();
 
@@ -250,7 +222,7 @@ export const confirmMyTherapistLeadPurchase = async (
 				amountMinor: true,
 				currency: true,
 				paymentStatus: true,
-				razorpayOrderId: true,
+				merchantTransactionId: true,
 				razorpayPaymentId: true,
 			},
 		});
@@ -263,7 +235,7 @@ export const confirmMyTherapistLeadPurchase = async (
 			throw new AppError('Lead is reserved by another therapist', 403, { leadId });
 		}
 
-		if (lead.razorpayOrderId !== input.razorpayOrderId) {
+		if (lead.merchantTransactionId !== input.merchantTransactionId) {
 			throw new AppError('Order id does not match reserved lead', 409, { leadId });
 		}
 
@@ -275,7 +247,7 @@ export const confirmMyTherapistLeadPurchase = async (
 				providerId: lead.providerId,
 				amountMinor: lead.amountMinor,
 				currency: lead.currency,
-				razorpayOrderId: lead.razorpayOrderId,
+				merchantTransactionId: lead.merchantTransactionId,
 				razorpayPaymentId: lead.razorpayPaymentId,
 			};
 		}
@@ -286,12 +258,12 @@ export const confirmMyTherapistLeadPurchase = async (
 				providerId: userId,
 				status: 'AVAILABLE',
 				paymentStatus: 'INITIATED',
-				razorpayOrderId: input.razorpayOrderId,
+				merchantTransactionId: input.merchantTransactionId,
 			},
 			data: {
 				status: 'PURCHASED',
 				paymentStatus: 'CAPTURED',
-				razorpayPaymentId: input.razorpayPaymentId,
+				razorpayPaymentId: input.transactionId,
 				paymentCapturedAt: now,
 				purchasedAt: now,
 			},
@@ -324,7 +296,7 @@ export const confirmMyTherapistLeadPurchase = async (
 				purchasedAt: true,
 				amountMinor: true,
 				currency: true,
-				razorpayOrderId: true,
+				merchantTransactionId: true,
 				razorpayPaymentId: true,
 			},
 		});

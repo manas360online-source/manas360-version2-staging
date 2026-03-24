@@ -228,7 +228,7 @@ export const patientApi = {
     preferredWindow?: string;
   }) =>
     (await http.post('/v1/sessions/book', payload)).data,
-  verifyPayment: async (payload: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) =>
+  verifyPayment: async (payload: { merchantTransactionId: string; transactionId: string; signature: string }) =>
     (await http.post('/v1/payments/verify', payload)).data,
   getUpcomingSessions: async () =>
     withFallbackChain([
@@ -460,30 +460,85 @@ export const patientApi = {
       async () => (await http.get('/patient/me/profile')).data,
     ]),
   getSubscription: async () => {
-    const response = await http.get('/patient/subscription');
-    return unwrapPayload(response.data);
+    const response = await withFallbackChain([
+      async () => (await http.get('/v1/subscription')).data,
+      async () => (await http.get('/subscription')).data,
+      async () => (await http.get('/patient/subscription')).data,
+      async () => (await http.get('/v1/patient/subscription')).data,
+    ]);
+    return unwrapPayload(response);
   },
   createSessionPayment: async (payload: { providerId: string; amountMinor: number; currency?: string }) => {
     const response = await http.post('/v1/payments/sessions', payload);
     return unwrapPayload(response.data);
   },
   upgradeSubscription: async (payload: { planKey: string }) => {
-    const response = await http.patch('/patient/subscription/upgrade', payload);
-    return unwrapPayload(response.data);
+    const response = await withFallbackChain([
+      async () => (await http.patch('/v1/subscription/upgrade', payload)).data,
+      async () => (await http.patch('/subscription/upgrade', payload)).data,
+      async () => (await http.patch('/patient/subscription/upgrade', payload)).data,
+      async () => (await http.patch('/v1/patient/subscription/upgrade', payload)).data,
+    ]);
+    return unwrapPayload(response);
   },
   downgradeSubscription: async () => {
-    const response = await http.patch('/patient/subscription/downgrade');
-    return unwrapPayload(response.data);
+    const response = await withFallbackChain([
+      async () => (await http.patch('/v1/subscription/downgrade')).data,
+      async () => (await http.patch('/subscription/downgrade')).data,
+      async () => (await http.patch('/patient/subscription/downgrade')).data,
+      async () => (await http.patch('/v1/patient/subscription/downgrade')).data,
+    ]);
+    return unwrapPayload(response);
   },
-  cancelSubscription: async () => (await http.patch('/patient/subscription/cancel')).data,
-  reactivateSubscription: async () => (await http.patch('/patient/subscription/reactivate')).data,
-  setSubscriptionAutoRenew: async (autoRenew: boolean) => (await http.patch('/patient/subscription/auto-renew', { autoRenew })).data,
-  getPaymentMethod: async () => (await http.get('/patient/payment-method')).data,
+  cancelSubscription: async () =>
+    withFallbackChain([
+      async () => (await http.patch('/v1/subscription/cancel')).data,
+      async () => (await http.patch('/subscription/cancel')).data,
+      async () => (await http.patch('/patient/subscription/cancel')).data,
+      async () => (await http.patch('/v1/patient/subscription/cancel')).data,
+    ]),
+  reactivateSubscription: async () =>
+    withFallbackChain([
+      async () => (await http.patch('/v1/subscription/reactivate')).data,
+      async () => (await http.patch('/subscription/reactivate')).data,
+      async () => (await http.patch('/patient/subscription/reactivate')).data,
+      async () => (await http.patch('/v1/patient/subscription/reactivate')).data,
+    ]),
+  setSubscriptionAutoRenew: async (autoRenew: boolean) =>
+    withFallbackChain([
+      async () => (await http.patch('/v1/subscription/auto-renew', { autoRenew })).data,
+      async () => (await http.patch('/subscription/auto-renew', { autoRenew })).data,
+      async () => (await http.patch('/patient/subscription/auto-renew', { autoRenew })).data,
+      async () => (await http.patch('/v1/patient/subscription/auto-renew', { autoRenew })).data,
+    ]),
+  getPaymentMethod: async () =>
+    withFallbackChain([
+      async () => (await http.get('/v1/payment-method')).data,
+      async () => (await http.get('/payment-method')).data,
+      async () => (await http.get('/patient/payment-method')).data,
+      async () => (await http.get('/v1/patient/payment-method')).data,
+    ]),
   updatePaymentMethod: async (payload: { cardLast4: string; cardBrand: string; expiryMonth: number; expiryYear: number }) =>
-    (await http.put('/patient/payment-method', payload)).data,
-  getInvoices: async () => (await http.get('/patient/invoices')).data,
+    withFallbackChain([
+      async () => (await http.put('/v1/payment-method', payload)).data,
+      async () => (await http.put('/payment-method', payload)).data,
+      async () => (await http.put('/patient/payment-method', payload)).data,
+      async () => (await http.put('/v1/patient/payment-method', payload)).data,
+    ]),
+  getInvoices: async () =>
+    withFallbackChain([
+      async () => (await http.get('/v1/invoices')).data,
+      async () => (await http.get('/invoices')).data,
+      async () => (await http.get('/patient/invoices')).data,
+      async () => (await http.get('/v1/patient/invoices')).data,
+    ]),
   downloadInvoice: async (id: string) =>
-    (await http.get(`/patient/invoices/${encodeURIComponent(id)}/download`, { responseType: 'blob' })).data,
+    withFallbackChain([
+      async () => (await http.get(`/v1/invoices/${encodeURIComponent(id)}/download`, { responseType: 'blob' })).data,
+      async () => (await http.get(`/invoices/${encodeURIComponent(id)}/download`, { responseType: 'blob' })).data,
+      async () => (await http.get(`/patient/invoices/${encodeURIComponent(id)}/download`, { responseType: 'blob' })).data,
+      async () => (await http.get(`/v1/patient/invoices/${encodeURIComponent(id)}/download`, { responseType: 'blob' })).data,
+    ]),
   getExercises: async () => (await http.get('/patient/exercises')).data,
   logWellnessLibraryActivity: async (payload: { title: string; duration?: number; category?: string; kind?: 'audio' | 'interactive' }) =>
     withV1Fallback(

@@ -5,11 +5,9 @@ import { env } from '../config/env';
 import { prisma } from '../config/db';
 import {
 	createSessionPayment,
-	processRazorpayWebhook,
 	processPhonePeWebhook,
 	releaseSessionEarnings,
 } from '../services/payment.service';
-import { processSubscriptionWebhook } from '../services/subscription.service';
 import { 
 	verifyPhonePeWebhook, 
 	checkPhonePeStatus, 
@@ -69,41 +67,55 @@ export const completeFinancialSessionController = async (req: Request, res: Resp
 	sendSuccess(res, { sessionId }, 'Session earnings released');
 };
 
-export const razorpayWebhookController = async (req: Request, res: Response): Promise<void> => {
-	const signature = String(req.headers['x-razorpay-signature'] ?? '');
-	if (!signature) {
-		throw new AppError('Missing x-razorpay-signature', 401);
-	}
-
-	const rawBody = req.rawBody ?? JSON.stringify(req.body ?? {});
-	const event = req.body as any;
-	const eventType = String(event?.event ?? '');
-	const hasSubscriptionEntity = Boolean(
-		event?.payload?.subscription?.entity || event?.payload?.payment?.entity?.subscription,
-	);
-
-	let result;
-	if (eventType.startsWith('subscription.') || (eventType === 'payment.failed' && hasSubscriptionEntity)) {
-		result = await processSubscriptionWebhook(rawBody, signature);
-	} else {
-		result = await processRazorpayWebhook(rawBody, signature);
-	}
-
-	res.status(200).json({ success: true, ...result });
+export const razorpayWebhookController = async (_req: Request, res: Response): Promise<void> => {
+	// Razorpay payment provider has been removed in favor of PhonePe
+	res.status(200).json({ success: false, message: 'Razorpay is no longer supported. Use PhonePe webhooks.' });
 };
 
 export const phonepeWebhookController = async (req: Request, res: Response): Promise<void> => {
-	// Debug logging for webhook test calls
-	console.log('[PhonePeWebhook] incoming:', {
-		ip: getClientIpFromRequest(req),
-		auth: req.headers.authorization,
-		xVerify: req.headers['x-verify'],
-		body: req.body,
-	});
+	const rawBody = req.rawBody ?? JSON.stringify(req.body ?? {});
+	const xVerify = String(req.headers['x-verify'] ?? '').trim();
 
-	// Temporary success-only mode to allow PhonePe webhook registration.
-	// Keep for initial setup, then replace with actual signature processing.
-	res.status(200).json({ success: true });
+	// 1. IP Whitelisting
+	const { isPhonePeWebhookIP, verifyPhonePeWebhookAuth } = require('../services/phonepe.service');
+	const xForwardedFor = req.headers['x-forwarded-for'];
+	const xForwardedForString = Array.isArray(xForwardedFor) ? xForwardedFor[0] : xForwardedFor;
+	const clientIp =
+		(xForwardedForString ? xForwardedForString.split(',')[0].trim() : '') ||
+		req.headers['x-real-ip'] as string ||
+		req.headers['cf-connecting-ip'] as string ||
+		req.ip ||
+		req.socket?.remoteAddress ||
+		req.connection?.remoteAddress || '';
+	if (!isPhonePeWebhookIP(clientIp)) {
+		throw new AppError('Unauthorized source IP for PhonePe webhook', 403);
+	}
+
+	// 2. Authorization Header
+	const authHeader = String(req.headers['authorization'] ?? '').trim();
+	const { PHONEPE_WEBHOOK_USERNAME, PHONEPE_WEBHOOK_PASSWORD } = process.env;
+	if (!verifyPhonePeWebhookAuth(authHeader, PHONEPE_WEBHOOK_USERNAME, PHONEPE_WEBHOOK_PASSWORD)) {
+		throw new AppError('Invalid PhonePe webhook authorization', 401);
+	}
+
+	// 3. Signature Verification
+	if (!xVerify || !verifyPhonePeWebhook(rawBody, xVerify)) {
+		throw new AppError('Invalid PhonePe webhook signature', 401);
+	}
+
+	const payload = req.body as any;
+	let decoded: any = payload;
+
+	if (typeof payload?.response === 'string' && payload.response.trim().length > 0) {
+		try {
+			decoded = JSON.parse(Buffer.from(payload.response, 'base64').toString('utf8'));
+		} catch {
+			throw new AppError('Invalid PhonePe webhook payload', 422);
+		}
+	}
+
+	const result = await processPhonePeWebhook(decoded);
+	res.status(200).json({ success: true, ...result });
 };
 
 export const getPhonePeStatusController = async (req: Request, res: Response): Promise<void> => {
@@ -115,6 +127,21 @@ export const getPhonePeStatusController = async (req: Request, res: Response): P
 	const status = await checkPhonePeStatus(transactionId);
 	if (!status) {
 		throw new AppError('Unable to fetch payment status', 502);
+	}
+
+	const normalizedCode = String(status?.code || '').toUpperCase();
+	const normalizedState = String(status?.data?.state || '').toUpperCase();
+	const isCompleted = normalizedCode === 'PAYMENT_SUCCESS' || normalizedState === 'COMPLETED';
+
+	// Webhooks can be delayed/unavailable in local test setups.
+	// Reconcile completed PhonePe status inline so patient subscription activation is immediate.
+	if (isCompleted && transactionId.startsWith('SUB_')) {
+		await processPhonePeWebhook(status).catch((error) => {
+			logger.warn('[PhonePe] Inline status reconciliation failed', {
+				transactionId,
+				error: error?.message,
+			});
+		});
 	}
 
 	res.status(200).json({ success: true, data: status });
@@ -167,7 +194,7 @@ export const initiateRefundController = async (req: Request, res: Response): Pro
 		// Initiate PhonePe refund
 		const refundResult = await initiatePhonePeRefund({
 			merchantRefundId,
-			originalMerchantOrderId: payment.razorpayOrderId,
+			originalMerchantOrderId: payment.merchantTransactionId,
 			amountInPaise: Number(payment.amountMinor),
 		});
 
@@ -177,7 +204,7 @@ export const initiateRefundController = async (req: Request, res: Response): Pro
 			create: {
 				paymentId,
 				merchantRefundId,
-				originalMerchantOrderId: payment.razorpayOrderId,
+				originalMerchantOrderId: payment.merchantTransactionId,
 				phonePeRefundId: refundResult.refundId,
 				status: 'PENDING',
 				amountMinor: payment.amountMinor,

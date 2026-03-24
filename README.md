@@ -71,7 +71,7 @@ Prerequisites: Node 18+, npm (or yarn), Docker (optional, for Postgres/Redis), a
 
 - Backend supports two dev-only toggles in `backend/.env`:
 	- `DEV_VERIFICATION_BYPASS=true`: skips OTP verification gating for local email/phone auth testing.
-	- `DEV_PAYMENT_BYPASS=true`: skips Razorpay payment signature validation for local booking tests.
+	- `DEV_PAYMENT_BYPASS=true`: skips PhonePe payment signature validation for local booking tests.
 - These toggles are intended only for `NODE_ENV=development` and must stay disabled outside local development.
 - Frontend booking page shows a `Paid (Dev)` button automatically in Vite dev mode (`import.meta.env.DEV`).
 	- Flow: create booking intent -> simulate payment verify -> continue to patient sessions.

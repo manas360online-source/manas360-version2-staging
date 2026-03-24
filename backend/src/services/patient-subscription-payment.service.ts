@@ -1,10 +1,11 @@
 import { AppError } from '../middleware/error.middleware';
+import { prisma } from '../config/db';
 import { getActivePlatformPlan } from './pricing.service';
 import { initiatePhonePePayment } from './phonepe.service';
 import { env } from '../config/env';
+import { logger } from '../utils/logger';
 
 export const initiatePatientSubscriptionPayment = async (userId: string, planKey: string) => {
-	const { prisma } = await import('../config/db');
 	const plan = await getActivePlatformPlan(planKey);
 	if (!plan) throw new AppError('Invalid subscription plan', 422);
 
@@ -39,7 +40,7 @@ export const initiatePatientSubscriptionPayment = async (userId: string, planKey
 		const redirectUrl = String(latestAttempt?.metadata?.redirectUrl || '').trim();
 		if (redirectUrl && ageMs <= 15 * 60 * 1000) {
 			return {
-				transactionId: String(latestAttempt.razorpayOrderId),
+				transactionId: String(latestAttempt.merchantTransactionId),
 				redirectUrl,
 				planName: plan.name,
 				price: plan.price,
@@ -54,7 +55,8 @@ export const initiatePatientSubscriptionPayment = async (userId: string, planKey
 	}
 
 	const transactionId = `SUB_${userId}_${planKey}_${Date.now()}`;
-	const shouldBypass = env.allowDevPaymentBypass && env.nodeEnv === 'development';
+	const shouldBypass = false;
+	const amountMinor = Math.max(0, Math.round(Number(plan.price || 0) * 100));
 	const frontendBaseUrl = env.frontendUrl;
 	const callbackUrl = `${env.apiUrl}${env.apiPrefix}/v1/payments/phonepe/webhook`;
 	const cycleKey = new Date().toISOString().slice(0, 10);
@@ -65,7 +67,7 @@ export const initiatePatientSubscriptionPayment = async (userId: string, planKey
 		redirectUrl = await initiatePhonePePayment({
 			transactionId,
 			userId,
-			amountInPaise: plan.price,
+			amountInPaise: amountMinor,
 			callbackUrl,
 			redirectUrl: `${frontendBaseUrl}/payment/status?id=${transactionId}&status=SUCCESS`,
 		});
@@ -74,7 +76,6 @@ export const initiatePatientSubscriptionPayment = async (userId: string, planKey
 			throw new AppError(error?.message || 'PhonePe Payment Initiation Failed', 502);
 		}
 		// Bypass mode: mock a success redirect
-		const { logger } = await import('../utils/logger');
 		logger.info('[PhonePe] Bypassing patient payment initiation in development mode', { transactionId });
 		redirectUrl = `${frontendBaseUrl}/payment/status?id=${transactionId}&status=SUCCESS`;
 	}
@@ -83,9 +84,9 @@ export const initiatePatientSubscriptionPayment = async (userId: string, planKey
 	try {
 		await prisma.financialPayment.create({
 			data: {
-				razorpayOrderId: transactionId,
+				merchantTransactionId: transactionId,
 				patientId: userId,
-				amountMinor: plan.price,
+				amountMinor,
 				currency: 'INR',
 				captureIdempotencyKey: subscriptionIdempotencyKey,
 				status: shouldBypass ? 'CAPTURED' : 'INITIATED',
@@ -110,7 +111,7 @@ export const initiatePatientSubscriptionPayment = async (userId: string, planKey
 		const existingRedirect = String(existing?.metadata?.redirectUrl || '').trim();
 		if (existing && existingRedirect) {
 			return {
-				transactionId: String(existing.razorpayOrderId),
+				transactionId: String(existing.merchantTransactionId),
 				redirectUrl: existingRedirect,
 				planName: plan.name,
 				price: plan.price,
@@ -126,7 +127,7 @@ export const initiatePatientSubscriptionPayment = async (userId: string, planKey
 			where: { userId },
 			update: {
 				planName: plan.name,
-				price: plan.price,
+				price: amountMinor,
 				status: 'active',
 				renewalDate: nextRenewalDate,
 				updatedAt: new Date(),
@@ -134,7 +135,7 @@ export const initiatePatientSubscriptionPayment = async (userId: string, planKey
 			create: {
 				userId,
 				planName: plan.name,
-				price: plan.price,
+				price: amountMinor,
 				status: 'active',
 				renewalDate: nextRenewalDate,
 				billingCycle: 'monthly',

@@ -36,16 +36,16 @@ exports.initiateMyTherapistLeadPurchaseController = initiateMyTherapistLeadPurch
 const confirmMyTherapistLeadPurchaseController = async (req, res) => {
     const userId = getAuthUserId(req);
     const leadId = String(req.params.id);
-    const razorpayOrderId = String(req.body.razorpayOrderId ?? '').trim();
-    const razorpayPaymentId = String(req.body.razorpayPaymentId ?? '').trim();
-    const razorpaySignature = String(req.body.razorpaySignature ?? '').trim();
-    if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
-        throw new error_middleware_1.AppError('razorpayOrderId, razorpayPaymentId and razorpaySignature are required', 422);
+    const merchantTransactionId = String(req.body.merchantTransactionId ?? '').trim();
+    const transactionId = String(req.body.transactionId ?? '').trim();
+    const signature = String(req.body.signature ?? '').trim();
+    if (!merchantTransactionId || !transactionId || !signature) {
+        throw new error_middleware_1.AppError('merchantTransactionId, transactionId and signature are required', 422);
     }
     const result = await (0, lead_service_1.confirmMyTherapistLeadPurchase)(userId, leadId, {
-        razorpayOrderId,
-        razorpayPaymentId,
-        razorpaySignature,
+        merchantTransactionId,
+        transactionId,
+        signature,
     });
     (0, response_1.sendSuccess)(res, result, 'Lead purchase confirmed');
 };

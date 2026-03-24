@@ -33,13 +33,12 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.retryPaymentManually = exports.processRazorpayWebhook = exports.releaseSessionEarnings = exports.processPhonePeWebhook = exports.createSessionPayment = void 0;
+exports.retryPaymentManually = exports.releaseSessionEarnings = exports.processPhonePeWebhook = exports.createSessionPayment = void 0;
 const crypto_1 = __importStar(require("crypto"));
 const redis_1 = require("redis");
 const env_1 = require("../config/env");
 const db_1 = require("../config/db");
 const error_middleware_1 = require("../middleware/error.middleware");
-const razorpay_service_1 = require("./razorpay.service");
 const phonepe_service_1 = require("./phonepe.service");
 const payment_metrics_service_1 = require("./payment-metrics.service");
 const logger_1 = require("../utils/logger");
@@ -91,16 +90,8 @@ const createSessionPayment = async (input) => {
         if (payment) {
             return {
                 sessionId: existing.id,
-                paymentId: payment.id,
                 paymentType: 'provider_fee',
-                transactionId: existing.razorpayOrderId,
-                redirectUrl: '',
-                amountMinor: existing.expectedAmountMinor,
-                currency: existing.currency,
-                feeBreakdown: {
-                    platformFeeMinor: Math.round(existing.expectedAmountMinor * platformShareRatio),
-                    providerFeeMinor: Math.floor(existing.expectedAmountMinor * providerShareRatio),
-                },
+                transactionId: existing.merchantTransactionId,
                 idempotencyKey,
             };
         }
@@ -140,14 +131,14 @@ const createSessionPayment = async (input) => {
                 expectedAmountMinor: amountMinor,
                 currency: input.currency ?? 'INR',
                 idempotencyKey,
-                razorpayOrderId: transactionId,
+                merchantTransactionId: transactionId,
             },
         });
         const payment = await tx.financialPayment.create({
             data: {
                 sessionId: session.id,
                 providerId: input.providerId,
-                razorpayOrderId: transactionId,
+                merchantTransactionId: transactionId,
                 status: 'PENDING_CAPTURE',
                 amountMinor,
                 currency: input.currency ?? 'INR',
@@ -185,7 +176,7 @@ const processPhonePeWebhook = async (decoded) => {
             let capturedAmountMinor = 0;
             await db.$transaction(async (tx) => {
                 const payment = await tx.financialPayment.findFirst({
-                    where: { razorpayOrderId: merchantTransactionId },
+                    where: { merchantTransactionId: merchantTransactionId },
                 });
                 if (!payment) {
                     logger_1.logger.error('[PaymentService] PhonePe webhook with unknown transaction', { merchantTransactionId });
@@ -235,7 +226,6 @@ const processPhonePeWebhook = async (decoded) => {
                         currency: payment.currency,
                         referenceId: payment.sessionId,
                         sessionId: payment.sessionId,
-                        paymentId: payment.id,
                     },
                 });
             });
@@ -257,7 +247,7 @@ const processPhonePeWebhook = async (decoded) => {
             const userId = parts[1];
             const planKey = data.metadata?.plan || parts[2];
             const payment = await db.financialPayment.findFirst({
-                where: { razorpayOrderId: merchantTransactionId },
+                where: { merchantTransactionId: merchantTransactionId },
                 orderBy: { createdAt: 'desc' },
             });
             if (payment?.status === 'CAPTURED') {
@@ -317,7 +307,7 @@ const processPhonePeWebhook = async (decoded) => {
             // Fix 7: Get plan from metadata payload (fallback to URL param)
             const planKey = data.metadata?.plan || parts[3];
             const payment = await db.financialPayment.findFirst({
-                where: { razorpayOrderId: merchantTransactionId },
+                where: { merchantTransactionId: merchantTransactionId },
                 orderBy: { createdAt: 'desc' },
             });
             if (payment?.status === 'CAPTURED') {
@@ -433,7 +423,6 @@ const releaseSessionEarnings = async (sessionId, actorTherapistId) => {
                 balanceBeforeMinor: before,
                 balanceAfterMinor: after,
                 sessionId,
-                paymentId: payment.id,
                 referenceKey: releaseReferenceKey,
             },
         });
@@ -444,105 +433,6 @@ const releaseSessionEarnings = async (sessionId, actorTherapistId) => {
     });
 };
 exports.releaseSessionEarnings = releaseSessionEarnings;
-const processRazorpayWebhook = async (rawBody, signature) => {
-    if (!env_1.env.razorpayWebhookSecret) {
-        throw new error_middleware_1.AppError('RAZORPAY_WEBHOOK_SECRET not configured', 500);
-    }
-    const isSignatureValid = (0, razorpay_service_1.verifyRazorpayWebhookSignature)(rawBody, signature, env_1.env.razorpayWebhookSecret);
-    if (!isSignatureValid) {
-        throw new error_middleware_1.AppError('Invalid Razorpay webhook signature', 401);
-    }
-    const event = JSON.parse(rawBody);
-    const eventId = String(event?.id ?? '');
-    const eventType = String(event?.event ?? '');
-    if (!eventId || !eventType) {
-        throw new error_middleware_1.AppError('Invalid webhook payload', 422);
-    }
-    const cacheKey = `webhook:razorpay:${eventId}`;
-    let setOk = 'OK';
-    if (!isTestEnv) {
-        setOk = await redis.set(cacheKey, '1', {
-            NX: true,
-            EX: env_1.env.webhookIdempotencyTtlSeconds,
-        }).catch(() => 'OK');
-    }
-    if (!setOk) {
-        return { handled: true, message: 'Duplicate webhook (cache)' };
-    }
-    const payloadHash = sha256(rawBody);
-    try {
-        await db.webhookLog.create({
-            data: {
-                provider: 'RAZORPAY',
-                eventId,
-                eventType,
-                payloadHash,
-                signature,
-                isSignatureValid: true,
-                processStatus: 'RECEIVED',
-                rawPayload: event,
-            },
-        });
-    }
-    catch {
-        return { handled: true, message: 'Duplicate webhook (db unique)' };
-    }
-    if (eventType === 'payment.captured') {
-        const paymentEntity = event?.payload?.payment?.entity;
-        const razorpayOrderId = String(paymentEntity?.order_id ?? '');
-        const razorpayPaymentId = String(paymentEntity?.id ?? '');
-        const amountMinor = asMinor(Number(paymentEntity?.amount ?? 0));
-        if (!razorpayOrderId || !razorpayPaymentId || !amountMinor) {
-            await db.webhookLog.updateMany({
-                where: { provider: 'RAZORPAY', eventId },
-                data: { processStatus: 'FAILED' },
-            });
-            throw new error_middleware_1.AppError('Invalid payment.captured payload', 422);
-        }
-        await db.$transaction(async (tx) => {
-            const payment = await tx.financialPayment.findFirst({
-                where: { razorpayOrderId },
-            });
-            if (!payment || payment.status === 'CAPTURED' || payment.status === 'FAILED')
-                return;
-            const therapistShareMinor = Math.floor(amountMinor * providerShareRatio);
-            const platformShareMinor = amountMinor - therapistShareMinor;
-            await tx.financialPayment.update({
-                where: { id: payment.id },
-                data: {
-                    status: 'CAPTURED',
-                    razorpayPaymentId,
-                    capturedAt: new Date(),
-                    therapistShareMinor,
-                    platformShareMinor,
-                },
-            });
-            await tx.providerWallet.upsert({
-                where: { providerId: payment.providerId },
-                update: {
-                    pendingBalanceMinor: { increment: therapistShareMinor },
-                    lifetimeEarningsMinor: { increment: therapistShareMinor },
-                },
-                create: {
-                    providerId: payment.providerId,
-                    pendingBalanceMinor: therapistShareMinor,
-                    lifetimeEarningsMinor: therapistShareMinor,
-                },
-            });
-            await tx.financialSession.update({
-                where: { id: payment.sessionId },
-                data: { status: 'CONFIRMED', confirmedAt: new Date() },
-            });
-            await tx.webhookLog.updateMany({
-                where: { provider: 'RAZORPAY', eventId },
-                data: { processStatus: 'PROCESSED', processedAt: new Date(), sessionId: payment.sessionId },
-            });
-        });
-        return { handled: true, message: 'payment.captured processed' };
-    }
-    return { handled: false, message: `Unhandled event: ${eventType}` };
-};
-exports.processRazorpayWebhook = processRazorpayWebhook;
 /**
  * Manual Payment Retry (Admin Recovery Tool)
  *

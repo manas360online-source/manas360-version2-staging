@@ -3,7 +3,6 @@ import {
   login as loginApi,
   logout as logoutApi,
   me as meApi,
-  register as registerApi,
   type AuthUser,
 } from '../api/auth';
 
@@ -97,9 +96,8 @@ type AuthContextValue = {
   loading: boolean;
   isAuthenticated: boolean;
   login: (identifier: string, password: string) => Promise<AuthUser>;
-  register: (email: string, password: string, name: string, role: 'patient' | 'therapist' | 'psychiatrist' | 'coach') => Promise<void>;
   logout: () => Promise<void>;
-  checkAuth: () => Promise<void>;
+  checkAuth: (options?: { force?: boolean }) => Promise<void>;
 };
 
 type AuthContextGlobal = typeof globalThis & {
@@ -147,8 +145,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [authProbeBlockKey]);
 
-  const checkAuth = useCallback(async () => {
-    if (!hasSessionHint()) {
+  const checkAuth = useCallback(async (options?: { force?: boolean }) => {
+    const shouldForceProbe = options?.force === true;
+
+    if (!shouldForceProbe && !hasSessionHint()) {
       setUser(null);
       setLoading(false);
       return;
@@ -166,7 +166,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-	}, [hasSessionHint, clearSessionHint, authProbeBlockKey]);
+  }, [hasSessionHint, clearSessionHint, authProbeBlockKey]);
 
   useEffect(() => {
     if (hasCheckedInitialAuthRef.current) {
@@ -197,10 +197,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [authProbeBlockKey]);
 
-  const register = useCallback(async (email: string, password: string, name: string, role: 'patient' | 'therapist' | 'psychiatrist' | 'coach') => {
-    await registerApi({ email, password, name, role });
-  }, []);
-
   const logout = useCallback(async () => {
     try {
       await logoutApi();
@@ -218,11 +214,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       isAuthenticated: !!user,
       login,
-      register,
       logout,
       checkAuth,
     }),
-    [user, loading, login, register, logout, checkAuth],
+    [user, loading, login, logout, checkAuth],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

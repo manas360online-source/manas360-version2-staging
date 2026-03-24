@@ -11,7 +11,7 @@ export const trackWebhookEvent = async (eventId: string, eventType: string): Pro
 	try {
 		// Check if webhook was already processed
 		const existing = await prisma.webhookLog.findFirst({
-			where: { provider: 'RAZORPAY', eventId },
+			where: { provider: 'PHONEPE', eventId },
 		});
 
 		if (existing) {
@@ -27,7 +27,7 @@ export const trackWebhookEvent = async (eventId: string, eventType: string): Pro
 		const payloadHash = crypto.createHash('sha256').update(`${eventType}:${eventId}`).digest('hex');
 		await prisma.webhookLog.create({
 			data: {
-				provider: 'RAZORPAY',
+				provider: 'PHONEPE',
 				eventId,
 				eventType,
 				payloadHash,
@@ -75,7 +75,7 @@ export const processOrderCompletedEvent = async (payload: any): Promise<void> =>
 
 	// Find and update payment record
 	const payment = await prisma.financialPayment.findFirst({
-		where: { razorpayOrderId: merchantTransactionId },
+		where: { merchantTransactionId: merchantTransactionId },
 		include: { session: true },
 	});
 
@@ -153,7 +153,7 @@ export const processOrderFailedEvent = async (payload: any): Promise<void> => {
 
 	// Find and update payment record
 	const payment = await prisma.financialPayment.findFirst({
-		where: { razorpayOrderId: merchantTransactionId },
+		where: { merchantTransactionId: merchantTransactionId },
 	});
 
 	if (!payment) {

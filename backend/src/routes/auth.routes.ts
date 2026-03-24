@@ -7,15 +7,12 @@ import {
 	mfaSetupController,
 	mfaVerifyController,
 	providerRegisterController,
-	registerController,
 	refreshTokenController,
 	requestPasswordResetController,
 	revokeSessionController,
 	resetPasswordController,
 	sessionsController,
-	signupWithEmailController,
 	signupWithPhoneController,
-	verifyEmailOtpController,
 	verifyPhoneOtpController,
 } from '../controllers/auth.controller';
 import { requireAuth, requireCsrf } from '../middleware/auth.middleware';
@@ -24,10 +21,7 @@ import { asyncHandler } from '../middleware/validate.middleware';
 
 const router = Router();
 
-router.post('/register', authRateLimiter, asyncHandler(registerController));
 router.post('/provider-register', requireAuth, authRateLimiter, asyncHandler(providerRegisterController));
-router.post('/signup/email', authRateLimiter, asyncHandler(signupWithEmailController));
-router.post('/verify/email-otp', authRateLimiter, asyncHandler(verifyEmailOtpController));
 router.post('/signup/phone', authRateLimiter, asyncHandler(signupWithPhoneController));
 router.post('/verify/phone-otp', authRateLimiter, asyncHandler(verifyPhoneOtpController));
 

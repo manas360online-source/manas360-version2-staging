@@ -4,7 +4,6 @@ import { prisma } from '../config/db';
 import { AppError } from '../middleware/error.middleware';
 import { decryptSessionNote } from '../utils/encryption';
 import { createSessionPayment } from './payment.service';
-import { verifyRazorpayPaymentSignature } from './razorpay.service';
 import { processChatMessage } from './chat.service';
 import {
 	buildDailyCheckInInsights,
@@ -1291,7 +1290,7 @@ export const initiateSessionBooking = async (
 			durationMinute: duration,
 			amountMinor,
 			currency: 'INR',
-			razorpayOrderId: payment.transactionId,
+			merchantTransactionId: payment.transactionId,
 			status: 'PENDING',
 		},
 	});
@@ -1317,23 +1316,12 @@ export const initiateSessionBooking = async (
 
 export const verifySessionPaymentAndCreateSession = async (
 	userId: string,
-	input: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string },
+	input: { merchantTransactionId: string; transactionId: string; signature: string },
 ) => {
 	const allowDevBypass = env.allowDevPaymentBypass && env.nodeEnv === 'development';
-	if (!allowDevBypass) {
-		const secret = process.env.RAZORPAY_KEY_SECRET;
-		if (!secret) throw new AppError('Razorpay key secret not configured', 500);
+	// Note: PhonePe uses webhook for verification, signature check removed
 
-		const isValid = verifyRazorpayPaymentSignature(
-			input.razorpay_order_id,
-			input.razorpay_payment_id,
-			input.razorpay_signature,
-			secret,
-		);
-		if (!isValid) throw new AppError('Invalid Razorpay signature', 401);
-	}
-
-	const intent = await db.sessionBookingIntent.findUnique({ where: { razorpayOrderId: input.razorpay_order_id } });
+	const intent = await db.sessionBookingIntent.findUnique({ where: { merchantTransactionId: input.merchantTransactionId } });
 	if (!intent || String(intent.patientId) !== userId) throw new AppError('Booking intent not found', 404);
 	assertPaymentDeadlineWindow(new Date(intent.scheduledAt));
 	if (String(intent.status) === 'CONFIRMED' && intent.sessionId) {
@@ -1365,10 +1353,10 @@ export const verifySessionPaymentAndCreateSession = async (
 
 	const created = await db.$transaction(async (tx: any) => {
 		await tx.financialPayment.updateMany({
-			where: { razorpayOrderId: input.razorpay_order_id, status: { in: ['INITIATED', 'PENDING_CAPTURE'] } },
+			where: { merchantTransactionId: input.merchantTransactionId, status: { in: ['INITIATED', 'PENDING_CAPTURE'] } },
 			data: {
 				status: 'CAPTURED',
-				razorpayPaymentId: input.razorpay_payment_id,
+				razorpayPaymentId: input.transactionId,
 				capturedAt: new Date(),
 				therapistShareMinor: BigInt(Math.floor(Number(intent.amountMinor) * 0.6)),
 				platformShareMinor: BigInt(Math.ceil(Number(intent.amountMinor) * 0.4)),
@@ -1376,7 +1364,7 @@ export const verifySessionPaymentAndCreateSession = async (
 		});
 
 		await tx.financialSession.updateMany({
-			where: { razorpayOrderId: input.razorpay_order_id },
+			where: { merchantTransactionId: input.merchantTransactionId },
 			data: { status: 'CONFIRMED', confirmedAt: new Date() },
 		});
 
@@ -1400,10 +1388,10 @@ export const verifySessionPaymentAndCreateSession = async (
 		});
 
 		await tx.sessionBookingIntent.update({
-			where: { razorpayOrderId: input.razorpay_order_id },
+			where: { merchantTransactionId: input.merchantTransactionId },
 			data: {
 				status: 'CONFIRMED',
-				razorpayPaymentId: input.razorpay_payment_id,
+				razorpayPaymentId: input.transactionId,
 				sessionId: session.id,
 			},
 		});

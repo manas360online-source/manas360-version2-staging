@@ -52,6 +52,8 @@ import {
 	updatePatientSubscriptionPlan,
 	verifySessionPaymentAndCreateSession,
 } from '../services/patient-v1.service';
+import { getActivePlatformPlan } from '../services/pricing.service';
+import { initiatePatientSubscriptionPayment } from '../services/patient-subscription-payment.service';
 import {
 	completeTreatmentPlanTask,
 	getMyTreatmentPlan,
@@ -309,13 +311,13 @@ export const bookSessionController = async (req: Request, res: Response): Promis
 
 export const verifyPaymentController = async (req: Request, res: Response): Promise<void> => {
 	const userId = authUserId(req);
-	const razorpay_order_id = String(req.body.razorpay_order_id || '').trim();
-	const razorpay_payment_id = String(req.body.razorpay_payment_id || '').trim();
-	const razorpay_signature = String(req.body.razorpay_signature || '').trim();
-	if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-		throw new AppError('razorpay_order_id, razorpay_payment_id and razorpay_signature are required', 422);
+	const merchantTransactionId = String(req.body.merchantTransactionId || '').trim();
+	const transactionId = String(req.body.transactionId || '').trim();
+	const signature = String(req.body.signature || '').trim();
+	if (!merchantTransactionId || !transactionId || !signature) {
+		throw new AppError('merchantTransactionId, transactionId and signature are required', 422);
 	}
-	const result = await verifySessionPaymentAndCreateSession(userId, { razorpay_order_id, razorpay_payment_id, razorpay_signature });
+	const result = await verifySessionPaymentAndCreateSession(userId, { merchantTransactionId, transactionId, signature });
 	sendSuccess(res, result, 'Payment verified and session confirmed');
 };
 
@@ -615,7 +617,6 @@ export const upgradePatientSubscriptionController = async (req: Request, res: Re
 		throw new AppError('planKey is required', 422);
 	}
 
-	const { getActivePlatformPlan } = await import('../services/pricing.service');
 	const plan = await getActivePlatformPlan(planKey);
 	
 	if (!plan) {
@@ -630,7 +631,6 @@ export const upgradePatientSubscriptionController = async (req: Request, res: Re
 	}
 
 	// Paid plan: initiate PhonePe payment (supports dev bypass)
-	const { initiatePatientSubscriptionPayment } = await import('../services/patient-subscription-payment.service');
 	const data = await initiatePatientSubscriptionPayment(userId, planKey);
 	sendSuccess(res, data, 'Payment initiated');
 };

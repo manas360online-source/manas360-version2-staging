@@ -8,7 +8,6 @@ import {
 	loginWithPassword,
 	logoutSession,
 	refreshAuthTokens,
-	registerWithEmail,
 	registerProviderProfile,
 	registerWithPhone,
 	requestPasswordReset,
@@ -16,12 +15,10 @@ import {
 	revokeSession,
 	setupMfa,
 	verifyAndEnableMfa,
-	verifyEmailOtp,
 	verifyPhoneOtp,
 } from '../services/auth.service';
 import { sendSuccess } from '../utils/response';
 import {
-	validateEmail,
 	validateOtp,
 	validatePassword,
 	validatePhone,
@@ -43,6 +40,13 @@ const resolveCookieDomain = (): string | undefined => {
 
 	const normalized = rawDomain.toLowerCase();
 	if (normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '::1') {
+		return undefined;
+	}
+
+	const isIpv4 = /^(?:\d{1,3}\.){3}\d{1,3}$/.test(normalized);
+	const isBracketedIpv6 = /^\[[0-9a-f:]+\]$/i.test(normalized);
+	const isBareIpv6 = normalized.includes(':') && /^[0-9a-f:]+$/i.test(normalized);
+	if (isIpv4 || isBracketedIpv6 || isBareIpv6) {
 		return undefined;
 	}
 
@@ -70,16 +74,25 @@ const resolveRuntimeCookieDomain = (hostname?: string): string | undefined => {
 	return undefined;
 };
 
-const shouldUseSecureCookies = env.cookieSecure || (env.nodeEnv !== 'development' && env.nodeEnv !== 'test');
-const cookieSameSite = shouldUseSecureCookies ? 'none' as const : 'lax' as const;
+const shouldUseSecureCookies = (req: Request): boolean => (
+	env.cookieSecure || req.secure || (env.nodeEnv !== 'development' && env.nodeEnv !== 'test')
+);
 
-const buildTokenCookieOptions = (req: Request) => ({
-	httpOnly: true,
-	secure: shouldUseSecureCookies,
-	sameSite: cookieSameSite,
-	domain: resolveRuntimeCookieDomain(req.hostname),
-	path: '/',
-});
+const resolveCookieSameSite = (useSecureCookies: boolean): 'none' | 'lax' => (
+	useSecureCookies ? 'none' : 'lax'
+);
+
+const buildTokenCookieOptions = (req: Request) => {
+	const useSecureCookies = shouldUseSecureCookies(req);
+
+	return {
+		httpOnly: true,
+		secure: useSecureCookies,
+		sameSite: resolveCookieSameSite(useSecureCookies),
+		domain: resolveRuntimeCookieDomain(req.hostname),
+		path: '/',
+	};
+};
 
 const setAuthCookies = (req: Request, res: Response, accessToken: string, refreshToken: string): void => {
 	const tokenCookieOptions = buildTokenCookieOptions(req);
@@ -95,31 +108,12 @@ const setAuthCookies = (req: Request, res: Response, accessToken: string, refres
 
 	res.cookie(env.csrfCookieName, randomBytes(24).toString('hex'), {
 		httpOnly: false,
-		secure: shouldUseSecureCookies,
-		sameSite: cookieSameSite,
+		secure: tokenCookieOptions.secure,
+		sameSite: tokenCookieOptions.sameSite,
 		domain: tokenCookieOptions.domain,
 		path: '/',
 		maxAge: 7 * 24 * 60 * 60 * 1000,
 	});
-};
-
-export const registerController = async (req: Request, res: Response): Promise<void> => {
-	const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
-	if (!name) {
-		throw new AppError('name is required', 400);
-	}
-
-	const result = await registerWithEmail(
-		{
-			email: validateEmail(req.body.email),
-			password: validatePassword(req.body.password),
-			name,
-			role: validatePublicSignupRole(req.body.role),
-		},
-		getRequestMeta(req),
-	);
-
-	sendSuccess(res, result, 'Registration successful', 201);
 };
 
 export const providerRegisterController = async (req: Request, res: Response): Promise<void> => {
@@ -228,49 +222,24 @@ export const meController = async (req: Request, res: Response): Promise<void> =
 	);
 };
 
-export const signupWithEmailController = async (req: Request, res: Response): Promise<void> => {
-	const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
-	if (!name) {
-		throw new AppError('name is required', 400);
-	}
-
-	const result = await registerWithEmail(
-		{
-			email: validateEmail(req.body.email),
-			password: validatePassword(req.body.password),
-			name,
-			role: validatePublicSignupRole(req.body.role),
-		},
-		getRequestMeta(req),
-	);
-
-	sendSuccess(res, result, 'Registration successful', 201);
-};
-
-export const verifyEmailOtpController = async (req: Request, res: Response): Promise<void> => {
-	await verifyEmailOtp({
-		email: validateEmail(req.body.email),
-		otp: validateOtp(req.body.otp),
-	});
-
-	sendSuccess(res, null, 'Email verified');
-};
-
 export const signupWithPhoneController = async (req: Request, res: Response): Promise<void> => {
 	const result = await registerWithPhone({
 		phone: validatePhone(req.body.phone),
+		name: typeof req.body.name === 'string' ? req.body.name.trim() : undefined,
+		role: req.body.role ? validatePublicSignupRole(req.body.role) : undefined,
 	});
 
 	sendSuccess(res, result, 'Phone OTP sent', 201);
 };
 
 export const verifyPhoneOtpController = async (req: Request, res: Response): Promise<void> => {
-	await verifyPhoneOtp({
+	const result = await verifyPhoneOtp({
 		phone: validatePhone(req.body.phone),
 		otp: validateOtp(req.body.otp),
-	});
+	}, getRequestMeta(req));
 
-	sendSuccess(res, null, 'Phone verified');
+	setAuthCookies(req, res, result.accessToken, result.refreshToken);
+	sendSuccess(res, { user: result.user, sessionId: result.sessionId }, 'Phone verified and login successful');
 };
 
 export const loginController = async (req: Request, res: Response): Promise<void> => {
@@ -373,8 +342,8 @@ export const logoutController = async (req: Request, res: Response): Promise<voi
 	res.clearCookie(env.refreshCookieName, tokenCookieOptions);
 	res.clearCookie(env.csrfCookieName, {
 		httpOnly: false,
-		secure: shouldUseSecureCookies,
-		sameSite: cookieSameSite,
+		secure: tokenCookieOptions.secure,
+		sameSite: tokenCookieOptions.sameSite,
 		domain: tokenCookieOptions.domain,
 		path: '/',
 	});

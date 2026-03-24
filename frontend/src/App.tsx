@@ -14,8 +14,6 @@ import { OnboardingName } from './pages/OnboardingName'
 import { OnboardingEmail } from './pages/OnboardingEmail'
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
 const SignupPage = lazy(() => import('./pages/auth/SignupPage'));
-const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage'));
-const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage'));
 import ProtectedRoute from './components/ProtectedRoute'
 import PlatformAdminRoute from './components/PlatformAdminRoute'
 import CorporateRoute from './components/CorporateRoute'
@@ -283,8 +281,6 @@ function App() {
             <Route path="/psychiatrist/*" element={<Navigate to="/provider/dashboard" replace />} />
             <Route path="/psychologist/*" element={<Navigate to="/provider/dashboard" replace />} />
             <Route path="/auth/signup" element={<SignupPage />} />
-            <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
-            <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
             <Route path="/payment/status" element={<PaymentStatusPage />} />
             <Route path="/admin-portal/login" element={<AdminPortalLoginPage />} />
             <Route path="/corporate/login" element={<Navigate to="/auth/login" replace />} />

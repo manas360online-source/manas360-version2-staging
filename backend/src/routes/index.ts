@@ -46,6 +46,7 @@ router.use('/auth', authRoutes);
 router.use('/v1/auth', authRoutes);
 router.use('/v1', patientV1Routes);
 router.use('/patient', patientSelfRoutes);
+router.use('/v1/patient', patientSelfRoutes);
 router.use('/v1/users', userRoutes);
 router.use('/v1/patients', patientRoutes);
 router.use('/v1/therapists', therapistRoutes);

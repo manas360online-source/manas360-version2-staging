@@ -1,13 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcrypt');
-const { Pool } = require('pg');
-const { PrismaPg } = require('@prisma/adapter-pg');
-
-const connectionString = process.env.DATABASE_URL || '';
-const pool = new Pool({ connectionString });
-const adapter = new PrismaPg(pool);
-
-const prisma = new PrismaClient({ adapter });
+const prisma = new PrismaClient();
 
 const DEFAULT_PASSWORD = process.env.SEED_DEFAULT_PASSWORD || 'Demo@12345';
 
@@ -82,9 +75,21 @@ const createUsersByRole = ({ role, count, predefined = [] }) => {
   const needed = Math.max(0, count - predefined.length);
 
   for (let index = 1; index <= needed; index += 1) {
+    const serial = predefined.length + index;
     const suffix = `${role.toLowerCase()}${index}`;
+    const rolePrefixMap = {
+      PATIENT: '70001',
+      THERAPIST: '70002',
+      COACH: '70003',
+      PSYCHIATRIST: '70004',
+      PSYCHOLOGIST: '70005',
+      ADMIN: '70006',
+    };
+    const rolePrefix = rolePrefixMap[role] || '70009';
+    const phone = `+91${rolePrefix}${String(serial).padStart(5, '0')}`;
     generated.push({
       email: `${suffix}@demo.com`,
+      phone,
       firstName: role.slice(0, 1) + role.slice(1).toLowerCase(),
       lastName: `User${index}`,
       role,
@@ -95,7 +100,7 @@ const createUsersByRole = ({ role, count, predefined = [] }) => {
 };
 
 async function upsertUser(userInput, passwordHash) {
-  const { email, firstName, lastName, role } = userInput;
+  const { email, phone, firstName, lastName, role } = userInput;
   const providerType = providerTypeByRole[role] || null;
   const providerFlags = providerType
     ? {
@@ -117,11 +122,12 @@ async function upsertUser(userInput, passwordHash) {
       firstName,
       lastName,
       name: `${firstName} ${lastName}`,
+      phone,
       role,
       providerType,
       provider: 'LOCAL',
       emailVerified: true,
-      phoneVerified: false,
+      phoneVerified: true,
       isDeleted: false,
       status: 'ACTIVE',
       passwordHash,
@@ -131,6 +137,7 @@ async function upsertUser(userInput, passwordHash) {
     },
     create: {
       email,
+      phone,
       firstName,
       lastName,
       name: `${firstName} ${lastName}`,
@@ -138,7 +145,7 @@ async function upsertUser(userInput, passwordHash) {
       providerType,
       provider: 'LOCAL',
       emailVerified: true,
-      phoneVerified: false,
+      phoneVerified: true,
       status: 'ACTIVE',
       passwordHash,
       ...providerFlags,
@@ -153,42 +160,42 @@ async function seed() {
     role: 'PATIENT',
     count: 20,
     predefined: [
-      { email: 'patient@demo.com', firstName: 'Patient', lastName: 'Demo', role: 'PATIENT' },
-      { email: 'free@demo.com', firstName: 'Free', lastName: 'Plan', role: 'PATIENT' },
-      { email: 'basic@demo.com', firstName: 'Basic', lastName: 'Plan', role: 'PATIENT' },
-      { email: 'premium@demo.com', firstName: 'Premium', lastName: 'Plan', role: 'PATIENT' },
+      { email: 'patient@demo.com', phone: '+917000100001', firstName: 'Patient', lastName: 'Demo', role: 'PATIENT' },
+      { email: 'free@demo.com', phone: '+917000100002', firstName: 'Free', lastName: 'Plan', role: 'PATIENT' },
+      { email: 'basic@demo.com', phone: '+917000100003', firstName: 'Basic', lastName: 'Plan', role: 'PATIENT' },
+      { email: 'premium@demo.com', phone: '+917000100004', firstName: 'Premium', lastName: 'Plan', role: 'PATIENT' },
     ],
   });
 
   const therapistsSeed = createUsersByRole({
     role: 'THERAPIST',
     count: 10,
-    predefined: [{ email: 'therapist@demo.com', firstName: 'Therapist', lastName: 'Demo', role: 'THERAPIST' }],
+    predefined: [{ email: 'therapist@demo.com', phone: '+917000200001', firstName: 'Therapist', lastName: 'Demo', role: 'THERAPIST' }],
   });
 
   const coachesSeed = createUsersByRole({
     role: 'COACH',
     count: 5,
-    predefined: [{ email: 'coach@demo.com', firstName: 'Coach', lastName: 'Demo', role: 'COACH' }],
+    predefined: [{ email: 'coach@demo.com', phone: '+917000300001', firstName: 'Coach', lastName: 'Demo', role: 'COACH' }],
   });
 
   const psychiatristsSeed = createUsersByRole({
     role: 'PSYCHIATRIST',
     count: 3,
-    predefined: [{ email: 'psychiatrist@demo.com', firstName: 'Psychiatrist', lastName: 'Demo', role: 'PSYCHIATRIST' }],
+    predefined: [{ email: 'psychiatrist@demo.com', phone: '+917000400001', firstName: 'Psychiatrist', lastName: 'Demo', role: 'PSYCHIATRIST' }],
   });
 
   const psychologistsSeed = createUsersByRole({
     role: 'PSYCHOLOGIST',
     count: 4,
-    predefined: [{ email: 'psychologist@demo.com', firstName: 'Psychologist', lastName: 'Demo', role: 'PSYCHOLOGIST' }],
+    predefined: [{ email: 'psychologist@demo.com', phone: '+917000500001', firstName: 'Psychologist', lastName: 'Demo', role: 'PSYCHOLOGIST' }],
   });
 
   const adminsSeed = createUsersByRole({
     role: 'ADMIN',
     count: 1,
     predefined: [
-      { email: 'admin@demo.com', firstName: 'Admin', lastName: 'Demo', role: 'ADMIN' },
+      { email: 'admin@demo.com', phone: '+917000600001', firstName: 'Admin', lastName: 'Demo', role: 'ADMIN' },
     ],
   });
 
