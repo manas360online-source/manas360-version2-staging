@@ -191,7 +191,7 @@ export const initiateRefundController = async (req: Request, res: Response): Pro
 		// Initiate PhonePe refund
 		const refundResult = await initiatePhonePeRefund({
 			merchantRefundId,
-			originalMerchantOrderId: payment.razorpayOrderId,
+			originalMerchantOrderId: payment.merchantTransactionId,
 			amountInPaise: Number(payment.amountMinor),
 		});
 
@@ -201,7 +201,7 @@ export const initiateRefundController = async (req: Request, res: Response): Pro
 			create: {
 				paymentId,
 				merchantRefundId,
-				originalMerchantOrderId: payment.razorpayOrderId,
+				originalMerchantOrderId: payment.merchantTransactionId,
 				phonePeRefundId: refundResult.refundId,
 				status: 'PENDING',
 				amountMinor: payment.amountMinor,
