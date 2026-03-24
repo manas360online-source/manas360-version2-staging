@@ -251,16 +251,18 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 		}
 
 		if (merchantTransactionId.startsWith('SUB_')) {
-			const parts = merchantTransactionId.split('_');
-			const userId = parts[1];
-			const planKey = data.metadata?.plan || parts[2];
-
 			const payment = await db.financialPayment.findFirst({
 				where: { merchantTransactionId: merchantTransactionId },
 				orderBy: { createdAt: 'desc' },
 			});
 			if (payment?.status === 'CAPTURED') {
 				return { handled: true, message: 'Patient subscription payment already captured' };
+			}
+			const parts = merchantTransactionId.split('_');
+			const userId = String(payment?.patientId || parts[1] || '');
+			const planKey = data.metadata?.plan || payment?.metadata?.plan || parts[2];
+			if (!userId) {
+				throw new AppError('Unable to resolve patient subscription userId from payment', 422);
 			}
 
 			const { checkPhonePeStatus } = await import('./phonepe.service');
@@ -317,19 +319,19 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 		}
 
 		if (merchantTransactionId.startsWith('PROV_SUB_')) {
-			const parts = merchantTransactionId.split('_');
-			// PROV_SUB_{providerId}_{planKey}_{timestamp}
-			const providerId = parts[2];
-			
-			// Fix 7: Get plan from metadata payload (fallback to URL param)
-			const planKey = data.metadata?.plan || parts[3];
-
 			const payment = await db.financialPayment.findFirst({
 				where: { merchantTransactionId: merchantTransactionId },
 				orderBy: { createdAt: 'desc' },
 			});
 			if (payment?.status === 'CAPTURED') {
 				return { handled: true, message: 'Provider subscription payment already captured' };
+			}
+			const parts = merchantTransactionId.split('_');
+			// Support both legacy PROV_SUB_{providerId}_{plan}_{ts} and compact IDs.
+			const providerId = String(payment?.providerId || parts[2] || '');
+			const planKey = data.metadata?.plan || payment?.metadata?.plan || parts[3];
+			if (!providerId) {
+				throw new AppError('Unable to resolve providerId from provider subscription payment', 422);
 			}
 
 			const { checkPhonePeStatus } = await import('./phonepe.service');
