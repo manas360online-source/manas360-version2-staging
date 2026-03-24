@@ -8,7 +8,6 @@ import {
 	loginWithPassword,
 	logoutSession,
 	refreshAuthTokens,
-	registerWithEmail,
 	registerProviderProfile,
 	registerWithPhone,
 	requestPasswordReset,
@@ -16,12 +15,10 @@ import {
 	revokeSession,
 	setupMfa,
 	verifyAndEnableMfa,
-	verifyEmailOtp,
 	verifyPhoneOtp,
 } from '../services/auth.service';
 import { sendSuccess } from '../utils/response';
 import {
-	validateEmail,
 	validateOtp,
 	validatePassword,
 	validatePhone,
@@ -101,25 +98,6 @@ const setAuthCookies = (req: Request, res: Response, accessToken: string, refres
 		path: '/',
 		maxAge: 7 * 24 * 60 * 60 * 1000,
 	});
-};
-
-export const registerController = async (req: Request, res: Response): Promise<void> => {
-	const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
-	if (!name) {
-		throw new AppError('name is required', 400);
-	}
-
-	const result = await registerWithEmail(
-		{
-			email: validateEmail(req.body.email),
-			password: validatePassword(req.body.password),
-			name,
-			role: validatePublicSignupRole(req.body.role),
-		},
-		getRequestMeta(req),
-	);
-
-	sendSuccess(res, result, 'Registration successful', 201);
 };
 
 export const providerRegisterController = async (req: Request, res: Response): Promise<void> => {
@@ -228,49 +206,24 @@ export const meController = async (req: Request, res: Response): Promise<void> =
 	);
 };
 
-export const signupWithEmailController = async (req: Request, res: Response): Promise<void> => {
-	const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
-	if (!name) {
-		throw new AppError('name is required', 400);
-	}
-
-	const result = await registerWithEmail(
-		{
-			email: validateEmail(req.body.email),
-			password: validatePassword(req.body.password),
-			name,
-			role: validatePublicSignupRole(req.body.role),
-		},
-		getRequestMeta(req),
-	);
-
-	sendSuccess(res, result, 'Registration successful', 201);
-};
-
-export const verifyEmailOtpController = async (req: Request, res: Response): Promise<void> => {
-	await verifyEmailOtp({
-		email: validateEmail(req.body.email),
-		otp: validateOtp(req.body.otp),
-	});
-
-	sendSuccess(res, null, 'Email verified');
-};
-
 export const signupWithPhoneController = async (req: Request, res: Response): Promise<void> => {
 	const result = await registerWithPhone({
 		phone: validatePhone(req.body.phone),
+		name: typeof req.body.name === 'string' ? req.body.name.trim() : undefined,
+		role: req.body.role ? validatePublicSignupRole(req.body.role) : undefined,
 	});
 
 	sendSuccess(res, result, 'Phone OTP sent', 201);
 };
 
 export const verifyPhoneOtpController = async (req: Request, res: Response): Promise<void> => {
-	await verifyPhoneOtp({
+	const result = await verifyPhoneOtp({
 		phone: validatePhone(req.body.phone),
 		otp: validateOtp(req.body.otp),
-	});
+	}, getRequestMeta(req));
 
-	sendSuccess(res, null, 'Phone verified');
+	setAuthCookies(req, res, result.accessToken, result.refreshToken);
+	sendSuccess(res, { user: result.user, sessionId: result.sessionId }, 'Phone verified and login successful');
 };
 
 export const loginController = async (req: Request, res: Response): Promise<void> => {

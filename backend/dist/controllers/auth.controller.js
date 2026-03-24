@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.revokeSessionController = exports.sessionsController = exports.logoutController = exports.mfaVerifyController = exports.mfaSetupController = exports.resetPasswordController = exports.requestPasswordResetController = exports.refreshTokenController = exports.googleLoginController = exports.loginController = exports.verifyPhoneOtpController = exports.signupWithPhoneController = exports.verifyEmailOtpController = exports.signupWithEmailController = exports.meController = exports.providerRegisterController = exports.registerController = void 0;
+exports.revokeSessionController = exports.sessionsController = exports.logoutController = exports.mfaVerifyController = exports.mfaSetupController = exports.resetPasswordController = exports.requestPasswordResetController = exports.refreshTokenController = exports.googleLoginController = exports.loginController = exports.verifyPhoneOtpController = exports.signupWithPhoneController = exports.meController = exports.providerRegisterController = void 0;
 const crypto_1 = require("crypto");
 const env_1 = require("../config/env");
 const db_1 = require("../config/db");
@@ -68,20 +68,6 @@ const setAuthCookies = (req, res, accessToken, refreshToken) => {
         maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 };
-const registerController = async (req, res) => {
-    const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
-    if (!name) {
-        throw new error_middleware_1.AppError('name is required', 400);
-    }
-    const result = await (0, auth_service_1.registerWithEmail)({
-        email: (0, auth_validator_1.validateEmail)(req.body.email),
-        password: (0, auth_validator_1.validatePassword)(req.body.password),
-        name,
-        role: (0, auth_validator_1.validatePublicSignupRole)(req.body.role),
-    }, getRequestMeta(req));
-    (0, response_1.sendSuccess)(res, result, 'Registration successful', 201);
-};
-exports.registerController = registerController;
 const providerRegisterController = async (req, res) => {
     const userId = req.auth?.userId;
     if (!userId) {
@@ -174,41 +160,22 @@ const meController = async (req, res) => {
     }, 'Authenticated user fetched');
 };
 exports.meController = meController;
-const signupWithEmailController = async (req, res) => {
-    const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
-    if (!name) {
-        throw new error_middleware_1.AppError('name is required', 400);
-    }
-    const result = await (0, auth_service_1.registerWithEmail)({
-        email: (0, auth_validator_1.validateEmail)(req.body.email),
-        password: (0, auth_validator_1.validatePassword)(req.body.password),
-        name,
-        role: (0, auth_validator_1.validatePublicSignupRole)(req.body.role),
-    }, getRequestMeta(req));
-    (0, response_1.sendSuccess)(res, result, 'Registration successful', 201);
-};
-exports.signupWithEmailController = signupWithEmailController;
-const verifyEmailOtpController = async (req, res) => {
-    await (0, auth_service_1.verifyEmailOtp)({
-        email: (0, auth_validator_1.validateEmail)(req.body.email),
-        otp: (0, auth_validator_1.validateOtp)(req.body.otp),
-    });
-    (0, response_1.sendSuccess)(res, null, 'Email verified');
-};
-exports.verifyEmailOtpController = verifyEmailOtpController;
 const signupWithPhoneController = async (req, res) => {
     const result = await (0, auth_service_1.registerWithPhone)({
         phone: (0, auth_validator_1.validatePhone)(req.body.phone),
+        name: typeof req.body.name === 'string' ? req.body.name.trim() : undefined,
+        role: req.body.role ? (0, auth_validator_1.validatePublicSignupRole)(req.body.role) : undefined,
     });
     (0, response_1.sendSuccess)(res, result, 'Phone OTP sent', 201);
 };
 exports.signupWithPhoneController = signupWithPhoneController;
 const verifyPhoneOtpController = async (req, res) => {
-    await (0, auth_service_1.verifyPhoneOtp)({
+    const result = await (0, auth_service_1.verifyPhoneOtp)({
         phone: (0, auth_validator_1.validatePhone)(req.body.phone),
         otp: (0, auth_validator_1.validateOtp)(req.body.otp),
-    });
-    (0, response_1.sendSuccess)(res, null, 'Phone verified');
+    }, getRequestMeta(req));
+    setAuthCookies(req, res, result.accessToken, result.refreshToken);
+    (0, response_1.sendSuccess)(res, { user: result.user, sessionId: result.sessionId }, 'Phone verified and login successful');
 };
 exports.verifyPhoneOtpController = verifyPhoneOtpController;
 const loginController = async (req, res) => {

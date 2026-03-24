@@ -2,17 +2,20 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CheckCircle, XCircle, Loader2, ArrowLeft, Home, Clock } from 'lucide-react';
 import axios from 'axios';
+import { useAuth } from '../../context/AuthContext';
 
 type PaymentState = 'loading' | 'pending' | 'success' | 'failed';
 
 export default function PaymentStatusPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { checkAuth } = useAuth();
   const [state, setState] = useState<PaymentState>('loading');
   const [retryCount, setRetryCount] = useState(0);
 
   const statusFromUrl = (searchParams.get('status') || searchParams.get('code') || '').toUpperCase();
   const transactionId = searchParams.get('transactionId') || searchParams.get('id') || '';
+  const isProviderTransaction = transactionId.startsWith('PROV_');
 
   useEffect(() => {
     // Initial state determination
@@ -31,7 +34,7 @@ export default function PaymentStatusPage() {
 
     const pollStatus = async () => {
       try {
-        const response = await axios.get(`/api/v1/payments/phonepe/status/${transactionId}`);
+        const response = await axios.get(`/api/v1/payments/phonepe/status/${transactionId}`, { withCredentials: true });
         const data = response.data?.data;
         const stateFromApi = String(data?.data?.state || data?.code || '').toUpperCase();
 
@@ -62,6 +65,18 @@ export default function PaymentStatusPage() {
     pollStatus();
   }, [state, transactionId, retryCount]);
 
+  useEffect(() => {
+    if (state !== 'success') return;
+
+    const timer = window.setTimeout(() => {
+      void checkAuth({ force: true }).finally(() => {
+        navigate(isProviderTransaction ? '/provider/dashboard' : '/patient/dashboard', { replace: true });
+      });
+    }, 1800);
+
+    return () => window.clearTimeout(timer);
+  }, [state, checkAuth, navigate, isProviderTransaction]);
+
   if (state === 'loading') {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-slate-50">
@@ -91,7 +106,7 @@ export default function PaymentStatusPage() {
             <div className="mt-8 flex flex-col gap-3">
               <button
                 type="button"
-                onClick={() => navigate(transactionId.startsWith('PROV_') ? '/provider/dashboard' : '/patient/dashboard', { replace: true })}
+                onClick={() => navigate(isProviderTransaction ? '/provider/dashboard' : '/patient/dashboard', { replace: true })}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500"
               >
                 <Home className="h-4 w-4" /> Go to Dashboard
@@ -121,7 +136,7 @@ export default function PaymentStatusPage() {
             <div className="mt-8">
               <button
                 type="button"
-                onClick={() => navigate(transactionId.startsWith('PROV_') ? '/provider/dashboard' : '/patient/dashboard', { replace: true })}
+                onClick={() => navigate(isProviderTransaction ? '/provider/dashboard' : '/patient/dashboard', { replace: true })}
                 className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
               >
                 Go to Dashboard (Check back later)
@@ -147,7 +162,7 @@ export default function PaymentStatusPage() {
             <div className="mt-8 flex flex-col gap-3">
               <button
                 type="button"
-                onClick={() => navigate('/provider/subscription', { replace: true })}
+                onClick={() => navigate(isProviderTransaction ? '/provider/subscription' : '/patient/pricing', { replace: true })}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3 text-sm font-semibold text-white transition hover:bg-indigo-500"
               >
                 <ArrowLeft className="h-4 w-4" /> Retry Payment

@@ -61,7 +61,7 @@ const isAuthRoute = (url: string): boolean => (
 	url.includes('/auth/login')
 	|| url.includes('/auth/logout')
 	|| url.includes('/auth/refresh')
-	|| url.includes('/auth/register')
+	|| url.includes('/auth/me')
 	|| url.includes('/auth/password/')
 );
 

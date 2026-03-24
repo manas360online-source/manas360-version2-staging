@@ -21,11 +21,10 @@ import type {
 	MfaVerifyInput,
 	PasswordResetInput,
 	PasswordResetRequestInput,
+	PublicUserRole,
 	RefreshInput,
-	RegisterEmailInput,
 	RegisterPhoneInput,
 	RequestMeta,
-	VerifyEmailOtpInput,
 	VerifyPhoneOtpInput,
 } from '../types/auth.types';
 
@@ -36,7 +35,7 @@ const nowPlusMinutes = (minutes: number): Date => new Date(Date.now() + minutes 
 
 const nowPlusDays = (days: number): Date => new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 
-const toPrismaUserRole = (role: RegisterEmailInput['role']): 'PATIENT' | 'THERAPIST' | 'PSYCHIATRIST' | 'COACH' => {
+const toPrismaUserRole = (role: PublicUserRole): 'PATIENT' | 'THERAPIST' | 'PSYCHIATRIST' | 'COACH' => {
 	if (role === 'patient') return 'PATIENT';
 	if (role === 'therapist') return 'THERAPIST';
 	if (role === 'psychiatrist') return 'PSYCHIATRIST';
@@ -58,6 +57,16 @@ const getCompanyAdminMeta = async (userId: string) => {
 		isCompanyAdmin: Boolean(row.is_company_admin),
 		is_company_admin: Boolean(row.is_company_admin),
 	};
+};
+
+const isPlatformAdminAccount = async (user: { id: string; role?: string | null }): Promise<boolean> => {
+	const role = String(user.role || '').toUpperCase();
+	if (role !== 'ADMIN') {
+		return false;
+	}
+
+	const companyMeta = await getCompanyAdminMeta(String(user.id));
+	return !companyMeta.company_key && !companyMeta.is_company_admin;
 };
 
 const getEmailDomain = (email?: string | null): string | null => {
@@ -183,54 +192,6 @@ const issueSessionTokens = async (userId: string, meta: RequestMeta) => {
 	});
 
 	return tokenPair;
-};
-
-export const registerWithEmail = async (input: RegisterEmailInput, meta: RequestMeta) => {
-	const existing = await db.user.findUnique({ where: { email: input.email.toLowerCase() } });
-	if (existing) {
-		if (existing.isDeleted) {
-			throw new AppError('Account is deleted. Contact support to restore access.', 410);
-		}
-
-		throw new AppError('Email already registered', 409);
-	}
-
-	const passwordHash = await hashPassword(input.password);
-	const shouldBypassVerification = env.allowDevVerificationBypass && env.nodeEnv === 'development';
-	const otp = shouldBypassVerification ? null : generateNumericOtp();
-	const otpHash = otp ? await hashOtp(otp) : null;
-	const prismaRole = toPrismaUserRole(input.role);
-	const supportedRoles = await getSupportedUserRoles();
-
-	if (!supportedRoles.has(prismaRole)) {
-		throw new AppError(`Selected role '${input.role}' is not enabled yet. Role migration is pending.`, 400);
-	}
-
-	const user = await db.user.create({
-		data: {
-			email: input.email.toLowerCase(),
-			passwordHash,
-			emailVerificationOtpHash: otpHash,
-			emailVerificationOtpExpiresAt: otp ? nowPlusMinutes(env.otpTtlMinutes) : null,
-			emailVerified: shouldBypassVerification,
-			provider: 'LOCAL',
-			role: prismaRole,
-			name: input.name,
-			firstName: input.name.trim(),
-			lastName: '',
-		},
-	});
-
-	await audit('REGISTER_SUCCESS', 'success', meta, { userId: user.id, email: user.email });
-
-	return {
-		userId: String(user.id),
-		email: user.email,
-		message: shouldBypassVerification
-			? 'Registration successful. Email verification is bypassed in development.'
-			: 'Registration successful. Verify your email OTP.',
-		devOtp: env.nodeEnv !== 'production' && otp ? otp : undefined,
-	};
 };
 
 type ProviderRegisterInput = {
@@ -363,72 +324,57 @@ export const registerProviderProfile = async (userId: string, input: ProviderReg
 	});
 };
 
-export const verifyEmailOtp = async (input: VerifyEmailOtpInput): Promise<void> => {
-	const user = await db.user.findUnique({ where: { email: input.email.toLowerCase() } });
-	if (!user || !user.emailVerificationOtpHash || !user.emailVerificationOtpExpiresAt) {
-		throw new AppError('Invalid verification request', 400);
-	}
-
-	if (user.emailVerificationOtpExpiresAt < new Date()) {
-		throw new AppError('OTP expired', 400);
-	}
-
-	const validOtp = await verifyOtp(input.otp, user.emailVerificationOtpHash);
-	if (!validOtp) {
-		throw new AppError('Invalid OTP', 400);
-	}
-
-	await db.user.update({
-		where: { id: user.id },
-		data: {
-			emailVerified: true,
-			emailVerificationOtpHash: null,
-			emailVerificationOtpExpiresAt: null,
-		},
-	});
-};
-
 export const registerWithPhone = async (input: RegisterPhoneInput) => {
 	const existing = await db.user.findFirst({ where: { phone: input.phone } });
-	if (existing) {
-		if (existing.isDeleted) {
-			throw new AppError('Account is deleted. Contact support to restore access.', 410);
-		}
-
-		throw new AppError('Phone already registered', 409);
+	if (existing?.isDeleted) {
+		throw new AppError('Account is deleted. Contact support to restore access.', 410);
+	}
+	if (existing && (await isPlatformAdminAccount({ id: String(existing.id), role: String(existing.role || '') }))) {
+		throw new AppError('Platform admin accounts must login using email and password', 403);
 	}
 
-	const shouldBypassVerification = env.allowDevVerificationBypass && env.nodeEnv === 'development';
-	const otp = shouldBypassVerification ? null : generateNumericOtp();
-	const otpHash = otp ? await hashOtp(otp) : null;
-
-	const user = await db.user.create({
-		data: {
-			phone: input.phone,
-			phoneVerificationOtpHash: otpHash,
-			phoneVerificationOtpExpiresAt: otp ? nowPlusMinutes(env.otpTtlMinutes) : null,
-			phoneVerified: shouldBypassVerification,
-			provider: 'PHONE',
-			role: 'PATIENT',
-			firstName: '',
-			lastName: '',
-		},
-	});
+	const otp = generateNumericOtp();
+	const otpHash = await hashOtp(otp);
+	const role = input.role ? toPrismaUserRole(input.role) : 'PATIENT';
+	const trimmedName = String(input.name || '').trim();
+	const user = existing
+		? await db.user.update({
+				where: { id: existing.id },
+				data: {
+					phoneVerificationOtpHash: otpHash,
+					phoneVerificationOtpExpiresAt: nowPlusMinutes(env.otpTtlMinutes),
+				},
+		  })
+		: await db.user.create({
+				data: {
+					phone: input.phone,
+					phoneVerificationOtpHash: otpHash,
+					phoneVerificationOtpExpiresAt: nowPlusMinutes(env.otpTtlMinutes),
+					phoneVerified: false,
+					emailVerified: true,
+					provider: 'PHONE',
+					role,
+					name: trimmedName || null,
+					firstName: trimmedName || '',
+					lastName: '',
+				},
+		  });
 
 	return {
 		userId: String(user.id),
 		phone: user.phone,
-		message: shouldBypassVerification
-			? 'Registration successful. Phone verification is bypassed in development.'
-			: 'Phone OTP sent.',
-		devOtp: env.nodeEnv !== 'production' && otp ? otp : undefined,
+		message: 'Phone OTP sent.',
+		devOtp: env.nodeEnv !== 'production' ? otp : undefined,
 	};
 };
 
-export const verifyPhoneOtp = async (input: VerifyPhoneOtpInput): Promise<void> => {
+export const verifyPhoneOtp = async (input: VerifyPhoneOtpInput, meta: RequestMeta) => {
 	const user = await db.user.findFirst({ where: { phone: input.phone } });
 	if (!user || !user.phoneVerificationOtpHash || !user.phoneVerificationOtpExpiresAt) {
 		throw new AppError('Invalid verification request', 400);
+	}
+	if (await isPlatformAdminAccount({ id: String(user.id), role: String(user.role || '') })) {
+		throw new AppError('Platform admin accounts must login using email and password', 403);
 	}
 
 	if (user.phoneVerificationOtpExpiresAt < new Date()) {
@@ -448,11 +394,37 @@ export const verifyPhoneOtp = async (input: VerifyPhoneOtpInput): Promise<void> 
 			phoneVerificationOtpExpiresAt: null,
 		},
 	});
+
+	const tokenPair = await issueSessionTokens(String(user.id), meta);
+	const therapistProfile = await db.therapistProfile.findUnique({
+		where: { userId: String(user.id) },
+		select: { onboardingCompleted: true, isVerified: true },
+	});
+	const companyAdminMeta = await resolveUserCompanyMeta(String(user.id), user.email);
+
+	await audit('LOGIN_SUCCESS', 'success', meta, { userId: user.id, phone: user.phone });
+
+	return {
+		user: {
+			id: String(user.id),
+			email: user.email,
+			phone: user.phone,
+			role: user.role,
+			emailVerified: user.emailVerified,
+			phoneVerified: true,
+			mfaEnabled: user.mfaEnabled,
+			isTherapistVerified: Boolean((user as any).isTherapistVerified),
+			therapistVerifiedAt: (user as any).therapistVerifiedAt ?? null,
+			providerOnboardingCompleted: Boolean((therapistProfile as any)?.onboardingCompleted),
+			providerProfileVerified: Boolean((therapistProfile as any)?.isVerified),
+			...companyAdminMeta,
+		},
+		...tokenPair,
+	};
 };
 
 const resolveUserByIdentifier = async (identifier: string) => {
-	const isEmail = identifier.includes('@');
-	if (isEmail) {
+	if (identifier.includes('@')) {
 		return db.user.findUnique({ where: { email: identifier.toLowerCase() } });
 	}
 	return db.user.findFirst({ where: { phone: identifier } });
@@ -461,12 +433,21 @@ const resolveUserByIdentifier = async (identifier: string) => {
 export const loginWithPassword = async (input: LoginInput, meta: RequestMeta) => {
 	const user = await resolveUserByIdentifier(input.identifier);
 	if (!user || !user.passwordHash) {
-		await audit('LOGIN_FAILED', 'failure', meta, { email: input.identifier });
+		await audit('LOGIN_FAILED', 'failure', meta, { phone: input.identifier, email: input.identifier });
 		throw new AppError('Invalid credentials', 401);
 	}
 
+	const isPlatformAdmin = await isPlatformAdminAccount({ id: String(user.id), role: String(user.role || '') });
+	if (!isPlatformAdmin) {
+		await audit('LOGIN_BLOCKED_NON_ADMIN_PASSWORD', 'failure', meta, { userId: user.id, phone: user.phone, email: user.email });
+		throw new AppError('Use phone OTP login for this account', 403);
+	}
+	if (!input.identifier.includes('@')) {
+		throw new AppError('Platform admin login requires email identifier', 400);
+	}
+
 	if (user.isDeleted) {
-		await audit('LOGIN_FAILED', 'failure', meta, { email: input.identifier, userId: user.id });
+		await audit('LOGIN_FAILED', 'failure', meta, { phone: input.identifier, userId: user.id });
 		throw new AppError('User account is deleted', 410);
 	}
 
@@ -487,16 +468,16 @@ export const loginWithPassword = async (input: LoginInput, meta: RequestMeta) =>
 		});
 
 		if (willLock) {
-			await audit('LOCKOUT_TRIGGERED', 'failure', meta, { userId: user.id, email: user.email });
+			await audit('LOCKOUT_TRIGGERED', 'failure', meta, { userId: user.id, phone: user.phone });
 		}
-		await audit('LOGIN_FAILED', 'failure', meta, { userId: user.id, email: user.email });
+		await audit('LOGIN_FAILED', 'failure', meta, { userId: user.id, phone: user.phone });
 		throw new AppError('Invalid credentials', 401);
 	}
 
-	const shouldEnforceEmailVerification = !(env.allowDevVerificationBypass && env.nodeEnv === 'development');
-	if (shouldEnforceEmailVerification && user.email && !user.emailVerified) {
-		await audit('LOGIN_BLOCKED_EMAIL_UNVERIFIED', 'failure', meta, { userId: user.id, email: user.email });
-		throw new AppError('Email verification required before login', 403);
+	const shouldEnforcePhoneVerification = !(env.allowDevVerificationBypass && env.nodeEnv === 'development');
+	if (shouldEnforcePhoneVerification && user.phone && !user.phoneVerified) {
+		await audit('LOGIN_BLOCKED_PHONE_UNVERIFIED', 'failure', meta, { userId: user.id, phone: user.phone });
+		throw new AppError('Phone verification required before login', 403);
 	}
 
 	if (user.mfaEnabled) {
@@ -662,7 +643,7 @@ export const requestPasswordReset = async (input: PasswordResetRequestInput, met
 			},
 		});
 
-		await audit('PASSWORD_RESET_REQUESTED', 'success', meta, { userId: user.id, email: user.email });
+		await audit('PASSWORD_RESET_REQUESTED', 'success', meta, { userId: user.id, phone: user.phone });
 
 		return {
 			message: 'Password reset OTP sent.',
@@ -699,7 +680,7 @@ export const resetPassword = async (input: PasswordResetInput, meta: RequestMeta
 	});
 
 	await db.authSession.updateMany({ where: { userId: user.id, revokedAt: null }, data: { revokedAt: new Date() } });
-	await audit('PASSWORD_RESET_SUCCESS', 'success', meta, { userId: user.id, email: user.email });
+	await audit('PASSWORD_RESET_SUCCESS', 'success', meta, { userId: user.id, phone: user.phone });
 };
 
 export const setupMfa = async (input: MfaSetupInput) => {

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { getApiErrorMessage } from '../../api/auth';
+import { getApiErrorMessage, signupWithPhone, verifyPhoneSignupOtp } from '../../api/auth';
 import { patientApi } from '../../api/patient';
-import LoginForm from '../../components/auth/LoginForm';
+import Button from '../../components/ui/Button';
+import Input from '../../components/ui/Input';
 import { getPostLoginRoute, useAuth } from '../../context/AuthContext';
 
 const isSubscriptionActive = (subscription: any): boolean => {
@@ -16,13 +17,19 @@ const isSubscriptionActive = (subscription: any): boolean => {
 };
 
 export default function LoginPage() {
-	const { user, isAuthenticated, login } = useAuth();
+	const { user, isAuthenticated, checkAuth } = useAuth();
 	const navigate = useNavigate();
 	const location = useLocation();
 	const from = (location.state as { from?: string; afterLogin?: string } | null)?.from;
 	const afterLogin = (location.state as { from?: string; afterLogin?: string } | null)?.afterLogin;
 	const next = new URLSearchParams(location.search).get('next');
 
+	const [phone, setPhone] = useState('');
+	const [otp, setOtp] = useState('');
+	const [otpSent, setOtpSent] = useState(false);
+	const [devOtp, setDevOtp] = useState<string | null>(null);
+	const [loading, setLoading] = useState(false);
+	const [error, setError] = useState<string | null>(null);
 
 	const resolvePostLoginRouteWithSubscription = async (candidate: string | null, role: string | undefined) => {
 		if (!candidate || candidate.startsWith('/auth/')) {
@@ -42,14 +49,11 @@ export default function LoginPage() {
 				return '/patient/dashboard';
 			}
 		} catch {
-			// If subscription check fails, keep original target.
+			// Keep original target when subscription lookup fails.
 		}
 
 		return candidate;
 	};
-
-	const [loading, setLoading] = useState(false);
-	const [error, setError] = useState<string | null>(null);
 
 	useEffect(() => {
 		if (!isAuthenticated || !user) {
@@ -63,16 +67,32 @@ export default function LoginPage() {
 		})();
 	}, [afterLogin, from, isAuthenticated, navigate, next, user]);
 
-	const onSubmit = async (identifier: string, password: string) => {
+	const requestOtp = async () => {
+		setError(null);
+		setLoading(true);
+		setDevOtp(null);
+		try {
+			const result = await signupWithPhone(phone.trim());
+			setOtpSent(true);
+			setDevOtp(result.devOtp || null);
+		} catch (err) {
+			setError(getApiErrorMessage(err, 'Failed to send OTP'));
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	const verifyOtp = async () => {
 		setError(null);
 		setLoading(true);
 		try {
-			const loggedInUser = await login(identifier, password);
+			const result = await verifyPhoneSignupOtp(phone.trim(), otp.trim());
+			await checkAuth({ force: true });
 			const candidate = from || afterLogin || next || null;
-			const postLoginRoute = await resolvePostLoginRouteWithSubscription(candidate, loggedInUser.role);
+			const postLoginRoute = await resolvePostLoginRouteWithSubscription(candidate, result.user?.role);
 			navigate(postLoginRoute, { replace: true });
 		} catch (err) {
-			setError(getApiErrorMessage(err, 'Login failed'));
+			setError(getApiErrorMessage(err, 'OTP verification failed'));
 		} finally {
 			setLoading(false);
 		}
@@ -83,23 +103,62 @@ export default function LoginPage() {
 			<div className="responsive-container py-6 sm:py-10">
 				<div className="mx-auto w-full max-w-lg rounded-3xl border border-calm-sage/20 bg-wellness-surface p-5 shadow-soft-md sm:p-8">
 					<h1 className="text-2xl font-semibold text-wellness-text sm:text-3xl">Welcome back</h1>
-					<p className="mt-2 text-sm text-wellness-muted sm:text-base">Sign in to continue your wellness journey.</p>
-					<div className="mt-6">
-						<LoginForm onSubmit={onSubmit} loading={loading} error={error} />
+					<p className="mt-2 text-sm text-wellness-muted sm:text-base">Login with your phone number and OTP.</p>
+
+					<div className="mt-6 space-y-4">
+						<Input
+							id="login-phone"
+							label="Phone Number"
+							type="tel"
+							autoComplete="tel"
+							placeholder="+919876543210"
+							value={phone}
+							onChange={(event) => setPhone(event.target.value)}
+							required
+						/>
+
+						{otpSent ? (
+							<Input
+								id="login-otp"
+								label="OTP"
+								inputMode="numeric"
+								pattern="\\d{6}"
+								maxLength={6}
+								autoComplete="one-time-code"
+								placeholder="6-digit OTP"
+								value={otp}
+								onChange={(event) => setOtp(event.target.value.replace(/\D/g, '').slice(0, 6))}
+								required
+							/>
+						) : null}
+
+						{!otpSent ? (
+							<Button type="button" fullWidth loading={loading} className="min-h-[48px]" onClick={requestOtp}>
+								{loading ? 'Sending OTP...' : 'Send OTP'}
+							</Button>
+						) : (
+							<Button type="button" fullWidth loading={loading} className="min-h-[48px]" onClick={verifyOtp}>
+								{loading ? 'Verifying OTP...' : 'Verify OTP and Login'}
+							</Button>
+						)}
 					</div>
-					<p className="mt-6 text-center text-xs text-wellness-muted">
-						By continuing, you agree to responsible and secure use of your account.
-					</p>
+
+					{devOtp ? (
+						<p className="mt-3 text-xs text-wellness-muted">
+							Development OTP: <span className="font-semibold text-wellness-text">{devOtp}</span>
+						</p>
+					) : null}
+
+					{error ? (
+						<p role="alert" aria-live="polite" className="mt-3 text-sm text-red-600">
+							{error}
+						</p>
+					) : null}
+
 					<p className="mt-2 text-center text-sm text-wellness-muted">
 						Need to create an account?{' '}
 						<Link to="/auth/signup" className="text-calm-sage underline underline-offset-2 hover:text-wellness-text">
 							Register here
-						</Link>
-					</p>
-					<p className="mt-2 text-center text-xs text-wellness-muted">
-						Want to go back to the landing page?{' '}
-						<Link to="/" className="text-calm-sage underline underline-offset-2 hover:text-wellness-text">
-							Go to Home
 						</Link>
 					</p>
 				</div>

@@ -33,13 +33,6 @@ export interface LoginPayload {
 	password: string;
 }
 
-export interface RegisterPayload {
-	email: string;
-	password: string;
-	name: string;
-	role: 'patient' | 'therapist' | 'psychiatrist' | 'coach';
-}
-
 export interface ProviderRegisterPayload {
 	professionalType: string;
 	fullName: string;
@@ -67,19 +60,23 @@ export interface ProviderRegisterPayload {
 	digitalSignature: string;
 }
 
-export interface PasswordResetRequestPayload {
-	identifier: string;
-}
-
-export interface PasswordResetPayload {
-	identifier: string;
-	otp: string;
-	newPassword: string;
-}
-
 export const getApiErrorMessage = (error: unknown, fallback = 'Request failed'): string => {
 	const axiosError = error as AxiosError<{ message?: string }>;
 	return axiosError.response?.data?.message ?? fallback;
+};
+
+const normalizePhoneForAuth = (value: string): string => {
+	const compactPhone = String(value || '').trim().replace(/[\s()-]/g, '');
+
+	if (/^\d{10}$/.test(compactPhone)) {
+		return `+91${compactPhone}`;
+	}
+
+	if (/^91\d{10}$/.test(compactPhone)) {
+		return `+${compactPhone}`;
+	}
+
+	return compactPhone;
 };
 
 export const login = async (payload: LoginPayload): Promise<AuthUser> => {
@@ -97,10 +94,6 @@ export const login = async (payload: LoginPayload): Promise<AuthUser> => {
 	return loggedInUser;
 };
 
-export const register = async (payload: RegisterPayload): Promise<void> => {
-	await http.post<ApiEnvelope<{ userId: string; email: string; message: string }>>('/auth/register', payload);
-};
-
 export const providerRegister = async (payload: ProviderRegisterPayload): Promise<void> => {
 	await http.post<ApiEnvelope<unknown>>('/v1/provider/onboarding', payload);
 };
@@ -110,22 +103,22 @@ export const googleLogin = async (idToken: string): Promise<AuthUser> => {
 	return response.data.data.user;
 };
 
-export const signupWithPhone = async (phone: string): Promise<{ userId: string; phone: string; message: string; devOtp?: string }> => {
-	const response = await http.post<ApiEnvelope<{ userId: string; phone: string; message: string; devOtp?: string }>>('/auth/signup/phone', { phone });
+export const signupWithPhone = async (
+	phone: string,
+	profile?: { name?: string; role?: 'patient' | 'therapist' | 'psychiatrist' | 'coach' },
+): Promise<{ userId: string; phone: string; message: string; devOtp?: string }> => {
+	const normalizedPhone = normalizePhoneForAuth(phone);
+	const response = await http.post<ApiEnvelope<{ userId: string; phone: string; message: string; devOtp?: string }>>('/auth/signup/phone', {
+		phone: normalizedPhone,
+		...(profile || {}),
+	});
 	return response.data.data;
 };
 
-export const verifyPhoneSignupOtp = async (phone: string, otp: string): Promise<void> => {
-	await http.post('/auth/verify/phone-otp', { phone, otp });
-};
-
-export const requestPasswordReset = async (payload: PasswordResetRequestPayload): Promise<{ message: string; devOtp?: string }> => {
-	const response = await http.post<ApiEnvelope<{ message: string; devOtp?: string }>>('/auth/password/forgot', payload);
+export const verifyPhoneSignupOtp = async (phone: string, otp: string): Promise<{ user: AuthUser; sessionId: string }> => {
+	const normalizedPhone = normalizePhoneForAuth(phone);
+	const response = await http.post<ApiEnvelope<{ user: AuthUser; sessionId: string }>>('/auth/verify/phone-otp', { phone: normalizedPhone, otp });
 	return response.data.data;
-};
-
-export const resetPassword = async (payload: PasswordResetPayload): Promise<void> => {
-	await http.post('/auth/password/reset', payload);
 };
 
 export const me = async (): Promise<AuthUser> => {

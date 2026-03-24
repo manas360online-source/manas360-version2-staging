@@ -27,7 +27,9 @@ async function ensurePatientProfile(userId) {
 
 async function run() {
   const patientEmail = 'patient@manas360.local';
+  const patientPhone = '+917000100111';
   const adminEmail = 'admin@manas360.local';
+  const adminPhone = '+917000600111';
   const password = 'Manas@123';
   const passwordHash = await bcrypt.hash(password, 12);
 
@@ -35,10 +37,11 @@ async function run() {
     where: { email: patientEmail },
     update: {
       passwordHash,
+      phone: patientPhone,
       role: 'PATIENT',
       provider: 'LOCAL',
       emailVerified: true,
-      phoneVerified: false,
+      phoneVerified: true,
       failedLoginAttempts: 0,
       lockUntil: null,
       isDeleted: false,
@@ -48,26 +51,28 @@ async function run() {
     },
     create: {
       email: patientEmail,
+      phone: patientPhone,
       passwordHash,
       role: 'PATIENT',
       provider: 'LOCAL',
       emailVerified: true,
-      phoneVerified: false,
+      phoneVerified: true,
       firstName: 'Priya',
       lastName: 'Kumar',
       name: 'Priya Kumar',
     },
-    select: { id: true, email: true, role: true, emailVerified: true },
+    select: { id: true, email: true, phone: true, role: true, emailVerified: true },
   });
 
   const admin = await prisma.user.upsert({
     where: { email: adminEmail },
     update: {
       passwordHash,
+      phone: adminPhone,
       role: 'ADMIN',
       provider: 'LOCAL',
       emailVerified: true,
-      phoneVerified: false,
+      phoneVerified: true,
       failedLoginAttempts: 0,
       lockUntil: null,
       isDeleted: false,
@@ -77,16 +82,17 @@ async function run() {
     },
     create: {
       email: adminEmail,
+      phone: adminPhone,
       passwordHash,
       role: 'ADMIN',
       provider: 'LOCAL',
       emailVerified: true,
-      phoneVerified: false,
+      phoneVerified: true,
       firstName: 'Admin',
       lastName: 'User',
       name: 'Admin User',
     },
-    select: { id: true, email: true, role: true, emailVerified: true },
+    select: { id: true, email: true, phone: true, role: true, emailVerified: true },
   });
 
   const patientProfile = await ensurePatientProfile(patient.id);
@@ -121,8 +127,8 @@ async function run() {
     updatedExistingPatient: Boolean(existing),
     existingPatientProfileCreatedOrUpdated: Boolean(existingPatientProfile),
     credentials: {
-      patient: { email: patientEmail, password },
-      admin: { email: adminEmail, password },
+      patient: { phone: patientPhone, loginMethod: 'PHONE_OTP' },
+      admin: { email: adminEmail, password, loginMethod: 'EMAIL_PASSWORD' },
     },
   };
 }

@@ -4,20 +4,12 @@ export interface RequestMeta {
 	device?: string;
 }
 
-export interface RegisterEmailInput {
-	email: string;
-	password: string;
-	name: string;
-	role: 'patient' | 'therapist' | 'psychiatrist' | 'coach';
-}
-
-export interface VerifyEmailOtpInput {
-	email: string;
-	otp: string;
-}
+export type PublicUserRole = 'patient' | 'therapist' | 'psychiatrist' | 'coach';
 
 export interface RegisterPhoneInput {
 	phone: string;
+	name?: string;
+	role?: PublicUserRole;
 }
 
 export interface VerifyPhoneOtpInput {
