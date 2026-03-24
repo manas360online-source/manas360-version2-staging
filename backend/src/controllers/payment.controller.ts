@@ -67,11 +67,6 @@ export const completeFinancialSessionController = async (req: Request, res: Resp
 	sendSuccess(res, { sessionId }, 'Session earnings released');
 };
 
-export const razorpayWebhookController = async (_req: Request, res: Response): Promise<void> => {
-	// Razorpay payment provider has been removed in favor of PhonePe
-	res.status(200).json({ success: false, message: 'Razorpay is no longer supported. Use PhonePe webhooks.' });
-};
-
 export const phonepeWebhookController = async (req: Request, res: Response): Promise<void> => {
 	const rawBody = req.rawBody ?? JSON.stringify(req.body ?? {});
 	const xVerify = String(req.headers['x-verify'] ?? '').trim();

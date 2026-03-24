@@ -108,9 +108,6 @@ export interface EnvConfig {
 	disableAuthRateLimit: boolean;
 	// When true, disable adding ServerSideEncryption header for S3 uploads (useful for MinIO)
 	awsS3DisableServerSideEncryption: boolean;
-	razorpayKeyId?: string;
-	razorpayKeySecret?: string;
-	razorpayWebhookSecret?: string;
 	phonePeWebhookUsername?: string;
 	phonePeWebhookPassword?: string;
 	paymentProviderSharePercent: number;
@@ -164,9 +161,6 @@ export const env: EnvConfig = Object.freeze({
 	redisUrl: process.env.REDIS_URL ?? 'redis://127.0.0.1:6379',
 	analyticsRollupIntervalSeconds: parseNumber(process.env.ANALYTICS_ROLLUP_INTERVAL_SECONDS, 3600),
 	disableAuthRateLimit: parseBoolean(process.env.DISABLE_AUTH_RATE_LIMIT, false),
-	razorpayKeyId: process.env.RAZORPAY_KEY_ID,
-	razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET,
-	razorpayWebhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET,
 	phonePeWebhookUsername: process.env.PHONEPE_WEBHOOK_USERNAME,
 	phonePeWebhookPassword: process.env.PHONEPE_WEBHOOK_PASSWORD,
 	paymentProviderSharePercent: parseNumber(process.env.PAYMENT_PROVIDER_SHARE_PERCENT, 60),

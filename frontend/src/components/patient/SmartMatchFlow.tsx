@@ -4,7 +4,6 @@ import ProviderSelectionStep from './steps/ProviderSelectionStep';
 import PendingRequestStep from './steps/PendingRequestStep';
 import PreBookingPaymentStep from './steps/PreBookingPaymentStep';
 import CalendarSelection from './CalendarSelection';
-import { patientApi } from '../../api/patient';
 
 interface SmartMatchFlowProps {
   isOpen: boolean;
@@ -230,27 +229,6 @@ export default function SmartMatchFlow({
               <PreBookingPaymentStep
                 selectedProviders={selectedProviders}
                 selectedDateTime={calendarSelection}
-                onPaymentSuccess={async () => {
-                  try {
-                    const availabilityPrefs = getAvailabilityPrefs();
-                    if (!availabilityPrefs) {
-                      throw new Error('Please select date and time before payment confirmation.');
-                    }
-
-                    // Send booking request to providers only after payment is successful.
-                    const result = await patientApi.createAppointmentRequest({
-                      availabilityPrefs,
-                      providerIds: selectedProviders.map((p) => p.id),
-                      preferredSpecialization:
-                        selectedProviderType === 'ALL' ? undefined : selectedProviderType,
-                    });
-
-                    setAppointmentRequestId(result.appointmentRequestId);
-                    setStep('pending');
-                  } catch (err) {
-                    console.error('Failed to send booking request:', err);
-                  }
-                }}
                 onBack={() => setStep('provider-selection')}
                 onCancel={handleClose}
               />

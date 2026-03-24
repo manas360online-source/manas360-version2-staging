@@ -48,6 +48,8 @@ router.use('/v1/auth', auth_routes_1.default);
 router.use('/v1', patient_v1_routes_1.default);
 router.use('/patient', patient_self_routes_1.default);
 router.use('/v1/patient', patient_self_routes_1.default);
+// Backward-compatibility alias for legacy singular subscription endpoints.
+router.use('/v1/subscription', patient_self_routes_1.default);
 router.use('/v1/users', user_routes_1.default);
 router.use('/v1/patients', patient_routes_1.default);
 router.use('/v1/therapists', therapist_routes_1.default);
