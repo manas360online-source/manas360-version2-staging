@@ -111,7 +111,7 @@ export const initiatePatientSubscriptionPayment = async (userId: string, planKey
 		const existingRedirect = String(existing?.metadata?.redirectUrl || '').trim();
 		if (existing && existingRedirect) {
 			return {
-				transactionId: String(existing.razorpayOrderId),
+				transactionId: String(existing.merchantTransactionId),
 				redirectUrl: existingRedirect,
 				planName: plan.name,
 				price: plan.price,

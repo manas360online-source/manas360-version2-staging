@@ -1290,7 +1290,7 @@ export const initiateSessionBooking = async (
 			durationMinute: duration,
 			amountMinor,
 			currency: 'INR',
-			razorpayOrderId: payment.transactionId,
+			merchantTransactionId: payment.transactionId,
 			status: 'PENDING',
 		},
 	});

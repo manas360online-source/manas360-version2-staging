@@ -77,14 +77,7 @@ export const createSessionPayment = async (input: CreateFinancialSessionInput) =
 				sessionId: existing.id,
 				
 				paymentType: 'provider_fee',
-				transactionId: existing.razorpayOrderId,
-				redirectUrl: '',
-				amountMinor: existing.expectedAmountMinor,
-				currency: existing.currency,
-				feeBreakdown: {
-					platformFeeMinor: Math.round(existing.expectedAmountMinor * platformShareRatio),
-					providerFeeMinor: Math.floor(existing.expectedAmountMinor * providerShareRatio),
-				},
+ 				transactionId: existing.merchantTransactionId,
 				idempotencyKey,
 			};
 		}
@@ -129,7 +122,7 @@ export const createSessionPayment = async (input: CreateFinancialSessionInput) =
 				expectedAmountMinor: amountMinor,
 				currency: input.currency ?? 'INR',
 				idempotencyKey,
-				razorpayOrderId: transactionId,
+				merchantTransactionId: transactionId,
 			},
 		});
 
@@ -137,7 +130,7 @@ export const createSessionPayment = async (input: CreateFinancialSessionInput) =
 			data: {
 				sessionId: session.id,
 				providerId: input.providerId,
-				razorpayOrderId: transactionId,
+				merchantTransactionId: transactionId,
 				status: 'PENDING_CAPTURE',
 				amountMinor,
 				currency: input.currency ?? 'INR',
@@ -180,7 +173,7 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 			let capturedAmountMinor = 0;
 			await db.$transaction(async (tx: any) => {
 				const payment = await tx.financialPayment.findFirst({
-					where: { razorpayOrderId: merchantTransactionId },
+					where: { merchantTransactionId: merchantTransactionId },
 				});
 
 				if (!payment) {
@@ -226,7 +219,7 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 					where: { id: payment.sessionId },
 					data: { status: 'CONFIRMED', confirmedAt: new Date() },
 				});
-				
+
 				await tx.revenueLedger.create({
 					data: {
 						type: 'SESSION',
@@ -238,7 +231,6 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 						currency: payment.currency,
 						referenceId: payment.sessionId,
 						sessionId: payment.sessionId,
-						
 					},
 				});
 			});
@@ -264,7 +256,7 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 			const planKey = data.metadata?.plan || parts[2];
 
 			const payment = await db.financialPayment.findFirst({
-				where: { razorpayOrderId: merchantTransactionId },
+				where: { merchantTransactionId: merchantTransactionId },
 				orderBy: { createdAt: 'desc' },
 			});
 			if (payment?.status === 'CAPTURED') {
@@ -333,7 +325,7 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 			const planKey = data.metadata?.plan || parts[3];
 
 			const payment = await db.financialPayment.findFirst({
-				where: { razorpayOrderId: merchantTransactionId },
+				where: { merchantTransactionId: merchantTransactionId },
 				orderBy: { createdAt: 'desc' },
 			});
 			if (payment?.status === 'CAPTURED') {
