@@ -259,8 +259,14 @@ export const initiatePhonePePayment = async (input: {
 		const upstreamCode = String(error?.response?.data?.code || '').trim();
 		const upstreamMessage = String(error?.response?.data?.message || error?.message || 'PhonePe request failed').trim();
 		const isMappingError = upstreamMessage.toLowerCase().includes('api mapping not found');
+		// REST /pg/v1/pay needs Salt Key + index. Standard Checkout test creds are often OAuth-only;
+		// SDK path uses client credentials and still works when salt is missing or wrong for pg-sandbox.
+		const shouldTrySdk =
+			(isMappingError || upstreamCode === 'KEY_NOT_CONFIGURED')
+			&& PHONEPE_CLIENT_ID
+			&& PHONEPE_CLIENT_SECRET;
 
-		if (isMappingError && PHONEPE_CLIENT_ID && PHONEPE_CLIENT_SECRET) {
+		if (shouldTrySdk) {
 			const sdkRedirectUrl = await initiatePhonePePaymentViaSdk({
 				transactionId: input.transactionId,
 				amountInPaise: input.amountInPaise,
@@ -269,6 +275,7 @@ export const initiatePhonePePayment = async (input: {
 			if (sdkRedirectUrl) {
 				logger.info('[PhonePe] SDK fallback payment initiated successfully', {
 					transactionId: input.transactionId,
+					reason: upstreamCode || 'mapping',
 					redirectUrl: sdkRedirectUrl,
 				});
 				return sdkRedirectUrl;
