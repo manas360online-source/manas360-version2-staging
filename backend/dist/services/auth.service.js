@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.revokeSession = exports.getActiveSessions = exports.verifyAndEnableMfa = exports.setupMfa = exports.resetPassword = exports.requestPasswordReset = exports.logoutSession = exports.refreshAuthTokens = exports.loginWithGoogle = exports.loginWithPassword = exports.verifyPhoneOtp = exports.registerWithPhone = exports.verifyEmailOtp = exports.registerProviderProfile = exports.registerWithEmail = void 0;
+exports.revokeSession = exports.getActiveSessions = exports.verifyAndEnableMfa = exports.setupMfa = exports.resetPassword = exports.requestPasswordReset = exports.logoutSession = exports.refreshAuthTokens = exports.loginWithGoogle = exports.loginWithPassword = exports.verifyPhoneOtp = exports.registerWithPhone = exports.registerProviderProfile = void 0;
 const crypto_1 = require("crypto");
 const otplib_1 = require("otplib");
 const google_auth_library_1 = require("google-auth-library");
@@ -33,6 +33,14 @@ const getCompanyAdminMeta = async (userId) => {
         isCompanyAdmin: Boolean(row.is_company_admin),
         is_company_admin: Boolean(row.is_company_admin),
     };
+};
+const isPlatformAdminAccount = async (user) => {
+    const role = String(user.role || '').toUpperCase();
+    if (role !== 'ADMIN') {
+        return false;
+    }
+    const companyMeta = await getCompanyAdminMeta(String(user.id));
+    return !companyMeta.company_key && !companyMeta.is_company_admin;
 };
 const getEmailDomain = (email) => {
     if (!email)
@@ -134,48 +142,6 @@ const issueSessionTokens = async (userId, meta) => {
     });
     return tokenPair;
 };
-const registerWithEmail = async (input, meta) => {
-    const existing = await db.user.findUnique({ where: { email: input.email.toLowerCase() } });
-    if (existing) {
-        if (existing.isDeleted) {
-            throw new error_middleware_1.AppError('Account is deleted. Contact support to restore access.', 410);
-        }
-        throw new error_middleware_1.AppError('Email already registered', 409);
-    }
-    const passwordHash = await (0, hash_1.hashPassword)(input.password);
-    const shouldBypassVerification = env_1.env.allowDevVerificationBypass && env_1.env.nodeEnv === 'development';
-    const otp = shouldBypassVerification ? null : (0, hash_1.generateNumericOtp)();
-    const otpHash = otp ? await (0, hash_1.hashOtp)(otp) : null;
-    const prismaRole = toPrismaUserRole(input.role);
-    const supportedRoles = await getSupportedUserRoles();
-    if (!supportedRoles.has(prismaRole)) {
-        throw new error_middleware_1.AppError(`Selected role '${input.role}' is not enabled yet. Role migration is pending.`, 400);
-    }
-    const user = await db.user.create({
-        data: {
-            email: input.email.toLowerCase(),
-            passwordHash,
-            emailVerificationOtpHash: otpHash,
-            emailVerificationOtpExpiresAt: otp ? nowPlusMinutes(env_1.env.otpTtlMinutes) : null,
-            emailVerified: shouldBypassVerification,
-            provider: 'LOCAL',
-            role: prismaRole,
-            name: input.name,
-            firstName: input.name.trim(),
-            lastName: '',
-        },
-    });
-    await audit('REGISTER_SUCCESS', 'success', meta, { userId: user.id, email: user.email });
-    return {
-        userId: String(user.id),
-        email: user.email,
-        message: shouldBypassVerification
-            ? 'Registration successful. Email verification is bypassed in development.'
-            : 'Registration successful. Verify your email OTP.',
-        devOtp: env_1.env.nodeEnv !== 'production' && otp ? otp : undefined,
-    };
-};
-exports.registerWithEmail = registerWithEmail;
 const toProviderDisplayName = (displayName) => {
     const normalized = String(displayName || '').trim();
     return normalized || 'Provider';
@@ -279,65 +245,55 @@ const registerProviderProfile = async (userId, input) => {
     });
 };
 exports.registerProviderProfile = registerProviderProfile;
-const verifyEmailOtp = async (input) => {
-    const user = await db.user.findUnique({ where: { email: input.email.toLowerCase() } });
-    if (!user || !user.emailVerificationOtpHash || !user.emailVerificationOtpExpiresAt) {
-        throw new error_middleware_1.AppError('Invalid verification request', 400);
-    }
-    if (user.emailVerificationOtpExpiresAt < new Date()) {
-        throw new error_middleware_1.AppError('OTP expired', 400);
-    }
-    const validOtp = await (0, hash_1.verifyOtp)(input.otp, user.emailVerificationOtpHash);
-    if (!validOtp) {
-        throw new error_middleware_1.AppError('Invalid OTP', 400);
-    }
-    await db.user.update({
-        where: { id: user.id },
-        data: {
-            emailVerified: true,
-            emailVerificationOtpHash: null,
-            emailVerificationOtpExpiresAt: null,
-        },
-    });
-};
-exports.verifyEmailOtp = verifyEmailOtp;
 const registerWithPhone = async (input) => {
     const existing = await db.user.findFirst({ where: { phone: input.phone } });
-    if (existing) {
-        if (existing.isDeleted) {
-            throw new error_middleware_1.AppError('Account is deleted. Contact support to restore access.', 410);
-        }
-        throw new error_middleware_1.AppError('Phone already registered', 409);
+    if (existing?.isDeleted) {
+        throw new error_middleware_1.AppError('Account is deleted. Contact support to restore access.', 410);
     }
-    const shouldBypassVerification = env_1.env.allowDevVerificationBypass && env_1.env.nodeEnv === 'development';
-    const otp = shouldBypassVerification ? null : (0, hash_1.generateNumericOtp)();
-    const otpHash = otp ? await (0, hash_1.hashOtp)(otp) : null;
-    const user = await db.user.create({
-        data: {
-            phone: input.phone,
-            phoneVerificationOtpHash: otpHash,
-            phoneVerificationOtpExpiresAt: otp ? nowPlusMinutes(env_1.env.otpTtlMinutes) : null,
-            phoneVerified: shouldBypassVerification,
-            provider: 'PHONE',
-            role: 'PATIENT',
-            firstName: '',
-            lastName: '',
-        },
-    });
+    if (existing && (await isPlatformAdminAccount({ id: String(existing.id), role: String(existing.role || '') }))) {
+        throw new error_middleware_1.AppError('Platform admin accounts must login using email and password', 403);
+    }
+    const otp = (0, hash_1.generateNumericOtp)();
+    const otpHash = await (0, hash_1.hashOtp)(otp);
+    const role = input.role ? toPrismaUserRole(input.role) : 'PATIENT';
+    const trimmedName = String(input.name || '').trim();
+    const user = existing
+        ? await db.user.update({
+            where: { id: existing.id },
+            data: {
+                phoneVerificationOtpHash: otpHash,
+                phoneVerificationOtpExpiresAt: nowPlusMinutes(env_1.env.otpTtlMinutes),
+            },
+        })
+        : await db.user.create({
+            data: {
+                phone: input.phone,
+                phoneVerificationOtpHash: otpHash,
+                phoneVerificationOtpExpiresAt: nowPlusMinutes(env_1.env.otpTtlMinutes),
+                phoneVerified: false,
+                emailVerified: true,
+                provider: 'PHONE',
+                role,
+                name: trimmedName || null,
+                firstName: trimmedName || '',
+                lastName: '',
+            },
+        });
     return {
         userId: String(user.id),
         phone: user.phone,
-        message: shouldBypassVerification
-            ? 'Registration successful. Phone verification is bypassed in development.'
-            : 'Phone OTP sent.',
-        devOtp: env_1.env.nodeEnv !== 'production' && otp ? otp : undefined,
+        message: 'Phone OTP sent.',
+        devOtp: env_1.env.nodeEnv !== 'production' ? otp : undefined,
     };
 };
 exports.registerWithPhone = registerWithPhone;
-const verifyPhoneOtp = async (input) => {
+const verifyPhoneOtp = async (input, meta) => {
     const user = await db.user.findFirst({ where: { phone: input.phone } });
     if (!user || !user.phoneVerificationOtpHash || !user.phoneVerificationOtpExpiresAt) {
         throw new error_middleware_1.AppError('Invalid verification request', 400);
+    }
+    if (await isPlatformAdminAccount({ id: String(user.id), role: String(user.role || '') })) {
+        throw new error_middleware_1.AppError('Platform admin accounts must login using email and password', 403);
     }
     if (user.phoneVerificationOtpExpiresAt < new Date()) {
         throw new error_middleware_1.AppError('OTP expired', 400);
@@ -354,11 +310,34 @@ const verifyPhoneOtp = async (input) => {
             phoneVerificationOtpExpiresAt: null,
         },
     });
+    const tokenPair = await issueSessionTokens(String(user.id), meta);
+    const therapistProfile = await db.therapistProfile.findUnique({
+        where: { userId: String(user.id) },
+        select: { onboardingCompleted: true, isVerified: true },
+    });
+    const companyAdminMeta = await resolveUserCompanyMeta(String(user.id), user.email);
+    await audit('LOGIN_SUCCESS', 'success', meta, { userId: user.id, phone: user.phone });
+    return {
+        user: {
+            id: String(user.id),
+            email: user.email,
+            phone: user.phone,
+            role: user.role,
+            emailVerified: user.emailVerified,
+            phoneVerified: true,
+            mfaEnabled: user.mfaEnabled,
+            isTherapistVerified: Boolean(user.isTherapistVerified),
+            therapistVerifiedAt: user.therapistVerifiedAt ?? null,
+            providerOnboardingCompleted: Boolean(therapistProfile?.onboardingCompleted),
+            providerProfileVerified: Boolean(therapistProfile?.isVerified),
+            ...companyAdminMeta,
+        },
+        ...tokenPair,
+    };
 };
 exports.verifyPhoneOtp = verifyPhoneOtp;
 const resolveUserByIdentifier = async (identifier) => {
-    const isEmail = identifier.includes('@');
-    if (isEmail) {
+    if (identifier.includes('@')) {
         return db.user.findUnique({ where: { email: identifier.toLowerCase() } });
     }
     return db.user.findFirst({ where: { phone: identifier } });
@@ -366,11 +345,19 @@ const resolveUserByIdentifier = async (identifier) => {
 const loginWithPassword = async (input, meta) => {
     const user = await resolveUserByIdentifier(input.identifier);
     if (!user || !user.passwordHash) {
-        await audit('LOGIN_FAILED', 'failure', meta, { email: input.identifier });
+        await audit('LOGIN_FAILED', 'failure', meta, { phone: input.identifier, email: input.identifier });
         throw new error_middleware_1.AppError('Invalid credentials', 401);
     }
+    const isPlatformAdmin = await isPlatformAdminAccount({ id: String(user.id), role: String(user.role || '') });
+    if (!isPlatformAdmin) {
+        await audit('LOGIN_BLOCKED_NON_ADMIN_PASSWORD', 'failure', meta, { userId: user.id, phone: user.phone, email: user.email });
+        throw new error_middleware_1.AppError('Use phone OTP login for this account', 403);
+    }
+    if (!input.identifier.includes('@')) {
+        throw new error_middleware_1.AppError('Platform admin login requires email identifier', 400);
+    }
     if (user.isDeleted) {
-        await audit('LOGIN_FAILED', 'failure', meta, { email: input.identifier, userId: user.id });
+        await audit('LOGIN_FAILED', 'failure', meta, { phone: input.identifier, userId: user.id });
         throw new error_middleware_1.AppError('User account is deleted', 410);
     }
     if (user.lockUntil && user.lockUntil > new Date()) {
@@ -388,15 +375,15 @@ const loginWithPassword = async (input, meta) => {
             },
         });
         if (willLock) {
-            await audit('LOCKOUT_TRIGGERED', 'failure', meta, { userId: user.id, email: user.email });
+            await audit('LOCKOUT_TRIGGERED', 'failure', meta, { userId: user.id, phone: user.phone });
         }
-        await audit('LOGIN_FAILED', 'failure', meta, { userId: user.id, email: user.email });
+        await audit('LOGIN_FAILED', 'failure', meta, { userId: user.id, phone: user.phone });
         throw new error_middleware_1.AppError('Invalid credentials', 401);
     }
-    const shouldEnforceEmailVerification = !(env_1.env.allowDevVerificationBypass && env_1.env.nodeEnv === 'development');
-    if (shouldEnforceEmailVerification && user.email && !user.emailVerified) {
-        await audit('LOGIN_BLOCKED_EMAIL_UNVERIFIED', 'failure', meta, { userId: user.id, email: user.email });
-        throw new error_middleware_1.AppError('Email verification required before login', 403);
+    const shouldEnforcePhoneVerification = !(env_1.env.allowDevVerificationBypass && env_1.env.nodeEnv === 'development');
+    if (shouldEnforcePhoneVerification && user.phone && !user.phoneVerified) {
+        await audit('LOGIN_BLOCKED_PHONE_UNVERIFIED', 'failure', meta, { userId: user.id, phone: user.phone });
+        throw new error_middleware_1.AppError('Phone verification required before login', 403);
     }
     if (user.mfaEnabled) {
         if (!input.mfaCode || !user.mfaSecret || !otplib_1.authenticator.check(input.mfaCode, user.mfaSecret)) {
@@ -544,7 +531,7 @@ const requestPasswordReset = async (input, meta) => {
                 passwordResetOtpExpiresAt: nowPlusMinutes(env_1.env.resetOtpTtlMinutes),
             },
         });
-        await audit('PASSWORD_RESET_REQUESTED', 'success', meta, { userId: user.id, email: user.email });
+        await audit('PASSWORD_RESET_REQUESTED', 'success', meta, { userId: user.id, phone: user.phone });
         return {
             message: 'Password reset OTP sent.',
             devOtp: env_1.env.nodeEnv !== 'production' ? otp : undefined,
@@ -575,7 +562,7 @@ const resetPassword = async (input, meta) => {
         },
     });
     await db.authSession.updateMany({ where: { userId: user.id, revokedAt: null }, data: { revokedAt: new Date() } });
-    await audit('PASSWORD_RESET_SUCCESS', 'success', meta, { userId: user.id, email: user.email });
+    await audit('PASSWORD_RESET_SUCCESS', 'success', meta, { userId: user.id, phone: user.phone });
 };
 exports.resetPassword = resetPassword;
 const setupMfa = async (input) => {

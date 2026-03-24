@@ -93,17 +93,26 @@ export const razorpayWebhookController = async (req: Request, res: Response): Pr
 };
 
 export const phonepeWebhookController = async (req: Request, res: Response): Promise<void> => {
-	// Debug logging for webhook test calls
-	console.log('[PhonePeWebhook] incoming:', {
-		ip: getClientIpFromRequest(req),
-		auth: req.headers.authorization,
-		xVerify: req.headers['x-verify'],
-		body: req.body,
-	});
+	const rawBody = req.rawBody ?? JSON.stringify(req.body ?? {});
+	const xVerify = String(req.headers['x-verify'] ?? '').trim();
 
-	// Temporary success-only mode to allow PhonePe webhook registration.
-	// Keep for initial setup, then replace with actual signature processing.
-	res.status(200).json({ success: true });
+	if (!xVerify || !verifyPhonePeWebhook(rawBody, xVerify)) {
+		throw new AppError('Invalid PhonePe webhook signature', 401);
+	}
+
+	const payload = req.body as any;
+	let decoded: any = payload;
+
+	if (typeof payload?.response === 'string' && payload.response.trim().length > 0) {
+		try {
+			decoded = JSON.parse(Buffer.from(payload.response, 'base64').toString('utf8'));
+		} catch {
+			throw new AppError('Invalid PhonePe webhook payload', 422);
+		}
+	}
+
+	const result = await processPhonePeWebhook(decoded);
+	res.status(200).json({ success: true, ...result });
 };
 
 export const getPhonePeStatusController = async (req: Request, res: Response): Promise<void> => {
@@ -115,6 +124,21 @@ export const getPhonePeStatusController = async (req: Request, res: Response): P
 	const status = await checkPhonePeStatus(transactionId);
 	if (!status) {
 		throw new AppError('Unable to fetch payment status', 502);
+	}
+
+	const normalizedCode = String(status?.code || '').toUpperCase();
+	const normalizedState = String(status?.data?.state || '').toUpperCase();
+	const isCompleted = normalizedCode === 'PAYMENT_SUCCESS' || normalizedState === 'COMPLETED';
+
+	// Webhooks can be delayed/unavailable in local test setups.
+	// Reconcile completed PhonePe status inline so patient subscription activation is immediate.
+	if (isCompleted && transactionId.startsWith('SUB_')) {
+		await processPhonePeWebhook(status).catch((error) => {
+			logger.warn('[PhonePe] Inline status reconciliation failed', {
+				transactionId,
+				error: error?.message,
+			});
+		});
 	}
 
 	res.status(200).json({ success: true, data: status });

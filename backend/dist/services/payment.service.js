@@ -91,7 +91,6 @@ const createSessionPayment = async (input) => {
         if (payment) {
             return {
                 sessionId: existing.id,
-                paymentId: payment.id,
                 paymentType: 'provider_fee',
                 transactionId: existing.razorpayOrderId,
                 redirectUrl: '',
@@ -235,7 +234,6 @@ const processPhonePeWebhook = async (decoded) => {
                         currency: payment.currency,
                         referenceId: payment.sessionId,
                         sessionId: payment.sessionId,
-                        paymentId: payment.id,
                     },
                 });
             });
@@ -433,7 +431,6 @@ const releaseSessionEarnings = async (sessionId, actorTherapistId) => {
                 balanceBeforeMinor: before,
                 balanceAfterMinor: after,
                 sessionId,
-                paymentId: payment.id,
                 referenceKey: releaseReferenceKey,
             },
         });

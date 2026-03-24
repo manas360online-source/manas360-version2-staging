@@ -22,7 +22,15 @@ export const validateEmail = (value: unknown): string => {
 };
 
 export const validatePhone = (value: unknown): string => {
-	const phone = assertString(value, 'phone');
+	const rawPhone = assertString(value, 'phone');
+	const compactPhone = rawPhone.replace(/[\s()-]/g, '');
+
+	let phone = compactPhone;
+	if (/^\d{10}$/.test(phone)) {
+		phone = `+91${phone}`;
+	} else if (/^91\d{10}$/.test(phone)) {
+		phone = `+${phone}`;
+	}
 
 	if (!phoneRegex.test(phone)) {
 		throw new AppError('Invalid phone format', 400);

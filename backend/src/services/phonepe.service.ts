@@ -7,13 +7,22 @@ import { logger } from '../utils/logger';
 const PHONEPE_MERCHANT_ID = String(process.env.PHONEPE_MERCHANT_ID || 'PGCHECKOUT').trim();
 const PHONEPE_SALT_KEY = String(process.env.PHONEPE_SALT_KEY || '').trim();
 const PHONEPE_SALT_INDEX = String(process.env.PHONEPE_SALT_INDEX || '1').trim();
+const PHONEPE_ENV = String(process.env.PHONEPE_ENV || (env.nodeEnv === 'production' ? 'production' : 'preprod')).trim().toLowerCase();
+const PHONEPE_MODE = String(process.env.PHONEPE_MODE || '').trim().toLowerCase();
 
-// Automated Base URL selection: Use pgsandbox (simulator) for PGCHECKOUT, otherwise assume UAT/Prod (hermes)
+// Base URL selection priority:
+// 1) Explicit PHONEPE_BASE_URL
+// 2) PHONEPE_MODE=pgsandbox (simulator)
+// 3) PHONEPE_ENV=production|preprod (standard gateway)
 const GET_PHONEPE_BASE_URL = () => {
 	if (process.env.PHONEPE_BASE_URL) return String(process.env.PHONEPE_BASE_URL).trim();
-	return PHONEPE_MERCHANT_ID === 'PGCHECKOUT' 
-		? 'https://api-preprod.phonepe.com/apis/pgsandbox' 
-		: 'https://api-preprod.phonepe.com/apis/hermes';
+	if (PHONEPE_MODE === 'pgsandbox' || PHONEPE_MODE === 'simulator') {
+		return 'https://api-preprod.phonepe.com/apis/pg-sandbox';
+	}
+	if (PHONEPE_ENV === 'production' || PHONEPE_ENV === 'prod' || PHONEPE_ENV === 'live') {
+		return 'https://api.phonepe.com/apis/hermes';
+	}
+	return 'https://api-preprod.phonepe.com/apis/hermes';
 };
 
 const PHONEPE_BASE_URL = GET_PHONEPE_BASE_URL().replace(/\/+$/, '');
@@ -42,6 +51,9 @@ const getPhonePeOAuthUrl = (): string => {
 	if (PHONEPE_OAUTH_URL) return PHONEPE_OAUTH_URL;
 	if (PHONEPE_BASE_URL.includes('pgsandbox') || PHONEPE_BASE_URL.includes('pg-sandbox')) {
 		return 'https://api-preprod.phonepe.com/apis/pg-sandbox/v1/oauth/token';
+	}
+	if (PHONEPE_ENV === 'preprod' || PHONEPE_ENV === 'uat') {
+		return 'https://api-preprod.phonepe.com/apis/identity-manager/v1/oauth/token';
 	}
 	return 'https://api.phonepe.com/apis/identity-manager/v1/oauth/token';
 };
@@ -103,6 +115,66 @@ const getPhonePeAuthorizationHeader = async (): Promise<Record<string, string>> 
 		return {};
 	}
 	return { Authorization: `O-Bearer ${token}` };
+};
+
+const initiatePhonePePaymentViaSdk = async (input: {
+	transactionId: string;
+	amountInPaise: number;
+	redirectUrl: string;
+}): Promise<string | null> => {
+	try {
+		const sdk: any = await import('@phonepe-pg/pg-sdk-node');
+		const StandardCheckoutClient = sdk?.StandardCheckoutClient;
+		const Env = sdk?.Env;
+		if (!StandardCheckoutClient || !Env) {
+			return null;
+		}
+
+		const sdkEnv = PHONEPE_ENV === 'production' || PHONEPE_ENV === 'prod' || PHONEPE_ENV === 'live'
+			? Env.PRODUCTION
+			: Env.SANDBOX;
+		const clientVersion = Number(PHONEPE_CLIENT_VERSION || '1');
+		const client = StandardCheckoutClient.getInstance(PHONEPE_CLIENT_ID, PHONEPE_CLIENT_SECRET, clientVersion, sdkEnv);
+
+		const createOrderBuilder = sdk?.CreateSdkOrderRequest?.StandardCheckoutBuilder?.();
+		if (createOrderBuilder) {
+			const request = createOrderBuilder
+				.merchantOrderId(input.transactionId)
+				.amount(input.amountInPaise)
+				.redirectUrl(input.redirectUrl)
+				.disablePaymentRetry(true)
+				.build();
+
+			if (typeof client?.pay === 'function') {
+				const response = await client.pay(request);
+				const sdkRedirect = String(response?.redirectUrl || response?.redirect_url || '').trim();
+				if (sdkRedirect) return sdkRedirect;
+			}
+
+			if (typeof client?.createSdkOrder === 'function') {
+				const response = await client.createSdkOrder(request);
+				const sdkRedirect = String(response?.redirectUrl || response?.redirect_url || '').trim();
+				if (sdkRedirect) return sdkRedirect;
+			}
+		}
+
+		const payBuilder = sdk?.StandardCheckoutPayRequest?.builder?.();
+		if (payBuilder && typeof client?.pay === 'function') {
+			const request = payBuilder
+				.merchantOrderId(input.transactionId)
+				.amount(input.amountInPaise)
+				.redirectUrl(input.redirectUrl)
+				.build();
+			const response = await client.pay(request);
+			const sdkRedirect = String(response?.redirectUrl || response?.redirect_url || '').trim();
+			if (sdkRedirect) return sdkRedirect;
+		}
+
+		return null;
+	} catch (error: any) {
+		logger.error('[PhonePe] SDK fallback failed', { message: error?.message, stack: error?.stack });
+		return null;
+	}
 };
 
 interface PhonePePaymentRequest {
@@ -183,6 +255,22 @@ export const initiatePhonePePayment = async (input: {
 
 		const upstreamCode = String(error?.response?.data?.code || '').trim();
 		const upstreamMessage = String(error?.response?.data?.message || error?.message || 'PhonePe request failed').trim();
+		const isMappingError = upstreamMessage.toLowerCase().includes('api mapping not found');
+
+		if (isMappingError && PHONEPE_CLIENT_ID && PHONEPE_CLIENT_SECRET) {
+			const sdkRedirectUrl = await initiatePhonePePaymentViaSdk({
+				transactionId: input.transactionId,
+				amountInPaise: input.amountInPaise,
+				redirectUrl: input.redirectUrl,
+			});
+			if (sdkRedirectUrl) {
+				logger.info('[PhonePe] SDK fallback payment initiated successfully', {
+					transactionId: input.transactionId,
+					redirectUrl: sdkRedirectUrl,
+				});
+				return sdkRedirectUrl;
+			}
+		}
 
 		logger.error('[PhonePe] Payment Initiation Failed', {
 			transactionId: input.transactionId,
@@ -195,7 +283,7 @@ export const initiatePhonePePayment = async (input: {
 			? `PhonePe Payment Initiation Failed (${upstreamCode}): ${upstreamMessage}`
 			: `PhonePe Payment Initiation Failed: ${upstreamMessage}`;
 		const withHint = upstreamCode === 'KEY_NOT_CONFIGURED'
-			? `${detailed}. Verify PHONEPE_MERCHANT_ID=${PHONEPE_MERCHANT_ID} and PHONEPE_SALT_INDEX=${PHONEPE_SALT_INDEX} are activated in PhonePe preprod.`
+			? `${detailed}. Verify merchant activation and env alignment: PHONEPE_MERCHANT_ID=${PHONEPE_MERCHANT_ID}, PHONEPE_SALT_INDEX=${PHONEPE_SALT_INDEX}, PHONEPE_BASE_URL=${PHONEPE_BASE_URL} (or set PHONEPE_ENV/PHONEPE_MODE).`
 			: detailed;
 		throw new AppError(withHint, 502);
 	}

@@ -52,6 +52,8 @@ import {
 	updatePatientSubscriptionPlan,
 	verifySessionPaymentAndCreateSession,
 } from '../services/patient-v1.service';
+import { getActivePlatformPlan } from '../services/pricing.service';
+import { initiatePatientSubscriptionPayment } from '../services/patient-subscription-payment.service';
 import {
 	completeTreatmentPlanTask,
 	getMyTreatmentPlan,
@@ -615,7 +617,6 @@ export const upgradePatientSubscriptionController = async (req: Request, res: Re
 		throw new AppError('planKey is required', 422);
 	}
 
-	const { getActivePlatformPlan } = await import('../services/pricing.service');
 	const plan = await getActivePlatformPlan(planKey);
 	
 	if (!plan) {
@@ -630,7 +631,6 @@ export const upgradePatientSubscriptionController = async (req: Request, res: Re
 	}
 
 	// Paid plan: initiate PhonePe payment (supports dev bypass)
-	const { initiatePatientSubscriptionPayment } = await import('../services/patient-subscription-payment.service');
 	const data = await initiatePatientSubscriptionPayment(userId, planKey);
 	sendSuccess(res, data, 'Payment initiated');
 };
