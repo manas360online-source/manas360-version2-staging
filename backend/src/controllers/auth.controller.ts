@@ -43,6 +43,13 @@ const resolveCookieDomain = (): string | undefined => {
 		return undefined;
 	}
 
+	const isIpv4 = /^(?:\d{1,3}\.){3}\d{1,3}$/.test(normalized);
+	const isBracketedIpv6 = /^\[[0-9a-f:]+\]$/i.test(normalized);
+	const isBareIpv6 = normalized.includes(':') && /^[0-9a-f:]+$/i.test(normalized);
+	if (isIpv4 || isBracketedIpv6 || isBareIpv6) {
+		return undefined;
+	}
+
 	return rawDomain;
 };
 
@@ -67,16 +74,25 @@ const resolveRuntimeCookieDomain = (hostname?: string): string | undefined => {
 	return undefined;
 };
 
-const shouldUseSecureCookies = env.cookieSecure || (env.nodeEnv !== 'development' && env.nodeEnv !== 'test');
-const cookieSameSite = shouldUseSecureCookies ? 'none' as const : 'lax' as const;
+const shouldUseSecureCookies = (req: Request): boolean => (
+	env.cookieSecure || req.secure || (env.nodeEnv !== 'development' && env.nodeEnv !== 'test')
+);
 
-const buildTokenCookieOptions = (req: Request) => ({
-	httpOnly: true,
-	secure: shouldUseSecureCookies,
-	sameSite: cookieSameSite,
-	domain: resolveRuntimeCookieDomain(req.hostname),
-	path: '/',
-});
+const resolveCookieSameSite = (useSecureCookies: boolean): 'none' | 'lax' => (
+	useSecureCookies ? 'none' : 'lax'
+);
+
+const buildTokenCookieOptions = (req: Request) => {
+	const useSecureCookies = shouldUseSecureCookies(req);
+
+	return {
+		httpOnly: true,
+		secure: useSecureCookies,
+		sameSite: resolveCookieSameSite(useSecureCookies),
+		domain: resolveRuntimeCookieDomain(req.hostname),
+		path: '/',
+	};
+};
 
 const setAuthCookies = (req: Request, res: Response, accessToken: string, refreshToken: string): void => {
 	const tokenCookieOptions = buildTokenCookieOptions(req);
@@ -92,8 +108,8 @@ const setAuthCookies = (req: Request, res: Response, accessToken: string, refres
 
 	res.cookie(env.csrfCookieName, randomBytes(24).toString('hex'), {
 		httpOnly: false,
-		secure: shouldUseSecureCookies,
-		sameSite: cookieSameSite,
+		secure: tokenCookieOptions.secure,
+		sameSite: tokenCookieOptions.sameSite,
 		domain: tokenCookieOptions.domain,
 		path: '/',
 		maxAge: 7 * 24 * 60 * 60 * 1000,

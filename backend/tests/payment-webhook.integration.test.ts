@@ -36,7 +36,7 @@ describe('Phase 5 - E2E Validation: Payment Webhook Transitions', () => {
                         // 1. Create a pending payment
                         const mockPayment = await prisma.financialPayment.create({
                                 data: {
-                                        razorpayOrderId: mockTxId,
+                                        merchantTransactionId: mockTxId,
                                         amountMinor: 500000,
                                         currency: 'INR',
                                         status: 'INITIATED',
@@ -154,13 +154,13 @@ describe('Phase 5 - E2E Validation: Payment Webhook Transitions', () => {
                                         expectedAmountMinor: 100000, // 1000 INR
                                         currency: 'INR',
                                         idempotencyKey: `test_idem_abc_${Date.now()}_${Math.random()}`,
-                                        razorpayOrderId: mockTxId,
+                                        merchantTransactionId: mockTxId,
                                 }
                         });
 
                         const mockPayment = await prisma.financialPayment.create({
                                 data: {
-                                        razorpayOrderId: mockTxId,
+                                        merchantTransactionId: mockTxId,
                                         amountMinor: 100000,
                                         currency: 'INR',
                                         status: 'INITIATED',

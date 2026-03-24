@@ -52,18 +52,18 @@ export const initiateMyTherapistLeadPurchaseController = async (req: Request, re
 export const confirmMyTherapistLeadPurchaseController = async (req: Request, res: Response): Promise<void> => {
 	const userId = getAuthUserId(req);
 	const leadId = String(req.params.id);
-	const razorpayOrderId = String(req.body.razorpayOrderId ?? '').trim();
-	const razorpayPaymentId = String(req.body.razorpayPaymentId ?? '').trim();
-	const razorpaySignature = String(req.body.razorpaySignature ?? '').trim();
+	const merchantTransactionId = String(req.body.merchantTransactionId ?? '').trim();
+	const transactionId = String(req.body.transactionId ?? '').trim();
+	const signature = String(req.body.signature ?? '').trim();
 
-	if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
-		throw new AppError('razorpayOrderId, razorpayPaymentId and razorpaySignature are required', 422);
+	if (!merchantTransactionId || !transactionId || !signature) {
+		throw new AppError('merchantTransactionId, transactionId and signature are required', 422);
 	}
 
 	const result = await confirmMyTherapistLeadPurchase(userId, leadId, {
-		razorpayOrderId,
-		razorpayPaymentId,
-		razorpaySignature,
+		merchantTransactionId,
+		transactionId,
+		signature,
 	});
 
 	sendSuccess(res, result, 'Lead purchase confirmed');

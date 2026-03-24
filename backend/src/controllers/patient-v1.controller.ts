@@ -311,13 +311,13 @@ export const bookSessionController = async (req: Request, res: Response): Promis
 
 export const verifyPaymentController = async (req: Request, res: Response): Promise<void> => {
 	const userId = authUserId(req);
-	const razorpay_order_id = String(req.body.razorpay_order_id || '').trim();
-	const razorpay_payment_id = String(req.body.razorpay_payment_id || '').trim();
-	const razorpay_signature = String(req.body.razorpay_signature || '').trim();
-	if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-		throw new AppError('razorpay_order_id, razorpay_payment_id and razorpay_signature are required', 422);
+	const merchantTransactionId = String(req.body.merchantTransactionId || '').trim();
+	const transactionId = String(req.body.transactionId || '').trim();
+	const signature = String(req.body.signature || '').trim();
+	if (!merchantTransactionId || !transactionId || !signature) {
+		throw new AppError('merchantTransactionId, transactionId and signature are required', 422);
 	}
-	const result = await verifySessionPaymentAndCreateSession(userId, { razorpay_order_id, razorpay_payment_id, razorpay_signature });
+	const result = await verifySessionPaymentAndCreateSession(userId, { merchantTransactionId, transactionId, signature });
 	sendSuccess(res, result, 'Payment verified and session confirmed');
 };
 

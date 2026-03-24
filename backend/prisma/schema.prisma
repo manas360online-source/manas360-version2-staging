@@ -691,7 +691,7 @@ model SessionBookingIntent {
   durationMinute    Int                 @default(50)
   amountMinor       BigInt
   currency          String              @default("INR")
-  razorpayOrderId   String              @unique
+  merchantTransactionId   String              @unique
   razorpayPaymentId String?
   status            BookingIntentStatus @default(PENDING)
   sessionId         String?
@@ -989,7 +989,7 @@ model FinancialSession {
   expectedAmountMinor BigInt
   currency            String                 @default("INR")
   idempotencyKey      String                 @unique
-  razorpayOrderId     String?                @unique
+  merchantTransactionId     String?                @unique
   confirmedAt         DateTime?
   completedAt         DateTime?
   expiredAt           DateTime?
@@ -1025,7 +1025,7 @@ model Lead {
   createdAt              DateTime          @default(now())
   updatedAt              DateTime          @updatedAt
   paymentStatus          LeadPaymentStatus @default(NOT_REQUIRED)
-  razorpayOrderId        String?           @unique
+  merchantTransactionId        String?           @unique
   razorpayPaymentId      String?           @unique
   paymentCapturedAt      DateTime?
   channel                LeadChannel       @default(CONSUMER)
@@ -1056,8 +1056,8 @@ model FinancialPayment {
   sessionId             String?
   providerId            String?
   patientId             String?
-  providerGateway       String                 @default("RAZORPAY")
-  razorpayOrderId       String                 @unique
+  providerGateway       String                 @default("PHONEPE")
+  merchantTransactionId String                 @unique
   razorpayPaymentId     String?                @unique
   status                FinancialPaymentStatus @default(INITIATED)
   amountMinor           BigInt
@@ -1084,7 +1084,7 @@ model FinancialPayment {
   @@index([providerId, status])
   @@index([paymentType, status])
   @@index([status, nextRetryAt])
-  @@index([razorpayOrderId])
+  @@index([merchantTransactionId])
   @@index([createdAt])
   @@map("financial_payments")
 }
@@ -1199,9 +1199,9 @@ model MarketplaceSubscription {
   domain                 SubscriptionDomain
   plan                   SubscriptionPlan
   status                 SubscriptionStatus    @default(PAST_DUE)
-  providerGateway        String                @default("RAZORPAY")
-  razorpaySubscriptionId String                @unique
-  razorpayPlanId         String
+  providerGateway        String                @default("PHONEPE")
+  phonepeSubscriptionId String                @unique
+  phonepePlanId         String
   currentPeriodStart     DateTime?
   currentPeriodEnd       DateTime?
   nextBillingDate        DateTime?
