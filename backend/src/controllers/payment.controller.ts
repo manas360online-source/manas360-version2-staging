@@ -5,7 +5,6 @@ import { env } from '../config/env';
 import { prisma } from '../config/db';
 import {
 	createSessionPayment,
-	processRazorpayWebhook,
 	processPhonePeWebhook,
 	releaseSessionEarnings,
 } from '../services/payment.service';
@@ -68,28 +67,9 @@ export const completeFinancialSessionController = async (req: Request, res: Resp
 	sendSuccess(res, { sessionId }, 'Session earnings released');
 };
 
-export const razorpayWebhookController = async (req: Request, res: Response): Promise<void> => {
-	const signature = String(req.headers['x-razorpay-signature'] ?? '');
-	if (!signature) {
-		throw new AppError('Missing x-razorpay-signature', 401);
-	}
-
-	const rawBody = req.rawBody ?? JSON.stringify(req.body ?? {});
-	const event = req.body as any;
-	const eventType = String(event?.event ?? '');
-	const hasSubscriptionEntity = Boolean(
-		event?.payload?.subscription?.entity || event?.payload?.payment?.entity?.subscription,
-	);
-
-	let result;
-	if (eventType.startsWith('subscription.') || (eventType === 'payment.failed' && hasSubscriptionEntity)) {
-		// Subscription webhooks removed (was Razorpay)
-		result = { handled: false, message: 'Subscription webhooks not supported' };
-	} else {
-		result = await processRazorpayWebhook(rawBody, signature);
-	}
-
-	res.status(200).json({ success: true, ...result });
+export const razorpayWebhookController = async (_req: Request, res: Response): Promise<void> => {
+	// Razorpay payment provider has been removed in favor of PhonePe
+	res.status(200).json({ success: false, message: 'Razorpay is no longer supported. Use PhonePe webhooks.' });
 };
 
 export const phonepeWebhookController = async (req: Request, res: Response): Promise<void> => {

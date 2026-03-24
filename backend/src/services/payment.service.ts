@@ -3,10 +3,6 @@ import { createClient } from 'redis';
 import { env } from '../config/env';
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/error.middleware';
-import {
-	createRazorpayOrder,
-	verifyRazorpayWebhookSignature,
-} from './razorpay.service';
 import { initiatePhonePePayment } from './phonepe.service';
 import { recordPaymentCapturedMetric } from './payment-metrics.service';
 import { logger } from '../utils/logger';
@@ -488,119 +484,7 @@ export const releaseSessionEarnings = async (sessionId: string, actorTherapistId
 	});
 };
 
-export const processRazorpayWebhook = async (rawBody: string, signature: string): Promise<{ handled: boolean; message: string }> => {
-	if (!env.razorpayWebhookSecret) {
-		throw new AppError('RAZORPAY_WEBHOOK_SECRET not configured', 500);
-	}
 
-	const isSignatureValid = verifyRazorpayWebhookSignature(rawBody, signature, env.razorpayWebhookSecret);
-	if (!isSignatureValid) {
-		throw new AppError('Invalid Razorpay webhook signature', 401);
-	}
-
-	const event = JSON.parse(rawBody) as any;
-	const eventId = String(event?.id ?? '');
-	const eventType = String(event?.event ?? '');
-
-	if (!eventId || !eventType) {
-		throw new AppError('Invalid webhook payload', 422);
-	}
-
-	const cacheKey = `webhook:razorpay:${eventId}`;
-	let setOk: string | null = 'OK';
-	if (!isTestEnv) {
-		setOk = await redis.set(cacheKey, '1', {
-			NX: true,
-			EX: env.webhookIdempotencyTtlSeconds,
-		}).catch(() => 'OK');
-	}
-	if (!setOk) {
-		return { handled: true, message: 'Duplicate webhook (cache)' };
-	}
-
-	const payloadHash = sha256(rawBody);
-
-	try {
-		await db.webhookLog.create({
-			data: {
-				provider: 'RAZORPAY',
-				eventId,
-				eventType,
-				payloadHash,
-				signature,
-				isSignatureValid: true,
-				processStatus: 'RECEIVED',
-				rawPayload: event,
-			},
-		});
-	} catch {
-		return { handled: true, message: 'Duplicate webhook (db unique)' };
-	}
-
-	if (eventType === 'payment.captured') {
-		const paymentEntity = event?.payload?.payment?.entity;
-		const razorpayOrderId = String(paymentEntity?.order_id ?? '');
-		const razorpayPaymentId = String(paymentEntity?.id ?? '');
-		const amountMinor = asMinor(Number(paymentEntity?.amount ?? 0));
-
-		if (!razorpayOrderId || !razorpayPaymentId || !amountMinor) {
-			await db.webhookLog.updateMany({
-				where: { provider: 'RAZORPAY', eventId },
-				data: { processStatus: 'FAILED' },
-			});
-			throw new AppError('Invalid payment.captured payload', 422);
-		}
-
-		await db.$transaction(async (tx: any) => {
-			const payment = await tx.financialPayment.findFirst({
-				where: { razorpayOrderId },
-			});
-
-			if (!payment || payment.status === 'CAPTURED' || payment.status === 'FAILED') return;
-
-			const therapistShareMinor = Math.floor(amountMinor * providerShareRatio);
-			const platformShareMinor = amountMinor - therapistShareMinor;
-
-			await tx.financialPayment.update({
-				where: { id: payment.id },
-				data: {
-					status: 'CAPTURED',
-					razorpayPaymentId,
-					capturedAt: new Date(),
-					therapistShareMinor,
-					platformShareMinor,
-				},
-			});
-
-			await tx.providerWallet.upsert({
-				where: { providerId: payment.providerId },
-				update: {
-					pendingBalanceMinor: { increment: therapistShareMinor },
-					lifetimeEarningsMinor: { increment: therapistShareMinor },
-				},
-				create: {
-					providerId: payment.providerId,
-					pendingBalanceMinor: therapistShareMinor,
-					lifetimeEarningsMinor: therapistShareMinor,
-				},
-			});
-
-			await tx.financialSession.update({
-				where: { id: payment.sessionId },
-				data: { status: 'CONFIRMED', confirmedAt: new Date() },
-			});
-
-			await tx.webhookLog.updateMany({
-				where: { provider: 'RAZORPAY', eventId },
-				data: { processStatus: 'PROCESSED', processedAt: new Date(), sessionId: payment.sessionId },
-			});
-		});
-
-		return { handled: true, message: 'payment.captured processed' };
-	}
-
-	return { handled: false, message: `Unhandled event: ${eventType}` };
-};
 /**
  * Manual Payment Retry (Admin Recovery Tool)
  *

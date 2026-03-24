@@ -267,8 +267,8 @@ const logoutController = async (req, res) => {
     res.clearCookie(env_1.env.refreshCookieName, tokenCookieOptions);
     res.clearCookie(env_1.env.csrfCookieName, {
         httpOnly: false,
-        secure: shouldUseSecureCookies,
-        sameSite: cookieSameSite,
+        secure: tokenCookieOptions.secure,
+        sameSite: tokenCookieOptions.sameSite,
         domain: tokenCookieOptions.domain,
         path: '/',
     });
