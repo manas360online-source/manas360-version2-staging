@@ -60,7 +60,8 @@ export const initiateProviderSubscriptionPayment = async (providerId: string, pl
 	}
 
 	const transactionId = `PROV_SUB_${providerId}_${planKey}_${Date.now()}`;
-	const shouldBypass = env.allowDevPaymentBypass && env.nodeEnv === 'development';
+	const shouldBypass = env.allowDevPaymentBypass && env.nodeEnv !== 'production';
+	const canFallbackWithoutGateway = env.nodeEnv !== 'production';
 	const frontendBaseUrl = env.frontendUrl;
 	const callbackUrl = `${env.apiUrl}${env.apiPrefix}/v1/payments/phonepe/webhook`;
 	const cycleKey = new Date().toISOString().slice(0, 10);
@@ -77,11 +78,15 @@ export const initiateProviderSubscriptionPayment = async (providerId: string, pl
 			metadata: { plan: planKey },
 		});
 	} catch (error: any) {
-		if (!shouldBypass) {
+		if (!shouldBypass && !canFallbackWithoutGateway) {
 			throw new AppError(error?.message || 'PhonePe Payment Initiation Failed', 502);
 		}
-		// Bypass mode: mock a success redirect
-		logger.info('[PhonePe] Bypassing payment initiation in development mode', { transactionId });
+		// Non-production fallback: return a local redirect URL even if gateway is unavailable.
+		logger.warn('[PhonePe] Falling back to local redirect after payment initiation failure', {
+			transactionId,
+			nodeEnv: env.nodeEnv,
+			error: error?.message,
+		});
 		redirectUrl = `${frontendBaseUrl}/payment/status?id=${transactionId}&status=SUCCESS`;
 	}
 

@@ -21,6 +21,7 @@ const app = express();
 Sentry.setupExpressErrorHandler(app);
 
 app.disable('x-powered-by');
+app.set('trust proxy', 1);
 app.use(helmet());
 const allowedCorsOrigins = Array.from(new Set([
 	...env.corsOrigins,
@@ -49,7 +50,7 @@ app.use(cors({
 	optionsSuccessStatus: 204,
 }));
 
-app.options('*', cors());
+// app.options('*', cors());
 app.use(
 	express.json({
 		limit: '1mb',

@@ -9,6 +9,11 @@
             "date": 1774194000074,
             "name": "/Users/chandu/Project/MANAS360_version2/backend/logs/error-2026-03-22.log",
             "hash": "e8b1d7ed4e407483e2a48c0ccb50574e988d26497aa92f9bbeb588cde9fea95d"
+        },
+        {
+            "date": 1774315135498,
+            "name": "/Users/chandu/Project/MANAS360_version2/backend/logs/error-2026-03-24.log",
+            "hash": "9299f85ce02ce655c0e9a1c0979bb2869f060695de4efa717cbd2d275f1a58bd"
         }
     ],
     "hashType": "sha256"

@@ -15,6 +15,7 @@ const payment_routes_1 = __importDefault(require("./payment.routes"));
 const subscription_routes_1 = __importDefault(require("./subscription.routes"));
 const webhook_routes_1 = __importDefault(require("./webhook.routes"));
 const lead_routes_1 = __importDefault(require("./lead.routes"));
+const lead_response_routes_1 = __importDefault(require("./lead-response.routes"));
 const patient_v1_routes_1 = __importDefault(require("./patient-v1.routes"));
 const patient_self_routes_1 = __importDefault(require("./patient-self.routes"));
 const certification_routes_1 = __importDefault(require("./certification.routes"));
@@ -31,6 +32,7 @@ const free_screening_routes_1 = __importDefault(require("./free-screening.routes
 const gps_routes_1 = __importDefault(require("./gps.routes"));
 const provider_routes_1 = __importDefault(require("./provider.routes"));
 const sound_routes_1 = __importDefault(require("./sound.routes"));
+const provider_dashboard_routes_1 = __importDefault(require("./provider-dashboard.routes"));
 const router = (0, express_1.Router)();
 router.get('/health', (_req, res) => {
     res.status(200).json({
@@ -65,6 +67,8 @@ router.use('/pricing', pricing_routes_1.default);
 router.use('/v1/patient-journey', patient_journey_routes_1.default);
 router.use('/v1', free_screening_routes_1.default);
 router.use('/v1/leads', lead_routes_1.default);
+router.use('/v1', lead_response_routes_1.default);
+router.use('/v1', provider_dashboard_routes_1.default);
 router.use('/certifications', certification_routes_1.default);
 router.use('/v1/certifications', certification_routes_1.default);
 router.use('/landing', landing_routes_1.default);

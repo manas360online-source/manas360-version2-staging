@@ -144,7 +144,7 @@ export const startFreeScreeningAttempt = async (input: StartInput) => {
 	};
 };
 
-const resolveBand = (bands: any[], totalScore: number) => {
+export const resolveBand = (bands: any[], totalScore: number) => {
 	const matched = (bands || []).find((band) => totalScore >= Number(band.minScore) && totalScore <= Number(band.maxScore));
 	if (matched) return matched;
 	if (!bands?.length) {

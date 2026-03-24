@@ -1,6 +1,7 @@
 import { AppError } from '../middleware/error.middleware';
 import { prisma } from '../config/db';
 import { PROVIDER_PLANS, type ProviderPlanKey } from '../config/providerPlans';
+import { PLAN_CONFIG } from '../config/plans';
 
 const db = prisma as any;
 const SUBSCRIPTION_LOCK_TIMEOUT_MS = 5 * 60 * 1000;
@@ -95,6 +96,13 @@ const calculateExpiry = (durationDays: number): Date => {
 	return expiry;
 };
 
+const resolveTierForPlan = (planKey: ProviderPlanKey): 'STARTER' | 'GROWTH' | 'SCALE' | null => {
+	if (planKey === 'basic') return 'STARTER';
+	if (planKey === 'standard') return 'GROWTH';
+	if (planKey === 'premium') return 'SCALE';
+	return null;
+};
+
 /** Get the current provider subscription */
 export const getProviderSubscription = async (providerId: string) => {
 	const sub = await db.providerSubscription.findUnique({
@@ -115,10 +123,13 @@ export const getProviderSubscription = async (providerId: string) => {
 	}
 
 	const planDetails = PROVIDER_PLANS[sub.plan as ProviderPlanKey] || PROVIDER_PLANS.free;
+	const tier = (sub.tier || resolveTierForPlan(sub.plan as ProviderPlanKey) || null) as any;
+	const tierDetails = tier ? (PLAN_CONFIG as any)[tier] : null;
 
 	return {
 		...sub,
 		planDetails,
+		tierDetails,
 	};
 };
 
@@ -137,13 +148,17 @@ export const activateProviderSubscription = async (
 				where: { providerId },
 				data: {
 					plan: planKey,
+					tier: null,
 					price: 0,
 					leadsPerWeek: 0,
+					bonusLeads: 0,
 					startDate: new Date(),
 					expiryDate: new Date('2099-12-31'),
 					status: 'active',
 					autoRenew: false,
 					paymentId: paymentId || undefined,
+					leadsUsedThisWeek: 0,
+					weekStartsAt: new Date(),
 				},
 			});
 
@@ -165,17 +180,24 @@ export const activateProviderSubscription = async (
 			return next;
 		}
 
+		const mappedTier = resolveTierForPlan(planKey);
+		const tierConfig = mappedTier ? (PLAN_CONFIG as any)[mappedTier] : null;
+
 		const next = await db.providerSubscription.update({
 			where: { providerId },
 			data: {
 				plan: planKey,
+				tier: mappedTier,
 				price: plan.price,
-				leadsPerWeek: plan.leadsPerWeek,
+				leadsPerWeek: Number(tierConfig?.leadsPerWeek ?? plan.leadsPerWeek),
+				bonusLeads: Number(tierConfig?.bonusLeads ?? 0),
 				startDate: new Date(),
 				expiryDate: calculateExpiry(plan.durationDays),
 				status: 'active',
 				autoRenew: true,
 				paymentId: paymentId || undefined,
+				leadsUsedThisWeek: 0,
+				weekStartsAt: new Date(),
 			},
 		});
 

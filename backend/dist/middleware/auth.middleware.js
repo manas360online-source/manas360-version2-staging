@@ -20,7 +20,8 @@ const requireAuth = (req, _res, next) => {
     }
     try {
         const payload = (0, jwt_1.verifyAccessToken)(accessToken);
-        req.auth = {
+        const requestWithAuth = req;
+        requestWithAuth.auth = {
             userId: payload.sub,
             sessionId: payload.sessionId,
             jti: payload.jti,

@@ -87,8 +87,11 @@ const ProviderInboxPage = lazy(() => import('./pages/provider/Messages'));
 const ProviderEarningsPage = lazy(() => import('./pages/provider/Earnings'));
 const ProviderSettingsPage = lazy(() => import('./pages/provider/Settings'));
 const ProviderDashboard = lazy(() => import('./pages/provider/Dashboard/ProviderDashboard'));
+const ProviderSubscriptionPage = lazy(() => import('./pages/provider/ProviderSubscriptionPage'));
+const AppointmentRequestsPage = lazy(() => import('./pages/provider/AppointmentRequests'));
 const ProviderOnboardingPage = lazy(() => import('./pages/provider/ProviderOnboardingPage'));
 const ProviderVerificationPendingPage = lazy(() => import('./pages/provider/ProviderVerificationPendingPage'));
+const PaymentStatusPage = lazy(() => import('./pages/shared/PaymentStatus'));
 const HubLayout = lazy(() => import('./components/layout/HubLayout'));
 const PatientList = lazy(() => import('./pages/provider/Patients/PatientList'));
 const PatientChartLayout = lazy(() => import('./components/layout/PatientChartLayout'));
@@ -252,6 +255,8 @@ function App() {
               <Route path="labs" element={<Navigate to="patient/123/labs" replace />} />
               <Route path="goals" element={<Navigate to="patient/123/goals" replace />} />
               <Route path="earnings" element={<ProviderEarningsPage />} />
+              <Route path="appointments" element={<AppointmentRequestsPage />} />
+              <Route path="subscription" element={<ProviderSubscriptionPage />} />
               <Route path="messages" element={<ProviderInboxPage />} />
               <Route path="settings" element={<ProviderSettingsPage />} />
               <Route path="live-session/:sessionId" element={<VideoSessionPage />} />
@@ -280,6 +285,7 @@ function App() {
             <Route path="/auth/signup" element={<SignupPage />} />
             <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/payment/status" element={<PaymentStatusPage />} />
             <Route path="/admin-portal/login" element={<AdminPortalLoginPage />} />
             <Route path="/corporate/login" element={<Navigate to="/auth/login" replace />} />
             <Route

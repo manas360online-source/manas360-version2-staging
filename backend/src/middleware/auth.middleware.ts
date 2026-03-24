@@ -23,8 +23,9 @@ export const requireAuth = (req: Request, _res: Response, next: NextFunction): v
 
 	try {
 		const payload = verifyAccessToken(accessToken);
+		const requestWithAuth = req as Request & { auth?: { userId: string; sessionId?: string; jti?: string } };
 
-		req.auth = {
+		requestWithAuth.auth = {
 			userId: payload.sub,
 			sessionId: payload.sessionId,
 			jti: payload.jti,

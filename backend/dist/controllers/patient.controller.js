@@ -1,37 +1,4 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getPatientDocumentDownload = exports.uploadPatientDocument = exports.getMyPrescriptionsController = exports.getMyDocumentsController = exports.addDailyCheckInController = exports.getMyTherapyPlanController = exports.getMyTherapistMatchesController = exports.getMyMoodHistoryController = exports.getMyPatientAssessmentHistoryController = exports.createPatientAssessmentController = exports.getMyPatientProfileController = exports.createPatientProfileController = void 0;
 const db_1 = require("../config/db");
@@ -616,7 +583,7 @@ const uploadPatientDocument = async (req, res) => {
         });
         for (const assignment of assignments) {
             // Emit to provider inbox room
-            const { notifyProviderLabUpload } = await Promise.resolve().then(() => __importStar(require('../routes/gps.routes')));
+            const { notifyProviderLabUpload } = await import('../routes/gps.routes');
             notifyProviderLabUpload(assignment.providerId, {
                 documentId: doc.id,
                 patientId: userId,
@@ -645,8 +612,8 @@ const getPatientDocumentDownload = async (req, res) => {
     if (!doc.s3ObjectKey)
         throw new error_middleware_1.AppError('No file available for download', 404);
     try {
-        const { GetObjectCommand } = await Promise.resolve().then(() => __importStar(require('@aws-sdk/client-s3')));
-        const { getSignedUrl } = await Promise.resolve().then(() => __importStar(require('@aws-sdk/s3-request-presigner')));
+        const { GetObjectCommand } = await import('@aws-sdk/client-s3');
+        const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner');
         const cmd = new GetObjectCommand({ Bucket: env_1.env.awsS3Bucket, Key: doc.s3ObjectKey });
         const url = await getSignedUrl(s3_service_1.s3Client, cmd, { expiresIn: 60 * 5 });
         (0, response_1.sendSuccess)(res, { url }, 'Presigned url generated');
