@@ -60,9 +60,8 @@ export const initiatePatientSubscriptionPayment = async (userId: string, planKey
 		}).catch(() => null);
 	}
 
-	const userToken = toCompactToken(userId, 12) || 'user';
-	const planToken = toCompactToken(planKey, 10) || 'plan';
-	const transactionId = `SUB_${userToken}_${planToken}_${Date.now()}`;
+	const userToken = toCompactToken(userId, 8) || 'user';
+	const transactionId = `SUB_${userToken}_${Date.now()}`;
 	const shouldBypass = false;
 	const amountMinor = Math.max(0, Math.round(Number(plan.price || 0) * 100));
 	const frontendBaseUrl = env.frontendUrl;

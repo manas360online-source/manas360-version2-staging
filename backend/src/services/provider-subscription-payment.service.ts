@@ -65,9 +65,8 @@ export const initiateProviderSubscriptionPayment = async (providerId: string, pl
 		}).catch(() => null);
 	}
 
-	const providerToken = toCompactToken(providerId, 12) || 'provider';
-	const planToken = toCompactToken(planKey, 10) || 'plan';
-	const transactionId = `PROV_SUB_${providerToken}_${planToken}_${Date.now()}`;
+	const providerToken = toCompactToken(providerId, 8) || 'provider';
+	const transactionId = `PROV_SUB_${providerToken}_${Date.now()}`;
 	const shouldBypass = env.allowDevPaymentBypass && env.nodeEnv !== 'production';
 	const canFallbackWithoutGateway = env.nodeEnv !== 'production';
 	const frontendBaseUrl = env.frontendUrl;

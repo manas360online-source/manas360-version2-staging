@@ -82,7 +82,8 @@ export const phonepeWebhookController = async (req: Request, res: Response): Pro
 		req.ip ||
 		req.socket?.remoteAddress ||
 		req.connection?.remoteAddress || '';
-	if (!isPhonePeWebhookIP(clientIp)) {
+	const shouldBypassPhonePeWebhookIp = env.nodeEnv !== 'production' && env.allowPhonePeWebhookIpBypass;
+	if (!shouldBypassPhonePeWebhookIp && !isPhonePeWebhookIP(clientIp)) {
 		throw new AppError('Unauthorized source IP for PhonePe webhook', 403);
 	}
 

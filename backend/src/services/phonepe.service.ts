@@ -30,6 +30,9 @@ const PHONEPE_CLIENT_ID = String(process.env.PHONEPE_CLIENT_ID || '').trim();
 const PHONEPE_CLIENT_SECRET = String(process.env.PHONEPE_CLIENT_SECRET || '').trim();
 const PHONEPE_CLIENT_VERSION = String(process.env.PHONEPE_CLIENT_VERSION || '1').trim();
 const PHONEPE_OAUTH_URL = String(process.env.PHONEPE_OAUTH_URL || '').trim();
+const PHONEPE_STATUS_ENDPOINT_TEMPLATE = String(
+	process.env.PHONEPE_STATUS_ENDPOINT_TEMPLATE || '/pg/v1/status/{merchantId}/{transactionId}'
+).trim();
 
 if (!PHONEPE_SALT_KEY) {
 	logger.error('[PhonePe] PHONEPE_SALT_KEY is not set. Payment signing and verification will fail.');
@@ -320,7 +323,12 @@ export const verifyPhonePeWebhook = (reqBody: string, xVerify: string): boolean 
 };
 
 export const checkPhonePeStatus = async (merchantTransactionId: string) => {
-	const endpoint = `/pg/v1/status/${PHONEPE_MERCHANT_ID}/${merchantTransactionId}`;
+	const resolvedStatusEndpoint = PHONEPE_STATUS_ENDPOINT_TEMPLATE
+		.replace('{merchantId}', PHONEPE_MERCHANT_ID)
+		.replace('{transactionId}', merchantTransactionId);
+	const endpoint = resolvedStatusEndpoint.startsWith('/')
+		? resolvedStatusEndpoint
+		: `/${resolvedStatusEndpoint}`;
 	const checksum = sha256(endpoint + PHONEPE_SALT_KEY) + '###' + PHONEPE_SALT_INDEX;
 
 	try {
