@@ -228,7 +228,7 @@ export const patientApi = {
     preferredWindow?: string;
   }) =>
     (await http.post('/v1/sessions/book', payload)).data,
-  verifyPayment: async (payload: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) =>
+  verifyPayment: async (payload: { merchantTransactionId: string; transactionId: string; signature: string }) =>
     (await http.post('/v1/payments/verify', payload)).data,
   getUpcomingSessions: async () =>
     withFallbackChain([

@@ -9,7 +9,6 @@ import {
 	processPhonePeWebhook,
 	releaseSessionEarnings,
 } from '../services/payment.service';
-import { processSubscriptionWebhook } from '../services/subscription.service';
 import { 
 	verifyPhonePeWebhook, 
 	checkPhonePeStatus, 
@@ -84,7 +83,8 @@ export const razorpayWebhookController = async (req: Request, res: Response): Pr
 
 	let result;
 	if (eventType.startsWith('subscription.') || (eventType === 'payment.failed' && hasSubscriptionEntity)) {
-		result = await processSubscriptionWebhook(rawBody, signature);
+		// Subscription webhooks removed (was Razorpay)
+		result = { handled: false, message: 'Subscription webhooks not supported' };
 	} else {
 		result = await processRazorpayWebhook(rawBody, signature);
 	}

@@ -59,7 +59,7 @@ export const reconcilePendingPayments = async (): Promise<{ checked: number; res
 		},
 		select: {
 			id: true,
-			razorpayOrderId: true,
+			merchantTransactionId: true,
 			razorpayPaymentId: true,
 			status: true,
 			retryCount: true,
@@ -79,8 +79,8 @@ export const reconcilePendingPayments = async (): Promise<{ checked: number; res
 	let failed = 0;
 
 	for (const payment of pendingPayments) {
-		// Extract merchant transaction id (stored in razorpayOrderId for PhonePe compatibility)
-		const merchantTransactionId = String((payment as any).razorpayOrderId || payment.razorpayPaymentId || payment.id);
+		// Extract merchant transaction id
+		const merchantTransactionId = String((payment as any).merchantTransactionId || payment.razorpayPaymentId || payment.id);
 		const paymentStatus = String((payment as any).status || '').toUpperCase();
 
 		// Parse metadata to check reconciliation attempt count
