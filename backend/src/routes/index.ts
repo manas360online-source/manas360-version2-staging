@@ -10,6 +10,7 @@ import paymentRoutes from './payment.routes';
 import subscriptionRoutes from './subscription.routes';
 import webhookRoutes from './webhook.routes';
 import leadRoutes from './lead.routes';
+import leadResponseRoutes from './lead-response.routes';
 import patientV1Routes from './patient-v1.routes';
 import patientSelfRoutes from './patient-self.routes';
 import certificationRoutes from './certification.routes';
@@ -26,6 +27,7 @@ import freeScreeningRoutes from './free-screening.routes';
 import gpsRoutes from './gps.routes';
 import providerRoutes from './provider.routes';
 import soundRoutes from './sound.routes';
+import providerDashboardRoutes from './provider-dashboard.routes';
 
 const router = Router();
 
@@ -64,6 +66,8 @@ router.use('/pricing', pricingRoutes);
 router.use('/v1/patient-journey', patientJourneyRoutes);
 router.use('/v1', freeScreeningRoutes);
 router.use('/v1/leads', leadRoutes);
+router.use('/v1', leadResponseRoutes);
+router.use('/v1', providerDashboardRoutes);
 router.use('/certifications', certificationRoutes);
 router.use('/v1/certifications', certificationRoutes);
 router.use('/landing', landingRoutes);

@@ -17,6 +17,10 @@ import {
 	sendDirectMessage,
 } from '../services/messaging.service';
 import { registerProviderProfile } from '../services/auth.service';
+import {
+	acceptAppointmentRequest as acceptAppointmentRequestService,
+	rejectAppointmentRequest as rejectAppointmentRequestService,
+} from '../services/smart-match.service';
 
 type ProviderRole = 'THERAPIST' | 'PSYCHOLOGIST' | 'PSYCHIATRIST' | 'COACH';
 type SmartTherapistAlert = {
@@ -2943,12 +2947,32 @@ export const getPendingAppointmentRequests = async (req: Request, res: Response)
 	const requests = await prisma.appointmentRequest.findMany({
 		where: { status: 'PENDING' },
 		orderBy: { createdAt: 'desc' },
-		include: {
-			patient: {
-				select: { id: true, firstName: true, lastName: true, name: true, email: true },
-			},
-		},
 	});
+
+	const patientIds = Array.from(new Set(requests.map((r) => r.patientId).filter(Boolean)));
+	const patients = patientIds.length > 0
+		? await prisma.user.findMany({
+				where: { id: { in: patientIds } },
+				select: { id: true, firstName: true, lastName: true, name: true, email: true },
+			})
+		: [];
+	type AppointmentPatient = {
+		firstName: string | null;
+		lastName: string | null;
+		name: string | null;
+		email: string | null;
+	};
+	const patientById = new Map<string, AppointmentPatient>(
+		patients.map((p) => [
+			p.id,
+			{
+				firstName: p.firstName,
+				lastName: p.lastName,
+				name: p.name,
+				email: p.email,
+			},
+		]),
+	);
 
 	const pending = requests.filter((r) => {
 		const providers = Array.isArray(r.providers) ? r.providers : [];
@@ -2957,17 +2981,20 @@ export const getPendingAppointmentRequests = async (req: Request, res: Response)
 		);
 	});
 
-	const result = pending.map((r) => ({
+	const result = pending.map((r) => {
+		const patient = patientById.get(r.patientId);
+		return {
 		id: r.id,
 		patientId: r.patientId,
-		patientName: toPatientName(r.patient.firstName, r.patient.lastName, r.patient.name),
-		patientEmail: r.patient.email,
+		patientName: toPatientName(patient?.firstName, patient?.lastName, patient?.name),
+		patientEmail: patient?.email ?? null,
 		availabilityPrefs: r.availabilityPrefs,
 		preferredSpecialization: r.preferredSpecialization,
 		durationMinutes: r.durationMinutes,
 		createdAt: r.createdAt.toISOString(),
 		expiresAt: r.expiresAt?.toISOString() || null,
-	}));
+		};
+	});
 
 	sendSuccess(res, result, 'Pending appointment requests fetched');
 };
@@ -3057,7 +3084,7 @@ export const getPatientDocuments = async (req: Request, res: Response): Promise<
 
 // ── Accept appointment request ─────────────────────────────────────
 export const acceptAppointmentRequest = async (req: Request, res: Response): Promise<void> => {
-	const userId = authUserId(req);
+	const providerId = authUserId(req);
 	const requestId = String(req.params.requestId);
 	const { scheduledAt } = req.body as { scheduledAt: string };
 
@@ -3066,54 +3093,19 @@ export const acceptAppointmentRequest = async (req: Request, res: Response): Pro
 		return;
 	}
 
-	const appointmentReq = await prisma.appointmentRequest.findFirst({
-		where: { id: requestId, providerId: userId, status: 'PENDING' },
+	const result = await acceptAppointmentRequestService({
+		appointmentRequestId: requestId,
+		providerId,
+		scheduledAt: new Date(scheduledAt),
 	});
 
-	if (!appointmentReq) {
-		sendError(res, 'Appointment request not found or already handled', 404);
-		return;
-	}
-
-	// Create a calendar session
-	const session = await prisma.calendarSession.create({
-		data: {
-			patientId: appointmentReq.patientId,
-			providerId: userId,
-			dateTime: new Date(scheduledAt),
-			duration: appointmentReq.durationMinutes || 50,
-			type: 'Therapy',
-			status: 'Upcoming',
-		},
-	});
-
-	// Update request status
-	await prisma.appointmentRequest.update({
-		where: { id: requestId },
-		data: { status: 'ACCEPTED' },
-	});
-
-	sendSuccess(res, { sessionId: session.id, scheduledAt }, 'Appointment accepted and scheduled');
+	sendSuccess(res, result, 'Appointment accepted and scheduled');
 };
 
 // ── Reject appointment request ─────────────────────────────────────
 export const rejectAppointmentRequest = async (req: Request, res: Response): Promise<void> => {
-	const userId = authUserId(req);
+	const providerId = authUserId(req);
 	const requestId = String(req.params.requestId);
-
-	const appointmentReq = await prisma.appointmentRequest.findFirst({
-		where: { id: requestId, providerId: userId, status: 'PENDING' },
-	});
-
-	if (!appointmentReq) {
-		sendError(res, 'Appointment request not found or already handled', 404);
-		return;
-	}
-
-	await prisma.appointmentRequest.update({
-		where: { id: requestId },
-		data: { status: 'REJECTED' },
-	});
-
-	sendSuccess(res, { requestId }, 'Appointment request declined');
+	const result = await rejectAppointmentRequestService(requestId, providerId);
+	sendSuccess(res, { requestId, ...result }, 'Appointment request declined');
 };

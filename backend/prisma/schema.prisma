@@ -97,6 +97,7 @@ model User {
   therapyBookings               TherapySession[]
   grantedCapabilities           UserCapability[]            @relation("UserCapabilitiesGrantor")
   userCapabilities              UserCapability[]            @relation("UserCapabilitiesOwner")
+  leadAssignments               LeadAssignment[]            // Therapist's assigned leads
 
   @@index([email])
   @@index([phone])
@@ -1030,8 +1031,13 @@ model Lead {
   channel                LeadChannel       @default(CONSUMER)
   tier                   LeadTier?
   visibleAt              DateTime?
+  issue                  String[]          @default([])           // ["anxiety", "depression", etc.]
+  verificationLevel      String            @default("email")      // "email" | "phone" | "complete"
+  quality                Int               @default(50)           // Quality score 0-100
+  exclusivity            String            @default("shared")     // "shared" | "semi-exclusive" | "exclusive"
   patient                User              @relation("LeadPatient", fields: [patientId], references: [id])
   provider               User?             @relation("LeadProvider", fields: [providerId], references: [id], onDelete: Restrict)
+  assignments            LeadAssignment[]                           // Track therapist assignments
 
   @@index([status, createdAt(sort: Desc)])
   @@index([providerId, status])
@@ -1040,6 +1046,8 @@ model Lead {
   @@index([patientId, status])
   @@index([channel, tier, visibleAt])
   @@index([patientAcceptanceUntil])
+  @@index([quality])
+  @@index([issue])
   @@map("leads")
 }
 
@@ -1921,25 +1929,40 @@ enum ProviderPlan {
   premium
 }
 
+enum ProviderSubscriptionTier {
+  STARTER
+  GROWTH
+  SCALE
+}
+
 model ProviderSubscription {
-  id            String       @id @default(uuid())
-  providerId    String       @unique
-  plan          ProviderPlan
-  price         Int
-  leadsPerWeek  Int
-  startDate     DateTime     @default(now())
-  expiryDate    DateTime
-  status        String       // "active" | "expired" | "cancelled"
-  autoRenew     Boolean      @default(false)
-  processing    Boolean      @default(false)
-  processingStartedAt DateTime?
-  paymentId     String?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  provider      User         @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  id                    String                    @id @default(uuid())
+  providerId            String                    @unique
+  plan                  ProviderPlan
+  tier                  ProviderSubscriptionTier? // "STARTER" | "GROWTH" | "SCALE"
+  price                 Int
+  leadsPerWeek          Int
+  bonusLeads            Int                       @default(0)          // For GROWTH: always 1
+  startDate             DateTime                  @default(now())
+  expiryDate            DateTime
+  billingCycle          String                    @default("monthly")   // Monthly recurring
+  status                String                    // "active" | "expired" | "cancelled"
+  autoRenew             Boolean                   @default(false)
+  processing            Boolean                   @default(false)
+  processingStartedAt   DateTime?
+  paymentId             String?
+  leadsUsedThisWeek     Int                       @default(0)          // Reset every Sunday 00:00 UTC
+  totalLeadsReceived    Int                       @default(0)          // Lifetime metric
+  weekStartsAt          DateTime                  @default(now())      // Track week boundary
+  lastAssignedAt        DateTime?                 // For fair rotation
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+  provider              User                      @relation(fields: [providerId], references: [id], onDelete: Cascade)
 
   @@index([status])
   @@index([status, processing])
+  @@index([tier])
+  @@index([leadsUsedThisWeek])
   @@map("provider_subscriptions")
 }
 
@@ -1959,6 +1982,29 @@ model LeadPurchase {
   @@index([leadId])
   @@unique([providerId, leadId])
   @@map("lead_purchases")
+}
+
+model LeadAssignment {
+  id              String    @id @default(uuid())
+  leadId          String
+  therapistId     String
+  assignedAt      DateTime  @default(now())
+  respondedAt     DateTime?
+  responseTime    Int?                            // Minutes from assignedAt to respondedAt
+  convertedAt     DateTime?                       // ONLY when patient books first paid session
+  sessionBooked   Boolean   @default(false)
+  status          String    @default("assigned")  // "assigned" | "responded" | "converted" | "expired" | "declined"
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  lead            Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  therapist       User      @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+
+  @@unique([leadId, therapistId])
+  @@index([therapistId, respondedAt])
+  @@index([therapistId, convertedAt])
+  @@index([therapistId, status])
+  @@index([assignedAt])
+  @@map("lead_assignments")
 }
 
 model ProviderPlanConfig {

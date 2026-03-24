@@ -152,7 +152,7 @@ jobs:
             docker volume prune -f || true
 
             echo "Starting fresh containers..."
-            ${DC} -p manas360-version2-staging up -d --build
+            ${DC} -p manas360-version2-staging up -d --build --no-cache
 
             echo "Applying database schema (migrate deploy, fallback to db push for baseline DBs)..."
             BACKEND_ID="$(${DC} -p manas360-version2-staging ps -q backend)"

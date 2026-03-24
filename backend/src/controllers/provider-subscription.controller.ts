@@ -21,6 +21,15 @@ const authUserId = (req: Request): string => {
 	return id;
 };
 
+const normalizeProviderPlanKey = (raw: string): ProviderPlanKey => {
+	const key = String(raw || '').trim().toLowerCase();
+	if (key === 'starter') return 'basic';
+	if (key === 'growth') return 'standard';
+	if (key === 'scale') return 'premium';
+	if (key === 'free' || key === 'basic' || key === 'standard' || key === 'premium') return key;
+	throw new AppError('Invalid plan key', 422);
+};
+
 /** GET /provider/subscription */
 export const getProviderSubscriptionController = async (req: Request, res: Response): Promise<void> => {
 	const data = await getProviderSubscription(authUserId(req));
@@ -30,23 +39,18 @@ export const getProviderSubscriptionController = async (req: Request, res: Respo
 /** PATCH /provider/subscription/upgrade */
 export const upgradeProviderSubscriptionController = async (req: Request, res: Response): Promise<void> => {
 	const providerId = authUserId(req);
-	const { planKey } = req.body;
-
-	if (!planKey || !PROVIDER_PLANS[planKey as ProviderPlanKey]) {
-		throw new AppError('Invalid plan key', 422);
-	}
-
-	const plan = PROVIDER_PLANS[planKey as ProviderPlanKey];
+	const normalizedPlanKey = normalizeProviderPlanKey(String(req.body.planKey ?? req.body.tier ?? ''));
+	const plan = PROVIDER_PLANS[normalizedPlanKey];
 
 	// Free plan: activate immediately
 	if (plan.price === 0) {
-		const data = await activateProviderSubscription(providerId, planKey);
+		const data = await activateProviderSubscription(providerId, normalizedPlanKey);
 		sendSuccess(res, data, 'Free plan activated');
 		return;
 	}
 
 	// Paid plan: initiate payment
-	const data = await initiateProviderSubscriptionPayment(providerId, planKey);
+	const data = await initiateProviderSubscriptionPayment(providerId, normalizedPlanKey);
 	sendSuccess(res, data, 'Payment initiated');
 };
 
