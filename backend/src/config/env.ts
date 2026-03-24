@@ -118,6 +118,7 @@ export interface EnvConfig {
 	allowDevVerificationBypass: boolean;
 	allowDevPaymentBypass: boolean;
 	allowDevPhonePeWebhookProbeBypass: boolean;
+	allowPhonePeWebhookIpBypass: boolean;
 	freesoundApiKey?: string;
 }
 
@@ -171,6 +172,7 @@ export const env: EnvConfig = Object.freeze({
 	allowDevVerificationBypass: parseBoolean(process.env.DEV_VERIFICATION_BYPASS, parseNodeEnv(process.env.NODE_ENV) === 'development'),
 	allowDevPaymentBypass: parseBoolean(process.env.DEV_PAYMENT_BYPASS, parseNodeEnv(process.env.NODE_ENV) === 'development'),
 	allowDevPhonePeWebhookProbeBypass: parseBoolean(process.env.PHONEPE_WEBHOOK_PROBE_BYPASS, false),
+	allowPhonePeWebhookIpBypass: parseBoolean(process.env.PHONEPE_WEBHOOK_IP_BYPASS, false),
 	freesoundApiKey: process.env.FREESOUND_API_KEY,
 });
 
