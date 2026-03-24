@@ -5,6 +5,12 @@ import { initiatePhonePePayment } from './phonepe.service';
 import { env } from '../config/env';
 import { logger } from '../utils/logger';
 
+const toCompactToken = (value: string, maxLength: number): string =>
+	String(value || '')
+		.replace(/[^a-zA-Z0-9]/g, '')
+		.slice(0, maxLength)
+		.toLowerCase();
+
 export const initiatePatientSubscriptionPayment = async (userId: string, planKey: string) => {
 	const plan = await getActivePlatformPlan(planKey);
 	if (!plan) throw new AppError('Invalid subscription plan', 422);
@@ -54,7 +60,9 @@ export const initiatePatientSubscriptionPayment = async (userId: string, planKey
 		}).catch(() => null);
 	}
 
-	const transactionId = `SUB_${userId}_${planKey}_${Date.now()}`;
+	const userToken = toCompactToken(userId, 12) || 'user';
+	const planToken = toCompactToken(planKey, 10) || 'plan';
+	const transactionId = `SUB_${userToken}_${planToken}_${Date.now()}`;
 	const shouldBypass = false;
 	const amountMinor = Math.max(0, Math.round(Number(plan.price || 0) * 100));
 	const frontendBaseUrl = env.frontendUrl;

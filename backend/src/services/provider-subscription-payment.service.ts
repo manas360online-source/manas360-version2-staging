@@ -4,6 +4,12 @@ import { initiatePhonePePayment } from './phonepe.service';
 import { env } from '../config/env';
 import { logger } from '../utils/logger';
 
+const toCompactToken = (value: string, maxLength: number): string =>
+	String(value || '')
+		.replace(/[^a-zA-Z0-9]/g, '')
+		.slice(0, maxLength)
+		.toLowerCase();
+
 /**
  * Initiate a payment for provider subscription via PhonePe.
  * Transaction ID prefixed with PROV_SUB_ for webhook identification.
@@ -59,7 +65,9 @@ export const initiateProviderSubscriptionPayment = async (providerId: string, pl
 		}).catch(() => null);
 	}
 
-	const transactionId = `PROV_SUB_${providerId}_${planKey}_${Date.now()}`;
+	const providerToken = toCompactToken(providerId, 12) || 'provider';
+	const planToken = toCompactToken(planKey, 10) || 'plan';
+	const transactionId = `PROV_SUB_${providerToken}_${planToken}_${Date.now()}`;
 	const shouldBypass = env.allowDevPaymentBypass && env.nodeEnv !== 'production';
 	const canFallbackWithoutGateway = env.nodeEnv !== 'production';
 	const frontendBaseUrl = env.frontendUrl;
