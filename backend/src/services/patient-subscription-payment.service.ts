@@ -86,7 +86,7 @@ export const initiatePatientSubscriptionPayment = async (userId: string, planKey
 			data: {
 				merchantTransactionId: transactionId,
 				patientId: userId,
-				amountMinor,
+				amountMinor: BigInt(amountMinor),
 				currency: 'INR',
 				captureIdempotencyKey: subscriptionIdempotencyKey,
 				status: shouldBypass ? 'CAPTURED' : 'INITIATED',
