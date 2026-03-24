@@ -437,8 +437,10 @@ export const isPhonePeWebhookIP = (clientIp: string): boolean => {
 };
 
 /**
- * Verify webhook authorization header using SHA256(username:password)
- * Per PhonePe doc: "Authorization: SHA256(username:password)"
+ * Verify webhook authorization header.
+ * Supports:
+ * - PhonePe format: Authorization: SHA256(<hex sha256(username:password)>)
+ * - Basic auth format: Authorization: Basic <base64(username:password)>
  */
 export const verifyPhonePeWebhookAuth = (
 	authHeader: string,
@@ -451,32 +453,57 @@ export const verifyPhonePeWebhookAuth = (
 	}
 
 	try {
-		// PhonePe sends: "Authorization: SHA256(username:password)"
-		// Extract the hash portion from header
-		const headerValue = authHeader.replace(/^SHA256\s*\(\s*|\s*\)$/g, '').trim();
-		
-		// Compute expected hash
 		const credentials = `${expectedUsername}:${expectedPassword}`;
 		const expectedHash = crypto.createHash('sha256').update(credentials).digest('hex');
+		const normalizedAuthHeader = String(authHeader || '').trim();
 
-		// Timing-safe comparison
-		const headerBuf = Buffer.from(headerValue);
-		const expectedBuf = Buffer.from(expectedHash);
+		const compareTimingSafe = (received: string, expected: string): boolean => {
+			const receivedBuf = Buffer.from(received);
+			const expectedBuf = Buffer.from(expected);
+			if (receivedBuf.length !== expectedBuf.length) {
+				return false;
+			}
+			return crypto.timingSafeEqual(receivedBuf, expectedBuf);
+		};
 
-		if (headerBuf.length !== expectedBuf.length) {
-			logger.error('[PhonePe] Webhook auth header length mismatch');
-			return false;
+		// PhonePe hash format: Authorization: SHA256(<hash>)
+		const sha256Match = normalizedAuthHeader.match(/^SHA256\s*\(\s*([a-fA-F0-9]{64})\s*\)\s*$/);
+		if (sha256Match) {
+			const receivedHash = String(sha256Match[1] || '').toLowerCase();
+			const isValid = compareTimingSafe(receivedHash, expectedHash);
+			if (!isValid) {
+				logger.error('[PhonePe] Webhook auth signature mismatch', {
+					received: receivedHash.substring(0, 20) + '...',
+					expectedHash: expectedHash.substring(0, 20) + '...',
+				});
+			} else {
+				logger.info('[PhonePe] Webhook auth accepted', { mode: 'sha256' });
+			}
+			return isValid;
 		}
 
-		const isValid = crypto.timingSafeEqual(headerBuf, expectedBuf);
-		if (!isValid) {
-			logger.error('[PhonePe] Webhook auth signature mismatch', {
-				received: headerValue.substring(0, 20) + '...',
-				expectedHash: expectedHash.substring(0, 20) + '...',
-			});
+		// Basic auth format: Authorization: Basic <base64(username:password)>
+		if (/^Basic\s+/i.test(normalizedAuthHeader)) {
+			const encoded = normalizedAuthHeader.replace(/^Basic\s+/i, '').trim();
+			let decoded = '';
+			try {
+				decoded = Buffer.from(encoded, 'base64').toString('utf8');
+			} catch {
+				logger.error('[PhonePe] Invalid basic auth encoding in webhook authorization');
+				return false;
+			}
+
+			const isValid = compareTimingSafe(decoded, credentials);
+			if (!isValid) {
+				logger.error('[PhonePe] Webhook basic auth credentials mismatch');
+			} else {
+				logger.info('[PhonePe] Webhook auth accepted', { mode: 'basic' });
+			}
+			return isValid;
 		}
 
-		return isValid;
+		logger.error('[PhonePe] Unsupported webhook authorization format');
+		return false;
 	} catch (error: any) {
 		logger.error('[PhonePe] Webhook auth verification failed', { error: error?.message });
 		return false;
