@@ -461,10 +461,10 @@ export const patientApi = {
     ]),
   getSubscription: async () => {
     const response = await withFallbackChain([
+      async () => (await http.get('/v1/patient/subscription')).data,
+      async () => (await http.get('/patient/subscription')).data,
       async () => (await http.get('/v1/subscription')).data,
       async () => (await http.get('/subscription')).data,
-      async () => (await http.get('/patient/subscription')).data,
-      async () => (await http.get('/v1/patient/subscription')).data,
     ]);
     return unwrapPayload(response);
   },
@@ -474,42 +474,42 @@ export const patientApi = {
   },
   upgradeSubscription: async (payload: { planKey: string }) => {
     const response = await withFallbackChain([
+      async () => (await http.patch('/v1/patient/subscription/upgrade', payload)).data,
+      async () => (await http.patch('/patient/subscription/upgrade', payload)).data,
       async () => (await http.patch('/v1/subscription/upgrade', payload)).data,
       async () => (await http.patch('/subscription/upgrade', payload)).data,
-      async () => (await http.patch('/patient/subscription/upgrade', payload)).data,
-      async () => (await http.patch('/v1/patient/subscription/upgrade', payload)).data,
     ]);
     return unwrapPayload(response);
   },
   downgradeSubscription: async () => {
     const response = await withFallbackChain([
+      async () => (await http.patch('/v1/patient/subscription/downgrade')).data,
+      async () => (await http.patch('/patient/subscription/downgrade')).data,
       async () => (await http.patch('/v1/subscription/downgrade')).data,
       async () => (await http.patch('/subscription/downgrade')).data,
-      async () => (await http.patch('/patient/subscription/downgrade')).data,
-      async () => (await http.patch('/v1/patient/subscription/downgrade')).data,
     ]);
     return unwrapPayload(response);
   },
   cancelSubscription: async () =>
     withFallbackChain([
+      async () => (await http.patch('/v1/patient/subscription/cancel')).data,
+      async () => (await http.patch('/patient/subscription/cancel')).data,
       async () => (await http.patch('/v1/subscription/cancel')).data,
       async () => (await http.patch('/subscription/cancel')).data,
-      async () => (await http.patch('/patient/subscription/cancel')).data,
-      async () => (await http.patch('/v1/patient/subscription/cancel')).data,
     ]),
   reactivateSubscription: async () =>
     withFallbackChain([
+      async () => (await http.patch('/v1/patient/subscription/reactivate')).data,
+      async () => (await http.patch('/patient/subscription/reactivate')).data,
       async () => (await http.patch('/v1/subscription/reactivate')).data,
       async () => (await http.patch('/subscription/reactivate')).data,
-      async () => (await http.patch('/patient/subscription/reactivate')).data,
-      async () => (await http.patch('/v1/patient/subscription/reactivate')).data,
     ]),
   setSubscriptionAutoRenew: async (autoRenew: boolean) =>
     withFallbackChain([
+      async () => (await http.patch('/v1/patient/subscription/auto-renew', { autoRenew })).data,
+      async () => (await http.patch('/patient/subscription/auto-renew', { autoRenew })).data,
       async () => (await http.patch('/v1/subscription/auto-renew', { autoRenew })).data,
       async () => (await http.patch('/subscription/auto-renew', { autoRenew })).data,
-      async () => (await http.patch('/patient/subscription/auto-renew', { autoRenew })).data,
-      async () => (await http.patch('/v1/patient/subscription/auto-renew', { autoRenew })).data,
     ]),
   getPaymentMethod: async () =>
     withFallbackChain([

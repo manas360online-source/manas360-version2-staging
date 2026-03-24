@@ -393,6 +393,15 @@ const PHONEPE_WEBHOOK_IPS = [
 	'103.243.35.242',
 ];
 
+// Allow additional, deployment-specific webhook source IPs via env var
+// Comma-separated list, e.g. "1.2.3.4,5.6.7.8"
+const PHONEPE_WEBHOOK_ALLOWED_IPS = String(process.env.PHONEPE_WEBHOOK_ALLOWED_IPS || '').split(',')
+	.map((s) => String(s || '').trim())
+	.filter(Boolean);
+
+// Combined whitelist used at runtime
+const PHONEPE_COMBINED_WEBHOOK_IPS = Array.from(new Set([...PHONEPE_WEBHOOK_IPS, ...PHONEPE_WEBHOOK_ALLOWED_IPS]));
+
 /**
  * Verify webhook IP is from PhonePe
  * PhonePe sends webhooks from their proxy IPs
@@ -405,8 +414,11 @@ export const isPhonePeWebhookIP = (clientIp: string): boolean => {
 		return process.env.NODE_ENV === 'development';
 	}
 
-	// Check against PhonePe IP whitelist
-	return PHONEPE_WEBHOOK_IPS.includes(clientIp);
+	// Normalize IPv4-mapped IPv6 addresses ("::ffff:1.2.3.4")
+	const normalizedIp = String(clientIp).startsWith('::ffff:') ? String(clientIp).replace('::ffff:', '') : String(clientIp);
+
+	// Check against combined whitelist (official PhonePe IPs + any deployment overrides)
+	return PHONEPE_COMBINED_WEBHOOK_IPS.includes(normalizedIp);
 };
 
 /**
