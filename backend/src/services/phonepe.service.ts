@@ -107,13 +107,18 @@ export const cleanupPhonePeTokenRefresh = (): void => {
 };
 
 const getPhonePeOAuthUrl = (): string => {
-	if (PHONEPE_OAUTH_URL) return PHONEPE_OAUTH_URL;
-	if (PHONEPE_BASE_URL.includes('pgsandbox') || PHONEPE_BASE_URL.includes('pg-sandbox')) {
-		return 'https://api-preprod.phonepe.com/apis/pg-sandbox/v1/oauth/token';
+	if (PHONEPE_OAUTH_URL) {
+		return PHONEPE_OAUTH_URL;
 	}
+
 	if (PHONEPE_ENV === 'preprod' || PHONEPE_ENV === 'uat') {
 		return 'https://api-preprod.phonepe.com/apis/identity-manager/v1/oauth/token';
 	}
+
+	if (PHONEPE_BASE_URL.includes('api-preprod.phonepe.com')) {
+		return 'https://api-preprod.phonepe.com/apis/identity-manager/v1/oauth/token';
+	}
+
 	return 'https://api.phonepe.com/apis/identity-manager/v1/oauth/token';
 };
 
@@ -130,13 +135,25 @@ const fetchPhonePeToken = async (): Promise<string | null> => {
 
 	try {
 		const oauthUrl = getPhonePeOAuthUrl();
+		if (
+			(PHONEPE_ENV === 'preprod' || PHONEPE_ENV === 'uat' || PHONEPE_BASE_URL.includes('api-preprod.phonepe.com'))
+			&& oauthUrl.includes('api.phonepe.com')
+			&& !oauthUrl.includes('api-preprod.phonepe.com')
+		) {
+			logger.warn('[PhonePe] OAuth URL appears to be production while runtime is preprod/UAT. Check PHONEPE_OAUTH_URL.', {
+				oauthUrl,
+				baseUrl: PHONEPE_BASE_URL,
+				env: PHONEPE_ENV,
+			});
+		}
+
 		const payload = new URLSearchParams();
 		payload.append('client_id', PHONEPE_CLIENT_ID);
 		payload.append('client_version', PHONEPE_CLIENT_VERSION);
 		payload.append('client_secret', PHONEPE_CLIENT_SECRET);
 		payload.append('grant_type', 'client_credentials');
 
-		const response = await axios.post(oauthUrl, payload.toString(), {
+		const response = await axios.post(oauthUrl, payload, {
 			headers: {
 				'Content-Type': 'application/x-www-form-urlencoded',
 			},
@@ -252,16 +269,26 @@ export const initiatePhonePePayment = async (input: {
 			}
 		);
 
-		// Normalise different PhonePe response wrappers to a single object we can inspect.
-		const responseData = response.data?.data || response.data?.responseData || response.data?.response || response.data;
+		// PhonePe payloads can arrive in multiple shapes. Prefer top-level first, then nested wrappers.
+		const rawResponse = response.data;
+		const responseData = rawResponse?.responseData || rawResponse?.data || rawResponse?.response || rawResponse;
+		const nestedData = responseData?.data;
 
-		const redirectUrl = responseData?.redirectUrl
+		const redirectUrl = rawResponse?.redirectUrl
+			|| responseData?.redirectUrl
+			|| nestedData?.redirectUrl
+			|| rawResponse?.instrumentResponse?.redirectInfo?.url
 			|| responseData?.instrumentResponse?.redirectInfo?.url
+			|| nestedData?.instrumentResponse?.redirectInfo?.url
+			|| rawResponse?.instrument_response?.redirect_info?.url
 			|| responseData?.instrument_response?.redirect_info?.url
-			|| response.data?.redirectUrl;
+			|| nestedData?.instrument_response?.redirect_info?.url;
 
 		if (!redirectUrl) {
-			logger.error('[PhonePe] No redirect URL in response', { transactionId: input.transactionId, fullResponse: response.data });
+			logger.error('[PhonePe] No redirect URL in response', {
+				transactionId: input.transactionId,
+				fullResponse: rawResponse,
+			});
 			throw new AppError('PhonePe did not return a redirect URL', 502);
 		}
 
