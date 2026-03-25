@@ -251,10 +251,16 @@ export const initiatePhonePePayment = async (input: {
 			}
 		);
 
-		const redirectUrl = response.data?.data?.redirectUrl || response.data?.data?.instrumentResponse?.redirectInfo?.url;
+		// Normalise different PhonePe response wrappers to a single object we can inspect.
+		const responseData = response.data?.data || response.data?.responseData || response.data?.response || response.data;
+
+		const redirectUrl = responseData?.redirectUrl
+			|| responseData?.instrumentResponse?.redirectInfo?.url
+			|| responseData?.instrument_response?.redirect_info?.url
+			|| response.data?.redirectUrl;
 
 		if (!redirectUrl) {
-			logger.error('[PhonePe] No redirect URL in response', { transactionId: input.transactionId, responseData: response.data });
+			logger.error('[PhonePe] No redirect URL in response', { transactionId: input.transactionId, fullResponse: response.data });
 			throw new AppError('PhonePe did not return a redirect URL', 502);
 		}
 
