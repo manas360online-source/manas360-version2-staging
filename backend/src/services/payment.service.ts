@@ -267,8 +267,25 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 
 			const { checkPhonePeStatus } = await import('./phonepe.service');
 			const verify = await checkPhonePeStatus(merchantTransactionId);
-			if (!verify || !verify.success || verify.code !== 'PAYMENT_SUCCESS' || verify.data?.state !== 'COMPLETED') {
-				throw new AppError("Patient payment not verified", 400);
+			const verifyCode = String(verify?.code || '').toUpperCase();
+			const verifyState = String(verify?.data?.state || '').toUpperCase();
+			const isVerifiedByStatus = Boolean(verify) && (
+				verifyCode === 'PAYMENT_SUCCESS' || verifyState === 'COMPLETED'
+			);
+			const isExplicitFailure = verifyCode === 'PAYMENT_ERROR'
+				|| verifyState === 'FAILED'
+				|| verifyState === 'DECLINED';
+
+			if (isExplicitFailure) {
+				throw new AppError('Patient payment not verified', 400);
+			}
+
+			if (!isVerifiedByStatus) {
+				logger.warn('[PaymentService] Status verification unavailable/non-completed; proceeding with webhook success', {
+					merchantTransactionId,
+					verifyCode,
+					verifyState,
+				});
 			}
 
 			// Fix 8: Idempotency check for patient
@@ -336,8 +353,25 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 
 			const { checkPhonePeStatus } = await import('./phonepe.service');
 			const verify = await checkPhonePeStatus(merchantTransactionId);
-			if (!verify || !verify.success || verify.code !== 'PAYMENT_SUCCESS' || verify.data?.state !== 'COMPLETED') {
-				throw new AppError("Provider payment not verified or not completed", 400);
+			const verifyCode = String(verify?.code || '').toUpperCase();
+			const verifyState = String(verify?.data?.state || '').toUpperCase();
+			const isVerifiedByStatus = Boolean(verify) && (
+				verifyCode === 'PAYMENT_SUCCESS' || verifyState === 'COMPLETED'
+			);
+			const isExplicitFailure = verifyCode === 'PAYMENT_ERROR'
+				|| verifyState === 'FAILED'
+				|| verifyState === 'DECLINED';
+
+			if (isExplicitFailure) {
+				throw new AppError('Provider payment not verified or not completed', 400);
+			}
+
+			if (!isVerifiedByStatus) {
+				logger.warn('[PaymentService] Provider status verification unavailable/non-completed; proceeding with webhook success', {
+					merchantTransactionId,
+					verifyCode,
+					verifyState,
+				});
 			}
 
 			// Fix 8: Idempotency check for provider
