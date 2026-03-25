@@ -252,16 +252,26 @@ export const initiatePhonePePayment = async (input: {
 			}
 		);
 
-		// Normalise different PhonePe response wrappers to a single object we can inspect.
-		const responseData = response.data?.data || response.data?.responseData || response.data?.response || response.data;
+		// PhonePe payloads can arrive in multiple shapes. Prefer top-level first, then nested wrappers.
+		const rawResponse = response.data;
+		const responseData = rawResponse?.responseData || rawResponse?.data || rawResponse?.response || rawResponse;
+		const nestedData = responseData?.data;
 
-		const redirectUrl = responseData?.redirectUrl
+		const redirectUrl = rawResponse?.redirectUrl
+			|| responseData?.redirectUrl
+			|| nestedData?.redirectUrl
+			|| rawResponse?.instrumentResponse?.redirectInfo?.url
 			|| responseData?.instrumentResponse?.redirectInfo?.url
+			|| nestedData?.instrumentResponse?.redirectInfo?.url
+			|| rawResponse?.instrument_response?.redirect_info?.url
 			|| responseData?.instrument_response?.redirect_info?.url
-			|| response.data?.redirectUrl;
+			|| nestedData?.instrument_response?.redirect_info?.url;
 
 		if (!redirectUrl) {
-			logger.error('[PhonePe] No redirect URL in response', { transactionId: input.transactionId, fullResponse: response.data });
+			logger.error('[PhonePe] No redirect URL in response', {
+				transactionId: input.transactionId,
+				fullResponse: rawResponse,
+			});
 			throw new AppError('PhonePe did not return a redirect URL', 502);
 		}
 
