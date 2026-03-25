@@ -41,16 +41,11 @@ async function runTests() {
       }
     };
     const base64Payload = Buffer.from(JSON.stringify(mockPayload)).toString('base64');
-    const saltKey = process.env.PHONEPE_SALT_KEY || 'test-salt-key';
+    const webhookSecret = process.env.PHONEPE_WEBHOOK_SECRET || process.env.PHONEPE_SALT_KEY || 'test-webhook-secret';
     const saltIndex = process.env.PHONEPE_SALT_INDEX || '1';
-    const expectedXVerify = crypto.createHash('sha256').update(base64Payload + '/pg/v1/pay' + saltKey).digest('hex') + '###' + saltIndex; // Note the endpoint in checksum
-    
-    // In phonepe.service.ts, verifyPhonePeWebhook uses: sha256(reqBody + PHONEPE_SALT_KEY)
-    // Wait, let's check the verifyPhonePeWebhook implementation again.
-    // Line 101: const expected = sha256(reqBody + PHONEPE_SALT_KEY) + '###' + PHONEPE_SALT_INDEX;
-    const correctXVerify = crypto.createHash('sha256').update(base64Payload + saltKey).digest('hex') + '###' + saltIndex;
+    const correctXVerify = crypto.createHash('sha256').update(base64Payload + webhookSecret).digest('hex') + '###' + saltIndex;
     const isValid = verifyPhonePeWebhook(base64Payload, correctXVerify);
-    console.log(isValid ? '✅ Webhook Signature Valid' : '❌ Webhook Signature INVALID');
+    console.log(isValid ? '✅ Webhook Signature Valid' : '❌ Webhook Signature INVALID (set PHONEPE_WEBHOOK_SECRET)');
 
     // 3. Test Reconciliation Logic (Stale detection)
     console.log('\n--- TEST 3: Reconciliation Logic ---');

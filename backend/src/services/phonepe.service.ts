@@ -7,6 +7,7 @@ import { logger } from '../utils/logger';
 const PHONEPE_MERCHANT_ID = String(process.env.PHONEPE_MERCHANT_ID || 'PGCHECKOUT').trim();
 const PHONEPE_SALT_KEY = String(process.env.PHONEPE_SALT_KEY || '').trim();
 const PHONEPE_SALT_INDEX = String(process.env.PHONEPE_SALT_INDEX || '1').trim();
+const PHONEPE_WEBHOOK_SECRET = String(process.env.PHONEPE_WEBHOOK_SECRET || process.env.PHONEPE_SALT_KEY || '').trim();
 const PHONEPE_ENV = String(process.env.PHONEPE_ENV || (env.nodeEnv === 'production' ? 'production' : 'preprod')).trim().toLowerCase();
 const PHONEPE_MODE = String(process.env.PHONEPE_MODE || '').trim().toLowerCase();
 
@@ -175,66 +176,6 @@ const getPhonePeAuthorizationHeader = async (): Promise<Record<string, string>> 
 	return { Authorization: `O-Bearer ${token}` };
 };
 
-const initiatePhonePePaymentViaSdk = async (input: {
-	transactionId: string;
-	amountInPaise: number;
-	redirectUrl: string;
-}): Promise<string | null> => {
-	try {
-		const sdk: any = await import('@phonepe-pg/pg-sdk-node');
-		const StandardCheckoutClient = sdk?.StandardCheckoutClient;
-		const Env = sdk?.Env;
-		if (!StandardCheckoutClient || !Env) {
-			return null;
-		}
-
-		const sdkEnv = PHONEPE_ENV === 'production' || PHONEPE_ENV === 'prod' || PHONEPE_ENV === 'live'
-			? Env.PRODUCTION
-			: Env.SANDBOX;
-		const clientVersion = Number(PHONEPE_CLIENT_VERSION || '1');
-		const client = StandardCheckoutClient.getInstance(PHONEPE_CLIENT_ID, PHONEPE_CLIENT_SECRET, clientVersion, sdkEnv);
-
-		const createOrderBuilder = sdk?.CreateSdkOrderRequest?.StandardCheckoutBuilder?.();
-		if (createOrderBuilder) {
-			const request = createOrderBuilder
-				.merchantOrderId(input.transactionId)
-				.amount(input.amountInPaise)
-				.redirectUrl(input.redirectUrl)
-				.disablePaymentRetry(true)
-				.build();
-
-			if (typeof client?.pay === 'function') {
-				const response = await client.pay(request);
-				const sdkRedirect = String(response?.redirectUrl || response?.redirect_url || '').trim();
-				if (sdkRedirect) return sdkRedirect;
-			}
-
-			if (typeof client?.createSdkOrder === 'function') {
-				const response = await client.createSdkOrder(request);
-				const sdkRedirect = String(response?.redirectUrl || response?.redirect_url || '').trim();
-				if (sdkRedirect) return sdkRedirect;
-			}
-		}
-
-		const payBuilder = sdk?.StandardCheckoutPayRequest?.builder?.();
-		if (payBuilder && typeof client?.pay === 'function') {
-			const request = payBuilder
-				.merchantOrderId(input.transactionId)
-				.amount(input.amountInPaise)
-				.redirectUrl(input.redirectUrl)
-				.build();
-			const response = await client.pay(request);
-			const sdkRedirect = String(response?.redirectUrl || response?.redirect_url || '').trim();
-			if (sdkRedirect) return sdkRedirect;
-		}
-
-		return null;
-	} catch (error: any) {
-		logger.error('[PhonePe] SDK fallback failed', { message: error?.message, stack: error?.stack });
-		return null;
-	}
-};
-
 interface PhonePePaymentRequest {
 	merchantId: string;
 	merchantTransactionId: string;
@@ -279,13 +220,13 @@ export const initiatePhonePePayment = async (input: {
 	};
 
 	const base64Payload = Buffer.from(JSON.stringify(payload)).toString('base64');
-	const endpoint = PHONEPE_BASE_URL.includes('pg-sandbox') ? '/pg/v1/pay' : '/pg/v1/pay'; // Both use same endpoint path suffix
-	const checksum = PHONEPE_SALT_KEY ? sha256(base64Payload + '/pg/v1/pay' + PHONEPE_SALT_KEY) + '###' + PHONEPE_SALT_INDEX : null;
+	const endpoint = '/pg/v1/pay';
+	const checksum = PHONEPE_SALT_KEY ? sha256(base64Payload + endpoint + PHONEPE_SALT_KEY) + '###' + PHONEPE_SALT_INDEX : null;
 
 	try {
 		const authHeaders = await getPhonePeAuthorizationHeader();
 		const response = await axios.post(
-			`${PHONEPE_BASE_URL}/pg/v1/pay`,
+			`${PHONEPE_BASE_URL}${endpoint}`,
 			{ request: base64Payload },
 			{
 				headers: {
@@ -313,29 +254,6 @@ export const initiatePhonePePayment = async (input: {
 
 		const upstreamCode = String(error?.response?.data?.code || '').trim();
 		const upstreamMessage = String(error?.response?.data?.message || error?.message || 'PhonePe request failed').trim();
-		const isMappingError = upstreamMessage.toLowerCase().includes('api mapping not found');
-		// REST /pg/v1/pay needs Salt Key + index. Standard Checkout test creds are often OAuth-only;
-		// SDK path uses client credentials and still works when salt is missing or wrong for pg-sandbox.
-		const shouldTrySdk =
-			(isMappingError || upstreamCode === 'KEY_NOT_CONFIGURED')
-			&& PHONEPE_CLIENT_ID
-			&& PHONEPE_CLIENT_SECRET;
-
-		if (shouldTrySdk) {
-			const sdkRedirectUrl = await initiatePhonePePaymentViaSdk({
-				transactionId: input.transactionId,
-				amountInPaise: input.amountInPaise,
-				redirectUrl: input.redirectUrl,
-			});
-			if (sdkRedirectUrl) {
-				logger.info('[PhonePe] SDK fallback payment initiated successfully', {
-					transactionId: input.transactionId,
-					reason: upstreamCode || 'mapping',
-					redirectUrl: sdkRedirectUrl,
-				});
-				return sdkRedirectUrl;
-			}
-		}
 
 		logger.error('[PhonePe] Payment Initiation Failed', {
 			transactionId: input.transactionId,
@@ -360,12 +278,12 @@ export const verifyPhonePeWebhook = (reqBody: string, xVerify: string): boolean 
 		return false;
 	}
 
-	if (!PHONEPE_SALT_KEY) {
-		logger.warn('[PhonePe] PHONEPE_SALT_KEY not configured; cannot verify webhook signature (set webhook secret in PHONEPE_SALT_KEY).');
+	if (!PHONEPE_WEBHOOK_SECRET) {
+		logger.warn('[PhonePe] PHONEPE_WEBHOOK_SECRET not configured; cannot verify webhook signature.');
 		return false;
 	}
 
-	const expected = sha256(reqBody + PHONEPE_SALT_KEY) + '###' + PHONEPE_SALT_INDEX;
+	const expected = sha256(reqBody + PHONEPE_WEBHOOK_SECRET) + '###' + PHONEPE_SALT_INDEX;
 
 	try {
 		const expectedBuf = Buffer.from(expected);
@@ -396,14 +314,14 @@ export const checkPhonePeStatus = async (merchantTransactionId: string) => {
 	const endpoint = resolvedStatusEndpoint.startsWith('/')
 		? resolvedStatusEndpoint
 		: `/${resolvedStatusEndpoint}`;
-	const checksum = sha256(endpoint + PHONEPE_SALT_KEY) + '###' + PHONEPE_SALT_INDEX;
+	const checksum = PHONEPE_SALT_KEY ? sha256(endpoint + PHONEPE_SALT_KEY) + '###' + PHONEPE_SALT_INDEX : null;
 
 	try {
 		const authHeaders = await getPhonePeAuthorizationHeader();
 		const response = await axios.get(`${PHONEPE_BASE_URL}${endpoint}`, {
 			headers: {
 				'Content-Type': 'application/json',
-				'X-VERIFY': checksum,
+				...(checksum ? { 'X-VERIFY': checksum } : {}),
 				'X-MERCHANT-ID': PHONEPE_MERCHANT_ID,
 				accept: 'application/json',
 				...authHeaders,
