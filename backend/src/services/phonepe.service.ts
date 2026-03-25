@@ -49,6 +49,53 @@ interface PhonePeToken {
 }
 
 let cachedPhonePeToken: PhonePeToken | null = null;
+let tokenRefreshTimeout: NodeJS.Timeout | null = null;
+
+const scheduleTokenRefresh = (expiresAt: number): void => {
+	if (tokenRefreshTimeout) {
+		clearTimeout(tokenRefreshTimeout);
+	}
+
+	const now = Date.now();
+	const refreshLeadTime = 60 * 1000; // 60 seconds before expiry
+	const timeUntilRefresh = expiresAt - now - refreshLeadTime;
+
+	if (timeUntilRefresh > 0) {
+		tokenRefreshTimeout = setTimeout(async () => {
+			logger.info('[PhonePe] Auto-refreshing OAuth token (proactive refresh)');
+			await fetchPhonePeToken();
+		}, timeUntilRefresh);
+	}
+};
+
+export const initializePhonePeTokenRefresh = async (): Promise<void> => {
+	if (!PHONEPE_CLIENT_ID || !PHONEPE_CLIENT_SECRET) {
+		logger.info('[PhonePe] OAuth credentials not configured; skipping token initialization');
+		return;
+	}
+
+	try {
+		logger.info('[PhonePe] Initializing OAuth token on startup');
+		const token = await fetchPhonePeToken();
+		if (token && cachedPhonePeToken) {
+			scheduleTokenRefresh(cachedPhonePeToken.expiresAt);
+			logger.info('[PhonePe] Token refresh scheduled', {
+				expiresIn: Math.round((cachedPhonePeToken.expiresAt - Date.now()) / 1000),
+				seconds: 's',
+			});
+		}
+	} catch (error: any) {
+		logger.error('[PhonePe] Token initialization failed', { error: error?.message });
+	}
+};
+
+export const cleanupPhonePeTokenRefresh = (): void => {
+	if (tokenRefreshTimeout) {
+		clearTimeout(tokenRefreshTimeout);
+		tokenRefreshTimeout = null;
+		logger.info('[PhonePe] Token refresh cleanup complete');
+	}
+};
 
 const getPhonePeOAuthUrl = (): string => {
 	if (PHONEPE_OAUTH_URL) return PHONEPE_OAUTH_URL;
@@ -95,6 +142,7 @@ const fetchPhonePeToken = async (): Promise<string | null> => {
 
 		cachedPhonePeToken = { accessToken: token, expiresAt };
 		logger.info('[PhonePe] OAuth token fetched', { expiresAt });
+		scheduleTokenRefresh(expiresAt);
 		return token;
 	} catch (error: any) {
 		logger.error('[PhonePe] OAuth token fetch failed', {
