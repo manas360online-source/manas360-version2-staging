@@ -339,7 +339,13 @@ export const checkPhonePeStatus = async (merchantTransactionId: string) => {
 		resolvedStatusEndpoint = `/checkout/v2/order/${merchantTransactionId}/status`;
 	}
 
-	const endpoint = resolvedStatusEndpoint.startsWith('/') ? resolvedStatusEndpoint : `/${resolvedStatusEndpoint}`;
+	let endpoint = resolvedStatusEndpoint.startsWith('/') ? resolvedStatusEndpoint : `/${resolvedStatusEndpoint}`;
+
+	// Guard against stale env templates accidentally pointing to old subscriptions API.
+	if (endpoint.includes('/subscriptions/v2/')) {
+		endpoint = `/checkout/v2/order/${merchantTransactionId}/status`;
+	}
+	const fallbackEndpoint = `/checkout/v2/order/${merchantTransactionId}/status`;
 
 	try {
 		const authHeaders = await getPhonePeAuthorizationHeader();
@@ -363,6 +369,42 @@ export const checkPhonePeStatus = async (merchantTransactionId: string) => {
 
 		return response.data;
 	} catch (error: any) {
+		const upstreamCode = String(error?.response?.data?.code || '').toUpperCase();
+		const shouldRetryWithFallback = upstreamCode === 'API_MAPPING_NOT_FOUND' || upstreamCode === 'API MAPPING NOT FOUND';
+
+		if (shouldRetryWithFallback && endpoint !== fallbackEndpoint) {
+			try {
+				const authHeaders = await getPhonePeAuthorizationHeader();
+				const retryResponse = await axios.get(`${PHONEPE_BASE_URL}${fallbackEndpoint}`, {
+					headers: {
+						'Content-Type': 'application/json',
+						'X-CLIENT-ID': PHONEPE_CLIENT_ID,
+						'X-MERCHANT-ID': PHONEPE_MERCHANT_ID,
+						accept: 'application/json',
+						...authHeaders,
+					},
+					timeout: 10000,
+				});
+
+				logger.info('[PhonePe] Status check fallback succeeded', {
+					merchantTransactionId,
+					endpoint: fallbackEndpoint,
+					code: retryResponse.data?.code,
+					state: retryResponse.data?.data?.state,
+				});
+
+				return retryResponse.data;
+			} catch (retryError: any) {
+				logger.error('[PhonePe] Status check fallback failed', {
+					merchantTransactionId,
+					endpoint: fallbackEndpoint,
+					status: retryError?.response?.status,
+					data: retryError?.response?.data,
+					message: retryError?.message,
+				});
+			}
+		}
+
 		logger.error('[PhonePe] Status Check Failed', {
 			merchantTransactionId,
 			status: error?.response?.status,

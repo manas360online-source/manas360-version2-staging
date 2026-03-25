@@ -72,8 +72,9 @@ export const phonepeWebhookController = async (req: Request, res: Response): Pro
 	const xVerify = String(req.headers['x-verify'] ?? '').trim();
 	const payload = req.body as any;
 	const hasBase64WebhookPayload = typeof payload?.response === 'string' && payload.response.trim().length > 0;
+	const hasStructuredWebhookPayload = Boolean(payload?.data?.merchantTransactionId || payload?.merchantTransactionId);
 
-	if (env.allowDevPhonePeWebhookProbeBypass) {
+	if (env.allowDevPhonePeWebhookProbeBypass && !hasBase64WebhookPayload && !hasStructuredWebhookPayload) {
 		logger.warn('[PhonePe] Webhook probe bypass is ENABLED. Returning 200 without strict validation.');
 		logger.info('[PhonePe] Probe request received', { headers: req.headers, body: payload });
 		return void res.status(200).json({ success: true, message: 'Webhook probe bypass enabled' });
