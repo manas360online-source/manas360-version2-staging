@@ -183,6 +183,18 @@ if (
 	throw new Error('JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must be configured for staging/production');
 }
 
-if ((env.nodeEnv === 'production' || env.nodeEnv === 'staging') && (!process.env.PHONEPE_SALT_KEY || !process.env.PHONEPE_MERCHANT_ID || !process.env.PHONEPE_SALT_INDEX)) {
-	throw new Error('PHONEPE_SALT_KEY, PHONEPE_MERCHANT_ID and PHONEPE_SALT_INDEX must be configured for staging/production');
+if (env.nodeEnv === 'production' || env.nodeEnv === 'staging') {
+	const hasMerchantId = Boolean(String(process.env.PHONEPE_MERCHANT_ID || '').trim());
+	const hasOAuth = Boolean(String(process.env.PHONEPE_CLIENT_ID || '').trim())
+		&& Boolean(String(process.env.PHONEPE_CLIENT_SECRET || '').trim());
+	const hasSaltFlow = Boolean(String(process.env.PHONEPE_SALT_KEY || '').trim())
+		&& Boolean(String(process.env.PHONEPE_SALT_INDEX || '').trim());
+
+	if (!hasMerchantId) {
+		throw new Error('PHONEPE_MERCHANT_ID must be configured for staging/production');
+	}
+
+	if (!hasOAuth && !hasSaltFlow) {
+		throw new Error('PhonePe config invalid: set PHONEPE_CLIENT_ID + PHONEPE_CLIENT_SECRET (OAuth V2) or PHONEPE_SALT_KEY + PHONEPE_SALT_INDEX');
+	}
 }

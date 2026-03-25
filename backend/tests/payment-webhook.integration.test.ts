@@ -154,8 +154,11 @@ describe('Phase 5 - E2E Validation: Payment Webhook Transitions', () => {
                                         expectedAmountMinor: 100000, // 1000 INR
                                         currency: 'INR',
                                         idempotencyKey: `test_idem_abc_${Date.now()}_${Math.random()}`,
-                                        merchantTransactionId: mockTxId,
-                                }
+                                },
+                                select: {
+                                        id: true,
+                                        status: true,
+                                },
                         });
 
                         const mockPayment = await prisma.financialPayment.create({
