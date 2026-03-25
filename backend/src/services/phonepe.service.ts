@@ -34,8 +34,9 @@ const PHONEPE_CLIENT_ID = String(process.env.PHONEPE_CLIENT_ID || '').trim();
 const PHONEPE_CLIENT_SECRET = String(process.env.PHONEPE_CLIENT_SECRET || '').trim();
 const PHONEPE_CLIENT_VERSION = String(process.env.PHONEPE_CLIENT_VERSION || '1').trim();
 const PHONEPE_OAUTH_URL = String(process.env.PHONEPE_OAUTH_URL || '').trim();
+// Prefer V2 checkout status endpoint by default; allow override via env
 const PHONEPE_STATUS_ENDPOINT_TEMPLATE = String(
-	process.env.PHONEPE_STATUS_ENDPOINT_TEMPLATE || '/pg/v1/status/{merchantId}/{transactionId}'
+	process.env.PHONEPE_STATUS_ENDPOINT_TEMPLATE || '/checkout/v2/order/{merchantTransactionId}/status'
 ).trim();
 
 if (!PHONEPE_SALT_KEY) {
@@ -325,12 +326,20 @@ export const verifyPhonePeWebhook = (reqBody: string, xVerify: string): boolean 
 };
 
 export const checkPhonePeStatus = async (merchantTransactionId: string) => {
-	const resolvedStatusEndpoint = PHONEPE_STATUS_ENDPOINT_TEMPLATE
-		.replace('{merchantId}', PHONEPE_MERCHANT_ID)
-		.replace('{transactionId}', merchantTransactionId);
-	const endpoint = resolvedStatusEndpoint.startsWith('/')
-		? resolvedStatusEndpoint
-		: `/${resolvedStatusEndpoint}`;
+	// Support multiple template variable patterns for backward compatibility.
+	let resolvedStatusEndpoint = PHONEPE_STATUS_ENDPOINT_TEMPLATE;
+	if (resolvedStatusEndpoint.includes('{merchantTransactionId}')) {
+		resolvedStatusEndpoint = resolvedStatusEndpoint.replace('{merchantTransactionId}', merchantTransactionId);
+	} else if (resolvedStatusEndpoint.includes('{merchantId}') && resolvedStatusEndpoint.includes('{transactionId}')) {
+		resolvedStatusEndpoint = resolvedStatusEndpoint
+			.replace('{merchantId}', PHONEPE_MERCHANT_ID)
+			.replace('{transactionId}', merchantTransactionId);
+	} else {
+		// Fallback to common V2 path
+		resolvedStatusEndpoint = `/checkout/v2/order/${merchantTransactionId}/status`;
+	}
+
+	const endpoint = resolvedStatusEndpoint.startsWith('/') ? resolvedStatusEndpoint : `/${resolvedStatusEndpoint}`;
 
 	try {
 		const authHeaders = await getPhonePeAuthorizationHeader();
