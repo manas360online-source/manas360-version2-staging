@@ -171,7 +171,7 @@ const getPhonePeAuthToken = async (): Promise<string | null> => {
 const getPhonePeAuthorizationHeader = async (): Promise<Record<string, string>> => {
 	const token = await getPhonePeAuthToken();
 	if (!token) {
-		return {};
+		throw new AppError('PhonePe OAuth token unavailable. Check PHONEPE_CLIENT_ID/PHONEPE_CLIENT_SECRET and PHONEPE_OAUTH_URL.', 502);
 	}
 	return { Authorization: `O-Bearer ${token}` };
 };
@@ -219,19 +219,30 @@ export const initiatePhonePePayment = async (input: {
 		},
 	};
 
-	const base64Payload = Buffer.from(JSON.stringify(payload)).toString('base64');
-	const endpoint = '/pg/v1/pay';
-	const checksum = PHONEPE_SALT_KEY ? sha256(base64Payload + endpoint + PHONEPE_SALT_KEY) + '###' + PHONEPE_SALT_INDEX : null;
+	const endpoint = '/checkout/v2/pay';
+	const v2Payload = {
+		merchantOrderId: input.transactionId,
+		amount: input.amountInPaise,
+		paymentFlow: {
+			type: 'PG_CHECKOUT',
+			merchantUrls: {
+				redirectUrl: input.redirectUrl,
+			},
+		},
+		metaInfo: {
+			udf1: input.userId,
+		},
+	};
 
 	try {
 		const authHeaders = await getPhonePeAuthorizationHeader();
 		const response = await axios.post(
 			`${PHONEPE_BASE_URL}${endpoint}`,
-			{ request: base64Payload },
+			v2Payload,
 			{
 				headers: {
 					'Content-Type': 'application/json',
-					...(checksum ? { 'X-VERIFY': checksum } : {}),
+					'X-CLIENT-ID': PHONEPE_CLIENT_ID,
 					'X-MERCHANT-ID': PHONEPE_MERCHANT_ID,
 					accept: 'application/json',
 					...authHeaders,
@@ -240,7 +251,7 @@ export const initiatePhonePePayment = async (input: {
 			}
 		);
 
-		const redirectUrl = response.data?.data?.instrumentResponse?.redirectInfo?.url;
+		const redirectUrl = response.data?.data?.redirectUrl || response.data?.data?.instrumentResponse?.redirectInfo?.url;
 
 		if (!redirectUrl) {
 			logger.error('[PhonePe] No redirect URL in response', { transactionId: input.transactionId, responseData: response.data });
@@ -314,14 +325,13 @@ export const checkPhonePeStatus = async (merchantTransactionId: string) => {
 	const endpoint = resolvedStatusEndpoint.startsWith('/')
 		? resolvedStatusEndpoint
 		: `/${resolvedStatusEndpoint}`;
-	const checksum = PHONEPE_SALT_KEY ? sha256(endpoint + PHONEPE_SALT_KEY) + '###' + PHONEPE_SALT_INDEX : null;
 
 	try {
 		const authHeaders = await getPhonePeAuthorizationHeader();
 		const response = await axios.get(`${PHONEPE_BASE_URL}${endpoint}`, {
 			headers: {
 				'Content-Type': 'application/json',
-				...(checksum ? { 'X-VERIFY': checksum } : {}),
+				'X-CLIENT-ID': PHONEPE_CLIENT_ID,
 				'X-MERCHANT-ID': PHONEPE_MERCHANT_ID,
 				accept: 'application/json',
 				...authHeaders,
@@ -524,19 +534,17 @@ export const initiatePhonePeRefund = async (input: {
 		originalTransactionId: input.originalMerchantOrderId,
 	};
 
-	const base64Payload = Buffer.from(JSON.stringify(payload)).toString('base64');
 	const endpoint = '/payments/v2/refund';
-	const checksum = PHONEPE_SALT_KEY ? sha256(base64Payload + endpoint + PHONEPE_SALT_KEY) + '###' + PHONEPE_SALT_INDEX : null;
 
 	try {
 		const authHeaders = await getPhonePeAuthorizationHeader();
 		const response = await axios.post(
 			`${PHONEPE_BASE_URL}${endpoint}`,
-			{ request: base64Payload },
+			payload,
 			{
 				headers: {
 					'Content-Type': 'application/json',
-					...(checksum ? { 'X-VERIFY': checksum } : {}),
+					'X-CLIENT-ID': PHONEPE_CLIENT_ID,
 					'X-MERCHANT-ID': PHONEPE_MERCHANT_ID,
 					accept: 'application/json',
 					...authHeaders,
@@ -580,14 +588,13 @@ export const initiatePhonePeRefund = async (input: {
 
 export const checkPhonePeRefundStatus = async (merchantRefundId: string) => {
 	const endpoint = `/payments/v2/refund/${merchantRefundId}/status`;
-	const checksum = PHONEPE_SALT_KEY ? sha256(endpoint + PHONEPE_SALT_KEY) + '###' + PHONEPE_SALT_INDEX : null;
 
 	try {
 		const authHeaders = await getPhonePeAuthorizationHeader();
 		const response = await axios.get(`${PHONEPE_BASE_URL}${endpoint}`, {
 			headers: {
 				'Content-Type': 'application/json',
-				...(checksum ? { 'X-VERIFY': checksum } : {}),
+				'X-CLIENT-ID': PHONEPE_CLIENT_ID,
 				'X-MERCHANT-ID': PHONEPE_MERCHANT_ID,
 				accept: 'application/json',
 				...authHeaders,

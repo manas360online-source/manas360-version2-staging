@@ -94,8 +94,8 @@ export const phonepeWebhookController = async (req: Request, res: Response): Pro
 		throw new AppError('Invalid PhonePe webhook authorization', 401);
 	}
 
-	// 3. Signature Verification
-	if (!xVerify || !verifyPhonePeWebhook(rawBody, xVerify)) {
+	// 3. Signature Verification (optional in OAuth V2; enforce only when x-verify is provided)
+	if (xVerify && !verifyPhonePeWebhook(rawBody, xVerify)) {
 		throw new AppError('Invalid PhonePe webhook signature', 401);
 	}
 
