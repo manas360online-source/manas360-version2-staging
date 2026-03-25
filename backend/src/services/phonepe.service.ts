@@ -15,10 +15,13 @@ const PHONEPE_MODE = String(process.env.PHONEPE_MODE || '').trim().toLowerCase()
 // 2) PHONEPE_MODE=pgsandbox (simulator)
 // 3) PHONEPE_ENV=production|preprod (standard gateway)
 const GET_PHONEPE_BASE_URL = () => {
-	if (process.env.PHONEPE_BASE_URL) return String(process.env.PHONEPE_BASE_URL).trim();
+	if (process.env.PHONEPE_BASE_URL) {
+		return String(process.env.PHONEPE_BASE_URL).trim();
+	}
 	if (PHONEPE_MODE === 'pgsandbox' || PHONEPE_MODE === 'simulator') {
 		return 'https://api-preprod.phonepe.com/apis/pg-sandbox';
 	}
+	
 	if (PHONEPE_ENV === 'production' || PHONEPE_ENV === 'prod' || PHONEPE_ENV === 'live') {
 		return 'https://api.phonepe.com/apis/hermes';
 	}
@@ -35,9 +38,13 @@ const PHONEPE_STATUS_ENDPOINT_TEMPLATE = String(
 ).trim();
 
 if (!PHONEPE_SALT_KEY) {
-	logger.error('[PhonePe] PHONEPE_SALT_KEY is not set. Payment signing and verification will fail.');
-	if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging') {
-		throw new Error('Missing PHONEPE_SALT_KEY in production/staging environment');
+	if (PHONEPE_CLIENT_ID && PHONEPE_CLIENT_SECRET) {
+		logger.info('[PhonePe] PHONEPE_SALT_KEY not set; operating in OAuth-only (V2) mode using client credentials.');
+	} else {
+		logger.error('[PhonePe] PHONEPE_SALT_KEY is not set and OAuth credentials are not configured. Payment signing and verification will fail.');
+		if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging') {
+			throw new Error('Missing PHONEPE_SALT_KEY or OAuth credentials in production/staging environment');
+		}
 	}
 }
 
@@ -273,7 +280,7 @@ export const initiatePhonePePayment = async (input: {
 
 	const base64Payload = Buffer.from(JSON.stringify(payload)).toString('base64');
 	const endpoint = PHONEPE_BASE_URL.includes('pg-sandbox') ? '/pg/v1/pay' : '/pg/v1/pay'; // Both use same endpoint path suffix
-	const checksum = sha256(base64Payload + '/pg/v1/pay' + PHONEPE_SALT_KEY) + '###' + PHONEPE_SALT_INDEX;
+	const checksum = PHONEPE_SALT_KEY ? sha256(base64Payload + '/pg/v1/pay' + PHONEPE_SALT_KEY) + '###' + PHONEPE_SALT_INDEX : null;
 
 	try {
 		const authHeaders = await getPhonePeAuthorizationHeader();
@@ -283,7 +290,7 @@ export const initiatePhonePePayment = async (input: {
 			{
 				headers: {
 					'Content-Type': 'application/json',
-					'X-VERIFY': checksum,
+					...(checksum ? { 'X-VERIFY': checksum } : {}),
 					'X-MERCHANT-ID': PHONEPE_MERCHANT_ID,
 					accept: 'application/json',
 					...authHeaders,
@@ -350,6 +357,11 @@ export const initiatePhonePePayment = async (input: {
 export const verifyPhonePeWebhook = (reqBody: string, xVerify: string): boolean => {
 	if (!reqBody || !xVerify) {
 		logger.error('[PhonePe] Webhook signature verification missing data', { reqBody, xVerify });
+		return false;
+	}
+
+	if (!PHONEPE_SALT_KEY) {
+		logger.warn('[PhonePe] PHONEPE_SALT_KEY not configured; cannot verify webhook signature (set webhook secret in PHONEPE_SALT_KEY).');
 		return false;
 	}
 
@@ -596,7 +608,7 @@ export const initiatePhonePeRefund = async (input: {
 
 	const base64Payload = Buffer.from(JSON.stringify(payload)).toString('base64');
 	const endpoint = '/payments/v2/refund';
-	const checksum = sha256(base64Payload + endpoint + PHONEPE_SALT_KEY) + '###' + PHONEPE_SALT_INDEX;
+	const checksum = PHONEPE_SALT_KEY ? sha256(base64Payload + endpoint + PHONEPE_SALT_KEY) + '###' + PHONEPE_SALT_INDEX : null;
 
 	try {
 		const authHeaders = await getPhonePeAuthorizationHeader();
@@ -606,7 +618,7 @@ export const initiatePhonePeRefund = async (input: {
 			{
 				headers: {
 					'Content-Type': 'application/json',
-					'X-VERIFY': checksum,
+					...(checksum ? { 'X-VERIFY': checksum } : {}),
 					'X-MERCHANT-ID': PHONEPE_MERCHANT_ID,
 					accept: 'application/json',
 					...authHeaders,
@@ -650,14 +662,14 @@ export const initiatePhonePeRefund = async (input: {
 
 export const checkPhonePeRefundStatus = async (merchantRefundId: string) => {
 	const endpoint = `/payments/v2/refund/${merchantRefundId}/status`;
-	const checksum = sha256(endpoint + PHONEPE_SALT_KEY) + '###' + PHONEPE_SALT_INDEX;
+	const checksum = PHONEPE_SALT_KEY ? sha256(endpoint + PHONEPE_SALT_KEY) + '###' + PHONEPE_SALT_INDEX : null;
 
 	try {
 		const authHeaders = await getPhonePeAuthorizationHeader();
 		const response = await axios.get(`${PHONEPE_BASE_URL}${endpoint}`, {
 			headers: {
 				'Content-Type': 'application/json',
-				'X-VERIFY': checksum,
+				...(checksum ? { 'X-VERIFY': checksum } : {}),
 				'X-MERCHANT-ID': PHONEPE_MERCHANT_ID,
 				accept: 'application/json',
 				...authHeaders,
