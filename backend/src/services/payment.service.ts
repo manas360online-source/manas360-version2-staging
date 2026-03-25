@@ -601,4 +601,118 @@ export const retryPaymentManually = async (paymentId: string, adminUserId: strin
 		message: 'Payment retry scheduled for immediate processing',
 		payment: updatedPayment,
 	};
-};
+}
+
+/**
+ * Reconcile payment status from PhonePe (handles PENDING polling).
+ * Called from redirect page or status endpoint to verify final payment state.
+ * 
+ * Implements PhonePe UAT polling schedule:
+ * - 1st check: after 5s
+ * - 2nd-3rd checks: every 3s (15s total)
+ * - 4th-5th checks: every 6s (30s total)  
+ * - 6th+ checks: every 10s (until 60s+) then every 30s
+ * 
+ * Returns: { state, transactionId, resultMessage }
+ */
+export const reconcilePhonePePaymentStatus = async (
+	transactionId: string,
+	maxRetries: number = 5,
+	initialWaitMs: number = 5000
+): Promise<{ state: string; transactionId: string; resultMessage: string }> => {
+	const { checkPhonePeStatus } = await import('./phonepe.service');
+
+	logger.info('[Payment.Reconcile] Starting status reconciliation', {
+		transactionId,
+		maxRetries,
+		initialWaitMs,
+	});
+
+	let currentState = 'PENDING';
+	let lastStatus: any = null;
+
+	for (let attempt = 1; attempt <= maxRetries; attempt++) {
+		// Calculate wait time based on PhonePe schedule
+		let waitMs = initialWaitMs;
+		if (attempt > 1) {
+			if (attempt <= 3) waitMs = 3000; // every 3s for attempts 2-3
+			else if (attempt <= 5) waitMs = 6000; // every 6s for attempts 4-5
+			else waitMs = 10000; // every 10s after
+		}
+
+		if (attempt > 1) {
+			logger.info('[Payment.Reconcile] Waiting before retry', {
+				transactionId,
+				attempt,
+				nextCheckInMs: waitMs,
+			});
+			await new Promise((resolve) => setTimeout(resolve, waitMs));
+		}
+
+		try {
+			lastStatus = await checkPhonePeStatus(transactionId);
+			if (!lastStatus) {
+				logger.warn('[Payment.Reconcile] Status check returned null', {
+					transactionId,
+					attempt,
+				});
+				continue;
+			}
+
+			currentState = String(lastStatus?.data?.state || lastStatus?.code || 'UNKNOWN').toUpperCase();
+			logger.info('[Payment.Reconcile] Status check result', {
+				transactionId,
+				attempt,
+				state: currentState,
+				code: lastStatus?.code,
+			});
+
+			// If state is final (not PENDING), stop polling
+			if (currentState !== 'PENDING') {
+				logger.info('[Payment.Reconcile] Final state reached', {
+					transactionId,
+					state: currentState,
+					attemptNumber: attempt,
+				});
+
+				// If success, trigger webhook processing to update DB
+				if (currentState === 'COMPLETED' && transactionId.startsWith('SUB_')) {
+					try {
+						await processPhonePeWebhook(lastStatus).catch((error) => {
+							logger.warn('[Payment.Reconcile] Inline webhook processing failed', {
+								transactionId,
+								error: error?.message,
+							});
+						});
+					} catch {}
+				}
+
+				return {
+					state: currentState,
+					transactionId,
+					resultMessage: `Payment state is ${currentState}`,
+				};
+			}
+		} catch (error: any) {
+			logger.warn('[Payment.Reconcile] Status check error', {
+				transactionId,
+				attempt,
+				error: error?.message,
+			});
+			// Continue to next retry
+		}
+	}
+
+	// All retries exhausted but still PENDING
+	logger.warn('[Payment.Reconcile] Max retries exhausted, still PENDING', {
+		transactionId,
+		maxRetries,
+		finalState: currentState,
+	});
+
+	return {
+		state: currentState,
+		transactionId,
+		resultMessage: `Payment status is still ${currentState}. Please check again in a moment or contact support.`,
+	};
+}
