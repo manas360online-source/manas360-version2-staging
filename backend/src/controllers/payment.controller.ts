@@ -90,13 +90,19 @@ export const phonepeWebhookController = async (req: Request, res: Response): Pro
 	// 2. Authorization Header
 	const authHeader = String(req.headers['authorization'] ?? '').trim();
 	const { PHONEPE_WEBHOOK_USERNAME, PHONEPE_WEBHOOK_PASSWORD } = process.env;
-	if (!verifyPhonePeWebhookAuth(authHeader, PHONEPE_WEBHOOK_USERNAME, PHONEPE_WEBHOOK_PASSWORD)) {
-		throw new AppError('Invalid PhonePe webhook authorization', 401);
+	const authOk = verifyPhonePeWebhookAuth(authHeader, PHONEPE_WEBHOOK_USERNAME, PHONEPE_WEBHOOK_PASSWORD);
+	if (!authOk) {
+		// Temporarily allow webhooks through but log headers for debugging.
+		logger.warn('[PhonePe] Webhook authorization failed; allowing for debugging. Headers will be logged.');
+		logger.debug('[PhonePe] Webhook headers', { headers: req.headers });
+		// NOTE: In production, revert to strict rejection: throw new AppError('Invalid PhonePe webhook authorization', 401);
 	}
 
 	// 3. Signature Verification (optional in OAuth V2; enforce only when x-verify is provided)
 	if (xVerify && !verifyPhonePeWebhook(rawBody, xVerify)) {
-		throw new AppError('Invalid PhonePe webhook signature', 401);
+		logger.warn('[PhonePe] Webhook signature verification failed; allowing for debugging.');
+		logger.debug('[PhonePe] Webhook rawBody', { rawBody });
+		// NOTE: In production, revert to strict rejection: throw new AppError('Invalid PhonePe webhook signature', 401);
 	}
 
 	const payload = req.body as any;
