@@ -18,6 +18,9 @@ router.post('/sessions', requireAuth, requireRole('patient'), paymentRateLimiter
 router.post('/sessions/:id/complete', requireAuth, requireRole('therapist'), paymentRateLimiter, asyncHandler(completeFinancialSessionController));
 
 // PhonePe specific routes
+router.get('/phonepe/webhook', (_req, res) => {
+	res.status(200).json({ success: true, message: 'PhonePe webhook endpoint reachable' });
+});
 router.post('/phonepe/webhook', asyncHandler(phonepeWebhookController));
 router.get('/phonepe/status/:transactionId', requireAuth, asyncHandler(getPhonePeStatusController));
 
