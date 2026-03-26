@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.retryPaymentManually = exports.releaseSessionEarnings = exports.processPhonePeWebhook = exports.createSessionPayment = void 0;
+exports.reconcilePhonePePaymentStatus = exports.retryPaymentManually = exports.releaseSessionEarnings = exports.processPhonePeWebhook = exports.createSessionPayment = void 0;
 const crypto_1 = __importStar(require("crypto"));
 const redis_1 = require("redis");
 const env_1 = require("../config/env");
@@ -41,6 +41,10 @@ const db_1 = require("../config/db");
 const error_middleware_1 = require("../middleware/error.middleware");
 const phonepe_service_1 = require("./phonepe.service");
 const payment_metrics_service_1 = require("./payment-metrics.service");
+const patient_v1_service_1 = require("./patient-v1.service");
+const provider_subscription_service_1 = require("./provider-subscription.service");
+const provider_subscription_pending_service_1 = require("./provider-subscription.pending.service");
+const phonepe_decline_reasons_service_1 = require("./phonepe-decline-reasons.service");
 const logger_1 = require("../utils/logger");
 const redis = (0, redis_1.createClient)({ url: env_1.env.redisUrl });
 const isTestEnv = process.env.NODE_ENV === 'test';
@@ -243,9 +247,6 @@ const processPhonePeWebhook = async (decoded) => {
             return { handled: true, message: 'PhonePe session payment processed' };
         }
         if (merchantTransactionId.startsWith('SUB_')) {
-            const parts = merchantTransactionId.split('_');
-            const userId = parts[1];
-            const planKey = data.metadata?.plan || parts[2];
             const payment = await db.financialPayment.findFirst({
                 where: { merchantTransactionId: merchantTransactionId },
                 orderBy: { createdAt: 'desc' },
@@ -253,20 +254,36 @@ const processPhonePeWebhook = async (decoded) => {
             if (payment?.status === 'CAPTURED') {
                 return { handled: true, message: 'Patient subscription payment already captured' };
             }
-            const { checkPhonePeStatus } = await import('./phonepe.service');
-            const verify = await checkPhonePeStatus(merchantTransactionId);
-            if (!verify || !verify.success || verify.code !== 'PAYMENT_SUCCESS' || verify.data?.state !== 'COMPLETED') {
-                throw new error_middleware_1.AppError("Patient payment not verified", 400);
+            const parts = merchantTransactionId.split('_');
+            const userId = String(payment?.patientId || parts[1] || '');
+            const planKey = data.metadata?.plan || payment?.metadata?.plan || parts[2];
+            if (!userId) {
+                throw new error_middleware_1.AppError('Unable to resolve patient subscription userId from payment', 422);
+            }
+            const verify = await (0, phonepe_service_1.checkPhonePeStatus)(merchantTransactionId);
+            const verifyCode = String(verify?.code || '').toUpperCase();
+            const verifyState = String(verify?.data?.state || '').toUpperCase();
+            const isVerifiedByStatus = Boolean(verify) && (verifyCode === 'PAYMENT_SUCCESS' || verifyState === 'COMPLETED');
+            const isExplicitFailure = verifyCode === 'PAYMENT_ERROR'
+                || verifyState === 'FAILED'
+                || verifyState === 'DECLINED';
+            if (isExplicitFailure) {
+                throw new error_middleware_1.AppError('Patient payment not verified', 400);
+            }
+            if (!isVerifiedByStatus) {
+                logger_1.logger.warn('[PaymentService] Status verification unavailable/non-completed; proceeding with webhook success', {
+                    merchantTransactionId,
+                    verifyCode,
+                    verifyState,
+                });
             }
             // Fix 8: Idempotency check for patient
-            const { prisma } = await import('../config/db');
-            const existingSub = await prisma.patientSubscription.findUnique({ where: { userId } });
+            const existingSub = await db.patientSubscription.findUnique({ where: { userId } });
             if (existingSub?.paymentId === merchantTransactionId) {
                 logger_1.logger.debug(`[PaymentService] Patient subscription webhook bypassed (Idempotency)`, { merchantTransactionId });
                 return { handled: true, message: 'Patient subscription already processed' };
             }
-            const { reactivatePatientSubscription } = await import('./patient-v1.service');
-            const activated = await reactivatePatientSubscription(userId, merchantTransactionId, String(planKey || ''));
+            const activated = await (0, patient_v1_service_1.reactivatePatientSubscription)(userId, merchantTransactionId, String(planKey || ''));
             if (payment?.id) {
                 await db.financialPayment.update({
                     where: { id: payment.id },
@@ -301,11 +318,6 @@ const processPhonePeWebhook = async (decoded) => {
             return { handled: true, message: 'PhonePe subscription payment processed' };
         }
         if (merchantTransactionId.startsWith('PROV_SUB_')) {
-            const parts = merchantTransactionId.split('_');
-            // PROV_SUB_{providerId}_{planKey}_{timestamp}
-            const providerId = parts[2];
-            // Fix 7: Get plan from metadata payload (fallback to URL param)
-            const planKey = data.metadata?.plan || parts[3];
             const payment = await db.financialPayment.findFirst({
                 where: { merchantTransactionId: merchantTransactionId },
                 orderBy: { createdAt: 'desc' },
@@ -313,20 +325,99 @@ const processPhonePeWebhook = async (decoded) => {
             if (payment?.status === 'CAPTURED') {
                 return { handled: true, message: 'Provider subscription payment already captured' };
             }
-            const { checkPhonePeStatus } = await import('./phonepe.service');
-            const verify = await checkPhonePeStatus(merchantTransactionId);
-            if (!verify || !verify.success || verify.code !== 'PAYMENT_SUCCESS' || verify.data?.state !== 'COMPLETED') {
-                throw new error_middleware_1.AppError("Provider payment not verified or not completed", 400);
+            const parts = merchantTransactionId.split('_');
+            // Support both legacy PROV_SUB_{providerId}_{plan}_{ts} and compact IDs.
+            const providerId = String(payment?.providerId || parts[2] || '');
+            const planKey = data.metadata?.plan || payment?.metadata?.plan || parts[3];
+            if (!providerId) {
+                throw new error_middleware_1.AppError('Unable to resolve providerId from provider subscription payment', 422);
+            }
+            const verify = await (0, phonepe_service_1.checkPhonePeStatus)(merchantTransactionId);
+            const verifyCode = String(verify?.code || '').toUpperCase();
+            const verifyState = String(verify?.data?.state || '').toUpperCase();
+            const rawDeclineReason = (0, phonepe_decline_reasons_service_1.extractDeclineReasonFromPhonePe)(verify?.data || {});
+            const declineReasonInfo = (0, phonepe_decline_reasons_service_1.formatDeclineMessage)(rawDeclineReason);
+            const isVerifiedByStatus = Boolean(verify) && (verifyCode === 'PAYMENT_SUCCESS' || verifyState === 'COMPLETED');
+            const isExplicitFailure = verifyCode === 'PAYMENT_ERROR'
+                || verifyState === 'FAILED'
+                || verifyState === 'DECLINED';
+            // ================================================================
+            // PHASE 2: Handle payment failure → expire pending components
+            // ================================================================
+            if (isExplicitFailure) {
+                // Expire all pending subscription components
+                await (0, provider_subscription_pending_service_1.expirePendingComponents)({
+                    providerId,
+                    merchantTransactionId,
+                    reason: rawDeclineReason || 'payment_declined',
+                }).catch(err => {
+                    logger_1.logger.warn('[Phase2] Failed to expire pending components on payment failure', {
+                        providerId,
+                        merchantTransactionId,
+                        error: String(err),
+                    });
+                    // Continue anyway - don't throw
+                });
+                // Store decline reason in payment record for dashboard/retry flow
+                if (payment?.id) {
+                    await db.financialPayment.update({
+                        where: { id: payment.id },
+                        data: {
+                            status: 'FAILED',
+                            failedAt: new Date(),
+                            failureReason: rawDeclineReason,
+                            metadata: {
+                                ...(payment.metadata || {}),
+                                type: 'provider_subscription',
+                                plan: planKey,
+                                declineReason: rawDeclineReason,
+                                declineTitle: declineReasonInfo.title,
+                                declineMessage: declineReasonInfo.message,
+                                declineAction: declineReasonInfo.action,
+                                declineIsRetryable: declineReasonInfo.isRetryable,
+                                declineRetryAfterMinutes: declineReasonInfo.retryAfterMinutes,
+                            },
+                        },
+                    }).catch(err => {
+                        logger_1.logger.warn('[Phase2] Failed to update payment record with decline reason', { error: String(err) });
+                    });
+                }
+                throw new error_middleware_1.AppError(declineReasonInfo.title, 400);
+            }
+            if (!isVerifiedByStatus) {
+                logger_1.logger.warn('[PaymentService] Provider status verification unavailable/non-completed; proceeding with webhook success', {
+                    merchantTransactionId,
+                    verifyCode,
+                    verifyState,
+                });
             }
             // Fix 8: Idempotency check for provider
-            const { prisma } = await import('../config/db');
-            const existingSub = await prisma.providerSubscription.findUnique({ where: { providerId } });
+            const existingSub = await db.providerSubscription.findUnique({ where: { providerId } });
             if (existingSub?.paymentId === merchantTransactionId) {
                 logger_1.logger.debug(`[PaymentService] Provider subscription webhook bypassed (Idempotency)`, { merchantTransactionId });
                 return { handled: true, message: 'Provider subscription already processed' };
             }
-            const { activateProviderSubscription } = await import('./provider-subscription.service');
-            const activated = await activateProviderSubscription(providerId, planKey, merchantTransactionId);
+            // ================================================================
+            // PHASE 2: Atomically activate all pending subscription components
+            // ================================================================
+            const pendingActivation = await (0, provider_subscription_pending_service_1.activateAllPendingComponents)({
+                providerId,
+                merchantTransactionId,
+            }).catch(err => {
+                logger_1.logger.error('[Phase2] Failed to atomically activate pending components', {
+                    providerId,
+                    merchantTransactionId,
+                    error: String(err),
+                });
+                // Continue with legacy activation for backward compatibility
+                return {
+                    platformActivated: 0,
+                    leadPlanActivated: 0,
+                    marketplaceActivated: 0,
+                    totalActivated: 0,
+                };
+            });
+            const activated = await (0, provider_subscription_service_1.activateProviderSubscription)(providerId, planKey, merchantTransactionId);
             if (payment?.id) {
                 await db.financialPayment.update({
                     where: { id: payment.id },
@@ -344,6 +435,9 @@ const processPhonePeWebhook = async (decoded) => {
                             plan: planKey,
                             subscriptionId: String(activated?.id || ''),
                             paymentVerifiedAt: new Date().toISOString(),
+                            // Store Phase 2 activation details
+                            pendingComponentsActivated: pendingActivation.totalActivated,
+                            phase2enabled: true,
                         },
                     },
                 });
@@ -357,8 +451,13 @@ const processPhonePeWebhook = async (decoded) => {
                     channel: 'provider_subscription',
                 });
             }
-            logger_1.logger.info(`[PaymentService] Provider subscription activated successfully`, { merchantTransactionId, providerId, planKey });
-            return { handled: true, message: 'PhonePe provider subscription payment processed' };
+            logger_1.logger.info(`[PaymentService] Provider subscription activated successfully (Phase 2)`, {
+                merchantTransactionId,
+                providerId,
+                planKey,
+                pendingComponentsActivated: pendingActivation.totalActivated,
+            });
+            return { handled: true, message: 'PhonePe provider subscription payment processed (with atomic pending activation)' };
         }
     }
     logger_1.logger.warn(`[PaymentService] PhonePe Webhook unhandled condition (success: ${success}, code: ${code})`, { merchantTransactionId });
@@ -508,3 +607,106 @@ const retryPaymentManually = async (paymentId, adminUserId) => {
     };
 };
 exports.retryPaymentManually = retryPaymentManually;
+/**
+ * Reconcile payment status from PhonePe (handles PENDING polling).
+ * Called from redirect page or status endpoint to verify final payment state.
+ *
+ * Implements PhonePe UAT polling schedule:
+ * - 1st check: after 5s
+ * - 2nd-3rd checks: every 3s (15s total)
+ * - 4th-5th checks: every 6s (30s total)
+ * - 6th+ checks: every 10s (until 60s+) then every 30s
+ *
+ * Returns: { state, transactionId, resultMessage }
+ */
+const reconcilePhonePePaymentStatus = async (transactionId, maxRetries = 5, initialWaitMs = 5000) => {
+    logger_1.logger.info('[Payment.Reconcile] Starting status reconciliation', {
+        transactionId,
+        maxRetries,
+        initialWaitMs,
+    });
+    let currentState = 'PENDING';
+    let lastStatus = null;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        // Calculate wait time based on PhonePe schedule
+        let waitMs = initialWaitMs;
+        if (attempt > 1) {
+            if (attempt <= 3)
+                waitMs = 3000; // every 3s for attempts 2-3
+            else if (attempt <= 5)
+                waitMs = 6000; // every 6s for attempts 4-5
+            else
+                waitMs = 10000; // every 10s after
+        }
+        if (attempt > 1) {
+            logger_1.logger.info('[Payment.Reconcile] Waiting before retry', {
+                transactionId,
+                attempt,
+                nextCheckInMs: waitMs,
+            });
+            await new Promise((resolve) => setTimeout(resolve, waitMs));
+        }
+        try {
+            lastStatus = await (0, phonepe_service_1.checkPhonePeStatus)(transactionId);
+            if (!lastStatus) {
+                logger_1.logger.warn('[Payment.Reconcile] Status check returned null', {
+                    transactionId,
+                    attempt,
+                });
+                continue;
+            }
+            currentState = String(lastStatus?.data?.state || lastStatus?.code || 'UNKNOWN').toUpperCase();
+            logger_1.logger.info('[Payment.Reconcile] Status check result', {
+                transactionId,
+                attempt,
+                state: currentState,
+                code: lastStatus?.code,
+            });
+            // If state is final (not PENDING), stop polling
+            if (currentState !== 'PENDING') {
+                logger_1.logger.info('[Payment.Reconcile] Final state reached', {
+                    transactionId,
+                    state: currentState,
+                    attemptNumber: attempt,
+                });
+                // If success, trigger webhook processing to update DB
+                if (currentState === 'COMPLETED' && transactionId.startsWith('SUB_')) {
+                    try {
+                        await (0, exports.processPhonePeWebhook)(lastStatus).catch((error) => {
+                            logger_1.logger.warn('[Payment.Reconcile] Inline webhook processing failed', {
+                                transactionId,
+                                error: error?.message,
+                            });
+                        });
+                    }
+                    catch { }
+                }
+                return {
+                    state: currentState,
+                    transactionId,
+                    resultMessage: `Payment state is ${currentState}`,
+                };
+            }
+        }
+        catch (error) {
+            logger_1.logger.warn('[Payment.Reconcile] Status check error', {
+                transactionId,
+                attempt,
+                error: error?.message,
+            });
+            // Continue to next retry
+        }
+    }
+    // All retries exhausted but still PENDING
+    logger_1.logger.warn('[Payment.Reconcile] Max retries exhausted, still PENDING', {
+        transactionId,
+        maxRetries,
+        finalState: currentState,
+    });
+    return {
+        state: currentState,
+        transactionId,
+        resultMessage: `Payment status is still ${currentState}. Please check again in a moment or contact support.`,
+    };
+};
+exports.reconcilePhonePePaymentStatus = reconcilePhonePePaymentStatus;

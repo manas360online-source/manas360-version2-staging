@@ -9,7 +9,7 @@ set -euo pipefail
 #   BASE_URL=http://localhost:3000
 #   ADMIN_TOKEN=... NON_ADMIN_TOKEN=...
 #   ADMIN_IDENTIFIER=admin@manas360.local ADMIN_PASSWORD=Manas@123
-#   NON_ADMIN_IDENTIFIER=patient@manas360.local NON_ADMIN_PASSWORD=Manas@123
+#   NON_ADMIN_PHONE=+917000100111
 #   FAILED_PAYMENT_ID=... CAPTURED_PAYMENT_ID=...
 
 BASE_URL="${BASE_URL:-http://localhost:3000}"
@@ -21,8 +21,7 @@ CAPTURED_PAYMENT_ID="${CAPTURED_PAYMENT_ID:-}"
 
 ADMIN_IDENTIFIER="${ADMIN_IDENTIFIER:-admin@manas360.local}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-Manas@123}"
-NON_ADMIN_IDENTIFIER="${NON_ADMIN_IDENTIFIER:-patient@manas360.local}"
-NON_ADMIN_PASSWORD="${NON_ADMIN_PASSWORD:-Manas@123}"
+NON_ADMIN_PHONE="${NON_ADMIN_PHONE:-+917000100111}"
 BACKEND_DIR="${BACKEND_DIR:-./backend}"
 AUTO_CREATE_FAILED_PAYMENT="${AUTO_CREATE_FAILED_PAYMENT:-1}"
 
@@ -52,6 +51,42 @@ login_and_store_cookie() {
   if [[ "$code" != "200" ]]; then
     echo "ERROR: Login failed for $identifier (HTTP $code)"
     cat /tmp/pgw_login_resp.json || true
+    exit 1
+  fi
+}
+
+otp_login_and_store_cookie() {
+  local phone="$1"
+  local cookie_jar="$2"
+
+  local code
+  code=$(curl -s -o /tmp/pgw_otp_req.json -w "%{http_code}" -c "$cookie_jar" \
+    -X POST "$BASE_URL/api/v1/auth/signup/phone" \
+    -H "Content-Type: application/json" \
+    -d "{\"phone\":\"$phone\"}")
+
+  if [[ "$code" != "201" && "$code" != "200" ]]; then
+    echo "ERROR: OTP request failed for $phone (HTTP $code)"
+    cat /tmp/pgw_otp_req.json || true
+    exit 1
+  fi
+
+  local otp
+  otp=$(cat /tmp/pgw_otp_req.json | json_get data.devOtp)
+  if [[ -z "$otp" ]]; then
+    echo "ERROR: OTP response did not include data.devOtp for $phone"
+    cat /tmp/pgw_otp_req.json || true
+    exit 1
+  fi
+
+  code=$(curl -s -o /tmp/pgw_otp_verify.json -w "%{http_code}" -c "$cookie_jar" \
+    -X POST "$BASE_URL/api/v1/auth/verify/phone-otp" \
+    -H "Content-Type: application/json" \
+    -d "{\"phone\":\"$phone\",\"otp\":\"$otp\"}")
+
+  if [[ "$code" != "200" ]]; then
+    echo "ERROR: OTP verify failed for $phone (HTTP $code)"
+    cat /tmp/pgw_otp_verify.json || true
     exit 1
   fi
 }
@@ -217,9 +252,9 @@ if [[ "$health_code" != "200" ]]; then
 fi
 
 if [[ -z "$ADMIN_TOKEN" || -z "$NON_ADMIN_TOKEN" ]]; then
-  echo "Using cookie auth via /api/v1/auth/login"
+  echo "Using cookie auth (admin: email/password, non-admin: phone/otp)"
   login_and_store_cookie "$ADMIN_IDENTIFIER" "$ADMIN_PASSWORD" "$ADMIN_COOKIE_JAR"
-  login_and_store_cookie "$NON_ADMIN_IDENTIFIER" "$NON_ADMIN_PASSWORD" "$NON_ADMIN_COOKIE_JAR"
+  otp_login_and_store_cookie "$NON_ADMIN_PHONE" "$NON_ADMIN_COOKIE_JAR"
 fi
 
 discover_payment_ids

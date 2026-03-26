@@ -2,6 +2,7 @@ import { AppError } from '../middleware/error.middleware';
 import { PROVIDER_PLANS, type ProviderPlanKey } from '../config/providerPlans';
 import { initiatePhonePePayment } from './phonepe.service';
 import { env } from '../config/env';
+import { prisma } from '../config/db';
 import { logger } from '../utils/logger';
 
 const toCompactToken = (value: string, maxLength: number): string =>
@@ -10,12 +11,21 @@ const toCompactToken = (value: string, maxLength: number): string =>
 		.slice(0, maxLength)
 		.toLowerCase();
 
+interface ProviderSubscriptionPaymentOptions {
+	amountMinorOverride?: number;
+	idempotencyKey?: string;
+	metadata?: Record<string, unknown>;
+}
+
 /**
  * Initiate a payment for provider subscription via PhonePe.
  * Transaction ID prefixed with PROV_SUB_ for webhook identification.
  */
-export const initiateProviderSubscriptionPayment = async (providerId: string, planKey: ProviderPlanKey) => {
-	const { prisma } = await import('../config/db');
+export const initiateProviderSubscriptionPayment = async (
+	providerId: string,
+	planKey: ProviderPlanKey,
+	options?: ProviderSubscriptionPaymentOptions,
+) => {
 	const plan = PROVIDER_PLANS[planKey];
 	if (!plan) throw new AppError('Invalid provider plan', 422);
 	if (plan.price === 0) throw new AppError('Free plan does not require payment', 422);
@@ -31,6 +41,22 @@ export const initiateProviderSubscriptionPayment = async (providerId: string, pl
 		throw new AppError('This provider plan is already active', 409);
 	}
 
+	const requestedIdempotencyKey = String(options?.idempotencyKey || '').trim();
+
+	const recentAttemptCount = await prisma.financialPayment.count({
+		where: {
+			providerId,
+			metadata: {
+				path: ['type'],
+				equals: 'provider_subscription',
+			},
+			createdAt: { gte: new Date(Date.now() - 60 * 60 * 1000) },
+		},
+	}).catch(() => 0);
+	if (recentAttemptCount >= 3) {
+		throw new AppError('Too many payment attempts. Please try again in one hour.', 429);
+	}
+
 	const initiatedAttempts = await prisma.financialPayment.findMany({
 		where: {
 			providerId,
@@ -40,10 +66,14 @@ export const initiateProviderSubscriptionPayment = async (providerId: string, pl
 		take: 20,
 	}).catch(() => [] as any[]);
 
-	const matchingAttempts = initiatedAttempts.filter((row: any) =>
-		String(row?.metadata?.type || '') === 'provider_subscription'
-		&& String(row?.metadata?.plan || '') === String(planKey),
-	);
+	const matchingAttempts = initiatedAttempts.filter((row: any) => {
+		const isPlanMatch =
+			String(row?.metadata?.type || '') === 'provider_subscription'
+			&& String(row?.metadata?.plan || '') === String(planKey);
+		if (!isPlanMatch) return false;
+		if (!requestedIdempotencyKey) return true;
+		return String(row?.captureIdempotencyKey || row?.metadata?.idempotencyKey || '') === requestedIdempotencyKey;
+	});
 
 	const latestAttempt = matchingAttempts[0] as any;
 	if (latestAttempt) {
@@ -72,17 +102,25 @@ export const initiateProviderSubscriptionPayment = async (providerId: string, pl
 	const frontendBaseUrl = env.frontendUrl;
 	const callbackUrl = `${env.apiUrl}${env.apiPrefix}/v1/payments/phonepe/webhook`;
 	const cycleKey = new Date().toISOString().slice(0, 10);
-	const subscriptionIdempotencyKey = `prov_sub_init:${providerId}:${planKey}:${cycleKey}`;
+	const subscriptionIdempotencyKey = requestedIdempotencyKey || `prov_sub_init:${providerId}:${planKey}:${cycleKey}`;
+	const amountMinor = Math.max(
+		0,
+		Math.round(
+			Number.isFinite(Number(options?.amountMinorOverride))
+				? Number(options?.amountMinorOverride)
+				: Number(plan.price || 0) * 100,
+		),
+	);
 
 	let redirectUrl: string;
 	try {
 		redirectUrl = await initiatePhonePePayment({
 			transactionId,
 			userId: providerId,
-			amountInPaise: plan.price * 100,
+			amountInPaise: amountMinor,
 			callbackUrl,
 			redirectUrl: `${frontendBaseUrl}/payment/status?id=${transactionId}&status=SUCCESS`,
-			metadata: { plan: planKey },
+			metadata: { plan: planKey, ...(options?.metadata || {}) },
 		});
 	} catch (error: any) {
 		if (!shouldBypass && !canFallbackWithoutGateway) {
@@ -99,11 +137,17 @@ export const initiateProviderSubscriptionPayment = async (providerId: string, pl
 
 	// Mandatory: Create financialPayment record for reconciliation worker
 	try {
+		await prisma.providerWallet.upsert({
+			where: { providerId },
+			update: {},
+			create: { providerId },
+		}).catch(() => null);
+
 		await prisma.financialPayment.create({
 			data: {
 				merchantTransactionId: transactionId,
 				providerId,
-				amountMinor: plan.price * 100,
+				amountMinor,
 				currency: 'INR',
 				captureIdempotencyKey: subscriptionIdempotencyKey,
 				status: shouldBypass ? 'CAPTURED' : 'INITIATED',
@@ -112,6 +156,7 @@ export const initiateProviderSubscriptionPayment = async (providerId: string, pl
 					plan: planKey,
 					redirectUrl,
 					idempotencyKey: subscriptionIdempotencyKey,
+					...(options?.metadata || {}),
 				}
 			}
 		});

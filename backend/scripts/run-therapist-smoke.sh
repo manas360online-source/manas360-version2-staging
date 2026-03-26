@@ -1,15 +1,28 @@
 #!/usr/bin/env bash
 set -eu
 BASE_URL="http://localhost:3000"
+THERAPIST_PHONE="${THERAPIST_PHONE:-+917000200002}"
 COOKIE_FILE="/tmp/manas_therapist_smoke.cookies"
 OUT_DIR="/tmp/therapist-smoke"
 mkdir -p "$OUT_DIR"
 
-echo "Logging in as therapist1@manas360.local..."
-curl -sS -c "$COOKIE_FILE" -H 'Content-Type: application/json' -d '{"identifier":"therapist1@manas360.local","password":"Manas@123"}' "$BASE_URL/api/auth/login" -o "$OUT_DIR/login.json" -w '\nHTTP:%{http_code}\n'
+echo "Logging in as therapist via phone OTP..."
+curl -sS -c "$COOKIE_FILE" -H 'Content-Type: application/json' \
+  -d "{\"phone\":\"$THERAPIST_PHONE\"}" \
+  "$BASE_URL/api/v1/auth/signup/phone" -o "$OUT_DIR/otp_request.json" -w '\nHTTP:%{http_code}\n'
+
+OTP_CODE=$(node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('$OUT_DIR/otp_request.json','utf8'));process.stdout.write(String(p?.data?.devOtp||''));")
+if [ -z "$OTP_CODE" ]; then
+  echo "Missing devOtp from /api/v1/auth/signup/phone response" >&2
+  exit 1
+fi
+
+curl -sS -c "$COOKIE_FILE" -H 'Content-Type: application/json' \
+  -d "{\"phone\":\"$THERAPIST_PHONE\",\"otp\":\"$OTP_CODE\"}" \
+  "$BASE_URL/api/v1/auth/verify/phone-otp" -o "$OUT_DIR/login.json" -w '\nHTTP:%{http_code}\n'
 
 echo "Creating exercise..."
-curl -sS -b "$COOKIE_FILE" -H 'Content-Type: application/json' -d '{"name":"Smoke Exercise Script","category":"CBT","assignedTo":"patient1@manas360.local"}' "$BASE_URL/api/v1/therapist/me/exercises" -o "$OUT_DIR/create_exercise.json" -w '\nHTTP:%{http_code}\n'
+curl -sS -b "$COOKIE_FILE" -H 'Content-Type: application/json' -d '{"name":"Smoke Exercise Script","category":"CBT","assignedTo":"+917000100001"}' "$BASE_URL/api/v1/therapist/me/exercises" -o "$OUT_DIR/create_exercise.json" -w '\nHTTP:%{http_code}\n'
 
 declare -a endpoints=(
   "/api/v1/therapist/me/profile"

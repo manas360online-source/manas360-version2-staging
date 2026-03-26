@@ -1,18 +1,9 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getApiErrorMessage, signupWithPhone, verifyPhoneSignupOtp } from '../../api/auth';
-import { patientApi } from '../../api/patient';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import { useAuth } from '../../context/AuthContext';
-
-const patientPlans = [
-	{ key: 'free', label: 'Free Tier (INR 0)' },
-	{ key: 'monthly', label: 'Monthly (INR 99)' },
-	{ key: 'quarterly', label: 'Quarterly (INR 299)' },
-	{ key: 'premium_monthly', label: 'Premium Monthly (INR 299)' },
-	{ key: 'premium_annual', label: 'Premium Annual (INR 2999)' },
-] as const;
 
 export default function SignupPage() {
 	const { checkAuth } = useAuth();
@@ -21,36 +12,14 @@ export default function SignupPage() {
 	const [name, setName] = useState('');
 	const [phone, setPhone] = useState('');
 	const [role, setRole] = useState<'patient' | 'therapist' | 'psychiatrist' | 'coach'>('patient');
-	const [selectedPlanKey, setSelectedPlanKey] = useState<string>('monthly');
 	const [otp, setOtp] = useState('');
 	const [otpSent, setOtpSent] = useState(false);
 	const [devOtp, setDevOtp] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
-	const activateSelectedPatientPlan = async (): Promise<boolean> => {
-		const chosenPlan = String(selectedPlanKey || '').trim();
-		if (!chosenPlan) {
-			return false;
-		}
-
-		const response = await patientApi.upgradeSubscription({ planKey: chosenPlan });
-		const payload = (response as any)?.data ?? response;
-		const redirectUrl = String(payload?.redirectUrl || '').trim();
-		if (redirectUrl) {
-			window.location.href = redirectUrl;
-			return true;
-		}
-
-		return false;
-	};
-
 	const requestOtp = async () => {
 		setError(null);
-		if (role === 'patient' && !selectedPlanKey) {
-			setError('Please select a subscription plan before requesting OTP.');
-			return;
-		}
 		setLoading(true);
 		setDevOtp(null);
 		try {
@@ -72,15 +41,7 @@ export default function SignupPage() {
 			await checkAuth({ force: true });
 			const normalizedRole = String(result.user?.role || '').toLowerCase();
 			if (normalizedRole === 'patient') {
-				try {
-					const redirectedForPayment = await activateSelectedPatientPlan();
-					if (!redirectedForPayment) {
-						navigate('/patient/dashboard', { replace: true });
-					}
-				} catch (planError) {
-					setError(getApiErrorMessage(planError, 'OTP verified, but we could not activate the selected plan. Please complete it from Pricing.'));
-					navigate('/patient/pricing', { replace: true });
-				}
+				navigate('/patient/dashboard', { replace: true });
 				return;
 			}
 			if (normalizedRole === 'therapist' || normalizedRole === 'psychiatrist' || normalizedRole === 'coach' || normalizedRole === 'psychologist') {
@@ -99,6 +60,11 @@ export default function SignupPage() {
 		<div className="responsive-page">
 			<div className="responsive-container py-6 sm:py-10">
 				<div className="mx-auto w-full max-w-lg rounded-3xl border border-calm-sage/20 bg-wellness-surface p-5 shadow-soft-md sm:p-8">
+					<div className="mb-3">
+						<Link to="/" className="text-sm text-calm-sage underline underline-offset-2 hover:text-wellness-text">
+							Back to Home
+						</Link>
+					</div>
 					<h1 className="text-2xl font-semibold text-wellness-text sm:text-3xl">Create your account</h1>
 					<p className="mt-2 text-sm text-wellness-muted sm:text-base">Register using phone number and OTP.</p>
 
@@ -137,24 +103,6 @@ export default function SignupPage() {
 								<option value="coach">Coach</option>
 							</select>
 						</div>
-
-						{role === 'patient' ? (
-							<div>
-								<label htmlFor="signup-plan" className="mb-2 block text-sm font-medium text-wellness-text">Choose Plan (before OTP verification)</label>
-								<select
-									id="signup-plan"
-									value={selectedPlanKey}
-									onChange={(event) => setSelectedPlanKey(event.target.value)}
-									disabled={otpSent}
-									className="w-full rounded-2xl border-2 border-calm-sage/30 bg-white px-5 py-3 text-wellness-text transition-smooth focus:border-calm-sage focus:outline-none focus:ring-2 focus:ring-calm-sage/20 disabled:cursor-not-allowed disabled:opacity-70"
-								>
-									{patientPlans.map((plan) => (
-										<option key={plan.key} value={plan.key}>{plan.label}</option>
-									))}
-								</select>
-								<p className="mt-1 text-xs text-wellness-muted">Your selected plan will be activated immediately after OTP verification.</p>
-							</div>
-						) : null}
 
 						{otpSent ? (
 							<Input

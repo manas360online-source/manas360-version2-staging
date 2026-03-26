@@ -136,10 +136,14 @@ export const LEAD_ASSIGNMENT_STATUS = {
  * Subscription plan states
  */
 export const SUBSCRIPTION_STATUS = {
+  TRIAL: 'trial',
   ACTIVE: 'active',
+  GRACE: 'grace',
+  LOCKED: 'locked',
   EXPIRED: 'expired',
   CANCELLED: 'cancelled',
   PAST_DUE: 'past-due',
+  RENEWAL_PENDING: 'renewal_pending',
 };
 
 /**

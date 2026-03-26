@@ -83,6 +83,7 @@ export default function SlideOverBookingDrawer({
                 timeSlots: [{ startMinute, endMinute: startMinute + 30 }],
               },
               supportedProviderType,
+              { context: 'Standard' },
             );
 
             const providers = Array.isArray(response?.providers) ? response.providers : [];

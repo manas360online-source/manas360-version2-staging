@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import ProviderSelectionStep from './steps/ProviderSelectionStep';
 import PendingRequestStep from './steps/PendingRequestStep';
 import PreBookingPaymentStep from './steps/PreBookingPaymentStep';
 import CalendarSelection from './CalendarSelection';
+import { patientApi } from '../../api/patient';
 
 interface SmartMatchFlowProps {
   isOpen: boolean;
@@ -25,6 +27,14 @@ interface SelectedProvider {
   name: string;
   type: string;
   fee: number;
+  score?: number;
+  tier?: 'HOT' | 'WARM' | 'COLD';
+  matchBand?: 'PLATINUM' | 'HOT' | 'WARM' | 'COLD';
+  breakdown?: {
+    expertise: number;
+    communication: number;
+    quality: number;
+  };
 }
 
 export default function SmartMatchFlow({
@@ -34,6 +44,7 @@ export default function SmartMatchFlow({
   initialProviderType = 'ALL',
   lockProviderType = false,
 }: SmartMatchFlowProps) {
+  const navigate = useNavigate();
   const [step, setStep] = useState<FlowStep>('calendar');
   const [calendarSelection, setCalendarSelection] = useState<CalendarSelection | null>(null);
   const [selectedProviderType, setSelectedProviderType] = useState<
@@ -41,6 +52,11 @@ export default function SmartMatchFlow({
   >(initialProviderType);
   const [selectedProviders, setSelectedProviders] = useState<SelectedProvider[]>([]);
   const [appointmentRequestId, setAppointmentRequestId] = useState<string | null>(null);
+  const [isCheckingSubscription, setIsCheckingSubscription] = useState(false);
+  const [isFreeBlocked, setIsFreeBlocked] = useState(false);
+  const [inGrace, setInGrace] = useState(false);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string>('');
+  const [graceEndDate, setGraceEndDate] = useState<string | null>(null);
 
   const flowSteps: FlowStep[] = lockProviderType
     ? ['calendar', 'provider-selection', 'pre-payment', 'pending']
@@ -62,6 +78,35 @@ export default function SmartMatchFlow({
       timeSlots: [{ startMinute: startMinuteOfDay, endMinute: endMinuteOfDay }],
     };
   };
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const checkSubscription = async () => {
+      try {
+        setIsCheckingSubscription(true);
+        const response = await patientApi.getSubscription();
+        const subscription = (response as any)?.data ?? response;
+        const status = String(subscription?.status || '').toLowerCase();
+        const freeLike = Number(subscription?.price || 0) <= 0 || String(subscription?.planName || '').toLowerCase().includes('free');
+        const activeLike = ['active', 'trial', 'trialing', 'grace'].includes(status);
+        const graceEnd = subscription?.metadata?.graceEndDate || null;
+
+        setSubscriptionStatus(status);
+        setGraceEndDate(graceEnd ? new Date(graceEnd).toISOString() : null);
+        setInGrace(status === 'grace');
+        setIsFreeBlocked(status === 'locked' || !activeLike || freeLike);
+      } catch {
+        setSubscriptionStatus('locked');
+        setGraceEndDate(null);
+        setIsFreeBlocked(true);
+      } finally {
+        setIsCheckingSubscription(false);
+      }
+    };
+
+    void checkSubscription();
+  }, [isOpen]);
 
   // Reset state when drawer closes
   const handleClose = () => {
@@ -135,7 +180,52 @@ export default function SmartMatchFlow({
 
           {/* Content */}
           <div className="flex-1 overflow-y-auto p-6">
-            {step === 'calendar' && (
+            {isCheckingSubscription && (
+              <div className="rounded-xl border border-calm-sage/20 bg-calm-sage/5 p-4 text-sm text-charcoal/70">
+                Checking subscription eligibility...
+              </div>
+            )}
+
+            {!isCheckingSubscription && inGrace && (
+              <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <p className="text-sm font-semibold text-amber-900">
+                  Grace period active until {graceEndDate ? new Date(graceEndDate).toLocaleString() : 'soon'}. Renew now to avoid lock.
+                </p>
+              </div>
+            )}
+
+            {!isCheckingSubscription && isFreeBlocked && (
+              <div className="space-y-4 rounded-xl border border-red-200 bg-red-50 p-5">
+                <h3 className="text-base font-semibold text-red-900">Smart Match is currently blocked</h3>
+                <p className="text-sm text-red-800">
+                  {subscriptionStatus === 'locked'
+                    ? 'Your subscription is locked. Renew now to continue V3 smart matching.'
+                    : 'Free or inactive plans cannot use V3 smart matching. Upgrade to continue.'}
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <button
+                    disabled
+                    className="rounded-lg bg-red-200 px-4 py-2 text-sm font-semibold text-red-800 cursor-not-allowed"
+                  >
+                    Upgrade or Renew to continue
+                  </button>
+                  <button
+                    onClick={() => navigate('/patient/plans')}
+                    className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
+                  >
+                    Upgrade or Renew
+                  </button>
+                  <button
+                    onClick={handleClose}
+                    className="rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-900 hover:bg-red-100"
+                  >
+                    Back
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!isCheckingSubscription && !isFreeBlocked && step === 'calendar' && (
               <CalendarSelection
                 onDateTimeSelect={(date, time) => {
                   setCalendarSelection({ date, time });
@@ -150,7 +240,7 @@ export default function SmartMatchFlow({
               />
             )}
 
-            {step === 'domain-selection' && (
+            {!isCheckingSubscription && !isFreeBlocked && step === 'domain-selection' && (
               <div className="space-y-6 animate-in fade-in duration-300">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
@@ -199,7 +289,7 @@ export default function SmartMatchFlow({
               </div>
             )}
 
-            {step === 'provider-selection' && calendarSelection && (
+            {!isCheckingSubscription && !isFreeBlocked && step === 'provider-selection' && calendarSelection && (
               <ProviderSelectionStep
                 availabilityPrefs={getAvailabilityPrefs()!}
                 providerType={selectedProviderType}
@@ -210,6 +300,10 @@ export default function SmartMatchFlow({
                      name: p.name || p.displayName || 'Provider',
                      type: p.providerType || 'Therapist',
                      fee: p.consultationFee || 69900,
+                     score: p.score,
+                     tier: p.tier,
+                     matchBand: p.matchBand,
+                     breakdown: p.breakdown,
                    }));
                    setSelectedProviders(selectedProviders);
                   setStep('pre-payment');
@@ -225,7 +319,7 @@ export default function SmartMatchFlow({
               />
             )}
 
-            {step === 'pre-payment' && calendarSelection && selectedProviders.length > 0 && (
+            {!isCheckingSubscription && !isFreeBlocked && step === 'pre-payment' && calendarSelection && selectedProviders.length > 0 && (
               <PreBookingPaymentStep
                 selectedProviders={selectedProviders}
                 selectedDateTime={calendarSelection}
@@ -234,7 +328,7 @@ export default function SmartMatchFlow({
               />
             )}
 
-            {step === 'pending' && appointmentRequestId && (
+            {!isCheckingSubscription && !isFreeBlocked && step === 'pending' && appointmentRequestId && (
               <PendingRequestStep
                 appointmentRequestId={appointmentRequestId}
                 onAccepted={handleSuccess}

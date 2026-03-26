@@ -7,16 +7,20 @@ console.log('Seed script starting...');
 
 const DEMO_PASSWORD = 'Manas@123';
 
-async function upsertUser({ email, role, firstName, lastName }, passwordHash) {
+async function upsertUser({ email = null, phone, role, firstName, lastName }, passwordHash) {
 	const isProvider = role === 'THERAPIST' || role === 'PSYCHIATRIST' || role === 'PSYCHOLOGIST' || role === 'COACH';
+  const isPlatformAdmin = role === 'ADMIN';
+  const whereClause = email ? { email } : { phone };
   return prisma.user.upsert({
-    where: { email },
+    where: whereClause,
     update: {
-      passwordHash,
+      passwordHash: isPlatformAdmin ? passwordHash : null,
       role,
       provider: 'LOCAL',
-      emailVerified: true,
-      phoneVerified: false,
+      email,
+      phone,
+      emailVerified: isPlatformAdmin,
+      phoneVerified: true,
       failedLoginAttempts: 0,
       lockUntil: null,
       isDeleted: false,
@@ -33,11 +37,12 @@ async function upsertUser({ email, role, firstName, lastName }, passwordHash) {
     },
     create: {
       email,
-      passwordHash,
+      phone,
+      passwordHash: isPlatformAdmin ? passwordHash : null,
       role,
       provider: 'LOCAL',
-      emailVerified: true,
-      phoneVerified: false,
+      emailVerified: isPlatformAdmin,
+      phoneVerified: true,
       firstName,
       lastName,
       name: `${firstName} ${lastName}`,
@@ -49,7 +54,7 @@ async function upsertUser({ email, role, firstName, lastName }, passwordHash) {
 			}
 			: {}),
     },
-    select: { id: true, email: true, role: true },
+    select: { id: true, email: true, phone: true, role: true },
   });
 }
 
@@ -192,21 +197,21 @@ async function run() {
 
   console.log('Creating patient user...');
   const patient = await upsertUser(
-    { email: 'patient@manas360.local', role: 'PATIENT', firstName: 'Priya', lastName: 'Kumar' },
+    { email: null, phone: '+917000100311', role: 'PATIENT', firstName: 'Priya', lastName: 'Kumar' },
     passwordHash,
   );
   console.log('Patient created:', patient);
 
   console.log('Creating admin user...');
   const admin = await upsertUser(
-    { email: 'admin@manas360.local', role: 'ADMIN', firstName: 'Admin', lastName: 'User' },
+    { email: 'admin@manas360.local', phone: '+917000600311', role: 'ADMIN', firstName: 'Admin', lastName: 'User' },
     passwordHash,
   );
   console.log('Admin created:', admin);
 
   console.log('Creating therapist user...');
   const therapist = await upsertUser(
-    { email: 'therapist@manas360.local', role: 'THERAPIST', firstName: 'Rohan', lastName: 'Sharma' },
+    { email: null, phone: '+917000200311', role: 'THERAPIST', firstName: 'Rohan', lastName: 'Sharma' },
     passwordHash,
   );
   console.log('Therapist created:', therapist);
@@ -222,8 +227,8 @@ async function run() {
       {
         ok: true,
         credentials: {
-          patient: { email: 'patient@manas360.local', password: DEMO_PASSWORD },
-          therapist: { email: 'therapist@manas360.local', password: DEMO_PASSWORD },
+          patient: { phone: '+917000100311', loginMethod: 'PHONE_OTP' },
+          therapist: { phone: '+917000200311', loginMethod: 'PHONE_OTP' },
           admin: { email: 'admin@manas360.local', password: DEMO_PASSWORD },
         },
         notes: [

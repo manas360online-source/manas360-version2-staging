@@ -88,7 +88,8 @@ const createUsersByRole = ({ role, count, predefined = [] }) => {
     const rolePrefix = rolePrefixMap[role] || '70009';
     const phone = `+91${rolePrefix}${String(serial).padStart(5, '0')}`;
     generated.push({
-      email: `${suffix}@demo.com`,
+      // For most roles the system uses phone+OTP; keep email only for platform admins
+      email: role === 'ADMIN' ? `${suffix}@demo.com` : null,
       phone,
       firstName: role.slice(0, 1) + role.slice(1).toLowerCase(),
       lastName: `User${index}`,
@@ -116,8 +117,13 @@ async function upsertUser(userInput, passwordHash) {
         therapistVerifiedByUserId: null,
       };
 
+  // Upsert by email when present, otherwise by phone (phone-first identity)
+  const whereClause = email ? { email } : { phone };
+  const isPlatformAdmin = role === 'ADMIN';
+  const passwordForCreate = isPlatformAdmin ? passwordHash : null;
+
   return prisma.user.upsert({
-    where: { email },
+    where: whereClause,
     update: {
       firstName,
       lastName,
@@ -126,17 +132,18 @@ async function upsertUser(userInput, passwordHash) {
       role,
       providerType,
       provider: 'LOCAL',
-      emailVerified: true,
+      // For non-admins prefer phone verification as primary
+      emailVerified: isPlatformAdmin && !!email,
       phoneVerified: true,
       isDeleted: false,
       status: 'ACTIVE',
-      passwordHash,
+      passwordHash: passwordForCreate,
       failedLoginAttempts: 0,
       lockUntil: null,
       ...providerFlags,
     },
     create: {
-      email,
+      email: email || null,
       phone,
       firstName,
       lastName,
@@ -144,10 +151,10 @@ async function upsertUser(userInput, passwordHash) {
       role,
       providerType,
       provider: 'LOCAL',
-      emailVerified: true,
+      emailVerified: isPlatformAdmin && !!email,
       phoneVerified: true,
       status: 'ACTIVE',
-      passwordHash,
+      passwordHash: passwordForCreate,
       ...providerFlags,
     },
   });
@@ -160,41 +167,42 @@ async function seed() {
     role: 'PATIENT',
     count: 20,
     predefined: [
-      { email: 'patient@demo.com', phone: '+917000100001', firstName: 'Patient', lastName: 'Demo', role: 'PATIENT' },
-      { email: 'free@demo.com', phone: '+917000100002', firstName: 'Free', lastName: 'Plan', role: 'PATIENT' },
-      { email: 'basic@demo.com', phone: '+917000100003', firstName: 'Basic', lastName: 'Plan', role: 'PATIENT' },
-      { email: 'premium@demo.com', phone: '+917000100004', firstName: 'Premium', lastName: 'Plan', role: 'PATIENT' },
+      { email: null, phone: '+917000100001', firstName: 'Patient', lastName: 'Demo', role: 'PATIENT' },
+      { email: null, phone: '+917000100002', firstName: 'Free', lastName: 'Plan', role: 'PATIENT' },
+      { email: null, phone: '+917000100003', firstName: 'Basic', lastName: 'Plan', role: 'PATIENT' },
+      { email: null, phone: '+917000100004', firstName: 'Premium', lastName: 'Plan', role: 'PATIENT' },
     ],
   });
 
   const therapistsSeed = createUsersByRole({
     role: 'THERAPIST',
     count: 10,
-    predefined: [{ email: 'therapist@demo.com', phone: '+917000200001', firstName: 'Therapist', lastName: 'Demo', role: 'THERAPIST' }],
+    predefined: [{ email: null, phone: '+917000200001', firstName: 'Therapist', lastName: 'Demo', role: 'THERAPIST' }],
   });
 
   const coachesSeed = createUsersByRole({
     role: 'COACH',
     count: 5,
-    predefined: [{ email: 'coach@demo.com', phone: '+917000300001', firstName: 'Coach', lastName: 'Demo', role: 'COACH' }],
+    predefined: [{ email: null, phone: '+917000300001', firstName: 'Coach', lastName: 'Demo', role: 'COACH' }],
   });
 
   const psychiatristsSeed = createUsersByRole({
     role: 'PSYCHIATRIST',
     count: 3,
-    predefined: [{ email: 'psychiatrist@demo.com', phone: '+917000400001', firstName: 'Psychiatrist', lastName: 'Demo', role: 'PSYCHIATRIST' }],
+    predefined: [{ email: null, phone: '+917000400001', firstName: 'Psychiatrist', lastName: 'Demo', role: 'PSYCHIATRIST' }],
   });
 
   const psychologistsSeed = createUsersByRole({
     role: 'PSYCHOLOGIST',
     count: 4,
-    predefined: [{ email: 'psychologist@demo.com', phone: '+917000500001', firstName: 'Psychologist', lastName: 'Demo', role: 'PSYCHOLOGIST' }],
+    predefined: [{ email: null, phone: '+917000500001', firstName: 'Psychologist', lastName: 'Demo', role: 'PSYCHOLOGIST' }],
   });
 
   const adminsSeed = createUsersByRole({
     role: 'ADMIN',
     count: 1,
     predefined: [
+      // Keep platform admin email/password intact
       { email: 'admin@demo.com', phone: '+917000600001', firstName: 'Admin', lastName: 'Demo', role: 'ADMIN' },
     ],
   });
@@ -205,12 +213,19 @@ async function seed() {
     persistedUsers.push(await upsertUser(userData, passwordHash));
   }
 
-  const usersByEmail = new Map(persistedUsers.map((user) => [String(user.email).toLowerCase(), user]));
-  const patientUsers = patientsSeed.map((row) => usersByEmail.get(row.email.toLowerCase())).filter(Boolean);
-  const therapistUsers = therapistsSeed.map((row) => usersByEmail.get(row.email.toLowerCase())).filter(Boolean);
-  const coachUsers = coachesSeed.map((row) => usersByEmail.get(row.email.toLowerCase())).filter(Boolean);
-  const psychiatristUsers = psychiatristsSeed.map((row) => usersByEmail.get(row.email.toLowerCase())).filter(Boolean);
-  const psychologistUsers = psychologistsSeed.map((row) => usersByEmail.get(row.email.toLowerCase())).filter(Boolean);
+  // Map persisted users by phone for phone-first lookups. Fall back to email when present.
+  const usersByPhone = new Map(persistedUsers.map((user) => [String(user.phone || '').trim(), user]));
+  const usersByEmailOrPhone = (row) => {
+    if (row.phone) return usersByPhone.get(row.phone);
+    if (row.email) return persistedUsers.find((u) => String(u.email || '').toLowerCase() === String(row.email || '').toLowerCase());
+    return null;
+  };
+
+  const patientUsers = patientsSeed.map((row) => usersByEmailOrPhone(row)).filter(Boolean);
+  const therapistUsers = therapistsSeed.map((row) => usersByEmailOrPhone(row)).filter(Boolean);
+  const coachUsers = coachesSeed.map((row) => usersByEmailOrPhone(row)).filter(Boolean);
+  const psychiatristUsers = psychiatristsSeed.map((row) => usersByEmailOrPhone(row)).filter(Boolean);
+  const psychologistUsers = psychologistsSeed.map((row) => usersByEmailOrPhone(row)).filter(Boolean);
   const providerUsers = [...therapistUsers, ...coachUsers, ...psychiatristUsers, ...psychologistUsers].filter(Boolean);
 
   // Ensure TherapistProfile rows exist for all seeded provider roles
@@ -345,15 +360,16 @@ async function seed() {
     }
   }
 
-  const planByEmail = {
-    'free@demo.com': { planName: 'Free Plan', price: 0, billingCycle: 'monthly', status: 'active' },
-    'basic@demo.com': { planName: 'Basic Plan', price: 999, billingCycle: 'monthly', status: 'active' },
-    'premium@demo.com': { planName: 'Premium Plan', price: 2499, billingCycle: 'monthly', status: 'active' },
+  // Assign plans by phone for seeded patients (email is optional/removed)
+  const planByPhone = {
+    '+917000100002': { planName: 'Free Plan', price: 0, billingCycle: 'monthly', status: 'active' },
+    '+917000100003': { planName: 'Basic Plan', price: 999, billingCycle: 'monthly', status: 'active' },
+    '+917000100004': { planName: 'Premium Plan', price: 2499, billingCycle: 'monthly', status: 'active' },
   };
 
   for (const patient of patientUsers) {
-    const email = String(patient.email || '').toLowerCase();
-    const plan = planByEmail[email] || { planName: randomItem(['Free Plan', 'Basic Plan', 'Premium Plan']), price: randomItem([0, 999, 2499]), billingCycle: 'monthly', status: 'active' };
+    const phone = String(patient.phone || '');
+    const plan = planByPhone[phone] || { planName: randomItem(['Free Plan', 'Basic Plan', 'Premium Plan']), price: randomItem([0, 999, 2499]), billingCycle: 'monthly', status: 'active' };
 
     await prisma.patientSubscription.upsert({
       where: { userId: patient.id },

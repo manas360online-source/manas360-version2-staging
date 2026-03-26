@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { AppError } from '../middleware/error.middleware';
 import { sendSuccess } from '../utils/response';
+import { prisma } from '../config/db';
 import {
   findMatchingProviders,
   createAppointmentRequest,
@@ -15,14 +16,60 @@ interface AvailabilityPrefs {
   timeSlots: Array<{ startMinute: number; endMinute: number }>;
 }
 
+const db = prisma as any;
+
+const parseQueryList = (value: unknown): string[] => {
+  if (Array.isArray(value)) {
+    return value.map((entry) => String(entry || '').trim()).filter(Boolean);
+  }
+  const raw = String(value || '').trim();
+  if (!raw) return [];
+  return raw.split(',').map((entry) => entry.trim()).filter(Boolean);
+};
+
 // GET /patient/providers/smart-match
 // Query available providers based on patient's availability preferences
 export const getAvailableProvidersController = async (req: Request, res: Response): Promise<void> => {
+  const patientId = req.auth?.userId;
+  if (!patientId) throw new AppError('Unauthorized', 401);
+
   const { daysOfWeek, timeSlots, providerType, limit } = req.query;
 
   if (!daysOfWeek || !timeSlots) {
     throw new AppError('daysOfWeek and timeSlots are required', 422);
   }
+
+  const subscription = await db.patientSubscription.findUnique({
+    where: { userId: patientId },
+    select: { status: true, planName: true, price: true },
+  });
+
+  const status = String(subscription?.status || '').toLowerCase();
+  const statusAllowed = ['active', 'trial', 'trialing', 'grace'].includes(status);
+  if (!statusAllowed) {
+    throw new AppError('Active subscription required to use smart matching', 403);
+  }
+
+  const freeLikePlan = Number(subscription?.price || 0) <= 0 || String(subscription?.planName || '').toLowerCase().includes('free');
+  if (freeLikePlan) {
+    sendSuccess(res, {
+      count: 0,
+      providers: [],
+      message: 'Smart matching is available on paid plans only.',
+    });
+    return;
+  }
+
+  const concerns = parseQueryList(req.query.concerns);
+  const languages = parseQueryList(req.query.languages);
+  const modes = parseQueryList(req.query.modes);
+  const rawContext = String(req.query.context || 'Standard').trim();
+  const context = (['Standard', 'Corporate', 'Night', 'Buddy', 'Crisis'].includes(rawContext) ? rawContext : 'Standard') as
+    | 'Standard'
+    | 'Corporate'
+    | 'Night'
+    | 'Buddy'
+    | 'Crisis';
 
   const availabilityPrefs: AvailabilityPrefs = {
     daysOfWeek: Array.isArray(daysOfWeek)
@@ -40,10 +87,18 @@ export const getAvailableProvidersController = async (req: Request, res: Respons
     availabilityPrefs,
     providerType ? String(providerType) : undefined,
     limit ? Math.min(Number(limit), 10) : 10,
+    {
+      concerns,
+      languages,
+      modes,
+      context,
+      patientUserId: patientId,
+    },
   );
 
   sendSuccess(res, {
     count: providers.length,
+    context,
     providers,
   });
 };
@@ -60,10 +115,31 @@ export const createAppointmentRequestController = async (req: Request, res: Resp
     providerIds,
     preferredSpecialization,
     durationMinutes,
+    context,
+    concerns,
+    languages,
+    modes,
+    rankedProviders,
   } = req.body;
 
   if (!availabilityPrefs || !providerIds) {
     throw new AppError('availabilityPrefs and providerIds are required', 422);
+  }
+
+  const subscription = await db.patientSubscription.findUnique({
+    where: { userId: patientId },
+    select: { status: true, planName: true, price: true },
+  });
+
+  const status = String(subscription?.status || '').toLowerCase();
+  const statusAllowed = ['active', 'trial', 'trialing', 'grace'].includes(status);
+  if (!statusAllowed) {
+    throw new AppError('Active subscription required to create smart-match requests', 403);
+  }
+
+  const freeLikePlan = Number(subscription?.price || 0) <= 0 || String(subscription?.planName || '').toLowerCase().includes('free');
+  if (freeLikePlan) {
+    throw new AppError('Smart matching is available on paid plans only.', 403);
   }
 
   const result = await createAppointmentRequest({
@@ -72,6 +148,11 @@ export const createAppointmentRequestController = async (req: Request, res: Resp
     providerIds,
     preferredSpecialization,
     durationMinutes,
+    context,
+    concerns,
+    languages,
+    modes,
+    rankedProviders,
   });
 
   sendSuccess(res, result, 'Appointment request created successfully', 201);

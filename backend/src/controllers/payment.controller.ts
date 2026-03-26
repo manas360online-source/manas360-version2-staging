@@ -11,18 +11,12 @@ import {
 } from '../services/payment.service';
 import { 
 	verifyPhonePeWebhook, 
-	checkPhonePeStatus, 
 	initiatePhonePeRefund, 
 	checkPhonePeRefundStatus,
 	verifyPhonePeWebhookAuth,
 	isPhonePeWebhookIP,
 	getClientIpFromRequest,
 } from '../services/phonepe.service';
-import { 
-	trackWebhookEvent,
-	processPhonePeWebhookEvent,
-} from '../services/phonepeWebhook.service';
-import crypto from 'crypto';
 import { logger } from '../utils/logger';
 
 const getAuthUserId = (req: Request): string => {
@@ -82,16 +76,7 @@ export const phonepeWebhookController = async (req: Request, res: Response): Pro
 	}
 
 	// 1. IP Whitelisting
-	const { isPhonePeWebhookIP, verifyPhonePeWebhookAuth } = require('../services/phonepe.service');
-	const xForwardedFor = req.headers['x-forwarded-for'];
-	const xForwardedForString = Array.isArray(xForwardedFor) ? xForwardedFor[0] : xForwardedFor;
-	const clientIp =
-		(xForwardedForString ? xForwardedForString.split(',')[0].trim() : '') ||
-		req.headers['x-real-ip'] as string ||
-		req.headers['cf-connecting-ip'] as string ||
-		req.ip ||
-		req.socket?.remoteAddress ||
-		req.connection?.remoteAddress || '';
+	const clientIp = getClientIpFromRequest(req);
 	const shouldBypassPhonePeWebhookIp = env.nodeEnv !== 'production' && env.allowPhonePeWebhookIpBypass;
 	if (!shouldBypassPhonePeWebhookIp && !isPhonePeWebhookIP(clientIp)) {
 		throw new AppError('Unauthorized source IP for PhonePe webhook', 403);
@@ -100,7 +85,7 @@ export const phonepeWebhookController = async (req: Request, res: Response): Pro
 	// 2. Authorization Header
 	const authHeader = String(req.headers['authorization'] ?? '').trim();
 	const { PHONEPE_WEBHOOK_USERNAME, PHONEPE_WEBHOOK_PASSWORD } = process.env;
-	if (!verifyPhonePeWebhookAuth(authHeader, PHONEPE_WEBHOOK_USERNAME, PHONEPE_WEBHOOK_PASSWORD)) {
+	if (!verifyPhonePeWebhookAuth(authHeader, String(PHONEPE_WEBHOOK_USERNAME ?? ''), String(PHONEPE_WEBHOOK_PASSWORD ?? ''))) {
 		// PhonePe dashboard validation commonly sends a lightweight probe payload.
 		if (!hasBase64WebhookPayload) {
 			logger.info('[PhonePe] Webhook probe accepted without auth enforcement', { headers: req.headers, body: payload });
@@ -110,11 +95,14 @@ export const phonepeWebhookController = async (req: Request, res: Response): Pro
 		throw new AppError('Invalid PhonePe webhook authorization', 401);
 	}
 
-	// 3. Signature Verification (optional in OAuth V2; enforce only when x-verify is provided)
+	// 3. Signature Verification: strict in production, lenient in non-production for diagnostics.
 	if (xVerify && !verifyPhonePeWebhook(rawBody, xVerify)) {
-		logger.warn('[PhonePe] Webhook signature verification failed; allowing for debugging.');
+		if (env.nodeEnv === 'production') {
+			throw new AppError('Invalid PhonePe webhook signature', 401);
+		}
+
+		logger.warn('[PhonePe] Webhook signature verification failed; allowing in non-production for debugging.');
 		logger.debug('[PhonePe] Webhook rawBody', { rawBody });
-		// NOTE: In production, revert to strict rejection: throw new AppError('Invalid PhonePe webhook signature', 401);
 	}
 
 	let decoded: any = payload;

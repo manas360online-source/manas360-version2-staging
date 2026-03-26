@@ -25,27 +25,42 @@ export type BulkEmployeeRow = {
 
 export type CorporateDemoRequestPayload = {
   companyName: string;
-  workEmail: string;
   companySize?: string;
   industry?: string;
   country?: string;
   contactName?: string;
   phone?: string;
+  email?: string;
 };
 
-export type CorporateCreateAccountPayload = {
+export type CorporateOtpRequestPayload = {
   companyName: string;
-  workEmail: string;
-  password: string;
+  phone: string;
   companySize?: string;
   industry?: string;
   country?: string;
   contactName?: string;
+  email?: string;
+};
+
+export type CorporateCreateAccountPayload = {
+  companyName: string;
+  phone: string;
+  otp: string;
+  companySize?: string;
+  industry?: string;
+  country?: string;
+  contactName?: string;
+  email?: string;
 };
 
 export const corporateApi = {
   requestDemo: async (payload: CorporateDemoRequestPayload) => {
     const response = await http.post('/v1/corporate/public/request-demo', payload);
+    return unwrap(response.data);
+  },
+  requestCorporateOtp: async (payload: CorporateOtpRequestPayload) => {
+    const response = await http.post('/v1/corporate/public/request-otp', payload);
     return unwrap(response.data);
   },
   createCorporateAccount: async (payload: CorporateCreateAccountPayload) => {

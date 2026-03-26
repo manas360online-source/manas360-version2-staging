@@ -56,6 +56,8 @@ export default function CalendarSelection({ onDateTimeSelect, onCancel }: Calend
                 daysOfWeek: [day],
                 timeSlots: [{ startMinute, endMinute }],
               },
+              undefined,
+              { context: 'Standard' },
             );
 
             const count = Number(response?.count ?? response?.providers?.length ?? 0);

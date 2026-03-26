@@ -481,6 +481,24 @@ export const patientApi = {
     ]);
     return unwrapPayload(response);
   },
+  checkoutSubscription: async (payload: {
+    planKey: string;
+    addons: Record<string, unknown>;
+    subtotalMinor: number;
+    gstMinor: number;
+    totalMinor: number;
+    acceptedTerms: boolean;
+    promoCode?: string;
+    idempotencyKey?: string;
+  }) => {
+    const response = await withFallbackChain([
+      async () => (await http.post('/v1/patient/subscription/checkout', payload)).data,
+      async () => (await http.post('/patient/subscription/checkout', payload)).data,
+      async () => (await http.post('/v1/subscription/checkout', payload)).data,
+      async () => (await http.post('/subscription/checkout', payload)).data,
+    ]);
+    return unwrapPayload(response);
+  },
   downgradeSubscription: async () => {
     const response = await withFallbackChain([
       async () => (await http.patch('/v1/patient/subscription/downgrade')).data,
@@ -745,6 +763,12 @@ export const patientApi = {
       timeSlots: Array<{ startMinute: number; endMinute: number }>;
     },
     providerType?: string,
+    options?: {
+      concerns?: string[];
+      languages?: string[];
+      modes?: string[];
+      context?: 'Standard' | 'Corporate' | 'Night' | 'Buddy' | 'Crisis';
+    },
   ) => {
     const query = new URLSearchParams();
     availabilityPrefs.daysOfWeek.forEach((day) => {
@@ -756,6 +780,10 @@ export const patientApi = {
     if (providerType && providerType !== 'ALL') {
       query.append('providerType', providerType);
     }
+    (options?.concerns || []).forEach((concern) => query.append('concerns', concern));
+    (options?.languages || []).forEach((language) => query.append('languages', language));
+    (options?.modes || []).forEach((mode) => query.append('modes', mode));
+    if (options?.context) query.append('context', options.context);
     const response = (await http.get(`/v1/patient/providers/smart-match?${query}`)).data;
     const payload = response?.data ?? response;
     const providers = Array.isArray(payload?.providers) ? payload.providers : [];

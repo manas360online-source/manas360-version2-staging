@@ -18,8 +18,11 @@ const sso_service_2 = require("./services/sso.service");
 const gps_routes_1 = require("./routes/gps.routes");
 const paymentReconciliation_1 = require("./cron/paymentReconciliation");
 const lead_distribution_cron_1 = require("./cron/lead-distribution.cron");
+const phonepe_service_1 = require("./services/phonepe.service");
 const startServer = async () => {
     await (0, db_1.connectDatabase)();
+    // Initialize PhonePe OAuth token refresh (proactive background refresh)
+    await (0, phonepe_service_1.initializePhonePeTokenRefresh)();
     // ensure SSO tables exist
     void (0, sso_service_1.ensureSsoTables)()
         .then(async () => {
@@ -65,6 +68,7 @@ const startServer = async () => {
     }, 30000);
     const shutdown = async (signal) => {
         console.log(`${signal} received. Shutting down gracefully...`);
+        (0, phonepe_service_1.cleanupPhonePeTokenRefresh)();
         server.close(async () => {
             await (0, db_1.disconnectDatabase)();
             process.exit(0);

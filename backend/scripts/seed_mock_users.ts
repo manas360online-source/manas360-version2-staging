@@ -3,8 +3,9 @@ import { prisma } from '../src/config/db';
 import { ProviderType, UserProvider, UserRole } from '@prisma/client';
 
 type MockUserSeed = {
-	email: string;
-	password: string;
+	email?: string | null;
+	password?: string;
+	phone: string;
 	role: UserRole;
 	providerType?: ProviderType;
 	firstName: string;
@@ -27,30 +28,31 @@ const MOCK_USERS: MockUserSeed[] = [
 	{
 		email: 'admin@manas360.local',
 		password: 'Admin@123',
+		phone: '+917000600211',
 		role: UserRole.ADMIN,
 		firstName: 'System',
 		lastName: 'Admin',
 		name: 'System Admin',
 	},
 	{
-		email: 'mock.patient@manas360.local',
-		password: 'Patient@123',
+		email: null,
+		phone: '+917000100211',
 		role: UserRole.PATIENT,
 		firstName: 'Mock',
 		lastName: 'Patient',
 		name: 'Mock Patient',
 	},
 	{
-		email: 'patient.qa@manas360.local',
-		password: 'Patient@123',
+		email: null,
+		phone: '+917000100212',
 		role: UserRole.PATIENT,
 		firstName: 'Priya',
 		lastName: 'QA',
 		name: 'Priya QA',
 	},
 	{
-		email: 'mock.therapist@manas360.local',
-		password: 'Therapist@123',
+		email: null,
+		phone: '+917000200211',
 		role: UserRole.THERAPIST,
 		providerType: ProviderType.THERAPIST,
 		firstName: 'Mock',
@@ -58,8 +60,8 @@ const MOCK_USERS: MockUserSeed[] = [
 		name: 'Mock Therapist',
 	},
 	{
-		email: 'mock.psychologist@manas360.local',
-		password: 'Psychologist@123',
+		email: null,
+		phone: '+917000500211',
 		role: UserRole.PSYCHOLOGIST,
 		providerType: ProviderType.PSYCHOLOGIST,
 		firstName: 'Mock',
@@ -67,8 +69,8 @@ const MOCK_USERS: MockUserSeed[] = [
 		name: 'Mock Psychologist',
 	},
 	{
-		email: 'mock.psychiatrist@manas360.local',
-		password: 'Psychiatrist@123',
+		email: null,
+		phone: '+917000400211',
 		role: UserRole.PSYCHIATRIST,
 		providerType: ProviderType.PSYCHIATRIST,
 		firstName: 'Mock',
@@ -76,8 +78,8 @@ const MOCK_USERS: MockUserSeed[] = [
 		name: 'Mock Psychiatrist',
 	},
 	{
-		email: 'mock.coach@manas360.local',
-		password: 'Coach@123',
+		email: null,
+		phone: '+917000300211',
 		role: UserRole.COACH,
 		providerType: ProviderType.COACH,
 		firstName: 'Mock',
@@ -85,8 +87,8 @@ const MOCK_USERS: MockUserSeed[] = [
 		name: 'Mock Coach',
 	},
 	{
-		email: 'therapist.qa@manas360.local',
-		password: 'Therapist@123',
+		email: null,
+		phone: '+917000200212',
 		role: UserRole.THERAPIST,
 		providerType: ProviderType.THERAPIST,
 		firstName: 'Rohan',
@@ -94,8 +96,8 @@ const MOCK_USERS: MockUserSeed[] = [
 		name: 'Rohan Sharma',
 	},
 	{
-		email: 'psychologist.qa@manas360.local',
-		password: 'Psychologist@123',
+		email: null,
+		phone: '+917000500212',
 		role: UserRole.PSYCHOLOGIST,
 		providerType: ProviderType.PSYCHOLOGIST,
 		firstName: 'Ananya',
@@ -103,8 +105,8 @@ const MOCK_USERS: MockUserSeed[] = [
 		name: 'Ananya Iyer',
 	},
 	{
-		email: 'psychiatrist.qa@manas360.local',
-		password: 'Psychiatrist@123',
+		email: null,
+		phone: '+917000400212',
 		role: UserRole.PSYCHIATRIST,
 		providerType: ProviderType.PSYCHIATRIST,
 		firstName: 'Arjun',
@@ -112,8 +114,8 @@ const MOCK_USERS: MockUserSeed[] = [
 		name: 'Arjun Mehta',
 	},
 	{
-		email: 'coach.qa@manas360.local',
-		password: 'Coach@123',
+		email: null,
+		phone: '+917000300212',
 		role: UserRole.COACH,
 		providerType: ProviderType.COACH,
 		firstName: 'Nisha',
@@ -123,7 +125,7 @@ const MOCK_USERS: MockUserSeed[] = [
 ];
 
 const PROVIDER_PROFILE_SEEDS: Record<string, ProviderProfileSeed> = {
-	'mock.therapist@manas360.local': {
+	'+917000200211': {
 		displayName: 'Mock Therapist',
 		bio: 'Trauma-informed therapist for QA and frontend provider-list testing.',
 		specializations: ['Anxiety Therapy', 'Stress Recovery'],
@@ -136,7 +138,7 @@ const PROVIDER_PROFILE_SEEDS: Record<string, ProviderProfileSeed> = {
 			{ dayOfWeek: 3, startMinute: 600, endMinute: 1080, isAvailable: true },
 		],
 	},
-	'mock.psychologist@manas360.local': {
+	'+917000500211': {
 		displayName: 'Mock Psychologist',
 		bio: 'Clinical psychologist profile seeded for patient assessments and care-team screens.',
 		specializations: ['Clinical Psychology', 'Behavioral Assessment'],
@@ -149,7 +151,7 @@ const PROVIDER_PROFILE_SEEDS: Record<string, ProviderProfileSeed> = {
 			{ dayOfWeek: 4, startMinute: 660, endMinute: 1140, isAvailable: true },
 		],
 	},
-	'mock.psychiatrist@manas360.local': {
+	'+917000400211': {
 		displayName: 'Mock Psychiatrist',
 		bio: 'Psychiatrist profile seeded for medication-pathway and urgent care testing.',
 		specializations: ['Medication Management', 'Clinical Psychiatry'],
@@ -162,7 +164,7 @@ const PROVIDER_PROFILE_SEEDS: Record<string, ProviderProfileSeed> = {
 			{ dayOfWeek: 5, startMinute: 720, endMinute: 1020, isAvailable: true },
 		],
 	},
-	'mock.coach@manas360.local': {
+	'+917000300211': {
 		displayName: 'Mock Coach',
 		bio: 'Coach profile seeded for self-care and wellness planning flows.',
 		specializations: ['Wellness Coaching', 'Habit Building'],
@@ -175,7 +177,7 @@ const PROVIDER_PROFILE_SEEDS: Record<string, ProviderProfileSeed> = {
 			{ dayOfWeek: 6, startMinute: 600, endMinute: 960, isAvailable: true },
 		],
 	},
-	'therapist.qa@manas360.local': {
+	'+917000200212': {
 		displayName: 'Rohan Sharma',
 		bio: 'Therapist test account for bookings, sessions, and care-team views.',
 		specializations: ['CBT', 'Relationship Therapy'],
@@ -188,7 +190,7 @@ const PROVIDER_PROFILE_SEEDS: Record<string, ProviderProfileSeed> = {
 			{ dayOfWeek: 2, startMinute: 600, endMinute: 1080, isAvailable: true },
 		],
 	},
-	'psychologist.qa@manas360.local': {
+	'+917000500212': {
 		displayName: 'Ananya Iyer',
 		bio: 'Psychologist test account for reports, assessment review, and provider browsing.',
 		specializations: ['Clinical Psychology', 'Trauma Assessment'],
@@ -201,7 +203,7 @@ const PROVIDER_PROFILE_SEEDS: Record<string, ProviderProfileSeed> = {
 			{ dayOfWeek: 4, startMinute: 660, endMinute: 1140, isAvailable: true },
 		],
 	},
-	'psychiatrist.qa@manas360.local': {
+	'+917000400212': {
 		displayName: 'Arjun Mehta',
 		bio: 'Psychiatrist test account for urgent care and medication-pathway validation.',
 		specializations: ['Clinical Psychiatry', 'Medication Reviews'],
@@ -214,7 +216,7 @@ const PROVIDER_PROFILE_SEEDS: Record<string, ProviderProfileSeed> = {
 			{ dayOfWeek: 5, startMinute: 720, endMinute: 1020, isAvailable: true },
 		],
 	},
-	'coach.qa@manas360.local': {
+	'+917000300212': {
 		displayName: 'Nisha Kapoor',
 		bio: 'Coach test account for wellness goal and recovery-planning flows.',
 		specializations: ['Wellness Coaching', 'Lifestyle Design'],
@@ -229,9 +231,9 @@ const PROVIDER_PROFILE_SEEDS: Record<string, ProviderProfileSeed> = {
 	},
 };
 
-const patientProfileSeedByEmail: Record<string, { age: number; gender: string; medicalHistory: string }> = {
-	'mock.patient@manas360.local': { age: 28, gender: 'female', medicalHistory: 'Generalized anxiety history noted for QA testing.' },
-	'patient.qa@manas360.local': { age: 34, gender: 'male', medicalHistory: 'Sleep disruption and workplace stress noted for QA testing.' },
+const patientProfileSeedByPhone: Record<string, { age: number; gender: string; medicalHistory: string }> = {
+	'+917000100211': { age: 28, gender: 'female', medicalHistory: 'Generalized anxiety history noted for QA testing.' },
+	'+917000100212': { age: 34, gender: 'male', medicalHistory: 'Sleep disruption and workplace stress noted for QA testing.' },
 };
 
 const roleToProviderType = (role: UserRole): ProviderType | null => {
@@ -244,16 +246,21 @@ const roleToProviderType = (role: UserRole): ProviderType | null => {
 
 async function run() {
 	console.log('Seeding mock users...');
-	const usersByEmail = new Map<string, any>();
+	const usersByPhone = new Map<string, any>();
 
 	for (const entry of MOCK_USERS) {
-		const passwordHash = await bcrypt.hash(entry.password, 12);
+		const passwordHash = entry.password ? await bcrypt.hash(entry.password, 12) : null;
 		const mappedProviderType = entry.providerType ?? roleToProviderType(entry.role);
+		const isPlatformAdmin = entry.role === UserRole.ADMIN;
+		const whereClause = entry.email ? { email: entry.email } : { phone: entry.phone };
 		const user = await prisma.user.upsert({
-			where: { email: entry.email },
+			where: whereClause,
 			update: {
-				passwordHash,
-				emailVerified: true,
+				passwordHash: isPlatformAdmin ? passwordHash : null,
+				email: entry.email ?? null,
+				emailVerified: isPlatformAdmin,
+				phone: entry.phone,
+				phoneVerified: true,
 				role: entry.role,
 				providerType: mappedProviderType,
 				provider: UserProvider.LOCAL,
@@ -267,9 +274,11 @@ async function run() {
 				lockUntil: null,
 			},
 			create: {
-				email: entry.email,
-				passwordHash,
-				emailVerified: true,
+				email: entry.email ?? null,
+				passwordHash: isPlatformAdmin ? passwordHash : null,
+				emailVerified: isPlatformAdmin,
+				phone: entry.phone,
+				phoneVerified: true,
 				role: entry.role,
 				providerType: mappedProviderType,
 				provider: UserProvider.LOCAL,
@@ -280,15 +289,17 @@ async function run() {
 				isTherapistVerified: Boolean(mappedProviderType),
 			},
 		});
-		usersByEmail.set(entry.email.toLowerCase(), user);
+		usersByPhone.set(entry.phone, user);
 
 		console.log(
 			JSON.stringify(
 				{
 					ok: true,
 					id: user.id,
-					email: entry.email,
-					password: entry.password,
+					email: entry.email ?? null,
+					phone: entry.phone,
+					loginMethod: isPlatformAdmin ? 'EMAIL_PASSWORD' : 'PHONE_OTP',
+					password: isPlatformAdmin ? entry.password : undefined,
 					role: entry.role,
 				},
 				null,
@@ -297,8 +308,8 @@ async function run() {
 		);
 	}
 
-	for (const [email, profileSeed] of Object.entries(PROVIDER_PROFILE_SEEDS)) {
-		const user = usersByEmail.get(email.toLowerCase());
+	for (const [phone, profileSeed] of Object.entries(PROVIDER_PROFILE_SEEDS)) {
+		const user = usersByPhone.get(phone);
 		if (!user) continue;
 
 		await prisma.therapistProfile.upsert({
@@ -311,8 +322,8 @@ async function run() {
 		});
 	}
 
-	for (const [email, patientSeed] of Object.entries(patientProfileSeedByEmail)) {
-		const user = usersByEmail.get(email.toLowerCase());
+	for (const [phone, patientSeed] of Object.entries(patientProfileSeedByPhone)) {
+		const user = usersByPhone.get(phone);
 		if (!user) continue;
 
 		await prisma.patientProfile.upsert({
@@ -364,12 +375,12 @@ async function run() {
 		});
 	}
 
-	const patientUsers = ['mock.patient@manas360.local', 'patient.qa@manas360.local']
-		.map((email) => usersByEmail.get(email.toLowerCase()))
+	const patientUsers = ['+917000100211', '+917000100212']
+		.map((phone) => usersByPhone.get(phone))
 		.filter(Boolean);
 	const providerUsers = MOCK_USERS
 		.filter((entry) => roleToProviderType(entry.role))
-		.map((entry) => usersByEmail.get(entry.email.toLowerCase()))
+		.map((entry) => usersByPhone.get(entry.phone))
 		.filter(Boolean);
 
 	for (const patient of patientUsers) {
@@ -406,12 +417,15 @@ async function run() {
 	console.log(
 		JSON.stringify(
 			{
-				patients: patientUsers.map((user) => ({ email: user.email, password: 'Patient@123' })),
+				patients: patientUsers.map((user) => ({ phone: user.phone, loginMethod: 'PHONE_OTP' })),
 				providers: MOCK_USERS.filter((entry) => roleToProviderType(entry.role)).map((entry) => ({
-					email: entry.email,
-					password: entry.password,
+					phone: entry.phone,
+					loginMethod: 'PHONE_OTP',
 					role: entry.role,
 				})),
+				admin: MOCK_USERS
+					.filter((entry) => entry.role === UserRole.ADMIN)
+					.map((entry) => ({ email: entry.email, password: entry.password, loginMethod: 'EMAIL_PASSWORD' })),
 			},
 			null,
 			2,

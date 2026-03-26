@@ -102,6 +102,11 @@ export default function LoginPage() {
 		<div className="responsive-page">
 			<div className="responsive-container py-6 sm:py-10">
 				<div className="mx-auto w-full max-w-lg rounded-3xl border border-calm-sage/20 bg-wellness-surface p-5 shadow-soft-md sm:p-8">
+					<div className="mb-3">
+						<Link to="/" className="text-sm text-calm-sage underline underline-offset-2 hover:text-wellness-text">
+							Back to Home
+						</Link>
+					</div>
 					<h1 className="text-2xl font-semibold text-wellness-text sm:text-3xl">Welcome back</h1>
 					<p className="mt-2 text-sm text-wellness-muted sm:text-base">Login with your phone number and OTP.</p>
 

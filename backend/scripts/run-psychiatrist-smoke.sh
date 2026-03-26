@@ -1,14 +1,26 @@
 #!/usr/bin/env bash
 set -eu
 BASE_URL="${BASE_URL:-http://localhost:3001}"
+PSYCHIATRIST_PHONE="${PSYCHIATRIST_PHONE:-+917000400001}"
 COOKIE_FILE="/tmp/manas_psychiatrist_smoke.cookies"
 OUT_DIR="/tmp/psychiatrist-smoke"
 mkdir -p "$OUT_DIR"
 
-echo "Logging in as psychiatrist@demo.com..."
+echo "Logging in as psychiatrist via phone OTP..."
 curl -sS -c "$COOKIE_FILE" -H 'Content-Type: application/json' \
-  -d '{"identifier":"psychiatrist@demo.com","password":"Demo@12345"}' \
-  "$BASE_URL/api/auth/login" \
+  -d "{\"phone\":\"$PSYCHIATRIST_PHONE\"}" \
+  "$BASE_URL/api/v1/auth/signup/phone" \
+  -o "$OUT_DIR/otp_request.json" -w '\nHTTP:%{http_code}\n'
+
+OTP_CODE=$(node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('$OUT_DIR/otp_request.json','utf8'));process.stdout.write(String(p?.data?.devOtp||''));")
+if [ -z "$OTP_CODE" ]; then
+  echo "Missing devOtp from /api/v1/auth/signup/phone response" >&2
+  exit 1
+fi
+
+curl -sS -c "$COOKIE_FILE" -H 'Content-Type: application/json' \
+  -d "{\"phone\":\"$PSYCHIATRIST_PHONE\",\"otp\":\"$OTP_CODE\"}" \
+  "$BASE_URL/api/v1/auth/verify/phone-otp" \
   -o "$OUT_DIR/login.json" -w '\nHTTP:%{http_code}\n'
 
 echo "Fetching patients..."
