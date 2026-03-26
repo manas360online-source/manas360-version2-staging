@@ -6,35 +6,41 @@ import { useAuth } from '../../context/AuthContext';
 type NavItem = { to: string; label: string; section: string; shortLabel: string };
 
 const navItems: NavItem[] = [
+	// OVERVIEW
 	{ to: '/admin/dashboard', label: 'Dashboard', shortLabel: 'Dash', section: 'OVERVIEW' },
-	{ to: '/admin/platform-analytics', label: 'Platform Analytics', shortLabel: 'PA', section: 'OVERVIEW' },
+	{ to: '/admin/platform-health', label: 'Platform Health', shortLabel: 'PH', section: 'OVERVIEW' },
+	// USER MANAGEMENT
+	{ to: '/admin/users', label: 'All Users', shortLabel: 'U', section: 'USER MANAGEMENT' },
 	{ to: '/admin/user-approvals', label: 'User Approvals', shortLabel: 'UA', section: 'USER MANAGEMENT' },
 	{ to: '/admin/therapist-verification', label: 'Therapist Verification', shortLabel: 'TV', section: 'USER MANAGEMENT' },
-	{ to: '/admin/users', label: 'All Users', shortLabel: 'U', section: 'USER MANAGEMENT' },
 	{ to: '/admin/roles', label: 'Role Management', shortLabel: 'RB', section: 'USER MANAGEMENT' },
-	{ to: '/admin/companies', label: 'Companies', shortLabel: 'Co', section: 'CORPORATE MANAGEMENT' },
-	{ to: '/admin/company-subscriptions', label: 'Company Subscriptions', shortLabel: 'CS', section: 'CORPORATE MANAGEMENT' },
-	{ to: '/admin/company-reports', label: 'Company Reports', shortLabel: 'CR', section: 'CORPORATE MANAGEMENT' },
-	{ to: '/admin/live-sessions', label: 'Live Sessions', shortLabel: 'LS', section: 'OPERATIONS' },
-	{ to: '/admin/templates', label: 'Template Management', shortLabel: 'TM', section: 'OPERATIONS' },
-	{ to: '/admin/crisis-alerts', label: 'Crisis Alerts', shortLabel: 'CA', section: 'OPERATIONS' },
-	{ to: '/admin/revenue', label: 'Revenue', shortLabel: 'Re', section: 'FINANCE' },
+	// CORPORATE
+	{ to: '/admin/companies', label: 'Companies', shortLabel: 'Co', section: 'CORPORATE' },
+	{ to: '/admin/company-subscriptions', label: 'Subscriptions', shortLabel: 'Sub', section: 'CORPORATE' },
+	{ to: '/admin/company-reports', label: 'Reports', shortLabel: 'Rep', section: 'CORPORATE' },
+	// OPERATIONS
+	{ to: '/admin/live-sessions', label: 'Sessions', shortLabel: 'Ses', section: 'OPERATIONS' },
+	{ to: '/admin/templates', label: 'Templates', shortLabel: 'Tpl', section: 'OPERATIONS' },
+	{ to: '/admin/crisis-alerts', label: 'Crises', shortLabel: 'Cri', section: 'OPERATIONS' },
+	// FINANCE
+	{ to: '/admin/revenue', label: 'Revenue', shortLabel: 'Rev', section: 'FINANCE' },
+	{ to: '/admin/pricing-management', label: 'Pricing', shortLabel: 'Prc', section: 'FINANCE' },
+	{ to: '/admin/payouts', label: 'Payouts', shortLabel: 'Pyt', section: 'FINANCE' },
+	{ to: '/admin/invoices', label: 'Invoices', shortLabel: 'Inv', section: 'FINANCE' },
 	{ to: '/admin/payment-reliability', label: 'Payment Reliability', shortLabel: 'PR', section: 'FINANCE' },
-	{ to: '/admin/pricing-management', label: 'Pricing Management', shortLabel: 'PM', section: 'FINANCE' },
-	{ to: '/admin/payouts', label: 'Payouts', shortLabel: 'Po', section: 'FINANCE' },
-	{ to: '/admin/invoices', label: 'Invoices', shortLabel: 'In', section: 'FINANCE' },
+	// ANALYTICS
+	{ to: '/admin/platform-analytics', label: 'Platform Analytics', shortLabel: 'PA', section: 'ANALYTICS' },
 	{ to: '/admin/user-growth', label: 'User Growth', shortLabel: 'UG', section: 'ANALYTICS' },
 	{ to: '/admin/session-analytics', label: 'Session Analytics', shortLabel: 'SA', section: 'ANALYTICS' },
 	{ to: '/admin/therapist-performance', label: 'Therapist Performance', shortLabel: 'TP', section: 'ANALYTICS' },
-	{ to: '/admin/mental-health-trends', label: 'Mental Health Trends', shortLabel: 'MH', section: 'ANALYTICS' },
-	{ to: '/admin/support-tickets', label: 'Support Tickets', shortLabel: 'ST', section: 'SUPPORT' },
+	// SUPPORT
+	{ to: '/admin/support-tickets', label: 'Tickets', shortLabel: 'Tkt', section: 'SUPPORT' },
 	{ to: '/admin/feedback', label: 'Feedback', shortLabel: 'Fb', section: 'SUPPORT' },
+	// SECURITY
 	{ to: '/admin/audit-logs', label: 'Audit Logs', shortLabel: 'AL', section: 'SECURITY' },
-	{ to: '/admin/compliance', label: 'Compliance', shortLabel: 'CP', section: 'SECURITY' },
-	{ to: '/admin/data-requests', label: 'Data Requests', shortLabel: 'DR', section: 'SECURITY' },
-	{ to: '/admin/platform-health', label: 'Platform Health', shortLabel: 'PH', section: 'SYSTEM' },
-	{ to: '/admin/ai-monitoring', label: 'AI Monitoring', shortLabel: 'AI', section: 'SYSTEM' },
-	{ to: '/admin/settings', label: 'Settings', shortLabel: 'Se', section: 'SYSTEM' },
+	{ to: '/admin/ai-monitoring', label: 'AI Monitoring', shortLabel: 'AI', section: 'SECURITY' },
+	// SYSTEM
+	{ to: '/admin/settings', label: 'Settings', shortLabel: 'Set', section: 'SYSTEM' },
 ];
 
 const mobileBottomNav = [

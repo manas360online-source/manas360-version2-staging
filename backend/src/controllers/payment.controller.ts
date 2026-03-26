@@ -7,6 +7,7 @@ import {
 	createSessionPayment,
 	processPhonePeWebhook,
 	releaseSessionEarnings,
+	reconcilePhonePePaymentStatus,
 } from '../services/payment.service';
 import { 
 	verifyPhonePeWebhook, 
@@ -136,27 +137,35 @@ export const getPhonePeStatusController = async (req: Request, res: Response): P
 		throw new AppError('transactionId is required', 422);
 	}
 
-	const status = await checkPhonePeStatus(transactionId);
-	if (!status) {
-		throw new AppError('Unable to fetch payment status', 502);
-	}
+	logger.info('[Payment.StatusCheck] Status check initiated', { transactionId });
 
-	const normalizedCode = String(status?.code || '').toUpperCase();
-	const normalizedState = String(status?.data?.state || '').toUpperCase();
-	const isCompleted = normalizedCode === 'PAYMENT_SUCCESS' || normalizedState === 'COMPLETED';
+	// Use polling/reconciliation for better UX (handles PENDING states)
+	const result = await reconcilePhonePePaymentStatus(transactionId, 5, 5000);
 
-	// Webhooks can be delayed/unavailable in local test setups.
-	// Reconcile completed PhonePe status inline so patient subscription activation is immediate.
-	if (isCompleted && transactionId.startsWith('SUB_')) {
-		await processPhonePeWebhook(status).catch((error) => {
-			logger.warn('[PhonePe] Inline status reconciliation failed', {
-				transactionId,
-				error: error?.message,
-			});
-		});
-	}
+	const state = String(result.state || '').toUpperCase();
+	const isSuccess = state === 'COMPLETED' || state === 'PAYMENT_SUCCESS';
+	const isFailed = state === 'FAILED' || state === 'DECLINED' || state === 'CANCELLED';
+	const isPending = state === 'PENDING';
 
-	res.status(200).json({ success: true, data: status });
+	logger.info('[Payment.StatusCheck] Final result', {
+		transactionId,
+		state,
+		isSuccess,
+		isFailed,
+		isPending,
+	});
+
+	res.status(200).json({
+		success: true,
+		data: {
+			transactionId,
+			state,
+			isSuccess,
+			isFailed,
+			isPending,
+			message: result.resultMessage,
+		},
+	});
 };
 
 export const initiateRefundController = async (req: Request, res: Response): Promise<void> => {

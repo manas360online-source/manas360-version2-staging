@@ -19,6 +19,11 @@ import {
 	downloadAdminAnalyticsExportController,
 	getAdminPaymentReliabilityController,
 	retryPaymentManuallyController,
+	getAdminRevenueAnalyticsController,
+	getAdminUserMetricsController,
+	getAdminProviderMetricsController,
+	getAdminMarketplaceMetricsController,
+	getAdminSystemHealthController,
 } from '../controllers/admin-analytics.controller';
 import { getAdminModuleSummaryController } from '../controllers/admin-module.controller';
 import { adminAnalyticsExportRateLimiter } from '../middleware/rateLimiter.middleware';
@@ -156,6 +161,11 @@ router.get('/screening/provider-questions', requireAuth, requireRole('admin'), a
  */
 router.get('/modules/:module/summary', requireAuth, requireRole('admin'), asyncHandler(getAdminModuleSummaryController));
 
+// ==================== DASHBOARD & CORE ====================
+router.get('/dashboard', requireAuth, requireRole('admin'), asyncHandler(getAdminModuleSummaryController));
+
+router.get('/platform-health', requireAuth, requireRole('admin'), asyncHandler(getAdminSystemHealthController));
+
 /**
  * GET /api/v1/admin/analytics/summary
  * Query params:
@@ -189,6 +199,66 @@ router.get('/analytics/templates', requireAuth, requireRole('admin'), asyncHandl
  *   - lastTherapistKey: bigint (optional, keyset cursor)
  */
 router.get('/analytics/utilization', requireAuth, requireRole('admin'), asyncHandler(getAdminTherapistUtilizationController));
+
+/**
+ * GET /api/v1/admin/analytics/revenue
+ * Get revenue analytics dashboard data
+ */
+router.get(
+	'/analytics/revenue',
+	requireAuth,
+	requireRole('admin'),
+	requirePermission('view_analytics'),
+	asyncHandler(getAdminRevenueAnalyticsController)
+);
+
+/**
+ * GET /api/v1/admin/analytics/user-metrics
+ * Get user metrics and growth analytics
+ */
+router.get(
+	'/analytics/users',
+	requireAuth,
+	requireRole('admin'),
+	requirePermission('view_analytics'),
+	asyncHandler(getAdminUserMetricsController)
+);
+
+/**
+ * GET /api/v1/admin/analytics/provider-metrics
+ * Get provider performance and utilization metrics
+ */
+router.get(
+	'/analytics/providers',
+	requireAuth,
+	requireRole('admin'),
+	requirePermission('view_analytics'),
+	asyncHandler(getAdminProviderMetricsController)
+);
+
+/**
+ * GET /api/v1/admin/analytics/marketplace-metrics
+ * Get marketplace (lead matching, supply/demand) metrics
+ */
+router.get(
+	'/analytics/marketplace',
+	requireAuth,
+	requireRole('admin'),
+	requirePermission('view_analytics'),
+	asyncHandler(getAdminMarketplaceMetricsController)
+);
+
+/**
+ * GET /api/v1/admin/analytics/system-health
+ * Get system health and infrastructure metrics
+ */
+router.get(
+	'/analytics/health',
+	requireAuth,
+	requireRole('admin'),
+	requirePermission('view_analytics'),
+	asyncHandler(getAdminSystemHealthController)
+);
 
 /**
  * GET /api/v1/admin/analytics/payments
@@ -241,6 +311,14 @@ router.get('/analytics/export/:exportJobKey/status', requireAuth, requireRole('a
  * GET /api/v1/admin/analytics/export/:exportJobKey/download
  * Download completed async export output.
  */
+router.get(
+	'/analytics/export/:exportJobKey/download',
+	requireAuth,
+	requireRole('admin'),
+	requirePermission('view_analytics'),
+	asyncHandler(downloadAdminAnalyticsExportController)
+);
+
 /**
  * POST /api/v1/admin/waive-subscription
  * Admin grants a subscription without charging the user (free access).

@@ -23,6 +23,8 @@ router.get('/phonepe/webhook', (_req, res) => {
 });
 router.post('/phonepe/webhook', asyncHandler(phonepeWebhookController));
 router.get('/phonepe/status/:transactionId', requireAuth, asyncHandler(getPhonePeStatusController));
+// Public status endpoint for redirect page (no auth required; transactionId is hard to guess)
+router.get('/status/:transactionId', asyncHandler(getPhonePeStatusController));
 
 // Refund routes
 router.post('/refund', requireAuth, requireRole('patient'), paymentRateLimiter, asyncHandler(initiateRefundController));
