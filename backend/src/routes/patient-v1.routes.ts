@@ -60,6 +60,7 @@ import {
 	upcomingSessionsController,
 	updatePatientPaymentMethodController,
 	upgradePatientSubscriptionController,
+	checkoutPatientSubscriptionController,
 	verifyPaymentController,
 	getMyActiveCbtAssignmentsController,
 } from '../controllers/patient-v1.controller';
@@ -98,7 +99,7 @@ router.get('/patient/documents/:id/download', requireAuth, requireRole('patient'
 router.get('/patient/care-team', requireAuth, requireRole('patient'), asyncHandler(getMyCareTeamController));
 
 // Smart Match appointment booking flow
-router.get('/patient/providers/smart-match', requireAuth, requireRole('patient'), asyncHandler(getAvailableProvidersController));
+router.get('/patient/providers/smart-match', requireAuth, requireRole('patient'), requireSubscription, asyncHandler(getAvailableProvidersController));
 router.post('/patient/appointments/smart-match', requireAuth, requireRole('patient'), requireSubscription, asyncHandler(createAppointmentRequestController));
 router.get('/patient/appointments/requests/pending', requireAuth, requireRole('patient'), asyncHandler(getPatientPendingRequestsController));
 router.get('/patient/appointments/payment-pending', requireAuth, requireRole('patient'), asyncHandler(getPaymentPendingRequestController));
@@ -141,6 +142,7 @@ router.patch('/notifications/:id/read', requireAuth, requireRole('patient'), asy
 
 router.get('/subscription', requireAuth, requireRole('patient'), asyncHandler(getPatientSubscriptionController));
 router.patch('/subscription/upgrade', requireAuth, requireRole('patient'), asyncHandler(upgradePatientSubscriptionController));
+router.post('/subscription/checkout', requireAuth, requireRole('patient'), asyncHandler(checkoutPatientSubscriptionController));
 router.patch('/subscription/downgrade', requireAuth, requireRole('patient'), asyncHandler(downgradePatientSubscriptionController));
 router.patch('/subscription/cancel', requireAuth, requireRole('patient'), asyncHandler(cancelPatientSubscriptionController));
 router.patch('/subscription/reactivate', requireAuth, requireRole('patient'), asyncHandler(reactivatePatientSubscriptionController));

@@ -15,9 +15,13 @@ import { createOrEnsureTenant, azureTemplate, googleTemplate, oktaTemplate } fro
 import { setSocketIO } from './routes/gps.routes';
 import { reconcilePendingPayments } from './cron/paymentReconciliation';
 import { initLeadDistributionCrons } from './cron/lead-distribution.cron';
+import { initializePhonePeTokenRefresh, cleanupPhonePeTokenRefresh } from './services/phonepe.service';
 
 const startServer = async (): Promise<void> => {
 	await connectDatabase();
+
+	// Initialize PhonePe OAuth token refresh (proactive background refresh)
+	await initializePhonePeTokenRefresh();
 
 	// ensure SSO tables exist
 	void ensureSsoTables()
@@ -69,6 +73,7 @@ const startServer = async (): Promise<void> => {
 	const shutdown = async (signal: string): Promise<void> => {
 		console.log(`${signal} received. Shutting down gracefully...`);
 
+		cleanupPhonePeTokenRefresh();
 		server.close(async () => {
 			await disconnectDatabase();
 			process.exit(0);

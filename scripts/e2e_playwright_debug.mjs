@@ -4,16 +4,30 @@ import fs from 'fs';
 
 const API_BASE = 'http://localhost:3000/api';
 const APP_URL = 'http://localhost:5173';
-const EMAIL = 'patient@manas360.local';
-const PASS = 'Manas@123';
+const PHONE = '+917000100111';
 
 const loginAndGetCookies = async () => {
-  const res = await fetch(`${API_BASE}/auth/login`, {
+  const otpRequest = await fetch(`${API_BASE}/auth/signup/phone`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ identifier: EMAIL, password: PASS }),
+    body: JSON.stringify({ phone: PHONE }),
   });
-  if (!res.ok) throw new Error(`login failed ${res.status}`);
+
+  if (!otpRequest.ok) {
+    const txt = await otpRequest.text();
+    throw new Error(`OTP request failed ${otpRequest.status}: ${txt}`);
+  }
+
+  const otpBody = await otpRequest.json();
+  const otp = otpBody?.data?.devOtp;
+  if (!otp) throw new Error('Missing devOtp in signup/phone response');
+
+  const res = await fetch(`${API_BASE}/auth/verify/phone-otp`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone: PHONE, otp }),
+  });
+  if (!res.ok) throw new Error(`phone otp verify failed ${res.status}`);
   const setCookie = res.headers.raw()['set-cookie'] || [];
   return setCookie.map((c) => {
     const [pair] = c.split(';').map((s) => s.trim());

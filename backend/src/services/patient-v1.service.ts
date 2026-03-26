@@ -17,6 +17,7 @@ import { getSessionQuote } from './pricing.service';
 import { getActivePlatformPlan } from './pricing.service';
 import { scoreGAD7, scorePHQ9 } from './riskScoring';
 import { sendSubscriptionActivationEmail } from './email.service';
+import { calculateGraceEndDate } from './subscription.helper';
 
 const db = prisma as any;
 const SUBSCRIPTION_LOCK_TIMEOUT_MS = 5 * 60 * 1000;
@@ -34,6 +35,7 @@ const recordPatientSubscriptionHistory = async (input: {
 	transactionId?: string;
 	reason:
 		| 'PAYMENT_SUCCESS'
+		| 'PAYMENT_FAILED'
 		| 'AUTO_RENEWAL'
 		| 'MANUAL_UPGRADE'
 		| 'MANUAL_DOWNGRADE'
@@ -1014,16 +1016,31 @@ export const reactivatePatientSubscription = async (userId: string, paymentId?: 
 	const updated = await withPatientSubscriptionLock(userId, async (subscription) => {
 		const activePlan = (await getActivePlatformPlan(planKey)) || { key: 'free', name: 'Free Tier', price: 0 };
 		const isFreePlan = Number(activePlan.price || 0) <= 0;
+		const currentStatus = String(subscription?.status || '').toLowerCase();
+		const hasPaidSubscriptionAlready = Number(subscription?.price || 0) > 0
+			&& ['active', 'trial', 'trialing', 'grace'].includes(currentStatus);
+		const nextStatus = isFreePlan
+			? 'active'
+			: hasPaidSubscriptionAlready
+				? 'active'
+				: 'trial';
+		const renewalDays = nextStatus === 'trial' ? 15 : 30;
+		const trialEndDate = nextStatus === 'trial' ? new Date(new Date().getTime() + 15 * 24 * 60 * 60 * 1000).toISOString() : undefined;
 		const next = await db.patientSubscription.update({
 			where: { userId },
 			data: {
 				planName: activePlan.name,
 				price: activePlan.price,
-				status: 'active',
+				status: nextStatus,
 				autoRenew: !isFreePlan,
 				paymentId: paymentId || undefined,
-				renewalDate: new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000),
+				renewalDate: new Date(new Date().getTime() + renewalDays * 24 * 60 * 60 * 1000),
 				billingCycle: isFreePlan ? 'none' : undefined,
+				metadata: nextStatus === 'trial' ? {
+					trialEndDate,
+					graceEndDate: null,
+					isFirstActivation: true
+				} : undefined,
 			},
 		});
 
@@ -1077,6 +1094,72 @@ export const setPatientSubscriptionAutoRenew = async (userId: string, autoRenew:
 		});
 
 		return next;
+	});
+};
+
+export const markPatientSubscriptionPaymentFailed = async (userId: string, paymentId?: string) => {
+	return withPatientSubscriptionLock(userId, async (subscription) => {
+		if (!subscription) {
+			throw new AppError('No subscription found for patient', 404);
+		}
+
+		const graceEndDate = calculateGraceEndDate().toISOString();
+		const currentMetadata = subscription?.metadata && typeof subscription.metadata === 'object'
+			? subscription.metadata
+			: {};
+
+		const next = await db.patientSubscription.update({
+			where: { userId },
+			data: {
+				status: 'grace',
+				metadata: {
+					...currentMetadata,
+					graceEndDate,
+				},
+			},
+		});
+
+		await recordPatientSubscriptionHistory({
+			userId,
+			subscriptionRefId: String(next.id),
+			oldPlan: String(subscription?.planName || ''),
+			newPlan: String(next.planName || ''),
+			oldStatus: String(subscription?.status || ''),
+			newStatus: String(next.status || ''),
+			oldPrice: Number(subscription?.price || 0),
+			newPrice: Number(next.price || 0),
+			paymentId,
+			transactionId: paymentId,
+			reason: 'PAYMENT_FAILED',
+			metadata: { graceEndDate },
+		});
+
+		return next;
+	});
+};
+
+export const getPatientSubscriptionsDueForReminder = async (hoursBefore = 48) => {
+	const now = new Date();
+	const windowEnd = new Date(now.getTime() + hoursBefore * 60 * 60 * 1000);
+	const subscriptions = await db.patientSubscription.findMany({
+		where: {
+			status: { in: ['active', 'trial', 'grace'] },
+			price: { gt: 0 },
+		},
+		select: {
+			id: true,
+			userId: true,
+			status: true,
+			renewalDate: true,
+			metadata: true,
+		},
+	});
+
+	return subscriptions.filter((sub: any) => {
+		const trialEndDate = sub?.metadata?.trialEndDate ? new Date(sub.metadata.trialEndDate) : null;
+		const endDate = trialEndDate || (sub.renewalDate ? new Date(sub.renewalDate) : null);
+		if (!endDate || Number.isNaN(endDate.getTime())) return false;
+		return endDate.getTime() > now.getTime() && endDate.getTime() <= windowEnd.getTime();
 	});
 };
 
@@ -1169,14 +1252,28 @@ export const listProviders = async (filters: ProviderFilters) => {
 	const roleFilter = requestedRole
 		? [requestedRole]
 		: [...PROVIDER_ROLES];
+	const eligibleSubscriptions = await db.providerSubscription.findMany({
+		where: {
+			status: { in: ['active', 'trial', 'grace'] },
+			expiryDate: { gt: new Date() },
+		},
+		select: { providerId: true },
+	});
+	const eligibleProviderIds = eligibleSubscriptions.map((row: any) => String(row.providerId));
+	if (!eligibleProviderIds.length) {
+		return {
+			items: [],
+			meta: { page, limit, total: 0, totalPages: 1 },
+		};
+	}
 	const therapists = await db.user.findMany({
-		where: { role: { in: roleFilter as any }, isDeleted: false },
+		where: { role: { in: roleFilter as any }, isDeleted: false, id: { in: eligibleProviderIds } },
 		select: { id: true, firstName: true, lastName: true, name: true, role: true, isDeleted: true, status: true, therapistProfile: true },
 		orderBy: { createdAt: 'desc' },
 		skip,
 		take: limit,
 	});
-	const total = await db.user.count({ where: { role: { in: roleFilter as any }, isDeleted: false } });
+	const total = await db.user.count({ where: { role: { in: roleFilter as any }, isDeleted: false, id: { in: eligibleProviderIds } } });
 	let items = await Promise.all(therapists.map((u: any) => toProviderListItem(u)));
 
 	if (filters.specialization) {
@@ -1197,6 +1294,16 @@ export const listProviders = async (filters: ProviderFilters) => {
 };
 
 export const getProviderById = async (providerId: string) => {
+	const eligible = await db.providerSubscription.findFirst({
+		where: {
+			providerId,
+			status: { in: ['active', 'trial', 'grace'] },
+			expiryDate: { gt: new Date() },
+		},
+		select: { providerId: true },
+	});
+	if (!eligible) throw new AppError('Provider not available for booking right now', 404);
+
 	const therapist = await db.user.findUnique({
 		where: { id: providerId },
 		select: { id: true, firstName: true, lastName: true, name: true, role: true, isDeleted: true, status: true, therapistProfile: true },

@@ -1248,6 +1248,7 @@ model PatientSubscription {
   renewalDate  DateTime
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  metadata     Json?
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([status])
@@ -1957,6 +1958,7 @@ model ProviderSubscription {
   lastAssignedAt        DateTime?                 // For fair rotation
   createdAt             DateTime                  @default(now())
   updatedAt             DateTime                  @updatedAt
+  metadata              Json?
   provider              User                      @relation(fields: [providerId], references: [id], onDelete: Cascade)
 
   @@index([status])
@@ -2047,5 +2049,98 @@ model SSOIdentity {
 
   @@unique([tenantKey, provider, providerSubject])
   @@map("sso_identities")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PHASE 2: Pending Entities for Atomic Activation
+// ═══════════════════════════════════════════════════════════════════════════
+// These tables enable multi-component (platform + lead plan + marketplace) 
+// atomic activation on webhook success. Created on checkout, activated on 
+// PAYMENT_SUCCESS, expunged on failure.
+
+model CorporateOtpRequest {
+  id              String   @id @default(uuid())
+  phone           String
+  otpHash         String
+  companyName     String
+  companySize     String?
+  industry        String?
+  country         String?
+  contactName     String?
+  email           String?
+  status          String   @default("PENDING")  // "PENDING" | "USED" | "EXPIRED"
+  expiresAt       DateTime
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([phone, status])
+  @@index([status, expiresAt])
+  @@map("corporate_otp_requests")
+}
+
+model PlatformAccessPending {
+  id                  String   @id @default(uuid())
+  providerId          String
+  billingCycle        String   // "monthly" | "quarterly"
+  amountMinor         Int      // Platform cost in paise (₹99M = 9900, ₹279Q = 27900)
+  paymentId           String?  // Links to financialPayment.merchantTransactionId
+  activatedAt         DateTime?
+  expiryDate          DateTime // When platform access expires (1M or 3M from activation)
+  status              String   @default("pending") // "pending" | "activated" | "expired"
+  metadata            Json?    // Additional activation context
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([providerId, paymentId])
+  @@index([providerId, status])
+  @@index([status, activatedAt])
+  @@map("platform_access_pending")
+}
+
+model LeadPlanPending {
+  id                  String   @id @default(uuid())
+  providerId          String
+  planKey             String   // "free" | "basic" | "standard" | "premium"
+  billingCycle        String   // "monthly" | "quarterly"
+  amountMinor         Int      // Lead plan cost in paise
+  leadsPerWeek        Int      // Weekly lead allocation
+  trialDays           Int      @default(21)  // Trial period before first charge
+  paymentId           String?  // Links to financialPayment.merchantTransactionId
+  activatedAt         DateTime?
+  renewalDate         DateTime // Auto-renewal date
+  status              String   @default("pending") // "pending" | "activated" | "expired" | "cancelled"
+  metadata            Json?    // Feature flags, bonuses, promo info
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([providerId, paymentId])
+  @@index([providerId, status])
+  @@index([status, activatedAt])
+  @@map("lead_plan_pending")
+}
+
+model MarketplaceLeadBundlePending {
+  id                  String   @id @default(uuid())
+  providerId          String
+  bundleKey           String   // Snapshot of: "hot:{qty}_warm:{qty}_cold:{qty}"
+  hotLeads            Int      // Qty of HOT leads
+  warmLeads           Int      // Qty of WARM leads
+  coldLeads           Int      // Qty of COLD leads
+  amountMinor         Int      // Total bundle cost in paise
+  paymentId           String?  // Links to financialPayment.merchantTransactionId
+  activatedAt         DateTime?
+  expiryDate          DateTime // Marketplace leads expire 48h or 72h from activation
+  status              String   @default("pending") // "pending" | "activated" | "expired" | "partially_used"
+  usedHotLeads        Int      @default(0)
+  usedWarmLeads       Int      @default(0)
+  usedColdLeads       Int      @default(0)
+  metadata            Json?    // Pricing breakdown, conversion tracking
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([providerId, paymentId])
+  @@index([providerId, status])
+  @@index([status, activatedAt])
+  @@map("marketplace_lead_bundle_pending")
 }
 

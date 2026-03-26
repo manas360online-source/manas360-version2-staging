@@ -93,9 +93,6 @@ exports.env = Object.freeze({
     redisUrl: process.env.REDIS_URL ?? 'redis://127.0.0.1:6379',
     analyticsRollupIntervalSeconds: parseNumber(process.env.ANALYTICS_ROLLUP_INTERVAL_SECONDS, 3600),
     disableAuthRateLimit: parseBoolean(process.env.DISABLE_AUTH_RATE_LIMIT, false),
-    razorpayKeyId: process.env.RAZORPAY_KEY_ID,
-    razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET,
-    razorpayWebhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET,
     phonePeWebhookUsername: process.env.PHONEPE_WEBHOOK_USERNAME,
     phonePeWebhookPassword: process.env.PHONEPE_WEBHOOK_PASSWORD,
     paymentProviderSharePercent: parseNumber(process.env.PAYMENT_PROVIDER_SHARE_PERCENT, 60),
@@ -106,12 +103,23 @@ exports.env = Object.freeze({
     allowDevVerificationBypass: parseBoolean(process.env.DEV_VERIFICATION_BYPASS, parseNodeEnv(process.env.NODE_ENV) === 'development'),
     allowDevPaymentBypass: parseBoolean(process.env.DEV_PAYMENT_BYPASS, parseNodeEnv(process.env.NODE_ENV) === 'development'),
     allowDevPhonePeWebhookProbeBypass: parseBoolean(process.env.PHONEPE_WEBHOOK_PROBE_BYPASS, false),
+    allowPhonePeWebhookIpBypass: parseBoolean(process.env.PHONEPE_WEBHOOK_IP_BYPASS, false),
     freesoundApiKey: process.env.FREESOUND_API_KEY,
 });
 if ((exports.env.nodeEnv === 'production' || exports.env.nodeEnv === 'staging')
     && (exports.env.jwtAccessSecret === JWT_ACCESS_FALLBACK || exports.env.jwtRefreshSecret === JWT_REFRESH_FALLBACK)) {
     throw new Error('JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must be configured for staging/production');
 }
-if ((exports.env.nodeEnv === 'production' || exports.env.nodeEnv === 'staging') && (!process.env.PHONEPE_SALT_KEY || !process.env.PHONEPE_MERCHANT_ID || !process.env.PHONEPE_SALT_INDEX)) {
-    throw new Error('PHONEPE_SALT_KEY, PHONEPE_MERCHANT_ID and PHONEPE_SALT_INDEX must be configured for staging/production');
+if (exports.env.nodeEnv === 'production' || exports.env.nodeEnv === 'staging') {
+    const hasMerchantId = Boolean(String(process.env.PHONEPE_MERCHANT_ID || '').trim());
+    const hasOAuth = Boolean(String(process.env.PHONEPE_CLIENT_ID || '').trim())
+        && Boolean(String(process.env.PHONEPE_CLIENT_SECRET || '').trim());
+    const hasSaltFlow = Boolean(String(process.env.PHONEPE_SALT_KEY || '').trim())
+        && Boolean(String(process.env.PHONEPE_SALT_INDEX || '').trim());
+    if (!hasMerchantId) {
+        throw new Error('PHONEPE_MERCHANT_ID must be configured for staging/production');
+    }
+    if (!hasOAuth && !hasSaltFlow) {
+        throw new Error('PhonePe config invalid: set PHONEPE_CLIENT_ID + PHONEPE_CLIENT_SECRET (OAuth V2) or PHONEPE_SALT_KEY + PHONEPE_SALT_INDEX');
+    }
 }

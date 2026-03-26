@@ -26,21 +26,22 @@ async function ensurePatientProfile(userId) {
 }
 
 async function run() {
-  const patientEmail = 'patient@manas360.local';
+  // Patient will use phone+OTP; admin remains email+password
+  const patientEmail = null;
   const patientPhone = '+917000100111';
   const adminEmail = 'admin@manas360.local';
   const adminPhone = '+917000600111';
   const password = 'Manas@123';
   const passwordHash = await bcrypt.hash(password, 12);
 
+  // Upsert patient by phone (phone-first); do not set a password for phone-based accounts
   const patient = await prisma.user.upsert({
-    where: { email: patientEmail },
+    where: { phone: patientPhone },
     update: {
-      passwordHash,
       phone: patientPhone,
       role: 'PATIENT',
       provider: 'LOCAL',
-      emailVerified: true,
+      emailVerified: false,
       phoneVerified: true,
       failedLoginAttempts: 0,
       lockUntil: null,
@@ -50,12 +51,11 @@ async function run() {
       name: 'Priya Kumar',
     },
     create: {
-      email: patientEmail,
+      email: null,
       phone: patientPhone,
-      passwordHash,
       role: 'PATIENT',
       provider: 'LOCAL',
-      emailVerified: true,
+      emailVerified: false,
       phoneVerified: true,
       firstName: 'Priya',
       lastName: 'Kumar',

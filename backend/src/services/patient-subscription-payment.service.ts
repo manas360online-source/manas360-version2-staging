@@ -5,7 +5,23 @@ import { initiatePhonePePayment } from './phonepe.service';
 import { env } from '../config/env';
 import { logger } from '../utils/logger';
 
-export const initiatePatientSubscriptionPayment = async (userId: string, planKey: string) => {
+const toCompactToken = (value: string, maxLength: number): string =>
+	String(value || '')
+		.replace(/[^a-zA-Z0-9]/g, '')
+		.slice(0, maxLength)
+		.toLowerCase();
+
+interface PatientSubscriptionPaymentOptions {
+	amountMinorOverride?: number;
+	idempotencyKey?: string;
+	metadata?: Record<string, unknown>;
+}
+
+export const initiatePatientSubscriptionPayment = async (
+	userId: string,
+	planKey: string,
+	options?: PatientSubscriptionPaymentOptions,
+) => {
 	const plan = await getActivePlatformPlan(planKey);
 	if (!plan) throw new AppError('Invalid subscription plan', 422);
 
@@ -29,10 +45,16 @@ export const initiatePatientSubscriptionPayment = async (userId: string, planKey
 		take: 20,
 	}).catch(() => [] as any[]);
 
-	const matchingAttempts = initiatedAttempts.filter((row: any) =>
-		String(row?.metadata?.type || '') === 'patient_subscription'
-		&& String(row?.metadata?.plan || '') === String(planKey),
-	);
+	const requestedIdempotencyKey = String(options?.idempotencyKey || '').trim();
+	const matchingAttempts = initiatedAttempts.filter((row: any) => {
+		const isPlanMatch =
+			String(row?.metadata?.type || '') === 'patient_subscription'
+			&& String(row?.metadata?.plan || '') === String(planKey);
+
+		if (!isPlanMatch) return false;
+		if (!requestedIdempotencyKey) return true;
+		return String(row?.captureIdempotencyKey || row?.metadata?.idempotencyKey || '') === requestedIdempotencyKey;
+	});
 
 	const latestAttempt = matchingAttempts[0] as any;
 	if (latestAttempt) {
@@ -54,13 +76,22 @@ export const initiatePatientSubscriptionPayment = async (userId: string, planKey
 		}).catch(() => null);
 	}
 
-	const transactionId = `SUB_${userId}_${planKey}_${Date.now()}`;
-	const shouldBypass = false;
-	const amountMinor = Math.max(0, Math.round(Number(plan.price || 0) * 100));
+	const userToken = toCompactToken(userId, 8) || 'user';
+	const transactionId = `SUB_${userToken}_${Date.now()}`;
+	const shouldBypass = env.allowDevPaymentBypass && env.nodeEnv !== 'production';
+	const canFallbackWithoutGateway = env.nodeEnv !== 'production';
+	const amountMinor = Math.max(
+		0,
+		Math.round(
+			Number.isFinite(Number(options?.amountMinorOverride))
+				? Number(options?.amountMinorOverride)
+				: Number(plan.price || 0) * 100,
+		),
+	);
 	const frontendBaseUrl = env.frontendUrl;
 	const callbackUrl = `${env.apiUrl}${env.apiPrefix}/v1/payments/phonepe/webhook`;
 	const cycleKey = new Date().toISOString().slice(0, 10);
-	const subscriptionIdempotencyKey = `sub_init:${userId}:${planKey}:${cycleKey}`;
+	const subscriptionIdempotencyKey = requestedIdempotencyKey || `sub_init:${userId}:${planKey}:${cycleKey}`;
 
 	let redirectUrl: string;
 	try {
@@ -72,11 +103,15 @@ export const initiatePatientSubscriptionPayment = async (userId: string, planKey
 			redirectUrl: `${frontendBaseUrl}/payment/status?id=${transactionId}&status=SUCCESS`,
 		});
 	} catch (error: any) {
-		if (!shouldBypass) {
+		if (!shouldBypass && !canFallbackWithoutGateway) {
 			throw new AppError(error?.message || 'PhonePe Payment Initiation Failed', 502);
 		}
-		// Bypass mode: mock a success redirect
-		logger.info('[PhonePe] Bypassing patient payment initiation in development mode', { transactionId });
+		// Non-production fallback: continue with local redirect when gateway is unavailable.
+		logger.warn('[PhonePe] Falling back to local redirect after patient payment initiation failure', {
+			transactionId,
+			nodeEnv: env.nodeEnv,
+			error: error?.message,
+		});
 		redirectUrl = `${frontendBaseUrl}/payment/status?id=${transactionId}&status=SUCCESS`;
 	}
 
@@ -86,7 +121,7 @@ export const initiatePatientSubscriptionPayment = async (userId: string, planKey
 			data: {
 				merchantTransactionId: transactionId,
 				patientId: userId,
-				amountMinor,
+				amountMinor: BigInt(amountMinor),
 				currency: 'INR',
 				captureIdempotencyKey: subscriptionIdempotencyKey,
 				status: shouldBypass ? 'CAPTURED' : 'INITIATED',
@@ -95,6 +130,7 @@ export const initiatePatientSubscriptionPayment = async (userId: string, planKey
 					plan: planKey,
 					redirectUrl,
 					idempotencyKey: subscriptionIdempotencyKey,
+					...(options?.metadata || {}),
 				}
 			}
 		});

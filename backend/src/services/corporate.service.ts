@@ -1,7 +1,8 @@
 import { randomUUID } from 'crypto';
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/error.middleware';
-import { hashPassword } from '../utils/hash';
+import { hashPassword, generateNumericOtp, hashOtp, verifyOtp } from '../utils/hash';
+import { env } from '../config/env';
 
 type BulkEmployeeRow = {
   employeeId?: string;
@@ -71,22 +72,33 @@ type PaymentMethodUpdateInput = {
 
 type CorporateDemoRequestInput = {
   companyName?: string;
-  workEmail?: string;
   companySize?: string;
   industry?: string;
   country?: string;
   contactName?: string;
   phone?: string;
+  email?: string;
 };
 
-type CorporateAccountCreateInput = {
+type CorporateOtpRequestInput = {
   companyName?: string;
-  workEmail?: string;
-  password?: string;
+  phone?: string;
   companySize?: string;
   industry?: string;
   country?: string;
   contactName?: string;
+  email?: string;
+};
+
+type CorporateAccountCreateInput = {
+  companyName?: string;
+  phone?: string;
+  otp?: string;
+  companySize?: string;
+  industry?: string;
+  country?: string;
+  contactName?: string;
+  email?: string;
 };
 
 const DEFAULT_COMPANY_KEY = 'techcorp-india';
@@ -1649,14 +1661,15 @@ export const submitCorporateDemoRequest = async (payload: CorporateDemoRequestIn
   await ensureCorporateTables();
 
   const companyName = String(payload.companyName || '').trim();
-  const workEmail = normalizeEmail(payload.workEmail);
+  const phone = String(payload.phone || '').trim();
+  const email = String(payload.email || '').trim().toLowerCase() || null;
 
   if (!companyName) {
     throw new AppError('companyName is required', 400);
   }
 
-  if (!workEmail || !workEmail.includes('@')) {
-    throw new AppError('A valid workEmail is required', 400);
+  if (!phone) {
+    throw new AppError('Phone number is required for demo request', 400);
   }
 
   const companyKey = sanitizeKeyPart(companyName);
@@ -1669,19 +1682,66 @@ export const submitCorporateDemoRequest = async (payload: CorporateDemoRequestIn
     requestId,
     companyName,
     companyKey || null,
-    workEmail,
+    email,
     String(payload.companySize || '').trim() || null,
     String(payload.industry || '').trim() || null,
     String(payload.country || '').trim() || null,
     String(payload.contactName || '').trim() || null,
-    String(payload.phone || '').trim() || null,
+    phone,
   );
 
   return {
     requestId,
     companyName,
-    workEmail,
+    phone,
+    email,
     status: 'NEW',
+  };
+};
+
+export const requestCorporateOtp = async (payload: CorporateOtpRequestInput) => {
+  await ensureCorporateTables();
+
+  const companyName = String(payload.companyName || '').trim();
+  const phone = String(payload.phone || '').trim();
+  
+  if (!companyName) {
+    throw new AppError('companyName is required', 400);
+  }
+
+  if (!phone) {
+    throw new AppError('Phone number is required', 400);
+  }
+
+  const otp = generateNumericOtp();
+  const otpHash = await hashOtp(otp);
+
+  // Store OTP in database with expiry
+  const otpRecordId = randomUUID();
+  const expiresAt = new Date(Date.now() + env.otpTtlMinutes * 60 * 1000);
+
+  // Store corporate OTP request
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO "corporate_otp_requests" (
+      "id","phone","otpHash","companyName","companySize","industry","country","contactName","email","status","expiresAt","createdAt","updatedAt"
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'PENDING',$10,NOW(),NOW())`,
+    otpRecordId,
+    phone,
+    otpHash,
+    companyName,
+    String(payload.companySize || '').trim() || null,
+    String(payload.industry || '').trim() || null,
+    String(payload.country || '').trim() || null,
+    String(payload.contactName || '').trim() || null,
+    String(payload.email || '').trim().toLowerCase() || null,
+    expiresAt,
+  );
+
+  return {
+    otpRecordId,
+    phone,
+    message: 'Corporate OTP sent',
+    devOtp: env.nodeEnv !== 'production' ? otp : undefined,
   };
 };
 
@@ -1689,29 +1749,57 @@ export const createCorporateAccount = async (payload: CorporateAccountCreateInpu
   await ensureCorporateTables();
 
   const companyName = String(payload.companyName || '').trim();
-  const workEmail = normalizeEmail(payload.workEmail);
-  const password = String(payload.password || '');
+  const phone = String(payload.phone || '').trim();
+  const otp = String(payload.otp || '').trim();
+  const email = String(payload.email || '').trim().toLowerCase() || null;
   const contactName = String(payload.contactName || '').trim();
 
   if (!companyName) {
     throw new AppError('companyName is required', 400);
   }
 
-  if (!workEmail || !workEmail.includes('@')) {
-    throw new AppError('A valid workEmail is required', 400);
+  if (!phone) {
+    throw new AppError('Phone number is required', 400);
   }
 
-  if (password.length < 8) {
-    throw new AppError('Password must be at least 8 characters long', 400);
+  if (!otp) {
+    throw new AppError('OTP is required', 400);
   }
 
-  const existingUser = await prisma.user.findUnique({ where: { email: workEmail } });
+  // Verify OTP
+  const otpRecord = (await prisma.$queryRawUnsafe(
+    `SELECT "otpHash", "expiresAt" FROM "corporate_otp_requests" 
+     WHERE phone = $1 AND status = 'PENDING' ORDER BY "createdAt" DESC LIMIT 1`,
+    phone,
+  )) as Array<{ otpHash: string; expiresAt: Date }>;
+
+  if (!otpRecord || !otpRecord[0]) {
+    throw new AppError('Invalid or expired OTP request', 400);
+  }
+
+  if (otpRecord[0].expiresAt < new Date()) {
+    throw new AppError('OTP expired', 400);
+  }
+
+  const validOtp = await verifyOtp(otp, otpRecord[0].otpHash);
+  if (!validOtp) {
+    throw new AppError('Invalid OTP', 400);
+  }
+
+  // Mark OTP as used
+  await prisma.$executeRawUnsafe(
+    `UPDATE "corporate_otp_requests" SET status = 'USED' WHERE phone = $1`,
+    phone,
+  );
+
+  // Check if phone already registered
+  const existingUser = await prisma.user.findFirst({ where: { phone } });
   if (existingUser && !existingUser.isDeleted) {
-    throw new AppError('Work email is already registered', 409);
+    throw new AppError('Phone number is already registered', 409);
   }
 
   const companyKey = await resolveUniqueCompanyKey(companyName);
-  const companyDomain = getDomainFromEmail(workEmail);
+  const companyDomain = email ? getDomainFromEmail(email) : null;
   const companyId = randomUUID();
   const defaultEmployeeLimit = Math.max(50, toInt(payload.companySize, 300));
   const defaultSessionQuota = Math.max(25, Math.round(defaultEmployeeLimit * 0.65));
@@ -1732,25 +1820,26 @@ export const createCorporateAccount = async (payload: CorporateAccountCreateInpu
     'Priority support within 4 business hours.',
   );
 
-  const passwordHash = await hashPassword(password);
   const nameParts = contactName ? contactName.split(/\s+/).filter(Boolean) : [];
   const firstName = nameParts[0] || companyName;
   const lastName = nameParts.slice(1).join(' ');
 
   const corporateMember = await prisma.user.create({
     data: {
-      email: workEmail,
-      passwordHash,
-      provider: 'LOCAL',
+      email: email || undefined,
+      phone,
+      provider: 'PHONE',
       role: 'PATIENT',
       firstName,
       lastName,
       name: contactName || companyName,
-      emailVerified: true,
+      phoneVerified: true,
+      emailVerified: Boolean(email),
     },
     select: {
       id: true,
       email: true,
+      phone: true,
       firstName: true,
       lastName: true,
     },

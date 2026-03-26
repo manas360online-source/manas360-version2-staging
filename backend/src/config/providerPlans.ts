@@ -40,8 +40,8 @@ export const PROVIDER_PLANS: Record<ProviderPlanKey, ProviderPlanDetail> = {
 		durationDays: 0,
 	},
 	basic: {
-		price: 999,
-		quarterlyPrice: 2758,
+		price: 199,
+		quarterlyPrice: 549,
 		leadsPerWeek: 3,
 		leadsPerMonth: 12,
 		discount: 0,
@@ -56,10 +56,10 @@ export const PROVIDER_PLANS: Record<ProviderPlanKey, ProviderPlanDetail> = {
 		durationDays: 30,
 	},
 	standard: {
-		price: 2499,
-		quarterlyPrice: 6897,
-		leadsPerWeek: 5,
-		leadsPerMonth: 20,
+		price: 299,
+		quarterlyPrice: 829,
+		leadsPerWeek: 6,
+		leadsPerMonth: 24,
 		discount: 10,
 		claimWindowHours: 36,
 		deliveryDays: ['Mon', 'Wed', 'Fri'],
@@ -72,8 +72,8 @@ export const PROVIDER_PLANS: Record<ProviderPlanKey, ProviderPlanDetail> = {
 		durationDays: 30,
 	},
 	premium: {
-		price: 4999,
-		quarterlyPrice: 13797,
+		price: 399,
+		quarterlyPrice: 1099,
 		leadsPerWeek: 7,
 		leadsPerMonth: 28,
 		discount: 20,
@@ -91,9 +91,9 @@ export const PROVIDER_PLANS: Record<ProviderPlanKey, ProviderPlanDetail> = {
 
 /** Marketplace lead pricing by type */
 export const LEAD_MARKETPLACE_PRICES: Record<string, number> = {
-	hot: 500,
-	warm: 300,
-	cold: 150,
+	hot: 299,
+	warm: 199,
+	cold: 99,
 };
 
 /** Calculate discounted marketplace price */

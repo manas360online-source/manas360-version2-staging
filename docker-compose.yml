@@ -38,7 +38,7 @@ services:
         condition: service_started
     ports:
       - "5000:5000"
-    command: ["sh", "-c", "node dist/server.js"]
+    command: ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]
 
   ai_engine:
     build:

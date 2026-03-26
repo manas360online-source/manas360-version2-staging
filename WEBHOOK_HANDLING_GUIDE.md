@@ -236,6 +236,10 @@ Enhanced webhook endpoint:
 
 ## Authorization Header Verification
 
+### PhonePe V2 Note
+- Payment APIs in V2 use OAuth (`Authorization: O-Bearer <token>`) and do not require payment `X-VERIFY` checksum headers.
+- Webhook signature verification should use a webhook-specific secret, exposed in this project as `PHONEPE_WEBHOOK_SECRET` (fallback: `PHONEPE_SALT_KEY` for backward compatibility).
+
 ### Format
 PhonePe sends: `Authorization: SHA256(username:password)`
 
@@ -308,6 +312,7 @@ The service handles various deployment scenarios:
 # Webhook credentials (from PhonePe Business Dashboard)
 PHONEPE_WEBHOOK_USERNAME=webhook_user     # 5-20 chars, letters/digits/underscores
 PHONEPE_WEBHOOK_PASSWORD=pass123456       # 8-20 chars, letters + numbers
+PHONEPE_WEBHOOK_SECRET=webhook_secret_key # Use webhook secret/salt from Webhooks tab
 
 # Optional: Allow dev bypass for testing
 DEV_ALLOW_PHONEPE_WEBHOOK_PROBE_BYPASS=true  # dev only

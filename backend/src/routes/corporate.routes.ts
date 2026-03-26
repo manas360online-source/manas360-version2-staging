@@ -25,6 +25,7 @@ import {
   updateCorporateSessionAllocationsController,
   updateCorporateSettingsController,
   submitCorporateDemoRequestController,
+  requestCorporateOtpController,
   createCorporateAccountController,
 } from '../controllers/corporate.controller';
 
@@ -32,6 +33,7 @@ const router = Router();
 const corporateUpload = multer({ storage: multer.memoryStorage() });
 
 router.post('/public/request-demo', asyncHandler(submitCorporateDemoRequestController));
+router.post('/public/request-otp', asyncHandler(requestCorporateOtpController));
 router.post('/public/create-account', asyncHandler(createCorporateAccountController));
 
 router.get('/dashboard', requireAuth, requireCorporateMemberAccess, asyncHandler(getCorporateDashboardController));

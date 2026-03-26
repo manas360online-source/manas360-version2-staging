@@ -2,14 +2,25 @@
 set -eu
 
 BASE_URL="${BASE_URL:-http://localhost:3000}"
+PATIENT_PHONE="${PATIENT_PHONE:-+917000100111}"
 COOKIE_FILE="/tmp/manas_patient_saas_smoke.cookies"
 OUT_DIR="/tmp/patient-saas-smoke"
 mkdir -p "$OUT_DIR"
 
-echo "[1/5] Login as deterministic demo patient..."
+echo "[1/5] Login as deterministic demo patient via phone OTP..."
 curl -sS -c "$COOKIE_FILE" -H 'Content-Type: application/json' \
-  -d '{"identifier":"patient@manas360.local","password":"Manas@123"}' \
-  "$BASE_URL/api/auth/login" -o "$OUT_DIR/login.json" -w '\nHTTP:%{http_code}\n'
+  -d "{\"phone\":\"$PATIENT_PHONE\"}" \
+  "$BASE_URL/api/v1/auth/signup/phone" -o "$OUT_DIR/otp_request.json" -w '\nHTTP:%{http_code}\n'
+
+OTP_CODE=$(node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('$OUT_DIR/otp_request.json','utf8'));process.stdout.write(String(p?.data?.devOtp||''));")
+if [ -z "$OTP_CODE" ]; then
+  echo "Missing devOtp from /api/v1/auth/signup/phone response" >&2
+  exit 1
+fi
+
+curl -sS -c "$COOKIE_FILE" -H 'Content-Type: application/json' \
+  -d "{\"phone\":\"$PATIENT_PHONE\",\"otp\":\"$OTP_CODE\"}" \
+  "$BASE_URL/api/v1/auth/verify/phone-otp" -o "$OUT_DIR/login.json" -w '\nHTTP:%{http_code}\n'
 
 echo "[2/5] Fetch journey recommendation..."
 curl -sS -b "$COOKIE_FILE" "$BASE_URL/api/v1/patient-journey/recommendation" \

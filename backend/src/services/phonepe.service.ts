@@ -7,6 +7,7 @@ import { logger } from '../utils/logger';
 const PHONEPE_MERCHANT_ID = String(process.env.PHONEPE_MERCHANT_ID || 'PGCHECKOUT').trim();
 const PHONEPE_SALT_KEY = String(process.env.PHONEPE_SALT_KEY || '').trim();
 const PHONEPE_SALT_INDEX = String(process.env.PHONEPE_SALT_INDEX || '1').trim();
+const PHONEPE_WEBHOOK_SECRET = String(process.env.PHONEPE_WEBHOOK_SECRET || process.env.PHONEPE_SALT_KEY || '').trim();
 const PHONEPE_ENV = String(process.env.PHONEPE_ENV || (env.nodeEnv === 'production' ? 'production' : 'preprod')).trim().toLowerCase();
 const PHONEPE_MODE = String(process.env.PHONEPE_MODE || '').trim().toLowerCase();
 
@@ -15,10 +16,13 @@ const PHONEPE_MODE = String(process.env.PHONEPE_MODE || '').trim().toLowerCase()
 // 2) PHONEPE_MODE=pgsandbox (simulator)
 // 3) PHONEPE_ENV=production|preprod (standard gateway)
 const GET_PHONEPE_BASE_URL = () => {
-	if (process.env.PHONEPE_BASE_URL) return String(process.env.PHONEPE_BASE_URL).trim();
+	if (process.env.PHONEPE_BASE_URL) {
+		return String(process.env.PHONEPE_BASE_URL).trim();
+	}
 	if (PHONEPE_MODE === 'pgsandbox' || PHONEPE_MODE === 'simulator') {
 		return 'https://api-preprod.phonepe.com/apis/pg-sandbox';
 	}
+	
 	if (PHONEPE_ENV === 'production' || PHONEPE_ENV === 'prod' || PHONEPE_ENV === 'live') {
 		return 'https://api.phonepe.com/apis/hermes';
 	}
@@ -30,11 +34,19 @@ const PHONEPE_CLIENT_ID = String(process.env.PHONEPE_CLIENT_ID || '').trim();
 const PHONEPE_CLIENT_SECRET = String(process.env.PHONEPE_CLIENT_SECRET || '').trim();
 const PHONEPE_CLIENT_VERSION = String(process.env.PHONEPE_CLIENT_VERSION || '1').trim();
 const PHONEPE_OAUTH_URL = String(process.env.PHONEPE_OAUTH_URL || '').trim();
+// Prefer V2 checkout status endpoint by default; allow override via env
+const PHONEPE_STATUS_ENDPOINT_TEMPLATE = String(
+	process.env.PHONEPE_STATUS_ENDPOINT_TEMPLATE || '/checkout/v2/order/{merchantTransactionId}/status'
+).trim();
 
 if (!PHONEPE_SALT_KEY) {
-	logger.error('[PhonePe] PHONEPE_SALT_KEY is not set. Payment signing and verification will fail.');
-	if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging') {
-		throw new Error('Missing PHONEPE_SALT_KEY in production/staging environment');
+	if (PHONEPE_CLIENT_ID && PHONEPE_CLIENT_SECRET) {
+		logger.info('[PhonePe] PHONEPE_SALT_KEY not set; operating in OAuth-only (V2) mode using client credentials.');
+	} else {
+		logger.error('[PhonePe] PHONEPE_SALT_KEY is not set and OAuth credentials are not configured. Payment signing and verification will fail.');
+		if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging') {
+			throw new Error('Missing PHONEPE_SALT_KEY or OAuth credentials in production/staging environment');
+		}
 	}
 }
 
@@ -46,15 +58,67 @@ interface PhonePeToken {
 }
 
 let cachedPhonePeToken: PhonePeToken | null = null;
+let tokenRefreshTimeout: NodeJS.Timeout | null = null;
+
+const scheduleTokenRefresh = (expiresAt: number): void => {
+	if (tokenRefreshTimeout) {
+		clearTimeout(tokenRefreshTimeout);
+	}
+
+	const now = Date.now();
+	const refreshLeadTime = 60 * 1000; // 60 seconds before expiry
+	const timeUntilRefresh = expiresAt - now - refreshLeadTime;
+
+	if (timeUntilRefresh > 0) {
+		tokenRefreshTimeout = setTimeout(async () => {
+			logger.info('[PhonePe] Auto-refreshing OAuth token (proactive refresh)');
+			await fetchPhonePeToken();
+		}, timeUntilRefresh);
+	}
+};
+
+export const initializePhonePeTokenRefresh = async (): Promise<void> => {
+	if (!PHONEPE_CLIENT_ID || !PHONEPE_CLIENT_SECRET) {
+		logger.info('[PhonePe] OAuth credentials not configured; skipping token initialization');
+		return;
+	}
+
+	try {
+		logger.info('[PhonePe] Initializing OAuth token on startup');
+		const token = await fetchPhonePeToken();
+		if (token && cachedPhonePeToken) {
+			scheduleTokenRefresh(cachedPhonePeToken.expiresAt);
+			logger.info('[PhonePe] Token refresh scheduled', {
+				expiresIn: Math.round((cachedPhonePeToken.expiresAt - Date.now()) / 1000),
+				seconds: 's',
+			});
+		}
+	} catch (error: any) {
+		logger.error('[PhonePe] Token initialization failed', { error: error?.message });
+	}
+};
+
+export const cleanupPhonePeTokenRefresh = (): void => {
+	if (tokenRefreshTimeout) {
+		clearTimeout(tokenRefreshTimeout);
+		tokenRefreshTimeout = null;
+		logger.info('[PhonePe] Token refresh cleanup complete');
+	}
+};
 
 const getPhonePeOAuthUrl = (): string => {
-	if (PHONEPE_OAUTH_URL) return PHONEPE_OAUTH_URL;
-	if (PHONEPE_BASE_URL.includes('pgsandbox') || PHONEPE_BASE_URL.includes('pg-sandbox')) {
-		return 'https://api-preprod.phonepe.com/apis/pg-sandbox/v1/oauth/token';
+	if (PHONEPE_OAUTH_URL) {
+		return PHONEPE_OAUTH_URL;
 	}
+
 	if (PHONEPE_ENV === 'preprod' || PHONEPE_ENV === 'uat') {
 		return 'https://api-preprod.phonepe.com/apis/identity-manager/v1/oauth/token';
 	}
+
+	if (PHONEPE_BASE_URL.includes('api-preprod.phonepe.com')) {
+		return 'https://api-preprod.phonepe.com/apis/identity-manager/v1/oauth/token';
+	}
+
 	return 'https://api.phonepe.com/apis/identity-manager/v1/oauth/token';
 };
 
@@ -71,13 +135,25 @@ const fetchPhonePeToken = async (): Promise<string | null> => {
 
 	try {
 		const oauthUrl = getPhonePeOAuthUrl();
+		if (
+			(PHONEPE_ENV === 'preprod' || PHONEPE_ENV === 'uat' || PHONEPE_BASE_URL.includes('api-preprod.phonepe.com'))
+			&& oauthUrl.includes('api.phonepe.com')
+			&& !oauthUrl.includes('api-preprod.phonepe.com')
+		) {
+			logger.warn('[PhonePe] OAuth URL appears to be production while runtime is preprod/UAT. Check PHONEPE_OAUTH_URL.', {
+				oauthUrl,
+				baseUrl: PHONEPE_BASE_URL,
+				env: PHONEPE_ENV,
+			});
+		}
+
 		const payload = new URLSearchParams();
 		payload.append('client_id', PHONEPE_CLIENT_ID);
 		payload.append('client_version', PHONEPE_CLIENT_VERSION);
 		payload.append('client_secret', PHONEPE_CLIENT_SECRET);
 		payload.append('grant_type', 'client_credentials');
 
-		const response = await axios.post(oauthUrl, payload.toString(), {
+		const response = await axios.post(oauthUrl, payload, {
 			headers: {
 				'Content-Type': 'application/x-www-form-urlencoded',
 			},
@@ -92,6 +168,7 @@ const fetchPhonePeToken = async (): Promise<string | null> => {
 
 		cachedPhonePeToken = { accessToken: token, expiresAt };
 		logger.info('[PhonePe] OAuth token fetched', { expiresAt });
+		scheduleTokenRefresh(expiresAt);
 		return token;
 	} catch (error: any) {
 		logger.error('[PhonePe] OAuth token fetch failed', {
@@ -112,69 +189,9 @@ const getPhonePeAuthToken = async (): Promise<string | null> => {
 const getPhonePeAuthorizationHeader = async (): Promise<Record<string, string>> => {
 	const token = await getPhonePeAuthToken();
 	if (!token) {
-		return {};
+		throw new AppError('PhonePe OAuth token unavailable. Check PHONEPE_CLIENT_ID/PHONEPE_CLIENT_SECRET and PHONEPE_OAUTH_URL.', 502);
 	}
 	return { Authorization: `O-Bearer ${token}` };
-};
-
-const initiatePhonePePaymentViaSdk = async (input: {
-	transactionId: string;
-	amountInPaise: number;
-	redirectUrl: string;
-}): Promise<string | null> => {
-	try {
-		const sdk: any = await import('@phonepe-pg/pg-sdk-node');
-		const StandardCheckoutClient = sdk?.StandardCheckoutClient;
-		const Env = sdk?.Env;
-		if (!StandardCheckoutClient || !Env) {
-			return null;
-		}
-
-		const sdkEnv = PHONEPE_ENV === 'production' || PHONEPE_ENV === 'prod' || PHONEPE_ENV === 'live'
-			? Env.PRODUCTION
-			: Env.SANDBOX;
-		const clientVersion = Number(PHONEPE_CLIENT_VERSION || '1');
-		const client = StandardCheckoutClient.getInstance(PHONEPE_CLIENT_ID, PHONEPE_CLIENT_SECRET, clientVersion, sdkEnv);
-
-		const createOrderBuilder = sdk?.CreateSdkOrderRequest?.StandardCheckoutBuilder?.();
-		if (createOrderBuilder) {
-			const request = createOrderBuilder
-				.merchantOrderId(input.transactionId)
-				.amount(input.amountInPaise)
-				.redirectUrl(input.redirectUrl)
-				.disablePaymentRetry(true)
-				.build();
-
-			if (typeof client?.pay === 'function') {
-				const response = await client.pay(request);
-				const sdkRedirect = String(response?.redirectUrl || response?.redirect_url || '').trim();
-				if (sdkRedirect) return sdkRedirect;
-			}
-
-			if (typeof client?.createSdkOrder === 'function') {
-				const response = await client.createSdkOrder(request);
-				const sdkRedirect = String(response?.redirectUrl || response?.redirect_url || '').trim();
-				if (sdkRedirect) return sdkRedirect;
-			}
-		}
-
-		const payBuilder = sdk?.StandardCheckoutPayRequest?.builder?.();
-		if (payBuilder && typeof client?.pay === 'function') {
-			const request = payBuilder
-				.merchantOrderId(input.transactionId)
-				.amount(input.amountInPaise)
-				.redirectUrl(input.redirectUrl)
-				.build();
-			const response = await client.pay(request);
-			const sdkRedirect = String(response?.redirectUrl || response?.redirect_url || '').trim();
-			if (sdkRedirect) return sdkRedirect;
-		}
-
-		return null;
-	} catch (error: any) {
-		logger.error('[PhonePe] SDK fallback failed', { message: error?.message, stack: error?.stack });
-		return null;
-	}
 };
 
 interface PhonePePaymentRequest {
@@ -220,19 +237,30 @@ export const initiatePhonePePayment = async (input: {
 		},
 	};
 
-	const base64Payload = Buffer.from(JSON.stringify(payload)).toString('base64');
-	const endpoint = PHONEPE_BASE_URL.includes('pg-sandbox') ? '/pg/v1/pay' : '/pg/v1/pay'; // Both use same endpoint path suffix
-	const checksum = sha256(base64Payload + '/pg/v1/pay' + PHONEPE_SALT_KEY) + '###' + PHONEPE_SALT_INDEX;
+	const endpoint = '/checkout/v2/pay';
+	const v2Payload = {
+		merchantOrderId: input.transactionId,
+		amount: input.amountInPaise,
+		paymentFlow: {
+			type: 'PG_CHECKOUT',
+			merchantUrls: {
+				redirectUrl: input.redirectUrl,
+			},
+		},
+		metaInfo: {
+			udf1: input.userId,
+		},
+	};
 
 	try {
 		const authHeaders = await getPhonePeAuthorizationHeader();
 		const response = await axios.post(
-			`${PHONEPE_BASE_URL}/pg/v1/pay`,
-			{ request: base64Payload },
+			`${PHONEPE_BASE_URL}${endpoint}`,
+			v2Payload,
 			{
 				headers: {
 					'Content-Type': 'application/json',
-					'X-VERIFY': checksum,
+					'X-CLIENT-ID': PHONEPE_CLIENT_ID,
 					'X-MERCHANT-ID': PHONEPE_MERCHANT_ID,
 					accept: 'application/json',
 					...authHeaders,
@@ -241,10 +269,26 @@ export const initiatePhonePePayment = async (input: {
 			}
 		);
 
-		const redirectUrl = response.data?.data?.instrumentResponse?.redirectInfo?.url;
+		// PhonePe payloads can arrive in multiple shapes. Prefer top-level first, then nested wrappers.
+		const rawResponse = response.data;
+		const responseData = rawResponse?.responseData || rawResponse?.data || rawResponse?.response || rawResponse;
+		const nestedData = responseData?.data;
+
+		const redirectUrl = rawResponse?.redirectUrl
+			|| responseData?.redirectUrl
+			|| nestedData?.redirectUrl
+			|| rawResponse?.instrumentResponse?.redirectInfo?.url
+			|| responseData?.instrumentResponse?.redirectInfo?.url
+			|| nestedData?.instrumentResponse?.redirectInfo?.url
+			|| rawResponse?.instrument_response?.redirect_info?.url
+			|| responseData?.instrument_response?.redirect_info?.url
+			|| nestedData?.instrument_response?.redirect_info?.url;
 
 		if (!redirectUrl) {
-			logger.error('[PhonePe] No redirect URL in response', { transactionId: input.transactionId, responseData: response.data });
+			logger.error('[PhonePe] No redirect URL in response', {
+				transactionId: input.transactionId,
+				fullResponse: rawResponse,
+			});
 			throw new AppError('PhonePe did not return a redirect URL', 502);
 		}
 
@@ -255,22 +299,6 @@ export const initiatePhonePePayment = async (input: {
 
 		const upstreamCode = String(error?.response?.data?.code || '').trim();
 		const upstreamMessage = String(error?.response?.data?.message || error?.message || 'PhonePe request failed').trim();
-		const isMappingError = upstreamMessage.toLowerCase().includes('api mapping not found');
-
-		if (isMappingError && PHONEPE_CLIENT_ID && PHONEPE_CLIENT_SECRET) {
-			const sdkRedirectUrl = await initiatePhonePePaymentViaSdk({
-				transactionId: input.transactionId,
-				amountInPaise: input.amountInPaise,
-				redirectUrl: input.redirectUrl,
-			});
-			if (sdkRedirectUrl) {
-				logger.info('[PhonePe] SDK fallback payment initiated successfully', {
-					transactionId: input.transactionId,
-					redirectUrl: sdkRedirectUrl,
-				});
-				return sdkRedirectUrl;
-			}
-		}
 
 		logger.error('[PhonePe] Payment Initiation Failed', {
 			transactionId: input.transactionId,
@@ -295,7 +323,12 @@ export const verifyPhonePeWebhook = (reqBody: string, xVerify: string): boolean 
 		return false;
 	}
 
-	const expected = sha256(reqBody + PHONEPE_SALT_KEY) + '###' + PHONEPE_SALT_INDEX;
+	if (!PHONEPE_WEBHOOK_SECRET) {
+		logger.warn('[PhonePe] PHONEPE_WEBHOOK_SECRET not configured; cannot verify webhook signature.');
+		return false;
+	}
+
+	const expected = sha256(reqBody + PHONEPE_WEBHOOK_SECRET) + '###' + PHONEPE_SALT_INDEX;
 
 	try {
 		const expectedBuf = Buffer.from(expected);
@@ -320,15 +353,33 @@ export const verifyPhonePeWebhook = (reqBody: string, xVerify: string): boolean 
 };
 
 export const checkPhonePeStatus = async (merchantTransactionId: string) => {
-	const endpoint = `/pg/v1/status/${PHONEPE_MERCHANT_ID}/${merchantTransactionId}`;
-	const checksum = sha256(endpoint + PHONEPE_SALT_KEY) + '###' + PHONEPE_SALT_INDEX;
+	// Support multiple template variable patterns for backward compatibility.
+	let resolvedStatusEndpoint = PHONEPE_STATUS_ENDPOINT_TEMPLATE;
+	if (resolvedStatusEndpoint.includes('{merchantTransactionId}')) {
+		resolvedStatusEndpoint = resolvedStatusEndpoint.replace('{merchantTransactionId}', merchantTransactionId);
+	} else if (resolvedStatusEndpoint.includes('{merchantId}') && resolvedStatusEndpoint.includes('{transactionId}')) {
+		resolvedStatusEndpoint = resolvedStatusEndpoint
+			.replace('{merchantId}', PHONEPE_MERCHANT_ID)
+			.replace('{transactionId}', merchantTransactionId);
+	} else {
+		// Fallback to common V2 path
+		resolvedStatusEndpoint = `/checkout/v2/order/${merchantTransactionId}/status`;
+	}
+
+	let endpoint = resolvedStatusEndpoint.startsWith('/') ? resolvedStatusEndpoint : `/${resolvedStatusEndpoint}`;
+
+	// Guard against stale env templates accidentally pointing to old subscriptions API.
+	if (endpoint.includes('/subscriptions/v2/')) {
+		endpoint = `/checkout/v2/order/${merchantTransactionId}/status`;
+	}
+	const fallbackEndpoint = `/checkout/v2/order/${merchantTransactionId}/status`;
 
 	try {
 		const authHeaders = await getPhonePeAuthorizationHeader();
 		const response = await axios.get(`${PHONEPE_BASE_URL}${endpoint}`, {
 			headers: {
 				'Content-Type': 'application/json',
-				'X-VERIFY': checksum,
+				'X-CLIENT-ID': PHONEPE_CLIENT_ID,
 				'X-MERCHANT-ID': PHONEPE_MERCHANT_ID,
 				accept: 'application/json',
 				...authHeaders,
@@ -345,6 +396,42 @@ export const checkPhonePeStatus = async (merchantTransactionId: string) => {
 
 		return response.data;
 	} catch (error: any) {
+		const upstreamCode = String(error?.response?.data?.code || '').toUpperCase();
+		const shouldRetryWithFallback = upstreamCode === 'API_MAPPING_NOT_FOUND' || upstreamCode === 'API MAPPING NOT FOUND';
+
+		if (shouldRetryWithFallback && endpoint !== fallbackEndpoint) {
+			try {
+				const authHeaders = await getPhonePeAuthorizationHeader();
+				const retryResponse = await axios.get(`${PHONEPE_BASE_URL}${fallbackEndpoint}`, {
+					headers: {
+						'Content-Type': 'application/json',
+						'X-CLIENT-ID': PHONEPE_CLIENT_ID,
+						'X-MERCHANT-ID': PHONEPE_MERCHANT_ID,
+						accept: 'application/json',
+						...authHeaders,
+					},
+					timeout: 10000,
+				});
+
+				logger.info('[PhonePe] Status check fallback succeeded', {
+					merchantTransactionId,
+					endpoint: fallbackEndpoint,
+					code: retryResponse.data?.code,
+					state: retryResponse.data?.data?.state,
+				});
+
+				return retryResponse.data;
+			} catch (retryError: any) {
+				logger.error('[PhonePe] Status check fallback failed', {
+					merchantTransactionId,
+					endpoint: fallbackEndpoint,
+					status: retryError?.response?.status,
+					data: retryError?.response?.data,
+					message: retryError?.message,
+				});
+			}
+		}
+
 		logger.error('[PhonePe] Status Check Failed', {
 			merchantTransactionId,
 			status: error?.response?.status,
@@ -393,6 +480,15 @@ const PHONEPE_WEBHOOK_IPS = [
 	'103.243.35.242',
 ];
 
+// Allow additional, deployment-specific webhook source IPs via env var
+// Comma-separated list, e.g. "1.2.3.4,5.6.7.8"
+const PHONEPE_WEBHOOK_ALLOWED_IPS = String(process.env.PHONEPE_WEBHOOK_ALLOWED_IPS || '').split(',')
+	.map((s) => String(s || '').trim())
+	.filter(Boolean);
+
+// Combined whitelist used at runtime
+const PHONEPE_COMBINED_WEBHOOK_IPS = Array.from(new Set([...PHONEPE_WEBHOOK_IPS, ...PHONEPE_WEBHOOK_ALLOWED_IPS]));
+
 /**
  * Verify webhook IP is from PhonePe
  * PhonePe sends webhooks from their proxy IPs
@@ -405,13 +501,18 @@ export const isPhonePeWebhookIP = (clientIp: string): boolean => {
 		return process.env.NODE_ENV === 'development';
 	}
 
-	// Check against PhonePe IP whitelist
-	return PHONEPE_WEBHOOK_IPS.includes(clientIp);
+	// Normalize IPv4-mapped IPv6 addresses ("::ffff:1.2.3.4")
+	const normalizedIp = String(clientIp).startsWith('::ffff:') ? String(clientIp).replace('::ffff:', '') : String(clientIp);
+
+	// Check against combined whitelist (official PhonePe IPs + any deployment overrides)
+	return PHONEPE_COMBINED_WEBHOOK_IPS.includes(normalizedIp);
 };
 
 /**
- * Verify webhook authorization header using SHA256(username:password)
- * Per PhonePe doc: "Authorization: SHA256(username:password)"
+ * Verify webhook authorization header.
+ * Supports:
+ * - PhonePe format: Authorization: SHA256(<hex sha256(username:password)>)
+ * - Basic auth format: Authorization: Basic <base64(username:password)>
  */
 export const verifyPhonePeWebhookAuth = (
 	authHeader: string,
@@ -424,32 +525,57 @@ export const verifyPhonePeWebhookAuth = (
 	}
 
 	try {
-		// PhonePe sends: "Authorization: SHA256(username:password)"
-		// Extract the hash portion from header
-		const headerValue = authHeader.replace(/^SHA256\s*\(\s*|\s*\)$/g, '').trim();
-		
-		// Compute expected hash
 		const credentials = `${expectedUsername}:${expectedPassword}`;
 		const expectedHash = crypto.createHash('sha256').update(credentials).digest('hex');
+		const normalizedAuthHeader = String(authHeader || '').trim();
 
-		// Timing-safe comparison
-		const headerBuf = Buffer.from(headerValue);
-		const expectedBuf = Buffer.from(expectedHash);
+		const compareTimingSafe = (received: string, expected: string): boolean => {
+			const receivedBuf = Buffer.from(received);
+			const expectedBuf = Buffer.from(expected);
+			if (receivedBuf.length !== expectedBuf.length) {
+				return false;
+			}
+			return crypto.timingSafeEqual(receivedBuf, expectedBuf);
+		};
 
-		if (headerBuf.length !== expectedBuf.length) {
-			logger.error('[PhonePe] Webhook auth header length mismatch');
-			return false;
+		// PhonePe hash format: Authorization: SHA256(<hash>)
+		const sha256Match = normalizedAuthHeader.match(/^SHA256\s*\(\s*([a-fA-F0-9]{64})\s*\)\s*$/);
+		if (sha256Match) {
+			const receivedHash = String(sha256Match[1] || '').toLowerCase();
+			const isValid = compareTimingSafe(receivedHash, expectedHash);
+			if (!isValid) {
+				logger.error('[PhonePe] Webhook auth signature mismatch', {
+					received: receivedHash.substring(0, 20) + '...',
+					expectedHash: expectedHash.substring(0, 20) + '...',
+				});
+			} else {
+				logger.info('[PhonePe] Webhook auth accepted', { mode: 'sha256' });
+			}
+			return isValid;
 		}
 
-		const isValid = crypto.timingSafeEqual(headerBuf, expectedBuf);
-		if (!isValid) {
-			logger.error('[PhonePe] Webhook auth signature mismatch', {
-				received: headerValue.substring(0, 20) + '...',
-				expectedHash: expectedHash.substring(0, 20) + '...',
-			});
+		// Basic auth format: Authorization: Basic <base64(username:password)>
+		if (/^Basic\s+/i.test(normalizedAuthHeader)) {
+			const encoded = normalizedAuthHeader.replace(/^Basic\s+/i, '').trim();
+			let decoded = '';
+			try {
+				decoded = Buffer.from(encoded, 'base64').toString('utf8');
+			} catch {
+				logger.error('[PhonePe] Invalid basic auth encoding in webhook authorization');
+				return false;
+			}
+
+			const isValid = compareTimingSafe(decoded, credentials);
+			if (!isValid) {
+				logger.error('[PhonePe] Webhook basic auth credentials mismatch');
+			} else {
+				logger.info('[PhonePe] Webhook auth accepted', { mode: 'basic' });
+			}
+			return isValid;
 		}
 
-		return isValid;
+		logger.error('[PhonePe] Unsupported webhook authorization format');
+		return false;
 	} catch (error: any) {
 		logger.error('[PhonePe] Webhook auth verification failed', { error: error?.message });
 		return false;
@@ -492,19 +618,17 @@ export const initiatePhonePeRefund = async (input: {
 		originalTransactionId: input.originalMerchantOrderId,
 	};
 
-	const base64Payload = Buffer.from(JSON.stringify(payload)).toString('base64');
 	const endpoint = '/payments/v2/refund';
-	const checksum = sha256(base64Payload + endpoint + PHONEPE_SALT_KEY) + '###' + PHONEPE_SALT_INDEX;
 
 	try {
 		const authHeaders = await getPhonePeAuthorizationHeader();
 		const response = await axios.post(
 			`${PHONEPE_BASE_URL}${endpoint}`,
-			{ request: base64Payload },
+			payload,
 			{
 				headers: {
 					'Content-Type': 'application/json',
-					'X-VERIFY': checksum,
+					'X-CLIENT-ID': PHONEPE_CLIENT_ID,
 					'X-MERCHANT-ID': PHONEPE_MERCHANT_ID,
 					accept: 'application/json',
 					...authHeaders,
@@ -548,14 +672,13 @@ export const initiatePhonePeRefund = async (input: {
 
 export const checkPhonePeRefundStatus = async (merchantRefundId: string) => {
 	const endpoint = `/payments/v2/refund/${merchantRefundId}/status`;
-	const checksum = sha256(endpoint + PHONEPE_SALT_KEY) + '###' + PHONEPE_SALT_INDEX;
 
 	try {
 		const authHeaders = await getPhonePeAuthorizationHeader();
 		const response = await axios.get(`${PHONEPE_BASE_URL}${endpoint}`, {
 			headers: {
 				'Content-Type': 'application/json',
-				'X-VERIFY': checksum,
+				'X-CLIENT-ID': PHONEPE_CLIENT_ID,
 				'X-MERCHANT-ID': PHONEPE_MERCHANT_ID,
 				accept: 'application/json',
 				...authHeaders,

@@ -18,8 +18,13 @@ router.post('/sessions', requireAuth, requireRole('patient'), paymentRateLimiter
 router.post('/sessions/:id/complete', requireAuth, requireRole('therapist'), paymentRateLimiter, asyncHandler(completeFinancialSessionController));
 
 // PhonePe specific routes
+router.get('/phonepe/webhook', (_req, res) => {
+	res.status(200).json({ success: true, message: 'PhonePe webhook endpoint reachable' });
+});
 router.post('/phonepe/webhook', asyncHandler(phonepeWebhookController));
 router.get('/phonepe/status/:transactionId', requireAuth, asyncHandler(getPhonePeStatusController));
+// Public status endpoint for redirect page (no auth required; transactionId is hard to guess)
+router.get('/status/:transactionId', asyncHandler(getPhonePeStatusController));
 
 // Refund routes
 router.post('/refund', requireAuth, requireRole('patient'), paymentRateLimiter, asyncHandler(initiateRefundController));

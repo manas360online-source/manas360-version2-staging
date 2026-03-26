@@ -461,10 +461,10 @@ export const patientApi = {
     ]),
   getSubscription: async () => {
     const response = await withFallbackChain([
+      async () => (await http.get('/v1/patient/subscription')).data,
+      async () => (await http.get('/patient/subscription')).data,
       async () => (await http.get('/v1/subscription')).data,
       async () => (await http.get('/subscription')).data,
-      async () => (await http.get('/patient/subscription')).data,
-      async () => (await http.get('/v1/patient/subscription')).data,
     ]);
     return unwrapPayload(response);
   },
@@ -474,42 +474,60 @@ export const patientApi = {
   },
   upgradeSubscription: async (payload: { planKey: string }) => {
     const response = await withFallbackChain([
+      async () => (await http.patch('/v1/patient/subscription/upgrade', payload)).data,
+      async () => (await http.patch('/patient/subscription/upgrade', payload)).data,
       async () => (await http.patch('/v1/subscription/upgrade', payload)).data,
       async () => (await http.patch('/subscription/upgrade', payload)).data,
-      async () => (await http.patch('/patient/subscription/upgrade', payload)).data,
-      async () => (await http.patch('/v1/patient/subscription/upgrade', payload)).data,
+    ]);
+    return unwrapPayload(response);
+  },
+  checkoutSubscription: async (payload: {
+    planKey: string;
+    addons: Record<string, unknown>;
+    subtotalMinor: number;
+    gstMinor: number;
+    totalMinor: number;
+    acceptedTerms: boolean;
+    promoCode?: string;
+    idempotencyKey?: string;
+  }) => {
+    const response = await withFallbackChain([
+      async () => (await http.post('/v1/patient/subscription/checkout', payload)).data,
+      async () => (await http.post('/patient/subscription/checkout', payload)).data,
+      async () => (await http.post('/v1/subscription/checkout', payload)).data,
+      async () => (await http.post('/subscription/checkout', payload)).data,
     ]);
     return unwrapPayload(response);
   },
   downgradeSubscription: async () => {
     const response = await withFallbackChain([
+      async () => (await http.patch('/v1/patient/subscription/downgrade')).data,
+      async () => (await http.patch('/patient/subscription/downgrade')).data,
       async () => (await http.patch('/v1/subscription/downgrade')).data,
       async () => (await http.patch('/subscription/downgrade')).data,
-      async () => (await http.patch('/patient/subscription/downgrade')).data,
-      async () => (await http.patch('/v1/patient/subscription/downgrade')).data,
     ]);
     return unwrapPayload(response);
   },
   cancelSubscription: async () =>
     withFallbackChain([
+      async () => (await http.patch('/v1/patient/subscription/cancel')).data,
+      async () => (await http.patch('/patient/subscription/cancel')).data,
       async () => (await http.patch('/v1/subscription/cancel')).data,
       async () => (await http.patch('/subscription/cancel')).data,
-      async () => (await http.patch('/patient/subscription/cancel')).data,
-      async () => (await http.patch('/v1/patient/subscription/cancel')).data,
     ]),
   reactivateSubscription: async () =>
     withFallbackChain([
+      async () => (await http.patch('/v1/patient/subscription/reactivate')).data,
+      async () => (await http.patch('/patient/subscription/reactivate')).data,
       async () => (await http.patch('/v1/subscription/reactivate')).data,
       async () => (await http.patch('/subscription/reactivate')).data,
-      async () => (await http.patch('/patient/subscription/reactivate')).data,
-      async () => (await http.patch('/v1/patient/subscription/reactivate')).data,
     ]),
   setSubscriptionAutoRenew: async (autoRenew: boolean) =>
     withFallbackChain([
+      async () => (await http.patch('/v1/patient/subscription/auto-renew', { autoRenew })).data,
+      async () => (await http.patch('/patient/subscription/auto-renew', { autoRenew })).data,
       async () => (await http.patch('/v1/subscription/auto-renew', { autoRenew })).data,
       async () => (await http.patch('/subscription/auto-renew', { autoRenew })).data,
-      async () => (await http.patch('/patient/subscription/auto-renew', { autoRenew })).data,
-      async () => (await http.patch('/v1/patient/subscription/auto-renew', { autoRenew })).data,
     ]),
   getPaymentMethod: async () =>
     withFallbackChain([
@@ -745,6 +763,12 @@ export const patientApi = {
       timeSlots: Array<{ startMinute: number; endMinute: number }>;
     },
     providerType?: string,
+    options?: {
+      concerns?: string[];
+      languages?: string[];
+      modes?: string[];
+      context?: 'Standard' | 'Corporate' | 'Night' | 'Buddy' | 'Crisis';
+    },
   ) => {
     const query = new URLSearchParams();
     availabilityPrefs.daysOfWeek.forEach((day) => {
@@ -756,6 +780,10 @@ export const patientApi = {
     if (providerType && providerType !== 'ALL') {
       query.append('providerType', providerType);
     }
+    (options?.concerns || []).forEach((concern) => query.append('concerns', concern));
+    (options?.languages || []).forEach((language) => query.append('languages', language));
+    (options?.modes || []).forEach((mode) => query.append('modes', mode));
+    if (options?.context) query.append('context', options.context);
     const response = (await http.get(`/v1/patient/providers/smart-match?${query}`)).data;
     const payload = response?.data ?? response;
     const providers = Array.isArray(payload?.providers) ? payload.providers : [];

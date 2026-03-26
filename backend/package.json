@@ -38,7 +38,6 @@
 	"dependencies": {
 		"@aws-sdk/client-s3": "^3.750.0",
 		"@aws-sdk/s3-request-presigner": "^3.750.0",
-		"@phonepe-pg/pg-sdk-node": "^2.0.5",
 		"@prisma/adapter-pg": "^7.5.0",
 		"@sentry/node": "^10.44.0",
 		"@sentry/profiling-node": "^10.44.0",

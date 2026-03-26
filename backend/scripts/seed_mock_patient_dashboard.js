@@ -2,8 +2,8 @@ const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
-const MOCK_PATIENT_EMAIL = 'mock.patient@manas360.local';
-const MOCK_THERAPIST_EMAIL = 'mock.therapist@manas360.local';
+const MOCK_PATIENT_PHONE = '+917000100211';
+const MOCK_THERAPIST_PHONE = '+917000200211';
 
 function addDays(days) {
   const date = new Date();
@@ -12,14 +12,14 @@ function addDays(days) {
 }
 
 async function run() {
-  const patientUser = await prisma.user.findUnique({ where: { email: MOCK_PATIENT_EMAIL } });
+  const patientUser = await prisma.user.findFirst({ where: { phone: MOCK_PATIENT_PHONE } });
   if (!patientUser) {
-    throw new Error(`Patient user not found: ${MOCK_PATIENT_EMAIL}. Run seed:users:mock first.`);
+    throw new Error(`Patient user not found: ${MOCK_PATIENT_PHONE}. Run seed:users:mock first.`);
   }
 
-  const therapistUser = await prisma.user.findUnique({ where: { email: MOCK_THERAPIST_EMAIL } });
+  const therapistUser = await prisma.user.findFirst({ where: { phone: MOCK_THERAPIST_PHONE } });
   if (!therapistUser) {
-    throw new Error(`Therapist user not found: ${MOCK_THERAPIST_EMAIL}. Run seed:users:mock first.`);
+    throw new Error(`Therapist user not found: ${MOCK_THERAPIST_PHONE}. Run seed:users:mock first.`);
   }
 
   const patientProfile = await prisma.patientProfile.upsert({

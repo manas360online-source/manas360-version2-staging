@@ -90,6 +90,9 @@ router.get('/screening/provider-questions', auth_middleware_1.requireAuth, (0, r
  * Generic real-time summary for admin module pages.
  */
 router.get('/modules/:module/summary', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, validate_middleware_1.asyncHandler)(admin_module_controller_1.getAdminModuleSummaryController));
+// ==================== DASHBOARD & CORE ====================
+router.get('/dashboard', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, validate_middleware_1.asyncHandler)(admin_module_controller_1.getAdminModuleSummaryController));
+router.get('/platform-health', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, validate_middleware_1.asyncHandler)(admin_analytics_controller_1.getAdminSystemHealthController));
 /**
  * GET /api/v1/admin/analytics/summary
  * Query params:
@@ -121,6 +124,31 @@ router.get('/analytics/templates', auth_middleware_1.requireAuth, (0, rbac_middl
  *   - lastTherapistKey: bigint (optional, keyset cursor)
  */
 router.get('/analytics/utilization', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, validate_middleware_1.asyncHandler)(admin_analytics_controller_1.getAdminTherapistUtilizationController));
+/**
+ * GET /api/v1/admin/analytics/revenue
+ * Get revenue analytics dashboard data
+ */
+router.get('/analytics/revenue', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('view_analytics'), (0, validate_middleware_1.asyncHandler)(admin_analytics_controller_1.getAdminRevenueAnalyticsController));
+/**
+ * GET /api/v1/admin/analytics/user-metrics
+ * Get user metrics and growth analytics
+ */
+router.get('/analytics/users', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('view_analytics'), (0, validate_middleware_1.asyncHandler)(admin_analytics_controller_1.getAdminUserMetricsController));
+/**
+ * GET /api/v1/admin/analytics/provider-metrics
+ * Get provider performance and utilization metrics
+ */
+router.get('/analytics/providers', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('view_analytics'), (0, validate_middleware_1.asyncHandler)(admin_analytics_controller_1.getAdminProviderMetricsController));
+/**
+ * GET /api/v1/admin/analytics/marketplace-metrics
+ * Get marketplace (lead matching, supply/demand) metrics
+ */
+router.get('/analytics/marketplace', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('view_analytics'), (0, validate_middleware_1.asyncHandler)(admin_analytics_controller_1.getAdminMarketplaceMetricsController));
+/**
+ * GET /api/v1/admin/analytics/system-health
+ * Get system health and infrastructure metrics
+ */
+router.get('/analytics/health', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('view_analytics'), (0, validate_middleware_1.asyncHandler)(admin_analytics_controller_1.getAdminSystemHealthController));
 /**
  * GET /api/v1/admin/analytics/payments
  * Query params:
@@ -167,6 +195,7 @@ router.get('/analytics/export/:exportJobKey/status', auth_middleware_1.requireAu
  * GET /api/v1/admin/analytics/export/:exportJobKey/download
  * Download completed async export output.
  */
+router.get('/analytics/export/:exportJobKey/download', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('view_analytics'), (0, validate_middleware_1.asyncHandler)(admin_analytics_controller_1.downloadAdminAnalyticsExportController));
 /**
  * POST /api/v1/admin/waive-subscription
  * Admin grants a subscription without charging the user (free access).

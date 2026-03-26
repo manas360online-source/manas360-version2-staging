@@ -751,3 +751,24 @@ export const purchaseProviderLead = async (leadId: string) => {
   const response = await http.post<Envelope<any>>('/v1/provider/marketplace/purchase', { leadId });
   return unwrap<any>(response.data);
 };
+
+export interface ProviderCheckoutPayload {
+  leadPlanKey: 'free' | 'basic' | 'standard' | 'premium';
+  platformCycle: 'monthly' | 'quarterly';
+  addons: {
+    hot: number;
+    warm: number;
+    cold: number;
+  };
+  subtotalMinor: number;
+  gstMinor: number;
+  totalMinor: number;
+  acceptedTerms: boolean;
+  promoCode?: string;
+  idempotencyKey?: string;
+}
+
+export const checkoutProviderSubscription = async (payload: ProviderCheckoutPayload) => {
+  const response = await http.post<Envelope<any>>('/v1/provider/subscription/checkout', payload);
+  return unwrap<any>(response.data);
+};

@@ -14,6 +14,16 @@
             "date": 1774315135497,
             "name": "/Users/chandu/Project/MANAS360_version2/backend/logs/combined-2026-03-24.log",
             "hash": "f00d4b0230e5a1478ccf7477b6bb9313a99371d92319b736b9d1c0d86470ef45"
+        },
+        {
+            "date": 1774406807881,
+            "name": "/Users/chandu/Project/MANAS360_version2/backend/logs/combined-2026-03-25.log",
+            "hash": "16f50ce80e863f7de4638fa90a3cd32e6d08655e686d1527d73bbb46445cec1b"
+        },
+        {
+            "date": 1774500707665,
+            "name": "/Users/chandu/Project/MANAS360_version2/backend/logs/combined-2026-03-26.log",
+            "hash": "ab55a6a2396ef0ca0b2694536e947def998bae0661dcacdb31c952f29209de77"
         }
     ],
     "hashType": "sha256"

@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { getApiErrorMessage } from '../../api/auth';
 import { hasCorporateAccess, isPlatformAdminUser, useAuth } from '../../context/AuthContext';
 
@@ -61,6 +61,11 @@ export default function AdminPortalLoginPage() {
 		<div className="responsive-page">
 			<div className="responsive-container">
 				<div className="mx-auto w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-md">
+					<div className="mb-3">
+						<Link to="/" className="text-sm text-slate-700 underline underline-offset-2 hover:text-slate-900">
+							Back to Home
+						</Link>
+					</div>
 					<h1 className="text-2xl font-semibold text-slate-900">Admin Portal Login</h1>
 					<p className="mt-2 text-sm text-slate-600">Only admin accounts can access this portal.</p>
 

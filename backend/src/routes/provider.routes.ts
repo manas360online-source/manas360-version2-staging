@@ -127,6 +127,7 @@ router.post('/meeting-link/:sessionId', requireAuth, requireRole(providerRoles),
 import {
 	getProviderSubscriptionController,
 	upgradeProviderSubscriptionController,
+	checkoutProviderSubscriptionController,
 	cancelProviderSubscriptionController,
 	getProviderLeadsController,
 	getProviderLeadStatsController,
@@ -138,6 +139,7 @@ import {
 router.get('/plans', asyncHandler(getProviderPlansController)); // public
 router.get('/subscription', requireAuth, requireRole(providerRoles), asyncHandler(getProviderSubscriptionController));
 router.patch('/subscription/upgrade', requireAuth, requireRole(providerRoles), asyncHandler(upgradeProviderSubscriptionController));
+router.post('/subscription/checkout', requireAuth, requireRole(providerRoles), asyncHandler(checkoutProviderSubscriptionController));
 router.patch('/subscription/cancel', requireAuth, requireRole(providerRoles), asyncHandler(cancelProviderSubscriptionController));
 router.get('/leads', requireAuth, requireRole(providerRoles), asyncHandler(getProviderLeadsController));
 router.get('/lead-stats', requireAuth, requireRole(providerRoles), asyncHandler(getProviderLeadStatsController));
