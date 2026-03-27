@@ -1,3 +1,10 @@
+// Public pricing controller for landing page
+export const getLivePricingController = async (req: Request, res: Response): Promise<void> => {
+	const { category } = req.params;
+	const data = await getPricingConfig();
+	// Optionally filter by category if needed
+	sendSuccess(res, category ? data[category] || {} : data, 'Live pricing fetched');
+};
 import type { Request, Response } from 'express';
 import { AppError } from '../middleware/error.middleware';
 import { sendSuccess } from '../utils/response';

@@ -53,6 +53,7 @@ export default function SlideOverBookingDrawer({
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showSubscriptionWarning, setShowSubscriptionWarning] = useState(false);
 
   // Reset state only when drawer is opened.
   useEffect(() => {
@@ -137,24 +138,20 @@ export default function SlideOverBookingDrawer({
 
   const handleConfirmBooking = async () => {
     if (!selectedDate || !selectedTime) return;
-    
     setIsLoading(true);
     setError(null);
-    
+    setShowSubscriptionWarning(false);
     try {
       // Create a JS Date composed of selectedDate + selectedTime (24-hour HH:mm)
       const [hours, minutes] = selectedTime.split(':').map(Number);
-      
       const scheduledAt = new Date(selectedDate);
       scheduledAt.setHours(hours, minutes, 0, 0);
-
       // Call the existing patientApi endpoint to create the therapy booking
       await patientApi.bookSession({
         providerId: provider.id,
         scheduledAt: scheduledAt.toISOString(),
         durationMinutes: 50,
       });
-
       // Initiate session payment so backend returns a gateway redirect URL
       try {
         const amountRupees = provider.sessionPrice || 1500;
@@ -168,13 +165,11 @@ export default function SlideOverBookingDrawer({
             return;
           }
         } catch (payErr: any) {
-          // If server denies booking due to missing subscription, redirect to plans
+          // If server denies booking due to missing subscription, show warning and button
           const status = Number(payErr?.response?.status || 0);
           const msg = String(payErr?.response?.data?.message || payErr?.message || '').toLowerCase();
           if (status === 403 || msg.includes('subscription required') || msg.includes('subscription')) {
-            // Preserve returnTo so user can continue booking after subscribing
-            const returnTo = window.location.pathname + window.location.search + window.location.hash;
-            navigate(`/plans?returnTo=${encodeURIComponent(returnTo)}`);
+            setShowSubscriptionWarning(true);
             return;
           }
           console.warn('Session payment initiation failed', payErr);
@@ -183,7 +178,6 @@ export default function SlideOverBookingDrawer({
         // If payment initiation fails, fall back to showing success + allow manual handling
         console.warn('Session payment initiation failed', payErr);
       }
-
       // If no redirect required, show success UI and close drawer
       setStep(3); // Show Success UI
       // Notify parent to refresh the Care Team / Next Up state
@@ -191,7 +185,6 @@ export default function SlideOverBookingDrawer({
         onBookingSuccess();
         onClose();
       }, 2000);
-
     } catch (err: any) {
       setError(err?.response?.data?.message || err?.message || 'Failed to confirm booking.');
     } finally {
@@ -231,6 +224,21 @@ export default function SlideOverBookingDrawer({
           {error && (
             <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
               {error}
+            </div>
+          )}
+          {showSubscriptionWarning && (
+            <div className="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 flex flex-col items-center">
+              <div className="mb-2 font-semibold">Subscribe to platform fee to book a session.</div>
+              <button
+                className="rounded-lg bg-teal-600 px-4 py-2 text-white font-semibold mt-2 hover:bg-teal-700 transition-colors"
+                onClick={() => {
+                  const returnTo = window.location.pathname + window.location.search + window.location.hash;
+                  // Use the provided subscription plan link or fallback to /plans
+                  window.location.href = `http://localhost:5173/payment/status?id=SUB_653d1e79_1774602028060&status=SUCCESS#/plans?returnTo=${encodeURIComponent(returnTo)}`;
+                }}
+              >
+                Subscribe to Platform Fee
+              </button>
             </div>
           )}
 

@@ -812,11 +812,18 @@ export const patientApi = {
     (options?.languages || []).forEach((language) => query.append('languages', language));
     (options?.modes || []).forEach((mode) => query.append('modes', mode));
     if (options?.context) query.append('context', options.context);
-    const response = (await http.get(`/v1/patient/providers/smart-match?${query}`)).data;
-    const payload = response?.data ?? response;
-    const providers = Array.isArray(payload?.providers) ? payload.providers : [];
-    const count = Number(payload?.count ?? providers.length ?? 0);
-    return { providers, count };
+    try {
+      const response = (await http.get(`/v1/patient/providers/smart-match?${query}`)).data;
+      const payload = response?.data ?? response;
+      const providers = Array.isArray(payload?.providers) ? payload.providers : [];
+      const count = Number(payload?.count ?? providers.length ?? 0);
+      return { providers, count };
+    } catch (err) {
+      // Axios error shape
+      const status = err?.response?.status;
+      const message = err?.response?.data?.message || err?.message || 'Unknown error';
+      return { error: true, status, message };
+    }
   },
 
   createAppointmentRequest: async (payload: {

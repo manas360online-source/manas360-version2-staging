@@ -1,3 +1,16 @@
+// Role to permissions mapping for JWT
+const permissionsMap: Record<string, Record<string, boolean>> = {
+	super_admin: { dashboard: true, users_read: true, users_write: true, verifications_approve: true, pricing_edit: true, payouts_approve: true, crisis_respond: true, offers_edit: true, audit_read: true },
+	clinical_director: { dashboard: true, users_read: true, verifications_approve: true, crisis_respond: true },
+	finance_manager: { dashboard: true, revenue: true, payouts_approve: true, pricing_edit: true },
+	therapist: { dashboard: true, own_earnings: true },
+	// Add all 11 profiles as needed
+	admin: { dashboard: true, users_read: true, users_write: true },
+	patient: {},
+	psychiatrist: { dashboard: true },
+	psychologist: { dashboard: true },
+	coach: { dashboard: true },
+};
 import { randomBytes } from 'crypto';
 import { authenticator } from 'otplib';
 import { OAuth2Client } from 'google-auth-library';
@@ -167,6 +180,7 @@ const audit = async (
 };
 
 const issueSessionTokens = async (userId: string, meta: RequestMeta) => {
+	const user = await db.user.findUnique({ where: { id: userId }, select: { role: true } });
 	const createdSession = await db.authSession.create({
 		data: {
 			userId,
@@ -180,7 +194,11 @@ const issueSessionTokens = async (userId: string, meta: RequestMeta) => {
 		select: { id: true },
 	});
 
-	const tokenPair = createTokenPair(userId, createdSession.id);
+	// Normalize role to lower case for mapping
+	const role = String(user?.role || '').toLowerCase();
+	const permissions = permissionsMap[role] || {};
+
+	const tokenPair = createTokenPair(userId, createdSession.id, permissions);
 	const refreshTokenHash = hashOpaqueToken(tokenPair.refreshToken);
 
 	await db.authSession.update({
