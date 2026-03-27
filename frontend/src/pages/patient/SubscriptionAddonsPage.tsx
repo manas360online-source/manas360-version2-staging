@@ -103,8 +103,18 @@ export default function SubscriptionAddonsPage() {
             </label>
           </div>
 
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-            Current total: <strong>INR {(summary.totalMinor / 100).toFixed(2)}</strong> <span className="text-slate-500">(includes 18% GST extra)</span>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 space-y-1">
+            <p>
+              Current total: <strong>INR {(summary.totalMinor / 100).toFixed(2)}</strong> <span className="text-slate-500">(includes 18% GST extra)</span>
+            </p>
+            <div className="flex items-center justify-between text-xs text-slate-600">
+              <span>Subtotal (before GST)</span>
+              <span>INR {(summary.subtotalMinor / 100).toFixed(2)}</span>
+            </div>
+            <div className="flex items-center justify-between text-xs text-slate-600">
+              <span>GST (18%)</span>
+              <span>INR {(summary.gstMinor / 100).toFixed(2)}</span>
+            </div>
           </div>
 
           <div className="flex flex-wrap gap-2">

@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
 }
 
 model User {
@@ -2142,5 +2142,97 @@ model MarketplaceLeadBundlePending {
   @@index([providerId, status])
   @@index([status, activatedAt])
   @@map("marketplace_lead_bundle_pending")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STORY 11.5: Hit a Sixer Gamification
+// ═══════════════════════════════════════════════════════════════════════════
+
+model DailyGamePlay {
+  id              String    @id @default(uuid())
+  userId          String
+  date            DateTime  @db.Date
+  sixesHit        Int       @default(0)
+  ballsPlayed     Int       @default(0)
+  didWin          Boolean   @default(false)
+  prizeAmount     Int?
+  lastPlayedAt    DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId, lastPlayedAt])
+  @@map("daily_game_play")
+}
+
+model UserWallet {
+  id              String    @id @default(uuid())
+  userId          String    @unique
+  balance         Int       @default(0)
+  lastTxnDate     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  transactions    UserWalletTransaction[]
+  credits         WalletCredit[]
+  bookingUsages   BookingWalletUsage[]
+
+  @@map("user_wallets")
+}
+
+model UserWalletTransaction {
+  id              String    @id @default(uuid())
+  walletId        String
+  transactionType WalletTransactionType
+  amount          Int
+  balanceAfter    Int
+  referenceId     String?   // GamePlayId, BookingId, etc.
+  description     String
+  createdAt       DateTime  @default(now())
+
+  wallet          UserWallet @relation(fields: [walletId], references: [id])
+
+  @@index([walletId, createdAt(sort: Desc)])
+  @@map("user_wallet_transactions")
+}
+
+model WalletCredit {
+  id              String    @id @default(uuid())
+  walletId        String
+  source          String    // "GAME_WIN", "REFERRAL", "PROMOTION"
+  amount          Int
+  status          WalletCreditStatus @default(AVAILABLE)
+  expiresAt       DateTime?
+  usedAt          DateTime?
+  createdAt       DateTime  @default(now())
+
+  wallet          UserWallet @relation(fields: [walletId], references: [id])
+
+  @@index([walletId, status])
+  @@map("wallet_credits")
+}
+
+model BookingWalletUsage {
+  id              String    @id @default(uuid())
+  walletId        String
+  bookingId       String    @unique
+  amountUsed      Int
+  createdAt       DateTime  @default(now())
+
+  wallet          UserWallet @relation(fields: [walletId], references: [id])
+
+  @@index([walletId])
+  @@map("booking_wallet_usages")
+}
+
+enum WalletTransactionType {
+  CREDIT
+  DEBIT
+}
+
+enum WalletCreditStatus {
+  AVAILABLE
+  USED
+  EXPIRED
 }
 

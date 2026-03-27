@@ -5,11 +5,20 @@ import { prisma } from '../config/db';
 import { AppError } from '../middleware/error.middleware';
 
 const db = prisma as any;
-const redis = createClient({ url: env.redisUrl });
+const redis = createClient({
+	url: env.redisUrl,
+	socket: {
+		reconnectStrategy: () => false,
+	},
+});
+let redisWarned = false;
 const isTestEnv = process.env.NODE_ENV === 'test';
 if (!isTestEnv) {
 	redis.on('error', (error) => {
-		console.warn('[subscription.service] Redis unavailable, continuing with degraded idempotency cache', error);
+		if (!redisWarned) {
+			console.warn('[subscription.service] Redis unavailable, continuing with degraded idempotency cache', error);
+			redisWarned = true;
+		}
 	});
 	void redis.connect().catch(() => undefined);
 }

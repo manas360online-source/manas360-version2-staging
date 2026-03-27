@@ -10,11 +10,20 @@ const env_1 = require("../config/env");
 const db_1 = require("../config/db");
 const error_middleware_1 = require("../middleware/error.middleware");
 const db = db_1.prisma;
-const redis = (0, redis_1.createClient)({ url: env_1.env.redisUrl });
+const redis = (0, redis_1.createClient)({
+    url: env_1.env.redisUrl,
+    socket: {
+        reconnectStrategy: () => false,
+    },
+});
+let redisWarned = false;
 const isTestEnv = process.env.NODE_ENV === 'test';
 if (!isTestEnv) {
     redis.on('error', (error) => {
-        console.warn('[subscription.service] Redis unavailable, continuing with degraded idempotency cache', error);
+        if (!redisWarned) {
+            console.warn('[subscription.service] Redis unavailable, continuing with degraded idempotency cache', error);
+            redisWarned = true;
+        }
     });
     void redis.connect().catch(() => undefined);
 }

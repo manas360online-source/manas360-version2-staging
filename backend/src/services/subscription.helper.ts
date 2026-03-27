@@ -30,6 +30,7 @@ export const calculateGraceEndDate = (): Date => {
 
 export const getEffectiveSubscriptionStatus = (sub: SubscriptionLike): 'active' | 'trial' | 'grace' | 'locked' => {
   const raw = String(sub.status || '').toLowerCase();
+
   if (raw === 'locked' || raw === 'expired' || raw === 'cancelled') return 'locked';
 
   const now = new Date();
@@ -59,4 +60,12 @@ export const isSubscriptionValidForMatching = (sub: SubscriptionLike | null | un
   if (isFreeLike(sub)) return false;
   const effective = getEffectiveSubscriptionStatus(sub);
   return effective === 'active' || effective === 'trial' || effective === 'grace';
+};
+
+export const isSubscriptionValidForGames = (sub: SubscriptionLike | null | undefined): boolean => {
+  if (!sub) return false;
+  // Allow any paying plan (price > 0) with a valid status
+  const effective = getEffectiveSubscriptionStatus(sub);
+  const isValidStatus = effective === 'active' || effective === 'trial' || effective === 'grace';
+  return isValidStatus && !isFreeLike(sub);
 };

@@ -11,6 +11,16 @@ const rawBaseUrl =
 
 const normalizeBaseUrl = (url: string): string => {
 	let normalized = url.trim();
+	// If the app is served from production (manas360.com) but the build still has
+	// VITE_API_BASE_URL pointing to localhost, override to same-origin relative API.
+	// This prevents production pages from calling http://localhost:3000/* in the browser.
+	if (
+		typeof window !== 'undefined'
+		&& /(^|\.)manas360\.com$/i.test(window.location.hostname)
+		&& normalized.includes('localhost:3000')
+	) {
+		return '/api';
+	}
 	if (normalized.startsWith('https://manas360.com')) {
 		normalized = normalized.replace('https://manas360.com', 'https://www.manas360.com');
 	}

@@ -104,6 +104,7 @@ exports.env = Object.freeze({
     allowDevPaymentBypass: parseBoolean(process.env.DEV_PAYMENT_BYPASS, parseNodeEnv(process.env.NODE_ENV) === 'development'),
     allowDevPhonePeWebhookProbeBypass: parseBoolean(process.env.PHONEPE_WEBHOOK_PROBE_BYPASS, false),
     allowPhonePeWebhookIpBypass: parseBoolean(process.env.PHONEPE_WEBHOOK_IP_BYPASS, false),
+    subscriptionPaymentBypass: parseBoolean(process.env.SUBSCRIPTION_PAYMENT_BYPASS, false),
     freesoundApiKey: process.env.FREESOUND_API_KEY,
 });
 if ((exports.env.nodeEnv === 'production' || exports.env.nodeEnv === 'staging')

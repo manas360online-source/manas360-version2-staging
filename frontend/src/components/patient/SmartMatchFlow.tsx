@@ -210,7 +210,7 @@ export default function SmartMatchFlow({
                     Upgrade or Renew to continue
                   </button>
                   <button
-                    onClick={() => navigate('/patient/plans')}
+                    onClick={() => navigate('/plans')}
                     className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
                   >
                     Upgrade or Renew

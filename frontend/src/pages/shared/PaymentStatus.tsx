@@ -104,19 +104,36 @@ export default function PaymentStatusPage() {
   useEffect(() => {
     if (state !== 'success') return;
 
-    if (!isProviderTransaction) {
-      navigate(`/confirmation?transactionId=${encodeURIComponent(transactionId)}`, { replace: true });
-      return;
-    }
+		const timer = window.setTimeout(() => {
+			void checkAuth({ force: true }).finally(async () => {
+				if (!isProviderTransaction) {
+					let redirectUrl = '';
+					try {
+						if (transactionId) {
+							const response = await axios.get(`/api/v1/payments/status/${transactionId}`, { withCredentials: true });
+							redirectUrl = response.data?.data?.metadata?.redirectUrl || '';
+						}
+					} catch (err) {
+						console.warn('Could not fetch custom redirect for successful payment', err);
+					}
 
-    const timer = window.setTimeout(() => {
-      void checkAuth({ force: true }).finally(() => {
-        navigate(`/provider/confirmation?transactionId=${encodeURIComponent(transactionId)}`, { replace: true });
-      });
-    }, 1200);
+					if (redirectUrl) {
+						if (redirectUrl.startsWith('/')) {
+							navigate(redirectUrl, { replace: true });
+						} else {
+							window.location.href = redirectUrl;
+						}
+					} else {
+						navigate('/patient/settings?section=billing', { replace: true });
+					}
+					return;
+				}
+				navigate(`/provider/confirmation?transactionId=${encodeURIComponent(transactionId)}`, { replace: true });
+			});
+		}, 800);
 
-    return () => window.clearTimeout(timer);
-  }, [state, checkAuth, navigate, isProviderTransaction, transactionId]);
+		return () => window.clearTimeout(timer);
+	}, [state, checkAuth, navigate, isProviderTransaction, transactionId]);
 
 	if (state === 'loading') {
 		return (

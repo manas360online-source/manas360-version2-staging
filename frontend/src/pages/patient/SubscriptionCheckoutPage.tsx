@@ -94,7 +94,7 @@ export default function SubscriptionCheckoutPage() {
             <div className="flex items-center justify-between"><span>Add-ons</span><strong>INR {(summary.addonsMinor / 100).toFixed(2)}</strong></div>
             <div className="flex items-center justify-between"><span>Subtotal (before GST)</span><strong>INR {(summary.subtotalMinor / 100).toFixed(2)}</strong></div>
             <div className="flex items-center justify-between"><span>GST (18%)</span><span>INR {(summary.gstMinor / 100).toFixed(2)}</span></div>
-            <div className="mt-3 flex items-center justify-between border-t border-slate-200 pt-3 text-base"><span className="font-bold">Total</span><strong className="text-lg">INR {(summary.totalMinor / 100).toFixed(2)}</strong></div>
+            <div className="mt-3 flex items-center justify-between border-t border-slate-200 pt-3 text-base"><span className="font-bold">Grand Total (incl. GST)</span><strong className="text-lg">INR {(summary.totalMinor / 100).toFixed(2)}</strong></div>
           </div>
 
           <label className="mt-4 block text-sm text-slate-700">

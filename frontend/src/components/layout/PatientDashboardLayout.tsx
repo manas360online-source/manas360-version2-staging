@@ -29,11 +29,13 @@ const mainNavItems = [
 const selfCareNavItems = [
   { to: '/patient/messages', label: 'Anytime Buddy (AI)', icon: MessageSquare, badge: 'AI' },
   { to: '/patient/check-in', label: 'Daily Check-in', icon: HeartPulse },
+    { to: '/patient/hit-a-sixer', label: 'Hit a Sixer', icon: Sparkles },
   { to: '/patient/wellness-library', label: 'Wellness Library', icon: Sparkles },
 ];
 
 const progressNavItems = [
   { to: '/patient/progress', label: 'My Progress', icon: BarChart3 },
+  { to: '/patient/wallet', label: 'Wallet', icon: () => <span className="text-[16px] leading-none">💰</span> },
   { to: '/patient/reports', label: 'Clinical Records', icon: FileText },
 ];
 
@@ -64,6 +66,7 @@ export default function PatientDashboardLayout() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
 
   const fetchUnread = useCallback(async () => {
     if (!user || user.role !== 'patient') {
@@ -80,6 +83,22 @@ export default function PatientDashboardLayout() {
   }, [user]);
 
   useEffect(() => { void fetchUnread(); }, [fetchUnread]);
+
+  useEffect(() => {
+    (async () => {
+      if (!user || user.role !== 'patient') {
+        setWalletBalance(null);
+        return;
+      }
+      try {
+        const res = await patientApi.getWalletBalance();
+        const payload = (res as any)?.data ?? res ?? {};
+        setWalletBalance(Number(payload?.total_balance ?? 0));
+      } catch {
+        setWalletBalance(null);
+      }
+    })();
+  }, [user]);
 
   const userName = [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim() || user?.email || 'Patient';
   const initials = userName
@@ -124,6 +143,10 @@ export default function PatientDashboardLayout() {
     '/patient/provider-messages': 'Messages',
   };
   const pageTitle = Object.entries(pageTitleMap).find(([path]) => location.pathname.startsWith(path))?.[1] || 'Dashboard';
+
+  const formattedWalletBalance = walletBalance === null
+    ? '₹—'
+    : `₹${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(walletBalance)}`;
 
   const handleLogout = async () => {
     await logout();
@@ -187,6 +210,11 @@ export default function PatientDashboardLayout() {
                   }`}
                 >
                   {item.badge}
+                </span>
+              )}
+              {item.label === 'Wallet' && walletBalance !== null && (
+                <span className="ml-auto rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                  {`\u20b9${walletBalance.toFixed(0)}`}
                 </span>
               )}
             </Link>
@@ -284,6 +312,10 @@ export default function PatientDashboardLayout() {
             </div>
 
             <div className="ml-auto flex items-center gap-2 sm:gap-3">
+                <div className="inline-flex min-h-[36px] items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                  <span className="text-[10px] uppercase tracking-[0.18em] text-emerald-800/70">Wallet</span>
+                  <span>{formattedWalletBalance}</span>
+                </div>
                 <button
                   type="button"
                   onClick={() => navigate('/crisis')}

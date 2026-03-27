@@ -1,7 +1,26 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { patientApi } from '../api/patient';
+import PatientWalletWidget from '../components/patient/PatientWalletWidget';
 
 export const CrisisPage: React.FC = () => {
   const [showCounselor, setShowCounselor] = useState(false);
+  const [walletLoading, setWalletLoading] = useState(true);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await patientApi.getWalletBalance();
+        const payload = (res as any)?.data ?? res ?? {};
+        setWalletBalance(Number(payload?.total_balance ?? 0));
+      } catch {
+        // Crisis page should never block the user if wallet is unavailable.
+        setWalletBalance(null);
+      } finally {
+        setWalletLoading(false);
+      }
+    })();
+  }, []);
 
   return (
     <div className="responsive-page bg-[#FEF2F2] flex flex-col items-center justify-center text-center animate-fade-in">
@@ -25,18 +44,32 @@ export const CrisisPage: React.FC = () => {
           You are not alone. Help is available <span className="font-bold text-red-600">RIGHT NOW</span>.
         </p>
 
-        <div className="section-stack w-full max-w-md mx-auto mb-12">
-          <a href="tel:18005990019" className="block w-full py-4 bg-red-600 text-white rounded-full font-bold text-lg hover:bg-red-700 transition shadow-lg shadow-red-200">
-            📞 CALL TELE-MANAS: 1800-599-0019
-          </a>
-          
-          <a href="sms:988?body=HELP" className="block w-full py-4 bg-white text-red-600 border-2 border-red-100 rounded-full font-bold text-lg hover:bg-red-50 transition">
-            💬 TEXT "HELP" to Crisis Line
-          </a>
-          
-          <a href="tel:112" className="block w-full py-4 bg-slate-800 text-white rounded-full font-bold text-lg hover:bg-slate-900 transition">
-             EMERGENCY: Call 112
-          </a>
+        <div className="mb-12 w-full max-w-md mx-auto">
+          <div className="flex flex-col md:flex-row gap-4 md:gap-5 items-stretch justify-center">
+            <div className="section-stack w-full flex-1">
+              <a href="tel:18005990019" className="block w-full py-4 bg-red-600 text-white rounded-full font-bold text-lg hover:bg-red-700 transition shadow-lg shadow-red-200">
+                📞 CALL TELE-MANAS: 1800-599-0019
+              </a>
+              
+              <a href="sms:988?body=HELP" className="block w-full py-4 bg-white text-red-600 border-2 border-red-100 rounded-full font-bold text-lg hover:bg-red-50 transition">
+                💬 TEXT "HELP" to Crisis Line
+              </a>
+              
+              <a href="tel:112" className="block w-full py-4 bg-slate-800 text-white rounded-full font-bold text-lg hover:bg-slate-900 transition">
+                EMERGENCY: Call 112
+              </a>
+            </div>
+
+            <div className="flex-1 flex justify-center md:justify-end">
+              <PatientWalletWidget
+                compact
+                loading={walletLoading}
+                balance={{
+                  total_balance: walletBalance ?? 0,
+                }}
+              />
+            </div>
+          </div>
         </div>
 
         <div className="pt-8 border-t border-red-50">

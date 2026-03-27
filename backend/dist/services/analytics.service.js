@@ -5,13 +5,27 @@ const db_1 = require("../config/db");
 const redis_1 = require("redis");
 const env_1 = require("../config/env");
 const redisUrl = process.env.REDIS_URL || env_1.env.redisUrl || 'redis://127.0.0.1:6379';
-const redis = (0, redis_1.createClient)({ url: redisUrl });
+const redis = (0, redis_1.createClient)({
+    url: redisUrl,
+    socket: {
+        reconnectStrategy: () => false,
+    },
+});
+let redisAvailable = false;
+let redisWarned = false;
 const isTestEnv = process.env.NODE_ENV === 'test';
 if (!isTestEnv) {
     redis.on('error', (error) => {
-        console.warn('[analytics.service] Redis unavailable, cache layer degraded', error);
+        if (!redisWarned) {
+            console.warn('[analytics.service] Redis unavailable, cache layer degraded', error);
+            redisWarned = true;
+        }
     });
-    void redis.connect().catch(() => { });
+    void redis.connect().then(() => {
+        redisAvailable = true;
+    }).catch(() => {
+        redisAvailable = false;
+    });
 }
 class AnalyticsService {
     cacheTtl = 300; // seconds
@@ -20,6 +34,8 @@ class AnalyticsService {
      * will reload fresh values after a materialized view refresh.
      */
     async invalidateCacheForTherapist(therapistId) {
+        if (!redisAvailable)
+            return;
         try {
             const pattern = `analytics:*:therapist:${therapistId}:*`;
             // keys can be expensive; keep it scoped and infrequent (on session complete)
@@ -38,6 +54,8 @@ class AnalyticsService {
     async getSummary(therapistId, range) {
         const key = this.cacheKey('summary', therapistId, range.from, range.to);
         try {
+            if (!redisAvailable)
+                throw new Error('redis-unavailable');
             const cached = await redis.get(key);
             if (cached)
                 return JSON.parse(cached);
@@ -64,6 +82,8 @@ class AnalyticsService {
                 sessions: Number(r?.sessions) ?? 0,
             };
             try {
+                if (!redisAvailable)
+                    throw new Error('redis-unavailable');
                 await redis.setEx(key, this.cacheTtl, JSON.stringify(summary));
             }
             catch (e) { }

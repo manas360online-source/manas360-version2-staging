@@ -11,11 +11,20 @@ import { activateAllPendingComponents, expirePendingComponents } from './provide
 import { extractDeclineReasonFromPhonePe, formatDeclineMessage } from './phonepe-decline-reasons.service';
 import { logger } from '../utils/logger';
 
-const redis = createClient({ url: env.redisUrl });
+const redis = createClient({
+  url: env.redisUrl,
+  socket: {
+    reconnectStrategy: () => false,
+  },
+});
+let redisWarned = false;
 const isTestEnv = process.env.NODE_ENV === 'test';
 if (!isTestEnv) {
 	redis.on('error', (error) => {
-		console.warn('[payment.service] Redis unavailable, continuing with degraded idempotency cache', error);
+		if (!redisWarned) {
+			console.warn('[payment.service] Redis unavailable, continuing with degraded idempotency cache', error);
+			redisWarned = true;
+		}
 	});
 	void redis.connect().catch(() => undefined);
 }

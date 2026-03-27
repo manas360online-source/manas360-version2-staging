@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "/Users/chandu/Project/github/MANAS360_version2/backend/logs/.08152e3dddf8e7679d4550d6971af1d648373e2c-audit.json",
+    "files": [
+        {
+            "date": 1774577694635,
+            "name": "/Users/chandu/Project/github/MANAS360_version2/backend/logs/combined-2026-03-27.log",
+            "hash": "000496bd780d47f28c0a7861944424b4d8992ab3c0f916b685f6842ae4f710be"
+        }
+    ],
+    "hashType": "sha256"
+}

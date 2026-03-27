@@ -169,8 +169,9 @@ async function seed() {
     predefined: [
       { email: null, phone: '+917000100001', firstName: 'Patient', lastName: 'Demo', role: 'PATIENT' },
       { email: null, phone: '+917000100002', firstName: 'Free', lastName: 'Plan', role: 'PATIENT' },
-      { email: null, phone: '+917000100003', firstName: 'Basic', lastName: 'Plan', role: 'PATIENT' },
-      { email: null, phone: '+917000100004', firstName: 'Premium', lastName: 'Plan', role: 'PATIENT' },
+      { email: null, phone: '+917000100003', firstName: 'Monthly', lastName: 'Plan', role: 'PATIENT' },
+      { email: null, phone: '+917000100004', firstName: 'Quarterly', lastName: 'Plan', role: 'PATIENT' },
+      { email: null, phone: '+917000100005', firstName: 'Premium', lastName: 'Plan', role: 'PATIENT' },
     ],
   });
 
@@ -363,13 +364,21 @@ async function seed() {
   // Assign plans by phone for seeded patients (email is optional/removed)
   const planByPhone = {
     '+917000100002': { planName: 'Free Plan', price: 0, billingCycle: 'monthly', status: 'active' },
-    '+917000100003': { planName: 'Basic Plan', price: 999, billingCycle: 'monthly', status: 'active' },
-    '+917000100004': { planName: 'Premium Plan', price: 2499, billingCycle: 'monthly', status: 'active' },
+    '+917000100003': { planName: 'Monthly Plan', price: 99, billingCycle: 'monthly', status: 'active' },
+    '+917000100004': { planName: 'Quarterly Plan', price: 279, billingCycle: 'quarterly', status: 'active' },
+    '+917000100005': { planName: 'Premium Monthly Plan', price: 299, billingCycle: 'monthly', status: 'active' },
   };
+
+  const randomPlans = [
+    { planName: 'Free Plan', price: 0, billingCycle: 'monthly', status: 'active' },
+    { planName: 'Monthly Plan', price: 99, billingCycle: 'monthly', status: 'active' },
+    { planName: 'Quarterly Plan', price: 279, billingCycle: 'quarterly', status: 'active' },
+    { planName: 'Premium Monthly Plan', price: 299, billingCycle: 'monthly', status: 'active' },
+  ];
 
   for (const patient of patientUsers) {
     const phone = String(patient.phone || '');
-    const plan = planByPhone[phone] || { planName: randomItem(['Free Plan', 'Basic Plan', 'Premium Plan']), price: randomItem([0, 999, 2499]), billingCycle: 'monthly', status: 'active' };
+    const plan = planByPhone[phone] || randomItem(randomPlans);
 
     await prisma.patientSubscription.upsert({
       where: { userId: patient.id },
@@ -378,8 +387,10 @@ async function seed() {
         price: plan.price,
         billingCycle: plan.billingCycle,
         status: plan.status,
-        autoRenew: plan.price > 0,
-        renewalDate: plusDays(30),
+        // For stable staging QA: prevent auto-renew logic from overriding the seeded plan.
+        autoRenew: false,
+        // Put renewal far in the future so `ensureSubscriptionRecord()` won't switch plans.
+        renewalDate: plusDays(365),
       },
       create: {
         userId: patient.id,
@@ -387,8 +398,10 @@ async function seed() {
         price: plan.price,
         billingCycle: plan.billingCycle,
         status: plan.status,
-        autoRenew: plan.price > 0,
-        renewalDate: plusDays(30),
+        // For stable staging QA: prevent auto-renew logic from overriding the seeded plan.
+        autoRenew: false,
+        // Put renewal far in the future so `ensureSubscriptionRecord()` won't switch plans.
+        renewalDate: plusDays(365),
       },
     });
   }
@@ -677,6 +690,11 @@ async function seed() {
 
   console.log('Seed complete ✅');
   console.log(`Default password for seeded users: ${DEFAULT_PASSWORD}`);
+  console.log('Patient plan test users (phone + plan):');
+  console.log('  +917000100002 -> Free Plan');
+  console.log('  +917000100003 -> Monthly Plan (INR 99 / month)');
+  console.log('  +917000100004 -> Quarterly Plan (INR 279 / quarter)');
+  console.log('  +917000100005 -> Premium Monthly Plan (INR 299 / month)');
 }
 
 seed()

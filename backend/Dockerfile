@@ -6,6 +6,8 @@ RUN apk add --no-cache openssl openssl-dev python3 build-base
 RUN npm install -g npm@latest
 RUN npm install --legacy-peer-deps
 COPY . .
+RUN rm -f .env
+ENV DATABASE_URL=postgresql://manas360:manas360@db:5432/manas360
 RUN npm run build && npx prisma generate
 
 FROM node:20-alpine

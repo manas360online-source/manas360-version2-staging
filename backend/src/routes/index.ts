@@ -28,6 +28,8 @@ import gpsRoutes from './gps.routes';
 import providerRoutes from './provider.routes';
 import soundRoutes from './sound.routes';
 import providerDashboardRoutes from './provider-dashboard.routes';
+import gameRoutes from './game.routes';
+import walletRoutes from './wallet.routes';
 
 const router = Router();
 
@@ -82,6 +84,9 @@ router.use('/v1/sounds', soundRoutes);
 // Mount GPS before broad /v1 middleware routes so internal bridge can remain unauthenticated.
 router.use('/v1/gps', gpsRoutes);
 router.use('/v1', riskAnalyticsRoutes);
+// Mount game and wallet routes for patient-facing game features and wallet APIs
+router.use('/v1/game', gameRoutes);
+router.use('/v1/wallet', walletRoutes);
 
 export default router;
 

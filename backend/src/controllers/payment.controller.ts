@@ -135,6 +135,12 @@ export const getPhonePeStatusController = async (req: Request, res: Response): P
 	const isFailed = state === 'FAILED' || state === 'DECLINED' || state === 'CANCELLED';
 	const isPending = state === 'PENDING';
 
+	// Fetch metadata from DB if it's a known payment
+	const payment = await prisma.financialPayment.findFirst({
+		where: { merchantTransactionId: transactionId },
+		select: { metadata: true }
+	});
+
 	logger.info('[Payment.StatusCheck] Final result', {
 		transactionId,
 		state,
@@ -152,6 +158,7 @@ export const getPhonePeStatusController = async (req: Request, res: Response): P
 			isFailed,
 			isPending,
 			message: result.resultMessage,
+			metadata: payment?.metadata || {},
 		},
 	});
 };

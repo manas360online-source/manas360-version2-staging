@@ -41,7 +41,7 @@ export default function SignupPage() {
 			await checkAuth({ force: true });
 			const normalizedRole = String(result.user?.role || '').toLowerCase();
 			if (normalizedRole === 'patient') {
-				navigate('/patient/dashboard', { replace: true });
+				navigate('/plans', { replace: true });
 				return;
 			}
 			if (normalizedRole === 'therapist' || normalizedRole === 'psychiatrist' || normalizedRole === 'coach' || normalizedRole === 'psychologist') {

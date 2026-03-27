@@ -468,11 +468,39 @@ export const patientApi = {
     ]);
     return unwrapPayload(response);
   },
+  getGameEligibility: async () => {
+    const response = await withFallbackChain([
+      async () => (await http.get('/v1/game/eligibility')).data,
+      async () => (await http.get('/game/eligibility')).data,
+    ]);
+    return unwrapPayload(response);
+  },
+  playGame: async () => {
+    const response = await withFallbackChain([
+      async () => (await http.post('/v1/game/play')).data,
+      async () => (await http.post('/game/play')).data,
+    ]);
+    return unwrapPayload(response);
+  },
+  getGameWinners: async (limit = 10) => {
+    const response = await withFallbackChain([
+      async () => (await http.get('/v1/game/winners', { params: { limit } })).data,
+      async () => (await http.get('/game/winners', { params: { limit } })).data,
+    ]);
+    return unwrapPayload(response);
+  },
+  getWalletBalance: async () => {
+    const response = await withFallbackChain([
+      async () => (await http.get('/v1/wallet/balance')).data,
+      async () => (await http.get('/wallet/balance')).data,
+    ]);
+    return unwrapPayload(response);
+  },
   createSessionPayment: async (payload: { providerId: string; amountMinor: number; currency?: string }) => {
     const response = await http.post('/v1/payments/sessions', payload);
     return unwrapPayload(response.data);
   },
-  upgradeSubscription: async (payload: { planKey: string }) => {
+  upgradeSubscription: async (payload: { planKey: string; redirectUrl?: string }) => {
     const response = await withFallbackChain([
       async () => (await http.patch('/v1/patient/subscription/upgrade', payload)).data,
       async () => (await http.patch('/patient/subscription/upgrade', payload)).data,

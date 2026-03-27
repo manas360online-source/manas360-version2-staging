@@ -6,6 +6,19 @@ import { env } from '../config/env';
 const REDIS_URL = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
 const TTL_SECONDS = 60; // presence TTL window
 
+function createPresenceRedisClient() {
+  const client = createClient({
+    url: REDIS_URL,
+    socket: {
+      reconnectStrategy: () => false,
+    },
+  });
+  client.on('error', () => {
+    // Presence is best-effort in local/dev; keep it fail-open.
+  });
+  return client;
+}
+
 function zsetKey(sessionId: string) {
   return `session:presence:${sessionId}`;
 }
@@ -19,8 +32,11 @@ export async function heartbeat(req: Request, res: Response) {
   const userId = (req as any).auth?.userId;
   if (!userId || !sessionId) return res.status(400).json({ error: 'missing params' });
   const cid = clientId || 'default';
-  const r = createClient({ url: REDIS_URL });
-  await r.connect();
+  const r = createPresenceRedisClient();
+  await r.connect().catch(() => null);
+  if (!r.isOpen) {
+    return res.json({ ok: true, clientCount: 1, degraded: true });
+  }
   const key = zsetKey(sessionId);
   const member = presenceMember(role || 'PATIENT', userId, cid);
   const now = Date.now();
@@ -71,8 +87,11 @@ export async function unloadBeacon(req: Request, res: Response) {
   const userId = (req as any).auth?.userId;
   if (!userId || !sessionId) return res.status(400).json({ error: 'missing params' });
   const cid = clientId || 'default';
-  const r = createClient({ url: REDIS_URL });
-  await r.connect();
+  const r = createPresenceRedisClient();
+  await r.connect().catch(() => null);
+  if (!r.isOpen) {
+    return res.json({ ok: true, degraded: true });
+  }
   const key = zsetKey(sessionId);
   const member = presenceMember(role || 'PATIENT', userId, cid);
   try {
@@ -119,8 +138,12 @@ export async function unloadBeacon(req: Request, res: Response) {
 export async function getSessionPresence(req: Request, res: Response) {
   const sessionId = req.params.id as string;
   if (!sessionId) return res.status(400).json({ error: 'missing sessionId' });
-  const r = createClient({ url: REDIS_URL });
-  await r.connect();
+  const r = createPresenceRedisClient();
+  await r.connect().catch(() => null);
+  if (!r.isOpen) {
+    const rows = await prisma.sessionPresence.findMany({ where: { sessionId } });
+    return res.json({ presence: rows.map((r: any) => ({ userId: r.userId, role: r.role, status: r.status, lastSeenAt: r.lastSeenAt, clientCount: r.clientCount })) });
+  }
   try {
     const all = await r.zRange(zsetKey(sessionId), 0, -1);
     if (all.length === 0) {

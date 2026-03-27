@@ -3,13 +3,27 @@ import { createClient } from 'redis';
 import { env } from '../config/env';
 
 const redisUrl = process.env.REDIS_URL || env.redisUrl || 'redis://127.0.0.1:6379';
-const redis = createClient({ url: redisUrl });
+const redis = createClient({
+  url: redisUrl,
+  socket: {
+    reconnectStrategy: () => false,
+  },
+});
+let redisAvailable = false;
+let redisWarned = false;
 const isTestEnv = process.env.NODE_ENV === 'test';
 if (!isTestEnv) {
   redis.on('error', (error) => {
-    console.warn('[analytics.service] Redis unavailable, cache layer degraded', error);
+    if (!redisWarned) {
+      console.warn('[analytics.service] Redis unavailable, cache layer degraded', error);
+      redisWarned = true;
+    }
   });
-  void redis.connect().catch(() => {});
+  void redis.connect().then(() => {
+    redisAvailable = true;
+  }).catch(() => {
+    redisAvailable = false;
+  });
 }
 
 export type DateRange = { from: string; to: string };
@@ -22,6 +36,7 @@ export class AnalyticsService {
    * will reload fresh values after a materialized view refresh.
    */
   async invalidateCacheForTherapist(therapistId: string) {
+    if (!redisAvailable) return;
     try {
       const pattern = `analytics:*:therapist:${therapistId}:*`;
       // keys can be expensive; keep it scoped and infrequent (on session complete)
@@ -41,6 +56,7 @@ export class AnalyticsService {
   async getSummary(therapistId: string, range: DateRange) {
     const key = this.cacheKey('summary', therapistId, range.from, range.to);
     try {
+      if (!redisAvailable) throw new Error('redis-unavailable');
       const cached = await redis.get(key);
       if (cached) return JSON.parse(cached);
     } catch (e) {}
@@ -72,6 +88,7 @@ export class AnalyticsService {
         sessions: Number(r?.sessions) ?? 0,
       };
       try {
+        if (!redisAvailable) throw new Error('redis-unavailable');
         await redis.setEx(key, this.cacheTtl, JSON.stringify(summary));
       } catch (e) {}
       return summary;

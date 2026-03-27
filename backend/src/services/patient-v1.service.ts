@@ -918,14 +918,60 @@ const ensureSubscriptionRecord = async (userId: string) => {
 };
 
 export const getPatientSubscription = async (userId: string) => {
-	const subscription = await ensureSubscriptionRecord(userId);
-	if (!subscription) throw new AppError('Subscription data unavailable', 500);
-	const activePlan = (await getActivePlatformPlan()) || { key: 'free', name: 'Free Tier', price: 0 };
-	return {
-		...subscription,
-		nextRenewalPrice: activePlan.price,
-		priceLockedUntil: subscription.renewalDate,
-	};
+	try {
+		const subscription = await ensureSubscriptionRecord(userId);
+		if (!subscription) throw new AppError('Subscription data unavailable', 500);
+		const activePlan = (await getActivePlatformPlan()) || { key: 'free', name: 'Free Tier', price: 0 };
+
+		// Testing bypass: if payment bypass is enabled but the record still looks free/inactive, upgrade it in-place
+		if (env.subscriptionPaymentBypass) {
+			const looksFree = Number(subscription.price || 0) <= 0 || String(subscription.planName || '').toLowerCase().includes('free');
+			const inactive = String(subscription.status || '').toLowerCase() === 'inactive';
+			if (looksFree || inactive) {
+				const premiumPlan = (await getActivePlatformPlan('premium_monthly')) || activePlan || { key: 'premium_monthly', name: 'Premium', price: 299 };
+				const nextRenewalDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+				const updated = await db.patientSubscription.update({
+					where: { userId },
+					data: {
+						planName: premiumPlan.name,
+						price: Number(premiumPlan.price || 0),
+						status: 'active',
+						autoRenew: true,
+						renewalDate: nextRenewalDate,
+						billingCycle: 'monthly',
+					},
+				}).catch(() => subscription);
+				subscription.planName = updated?.planName ?? premiumPlan.name;
+				subscription.price = updated?.price ?? premiumPlan.price;
+				subscription.status = updated?.status ?? 'active';
+				subscription.autoRenew = true;
+				subscription.renewalDate = updated?.renewalDate ?? nextRenewalDate;
+			}
+		}
+
+		return {
+			...subscription,
+			nextRenewalPrice: activePlan.price,
+			priceLockedUntil: subscription.renewalDate,
+		};
+	} catch {
+		const now = new Date();
+		const renewal = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+		return {
+			id: `fallback-${userId}`,
+			userId,
+			planName: 'Free Plan',
+			price: 0,
+			billingCycle: 'monthly',
+			status: 'inactive',
+			autoRenew: false,
+			renewalDate: renewal,
+			createdAt: now,
+			updatedAt: now,
+			nextRenewalPrice: 0,
+			priceLockedUntil: renewal,
+		};
+	}
 };
 
 export const updatePatientSubscriptionPlan = async (userId: string, action: 'upgrade' | 'downgrade') => {

@@ -33,6 +33,8 @@ const gps_routes_1 = __importDefault(require("./gps.routes"));
 const provider_routes_1 = __importDefault(require("./provider.routes"));
 const sound_routes_1 = __importDefault(require("./sound.routes"));
 const provider_dashboard_routes_1 = __importDefault(require("./provider-dashboard.routes"));
+const game_routes_1 = __importDefault(require("./game.routes"));
+const wallet_routes_1 = __importDefault(require("./wallet.routes"));
 const router = (0, express_1.Router)();
 router.get('/health', (_req, res) => {
     res.status(200).json({
@@ -83,4 +85,7 @@ router.use('/v1/sounds', sound_routes_1.default);
 // Mount GPS before broad /v1 middleware routes so internal bridge can remain unauthenticated.
 router.use('/v1/gps', gps_routes_1.default);
 router.use('/v1', riskAnalytics_routes_1.default);
+// Mount game and wallet routes for patient-facing game features and wallet APIs
+router.use('/v1/game', game_routes_1.default);
+router.use('/v1/wallet', wallet_routes_1.default);
 exports.default = router;

@@ -611,7 +611,7 @@ export const upgradePatientSubscriptionController = async (req: Request, res: Re
 	}
 
 	const userId = authUserId(req);
-	const { planKey } = req.body;
+	const { planKey, redirectUrl } = req.body;
 
 	if (!planKey) {
 		throw new AppError('planKey is required', 422);
@@ -626,12 +626,12 @@ export const upgradePatientSubscriptionController = async (req: Request, res: Re
 	// Free plan: activate immediately using legacy logic
 	if (plan.price === 0) {
 		const data = await reactivatePatientSubscription(userId, undefined, plan.key);
-		sendSuccess(res, data, 'Free plan activated');
+		sendSuccess(res, { ...data, redirectUrl }, 'Free plan activated');
 		return;
 	}
 
 	// Paid plan: initiate PhonePe payment (supports dev bypass)
-	const data = await initiatePatientSubscriptionPayment(userId, planKey);
+	const data = await initiatePatientSubscriptionPayment(userId, planKey, { metadata: { redirectUrl } });
 	sendSuccess(res, data, 'Payment initiated');
 };
 

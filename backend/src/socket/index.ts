@@ -30,7 +30,12 @@ export async function initSocket(server: http.Server) {
 
   // Redis adapter for horizontal scaling + pub/sub
   const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
-  const pubClient: RedisClientType = createClient({ url: redisUrl });
+  const pubClient: RedisClientType = createClient({
+    url: redisUrl,
+    socket: {
+      reconnectStrategy: () => false,
+    },
+  });
   const subClient: RedisClientType = pubClient.duplicate();
 
   // Streams configuration

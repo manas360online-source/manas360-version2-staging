@@ -45,6 +45,8 @@ const BuddyChatPage = lazy(() => import('./pages/patient/BuddyChatPage'));
 const ProviderMessagesPage = lazy(() => import('./pages/patient/ProviderMessagesPage'));
 const PatientOnboardingPage = lazy(() => import('./pages/patient/PatientOnboardingPage'));
 const DailyCheckInPage = lazy(() => import('./pages/patient/DailyCheckInPage'));
+const HitASixerGamePage = lazy(() => import('./pages/patient/HitASixerGamePage'));
+const WalletPage = lazy(() => import('./pages/patient/WalletPage'));
 const VideoSessionPage = lazy(() => import('./pages/shared/VideoSessionPage'));
 const AdminPortalLoginPage = lazy(() => import('./pages/admin/AdminPortalLoginPage'));
 const AdminDashboardPage = lazy(() => import('./pages/admin/Dashboard'));
@@ -404,6 +406,7 @@ function App() {
                 <Route path="pricing-management" element={<AdminPricingManagementPage />} />
                 <Route path="payouts" element={<AdminSectionPage title="Payouts" description="Review provider payouts, schedules, holds, and reconciliation exceptions." bullets={['Scheduled payout runs', 'Manual adjustments', 'Failed transfer handling', 'Payout audit log']} />} />
                 <Route path="invoices" element={<AdminSectionPage title="Invoices" description="Track invoices, collections, refunds, and payment disputes." bullets={['Invoice lifecycle tracking', 'Corporate and individual invoices', 'Refund analytics', 'Collection status by segment']} />} />
+                <Route path="payment-reliability" element={<AdminSectionPage title="Payment Reliability" description="Monitor payment success, retries, failures, and settlement reliability trends." bullets={['Success vs failed transactions', 'Retry conversion trends', 'Decline reason distribution', 'Settlement health indicators']} />} />
                 <Route path="user-growth" element={<AdminSectionPage title="User Growth Analytics" description="Analyze growth trends across patients, therapists, corporate users, and partners." bullets={['Monthly active users by role', 'Acquisition vs activation', 'Retention cohorts', 'Regional growth patterns']} />} />
                 <Route path="session-analytics" element={<AdminSectionPage title="Session Analytics" description="Track platform-wide session quality, throughput, and completion metrics." bullets={['Sessions per day/week/month', 'Completion and dropout rates', 'Average session duration', 'Service line distribution']} />} />
                 <Route path="therapist-performance" element={<AdminSectionPage title="Therapist Performance" description="Benchmark provider outcomes, ratings, and engagement effectiveness." bullets={['Sessions completed', 'Patient ratings', 'Improvement score trend', 'Retention and revisit rates']} />} />
@@ -483,12 +486,13 @@ function App() {
               <Route path="reports" element={<ReportsPage />} />
               <Route path="reports/shared/:id" element={<PatientReportDownloadPage />} />
               <Route path="notifications" element={<NotificationsPage />} />
-              <Route path="pricing" element={<PricingPage />} />
-              <Route path="plans" element={<PricingPage />} />
               <Route path="plans/addons" element={<SubscriptionAddonsPage />} />
               <Route path="checkout" element={<SubscriptionCheckoutPage />} />
               <Route path="confirmation" element={<SubscriptionConfirmationPage />} />
               <Route path="check-in" element={<DailyCheckInPage />} />
+              <Route path="game" element={<HitASixerGamePage />} />
+              <Route path="hit-a-sixer" element={<HitASixerGamePage />} />
+              <Route path="wallet" element={<WalletPage />} />
             </Route>
             <Route path="/providers/:id" element={<Navigate to="/patient/sessions" replace />} />
             <Route path="/book/:providerId" element={<Navigate to="/patient/sessions" replace />} />

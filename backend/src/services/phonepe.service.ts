@@ -60,6 +60,20 @@ interface PhonePeToken {
 let cachedPhonePeToken: PhonePeToken | null = null;
 let tokenRefreshTimeout: NodeJS.Timeout | null = null;
 
+const isPlaceholder = (value: string): boolean => {
+	const normalized = String(value || '').trim().toLowerCase();
+	if (!normalized) return true;
+	return normalized.startsWith('change-')
+		|| normalized.includes('replace-me')
+		|| normalized.includes('your-')
+		|| normalized === 'dummy'
+		|| normalized === 'test';
+};
+
+const hasUsableOAuthCredentials = (): boolean => {
+	return !isPlaceholder(PHONEPE_CLIENT_ID) && !isPlaceholder(PHONEPE_CLIENT_SECRET);
+};
+
 const scheduleTokenRefresh = (expiresAt: number): void => {
 	if (tokenRefreshTimeout) {
 		clearTimeout(tokenRefreshTimeout);
@@ -78,8 +92,8 @@ const scheduleTokenRefresh = (expiresAt: number): void => {
 };
 
 export const initializePhonePeTokenRefresh = async (): Promise<void> => {
-	if (!PHONEPE_CLIENT_ID || !PHONEPE_CLIENT_SECRET) {
-		logger.info('[PhonePe] OAuth credentials not configured; skipping token initialization');
+	if (!hasUsableOAuthCredentials()) {
+		logger.info('[PhonePe] OAuth credentials not configured (or placeholder); skipping token initialization');
 		return;
 	}
 
@@ -128,8 +142,8 @@ const isPhonePeTokenExpired = (): boolean => {
 };
 
 const fetchPhonePeToken = async (): Promise<string | null> => {
-	if (!PHONEPE_CLIENT_ID || !PHONEPE_CLIENT_SECRET) {
-		logger.info('[PhonePe] OAuth credentials not configured; skipping token fetch.');
+	if (!hasUsableOAuthCredentials()) {
+		logger.info('[PhonePe] OAuth credentials not configured (or placeholder); skipping token fetch.');
 		return null;
 	}
 

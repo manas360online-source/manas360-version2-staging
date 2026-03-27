@@ -78,8 +78,8 @@ export const initiatePatientSubscriptionPayment = async (
 
 	const userToken = toCompactToken(userId, 8) || 'user';
 	const transactionId = `SUB_${userToken}_${Date.now()}`;
-	const shouldBypass = env.allowDevPaymentBypass && env.nodeEnv !== 'production';
-	const canFallbackWithoutGateway = env.nodeEnv !== 'production';
+	const shouldBypass = (env.allowDevPaymentBypass && env.nodeEnv !== 'production') || env.subscriptionPaymentBypass;
+	const canFallbackWithoutGateway = env.nodeEnv !== 'production' || env.subscriptionPaymentBypass;
 	const amountMinor = Math.max(
 		0,
 		Math.round(
@@ -94,25 +94,30 @@ export const initiatePatientSubscriptionPayment = async (
 	const subscriptionIdempotencyKey = requestedIdempotencyKey || `sub_init:${userId}:${planKey}:${cycleKey}`;
 
 	let redirectUrl: string;
-	try {
-		redirectUrl = await initiatePhonePePayment({
-			transactionId,
-			userId,
-			amountInPaise: amountMinor,
-			callbackUrl,
-			redirectUrl: `${frontendBaseUrl}/payment/status?id=${transactionId}&status=SUCCESS`,
-		});
-	} catch (error: any) {
-		if (!shouldBypass && !canFallbackWithoutGateway) {
-			throw new AppError(error?.message || 'PhonePe Payment Initiation Failed', 502);
-		}
-		// Non-production fallback: continue with local redirect when gateway is unavailable.
-		logger.warn('[PhonePe] Falling back to local redirect after patient payment initiation failure', {
-			transactionId,
-			nodeEnv: env.nodeEnv,
-			error: error?.message,
-		});
+	if (shouldBypass) {
+		// Short-circuit: no gateway call, pretend success and jump to local success page.
 		redirectUrl = `${frontendBaseUrl}/payment/status?id=${transactionId}&status=SUCCESS`;
+	} else {
+		try {
+			redirectUrl = await initiatePhonePePayment({
+				transactionId,
+				userId,
+				amountInPaise: amountMinor,
+				callbackUrl,
+				redirectUrl: `${frontendBaseUrl}/payment/status?id=${transactionId}&status=SUCCESS`,
+			});
+		} catch (error: any) {
+			if (!canFallbackWithoutGateway) {
+				throw new AppError(error?.message || 'PhonePe Payment Initiation Failed', 502);
+			}
+			// Non-production fallback: continue with local redirect when gateway is unavailable.
+			logger.warn('[PhonePe] Falling back to local redirect after patient payment initiation failure', {
+				transactionId,
+				nodeEnv: env.nodeEnv,
+				error: error?.message,
+			});
+			redirectUrl = `${frontendBaseUrl}/payment/status?id=${transactionId}&status=SUCCESS`;
+		}
 	}
 
 	// Mandatory: Create financialPayment record for reconciliation worker
@@ -163,18 +168,21 @@ export const initiatePatientSubscriptionPayment = async (
 			where: { userId },
 			update: {
 				planName: plan.name,
-				price: amountMinor,
+				price: Number(plan.price || 0),
 				status: 'active',
 				renewalDate: nextRenewalDate,
+				autoRenew: true,
+				billingCycle: 'monthly',
 				updatedAt: new Date(),
 			},
 			create: {
 				userId,
 				planName: plan.name,
-				price: amountMinor,
+				price: Number(plan.price || 0),
 				status: 'active',
 				renewalDate: nextRenewalDate,
 				billingCycle: 'monthly',
+				autoRenew: true,
 			}
 		});
 	}

@@ -46,11 +46,20 @@ const provider_subscription_service_1 = require("./provider-subscription.service
 const provider_subscription_pending_service_1 = require("./provider-subscription.pending.service");
 const phonepe_decline_reasons_service_1 = require("./phonepe-decline-reasons.service");
 const logger_1 = require("../utils/logger");
-const redis = (0, redis_1.createClient)({ url: env_1.env.redisUrl });
+const redis = (0, redis_1.createClient)({
+    url: env_1.env.redisUrl,
+    socket: {
+        reconnectStrategy: () => false,
+    },
+});
+let redisWarned = false;
 const isTestEnv = process.env.NODE_ENV === 'test';
 if (!isTestEnv) {
     redis.on('error', (error) => {
-        console.warn('[payment.service] Redis unavailable, continuing with degraded idempotency cache', error);
+        if (!redisWarned) {
+            console.warn('[payment.service] Redis unavailable, continuing with degraded idempotency cache', error);
+            redisWarned = true;
+        }
     });
     void redis.connect().catch(() => undefined);
 }

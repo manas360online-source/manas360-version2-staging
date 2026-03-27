@@ -37,7 +37,7 @@ export default function LoginPage() {
 		}
 
 		const normalizedRole = String(role || '').toLowerCase();
-		const isPricingTarget = candidate.startsWith('/patient/pricing');
+		const isPricingTarget = candidate.startsWith('/plans');
 		if (normalizedRole !== 'patient' || !isPricingTarget) {
 			return candidate;
 		}
