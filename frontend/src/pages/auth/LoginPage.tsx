@@ -88,6 +88,13 @@ export default function LoginPage() {
 		try {
 			const result = await verifyPhoneSignupOtp(phone.trim(), otp.trim());
 			await checkAuth({ force: true });
+			// Redirect patients without subscription to plans
+			if (result.user?.requiresSubscription) {
+				const candidate = from || afterLogin || next || null;
+				const returnTo = candidate || '/';
+				navigate(`/plans?returnTo=${encodeURIComponent(returnTo)}`, { replace: true });
+				return;
+			}
 			const candidate = from || afterLogin || next || null;
 			const postLoginRoute = await resolvePostLoginRouteWithSubscription(candidate, result.user?.role);
 			navigate(postLoginRoute, { replace: true });

@@ -9,12 +9,13 @@ import {
 } from '../controllers/payment.controller';
 import { requireAuth } from '../middleware/auth.middleware';
 import { requireRole } from '../middleware/rbac.middleware';
+import { requireSubscription } from '../middleware/subscription.middleware';
 import { paymentRateLimiter } from '../middleware/rateLimiter.middleware';
 import { asyncHandler } from '../middleware/validate.middleware';
 
 const router = Router();
 
-router.post('/sessions', requireAuth, requireRole('patient'), paymentRateLimiter, asyncHandler(createSessionPaymentController));
+router.post('/sessions', requireAuth, requireRole('patient'), requireSubscription, paymentRateLimiter, asyncHandler(createSessionPaymentController));
 router.post('/sessions/:id/complete', requireAuth, requireRole('therapist'), paymentRateLimiter, asyncHandler(completeFinancialSessionController));
 
 // PhonePe specific routes

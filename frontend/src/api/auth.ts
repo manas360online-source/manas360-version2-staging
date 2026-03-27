@@ -26,6 +26,8 @@ export interface AuthUser {
 	onboardingStatus?: 'PENDING' | 'COMPLETED' | 'REJECTED' | string | null;
 	providerOnboardingCompleted?: boolean;
 	providerProfileVerified?: boolean;
+	requiresPlatformPayment?: boolean;
+	platformAccessActive?: boolean;
 }
 
 export interface LoginPayload {

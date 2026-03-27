@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { getApiErrorMessage, signupWithPhone, verifyPhoneSignupOtp } from '../../api/auth';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth, getPostLoginRoute } from '../../context/AuthContext';
 
 export default function SignupPage() {
 	const { checkAuth } = useAuth();
@@ -33,22 +33,27 @@ export default function SignupPage() {
 		}
 	};
 
+	const location = useLocation();
+
+	const resolveReturnTo = (): string => {
+		const qp = new URLSearchParams(location.search);
+		return qp.get('returnTo') || qp.get('next') || window.location.pathname || '/';
+	};
+
 	const verifyOtp = async () => {
 		setError(null);
 		setLoading(true);
 		try {
 			const result = await verifyPhoneSignupOtp(phone.trim(), otp.trim());
 			await checkAuth({ force: true });
-			const normalizedRole = String(result.user?.role || '').toLowerCase();
-			if (normalizedRole === 'patient') {
-				navigate('/plans', { replace: true });
+			// If backend indicates patient requires a subscription, send to plans page
+			if (result.user?.requiresSubscription) {
+				const returnTo = resolveReturnTo();
+				navigate(`/plans?returnTo=${encodeURIComponent(returnTo)}`, { replace: true });
 				return;
 			}
-			if (normalizedRole === 'therapist' || normalizedRole === 'psychiatrist' || normalizedRole === 'coach' || normalizedRole === 'psychologist') {
-				navigate('/onboarding/provider-setup', { replace: true });
-				return;
-			}
-			navigate('/dashboard', { replace: true });
+			const postLoginRoute = getPostLoginRoute(result.user);
+			navigate(postLoginRoute, { replace: true });
 		} catch (err) {
 			setError(getApiErrorMessage(err, 'OTP verification failed'));
 		} finally {

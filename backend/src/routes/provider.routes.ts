@@ -146,4 +146,14 @@ router.get('/lead-stats', requireAuth, requireRole(providerRoles), asyncHandler(
 router.get('/marketplace', requireAuth, requireRole(providerRoles), asyncHandler(getProviderMarketplaceController));
 router.post('/marketplace/purchase', requireAuth, requireRole(providerRoles), asyncHandler(purchaseMarketplaceLeadController));
 
+// ── Platform Access ──
+import {
+	getPlatformAccessController,
+	initiatePlatformAccessController,
+} from '../controllers/platform-access.controller';
+
+router.get('/platform-access', requireAuth, requireRole(providerRoles), asyncHandler(getPlatformAccessController));
+router.post('/platform-access/initiate', requireAuth, requireRole(providerRoles), asyncHandler(initiatePlatformAccessController));
+
 export default router;
+

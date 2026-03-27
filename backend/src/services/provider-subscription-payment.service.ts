@@ -195,3 +195,87 @@ export const initiateProviderSubscriptionPayment = async (
 		price: plan.price,
 	};
 };
+
+/**
+ * Initiate PhonePe payment specifically for Platform Access (₹99/mo or ₹279/qtr).
+ * Transaction ID prefixed with PROV_PA_ for webhook identification.
+ */
+export const initiateProviderPlatformPayment = async (
+	providerId: string,
+	billingCycle: 'monthly' | 'quarterly',
+	amountMinor: number,
+) => {
+	const providerToken = toCompactToken(providerId, 8) || 'provider';
+	const transactionId = `PROV_PA_${providerToken}_${Date.now()}`;
+	const shouldBypass = env.allowDevPaymentBypass && env.nodeEnv !== 'production';
+	const canFallbackWithoutGateway = env.nodeEnv !== 'production';
+	const frontendBaseUrl = env.frontendUrl;
+	const callbackUrl = `${env.apiUrl}${env.apiPrefix}/v1/payments/phonepe/webhook`;
+
+	let redirectUrl: string;
+	try {
+		redirectUrl = await initiatePhonePePayment({
+			transactionId,
+			userId: providerId,
+			amountInPaise: amountMinor,
+			callbackUrl,
+			redirectUrl: `${frontendBaseUrl}/payment/status?id=${transactionId}&status=SUCCESS`,
+			metadata: {
+				flow: 'provider_platform_access',
+				billingCycle,
+			},
+		});
+	} catch (error: any) {
+		if (!shouldBypass && !canFallbackWithoutGateway) {
+			throw new AppError(error?.message || 'PhonePe Payment Initiation Failed', 502);
+		}
+		logger.warn('[PhonePe] Platform access payment fallback to local redirect', {
+			transactionId,
+			nodeEnv: env.nodeEnv,
+			error: error?.message,
+		});
+		redirectUrl = `${frontendBaseUrl}/payment/status?id=${transactionId}&status=SUCCESS`;
+	}
+
+	// Create financialPayment record
+	try {
+		await prisma.providerWallet.upsert({
+			where: { providerId },
+			update: {},
+			create: { providerId },
+		}).catch(() => null);
+
+		await prisma.financialPayment.create({
+			data: {
+				merchantTransactionId: transactionId,
+				providerId,
+				amountMinor,
+				currency: 'INR',
+				captureIdempotencyKey: `prov_pa:${providerId}:${billingCycle}:${new Date().toISOString().slice(0, 10)}`,
+				status: shouldBypass ? 'CAPTURED' : 'INITIATED',
+				metadata: {
+					type: 'provider_platform_access',
+					flow: 'provider_platform_access',
+					billingCycle,
+					redirectUrl,
+				},
+			},
+		});
+	} catch (error: any) {
+		if (String(error?.code || '') !== 'P2002') throw error;
+		// Duplicate idempotency — payment already initiated today, that's fine
+	}
+
+	if (shouldBypass) {
+		// Dev bypass: activate immediately
+		const { activatePlatformAccess } = await import('./platform-access.service');
+		await activatePlatformAccess(providerId, billingCycle, transactionId);
+	}
+
+	return {
+		transactionId,
+		redirectUrl,
+		billingCycle,
+		amountMinor,
+	};
+};

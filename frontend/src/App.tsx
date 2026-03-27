@@ -97,6 +97,7 @@ const ProviderSubscriptionConfirmationPage = lazy(() => import('./pages/provider
 const AppointmentRequestsPage = lazy(() => import('./pages/provider/AppointmentRequests'));
 const ProviderOnboardingPage = lazy(() => import('./pages/provider/ProviderOnboardingPage'));
 const ProviderVerificationPendingPage = lazy(() => import('./pages/provider/ProviderVerificationPendingPage'));
+
 const PaymentStatusPage = lazy(() => import('./pages/shared/PaymentStatus'));
 const HubLayout = lazy(() => import('./components/layout/HubLayout'));
 const PatientList = lazy(() => import('./pages/provider/Patients/PatientList'));
@@ -263,11 +264,13 @@ function App() {
               <Route path="earnings" element={<ProviderEarningsPage />} />
               <Route path="appointments" element={<AppointmentRequestsPage />} />
               <Route path="subscription" element={<ProviderSubscriptionPage />} />
+              <Route path="platform-payment" element={<Navigate to="/provider/subscription" replace />} />
               <Route path="plans" element={<ProviderSubscriptionPage />} />
               <Route path="plans/addons" element={<ProviderSubscriptionAddonsPage />} />
               <Route path="checkout" element={<ProviderSubscriptionCheckoutPage />} />
               <Route path="confirmation" element={<ProviderSubscriptionConfirmationPage />} />
               <Route path="messages" element={<ProviderInboxPage />} />
+
               <Route path="settings" element={<ProviderSettingsPage />} />
               <Route path="live-session/:sessionId" element={<VideoSessionPage />} />
             </Route>
@@ -280,6 +283,14 @@ function App() {
               }
             />
             <Route path="/provider/onboarding" element={<Navigate to="/onboarding/provider-setup" replace />} />
+            <Route
+              path="/provider/platform-payment"
+              element={
+                <ProtectedRoute allowedRoles={['therapist', 'psychiatrist', 'psychologist', 'coach']}>
+                  <Navigate to="/provider/subscription" replace />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/provider/plans"
               element={

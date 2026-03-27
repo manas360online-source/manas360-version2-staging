@@ -47,7 +47,16 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
 		const onboardingStatus = String(user?.onboardingStatus || '').toUpperCase();
 		const onboardingRoute = '/onboarding/provider-setup';
 		const verificationRoute = '/provider/verification-pending';
+		const subscriptionRoute = '/provider/subscription';
 		const verified = Boolean(user?.isTherapistVerified);
+
+		// NEW: Enforce platform payment BEFORE onboarding
+		if (!user?.platformAccessActive) {
+			if (location.pathname !== subscriptionRoute) {
+				return <Navigate to={subscriptionRoute} replace />;
+			}
+			return <>{children}</>;
+		}
 
 		if (onboardingStatus !== 'COMPLETED') {
 			if (location.pathname !== onboardingRoute) {
