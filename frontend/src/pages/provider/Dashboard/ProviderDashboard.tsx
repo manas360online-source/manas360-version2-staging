@@ -186,6 +186,33 @@ export default function ProviderDashboard() {
         </p>
       </div>
 
+      {/* Onboarding Warning Banner */}
+      {user?.onboardingStatus !== 'COMPLETED' && (
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-amber-500 to-orange-600 p-1 shadow-lg shadow-amber-500/20">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 rounded-[calc(1rem-1px)] bg-amber-50 px-6 py-5">
+            <div className="flex items-center gap-4 text-left">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-bold text-amber-900 leading-tight">Complete Your Clinical Profile</h3>
+                <p className="text-sm text-amber-700 font-medium opacity-90">
+                  Your profile is currently hidden from patients. Complete your onboarding to start receiving leads and bookings.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => navigate('/onboarding/provider-setup')}
+              className="w-full md:w-auto px-8 py-3 rounded-xl bg-amber-600 text-white font-black text-sm hover:bg-amber-700 shadow-md shadow-amber-600/20 transition-all active:scale-95 whitespace-nowrap"
+            >
+              Complete Onboarding →
+            </button>
+          </div>
+        </div>
+      )}
+
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {dynamicStats.map((item) => (
           <article

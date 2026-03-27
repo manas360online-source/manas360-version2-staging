@@ -79,6 +79,7 @@ model User {
   patientProfile                PatientProfile?
   patientSubscription           PatientSubscription?
   providerSubscription          ProviderSubscription?
+  platformAccess                PlatformAccess?
   phq9Assessments               PHQ9Assessment[]            @relation("UserPHQ9Assessments")
   prescriptionsAsPatient        Prescription[]              @relation("PrescriptionPatient")
   prescriptionsAsProvider       Prescription[]              @relation("PrescriptionProvider")
@@ -1966,6 +1967,25 @@ model ProviderSubscription {
   @@index([tier])
   @@index([leadsUsedThisWeek])
   @@map("provider_subscriptions")
+}
+
+model PlatformAccess {
+  id            String    @id @default(uuid())
+  providerId    String    @unique
+  billingCycle  String    // "monthly" | "quarterly"
+  amountMinor   Int       // 9900 (₹99/month) or 27900 (₹279/quarter)
+  status        String    @default("active") // "active" | "expired" | "cancelled"
+  autoRenew     Boolean   @default(true)
+  startDate     DateTime  @default(now())
+  expiryDate    DateTime
+  paymentId     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  provider      User      @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([providerId, status])
+  @@index([status, expiryDate])
+  @@map("platform_access")
 }
 
 model LeadPurchase {

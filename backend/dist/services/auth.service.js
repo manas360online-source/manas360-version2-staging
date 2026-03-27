@@ -317,6 +317,23 @@ const verifyPhoneOtp = async (input, meta) => {
     });
     const companyAdminMeta = await resolveUserCompanyMeta(String(user.id), user.email);
     await audit('LOGIN_SUCCESS', 'success', meta, { userId: user.id, phone: user.phone });
+    // Determine if provider needs to pay the platform fee before onboarding
+    let requiresPlatformPayment = false;
+    try {
+        const providerRoles = new Set(['THERAPIST', 'PSYCHIATRIST', 'PSYCHOLOGIST', 'COACH']);
+        const roleUpper = String(user.role || '').toUpperCase();
+        if (providerRoles.has(roleUpper)) {
+            const activeSub = await db.providerSubscription.findFirst({ where: { providerId: String(user.id), status: 'active' } });
+            const onboardingCompleted = Boolean(therapistProfile?.onboardingCompleted);
+            if (!activeSub && !onboardingCompleted) {
+                requiresPlatformPayment = true;
+            }
+        }
+    }
+    catch (err) {
+        // Fail closed: if DB check errors, do not block login — just log and continue
+        console.error('[AUTH] Error checking provider subscription status:', err);
+    }
     return {
         user: {
             id: String(user.id),
@@ -330,6 +347,7 @@ const verifyPhoneOtp = async (input, meta) => {
             therapistVerifiedAt: user.therapistVerifiedAt ?? null,
             providerOnboardingCompleted: Boolean(therapistProfile?.onboardingCompleted),
             providerProfileVerified: Boolean(therapistProfile?.isVerified),
+            requiresPlatformPayment,
             ...companyAdminMeta,
         },
         ...tokenPair,
@@ -405,6 +423,22 @@ const loginWithPassword = async (input, meta) => {
     });
     const companyAdminMeta = await resolveUserCompanyMeta(String(user.id), user.email);
     await audit('LOGIN_SUCCESS', 'success', meta, { userId: user.id, email: user.email, phone: user.phone });
+    // Determine if provider needs to pay the platform fee before onboarding
+    let requiresPlatformPayment = false;
+    try {
+        const providerRoles = new Set(['THERAPIST', 'PSYCHIATRIST', 'PSYCHOLOGIST', 'COACH']);
+        const roleUpper = String(user.role || '').toUpperCase();
+        if (providerRoles.has(roleUpper)) {
+            const activeSub = await db.providerSubscription.findFirst({ where: { providerId: String(user.id), status: 'active' } });
+            const onboardingCompleted = Boolean(therapistProfile?.onboardingCompleted);
+            if (!activeSub && !onboardingCompleted) {
+                requiresPlatformPayment = true;
+            }
+        }
+    }
+    catch (err) {
+        console.error('[AUTH] Error checking provider subscription status:', err);
+    }
     return {
         user: {
             id: String(user.id),
@@ -418,6 +452,7 @@ const loginWithPassword = async (input, meta) => {
             therapistVerifiedAt: user.therapistVerifiedAt ?? null,
             providerOnboardingCompleted: Boolean(therapistProfile?.onboardingCompleted),
             providerProfileVerified: Boolean(therapistProfile?.isVerified),
+            requiresPlatformPayment,
             ...companyAdminMeta,
         },
         ...tokenPair,
@@ -475,6 +510,22 @@ const loginWithGoogle = async (input, meta) => {
     });
     const companyAdminMeta = await resolveUserCompanyMeta(String(user.id), user.email);
     await audit('LOGIN_SUCCESS', 'success', meta, { userId: user.id, email: user.email });
+    // Determine if provider needs to pay the platform fee before onboarding
+    let requiresPlatformPayment = false;
+    try {
+        const providerRoles = new Set(['THERAPIST', 'PSYCHIATRIST', 'PSYCHOLOGIST', 'COACH']);
+        const roleUpper = String(user.role || '').toUpperCase();
+        if (providerRoles.has(roleUpper)) {
+            const activeSub = await db.providerSubscription.findFirst({ where: { providerId: String(user.id), status: 'active' } });
+            const onboardingCompleted = Boolean(therapistProfile?.onboardingCompleted);
+            if (!activeSub && !onboardingCompleted) {
+                requiresPlatformPayment = true;
+            }
+        }
+    }
+    catch (err) {
+        console.error('[AUTH] Error checking provider subscription status:', err);
+    }
     return {
         user: {
             id: String(user.id),
@@ -488,6 +539,7 @@ const loginWithGoogle = async (input, meta) => {
             therapistVerifiedAt: user.therapistVerifiedAt ?? null,
             providerOnboardingCompleted: Boolean(therapistProfile?.onboardingCompleted),
             providerProfileVerified: Boolean(therapistProfile?.isVerified),
+            requiresPlatformPayment,
             ...companyAdminMeta,
         },
         ...tokenPair,

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getApiErrorMessage, providerRegister } from '../../api/auth';
 import { useAuth } from '../../context/AuthContext';
@@ -115,18 +115,55 @@ const initialForm: FormState = {
   digitalSignature: '',
 };
 
-export default function ProviderOnboardingPage() {
+export default function ProviderOnboardingPageWrapper() {
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && user) {
+      const providerRoles = ['therapist', 'psychiatrist', 'psychologist', 'coach'];
+      const role = String(user.role || '').toLowerCase();
+      if (providerRoles.includes(role) && !user.platformAccessActive) {
+        navigate('/provider/subscription', { replace: true });
+      }
+    }
+  }, [user, loading, navigate]);
+
+  return <ProviderOnboardingPage />;
+}
+const ONBOARDING_CACHE_KEY = 'manas360_provider_onboarding_temp';
+
+function ProviderOnboardingPage() {
   const navigate = useNavigate();
   const { user, checkAuth, logout } = useAuth();
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(() => {
+    const saved = localStorage.getItem(`${ONBOARDING_CACHE_KEY}_step`);
+    return saved ? parseInt(saved, 10) : 1;
+  });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState<FormState>({
-    ...initialForm,
-    email: String(user?.email || ''),
-    fullName: [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim(),
-    displayName: [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim(),
+  const [form, setForm] = useState<FormState>(() => {
+    const saved = localStorage.getItem(`${ONBOARDING_CACHE_KEY}_form`);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Failed to parse onboarding cache', e);
+      }
+    }
+    return {
+      ...initialForm,
+      email: String(user?.email || ''),
+      fullName: [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim(),
+      displayName: [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim(),
+    };
   });
+
+  // Save progress to localStorage
+  useEffect(() => {
+    localStorage.setItem(`${ONBOARDING_CACHE_KEY}_form`, JSON.stringify(form));
+    localStorage.setItem(`${ONBOARDING_CACHE_KEY}_step`, step.toString());
+  }, [form, step]);
   const certFileRef = useRef<HTMLInputElement>(null);
   const degreeFileRef = useRef<HTMLInputElement>(null);
 
@@ -204,6 +241,8 @@ export default function ProviderOnboardingPage() {
         digitalSignature: form.digitalSignature,
       });
 
+      localStorage.removeItem(`${ONBOARDING_CACHE_KEY}_form`);
+      localStorage.removeItem(`${ONBOARDING_CACHE_KEY}_step`);
       await checkAuth();
       navigate('/onboarding/provider-setup', { replace: true });
     } catch (err) {

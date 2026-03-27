@@ -122,6 +122,22 @@ export const providerRegisterController = async (req: Request, res: Response): P
 		throw new AppError('Authentication required', 401);
 	}
 
+	// Ensure provider has active platform access before allowing onboarding submission
+	const platformAccessRecord = await prisma.$queryRawUnsafe(
+		`SELECT status, expiry_date FROM platform_access WHERE provider_id = $1 LIMIT 1`,
+		userId,
+	).catch(() => [] as any[]) as Array<{ status: string; expiry_date: Date | null }>;
+	const paRecord = platformAccessRecord?.[0];
+	const platformAccessActive = Boolean(
+		paRecord
+			&& paRecord.status === 'active'
+			&& paRecord.expiry_date
+			&& new Date(paRecord.expiry_date).getTime() > Date.now(),
+	);
+	if (!platformAccessActive) {
+		throw new AppError('Platform access required. Please complete platform fee payment before onboarding.', 403);
+	}
+
 	const requiredString = (value: unknown, field: string): string => {
 		const normalized = typeof value === 'string' ? value.trim() : '';
 		if (!normalized) {
@@ -196,6 +212,52 @@ export const meController = async (req: Request, res: Response): Promise<void> =
 	)) as Array<{ company_key: string | null; is_company_admin: boolean | null }>;
 	const companyMeta = companyRows?.[0] ?? { company_key: null, is_company_admin: false };
 
+	// Check platform access status
+	const platformAccessRecord = await prisma.$queryRawUnsafe(
+		`SELECT status, expiry_date FROM platform_access WHERE provider_id = $1 LIMIT 1`,
+		user.id,
+	).catch(() => [] as any[]) as Array<{ status: string; expiry_date: Date | null }>;
+	const paRecord = platformAccessRecord?.[0];
+	const platformAccessActive = Boolean(
+		paRecord
+			&& paRecord.status === 'active'
+			&& paRecord.expiry_date
+			&& new Date(paRecord.expiry_date).getTime() > Date.now(),
+	);
+
+	// Check patient subscription status
+	const patientSubRecord = await prisma.$queryRawUnsafe(
+		`SELECT status, plan_name, price FROM patient_subscriptions WHERE user_id = $1 LIMIT 1`,
+		user.id,
+	).catch(() => [] as any[]) as Array<{ status: string | null; plan_name?: string | null; price?: number | null }>;
+	const psRecord = patientSubRecord?.[0];
+	const patientSubscriptionActive = Boolean(psRecord && ['active', 'trial', 'grace', 'trialing'].includes(String(psRecord.status || '').toLowerCase()));
+	const patientSubscriptionPlan = String(psRecord?.plan_name || 'free');
+
+	// Determine if provider needs to pay the platform fee before onboarding
+	let requiresPlatformPayment = false;
+	try {
+		const providerRoles = new Set(['THERAPIST', 'PSYCHIATRIST', 'PSYCHOLOGIST', 'COACH']);
+		const roleUpper = String(user.role || '').toUpperCase();
+		const onboardingCompleted = Boolean((user as any).therapistProfile?.onboardingCompleted);
+		if (providerRoles.has(roleUpper) && !platformAccessActive && !onboardingCompleted) {
+			requiresPlatformPayment = true;
+		}
+	} catch (err) {
+		console.error('[ME] Error computing requiresPlatformPayment:', err);
+	}
+
+	// Determine if patient needs a subscription to access booking
+	let requiresSubscription = false;
+	try {
+		const roleUpper = String(user.role || '').toUpperCase();
+		if (roleUpper === 'PATIENT' && !patientSubscriptionActive) {
+			requiresSubscription = true;
+		}
+	} catch (err) {
+		console.error('[ME] Error computing requiresSubscription:', err);
+	}
+
 	sendSuccess(
 		res,
 		{
@@ -213,6 +275,11 @@ export const meController = async (req: Request, res: Response): Promise<void> =
 			onboardingStatus: (user as any).onboardingStatus ?? null,
 			providerOnboardingCompleted: Boolean((user as any).therapistProfile?.onboardingCompleted),
 			providerProfileVerified: Boolean((user as any).therapistProfile?.isVerified),
+			requiresPlatformPayment,
+			platformAccessActive,
+			requiresSubscription,
+			patientSubscriptionActive,
+			patientSubscriptionPlan,
 			companyKey: companyMeta.company_key,
 			company_key: companyMeta.company_key,
 			isCompanyAdmin: Boolean(companyMeta.is_company_admin),
@@ -239,6 +306,23 @@ export const verifyPhoneOtpController = async (req: Request, res: Response): Pro
 	}, getRequestMeta(req));
 
 	setAuthCookies(req, res, result.accessToken, result.refreshToken);
+	// Augment user payload with subscription flags for immediate client routing
+	try {
+		if (result?.user?.id) {
+			const patientSub = await prisma.$queryRawUnsafe(
+				`SELECT status, plan_name FROM patient_subscriptions WHERE user_id = $1 LIMIT 1`,
+				result.user.id,
+			).catch(() => [] as any[]) as Array<{ status: string | null; plan_name?: string | null }>;
+			const ps = patientSub?.[0];
+			const isActive = Boolean(ps && ['active', 'trial', 'grace', 'trialing'].includes(String(ps.status || '').toLowerCase()));
+			(result.user as any).requiresSubscription = Boolean(result.user.role && String(result.user.role).toUpperCase() === 'PATIENT' && !isActive);
+			(result.user as any).patientSubscriptionActive = isActive;
+			(result.user as any).patientSubscriptionPlan = String(ps?.plan_name || 'free');
+		}
+	} catch (err) {
+		console.error('[VERIFY-OTP] Failed to augment user subscription flags', err);
+	}
+
 	sendSuccess(res, { user: result.user, sessionId: result.sessionId }, 'Phone verified and login successful');
 };
 
@@ -253,6 +337,23 @@ export const loginController = async (req: Request, res: Response): Promise<void
 	);
 
 	setAuthCookies(req, res, result.accessToken, result.refreshToken);
+	// Augment user payload with subscription flags for immediate client routing
+	try {
+		if (result?.user?.id) {
+			const patientSub = await prisma.$queryRawUnsafe(
+				`SELECT status, plan_name FROM patient_subscriptions WHERE user_id = $1 LIMIT 1`,
+				result.user.id,
+			).catch(() => [] as any[]) as Array<{ status: string | null; plan_name?: string | null }>;
+			const ps = patientSub?.[0];
+			const isActive = Boolean(ps && ['active', 'trial', 'grace', 'trialing'].includes(String(ps.status || '').toLowerCase()));
+			(result.user as any).requiresSubscription = Boolean(result.user.role && String(result.user.role).toUpperCase() === 'PATIENT' && !isActive);
+			(result.user as any).patientSubscriptionActive = isActive;
+			(result.user as any).patientSubscriptionPlan = String(ps?.plan_name || 'free');
+		}
+	} catch (err) {
+		console.error('[LOGIN] Failed to augment user subscription flags', err);
+	}
+
 	sendSuccess(res, { user: result.user, sessionId: result.sessionId }, 'Login successful');
 };
 
@@ -264,6 +365,23 @@ export const googleLoginController = async (req: Request, res: Response): Promis
 	const result = await loginWithGoogle({ idToken: req.body.idToken.trim() }, getRequestMeta(req));
 
 	setAuthCookies(req, res, result.accessToken, result.refreshToken);
+	// Augment user payload with subscription flags for immediate client routing
+	try {
+		if (result?.user?.id) {
+			const patientSub = await prisma.$queryRawUnsafe(
+				`SELECT status, plan_name FROM patient_subscriptions WHERE user_id = $1 LIMIT 1`,
+				result.user.id,
+			).catch(() => [] as any[]) as Array<{ status: string | null; plan_name?: string | null }>;
+			const ps = patientSub?.[0];
+			const isActive = Boolean(ps && ['active', 'trial', 'grace', 'trialing'].includes(String(ps.status || '').toLowerCase()));
+			(result.user as any).requiresSubscription = Boolean(result.user.role && String(result.user.role).toUpperCase() === 'PATIENT' && !isActive);
+			(result.user as any).patientSubscriptionActive = isActive;
+			(result.user as any).patientSubscriptionPlan = String(ps?.plan_name || 'free');
+		}
+	} catch (err) {
+		console.error('[GOOGLE-LOGIN] Failed to augment user subscription flags', err);
+	}
+
 	sendSuccess(res, { user: result.user, sessionId: result.sessionId }, 'Google login successful');
 };
 

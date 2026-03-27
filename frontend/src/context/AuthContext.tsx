@@ -63,6 +63,11 @@ export const isPlatformAdminUser = (user: AuthUser | null | undefined): boolean 
 export const getPostLoginRoute = (user: AuthUser | null | undefined): string => {
   if (!user) return '/patient/dashboard';
 
+  // If patient requires subscription, route to plans page
+  if ((user as any)?.requiresSubscription) {
+    return '/plans';
+  }
+
   if (hasCorporateAccess(user)) {
     return '/corporate/dashboard';
   }
@@ -79,6 +84,9 @@ export const getPostLoginRoute = (user: AuthUser | null | undefined): string => 
     if (skipOnboarding) return '/provider/dashboard';
     const onboardingStatus = String(user.onboardingStatus || '').toUpperCase();
 
+    if (!user.platformAccessActive) {
+      return '/provider/subscription';
+    }
     if (onboardingStatus !== 'COMPLETED') {
       return '/onboarding/provider-setup';
     }

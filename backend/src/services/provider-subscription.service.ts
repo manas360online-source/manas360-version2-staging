@@ -201,7 +201,7 @@ export const activateProviderSubscription = async (
 				startDate: new Date(),
 				expiryDate: calculateExpiry(expiryDays),
 				status: nextStatus,
-				autoRenew: true,
+				autoRenew: false, // Lead Plans are manual/one-time — no auto-renew
 				paymentId: paymentId || undefined,
 				leadsUsedThisWeek: 0,
 				weekStartsAt: new Date(),

@@ -772,3 +772,24 @@ export const checkoutProviderSubscription = async (payload: ProviderCheckoutPayl
   const response = await http.post<Envelope<any>>('/v1/provider/subscription/checkout', payload);
   return unwrap<any>(response.data);
 };
+
+// ============ PLATFORM ACCESS ============
+
+export interface ProviderPlatformStatus {
+  isActive: boolean;
+  status: 'active' | 'expired' | 'cancelled' | 'none';
+  expiryDate: string | null;
+  billingCycle: 'monthly' | 'quarterly' | null;
+  autoRenew: boolean;
+  amountMinor: number | null;
+}
+
+export const fetchProviderPlatformStatus = async (): Promise<ProviderPlatformStatus> => {
+  const response = await http.get<Envelope<ProviderPlatformStatus>>('/v1/provider/platform-access');
+  return unwrap<ProviderPlatformStatus>(response.data);
+};
+
+export const initiateProviderPlatformPayment = async (payload: { billingCycle: 'monthly' | 'quarterly' }) => {
+  const response = await http.post<Envelope<any>>('/v1/provider/platform-access/initiate', payload);
+  return unwrap<any>(response.data);
+};

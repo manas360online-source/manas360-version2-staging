@@ -117,14 +117,75 @@ export default function Settings() {
   const planStatus = sub?.status || 'inactive';
   const expiryDate = sub?.expiryDate ? new Date(sub.expiryDate).toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' }) : '—';
 
+  // Real Progress Calculation
+  const progressPercent = useMemo(() => {
+    let score = 0;
+    if (profileImageUrl.trim()) score += 15;
+    if (specialties.length > 0) score += 15;
+    if (bio.trim().length > 50) score += 20;
+    if (enabledDayCount > 0) score += 20;
+    if (selectedLanguages.length > 0) score += 10;
+    if (consultationFee > 0) score += 10;
+    if (tagline.trim()) score += 10;
+    return score;
+  }, [profileImageUrl, specialties, bio, enabledDayCount, selectedLanguages, consultationFee, tagline]);
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-[#23313A]">
       <section className="rounded-[28px] border border-[#D9E1D5] bg-[radial-gradient(circle_at_top_left,_rgba(21,89,74,0.16),_transparent_35%),linear-gradient(135deg,#F6FBF8_0%,#FFFFFF_62%)] p-8 shadow-[0_18px_60px_rgba(31,41,55,0.06)]">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5C7A72]">Settings</p>
         <h1 className="mt-3 text-3xl font-semibold text-[#23313A]">Clinical Identity & Availability</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
           Manage the profile details patients see when booking and define the working hours that produce bookable session slots.
         </p>
+      </section>
+
+      {/* Onboarding Progress Section */}
+      <section className="rounded-[24px] border border-[#DCE5D9] bg-white p-6 shadow-sm overflow-hidden relative">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-1">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#6B7B68]">Profile Completion</p>
+            <h2 className="text-xl font-semibold text-[#23313A]">Onboarding Progress</h2>
+            <p className="text-sm text-slate-500 max-w-sm">
+              {progressPercent === 100 
+                ? 'Your profile is 100% complete and visible to patients.' 
+                : 'Complete your clinical identity to unlock the marketplace.'}
+            </p>
+          </div>
+          
+          <div className="flex-1 max-w-md w-full">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-bold text-[#23313A]">
+                {progressPercent}%
+              </span>
+              <span className="text-xs font-medium text-slate-400">Target: 100%</span>
+            </div>
+            <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden">
+              <div 
+                className={`h-full transition-all duration-1000 ${progressPercent === 100 ? 'bg-emerald-500' : 'bg-amber-500'}`}
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+          </div>
+
+          {progressPercent < 100 && (
+            <button
+              onClick={() => navigate('/onboarding/provider-setup')}
+              className="px-6 py-2.5 rounded-xl bg-amber-600 text-white text-sm font-black hover:bg-amber-700 transition shadow-lg shadow-amber-600/20"
+            >
+              Finish Setup →
+            </button>
+          )}
+        </div>
+
+        {progressPercent < 100 && (
+           <div className="mt-6 flex items-center gap-3 bg-amber-50 border border-amber-100 p-4 rounded-2xl text-amber-800 text-xs font-medium">
+              <svg className="h-5 w-5 shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <span>Your profile is currently <span className="font-bold underline">HIDDEN</span> from the patient marketplace. Please complete all required fields in the onboarding flow to go live.</span>
+           </div>
+        )}
       </section>
 
       {/* Billing & Plan Section */}

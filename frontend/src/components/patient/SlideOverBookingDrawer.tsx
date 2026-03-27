@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { X, Calendar as CalendarIcon, Clock, CreditCard, CheckCircle2 } from 'lucide-react';
 import { patientApi } from '../../api/patient';
 
@@ -42,6 +43,7 @@ export default function SlideOverBookingDrawer({
   provider,
   onBookingSuccess,
 }: SlideOverBookingDrawerProps) {
+  const navigate = useNavigate();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
@@ -157,12 +159,25 @@ export default function SlideOverBookingDrawer({
       try {
         const amountRupees = provider.sessionPrice || 1500;
         const amountMinor = Math.round(Number(amountRupees) * 100); // convert to paise
-        const paymentPayload: any = await patientApi.createSessionPayment({ providerId: provider.id, amountMinor });
-        const redirectUrl = paymentPayload?.redirectUrl || paymentPayload?.data?.redirectUrl;
-        if (redirectUrl) {
-          // Redirect user to payment gateway
-          window.location.href = redirectUrl;
-          return;
+        try {
+          const paymentPayload: any = await patientApi.createSessionPayment({ providerId: provider.id, amountMinor });
+          const redirectUrl = paymentPayload?.redirectUrl || paymentPayload?.data?.redirectUrl;
+          if (redirectUrl) {
+            // Redirect user to payment gateway
+            window.location.href = redirectUrl;
+            return;
+          }
+        } catch (payErr: any) {
+          // If server denies booking due to missing subscription, redirect to plans
+          const status = Number(payErr?.response?.status || 0);
+          const msg = String(payErr?.response?.data?.message || payErr?.message || '').toLowerCase();
+          if (status === 403 || msg.includes('subscription required') || msg.includes('subscription')) {
+            // Preserve returnTo so user can continue booking after subscribing
+            const returnTo = window.location.pathname + window.location.search + window.location.hash;
+            navigate(`/plans?returnTo=${encodeURIComponent(returnTo)}`);
+            return;
+          }
+          console.warn('Session payment initiation failed', payErr);
         }
       } catch (payErr: any) {
         // If payment initiation fails, fall back to showing success + allow manual handling
