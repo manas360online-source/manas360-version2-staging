@@ -58,10 +58,8 @@ import {
 	completeTreatmentPlanTask,
 	getMyTreatmentPlan,
 } from '../services/treatment-plan.service';
-import {
-	getPatientSharedReportDownloadPayload,
-	getPatientSharedReportMeta,
-} from '../services/patient-shared-report.service';
+import { getPatientSharedReportMeta, getPatientSharedReportDownloadPayload } from '../services/patient-shared-report.service';
+import { applyCreditsForPayment, getOrCreateWallet } from '../services/wallet.service';
 
 const renderPdfBuffer = async (write: (doc: any) => void): Promise<Buffer> =>
 	new Promise((resolve, reject) => {
@@ -680,14 +678,32 @@ export const checkoutPatientSubscriptionController = async (req: Request, res: R
 		throw new AppError('Invalid checkout total. Total must be subtotal plus GST.', 422);
 	}
 
+	let finalAmountMinor = expectedTotalMinor;
+	let walletUsedMinor = 0;
+
+	// Auto-apply wallet credits
+	const walletResult = await applyCreditsForPayment({
+		userId,
+		referenceId: idempotencyKey || `sub_checkout_${Date.now()}`,
+		referenceType: 'patient_subscription',
+		amountMinor: expectedTotalMinor,
+	});
+
+	if (walletResult.amountUsed > 0) {
+		walletUsedMinor = walletResult.amountUsed;
+		finalAmountMinor = walletResult.finalAmount;
+	}
+
 	const data = await initiatePatientSubscriptionPayment(userId, planKey, {
-		amountMinorOverride: expectedTotalMinor,
+		amountMinorOverride: finalAmountMinor,
 		idempotencyKey,
 		metadata: {
 			checkout: {
 				subtotalMinor,
 				gstMinor,
 				totalMinor,
+				walletUsedMinor,
+				finalAmountMinor,
 				addons,
 				promoCode,
 				acceptedTerms,

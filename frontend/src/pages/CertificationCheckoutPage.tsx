@@ -6,12 +6,14 @@ import { CardSkeleton } from '../components/CertificationSkeleton';
 import { SEO } from '../components/CertificationSEO';
 import { useEnrollmentStore } from '../store/CertificationEnrollmentStore';
 import { Enrollment } from '../CertificationTypes';
+import { useWallet } from '../hooks/useWallet';
 
 export const CheckoutPage: React.FC = () => {
     const { slug } = useParams<{ slug: string }>();
     const navigate = useNavigate();
     const location = useLocation();
     const { addEnrollment, getEnrollmentBySlug } = useEnrollmentStore();
+    const { balance, applyWalletToPayment } = useWallet();
 
     const [loading, setLoading] = useState(true);
     const [processing, setProcessing] = useState(false);
@@ -38,6 +40,9 @@ export const CheckoutPage: React.FC = () => {
     const today = new Date();
     const nextMonth = new Date(today); nextMonth.setDate(today.getDate() + 30);
     const monthAfter = new Date(today); monthAfter.setDate(today.getDate() + 60);
+
+    const applicableWallet = Math.min(balance || 0, totalToday);
+    const finalTotal = totalToday - applicableWallet;
 
     const handleTransaction = async (isSuccess: boolean) => {
         setProcessing(true);
@@ -71,6 +76,18 @@ export const CheckoutPage: React.FC = () => {
 
             justPaid.current = true;
             addEnrollment(newEnrollment);
+
+            if (applicableWallet > 0) {
+                try {
+                    await applyWalletToPayment({
+                        referenceId: enrollmentId,
+                        referenceType: 'certification',
+                        amount: Math.round(applicableWallet * 100), // amountMinor
+                    });
+                } catch (err) {
+                    console.warn('Failed to apply wallet credits:', err);
+                }
+            }
 
             // ── Navigate to the enrollment confirmed/success page ──────────
             navigate('/enrollment-confirmed', {
@@ -138,12 +155,19 @@ export const CheckoutPage: React.FC = () => {
                                     <span>₹0</span>
                                 </div>
                             )}
+
+                            {applicableWallet > 0 && (
+                                <div className="flex justify-between text-sm font-medium text-teal-600">
+                                    <span>Wallet Credits Applied</span>
+                                    <span>- ₹{applicableWallet.toLocaleString()}</span>
+                                </div>
+                            )}
                         </div>
 
                         <div className="border-t border-slate-100 pt-4 flex justify-between items-center font-bold text-slate-800 text-lg">
                             <span>Total Due Today</span>
                             <span>
-                                {cert.price_inr === 0 ? 'Free' : `₹${totalToday.toLocaleString()}`}
+                                {finalTotal === 0 ? 'Free' : `₹${finalTotal.toLocaleString()}`}
                             </span>
                         </div>
                     </div>
@@ -244,7 +268,7 @@ export const CheckoutPage: React.FC = () => {
                                 ) : (
                                     <>
                                         <Lock size={18} className="text-purple-200" />
-                                        Pay ₹{totalToday.toLocaleString()}
+                                        Pay ₹{finalTotal.toLocaleString()}
                                     </>
                                 )}
                             </button>

@@ -51,84 +51,55 @@ const getNextPlayTime = (): string => {
 };
 
 export const checkEligibility = async (userId: string) => {
-  const subscription = await db.patientSubscription.findUnique({
-    where: { userId },
-  });
+  const istNow = getIstNow();
+  const gameDate = getIstDate();
+  
+  // Next midnight IST for countdown if they already played or it's past 6 PM
+  const nextPlayTime = new Date(istNow);
+  nextPlayTime.setDate(nextPlayTime.getDate() + 1);
+  nextPlayTime.setHours(0, 0, 0, 0);
 
-  if (!subscription || !isSubscriptionValidForGames(subscription)) {
+  const closeTime = new Date(istNow);
+  closeTime.setHours(18, 0, 0, 0); // 6:00 PM IST
+
+  // Rule 1: Time enforcement
+  if (istNow.getHours() >= 18) {
     return {
       eligible: false,
-      error: 'SUBSCRIPTION REQUIRED',
-      data: {
-        upgrade_prompt: {
-          plan: 'Premium',
-          price: 99,
-          benefits: [
-            'Play daily cricket game',
-            'Win 10-100 credits daily',
-            'Average 450/month winnings',
-            'Reduce session costs by 45%',
-          ],
-        },
+      error: 'Game closed for today. Play tomorrow before 6 PM!',
+      timing: {
+        time_remaining_seconds: Math.floor((nextPlayTime.getTime() - istNow.getTime()) / 1000),
+        closes_at: nextPlayTime.toISOString(),
       },
     };
   }
 
-  const today = getIstDate();
-  const existingPlay = await db.dailyGamePlay.findFirst({
+  // Rule 2: Limit to 1 play per day
+  const existingPlay = await db.dailyGamePlay.findUnique({
     where: {
-      userId,
-      date: today,
-    },
-    select: {
-      didWin: true,
-      prizeAmount: true,
-      sixesHit: true,
+      userId_date: {
+        userId,
+        date: gameDate,
+      },
     },
   });
 
   if (existingPlay) {
-    const amountWon = Number(existingPlay.prizeAmount || 0);
-    const outcome: GameOutcome = amountWon >= 100
-      ? 'sixer'
-      : amountWon >= 50
-        ? 'four'
-        : 'out';
-
     return {
       eligible: false,
-      error: 'ALREADY PLAYED TODAY',
-      data: {
-        today_result: {
-          outcome,
-          amount_won: amountWon,
-        },
-        next_play_at: getNextPlayTime(),
-      },
-    };
-  }
-
-  const istNow = getIstNow();
-  const closeTime = new Date(istNow);
-  closeTime.setHours(GAME_CLOSE_HOUR, GAME_CLOSE_MINUTE, 0, 0);
-
-  if (istNow >= closeTime) {
-    return {
-      eligible: false,
-      error: 'GAME CLOSED',
-      data: {
-        message: 'Game closed for today. Play tomorrow before 6 PM!',
-        next_play_at: getNextPlayTime(),
+      error: 'Already played today. Come back tomorrow!',
+      timing: {
+        time_remaining_seconds: Math.floor((nextPlayTime.getTime() - istNow.getTime()) / 1000),
+        closes_at: nextPlayTime.toISOString(),
       },
     };
   }
 
   const timeRemainingSeconds = Math.max(0, Math.floor((closeTime.getTime() - istNow.getTime()) / 1000));
-
   return {
     eligible: true,
     error: null,
-    data: {
+    timing: { // Renamed from 'data' to prevent frontend's unwrapPayload bug
       time_remaining_seconds: timeRemainingSeconds,
       closes_at: closeTime.toISOString(),
     },
@@ -155,7 +126,7 @@ export const playGame = async (input: { userId: string; ipAddress?: string | nul
     return {
       success: false,
       error: eligibility.error,
-      data: eligibility.data,
+      data: eligibility.timing,
     };
   }
 
@@ -167,6 +138,7 @@ export const playGame = async (input: { userId: string; ipAddress?: string | nul
   const gameDate = getIstDate();
   const playedAt = getIstNow();
 
+  // Insert standard create instead of testing upsert
   const gamePlay = await db.dailyGamePlay.create({
     data: {
       userId: input.userId,

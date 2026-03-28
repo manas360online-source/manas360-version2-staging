@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { patientApi } from '../../api/patient';
+import { useWallet } from '../../hooks/useWallet';
 import {
   clearCart,
   getCheckoutSummaryMinor,
@@ -11,6 +12,7 @@ import {
 
 export default function SubscriptionCheckoutPage() {
   const navigate = useNavigate();
+  const { balance } = useWallet();
   const [cart, setCart] = useState(loadCart());
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [promoCode, setPromoCode] = useState('');
@@ -33,6 +35,10 @@ export default function SubscriptionCheckoutPage() {
   if (!cart || !summary) return null;
 
   const plan = getPlanById(cart.planId);
+
+  const balanceMinor = balance * 100;
+  const applicableWalletMinor = Math.min(balanceMinor, summary.totalMinor);
+  const finalTotalMinor = summary.totalMinor - applicableWalletMinor;
 
   const confirmAndPay = async () => {
     if (!acceptedTerms) {
@@ -94,7 +100,18 @@ export default function SubscriptionCheckoutPage() {
             <div className="flex items-center justify-between"><span>Add-ons</span><strong>INR {(summary.addonsMinor / 100).toFixed(2)}</strong></div>
             <div className="flex items-center justify-between"><span>Subtotal (before GST)</span><strong>INR {(summary.subtotalMinor / 100).toFixed(2)}</strong></div>
             <div className="flex items-center justify-between"><span>GST (18%)</span><span>INR {(summary.gstMinor / 100).toFixed(2)}</span></div>
-            <div className="mt-3 flex items-center justify-between border-t border-slate-200 pt-3 text-base"><span className="font-bold">Grand Total (incl. GST)</span><strong className="text-lg">INR {(summary.totalMinor / 100).toFixed(2)}</strong></div>
+            
+            {applicableWalletMinor > 0 && (
+              <div className="flex items-center justify-between font-medium text-teal-600">
+                <span>Wallet Credits Applied</span>
+                <span>- INR {(applicableWalletMinor / 100).toFixed(2)}</span>
+              </div>
+            )}
+
+            <div className="mt-3 flex items-center justify-between border-t border-slate-200 pt-3 text-base">
+              <span className="font-bold">Grand Total (incl. GST)</span>
+              <strong className="text-lg">INR {(finalTotalMinor / 100).toFixed(2)}</strong>
+            </div>
           </div>
 
           <label className="mt-4 block text-sm text-slate-700">
@@ -110,7 +127,7 @@ export default function SubscriptionCheckoutPage() {
           <div className="mt-4 flex flex-wrap gap-2">
             <button type="button" onClick={() => navigate('/plans/addons')} className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">Back to Add-ons</button>
             <button type="button" onClick={confirmAndPay} disabled={submitting} className="rounded-xl bg-[#4a6741] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
-              {submitting ? 'Processing...' : `Confirm & Pay INR ${(summary.totalMinor / 100).toFixed(2)} with PhonePe`}
+              {submitting ? 'Processing...' : `Confirm & Pay INR ${(finalTotalMinor / 100).toFixed(2)}`}
             </button>
           </div>
         </section>

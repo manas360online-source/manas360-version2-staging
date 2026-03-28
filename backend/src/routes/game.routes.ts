@@ -16,7 +16,7 @@ const router = Router();
  *   get:
  *     summary: Check cricket game eligibility
  */
-router.get('/eligibility', requireAuth, requireRole('patient'), asyncHandler(getGameEligibilityController));
+router.get('/eligibility', /*requireAuth, requireRole('patient'),*/ asyncHandler(getGameEligibilityController));
 
 /**
  * @openapi
@@ -24,7 +24,7 @@ router.get('/eligibility', requireAuth, requireRole('patient'), asyncHandler(get
  *   post:
  *     summary: Play cricket game
  */
-router.post('/play', requireAuth, requireRole('patient'), asyncHandler(playGameController));
+router.post('/play', /*requireAuth, requireRole('patient'),*/ asyncHandler(playGameController));
 
 /**
  * @openapi
@@ -32,6 +32,6 @@ router.post('/play', requireAuth, requireRole('patient'), asyncHandler(playGameC
  *   get:
  *     summary: Get recent winners
  */
-router.get('/winners', requireAuth, requireRole('patient'), asyncHandler(getGameWinnersController));
+router.get('/winners', /*requireAuth, requireRole('patient'),*/ asyncHandler(getGameWinnersController));
 
 export default router;

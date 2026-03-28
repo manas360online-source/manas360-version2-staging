@@ -1,301 +1,464 @@
-import { useMemo } from 'react';
-import { Sparkles, Trophy, Wallet2 } from 'lucide-react';
+// frontend/src/components/patient/HitASixerGame.tsx
+// ✅ FINAL MOBILE-OPTIMIZED VERSION (Fixed empty box + perfect button size)
 
-export type GameOutcome = 'sixer' | 'four' | 'out';
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { patientApi } from '@/api/patient';
+import { useWallet } from '@/hooks/useWallet';
 
-export type GameEligibility = {
-  eligible: boolean;
-  error?: string | null;
-  data?: Record<string, any> | null;
-};
+const HitASixerGame: React.FC = () => {
+  const queryClient = useQueryClient();
+  const { balance, refreshWallet } = useWallet();
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animFrameRef = useRef<number>(0);
 
-export type GameResult = {
-  success: boolean;
-  outcome: GameOutcome;
-  prizeAmount: number;
-  message?: string;
-  nextPlayAt?: string | null;
-};
+  const [stage, setStage] = useState<'ready' | 'start' | 'bowling' | 'result'>('ready');
+  const [outcome, setOutcome] = useState<'sixer' | 'four' | 'out' | null>(null);
+  const [credit, setCredit] = useState(0);
+  const [hitQuality, setHitQuality] = useState<'perfect' | 'good' | 'miss'>('miss');
+  const [isFullScreen, setIsFullScreen] = useState(false);
 
-export type WalletBalance = {
-  total_balance: number;
-  game_credits: number;
-  referral_credits: number;
-  promo_credits: number;
-  lifetime_earned: number;
-  lifetime_spent: number;
-  lifetime_expired: number;
-  last_transaction_at?: string | null;
-};
+  // Eligibility
+  const { data: eligibility } = useQuery({
+    queryKey: ['cricket-eligibility'],
+    queryFn: () => patientApi.getGameEligibility(),
+    refetchInterval: 15000,
+  });
 
-export type WinnerItem = {
-  display_name: string;
-  outcome: GameOutcome;
-  amount_won: number;
-  played_at: string;
-};
+  // Play → Backend decides outcome
+  const playMutation = useMutation({
+    mutationFn: () => patientApi.playGame(),
+    onSuccess: (data) => {
+      const earned = data.credit ?? (data.outcome === 'sixer' ? 100 : data.outcome === 'four' ? 50 : 10);
+      setOutcome(data.outcome);
+      setCredit(earned);
+      setStage('start');
+      setIsFullScreen(true);
+    },
+    onError: (err: any) => toast.error(err.response?.data?.message || 'Cannot play now'),
+  });
 
-type HitASixerGameProps = {
-  eligibility: GameEligibility | null;
-  isPlaying: boolean;
-  onPlay: () => void;
-};
+  // ==================== FULL SCREEN CANVAS WITH PREVIEW ====================
+  const drawPreview = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const W = canvas.width;
+    const H = canvas.height;
 
-type WalletWidgetProps = {
-  balance: WalletBalance | null;
-};
+    // Background gradient
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, '#052e22');
+    grad.addColorStop(1, '#0f5c44');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
 
-type ResultScreenProps = {
-  amount: number;
-  nextPlayAt?: string | null;
-  message?: string;
-};
+    // Pitch
+    ctx.fillStyle = '#d4b37c';
+    ctx.fillRect(40, H * 0.41, W - 80, H * 0.45);
 
-type WinnersFeedProps = {
-  winners: WinnerItem[];
-  loading?: boolean;
-};
+    // Crease lines
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(40, H * 0.49); ctx.lineTo(W - 40, H * 0.49); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(40, H * 0.63); ctx.lineTo(W - 40, H * 0.63); ctx.stroke();
 
-type SubscribeToPlayGateProps = {
-  onSubscribe: () => void;
-};
+    // Stumps
+    ctx.fillStyle = '#f8f8f8';
+    const stumpBase = H * 0.44;
+    const stumpH = H * 0.27;
+    [W - 175, W - 160, W - 145].forEach(sx => ctx.fillRect(sx, stumpBase, 13, stumpH));
+    ctx.fillRect(W - 178, stumpBase, 46, 5); // Bails
 
-const formatInr = (value: number): string => `INR ${Number(value || 0).toFixed(0)}`;
+    // Static Ball
+    ctx.fillStyle = '#e63939';
+    ctx.beginPath();
+    ctx.arc(180, H * 0.58, 20, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(180, H * 0.58, 20, 0.4, Math.PI - 0.4);
+    ctx.stroke();
 
-const formatTime = (value?: string | null): string => {
-  if (!value) return 'Tomorrow';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Tomorrow';
-  return date.toLocaleString(undefined, { hour: 'numeric', minute: '2-digit', day: 'numeric', month: 'short' });
-};
+    // Bat (slightly angled)
+    const BAT_X = W / 2 - 40;
+    const BAT_Y = H * 0.60;
+    ctx.save();
+    ctx.translate(BAT_X, BAT_Y);
+    ctx.rotate(38 * Math.PI / 180);
+    ctx.fillStyle = '#6b3d11'; ctx.fillRect(-25, -22, 32, 44);
+    ctx.fillStyle = '#c8922a'; ctx.fillRect(7, -24, 165, 48);
+    ctx.fillStyle = '#e6b84a'; ctx.fillRect(7, -24, 7, 48);
+    ctx.restore();
 
-export const WalletWidget = ({ balance }: WalletWidgetProps) => {
-  if (!balance) {
-    return (
-      <div className="rounded-3xl border border-slate-200 bg-white/80 p-5 shadow-sm">
-        <div className="flex items-center gap-2 text-sm font-semibold text-slate-600">
-          <Wallet2 className="h-4 w-4" /> Wallet
-        </div>
-        <div className="mt-3 text-sm text-slate-500">Wallet data is loading...</div>
-      </div>
-    );
-  }
+    // Pulsing golden circle (preview)
+    const pulse = Math.sin(Date.now() / 300) * 6 + 95;
+    ctx.strokeStyle = '#ffd700';
+    ctx.lineWidth = 12;
+    ctx.setLineDash([14, 10]);
+    ctx.beginPath();
+    ctx.ellipse(BAT_X + 90, BAT_Y, pulse, 105, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  };
+
+  const startFullScreenGame = (finalOutcome: 'sixer' | 'four' | 'out') => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d')!;
+
+    const W = canvas.width;
+    const H = canvas.height;
+
+    let frame = 0;
+    let ballX = 80;
+    let ballY = H * 0.72;
+    let batAngle = 38; // idle raised position
+    let hasSwung = false;
+    let swingFrame = -1;
+    let batSwingProg = 0;
+
+    let ballHit = false;
+    let ballVx = 0, ballVy = 0;
+
+    const HIT_WIN_START = 52;
+    const HIT_WIN_END = 100;
+    const BALL_AT_BAT = 88;
+
+    const BAT_X = W / 2 - 40;
+    const BAT_Y = H * 0.60;
+
+    const drawArena = () => {
+      ctx.clearRect(0, 0, W, H);
+
+      const grad = ctx.createLinearGradient(0, 0, 0, H);
+      grad.addColorStop(0, '#052e22');
+      grad.addColorStop(1, '#0f5c44');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, H);
+
+      ctx.fillStyle = '#d4b37c';
+      ctx.fillRect(40, H * 0.41, W - 80, H * 0.45);
+
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([]);
+      ctx.beginPath(); ctx.moveTo(40, H * 0.49); ctx.lineTo(W - 40, H * 0.49); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(40, H * 0.63); ctx.lineTo(W - 40, H * 0.63); ctx.stroke();
+
+      ctx.fillStyle = '#f8f8f8';
+      const stumpBase = H * 0.44;
+      const stumpH = H * 0.27;
+      [W - 175, W - 160, W - 145].forEach(sx => ctx.fillRect(sx, stumpBase, 13, stumpH));
+      ctx.fillRect(W - 178, stumpBase, 46, 5);
+    };
+
+    const drawBall = (x: number, y: number) => {
+      ctx.fillStyle = '#e63939';
+      ctx.beginPath();
+      ctx.arc(x, y, 20, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(x, y, 20, 0.4, Math.PI - 0.4);
+      ctx.stroke();
+    };
+
+    const drawBat = (angle: number) => {
+      ctx.save();
+      ctx.translate(BAT_X, BAT_Y);
+      ctx.rotate((angle * Math.PI) / 180);
+      ctx.fillStyle = '#6b3d11'; ctx.fillRect(-25, -22, 32, 44);
+      ctx.fillStyle = '#c8922a'; ctx.fillRect(7, -24, 165, 48);
+      ctx.fillStyle = '#e6b84a'; ctx.fillRect(7, -24, 7, 48);
+      ctx.restore();
+    };
+
+    const runFrame = () => {
+      drawArena();
+
+      if (!ballHit) {
+        const progress = Math.min(frame / BALL_AT_BAT, 1);
+        ballX = 80 + progress * (BAT_X + 100 - 80);
+        ballY = H * 0.72 - Math.sin(progress * Math.PI) * 130;
+        drawBall(ballX, ballY);
+      }
+
+      if (ballHit) {
+        ballX += ballVx;
+        ballY += ballVy;
+        ballVy += 0.4;
+        if (ballY < H + 50) drawBall(ballX, ballY);
+      }
+
+      if (!hasSwung) {
+        drawBat(batAngle);
+      } else {
+        batSwingProg = Math.min((frame - swingFrame) / 22, 1);
+        drawBat(38 - batSwingProg * 113);
+      }
+
+      if (frame >= HIT_WIN_START && frame <= HIT_WIN_END && !hasSwung) {
+        const pulse = Math.sin(frame * 0.4) * 6 + 95;
+        const alpha = 0.45 + 0.4 * Math.abs(Math.sin(frame * 0.32));
+        ctx.strokeStyle = `rgba(255, 215, 0, ${alpha})`;
+        ctx.lineWidth = 12;
+        ctx.setLineDash([14, 10]);
+        ctx.beginPath();
+        ctx.ellipse(BAT_X + 90, BAT_Y, pulse, 105, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = `rgba(255, 215, 0, ${alpha})`;
+        ctx.font = `bold 22px "Segoe UI", sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText('🏏 TAP NOW!', BAT_X + 90, BAT_Y - 120);
+      }
+      
+      if (hasSwung && frame > swingFrame + 15 && frame < swingFrame + 60) {
+        const flashAlpha = Math.min((frame - swingFrame - 15) / 8, 1);
+        ctx.save();
+        ctx.globalAlpha = flashAlpha;
+        ctx.font = `bold 72px "Segoe UI", sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 14;
+        if (finalOutcome === 'sixer') { ctx.fillStyle = '#ffd700'; ctx.fillText('💥 SIXER!', W / 2, H * 0.30); }
+        else if (finalOutcome === 'four') { ctx.fillStyle = '#68d391'; ctx.fillText('✨ FOUR!', W / 2, H * 0.30); }
+        else { ctx.fillStyle = '#fc8181'; ctx.fillText('😢 OUT!', W / 2, H * 0.30); }
+        ctx.restore();
+      }
+
+      frame++;
+
+      const done = hasSwung && frame > swingFrame + 75;
+      const missed = !hasSwung && frame > 130;
+
+      if (!done && !missed) {
+        animFrameRef.current = requestAnimationFrame(runFrame);
+      } else {
+        let quality: 'perfect' | 'good' | 'miss' = 'miss';
+        if (hasSwung) {
+          const diff = Math.abs(swingFrame - BALL_AT_BAT);
+          quality = diff <= 8 ? 'perfect' : 'good';
+        }
+        setHitQuality(quality);
+        setStage('result');
+        refreshWallet();
+        queryClient.invalidateQueries({ queryKey: ['wallet'] });
+        toast.success(
+          finalOutcome === 'sixer' ? '🏏 SIXER! +₹100'
+          : finalOutcome === 'four' ? '🏏 FOUR! +₹50'
+          : '🏏 OUT! +₹10',
+          { description: quality === 'perfect' ? 'Perfect Timing 🔥' : quality === 'good' ? 'Good Swing!' : 'Better luck next time' }
+        );
+      }
+    };
+
+    const handleTap = (e: MouseEvent | TouchEvent) => {
+      if (hasSwung || frame < 40 || frame > 110) return; // Prevent too early/late taps
+      e.preventDefault();
+      hasSwung = true;
+      swingFrame = frame;
+
+      ballHit = true;
+      ballX = BAT_X + 100;
+      ballY = BAT_Y;
+      if (finalOutcome === 'sixer') { ballVx = -4; ballVy = -18; }
+      else if (finalOutcome === 'four') { ballVx = -6; ballVy = -10; }
+      else { ballVx = 5; ballVy = -3; }
+    };
+
+    canvas.addEventListener('click', handleTap);
+    canvas.addEventListener('touchstart', handleTap, { passive: false });
+    runFrame();
+
+    return () => {
+      canvas.removeEventListener('click', handleTap);
+      canvas.removeEventListener('touchstart', handleTap);
+    };
+  };
+
+  const handlePlayNow = () => {
+    if (!eligibility?.eligible) return;
+    playMutation.mutate();
+  };
+
+  const handleStartBowling = () => {
+    setStage('bowling');
+    if (outcome) startFullScreenGame(outcome);
+  };
+
+  const exitGame = () => {
+    cancelAnimationFrame(animFrameRef.current);
+    setIsFullScreen(false);
+    setStage('ready');
+  };
+
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout;
+    if (stage === 'start' && isFullScreen) {
+      const renderPreview = () => {
+        const canvas = canvasRef.current;
+        if (canvas) {
+          const ctx = canvas.getContext('2d')!;
+          drawPreview(ctx, canvas);
+        }
+      };
+      // Keep pulsing the preview circle
+      intervalId = setInterval(renderPreview, 1000 / 60);
+      renderPreview();
+    }
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [stage, isFullScreen]);
+
+  const displayCredit = credit || (outcome === 'sixer' ? 100 : outcome === 'four' ? 50 : 10);
 
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-sm">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-sm font-semibold text-slate-600">
-          <Wallet2 className="h-4 w-4" /> Wallet Balance
-        </div>
-        <div className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">{formatInr(balance.total_balance)}</div>
-      </div>
-
-      <div className="mt-4 grid grid-cols-2 gap-3 text-xs text-slate-600">
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
-          <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400">Game Credits</p>
-          <p className="mt-1 text-sm font-semibold text-slate-700">{formatInr(balance.game_credits)}</p>
-        </div>
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
-          <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400">Referral Credits</p>
-          <p className="mt-1 text-sm font-semibold text-slate-700">{formatInr(balance.referral_credits)}</p>
-        </div>
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
-          <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400">Promo Credits</p>
-          <p className="mt-1 text-sm font-semibold text-slate-700">{formatInr(balance.promo_credits)}</p>
-        </div>
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
-          <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400">Lifetime Earned</p>
-          <p className="mt-1 text-sm font-semibold text-slate-700">{formatInr(balance.lifetime_earned)}</p>
-        </div>
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-3 text-xs text-slate-500">
-        <span>Spent: {formatInr(balance.lifetime_spent)}</span>
-        <span>Expired: {formatInr(balance.lifetime_expired)}</span>
-      </div>
-    </div>
-  );
-};
-
-export const SubscribeToPlayGate = ({ onSubscribe }: SubscribeToPlayGateProps) => (
-  <div className="rounded-[32px] border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-amber-100/70 p-6 shadow-sm">
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-600">Subscribe to Play</p>
-        <h2 className="mt-2 text-2xl font-semibold text-slate-900">Hit a Sixer, win wallet credits</h2>
-        <p className="mt-2 text-sm text-slate-600">Activate a paid plan to unlock the daily cricket game and surprise rewards.</p>
-      </div>
-      <button
-        type="button"
-        onClick={onSubscribe}
-        className="inline-flex items-center justify-center rounded-full bg-amber-500 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-600"
-      >
-        View Plans
-      </button>
-    </div>
-  </div>
-);
-
-export const ResultScreenSixer = ({ amount, nextPlayAt, message }: ResultScreenProps) => (
-  <div className="relative overflow-hidden rounded-[32px] border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-emerald-100/60 p-6 shadow-sm">
-    <div className="absolute -right-6 -top-8 h-28 w-28 rounded-full bg-emerald-300/40 blur-2xl" />
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">SIXER!</p>
-        <h2 className="mt-2 text-2xl font-semibold text-slate-900">You smashed it.</h2>
-        <p className="mt-2 text-sm text-slate-600">{message || 'Big hit. Big reward.'}</p>
-      </div>
-      <div className="rounded-3xl bg-emerald-600 px-6 py-4 text-center text-white shadow-sm">
-        <p className="text-xs uppercase tracking-[0.2em]">Won</p>
-        <p className="mt-1 text-2xl font-bold">{formatInr(amount)}</p>
-      </div>
-    </div>
-    <p className="mt-4 text-xs text-slate-500">Next play: {formatTime(nextPlayAt)}</p>
-  </div>
-);
-
-export const ResultScreenFour = ({ amount, nextPlayAt, message }: ResultScreenProps) => (
-  <div className="relative overflow-hidden rounded-[32px] border border-sky-200 bg-gradient-to-br from-sky-50 via-white to-sky-100/60 p-6 shadow-sm">
-    <div className="absolute -left-8 -top-6 h-24 w-24 rounded-full bg-sky-300/40 blur-2xl" />
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600">FOUR!</p>
-        <h2 className="mt-2 text-2xl font-semibold text-slate-900">Clean boundary.</h2>
-        <p className="mt-2 text-sm text-slate-600">{message || 'Nice timing, nice reward.'}</p>
-      </div>
-      <div className="rounded-3xl bg-sky-500 px-6 py-4 text-center text-white shadow-sm">
-        <p className="text-xs uppercase tracking-[0.2em]">Won</p>
-        <p className="mt-1 text-2xl font-bold">{formatInr(amount)}</p>
-      </div>
-    </div>
-    <p className="mt-4 text-xs text-slate-500">Next play: {formatTime(nextPlayAt)}</p>
-  </div>
-);
-
-export const ResultScreenOut = ({ amount, nextPlayAt, message }: ResultScreenProps) => (
-  <div className="relative overflow-hidden rounded-[32px] border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-slate-100/60 p-6 shadow-sm">
-    <div className="absolute right-0 top-0 h-20 w-20 rounded-full bg-slate-300/40 blur-2xl" />
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">OUT</p>
-        <h2 className="mt-2 text-2xl font-semibold text-slate-900">Still earned credits.</h2>
-        <p className="mt-2 text-sm text-slate-600">{message || 'Come back tomorrow for another shot.'}</p>
-      </div>
-      <div className="rounded-3xl bg-slate-700 px-6 py-4 text-center text-white shadow-sm">
-        <p className="text-xs uppercase tracking-[0.2em]">Won</p>
-        <p className="mt-1 text-2xl font-bold">{formatInr(amount)}</p>
-      </div>
-    </div>
-    <p className="mt-4 text-xs text-slate-500">Next play: {formatTime(nextPlayAt)}</p>
-  </div>
-);
-
-export const WinnersFeed = ({ winners, loading }: WinnersFeedProps) => {
-  const items = useMemo(() => winners.slice(0, 10), [winners]);
-
-  return (
-    <div className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-sm">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm font-semibold text-slate-600">
-          <Trophy className="h-4 w-4" /> Winners Feed
-        </div>
-        <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Live</span>
-      </div>
-
-      {loading ? (
-        <p className="mt-3 text-sm text-slate-500">Loading winners...</p>
-      ) : (
-        <div className="mt-4 space-y-3">
-          {items.length === 0 ? (
-            <p className="text-sm text-slate-500">No winners yet. Be the first today.</p>
-          ) : (
-            items.map((winner, index) => (
-              <div key={`${winner.display_name}-${winner.played_at}-${index}`} className="flex items-center justify-between text-sm text-slate-600">
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-500">
-                    {winner.display_name.charAt(0)}
-                  </span>
-                  <div>
-                    <p className="font-medium text-slate-700">{winner.display_name}</p>
-                    <p className="text-xs text-slate-400">{winner.outcome.toUpperCase()}</p>
-                  </div>
-                </div>
-                <span className="font-semibold text-slate-700">{formatInr(winner.amount_won)}</span>
-              </div>
-            ))
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
-
-export const HitASixerGame = ({ eligibility, isPlaying, onPlay }: HitASixerGameProps) => {
-  // If eligibility is still loading/undefined but user reached this screen, allow the button; only block when explicitly ineligible.
-  const disabled = (eligibility?.eligible === false) || isPlaying;
-  const statusMessage = eligibility?.eligible
-    ? 'One play per day. Finish before 6 PM IST.'
-    : eligibility?.error === 'GAME CLOSED'
-      ? 'Game closed for today. Try again tomorrow.'
-      : eligibility?.error === 'ALREADY PLAYED TODAY'
-        ? 'You already played today.'
-      : 'Loading eligibility…';
-
-  return (
-    <div className="relative overflow-hidden rounded-[32px] border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-slate-100/50 p-6 shadow-sm">
-      <style>{`
-        @keyframes ball-flight {
-          0% { transform: translate(0, 0) scale(1); opacity: 1; }
-          40% { transform: translate(120px, -80px) scale(0.9); opacity: 1; }
-          100% { transform: translate(240px, -140px) scale(0.7); opacity: 0; }
-        }
-        @keyframes bat-swing {
-          0% { transform: rotate(0deg); }
-          50% { transform: rotate(-18deg); }
-          100% { transform: rotate(0deg); }
-        }
-        @keyframes glow {
-          0%, 100% { box-shadow: 0 0 0 rgba(16, 185, 129, 0.0); }
-          50% { box-shadow: 0 0 30px rgba(16, 185, 129, 0.28); }
-        }
-      `}</style>
-
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Hit A Sixer</p>
-          <h2 className="mt-2 text-2xl font-semibold text-slate-900">Cricket shot, daily reward.</h2>
-          <p className="mt-2 text-sm text-slate-600">{statusMessage}</p>
-        </div>
-        <button
-          type="button"
-          onClick={onPlay}
-          disabled={disabled}
-          className={`inline-flex items-center justify-center rounded-full px-6 py-2.5 text-sm font-semibold text-white transition ${disabled ? 'bg-slate-300' : 'bg-emerald-500 hover:bg-emerald-600'}`}
-        >
-          {isPlaying ? 'Playing...' : 'Play Now'}
-        </button>
-      </div>
-
-      <div className="relative mt-6 overflow-hidden rounded-3xl border border-slate-200 bg-white/80 p-5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-            <Sparkles className="h-4 w-4" /> Stadium View
+    <>
+      <div className="max-w-5xl mx-auto px-4 py-8 md:px-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
+          <div className="flex items-center gap-4">
+            <span className="text-5xl">🏏</span>
+            <h1 className="text-4xl md:text-5xl font-bold text-emerald-900">Hit a Sixer Daily</h1>
           </div>
-          <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">IST</span>
-        </div>
 
-        <div className="relative mt-6 flex h-40 items-end justify-between rounded-2xl bg-gradient-to-br from-emerald-50 via-white to-emerald-100/60 p-4">
-          <div className="relative flex h-full w-full items-center">
-            <div className={`absolute bottom-2 left-6 h-16 w-2 rounded-full bg-amber-400 ${isPlaying ? 'animate-[bat-swing_0.6s_ease-in-out]' : ''}`} />
-            <div className={`absolute bottom-8 left-8 h-3 w-3 rounded-full bg-red-500 ${isPlaying ? 'animate-[ball-flight_0.9s_ease-in-out]' : ''}`} />
-            <div className="absolute bottom-2 right-10 flex h-10 w-10 items-end justify-center rounded-xl bg-emerald-500/20">
-              <div className="h-8 w-2 rounded-full bg-emerald-700" />
-              <div className="mx-0.5 h-10 w-2 rounded-full bg-emerald-700" />
-              <div className="h-8 w-2 rounded-full bg-emerald-700" />
+          <div className="flex items-center gap-6">
+            <div className="bg-white px-7 py-4 rounded-3xl shadow flex items-center gap-3 text-xl">
+              <span className="font-semibold text-emerald-700">Wallet</span>
+              <span className="font-bold text-3xl">₹{balance}</span>
             </div>
+
+            <button
+              onClick={handlePlayNow}
+              disabled={!eligibility?.eligible || stage !== 'ready' || playMutation.isPending}
+              className="px-10 py-5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 text-white text-2xl font-bold rounded-3xl shadow-xl transition flex items-center gap-3"
+            >
+              {playMutation.isPending ? '⏳ Starting...' : '🎾 Play Now'}
+            </button>
           </div>
         </div>
+
+        {eligibility && (
+          <motion.div className="mb-8 px-8 py-5 rounded-3xl text-2xl font-medium text-center bg-emerald-100 text-emerald-800 flex justify-center items-center gap-2">
+            ✅ Eligible! {eligibility.timeLeft} left today
+          </motion.div>
+        )}
+
+        {stage === 'ready' && (
+          <div className="bg-emerald-950 rounded-3xl p-8 text-center text-white max-w-md mx-auto">
+            <div className="flex justify-center gap-8 text-7xl mb-6">
+              <span>🏏</span>
+              <span>🔴</span>
+            </div>
+            <h2 className="text-4xl font-bold mb-4">Ready to bat?</h2>
+            <p className="text-xl">You’ll get one shot.<br />Swing at the right moment!</p>
+          </div>
+        )}
+
+        <p className="text-center text-sm text-gray-500 mt-8">
+          4% SIXER (₹100) • 8% FOUR (₹50) • 88% OUT (₹10) • 1 play/day • Credits expire in 30 days
+        </p>
       </div>
-    </div>
+
+      <AnimatePresence>
+        {isFullScreen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black z-50 flex flex-col"
+          >
+            <div className="h-16 bg-emerald-900 flex items-center justify-between px-6 text-white text-lg font-medium shrink-0">
+              <button onClick={exitGame} className="flex items-center gap-2">✕ Exit</button>
+              <div className="font-bold text-2xl">Hit a Sixer</div>
+              <div className="font-bold text-xl">₹{balance}</div>
+            </div>
+
+            <div className="flex-1 flex items-center justify-center p-4 bg-emerald-950 relative min-h-0">
+              <canvas
+                ref={canvasRef}
+                width={820}
+                height={580}
+                className="w-full max-w-[820px] aspect-video rounded-3xl border-8 border-emerald-800 shadow-2xl cursor-crosshair touch-none"
+                style={{ maxHeight: '100%', objectFit: 'contain' }}
+              />
+
+              <AnimatePresence>
+                {stage === 'start' && (
+                  <motion.div
+                    initial={{ y: 100, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    exit={{ y: 50, opacity: 0 }}
+                    className="absolute bottom-10 left-1/2 -translate-x-1/2 w-11/12 max-w-md"
+                  >
+                    <button
+                      onClick={handleStartBowling}
+                      className="w-full flex items-center justify-center gap-4 bg-white text-emerald-700 px-6 py-6 rounded-3xl text-3xl font-bold shadow-[0_10px_40px_rgba(0,0,0,0.6)] active:scale-95 transition"
+                    >
+                      🏏 START BOWLING
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <AnimatePresence>
+                {stage === 'bowling' && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute top-8 left-1/2 -translate-x-1/2 w-11/12 max-w-md bg-yellow-400 text-yellow-900 px-6 py-3 rounded-xl text-center font-bold text-lg shadow-xl"
+                  >
+                    👁️ Watch golden circle, then TAP!
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            <AnimatePresence>
+              {stage === 'result' && outcome && (
+                <motion.div
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  className="absolute inset-0 flex items-center justify-center bg-black/80 z-20"
+                >
+                  <div className="bg-white rounded-3xl px-12 py-12 text-center max-w-sm w-full mx-6 shadow-2xl">
+                    <div className="text-8xl mb-6">
+                      {outcome === 'sixer' ? '🏏💥' : outcome === 'four' ? '🏏✨' : '🏏😢'}
+                    </div>
+                    <h2 className="text-6xl font-black text-emerald-600">
+                      {outcome.toUpperCase()}!
+                    </h2>
+                    <p className="text-5xl font-bold mt-4">+₹{displayCredit}</p>
+
+                    <div className="mt-6 flex flex-col items-center gap-2">
+                       <p className="text-xl text-gray-600 font-medium">
+                        {hitQuality === 'perfect' ? '🔥 Perfect Timing!' : hitQuality === 'good' ? '👍 Good Swing!' : '😅 Missed the ball'}
+                       </p>
+                       <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+                         <div className={`h-full rounded-full transition-all duration-500 ${hitQuality === 'perfect' ? 'bg-yellow-400 w-full' : hitQuality === 'good' ? 'bg-emerald-400 w-2/3' : 'bg-red-400 w-1/6'}`} />
+                       </div>
+                    </div>
+
+                    <button
+                      onClick={exitGame}
+                      className="mt-10 w-full py-6 text-2xl font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-3xl shadow-lg transition"
+                    >
+                      Done – See you tomorrow!
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 };
+
+export default HitASixerGame;

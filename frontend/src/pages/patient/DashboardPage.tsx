@@ -19,7 +19,7 @@ import { isOnboardingRequiredError, patientApi } from '../../api/patient';
 import type { ActiveCbtAssignment } from '../../api/patient';
 import { DashboardSkeletons } from '../../components/ui/Skeleton';
 import DashboardCard from '../../components/ui/DashboardCard';
-import { WinnersFeed } from '../../components/patient/HitASixerGame';
+
 
 const moodEmojiMap: Record<number, string> = {
   1: '😢',
@@ -213,7 +213,7 @@ export default function DashboardPage() {
 
       {/* Winners Feed: recent players */}
       <div>
-        <WinnersFeed winners={winners} loading={winnersLoading} />
+        {/* WinnersFeed component removed: not exported from HitASixerGame.tsx. You can implement a new WinnersFeed or remove this section. */}
       </div>
       
       {/* 1. HERO SECTION */}

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { X, Calendar as CalendarIcon, Clock, CreditCard, CheckCircle2 } from 'lucide-react';
 import { patientApi } from '../../api/patient';
+import { useWallet } from '../../hooks/useWallet';
 
 interface Provider {
   id: string;
@@ -43,7 +43,6 @@ export default function SlideOverBookingDrawer({
   provider,
   onBookingSuccess,
 }: SlideOverBookingDrawerProps) {
-  const navigate = useNavigate();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
@@ -54,6 +53,7 @@ export default function SlideOverBookingDrawer({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSubscriptionWarning, setShowSubscriptionWarning] = useState(false);
+  const { balance, applyWalletToPayment } = useWallet();
 
   // Reset state only when drawer is opened.
   useEffect(() => {
@@ -146,26 +146,52 @@ export default function SlideOverBookingDrawer({
       const [hours, minutes] = selectedTime.split(':').map(Number);
       const scheduledAt = new Date(selectedDate);
       scheduledAt.setHours(hours, minutes, 0, 0);
-      // Call the existing patientApi endpoint to create the therapy booking
-      await patientApi.bookSession({
+
+      // 1. Create the therapy booking record
+      const bookingResp = await patientApi.bookSession({
         providerId: provider.id,
         scheduledAt: scheduledAt.toISOString(),
         durationMinutes: 50,
       });
-      // Initiate session payment so backend returns a gateway redirect URL
-      try {
-        const amountRupees = provider.sessionPrice || 1500;
-        const amountMinor = Math.round(Number(amountRupees) * 100); // convert to paise
+
+      const bookingId = bookingResp?.sessionId || bookingResp?.data?.sessionId;
+      if (!bookingId) {
+        throw new Error('Failed to retrieve booking ID from server.');
+      }
+
+      const originalAmountRupees = provider.sessionPrice || 1500;
+      let amountMinor = Math.round(Number(originalAmountRupees) * 100); // base price in paise
+      let finalAmountMinor = amountMinor;
+
+      // 2. Apply wallet credits if available
+      if (balance > 0) {
         try {
-          const paymentPayload: any = await patientApi.createSessionPayment({ providerId: provider.id, amountMinor });
+          const walletResult = await applyWalletToPayment({
+            bookingId: String(bookingId),
+            amount: amountMinor,
+          });
+          // walletResult returns { used, finalAmount } from the recently updated backend controller
+          finalAmountMinor = walletResult?.finalAmount ?? (amountMinor - (walletResult?.used ?? 0));
+        } catch (walletErr) {
+          console.warn('Failed to apply wallet credits:', walletErr);
+          // Continue with full payment if wallet application fails
+        }
+      }
+
+      // 3. Initiate payment for the remainder (if any)
+      if (finalAmountMinor > 0) {
+        try {
+          const paymentPayload: any = await patientApi.createSessionPayment({ 
+            providerId: provider.id, 
+            amountMinor: finalAmountMinor 
+          });
+          
           const redirectUrl = paymentPayload?.redirectUrl || paymentPayload?.data?.redirectUrl;
           if (redirectUrl) {
-            // Redirect user to payment gateway
             window.location.href = redirectUrl;
             return;
           }
         } catch (payErr: any) {
-          // If server denies booking due to missing subscription, show warning and button
           const status = Number(payErr?.response?.status || 0);
           const msg = String(payErr?.response?.data?.message || payErr?.message || '').toLowerCase();
           if (status === 403 || msg.includes('subscription required') || msg.includes('subscription')) {
@@ -174,13 +200,10 @@ export default function SlideOverBookingDrawer({
           }
           console.warn('Session payment initiation failed', payErr);
         }
-      } catch (payErr: any) {
-        // If payment initiation fails, fall back to showing success + allow manual handling
-        console.warn('Session payment initiation failed', payErr);
       }
-      // If no redirect required, show success UI and close drawer
-      setStep(3); // Show Success UI
-      // Notify parent to refresh the Care Team / Next Up state
+
+      // 4. If no redirect required (e.g. fully paid by wallet or payment gateway skipped), show success
+      setStep(3);
       setTimeout(() => {
         onBookingSuccess();
         onClose();
@@ -333,15 +356,27 @@ export default function SlideOverBookingDrawer({
                     <span className="font-medium text-charcoal">{selectedTime ? toDisplayTime(selectedTime) : '-'}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-charcoal/60">Duration</span>
-                    <span className="font-medium text-charcoal">50 minutes</span>
+                    <span className="text-charcoal/60">Session Fee</span>
+                    <span className="font-medium text-charcoal">₹{provider.sessionPrice || 1500}</span>
                   </div>
+                  
+                  {balance > 0 && (
+                    <div className="flex justify-between text-teal-600 animate-in fade-in duration-300">
+                      <span className="flex items-center">
+                        <CheckCircle2 className="mr-1 h-3 w-3" />
+                        Wallet Credits Applied
+                      </span>
+                      <span className="font-medium">-₹{Math.min(balance, provider.sessionPrice || 1500)}</span>
+                    </div>
+                  )}
                   
                   <div className="my-4 border-t border-dashed border-calm-sage/30" />
                   
                   <div className="flex justify-between font-semibold text-lg items-center">
                     <span className="text-charcoal">Total Due</span>
-                    <span className="text-teal-600">₹{provider.sessionPrice || 1500}</span>
+                    <span className="text-teal-600">
+                      ₹{Math.max(0, (provider.sessionPrice || 1500) - balance)}
+                    </span>
                   </div>
                 </div>
               </div>

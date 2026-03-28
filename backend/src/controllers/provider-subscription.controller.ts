@@ -8,6 +8,7 @@ import {
 	getProviderLeadStats,
 } from '../services/provider-subscription.service';
 import { initiateProviderSubscriptionPayment } from '../services/provider-subscription-payment.service';
+import { applyCreditsForPayment } from '../services/wallet.service';
 import { createPendingSubscriptionComponents } from '../services/provider-subscription.pending.service';
 import {
 	getProviderLeads,
@@ -106,9 +107,25 @@ export const checkoutProviderSubscriptionController = async (req: Request, res: 
 	const idempotencyKey = String(req.body.idempotencyKey || '').trim() || undefined;
 	const promoCode = String(req.body.promoCode || '').trim() || undefined;
 
+	let finalAmountMinor = expectedTotalMinor;
+	let walletUsedMinor = 0;
+
+	// Auto-apply wallet credits
+	const walletResult = await applyCreditsForPayment({
+		userId: providerId,
+		referenceId: idempotencyKey || `prov_checkout_${Date.now()}`,
+		referenceType: 'provider_subscription',
+		amountMinor: expectedTotalMinor,
+	});
+
+	if (walletResult.amountUsed > 0) {
+		walletUsedMinor = walletResult.amountUsed;
+		finalAmountMinor = walletResult.finalAmount;
+	}
+
 	// Step 1: Initiate payment
 	const payment = await initiateProviderSubscriptionPayment(providerId, leadPlanKey, {
-		amountMinorOverride: expectedTotalMinor,
+		amountMinorOverride: finalAmountMinor,
 		idempotencyKey,
 		metadata: {
 			flow: 'provider_checkout_v2',
@@ -155,6 +172,8 @@ export const checkoutProviderSubscriptionController = async (req: Request, res: 
 			expectedSubtotalMinor,
 			expectedGstMinor,
 			expectedTotalMinor,
+			walletUsedMinor,
+			finalAmountMinor,
 		},
 	}, 'Provider checkout initiated (with pending components)');
 };

@@ -1,6 +1,4 @@
 import { getLivePricingController } from '../controllers/pricing.controller';
-// Defensive public pricing route for landing page
-router.get('/public/pricing/:category', getLivePricingController);
 import { Router } from 'express';
 import authRoutes from './auth.routes';
 import patientRoutes from './patient.routes';
@@ -34,7 +32,10 @@ import providerDashboardRoutes from './provider-dashboard.routes';
 import gameRoutes from './game.routes';
 import walletRoutes from './wallet.routes';
 
+
 const router = Router();
+// Defensive public pricing route for landing page
+router.get('/public/pricing/:category', getLivePricingController);
 
 router.get('/health', (_req, res) => {
 	res.status(200).json({
