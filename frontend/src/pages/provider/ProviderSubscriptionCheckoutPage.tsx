@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { checkoutProviderSubscription, upgradeProviderSubscription } from '../../api/provider';
+import { useWallet } from '../../hooks/useWallet';
 import {
   clearProviderCart,
   formatInr,
@@ -11,6 +12,7 @@ import {
 
 export default function ProviderSubscriptionCheckoutPage() {
   const navigate = useNavigate();
+  const { balance } = useWallet();
   const [cart, setCart] = useState(loadProviderCart());
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [promoCode, setPromoCode] = useState('');
@@ -31,6 +33,10 @@ export default function ProviderSubscriptionCheckoutPage() {
   }, [cart]);
 
   if (!cart || !summary) return null;
+
+  const balanceMinor = balance * 100;
+  const applicableWalletMinor = Math.min(balanceMinor, summary.totalMinor);
+  const finalTotalMinor = summary.totalMinor - applicableWalletMinor;
 
   const confirmAndPay = async () => {
     if (!acceptedTerms) {
@@ -93,7 +99,18 @@ export default function ProviderSubscriptionCheckoutPage() {
             <div className="flex items-center justify-between"><span>Marketplace Add-ons</span><strong>{formatInr(summary.addonsMinor)}</strong></div>
             <div className="flex items-center justify-between"><span>Subtotal (before GST)</span><strong>{formatInr(summary.subtotalMinor)}</strong></div>
             <div className="flex items-center justify-between"><span>GST (18%)</span><span>{formatInr(summary.gstMinor)}</span></div>
-            <div className="mt-3 flex items-center justify-between border-t border-slate-200 pt-3 text-base"><span className="font-bold">Total</span><strong className="text-lg">{formatInr(summary.totalMinor)}</strong></div>
+            
+            {applicableWalletMinor > 0 && (
+              <div className="flex items-center justify-between font-medium text-teal-600">
+                <span>Wallet Credits Applied</span>
+                <span>- {formatInr(applicableWalletMinor)}</span>
+              </div>
+            )}
+
+            <div className="mt-3 flex items-center justify-between border-t border-slate-200 pt-3 text-base">
+              <span className="font-bold">Total</span>
+              <strong className="text-lg">{formatInr(finalTotalMinor)}</strong>
+            </div>
           </div>
 
           <label className="mt-4 block text-sm text-slate-700">
@@ -109,7 +126,7 @@ export default function ProviderSubscriptionCheckoutPage() {
           <div className="mt-4 flex flex-wrap gap-2">
             <button type="button" onClick={() => navigate('/provider/plans/addons')} className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">Back to Add-ons</button>
             <button type="button" onClick={confirmAndPay} disabled={submitting} className="rounded-xl bg-[#1f6f5f] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
-              {submitting ? 'Processing...' : `Confirm & Pay ${formatInr(summary.totalMinor)} with PhonePe`}
+              {submitting ? 'Processing...' : `Confirm & Pay ${formatInr(finalTotalMinor)} with PhonePe`}
             </button>
           </div>
         </section>

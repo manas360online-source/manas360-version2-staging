@@ -473,14 +473,34 @@ export const patientApi = {
       async () => (await http.get('/v1/game/eligibility')).data,
       async () => (await http.get('/game/eligibility')).data,
     ]);
-    return unwrapPayload(response);
+    const raw = unwrapPayload(response);
+    // Timing info may be in 'timing' (new) or 'data' (legacy/unwrapped)
+    const timing = raw?.timing || raw?.data || raw || {};
+    return {
+      ...raw,
+      ...timing,
+      eligible: !!raw?.eligible,
+      reason: raw?.error || raw?.message || (raw?.eligible ? 'Eligible' : 'Not eligible'),
+      timeLeft: timing?.time_remaining_seconds
+        ? `${Math.floor(timing.time_remaining_seconds / 3600)}h ${Math.floor((timing.time_remaining_seconds % 3600) / 60)}m`
+        : '0h 0m',
+    };
   },
   playGame: async () => {
     const response = await withFallbackChain([
       async () => (await http.post('/v1/game/play')).data,
       async () => (await http.post('/game/play')).data,
     ]);
-    return unwrapPayload(response);
+    const raw = unwrapPayload(response);
+
+    // Map backend response { outcome, prize: { amount }, wallet: { new_balance } }
+    // to frontend expected { outcome, credit, newBalance }
+    return {
+      outcome: raw?.outcome,
+      credit: raw?.prize?.amount ?? raw?.wallet?.credit_added ?? 0,
+      newBalance: raw?.wallet?.new_balance ?? 0,
+      success: raw?.success
+    };
   },
   getGameWinners: async (limit = 10) => {
     const response = await withFallbackChain([
@@ -495,6 +515,10 @@ export const patientApi = {
       async () => (await http.get('/wallet/balance')).data,
     ]);
     return unwrapPayload(response);
+  },
+  applyWalletCredits: async (payload: { referenceId?: string; referenceType?: string; bookingId?: string; amount: number }) => {
+    const response = await http.post('/v1/wallet/apply', payload);
+    return unwrapPayload(response.data);
   },
   createSessionPayment: async (payload: { providerId: string; amountMinor: number; currency?: string }) => {
     const response = await http.post('/v1/payments/sessions', payload);
@@ -818,7 +842,7 @@ export const patientApi = {
       const providers = Array.isArray(payload?.providers) ? payload.providers : [];
       const count = Number(payload?.count ?? providers.length ?? 0);
       return { providers, count };
-    } catch (err) {
+    } catch (err: any) {
       // Axios error shape
       const status = err?.response?.status;
       const message = err?.response?.data?.message || err?.message || 'Unknown error';

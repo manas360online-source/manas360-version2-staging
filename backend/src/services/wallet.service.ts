@@ -90,9 +90,11 @@ export const addCredit = async (input: {
   });
 };
 
-export const applyCreditsForBooking = async (input: {
+export const applyCreditsForPayment = async (input: {
   userId: string;
   amountMinor: number;
+  referenceId: string;
+  referenceType?: string;
 }) => {
   const originalAmount = Math.max(0, Math.round(Number(input.amountMinor || 0)));
   if (!originalAmount) {
@@ -122,10 +124,26 @@ export const applyCreditsForBooking = async (input: {
         transactionType: 'DEBIT',
         amount: -used,
         balanceAfter,
-        referenceId: null,
-        description: `Used ${used} credits for booking`,
+        referenceId: input.referenceId,
+        description: `Used ${used} credits for ${input.referenceType || 'payment'} ${input.referenceId}`,
       },
     });
+
+    // Only record in the mapping table if it's explicitly a booking
+    if (!input.referenceType || input.referenceType === 'booking') {
+      try {
+        await tx.bookingWalletUsage.create({
+          data: {
+            walletId: wallet.id,
+            bookingId: input.referenceId,
+            amountUsed: used,
+          },
+        });
+      } catch (e) {
+        // Ignore if booking mapping fails (e.g. invalid foreign key), transaction debit still succeeds
+        console.warn('Failed to insert into bookingWalletUsage, continuing wallet debit.');
+      }
+    }
 
     await tx.userWallet.update({
       where: { id: wallet.id },

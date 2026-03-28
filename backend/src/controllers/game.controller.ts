@@ -21,6 +21,9 @@ const clampLimit = (value: unknown, fallback = 10): number => {
 export const getGameEligibilityController = async (req: Request, res: Response): Promise<void> => {
   const userId = getAuthUserId(req);
   const result = await checkEligibility(userId);
+  // Debug: log the eligibility response sent to frontend
+  // eslint-disable-next-line no-console
+  console.log('[DEBUG] Eligibility response for user', userId, JSON.stringify(result));
   sendSuccess(res, result, 'Game eligibility');
 };
 

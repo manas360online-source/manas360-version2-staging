@@ -5,6 +5,7 @@ import { asyncHandler } from '../middleware/validate.middleware';
 import {
   getWalletBalanceController,
   getWalletTransactionsController,
+  applyWalletToPaymentController,
 } from '../controllers/wallet.controller';
 
 const router = Router();
@@ -24,5 +25,13 @@ router.get('/balance', requireAuth, requireRole('patient'), asyncHandler(getWall
  *     summary: Get wallet transactions
  */
 router.get('/transactions', requireAuth, requireRole('patient'), asyncHandler(getWalletTransactionsController));
+
+/**
+ * @openapi
+ * /wallet/apply:
+ *   post:
+ *     summary: Apply wallet credits to a booking
+ */
+router.post('/apply', requireAuth, requireRole('patient'), asyncHandler(applyWalletToPaymentController));
 
 export default router;

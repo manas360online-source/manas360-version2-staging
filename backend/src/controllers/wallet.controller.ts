@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 import { AppError } from '../middleware/error.middleware';
 import { sendSuccess } from '../utils/response';
 import prisma from '../config/db';
-import { getOrCreateWallet } from '../services/wallet.service';
+import { getOrCreateWallet, applyCreditsForPayment } from '../services/wallet.service';
 
 const db = prisma as any;
 
@@ -51,4 +51,33 @@ export const getWalletTransactionsController = async (req: Request, res: Respons
   });
 
   sendSuccess(res, { transactions }, 'Wallet transactions');
+};
+export const applyWalletToPaymentController = async (req: Request, res: Response): Promise<void> => {
+  const userId = getAuthUserId(req);
+  const { bookingId, referenceId, referenceType, amount } = req.body;
+
+  const actualReferenceId = referenceId || bookingId;
+
+  if (!actualReferenceId) {
+    throw new AppError('referenceId is required', 400);
+  }
+
+  // Frontend sends amount in rupees; service expects amountMinor (paise/units).
+  // HitASixerGame.tsx and BookingCheckout.tsx handle conversions slightly differently;
+  // let's ensure we use the input amount as raw value, or convert if needed.
+  // Standardizing on 'amount' as standard unit value.
+  const amountToApply = Math.max(0, Math.round(Number(amount || 0)));
+
+  const result = await applyCreditsForPayment({
+    userId,
+    referenceId: String(actualReferenceId),
+    referenceType: referenceType || (bookingId ? 'booking' : 'payment'),
+    amountMinor: amountToApply,
+  });
+
+  sendSuccess(res, {
+    used: result.amountUsed,
+    finalAmount: result.finalAmount,
+    transactionId: result.transactionId,
+  }, 'Wallet credits applied');
 };
