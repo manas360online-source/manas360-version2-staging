@@ -7,6 +7,7 @@ import { GlobalAudioProvider } from './context/GlobalAudioContext';
 import GlobalAudioPlayerConsole from './components/audio/GlobalAudioPlayerConsole';
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 import { AuthProvider, getPostLoginRoute, useAuth } from './context/AuthContext';
+import { SocketProvider } from './context/SocketContext';
 import { Assessment } from './pages/Assessment'
 import { ResultsPage } from './pages/Results'
 import { CrisisPage } from './pages/Crisis'
@@ -56,9 +57,10 @@ const AdminUsersPage = lazy(() => import('./pages/admin/Users'));
 const AdminRolesPage = lazy(() => import('./pages/admin/Roles'));
 const AdminCompaniesPage = lazy(() => import('./pages/admin/Companies'));
 const AdminCompanySubscriptionsPage = lazy(() => import('./pages/admin/CompanySubscriptions'));
-const AdminCompanyReportsPage = lazy(() => import('./pages/admin/CompanyReports'));
+const AdminReportsPage = lazy(() => import('./pages/admin/Reports'));
+const PlatformAnalytics = lazy(() => import('./pages/admin/PlatformAnalytics'));
 const AdminPlatformHealthPage = lazy(() => import('./pages/admin/PlatformHealth'));
-const AdminVerificationPage = lazy(() => import('./pages/admin/Verification'));
+const TherapistVerification = lazy(() => import('./pages/admin/TherapistVerification'));
 const AdminPendingProvidersPage = lazy(() => import('./pages/admin/PendingProviders'));
 const AdminRevenuePage = lazy(() => import('./pages/admin/Revenue'));
 const AdminSettingsPage = lazy(() => import('./pages/admin/Settings'));
@@ -66,6 +68,22 @@ const AdminPricingManagementPage = lazy(() => import('./pages/admin/PricingManag
 const ClinicalAssistantPage = lazy(() => import('./pages/admin/ClinicalAssistantPage'));
 const AdminSectionPage = lazy(() => import('./pages/admin/AdminSectionPage'));
 const AdminTemplatesPage = lazy(() => import('./pages/admin/Templates'));
+const AdminPayoutsPage = lazy(() => import('./pages/admin/Payouts'));
+const ZohoDeskPanel = lazy(() => import('./pages/admin/ZohoDeskPanel'));
+const OfferMarqueeEditor = lazy(() => import('./pages/admin/OfferMarqueeEditor'));
+const PricingContracts = lazy(() => import('./pages/admin/PricingContracts'));
+const CrisisConsole = lazy(() => import('./pages/admin/CrisisConsole'));
+const AuditTrail = lazy(() => import('./pages/admin/AuditTrail'));
+const GroupManagement = lazy(() => import('./pages/admin/GroupManagement'));
+const PricingVersions = lazy(() => import('./pages/admin/PricingVersions'));
+const TherapistPerformance = lazy(() => import('./pages/admin/TherapistPerformance'));
+const SessionAnalytics = lazy(() => import('./pages/admin/SessionAnalytics'));
+const UserGrowthAnalytics = lazy(() => import('./pages/admin/UserGrowthAnalytics'));
+const RoleManagement = lazy(() => import('./pages/admin/RoleManagement'));
+const UserApprovals = lazy(() => import('./pages/admin/UserApprovals'));
+const LiveSessions = lazy(() => import('./pages/admin/LiveSessions'));
+const Feedback = lazy(() => import('./pages/admin/Feedback'));
+const AllUsers = lazy(() => import('./pages/admin/AllUsers'));
 const CertificationsPage = lazy(() => import('./pages/CertificationsPage'));
 const CertificationLandingPage = lazy(() => import('./pages/CertificationLandingPage'));
 const CancellationRefundPolicyPage = lazy(() => import('./pages/legal/CancellationRefundPolicyPage'));
@@ -169,9 +187,10 @@ function App() {
 
   return (
     <AuthProvider>
-      <GlobalAudioProvider>
-        <Toaster
-          position="top-center"
+      <SocketProvider>
+        <GlobalAudioProvider>
+          <Toaster
+            position="top-center"
           toastOptions={{
             duration: 3500,
             style: {
@@ -401,28 +420,36 @@ function App() {
               <Route element={<AdminShellLayout />}>
                 <Route index element={<Navigate to="dashboard" replace />} />
                 <Route path="dashboard" element={<AdminDashboardPage />} />
-                <Route path="platform-analytics" element={<AdminSectionPage title="Platform Analytics" description="Growth, monetization, retention, and operational analytics across the platform." bullets={['User growth by role', 'Revenue trends and cohorts', 'Session completion and drop rates', 'Subscription funnel and churn intelligence']} />} />
-                <Route path="user-approvals" element={<AdminSectionPage title="User Approvals" description="Approve, reject, and monitor pending user onboarding requests." bullets={['Pending approval queue', 'KYC validation status', 'Approval SLA tracking', 'Escalation workflow']} />} />
-                <Route path="therapist-verification" element={<AdminVerificationPage />} />
+                <Route path="platform-analytics" element={<PlatformAnalytics />} />
+                <Route path="user-approvals" element={<UserApprovals />} />
+                <Route path="therapist-verification" element={<TherapistVerification />} />
                 <Route path="pending-providers" element={<AdminPendingProvidersPage />} />
                 <Route path="users" element={<AdminUsersPage />} />
                 <Route path="roles" element={<AdminRolesPage />} />
                 <Route path="companies" element={<AdminCompaniesPage />} />
                 <Route path="company-subscriptions" element={<AdminCompanySubscriptionsPage />} />
-                <Route path="company-reports" element={<AdminCompanyReportsPage />} />
-                <Route path="live-sessions" element={<AdminSectionPage title="Live Sessions" description="Monitor active sessions, disruptions, and quality metrics in real-time." bullets={['Live session monitor', 'Drop/disconnect alerts', 'Therapist capacity overview', 'Session intervention controls']} />} />
+                <Route path="company-reports" element={<AdminReportsPage />} />
+                <Route path="live-sessions" element={<LiveSessions />} />
+                <Route path="feedback" element={<Feedback />} />
+                <Route path="all-users" element={<AllUsers />} />
                 <Route path="templates" element={<AdminTemplatesPage />} />
-                <Route path="crisis-alerts" element={<AdminSectionPage title="Crisis Alerts" description="Triage and escalate high-risk events with defined safety protocols." bullets={['Suicide risk alerts', 'Escalate to psychiatrist', 'Emergency protocol status', 'Resolution timeline']} />} />
                 <Route path="revenue" element={<AdminRevenuePage />} />
                 <Route path="pricing-management" element={<AdminPricingManagementPage />} />
-                <Route path="payouts" element={<AdminSectionPage title="Payouts" description="Review provider payouts, schedules, holds, and reconciliation exceptions." bullets={['Scheduled payout runs', 'Manual adjustments', 'Failed transfer handling', 'Payout audit log']} />} />
+                <Route path="payouts" element={<AdminPayoutsPage />} />
                 <Route path="invoices" element={<AdminSectionPage title="Invoices" description="Track invoices, collections, refunds, and payment disputes." bullets={['Invoice lifecycle tracking', 'Corporate and individual invoices', 'Refund analytics', 'Collection status by segment']} />} />
                 <Route path="payment-reliability" element={<AdminSectionPage title="Payment Reliability" description="Monitor payment success, retries, failures, and settlement reliability trends." bullets={['Success vs failed transactions', 'Retry conversion trends', 'Decline reason distribution', 'Settlement health indicators']} />} />
-                <Route path="user-growth" element={<AdminSectionPage title="User Growth Analytics" description="Analyze growth trends across patients, therapists, corporate users, and partners." bullets={['Monthly active users by role', 'Acquisition vs activation', 'Retention cohorts', 'Regional growth patterns']} />} />
-                <Route path="session-analytics" element={<AdminSectionPage title="Session Analytics" description="Track platform-wide session quality, throughput, and completion metrics." bullets={['Sessions per day/week/month', 'Completion and dropout rates', 'Average session duration', 'Service line distribution']} />} />
-                <Route path="therapist-performance" element={<AdminSectionPage title="Therapist Performance" description="Benchmark provider outcomes, ratings, and engagement effectiveness." bullets={['Sessions completed', 'Patient ratings', 'Improvement score trend', 'Retention and revisit rates']} />} />
+                <Route path="user-growth" element={<UserGrowthAnalytics />} />
+                <Route path="session-analytics" element={<SessionAnalytics />} />
+                <Route path="therapist-performance" element={<TherapistPerformance />} />
                 <Route path="mental-health-trends" element={<AdminSectionPage title="Mental Health Trends" description="Monitor category-level trends to plan interventions and workforce readiness." bullets={['Depression and anxiety trends', 'Sleep and stress categories', 'High-risk cluster detection', 'Program outcome comparisons']} />} />
-                <Route path="support-tickets" element={<AdminSectionPage title="Support Tickets" description="Operational support queue with category insights and SLA compliance." bullets={['Open vs resolved volume', 'Ticket category analytics', 'Average resolution time', 'Satisfaction tracking']} />} />
+                <Route path="zoho-desk" element={<ZohoDeskPanel />} />
+                <Route path="offer-marquee" element={<OfferMarqueeEditor />} />
+                <Route path="pricing-versions" element={<PricingVersions />} />
+                <Route path="pricing-contracts" element={<PricingContracts />} />
+                <Route path="crisis-console" element={<CrisisConsole />} />
+                <Route path="audit-trail" element={<AuditTrail />} />
+                <Route path="groups" element={<GroupManagement />} />
+                <Route path="roles" element={<RoleManagement />} />
                 <Route path="feedback" element={<AdminSectionPage title="Feedback" description="Collect and analyze user and provider feedback loops for product quality." bullets={['NPS and CSAT trends', 'Feedback themes', 'Feature request clusters', 'Escalation tagging']} />} />
                 <Route path="audit-logs" element={<AdminSectionPage title="Audit Logs" description="Security-grade activity timeline for admin actions and sensitive operations." bullets={['User login and role changes', 'Account suspension events', 'Payment and billing actions', 'Immutable audit export']} />} />
                 <Route path="compliance" element={<AdminSectionPage title="Compliance" description="Track DPDPA/HIPAA controls, policy adherence, and privacy operations." bullets={['Consent lifecycle logs', 'Data access events', 'Compliance readiness status', 'Policy exception management']} />} />
@@ -522,7 +549,8 @@ function App() {
         </Suspense>
         <GlobalAudioPlayerConsole />
       </GlobalAudioProvider>
-    </AuthProvider>
+    </SocketProvider>
+  </AuthProvider>
   )
 }
 

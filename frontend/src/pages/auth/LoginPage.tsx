@@ -89,7 +89,7 @@ export default function LoginPage() {
 			const result = await verifyPhoneSignupOtp(phone.trim(), otp.trim());
 			await checkAuth({ force: true });
 			// Redirect patients without subscription to plans
-			if (result.user?.requiresSubscription) {
+			if ((result.user as any)?.requiresSubscription) {
 				const candidate = from || afterLogin || next || null;
 				const returnTo = candidate || '/';
 				navigate(`/plans?returnTo=${encodeURIComponent(returnTo)}`, { replace: true });
@@ -173,6 +173,43 @@ export default function LoginPage() {
 							Register here
 						</Link>
 					</p>
+
+					<div className="mt-10 pt-6 border-t border-gray-100">
+						<p className="text-[10px] uppercase font-bold text-gray-400 mb-4 text-center tracking-widest">
+							Developer Sandbox — Quick Admin Login
+						</p>
+						<div className="grid grid-cols-1 gap-2">
+							<Button 
+								variant="soft" 
+								size="sm"
+                className="text-xs py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-100"
+								onClick={() => { setPhone('superadmin@manas360.com'); setOtpSent(true); setOtp('123456'); }}
+							>
+								🚀 Login as Super Admin
+							</Button>
+							<div className="grid grid-cols-2 gap-2">
+								<Button 
+									variant="soft" 
+									size="sm"
+                  className="text-[10px] py-1.5"
+									onClick={() => { setPhone('finance@manas360.com'); setOtpSent(true); setOtp('123456'); }}
+								>
+									💳 Finance Manager
+								</Button>
+								<Button 
+									variant="soft" 
+									size="sm"
+                  className="text-[10px] py-1.5"
+									onClick={() => { setPhone('clinical@manas360.com'); setOtpSent(true); setOtp('123456'); }}
+								>
+									🏥 Clinical Director
+								</Button>
+							</div>
+						</div>
+						<p className="mt-2 text-[9px] text-gray-400 text-center italic">
+							Note: Click a role then click "Verify and Login". Uses dev bypass.
+						</p>
+					</div>
 				</div>
 			</div>
 		</div>

@@ -13,6 +13,7 @@ import {
 export default function SubscriptionCheckoutPage() {
   const navigate = useNavigate();
   const { balance } = useWallet();
+  const wallet = Number((balance as any)?.total_balance || 0);
   const [cart, setCart] = useState(loadCart());
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [promoCode, setPromoCode] = useState('');
@@ -36,7 +37,7 @@ export default function SubscriptionCheckoutPage() {
 
   const plan = getPlanById(cart.planId);
 
-  const balanceMinor = balance * 100;
+  const balanceMinor = wallet * 100;
   const applicableWalletMinor = Math.min(balanceMinor, summary.totalMinor);
   const finalTotalMinor = summary.totalMinor - applicableWalletMinor;
 

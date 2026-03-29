@@ -1,3 +1,5 @@
+/* eslint-disable no-useless-escape */
+
 export const wireframeHTML = `<!DOCTYPE html>
 <html lang="en">
 <head>

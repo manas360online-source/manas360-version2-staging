@@ -37,13 +37,14 @@ const verifyRefreshToken = (token) => {
     return decoded;
 };
 exports.verifyRefreshToken = verifyRefreshToken;
-const createTokenPair = (userId, sessionId) => {
+const createTokenPair = (userId, sessionId, permissions) => {
     const refreshJti = (0, crypto_1.randomUUID)();
     const accessJti = (0, crypto_1.randomUUID)();
     const accessToken = (0, exports.createAccessToken)({
         sub: userId,
         sessionId,
         jti: accessJti,
+        ...(permissions ? { permissions } : {}),
     });
     const refreshToken = (0, exports.createRefreshToken)({
         sub: userId,

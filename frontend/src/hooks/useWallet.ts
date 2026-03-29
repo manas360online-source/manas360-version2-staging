@@ -16,11 +16,12 @@ export const useWallet = () => {
   const queryClient = useQueryClient();
 
   // Fetch current wallet (used in HitASixerGame, header, etc.)
-  const { data: balance = 0, refetch: refreshWallet } = useQuery({
+  // Normalize API response to the expected WalletBalance shape.
+  const { data: balance = null, refetch: refreshWallet } = useQuery({
     queryKey: ['wallet'],
     queryFn: async () => {
-      const data = await patientApi.getWalletBalance();
-      return data?.total_balance ?? 0;
+      const resp = await patientApi.getWalletBalance();
+      return (resp && (resp.data ?? resp)) ?? null;
     },
     staleTime: 0, // always fresh after game play
   });

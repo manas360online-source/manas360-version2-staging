@@ -47,7 +47,7 @@ export default function SignupPage() {
 			const result = await verifyPhoneSignupOtp(phone.trim(), otp.trim());
 			await checkAuth({ force: true });
 			// If backend indicates patient requires a subscription, send to plans page
-			if (result.user?.requiresSubscription) {
+			if ((result.user as any)?.requiresSubscription) {
 				const returnTo = resolveReturnTo();
 				navigate(`/plans?returnTo=${encodeURIComponent(returnTo)}`, { replace: true });
 				return;

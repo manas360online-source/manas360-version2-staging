@@ -14,6 +14,7 @@ export const CheckoutPage: React.FC = () => {
     const location = useLocation();
     const { addEnrollment, getEnrollmentBySlug } = useEnrollmentStore();
     const { balance, applyWalletToPayment } = useWallet();
+    const walletAmount = Number((balance as any)?.total_balance || 0);
 
     const [loading, setLoading] = useState(true);
     const [processing, setProcessing] = useState(false);
@@ -41,7 +42,7 @@ export const CheckoutPage: React.FC = () => {
     const nextMonth = new Date(today); nextMonth.setDate(today.getDate() + 30);
     const monthAfter = new Date(today); monthAfter.setDate(today.getDate() + 60);
 
-    const applicableWallet = Math.min(balance || 0, totalToday);
+    const applicableWallet = Math.min(walletAmount, totalToday);
     const finalTotal = totalToday - applicableWallet;
 
     const handleTransaction = async (isSuccess: boolean) => {

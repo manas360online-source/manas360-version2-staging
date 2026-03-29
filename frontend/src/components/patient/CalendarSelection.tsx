@@ -69,7 +69,7 @@ export default function CalendarSelection({ onDateTimeSelect, onCancel }: Calend
             if (response?.error) {
               throw new Error(response.message || 'Unknown error');
             }
-            const count = Number(response?.count ?? response?.providers?.length ?? 0);
+            const count = Number(response?.count ?? (response as any)?.providers?.length ?? 0);
             return {
               ...slot,
               availableCount: Number.isFinite(count) ? count : 0,

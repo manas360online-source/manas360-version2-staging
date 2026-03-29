@@ -54,6 +54,7 @@ export default function SlideOverBookingDrawer({
   const [error, setError] = useState<string | null>(null);
   const [showSubscriptionWarning, setShowSubscriptionWarning] = useState(false);
   const { balance, applyWalletToPayment } = useWallet();
+  const total = Number((balance as any)?.total_balance || 0);
 
   // Reset state only when drawer is opened.
   useEffect(() => {
@@ -160,11 +161,11 @@ export default function SlideOverBookingDrawer({
       }
 
       const originalAmountRupees = provider.sessionPrice || 1500;
-      let amountMinor = Math.round(Number(originalAmountRupees) * 100); // base price in paise
+      const amountMinor = Math.round(Number(originalAmountRupees) * 100); // base price in paise
       let finalAmountMinor = amountMinor;
 
       // 2. Apply wallet credits if available
-      if (balance > 0) {
+      if (total > 0) {
         try {
           const walletResult = await applyWalletToPayment({
             bookingId: String(bookingId),
@@ -360,13 +361,13 @@ export default function SlideOverBookingDrawer({
                     <span className="font-medium text-charcoal">₹{provider.sessionPrice || 1500}</span>
                   </div>
                   
-                  {balance > 0 && (
+                  {total > 0 && (
                     <div className="flex justify-between text-teal-600 animate-in fade-in duration-300">
                       <span className="flex items-center">
                         <CheckCircle2 className="mr-1 h-3 w-3" />
                         Wallet Credits Applied
                       </span>
-                      <span className="font-medium">-₹{Math.min(balance, provider.sessionPrice || 1500)}</span>
+                      <span className="font-medium">-₹{Math.min(total, provider.sessionPrice || 1500)}</span>
                     </div>
                   )}
                   
@@ -375,7 +376,7 @@ export default function SlideOverBookingDrawer({
                   <div className="flex justify-between font-semibold text-lg items-center">
                     <span className="text-charcoal">Total Due</span>
                     <span className="text-teal-600">
-                      ₹{Math.max(0, (provider.sessionPrice || 1500) - balance)}
+                      ₹{Math.max(0, (provider.sessionPrice || 1500) - total)}
                     </span>
                   </div>
                 </div>

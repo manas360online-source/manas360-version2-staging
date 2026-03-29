@@ -3,6 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+const pricing_controller_1 = require("../controllers/pricing.controller");
 const express_1 = require("express");
 const auth_routes_1 = __importDefault(require("./auth.routes"));
 const patient_routes_1 = __importDefault(require("./patient.routes"));
@@ -36,6 +37,8 @@ const provider_dashboard_routes_1 = __importDefault(require("./provider-dashboar
 const game_routes_1 = __importDefault(require("./game.routes"));
 const wallet_routes_1 = __importDefault(require("./wallet.routes"));
 const router = (0, express_1.Router)();
+// Defensive public pricing route for landing page
+router.get('/public/pricing/:category', pricing_controller_1.getLivePricingController);
 router.get('/health', (_req, res) => {
     res.status(200).json({
         status: 'ok',

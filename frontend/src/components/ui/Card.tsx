@@ -57,4 +57,16 @@ export const Card: React.FC<CardProps> = ({
   );
 };
 
+export const CardHeader: React.FC<{ className?: string; children: React.ReactNode }> = ({ className = '', children }) => (
+  <div className={`mb-4 flex items-center justify-between ${className}`}>{children}</div>
+);
+
+export const CardTitle: React.FC<{ className?: string; children: React.ReactNode }> = ({ className = '', children }) => (
+  <h3 className={`font-display text-lg font-bold text-ink-800 ${className}`}>{children}</h3>
+);
+
+export const CardContent: React.FC<{ className?: string; children: React.ReactNode }> = ({ className = '', children }) => (
+  <div className={className}>{children}</div>
+);
+
 export default Card;

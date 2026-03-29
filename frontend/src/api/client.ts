@@ -98,6 +98,13 @@ const client = {
 		});
 		return parseResponse<T>(res);
 	},
+	async delete<T = any>(url: string) {
+		const res = await fetch(joinUrl(url), {
+			method: 'DELETE',
+			credentials: 'include',
+		});
+		return parseResponse<T>(res);
+	},
 };
 
 export default client;

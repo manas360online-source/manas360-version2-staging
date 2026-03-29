@@ -74,8 +74,8 @@ export default function DashboardPage() {
   const [playedToday, setPlayedToday] = useState(false);
   const [nextPlayAt, setNextPlayAt] = useState<string | null>(null);
   const [nowTick, setNowTick] = useState<number>(Date.now());
-  const [winners, setWinners] = useState<any[]>([]);
-  const [winnersLoading, setWinnersLoading] = useState(false);
+  const [, setWinners] = useState<any[]>([]);
+  const [, setWinnersLoading] = useState(false);
 
   const fetchDashboardData = async () => {
     const dashboardRes = await patientApi.getDashboardV2();
