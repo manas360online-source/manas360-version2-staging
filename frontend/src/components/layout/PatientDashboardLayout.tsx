@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { patientApi } from '../../api/patient';
+import { useWallet } from '@/hooks/useWallet';
 import { useAuth } from '../../context/AuthContext';
 
 const mainNavItems = [
@@ -66,7 +67,8 @@ export default function PatientDashboardLayout() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const { balance } = useWallet();
+  const walletBalance = balance ? Number((balance as any)?.total_balance ?? 0) : null;
 
   const fetchUnread = useCallback(async () => {
     if (!user || user.role !== 'patient') {
@@ -85,19 +87,8 @@ export default function PatientDashboardLayout() {
   useEffect(() => { void fetchUnread(); }, [fetchUnread]);
 
   useEffect(() => {
-    (async () => {
-      if (!user || user.role !== 'patient') {
-        setWalletBalance(null);
-        return;
-      }
-      try {
-        const res = await patientApi.getWalletBalance();
-        const payload = (res as any)?.data ?? res ?? {};
-        setWalletBalance(Number(payload?.total_balance ?? 0));
-      } catch {
-        setWalletBalance(null);
-      }
-    })();
+    // keep header reactive to auth changes; useWallet handles fetching and caching
+    // ensure walletBalance is reset when user changes
   }, [user]);
 
   const userName = [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim() || user?.email || 'Patient';

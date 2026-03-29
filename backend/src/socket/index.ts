@@ -18,8 +18,10 @@ type JwtPayload = {
   [k: string]: any;
 };
 
+export let io: IOServer;
+
 export async function initSocket(server: http.Server) {
-  const io = new IOServer(server, {
+  io = new IOServer(server, {
     cors: {
       origin: true,
       credentials: true,
@@ -164,16 +166,19 @@ export async function initSocket(server: http.Server) {
 
   // Helper: authorize a user to join a session room
   async function authorizeJoin(sessionId: string, userId: string, role?: string) {
-    const session = await prisma.patientSession.findUnique({ where: { id: sessionId }, include: { template: true } });
+    const session = await prisma.therapySession.findUnique({ 
+      where: { id: sessionId }
+    });
     if (!session) return false;
-    if (role === 'patient' && session.patientId === userId) return true;
-    // allow therapist if they own the template or are assigned (assignedTherapistId)
-    if (role === 'therapist') {
-      if ((session as any).assignedTherapistId && (session as any).assignedTherapistId === userId) return true;
-      if (session.template && (session.template as any).therapistId === userId) return true;
+    
+    if (role === 'patient') {
+      const patient = await prisma.patientProfile.findUnique({ where: { userId } });
+      if (patient && session.patientProfileId === patient.id) return true;
     }
-    // admins allowed
-    if (role === 'admin') return true;
+    
+    if ((role === 'therapist' || role === 'provider') && session.therapistProfileId === userId) return true;
+    
+    if (role === 'admin' || role === 'superadmin') return true;
     return false;
   }
 
@@ -183,6 +188,12 @@ export async function initSocket(server: http.Server) {
     try { activeConnections.labels(os.hostname()).inc(); } catch (e) {}
     console.info('socket.connect', { socketId: socket.id, userId: user?.id, role: user?.role });
 
+    // Automatically join admins to the admin-room
+    if (user?.role === 'admin') {
+      socket.join('admin-room');
+      console.info('socket.join_admin_room', { userId: user.id });
+    }
+
     socket.on('join_session', async (payload: { sessionId: string }) => {
       if (!(await (socket as any).allowEvent(1))) return socket.emit('error', { code: 'RATE_LIMIT' });
       const { sessionId } = payload;
@@ -191,6 +202,36 @@ export async function initSocket(server: http.Server) {
         if (!ok) return socket.emit('join_denied', { reason: 'unauthorized' });
         // join the room
         await socket.join(sessionId);
+
+        // Update presence in Redis
+        if (redisAvailable) {
+          const member = `${user.role}:${user.id}:${socket.id}`;
+          await pubClient.sendCommand(['ZADD', `session:presence:${sessionId}`, String(Date.now()), member]);
+          
+          // If first person joining a CONFIRMED session, notify admins
+          const session = await prisma.therapySession.findUnique({
+            where: { id: sessionId },
+            include: {
+              therapistProfile: { select: { firstName: true, lastName: true, name: true } },
+              patientProfile: { include: { user: { select: { firstName: true, lastName: true, name: true } } } }
+            }
+          });
+
+          if (session && session.status === 'CONFIRMED') {
+            const count = await pubClient.sendCommand(['ZCARD', `session:presence:${sessionId}`]);
+            if (Number(count) === 1) {
+              const liveSession = {
+                id: session.id,
+                therapistName: session.therapistProfile.name || `${session.therapistProfile.firstName} ${session.therapistProfile.lastName}`,
+                patientName: session.patientProfile.user.name || `${session.patientProfile.user.firstName} ${session.patientProfile.user.lastName}`,
+                startTime: session.dateTime.toISOString(),
+                status: 'in-progress'
+              };
+              io.to('admin-room').emit('session-started', liveSession);
+            }
+          }
+        }
+
         // broadcast presence
         const socketsInRoom = await io.in(sessionId).allSockets();
         io.to(sessionId).emit('presence', { count: socketsInRoom.size });
@@ -202,6 +243,17 @@ export async function initSocket(server: http.Server) {
 
     socket.on('leave_session', async (payload: { sessionId: string }) => {
       const { sessionId } = payload;
+      
+      if (redisAvailable) {
+        const member = `${user.role}:${user.id}:${socket.id}`;
+        await pubClient.sendCommand(['ZREM', `session:presence:${sessionId}`, member]);
+        
+        const count = await pubClient.sendCommand(['ZCARD', `session:presence:${sessionId}`]);
+        if (Number(count) === 0) {
+          io.to('admin-room').emit('session-ended', { sessionId });
+        }
+      }
+
       await socket.leave(sessionId);
       const socketsInRoom = await io.in(sessionId).allSockets();
       io.to(sessionId).emit('presence', { count: socketsInRoom.size });
@@ -386,9 +438,21 @@ export async function initSocket(server: http.Server) {
         }
       }
     });
-    socket.on('disconnect', (reason) => {
+    socket.on('disconnect', async (reason) => {
       try { activeConnections.labels(os.hostname()).dec(); } catch (e) {}
       try { droppedConnections.labels(os.hostname(), String(reason)).inc(); } catch (e) {}
+      
+      // Clean up session presence on disconnect
+      try {
+        if (redisAvailable) {
+          // We need to find which sessions this socket was in.
+          // Since we don't have a direct map here, we rely on presenceCleanup
+          // or we could track sessions on the socket object.
+          // For now, let's let presenceCleanup handle it to avoid complex tracking,
+          // OR we can use the rooms the socket was in before disconnect.
+        }
+      } catch (e) {}
+
       console.info('socket.disconnect', { socketId: socket.id, reason });
     });
   });
@@ -500,9 +564,17 @@ export async function initSocket(server: http.Server) {
               const stale = (await pubClient.sendCommand(['ZRANGEBYSCORE', key, '-inf', String(staleMax)])) as any[];
               if (stale && stale.length > 0) {
                 // remove them
-                await pubClient.sendCommand(['ZREM', key, ...stale as any[]]);
+                await pubClient.sendCommand(['ZREM', key, ...(stale as any[])]);
+                
                 // recompute current online users and publish update
                 const remaining = (await pubClient.sendCommand(['ZRANGE', key, '0', '-1'])) as any[];
+                
+                const sessionId = key.split(':')[2];
+                if (remaining.length === 0) {
+                   // Notify admins if session ended
+                   io.to('admin-room').emit('session-ended', { sessionId });
+                }
+
                 const onlineUsers = {} as Record<string, { userId: string; role: string; clientCount: number }>;
                 for (const mem of remaining) {
                   const parts = mem.split(':');
@@ -514,7 +586,6 @@ export async function initSocket(server: http.Server) {
                   onlineUsers[k].clientCount += 1;
                 }
                 const summary = Object.values(onlineUsers).map((v) => ({ userId: v.userId, role: v.role, clientCount: v.clientCount }));
-                const sessionId = key.split(':')[2];
                 await pubClient.sendCommand(['PUBLISH', `presence:updates:${sessionId}`, JSON.stringify({ sessionId, summary })]);
                 // sync to DB: simple approach - set offline for any DB rows not in summary
                 const onlineUserIds = Object.keys(onlineUsers).map((k) => onlineUsers[k].userId);

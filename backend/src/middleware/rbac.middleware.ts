@@ -31,6 +31,7 @@ export const roleHierarchy: Record<UserRole, number> = {
  * Key: userId, Value: { role, timestamp }
  */
 const roleCache = new Map<string, { role: UserRole; timestamp: number; isDeleted: boolean }>();
+const permissionsCache = new Map<UserRole, { permissions: string[]; timestamp: number }>();
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 /**
@@ -42,6 +43,41 @@ export const clearRoleCache = (userId?: string): void => {
 	} else {
 		roleCache.clear();
 	}
+};
+
+/**
+ * Clear permissions cache (useful after permission updates)
+ */
+export const clearPermissionsCache = (roleName?: UserRole): void => {
+	if (roleName) {
+		permissionsCache.delete(roleName);
+	} else {
+		permissionsCache.clear();
+	}
+};
+
+/**
+ * Get role permissions from DB or cache
+ */
+const getRolePermissions = async (roleName: UserRole): Promise<string[]> => {
+	const cached = permissionsCache.get(roleName);
+	if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+		return cached.permissions;
+	}
+
+	const roleData = await db.role.findUnique({
+		where: { name: roleName },
+		select: { permissions: true },
+	});
+
+	const permissions = roleData?.permissions || [];
+	
+	permissionsCache.set(roleName, {
+		permissions,
+		timestamp: Date.now(),
+	});
+
+	return permissions;
 };
 
 /**
@@ -312,38 +348,7 @@ export const requirePermission = (
 			return;
 		}
 
-		// TODO: Map roles to permissions and check
-		// For now, map roles directly to permissions
-		const rolePermissions: Record<UserRole, string[]> = {
-			patient: ['read_own_profile', 'book_session', 'view_therapists', 'submit_assessments', 'view_own_sessions'],
-			therapist: ['read_own_profile', 'manage_sessions', 'view_earnings', 'build_templates', 'view_assigned_patients'],
-			psychologist: ['read_own_profile', 'manage_assessments', 'manage_reports', 'view_assigned_patients', 'manage_risk'],
-			psychiatrist: ['read_own_profile', 'manage_sessions', 'view_earnings', 'view_assigned_patients'],
-			coach: ['read_own_profile', 'manage_sessions', 'view_earnings', 'view_assigned_patients'],
-			admin: [
-				'read_all_profiles', 
-				'manage_users', 
-				'manage_therapists', 
-				'manage_payments',
-				'view_analytics', 
-				'manage_corporate', 
-				'view_system_logs'
-			],
-			superadmin: [
-				'read_all_profiles',
-				'manage_users',
-				'manage_therapists',
-				'manage_payments',
-				'view_analytics',
-				'manage_corporate',
-				'view_system_logs',
-				'manage_roles',
-				'manage_permissions',
-				'system_config',
-			],
-		};
-
-		const userPermissions = rolePermissions[userDetails.role] || [];
+		const userPermissions = await getRolePermissions(userDetails.role);
 
 		// Check if user has any of the required permissions
 		const hasPermission = permissions.some(perm => userPermissions.includes(perm));

@@ -1,7 +1,8 @@
-import { Bell, ChevronDown, LogOut, Menu, Search, Settings, User } from 'lucide-react';
+import { AlertCircle, Bell, ChevronDown, LogOut, Menu, Search, Settings, User } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useSocket } from '../../context/SocketContext';
 
 type NavItem = { to: string; label: string; section: string; shortLabel: string };
 
@@ -21,10 +22,13 @@ const navItems: NavItem[] = [
 	// OPERATIONS
 	{ to: '/admin/live-sessions', label: 'Sessions', shortLabel: 'Ses', section: 'OPERATIONS' },
 	{ to: '/admin/templates', label: 'Templates', shortLabel: 'Tpl', section: 'OPERATIONS' },
-	{ to: '/admin/crisis-alerts', label: 'Crises', shortLabel: 'Cri', section: 'OPERATIONS' },
+	{ to: '/admin/groups', label: 'Group Management', shortLabel: 'Grp', section: 'OPERATIONS' },
+	{ to: '/admin/crisis-console', label: 'Crisis Console', shortLabel: 'CRC', section: 'OPERATIONS' },
 	// FINANCE
 	{ to: '/admin/revenue', label: 'Revenue', shortLabel: 'Rev', section: 'FINANCE' },
-	{ to: '/admin/pricing-management', label: 'Pricing', shortLabel: 'Prc', section: 'FINANCE' },
+	{ to: '/admin/pricing-versions', label: 'Pricing Versions', shortLabel: 'PV', section: 'FINANCE' },
+	{ to: '/admin/pricing-contracts', label: 'Pricing History', shortLabel: 'PH', section: 'FINANCE' },
+	{ to: '/admin/offer-marquee', label: 'Offer Marquee', shortLabel: 'OM', section: 'FINANCE' },
 	{ to: '/admin/payouts', label: 'Payouts', shortLabel: 'Pyt', section: 'FINANCE' },
 	{ to: '/admin/invoices', label: 'Invoices', shortLabel: 'Inv', section: 'FINANCE' },
 	{ to: '/admin/payment-reliability', label: 'Payment Reliability', shortLabel: 'PR', section: 'FINANCE' },
@@ -34,10 +38,11 @@ const navItems: NavItem[] = [
 	{ to: '/admin/session-analytics', label: 'Session Analytics', shortLabel: 'SA', section: 'ANALYTICS' },
 	{ to: '/admin/therapist-performance', label: 'Therapist Performance', shortLabel: 'TP', section: 'ANALYTICS' },
 	// SUPPORT
-	{ to: '/admin/support-tickets', label: 'Tickets', shortLabel: 'Tkt', section: 'SUPPORT' },
+	{ to: '/admin/zoho-desk', label: 'Tickets', shortLabel: 'Tkt', section: 'SUPPORT' },
 	{ to: '/admin/feedback', label: 'Feedback', shortLabel: 'Fb', section: 'SUPPORT' },
 	// SECURITY
-	{ to: '/admin/audit-logs', label: 'Audit Logs', shortLabel: 'AL', section: 'SECURITY' },
+	{ to: '/admin/audit-trail', label: 'Audit Trail', shortLabel: 'AT', section: 'SECURITY' },
+	{ to: '/admin/audit-logs', label: 'System Logs', shortLabel: 'AL', section: 'SECURITY' },
 	{ to: '/admin/ai-monitoring', label: 'AI Monitoring', shortLabel: 'AI', section: 'SECURITY' },
 	// SYSTEM
 	{ to: '/admin/settings', label: 'Settings', shortLabel: 'Set', section: 'SYSTEM' },
@@ -47,7 +52,7 @@ const mobileBottomNav = [
 	{ to: '/admin/dashboard', label: 'Dashboard' },
 	{ to: '/admin/users', label: 'Users' },
 	{ to: '/admin/session-analytics', label: 'Analytics' },
-	{ to: '/admin/support-tickets', label: 'Tickets' },
+	{ to: '/admin/zoho-desk', label: 'Tickets' },
 	{ to: '/admin/settings', label: 'Settings' },
 ];
 
@@ -57,6 +62,7 @@ export default function AdminShellLayout() {
 	const { user, logout } = useAuth();
 	const [mobileOpen, setMobileOpen] = useState(false);
 	const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+	const [activeCrisis, setActiveCrisis] = useState<any>(null);
 	const profileMenuRef = useRef<HTMLDivElement | null>(null);
 
 	useEffect(() => {
@@ -129,6 +135,26 @@ export default function AdminShellLayout() {
 		navigate('/auth/login', { replace: true });
 	};
 
+	const { socket } = useSocket();
+
+	useEffect(() => {
+		if (!socket) return;
+
+		const handleCrisisAlert = (alert: any) => {
+			setActiveCrisis(alert);
+			// Optional: play alert sound
+			try {
+				const audio = new Audio('/sounds/emergency-alert.mp3');
+				audio.play().catch(() => {});
+			} catch (e) {}
+		};
+
+		socket.on('crisis-alert', handleCrisisAlert);
+		return () => {
+			socket.off('crisis-alert', handleCrisisAlert);
+		};
+	}, [socket]);
+
 	useEffect(() => {
 		if (!profileMenuOpen) return;
 
@@ -172,6 +198,33 @@ export default function AdminShellLayout() {
 				</aside>
 
 				<div className="flex min-w-0 flex-1 flex-col md:pl-16 lg:pl-64">
+					{/* Crisis Alert Banner */}
+					{activeCrisis && (
+						<div className="bg-rose-600 text-white px-4 py-3 flex items-center justify-between sticky top-0 z-[60] shadow-lg animate-pulse">
+							<div className="flex items-center gap-3">
+								<AlertCircle className="h-6 w-6" />
+								<div>
+									<p className="text-sm font-bold">CRISIS ALERT [{activeCrisis.severity}]: {activeCrisis.type}</p>
+									<p className="text-xs opacity-90">{activeCrisis.userName} is in potential risk: {activeCrisis.message}</p>
+								</div>
+							</div>
+							<div className="flex items-center gap-2">
+								<button 
+									onClick={() => navigate(`/admin/crisis-alerts`)}
+									className="px-3 py-1 bg-white text-rose-600 rounded text-xs font-bold hover:bg-rose-50"
+								>
+									Take Action
+								</button>
+								<button 
+									onClick={() => setActiveCrisis(null)}
+									className="p-1 hover:bg-rose-700 rounded"
+								>
+									<LogOut className="h-4 w-4 rotate-90" />
+								</button>
+							</div>
+						</div>
+					)}
+
 					<header className="sticky top-0 z-30 h-16 border-b border-ink-100 bg-white/90 backdrop-blur">
 						<div className="flex h-full items-center px-4 lg:px-6">
 							<button className="mr-3 rounded-lg p-2 hover:bg-ink-50 md:hidden" onClick={() => setMobileOpen((prev) => !prev)}>

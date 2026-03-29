@@ -3,7 +3,8 @@ export const getLivePricingController = async (req: Request, res: Response): Pro
 	const { category } = req.params;
 	const data = await getPricingConfig();
 	// Optionally filter by category if needed
-	sendSuccess(res, category ? data[category] || {} : data, 'Live pricing fetched');
+	const results = category ? (data as any)[category as string] || {} : data;
+	sendSuccess(res, results, 'Live pricing fetched');
 };
 import type { Request, Response } from 'express';
 import { AppError } from '../middleware/error.middleware';

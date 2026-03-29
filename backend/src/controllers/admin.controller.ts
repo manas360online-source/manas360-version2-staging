@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { AppError } from '../middleware/error.middleware';
-import { listUsers, getUserById, verifyTherapist, verifyProvider, approveProvider, getMetrics, listSubscriptions } from '../services/admin.service';
+import { listUsers, getUserById, verifyTherapist, verifyProvider, approveProvider, getMetrics, listSubscriptions, getUserApprovals, updateUserApprovalStatus, listLiveSessions, getFeedback, resolveFeedback, updateUserStatus, getRoles, updateRolePermissions } from '../services/admin.service';
 import { sendSuccess } from '../utils/response';
 
 /**
@@ -140,4 +140,123 @@ export const listSubscriptionsController = async (req: Request, res: Response): 
 	});
 
 	sendSuccess(res, result, 'Subscriptions fetched successfully');
+};
+
+/**
+ * GET /api/v1/admin/user-approvals
+ * Get all users pending onboarding approval
+ */
+export const getAdminUserApprovalsController = async (req: Request, res: Response): Promise<void> => {
+	const users = await getUserApprovals();
+	sendSuccess(res, { users }, 'Pending approvals fetched successfully');
+};
+
+/**
+ * PATCH /api/v1/admin/user-approvals/:id
+ * Approve or Reject a user's registration
+ */
+export const updateAdminUserApprovalController = async (req: Request, res: Response): Promise<void> => {
+	const userId = req.params['id'] as string;
+	const { action, reason } = req.body;
+
+	if (!userId) {
+		throw new AppError('User ID is required', 400);
+	}
+
+	if (!['approve', 'reject'].includes(action)) {
+		throw new AppError('Invalid action. Must be "approve" or "reject"', 400);
+	}
+
+	await updateUserApprovalStatus(userId, action, reason);
+
+	sendSuccess(res, null, `User ${action}ed successfully`);
+};
+
+/**
+ * GET /api/v1/admin/live-sessions
+ * Get currently active sessions (Live Monitor)
+ */
+export const getAdminLiveSessionsController = async (req: Request, res: Response): Promise<void> => {
+	const sessions = await listLiveSessions();
+	sendSuccess(res, { sessions }, 'Live sessions fetched successfully');
+};
+
+/**
+ * GET /api/v1/admin/feedback
+ * List all user feedback
+ */
+export const getAdminFeedbackController = async (req: Request, res: Response): Promise<void> => {
+	const feedback = await getFeedback();
+	sendSuccess(res, { feedback }, 'User feedback fetched successfully');
+};
+
+/**
+ * POST /api/v1/admin/feedback/:id/resolve
+ * Mark a feedback item as resolved
+ */
+export const resolveAdminFeedbackController = async (req: Request, res: Response): Promise<void> => {
+	const feedbackId = req.params['id'] as string;
+
+	if (!feedbackId) {
+		throw new AppError('Feedback ID is required', 400);
+	}
+
+	await resolveFeedback(feedbackId);
+
+	sendSuccess(res, null, 'Feedback marked as resolved');
+};
+
+/**
+ * PATCH /api/v1/admin/users/:id/status
+ * Update a user's status (Active/Suspended/etc)
+ */
+export const updateAdminUserStatusController = async (req: Request, res: Response): Promise<void> => {
+	const userId = req.params['id'] as string;
+	const { status } = req.body;
+
+	if (!userId) {
+		throw new AppError('User ID is required', 400);
+	}
+
+	if (!status) {
+		throw new AppError('Status is required', 400);
+	}
+
+	await updateUserStatus(userId, status);
+
+	sendSuccess(res, null, `User status updated to ${status} successfully`);
+};
+
+/**
+ * GET /api/v1/admin/roles
+ * Fetch all dynamic roles mapping
+ */
+export const getRolesController = async (req: Request, res: Response): Promise<void> => {
+	const roles = await getRoles();
+	sendSuccess(res, roles, 'Roles fetched successfully');
+};
+
+/**
+ * PATCH /api/v1/admin/roles/:role
+ * Update permissions for a given role
+ */
+export const updateRolePermissionsController = async (req: Request, res: Response): Promise<void> => {
+	const roleName = req.params['role'] as string;
+	const { permissions } = req.body;
+
+	if (!roleName) {
+		throw new AppError('Role is required', 400);
+	}
+
+	if (!Array.isArray(permissions)) {
+		throw new AppError('Permissions must be an array of strings', 400);
+	}
+
+	const updatedRole = await updateRolePermissions(roleName, permissions);
+
+	// Clear the permissions cache dynamically to avoid circular dependencies during module init
+	const { clearPermissionsCache } = await import('../middleware/rbac.middleware');
+	clearPermissionsCache(roleName as any);
+
+	sendSuccess(res, updatedRole, `Role ${roleName} updated successfully`);
 };

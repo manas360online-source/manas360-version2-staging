@@ -111,11 +111,11 @@ if (axios && typeof (axios as any).create === 'function') {
 		},
 	});
 } else if (axios) {
-    // In test mocks axios may be an object with get/post helpers but no create function.
-    // Fall back to using the axios object directly so tests can mock `get`.
-    httpInstance = axios as any;
+	// In test mocks axios may be an object with get/post helpers but no create function.
+	// Fall back to using the axios object directly so tests can mock `get`.
+	httpInstance = axios as any;
 } else {
-    httpInstance = {} as any;
+	httpInstance = {} as any;
 }
 
 export const http = httpInstance as AxiosInstance;
@@ -136,27 +136,27 @@ if (http && http.interceptors && http.interceptors.response && typeof http.inter
 	});
 
 	http.interceptors.response.use(
- 		(response: AxiosResponse) => response,
- 		async (error: any) => {
- 			const status: number | undefined = error?.response?.status;
- 			const baseUrl = error?.config?.baseURL || '';
- 			const relativeUrl = error?.config?.url || '';
- 			const fullUrl = `${baseUrl}${relativeUrl}`;
+		(response: AxiosResponse) => response,
+		async (error: any) => {
+			const status: number | undefined = error?.response?.status;
+			const baseUrl = error?.config?.baseURL || '';
+			const relativeUrl = error?.config?.url || '';
+			const fullUrl = `${baseUrl}${relativeUrl}`;
 
- 			(error as any).isExpectedAuthFailure = isExpectedAuthFailure(status, fullUrl);
+			(error as any).isExpectedAuthFailure = isExpectedAuthFailure(status, fullUrl);
 
- 			const originalRequest = error?.config as (typeof error.config & { _retry?: boolean }) | undefined;
- 			if (status === 401 && originalRequest && !originalRequest._retry && !isAuthRoute(fullUrl)) {
- 				originalRequest._retry = true;
- 				try {
- 					await refreshAccessToken();
- 					return http(originalRequest as any);
- 				} catch {
- 					// Let the original 401 bubble up when refresh is unavailable/expired.
- 				}
- 			}
+			const originalRequest = error?.config as (typeof error.config & { _retry?: boolean }) | undefined;
+			if (status === 401 && originalRequest && !originalRequest._retry && !isAuthRoute(fullUrl)) {
+				originalRequest._retry = true;
+				try {
+					await refreshAccessToken();
+					return http(originalRequest as any);
+				} catch {
+					// Let the original 401 bubble up when refresh is unavailable/expired.
+				}
+			}
 
- 			return Promise.reject(error);
- 		},
- 	);
+			return Promise.reject(error);
+		},
+	);
 }

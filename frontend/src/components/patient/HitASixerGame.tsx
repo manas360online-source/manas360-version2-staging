@@ -11,6 +11,7 @@ import { useWallet } from '@/hooks/useWallet';
 const HitASixerGame: React.FC = () => {
   const queryClient = useQueryClient();
   const { balance, refreshWallet } = useWallet();
+  const total = Number((balance as any)?.total_balance || 0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animFrameRef = useRef<number>(0);
 
@@ -115,7 +116,7 @@ const HitASixerGame: React.FC = () => {
     let frame = 0;
     let ballX = 80;
     let ballY = H * 0.72;
-    let batAngle = 38; // idle raised position
+    const batAngle = 38; // idle raised position
     let hasSwung = false;
     let swingFrame = -1;
     let batSwingProg = 0;
@@ -329,7 +330,7 @@ const HitASixerGame: React.FC = () => {
           <div className="flex items-center gap-6">
             <div className="bg-white px-7 py-4 rounded-3xl shadow flex items-center gap-3 text-xl">
               <span className="font-semibold text-emerald-700">Wallet</span>
-              <span className="font-bold text-3xl">₹{balance}</span>
+                <span className="font-bold text-3xl">₹{total}</span>
             </div>
 
             <button
@@ -360,8 +361,8 @@ const HitASixerGame: React.FC = () => {
         )}
 
         <p className="text-center text-sm text-gray-500 mt-8">
-          4% SIXER (₹100) • 8% FOUR (₹50) • 88% OUT (₹10) • 1 play/day • Credits expire in 30 days
-        </p>
+            4% SIXER (₹100) • 8% FOUR (₹50) • 88% OUT (₹10) • 1 play/day • Credits expire in 30 days
+          </p>
       </div>
 
       <AnimatePresence>
@@ -375,7 +376,7 @@ const HitASixerGame: React.FC = () => {
             <div className="h-16 bg-emerald-900 flex items-center justify-between px-6 text-white text-lg font-medium shrink-0">
               <button onClick={exitGame} className="flex items-center gap-2">✕ Exit</button>
               <div className="font-bold text-2xl">Hit a Sixer</div>
-              <div className="font-bold text-xl">₹{balance}</div>
+              <div className="font-bold text-xl">₹{total}</div>
             </div>
 
             <div className="flex-1 flex items-center justify-center p-4 bg-emerald-950 relative min-h-0">

@@ -16,6 +16,8 @@ import { setSocketIO } from './routes/gps.routes';
 import { reconcilePendingPayments } from './cron/paymentReconciliation';
 import { initLeadDistributionCrons } from './cron/lead-distribution.cron';
 import { initializePhonePeTokenRefresh, cleanupPhonePeTokenRefresh } from './services/phonepe.service';
+import { calculateLiveMetrics } from './controllers/admin-metrics.controller';
+import { io as socketIO } from './socket';
 
 const startServer = async (): Promise<void> => {
 	await connectDatabase();
@@ -68,6 +70,18 @@ const startServer = async (): Promise<void> => {
 	// PhonePe reconciliation CRON (every 30s)
 	setInterval(() => {
 		reconcilePendingPayments().catch(err => console.error('[CRON] Reconciliation failed', err));
+	}, 30000);
+
+	// Real-time Metrics Push (every 30s)
+	setInterval(async () => {
+		try {
+			const metrics = await calculateLiveMetrics();
+			if (socketIO) {
+				socketIO.to('admin-room').emit('metrics-update', metrics);
+			}
+		} catch (err) {
+			console.error('[CRON] Metrics push failed', err);
+		}
 	}, 30000);
 
 	const shutdown = async (signal: string): Promise<void> => {

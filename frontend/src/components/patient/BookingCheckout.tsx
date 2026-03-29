@@ -14,14 +14,15 @@ const BookingCheckout: React.FC<BookingCheckoutProps> = ({
   onSuccess,
 }) => {
   const { balance, applyWalletToPayment } = useWallet();
+  const total = Number((balance as any)?.total_balance || 0);
 
   const handlePay = async () => {
     let finalAmount = sessionPrice;
 
     // Auto-apply wallet credits (works for game credits + any other credits)
-    if (balance > 0) {
-      const used = Math.min(balance, sessionPrice);
-      await applyWalletToPayment({ bookingId, amount: used });
+    if (total > 0) {
+      const used = Math.min(total, sessionPrice);
+      await applyWalletToPayment({ bookingId: String(bookingId), amount: used });
       finalAmount = sessionPrice - used;
     }
 
@@ -45,10 +46,10 @@ const BookingCheckout: React.FC<BookingCheckoutProps> = ({
           <span className="font-semibold">₹{sessionPrice}</span>
         </div>
 
-        {balance > 0 && (
+        {total > 0 && (
           <div className="flex justify-between items-center text-emerald-600 mt-4">
             <span className="font-medium">Wallet Credits Applied</span>
-            <span className="font-bold">-₹{Math.min(balance, sessionPrice)}</span>
+            <span className="font-bold">-₹{Math.min(total, sessionPrice)}</span>
           </div>
         )}
 
@@ -56,7 +57,7 @@ const BookingCheckout: React.FC<BookingCheckoutProps> = ({
 
         <div className="flex justify-between items-center text-2xl font-bold">
           <span>To Pay</span>
-          <span className="text-emerald-600">₹{Math.max(0, sessionPrice - balance)}</span>
+          <span className="text-emerald-600">₹{Math.max(0, sessionPrice - total)}</span>
         </div>
       </div>
 
@@ -64,9 +65,9 @@ const BookingCheckout: React.FC<BookingCheckoutProps> = ({
         onClick={handlePay}
         className="w-full py-7 text-2xl font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-3xl shadow-xl transition"
       >
-        {Math.max(0, sessionPrice - balance) === 0
+          {Math.max(0, sessionPrice - total) === 0
           ? '✅ Book with Wallet Credits'
-          : `Pay ₹${Math.max(0, sessionPrice - balance)}`}
+          : `Pay ₹${Math.max(0, sessionPrice - total)}`}
       </button>
 
       <p className="text-center text-xs text-gray-500">
