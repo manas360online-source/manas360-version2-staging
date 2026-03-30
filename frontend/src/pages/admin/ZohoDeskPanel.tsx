@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { api } from '../../api/admin.api';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
+
 import { toast } from 'react-hot-toast';
 
 interface Ticket {
@@ -25,10 +25,9 @@ interface BlueprintCard {
 export default function ZohoDeskPanel() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [blueprints, setBlueprints] = useState<BlueprintCard[]>([]);
-  const [loading, setLoading] = useState(true);
+
 
   const fetchData = async () => {
-    setLoading(true);
     try {
       const [ticketsRes, blueprintsRes] = await Promise.all([
         api.get('/v1/admin/tickets?limit=15'),
@@ -47,8 +46,6 @@ export default function ZohoDeskPanel() {
     } catch (err) {
       console.error(err);
       toast.error('Failed to sync Zoho Desk data');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -60,7 +57,7 @@ export default function ZohoDeskPanel() {
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Zoho Desk Command Center</h1>
-        <Button onClick={fetchData} variant="outline">
+        <Button onClick={fetchData} variant="secondary">
           🔄 Sync Live
         </Button>
       </div>

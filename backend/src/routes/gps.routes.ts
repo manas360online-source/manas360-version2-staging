@@ -1,10 +1,3 @@
-// Notify provider of new lab upload
-export function notifyProviderLabUpload(providerId: string, payload: any) {
-  const io = require('../socket').io;
-  const room = `inbox:${providerId}`;
-  io.to(room).emit('provider:lab-upload', payload);
-  console.log('notifyProviderLabUpload ->', { room, payloadPreview: { documentId: payload.documentId, patientId: payload.patientId, title: payload.title } });
-}
 /**
  * GPS Meter REST routes
  * POST   /v1/gps/sessions/:sessionId/start    – therapist starts GPS monitoring
@@ -48,18 +41,6 @@ export function setSocketIO(io: IOServer): void {
   _io = io;
 }
 
-// Notify patient inbox about a newly created document
-export function notifyPatientDocument(patientId: string, payload: Record<string, any>): void {
-  try {
-    if (!_io) return;
-    const room = `inbox:${patientId}`;
-    console.log('notifyPatientDocument ->', { room, payloadPreview: { id: payload.id, title: payload.title } });
-    _io.to(room).emit('patient:document:new', payload);
-  } catch (e) {
-    console.warn('notifyPatientDocument failed', e);
-  }
-}
-
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 /** Ensure the requesting user is the therapist for the given session. */
@@ -69,14 +50,11 @@ async function assertTherapistOwnsSession(
 ): Promise<void> {
   const userId = (req as any).auth?.userId;
   const rows: any[] = await db.$queryRawUnsafe(
-    `SELECT "therapistProfileId" AS therapist_profile_id
-       FROM "therapy_sessions"
-      WHERE "id" = $1
-      LIMIT 1`,
+    `SELECT therapist_id FROM sessions WHERE id = $1::uuid LIMIT 1`,
     sessionId,
   );
   if (!rows.length) throw new AppError('Session not found', 404);
-  if (rows[0].therapist_profile_id !== userId) throw new AppError('Forbidden', 403);
+  if (rows[0].therapist_id !== userId) throw new AppError('Forbidden', 403);
 }
 
 // ── POST /sessions/:sessionId/start ──────────────────────────────────────────
@@ -87,16 +65,12 @@ router.post('/sessions/:sessionId/start', requireAuth, async (req: Request, res:
     await assertTherapistOwnsSession(req, sessionId);
 
     const sessionRows: any[] = await db.$queryRawUnsafe(
-      `SELECT "therapistProfileId" AS therapist_profile_id,
-              "patientProfileId" AS patient_profile_id
-         FROM "therapy_sessions"
-        WHERE "id" = $1
-        LIMIT 1`,
+      `SELECT therapist_id, patient_id FROM sessions WHERE id = $1::uuid LIMIT 1`,
       sessionId,
     );
-    const { therapist_profile_id, patient_profile_id } = sessionRows[0];
+    const { therapist_id, patient_id } = sessionRows[0];
 
-    const monitoringId = await initSessionMonitoring(sessionId, therapist_profile_id, patient_profile_id);
+    const monitoringId = await initSessionMonitoring(sessionId, therapist_id, patient_id);
     res.status(201).json({ monitoringId });
   } catch (err) {
     next(err);

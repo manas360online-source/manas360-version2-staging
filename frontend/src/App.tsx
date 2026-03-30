@@ -115,6 +115,7 @@ const ProviderSubscriptionConfirmationPage = lazy(() => import('./pages/provider
 const AppointmentRequestsPage = lazy(() => import('./pages/provider/AppointmentRequests'));
 const ProviderOnboardingPage = lazy(() => import('./pages/provider/ProviderOnboardingPage'));
 const ProviderVerificationPendingPage = lazy(() => import('./pages/provider/ProviderVerificationPendingPage'));
+const TherapistLiveSessionPage = lazy(() => import('./pages/therapist/TherapistLiveSessionPage'));
 
 const PaymentStatusPage = lazy(() => import('./pages/shared/PaymentStatus'));
 const HubLayout = lazy(() => import('./components/layout/HubLayout'));
@@ -291,7 +292,7 @@ function App() {
               <Route path="messages" element={<ProviderInboxPage />} />
 
               <Route path="settings" element={<ProviderSettingsPage />} />
-              <Route path="live-session/:sessionId" element={<VideoSessionPage />} />
+              <Route path="live-session/:sessionId" element={<TherapistLiveSessionPage />} />
             </Route>
             <Route
               path="/onboarding/provider-setup"

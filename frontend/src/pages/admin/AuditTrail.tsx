@@ -6,7 +6,6 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { toast } from 'sonner';
 import { 
-  Download, 
   Search, 
   ShieldCheck, 
   History, 
@@ -14,7 +13,6 @@ import {
   Activity, 
   Globe, 
   Info,
-  Filter,
   ArrowUpDown,
   FileSpreadsheet
 } from 'lucide-react';
