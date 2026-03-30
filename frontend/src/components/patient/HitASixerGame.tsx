@@ -32,7 +32,7 @@ const HitASixerGame: React.FC = () => {
   const playMutation = useMutation({
     mutationFn: () => patientApi.playGame(),
     onSuccess: (data) => {
-      const earned = data.credit ?? (data.outcome === 'sixer' ? 100 : data.outcome === 'four' ? 50 : 10);
+      const earned = data.credit ?? (data.outcome === 'sixer' ? 108 : data.outcome === 'four' ? 50 : 10);
       setOutcome(data.outcome);
       setCredit(earned);
       setStage('start');
@@ -249,7 +249,7 @@ const HitASixerGame: React.FC = () => {
         refreshWallet();
         queryClient.invalidateQueries({ queryKey: ['wallet'] });
         toast.success(
-          finalOutcome === 'sixer' ? '🏏 SIXER! +₹100'
+          finalOutcome === 'sixer' ? '🏏 SIXER! +₹108'
           : finalOutcome === 'four' ? '🏏 FOUR! +₹50'
           : '🏏 OUT! +₹10',
           { description: quality === 'perfect' ? 'Perfect Timing 🔥' : quality === 'good' ? 'Good Swing!' : 'Better luck next time' }
@@ -316,7 +316,7 @@ const HitASixerGame: React.FC = () => {
     };
   }, [stage, isFullScreen]);
 
-  const displayCredit = credit || (outcome === 'sixer' ? 100 : outcome === 'four' ? 50 : 10);
+  const displayCredit = credit || (outcome === 'sixer' ? 108 : outcome === 'four' ? 50 : 10);
 
   return (
     <>
@@ -360,8 +360,8 @@ const HitASixerGame: React.FC = () => {
           </div>
         )}
 
-        <p className="text-center text-sm text-gray-500 mt-8">
-            4% SIXER (₹100) • 8% FOUR (₹50) • 88% OUT (₹10) • 1 play/day • Credits expire in 30 days
+            <p className="text-center text-sm text-gray-500 mt-8">
+            4% SIXER (₹108) • 8% FOUR (₹50) • 88% OUT (₹10) • 1 play/day • Credits expire in 30 days
           </p>
       </div>
 
@@ -400,7 +400,7 @@ const HitASixerGame: React.FC = () => {
                       onClick={handleStartBowling}
                       className="w-full flex items-center justify-center gap-4 bg-white text-emerald-700 px-6 py-6 rounded-3xl text-3xl font-bold shadow-[0_10px_40px_rgba(0,0,0,0.6)] active:scale-95 transition"
                     >
-                      🏏 START BOWLING
+                      🏏 Start bowling
                     </button>
                   </motion.div>
                 )}

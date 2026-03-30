@@ -182,8 +182,13 @@ export default function LoginPage() {
 							<Button 
 								variant="soft" 
 								size="sm"
-                className="text-xs py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-100"
-								onClick={() => { setPhone('superadmin@manas360.com'); setOtpSent(true); setOtp('123456'); }}
+				className="text-xs py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-100"
+								onClick={() => {
+									setPhone('superadmin@manas360.com');
+									setOtpSent(true);
+									setOtp('123456');
+									window.location.href = 'http://localhost:5173/#/admin-portal/login';
+								}}
 							>
 								🚀 Login as Super Admin
 							</Button>
@@ -191,16 +196,26 @@ export default function LoginPage() {
 								<Button 
 									variant="soft" 
 									size="sm"
-                  className="text-[10px] py-1.5"
-									onClick={() => { setPhone('finance@manas360.com'); setOtpSent(true); setOtp('123456'); }}
+				  className="text-[10px] py-1.5"
+									onClick={() => {
+										setPhone('finance@manas360.com');
+										setOtpSent(true);
+										setOtp('123456');
+										window.location.href = 'http://localhost:5173/#/admin-portal/login';
+									}}
 								>
 									💳 Finance Manager
 								</Button>
 								<Button 
 									variant="soft" 
 									size="sm"
-                  className="text-[10px] py-1.5"
-									onClick={() => { setPhone('clinical@manas360.com'); setOtpSent(true); setOtp('123456'); }}
+				  className="text-[10px] py-1.5"
+									onClick={() => {
+										setPhone('clinical@manas360.com');
+										setOtpSent(true);
+										setOtp('123456');
+										window.location.href = 'http://localhost:5173/#/admin-portal/login';
+									}}
 								>
 									🏥 Clinical Director
 								</Button>

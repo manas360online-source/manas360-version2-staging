@@ -17,6 +17,7 @@ export const requireAuth = (req: Request, _res: Response, next: NextFunction): v
 	const accessToken = bearerToken ?? cookieToken;
 
 	if (!accessToken) {
+		console.log(`[AUTH FAILED] No access token found. URL: ${req.originalUrl}, Cookies:`, req.cookies, 'Headers:', req.headers.authorization);
 		next(new AppError('Authentication required', 401));
 		return;
 	}
@@ -32,7 +33,8 @@ export const requireAuth = (req: Request, _res: Response, next: NextFunction): v
 		};
 
 		next();
-	} catch {
+	} catch (error) {
+		console.log(`[AUTH FAILED] Token verification failed. URL: ${req.originalUrl}, Error:`, error);
 		next(new AppError('Invalid or expired access token', 401));
 	}
 };

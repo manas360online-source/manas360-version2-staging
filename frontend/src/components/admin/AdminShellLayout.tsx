@@ -11,7 +11,7 @@ const navItems: NavItem[] = [
 	{ to: '/admin/dashboard', label: 'Dashboard', shortLabel: 'Dash', section: 'OVERVIEW' },
 	{ to: '/admin/platform-health', label: 'Platform Health', shortLabel: 'PH', section: 'OVERVIEW' },
 	// USER MANAGEMENT
-	{ to: '/admin/users', label: 'All Users', shortLabel: 'U', section: 'USER MANAGEMENT' },
+	{ to: '/admin/users', label: 'One View', shortLabel: 'U', section: 'USER MANAGEMENT' },
 	{ to: '/admin/user-approvals', label: 'User Approvals', shortLabel: 'UA', section: 'USER MANAGEMENT' },
 	{ to: '/admin/therapist-verification', label: 'Therapist Verification', shortLabel: 'TV', section: 'USER MANAGEMENT' },
 	{ to: '/admin/roles', label: 'Role Management', shortLabel: 'RB', section: 'USER MANAGEMENT' },
@@ -21,8 +21,8 @@ const navItems: NavItem[] = [
 	{ to: '/admin/company-reports', label: 'Reports', shortLabel: 'Rep', section: 'CORPORATE' },
 	// OPERATIONS
 	{ to: '/admin/live-sessions', label: 'Sessions', shortLabel: 'Ses', section: 'OPERATIONS' },
-	{ to: '/admin/templates', label: 'Templates', shortLabel: 'Tpl', section: 'OPERATIONS' },
-	{ to: '/admin/groups', label: 'Group Management', shortLabel: 'Grp', section: 'OPERATIONS' },
+	{ to: '/admin/templates', label: 'Screening Framework Modification', shortLabel: 'Tpl', section: 'OPERATIONS' },
+	{ to: '/admin/groups', label: 'Group Therapy Management', shortLabel: 'Grp', section: 'OPERATIONS' },
 	{ to: '/admin/crisis-console', label: 'Crisis Console', shortLabel: 'CRC', section: 'OPERATIONS' },
 	// FINANCE
 	{ to: '/admin/revenue', label: 'Revenue', shortLabel: 'Rev', section: 'FINANCE' },
@@ -36,7 +36,7 @@ const navItems: NavItem[] = [
 	{ to: '/admin/platform-analytics', label: 'Platform Analytics', shortLabel: 'PA', section: 'ANALYTICS' },
 	{ to: '/admin/user-growth', label: 'User Growth', shortLabel: 'UG', section: 'ANALYTICS' },
 	{ to: '/admin/session-analytics', label: 'Session Analytics', shortLabel: 'SA', section: 'ANALYTICS' },
-	{ to: '/admin/therapist-performance', label: 'Therapist Performance', shortLabel: 'TP', section: 'ANALYTICS' },
+	{ to: '/admin/therapist-performance', label: 'Providers Performance', shortLabel: 'TP', section: 'ANALYTICS' },
 	// SUPPORT
 	{ to: '/admin/zoho-desk', label: 'Tickets', shortLabel: 'Tkt', section: 'SUPPORT' },
 	{ to: '/admin/feedback', label: 'Feedback', shortLabel: 'Fb', section: 'SUPPORT' },
@@ -50,7 +50,7 @@ const navItems: NavItem[] = [
 
 const mobileBottomNav = [
 	{ to: '/admin/dashboard', label: 'Dashboard' },
-	{ to: '/admin/users', label: 'Users' },
+	{ to: '/admin/users', label: 'One View' },
 	{ to: '/admin/session-analytics', label: 'Analytics' },
 	{ to: '/admin/zoho-desk', label: 'Tickets' },
 	{ to: '/admin/settings', label: 'Settings' },
@@ -60,6 +60,16 @@ export default function AdminShellLayout() {
 	const location = useLocation();
 	const navigate = useNavigate();
 	const { user, logout } = useAuth();
+
+	const userName = [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim() || user?.email || 'Admin';
+	const userEmail = typeof user?.email === 'string' ? user.email.toLowerCase() : '';
+	const initials = userName
+		.split(' ')
+		.filter(Boolean)
+		.slice(0, 2)
+		.map((part: string) => part[0]?.toUpperCase())
+		.join('') || 'MA';
+
 	const [mobileOpen, setMobileOpen] = useState(false);
 	const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 	const [activeCrisis, setActiveCrisis] = useState<any>(null);
@@ -83,20 +93,24 @@ export default function AdminShellLayout() {
 
 	const sections = useMemo(() => {
 		const grouped = new Map<string, NavItem[]>();
+
 		for (const item of navItems) {
-			if (!grouped.has(item.section)) grouped.set(item.section, []);
-			grouped.get(item.section)?.push(item);
+			let showItem = true;
+			if (userEmail === 'finance@manas360.com') {
+				showItem = ['FINANCE', 'OVERVIEW'].includes(item.section);
+			} else if (userEmail === 'clinical@manas360.com') {
+				showItem = ['OPERATIONS', 'USER MANAGEMENT', 'SUPPORT', 'OVERVIEW', 'ANALYTICS'].includes(item.section);
+			}
+
+			if (showItem) {
+				if (!grouped.has(item.section)) grouped.set(item.section, []);
+				grouped.get(item.section)?.push(item);
+			}
 		}
 		return Array.from(grouped.entries());
-	}, []);
+	}, [user?.email]);
 
-	const userName = [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim() || user?.email || 'Admin';
-	const initials = userName
-		.split(' ')
-		.filter(Boolean)
-		.slice(0, 2)
-		.map((part: string) => part[0]?.toUpperCase())
-		.join('') || 'MA';
+
 
 	const activeNavItem = useMemo(() => {
 		const exactMatch = navItems.find((item) => item.to === location.pathname);
@@ -180,21 +194,33 @@ export default function AdminShellLayout() {
 		};
 	}, [profileMenuOpen]);
 
+	const filteredMobileNav = useMemo(() => {
+		return mobileBottomNav.filter((item) => {
+			if (userEmail === 'finance@manas360.com') {
+				return item.label === 'Dashboard';
+			}
+			if (userEmail === 'clinical@manas360.com') {
+				return ['Dashboard', 'Users', 'Analytics', 'Tickets'].includes(item.label);
+			}
+			return true;
+		});
+	}, [user?.email]);
+
 	return (
 		<div className="h-screen overflow-hidden bg-[#FAFAF8] text-[#1A1A1A]">
 			<div className="flex h-screen">
 				<div className={`fixed inset-0 z-40 bg-black/40 transition-opacity md:hidden ${mobileOpen ? 'opacity-100' : 'pointer-events-none opacity-0'}`} onClick={() => setMobileOpen(false)} />
 
 				<aside className={`fixed left-0 top-0 z-50 h-screen w-64 bg-[#1A1A1A] transition-transform md:hidden ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-					<AdminNav sections={sections} compact={false} />
+					<AdminNav sections={sections} compact={false} initials={initials} userName={userName} userRole={userEmail === 'superadmin@manas360.com' ? 'Super Admin' : userEmail === 'finance@manas360.com' ? 'Finance Manager' : userEmail === 'clinical@manas360.com' ? 'Clinical Director' : 'Admin'} />
 				</aside>
 
 				<aside className="fixed left-0 top-0 z-40 hidden h-screen w-16 bg-[#1A1A1A] md:block lg:hidden">
-					<AdminNav sections={sections} compact={true} />
+					<AdminNav sections={sections} compact={true} initials={initials} userName={userName} userRole={userEmail === 'superadmin@manas360.com' ? 'Super Admin' : userEmail === 'finance@manas360.com' ? 'Finance Manager' : userEmail === 'clinical@manas360.com' ? 'Clinical Director' : 'Admin'} />
 				</aside>
 
 				<aside className="fixed left-0 top-0 z-40 hidden h-screen w-64 bg-[#1A1A1A] lg:block">
-					<AdminNav sections={sections} compact={false} />
+					<AdminNav sections={sections} compact={false} initials={initials} userName={userName} userRole={userEmail === 'superadmin@manas360.com' ? 'Super Admin' : userEmail === 'finance@manas360.com' ? 'Finance Manager' : userEmail === 'clinical@manas360.com' ? 'Clinical Director' : 'Admin'} />
 				</aside>
 
 				<div className="flex min-w-0 flex-1 flex-col md:pl-16 lg:pl-64">
@@ -296,9 +322,9 @@ export default function AdminShellLayout() {
 					</main>
 
 					<nav className="fixed bottom-0 left-0 right-0 z-30 border-t border-ink-100 bg-white md:hidden">
-						<div className="grid grid-cols-5">
-							{mobileBottomNav.map((item) => (
-								<NavLink key={item.to} to={item.to} className={({ isActive }) => `px-1 py-2 text-center text-[11px] ${isActive ? 'text-sage-700' : 'text-ink-500'}`}>
+						<div className="flex justify-around">
+							{filteredMobileNav.map((item) => (
+								<NavLink key={item.to} to={item.to} className={({ isActive }) => `flex-1 px-1 py-2 text-center text-[11px] ${isActive ? 'text-sage-700' : 'text-ink-500'}`}>
 									{item.label}
 								</NavLink>
 							))}
@@ -310,7 +336,7 @@ export default function AdminShellLayout() {
 	);
 }
 
-function AdminNav({ sections, compact }: { sections: Array<[string, NavItem[]]>; compact: boolean }) {
+function AdminNav({ sections, compact, initials, userName, userRole }: { sections: Array<[string, NavItem[]]>; compact: boolean; initials?: string; userName?: string; userRole?: string }) {
 	return (
 		<div className="flex h-full flex-col">
 			<div className="flex h-16 items-center gap-3 border-b border-white/10 px-4">
@@ -352,10 +378,10 @@ function AdminNav({ sections, compact }: { sections: Array<[string, NavItem[]]>;
 			{!compact ? (
 				<div className="border-t border-white/10 p-4">
 					<div className="flex items-center gap-3">
-						<div className="flex h-9 w-9 items-center justify-center rounded-full bg-sage-500 text-sm font-bold text-white">MA</div>
+						<div className="flex h-9 w-9 items-center justify-center rounded-full bg-sage-500 text-sm font-bold text-white">{initials || 'MA'}</div>
 						<div>
-							<p className="text-sm font-semibold text-white">Mahan A.</p>
-							<p className="text-[11px] text-white/40">Super Admin</p>
+							<p className="text-sm font-semibold text-white">{userName || 'Admin'}</p>
+							<p className="text-[11px] text-white/40">{userRole || 'Super Admin'}</p>
 						</div>
 					</div>
 				</div>
