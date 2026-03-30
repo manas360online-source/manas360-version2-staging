@@ -198,7 +198,7 @@ export default function DashboardPage() {
             <p className="text-sm font-semibold text-slate-800 sm:text-base">
               {playedToday
                 ? (nextPlayCountdown || 'Next play time will unlock soon')
-                : '🏏 Play Hit a Sixer today & win up to ₹100 wallet credits!'}
+                : '🏏 Play Hit a Sixer today & win up to ₹108 wallet credits!'}
             </p>
             <button
               type="button"
