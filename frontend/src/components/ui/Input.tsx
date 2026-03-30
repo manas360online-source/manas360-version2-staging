@@ -57,6 +57,13 @@ export const Input: React.FC<InputProps> = ({
         id={inputId}
         className={inputStyles}
         {...props}
+        // Guard against React warning when a numeric value is NaN
+        value={
+          // prefer explicit prop value if provided; coerce NaN -> empty string
+          typeof (props as any).value === 'number' && Number.isNaN((props as any).value)
+            ? ''
+            : (props as any).value
+        }
       />
 
       {helperText && !error && (

@@ -166,6 +166,7 @@ export const requireRole = (
 			const userId = req.auth?.userId;
 
 			if (!userId) {
+				console.log(`[RBAC] No userId found in req.auth on URL: ${req.originalUrl}. req.auth exists:`, !!req.auth);
 				next(new AppError('Authentication required', 401));
 				return;
 			}
