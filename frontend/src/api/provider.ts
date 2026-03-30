@@ -793,3 +793,37 @@ export const initiateProviderPlatformPayment = async (payload: { billingCycle: '
   const response = await http.post<Envelope<any>>('/v1/provider/platform-access/initiate', payload);
   return unwrap<any>(response.data);
 };
+
+// ============ CBT ASSIGNMENT TEMPLATES (GPS Live Session) ============
+
+export interface CbtAssignmentTemplateOption {
+  key: string;
+  /** Alias for key – used by VideoSessionPage from GPS branch */
+  templateType: string;
+  /** Display label – also aliased as title */
+  label: string;
+  title: string;
+  description?: string;
+}
+
+export const fetchCbtAssignmentTemplates = async (): Promise<CbtAssignmentTemplateOption[]> => {
+  // Return sensible defaults until backend endpoint is fully implemented
+  return [
+    { key: 'thought_record', templateType: 'thought_record', label: 'Thought Record', title: 'Thought Record', description: 'Identify and challenge negative thought patterns' },
+    { key: 'behavioral_activation', templateType: 'behavioral_activation', label: 'Behavioral Activation', title: 'Behavioral Activation', description: 'Schedule activities to improve mood' },
+    { key: 'safety_plan', templateType: 'safety_plan', label: 'Safety Plan', title: 'Safety Plan', description: 'Develop a personal crisis support plan' },
+    { key: 'relaxation', templateType: 'relaxation', label: 'Relaxation Exercise', title: 'Relaxation Exercise', description: 'Guided breathing and grounding techniques' },
+  ];
+};
+
+export const quickAssignCbtTemplate = async (
+  patientId: string,
+  templateKey: string,
+): Promise<{ assignmentId: string; status: string; title?: string }> => {
+  const response = await http.post<Envelope<{ assignmentId: string; status: string; title?: string }>>(
+    `/v1/provider/patient/${patientId}/assign`,
+    { assignmentType: 'CBT', title: templateKey, templateId: templateKey },
+  );
+  return unwrap<{ assignmentId: string; status: string; title?: string }>(response.data);
+};
+

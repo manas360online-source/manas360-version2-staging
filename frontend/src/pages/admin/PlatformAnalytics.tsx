@@ -11,7 +11,7 @@ import {
   Legend,
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
+
 import { toast } from 'sonner';
 import { 
   IndianRupee, 

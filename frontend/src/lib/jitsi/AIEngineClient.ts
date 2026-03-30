@@ -16,13 +16,13 @@
 
 export type GPSUpdateCallback = (metrics: Record<string, unknown>) => void;
 export type CrisisAlertCallback = (alert: Record<string, unknown>) => void;
+export type TranscriptUpdateCallback = (transcript: Record<string, unknown>) => void;
 export type ConnectionStateCallback = (connected: boolean) => void;
 
 interface AIEngineClientOptions {
   /** Full WebSocket URL, e.g. wss://api.manas360.com/ai-engine */
   url: string;
   sessionId: string;
-  monitoringId?: string;
   userRole: 'therapist' | 'patient';
   /** Reconnect delay in ms (default: 5000) */
   reconnectDelayMs?: number;
@@ -39,13 +39,13 @@ export class AIEngineClient {
 
   private _onGPSUpdate: GPSUpdateCallback | null = null;
   private _onCrisisAlert: CrisisAlertCallback | null = null;
+  private _onTranscriptUpdate: TranscriptUpdateCallback | null = null;
   private _onConnectionState: ConnectionStateCallback | null = null;
 
   constructor(options: AIEngineClientOptions) {
     this.opts = {
       reconnectDelayMs: 5000,
       maxReconnects: 0,
-      monitoringId: '',
       ...options,
     };
   }
@@ -61,6 +61,12 @@ export class AIEngineClient {
   /** Register a crisis alert callback. */
   onCrisisAlert(cb: CrisisAlertCallback): this {
     this._onCrisisAlert = cb;
+    return this;
+  }
+
+  /** Register a transcript update callback. */
+  onTranscriptUpdate(cb: TranscriptUpdateCallback): this {
+    this._onTranscriptUpdate = cb;
     return this;
   }
 
@@ -111,7 +117,6 @@ export class AIEngineClient {
         this._send({
           type: 'init',
           sessionId: this.opts.sessionId,
-          monitoringId: this.opts.monitoringId,
           userRole: this.opts.userRole,
         });
       };
@@ -153,6 +158,9 @@ export class AIEngineClient {
         break;
       case 'crisis_alert':
         this._onCrisisAlert?.(data['alert'] as Record<string, unknown>);
+        break;
+      case 'transcript_update':
+        this._onTranscriptUpdate?.(data['transcript'] as Record<string, unknown>);
         break;
       case 'pong':
         // heartbeat – no-op

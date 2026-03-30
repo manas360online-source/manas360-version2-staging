@@ -70,6 +70,7 @@ export interface JitsiSessionManagerOptions {
   aiEngineUrl?: string;
   /** Callbacks */
   onGPSUpdate?: (metrics: Record<string, unknown>) => void;
+  onTranscriptUpdate?: (transcript: Record<string, unknown>) => void;
   onCrisisAlert?: (alert: Record<string, unknown>) => void;
   onConnectionState?: (connected: boolean) => void;
 }
@@ -148,18 +149,18 @@ export class JitsiSessionManager {
   // ─── Private ────────────────────────────────────────────────────────────────
 
   private _initAIEngine(): void {
-    const { sessionId, aiEngineUrl, onGPSUpdate, onCrisisAlert, onConnectionState } = this.opts;
+    const { sessionId, aiEngineUrl, onGPSUpdate, onTranscriptUpdate, onCrisisAlert, onConnectionState } = this.opts;
 
     if (!aiEngineUrl) return;
 
     this.aiClient = new AIEngineClient({
       url: aiEngineUrl,
       sessionId,
-      monitoringId: this.opts.monitoringId,
       userRole: 'therapist',
     });
 
     if (onGPSUpdate) this.aiClient.onGPSUpdate(onGPSUpdate);
+    if (onTranscriptUpdate) this.aiClient.onTranscriptUpdate(onTranscriptUpdate);
     if (onCrisisAlert) this.aiClient.onCrisisAlert(onCrisisAlert);
     if (onConnectionState) this.aiClient.onConnectionState(onConnectionState);
 

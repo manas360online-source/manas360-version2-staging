@@ -112,15 +112,16 @@ const getUserRole = async (userId: string): Promise<{ role: UserRole; isDeleted:
 		return null;
 	}
 
-	// Cache the result
+	// Cache the result (map super_admin to superadmin for generic convention)
+	const cleanRole = String(user.role).toLowerCase().replace('_', '') as UserRole;
 	roleCache.set(userId, {
-		role: String(user.role).toLowerCase() as UserRole,
+		role: cleanRole,
 		timestamp: Date.now(),
 		isDeleted: false,
 	});
 
 	return {
-		role: String(user.role).toLowerCase() as UserRole,
+		role: cleanRole,
 		isDeleted: false,
 	};
 };
@@ -186,11 +187,15 @@ export const requireRole = (
 				return;
 			}
 
-			// Check if user's role is in allowed roles
-			if (!roles.includes(userDetails.role)) {
+			// Check if user's role is in allowed roles OR satisfies hierarchy
+			const userRank = roleHierarchy[userDetails.role] || 0;
+			const isAllowedByExplicitRole = roles.includes(userDetails.role);
+			const isAllowedByHierarchy = roles.some(role => userRank >= (roleHierarchy[role] || 0));
+
+			if (!isAllowedByExplicitRole && !isAllowedByHierarchy) {
 				// Log unauthorized attempt for security audit
 				console.warn(
-					`[RBAC] Unauthorized access attempt - userId: ${userId}, userRole: ${userDetails.role}, requiredRoles: ${roles.join(',')}`,
+					`[RBAC] Access denied - userId: ${userId}, userRole: ${userDetails.role}, requiredRoles: ${roles.join(',')}, rank: ${userRank}`,
 				);
 
 				next(
