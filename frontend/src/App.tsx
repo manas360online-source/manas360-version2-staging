@@ -124,7 +124,6 @@ const AppointmentRequestsPage = lazy(() => import('./pages/provider/AppointmentR
 const ProviderOnboardingPage = lazy(() => import('./pages/provider/ProviderOnboardingPage'));
 const ProviderVerificationPendingPage = lazy(() => import('./pages/provider/ProviderVerificationPendingPage'));
 const TherapistLiveSessionPage = lazy(() => import('./pages/therapist/TherapistLiveSessionPage'));
-const ProviderPortalPage = lazy(() => import('./pages/provider/ProviderPortalPage').then(m => ({ default: m.ProviderPortalPage })));
 
 const PaymentStatusPage = lazy(() => import('./pages/shared/PaymentStatus'));
 const HubLayout = lazy(() => import('./components/layout/HubLayout'));

@@ -71,12 +71,6 @@ model User {
   labOrdersAsPatient            LabOrder[]                  @relation("LabOrderPatient")
   labOrdersAsProvider           LabOrder[]                  @relation("LabOrderProvider")
   leadAssignments               LeadAssignment[]
-  groupTherapyRequests          GroupTherapySession[]        @relation("GroupTherapyRequestedBy")
-  groupTherapyHosting           GroupTherapySession[]        @relation("GroupTherapyHostedBy")
-  groupTherapyApprovals         GroupTherapySession[]        @relation("GroupTherapyApprovedBy")
-  groupTherapyInvitesReceived   GroupTherapyInvite[]         @relation("GroupTherapyInvitePatient")
-  groupTherapyInvitesSent       GroupTherapyInvite[]         @relation("GroupTherapyInviteSender")
-  groupTherapyEnrollments       GroupTherapyEnrollment[]     @relation("GroupTherapyEnrollmentUser")
   patientLeads                  Lead[]                      @relation("LeadPatient")
   providerLeads                 Lead[]                      @relation("LeadProvider")
   subscriptions                 MarketplaceSubscription[]   @relation("UserSubscriptions")
@@ -1099,8 +1093,6 @@ model FinancialPayment {
   merchantTransactionId String                 @unique
   wallet                ProviderWallet?        @relation("WalletPayments", fields: [providerId], references: [providerId])
   session               FinancialSession?      @relation("SessionPayments", fields: [sessionId], references: [id])
-  groupTherapyInvites   GroupTherapyInvite[]
-  groupTherapyEnrollments GroupTherapyEnrollment[]
   refunds               FinancialRefund[]      @relation("PaymentRefunds")
   revenueLedger         RevenueLedger[]        @relation("PaymentRevenueLedger")
   walletTransactions    WalletTransaction[]    @relation("PaymentWalletTransactions")
@@ -2057,98 +2049,8 @@ model GroupCategory {
   isActive     Boolean  @default(true) @map("is_active")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
-  sessions     GroupTherapySession[]
 
   @@map("group_categories")
-}
-
-model GroupTherapySession {
-  id                 String                 @id @default(uuid())
-  title              String
-  topic              String
-  description        String?
-  sessionMode        GroupTherapyMode       @default(PUBLIC) @map("session_mode")
-  status             GroupTherapyStatus     @default(PENDING_APPROVAL)
-  requestedById      String                 @map("requested_by_id")
-  hostTherapistId    String                 @map("host_therapist_id")
-  approvedById       String?                @map("approved_by_id")
-  groupCategoryId    String?                @map("group_category_id")
-  scheduledAt        DateTime               @map("scheduled_at")
-  durationMinutes    Int                    @default(60) @map("duration_minutes")
-  maxMembers         Int                    @default(10) @map("max_members")
-  priceMinor         BigInt                 @default(0) @map("price_minor")
-  allowGuestJoin     Boolean                @default(true) @map("allow_guest_join")
-  requiresAdminGate  Boolean                @default(true) @map("requires_admin_gate")
-  requiresPayment    Boolean                @default(true) @map("requires_payment")
-  jitsiRoomName      String?                @map("jitsi_room_name")
-  publishAt          DateTime?              @map("publish_at")
-  rejectionReason    String?                @map("rejection_reason")
-  createdAt          DateTime               @default(now()) @map("created_at")
-  updatedAt          DateTime               @updatedAt @map("updated_at")
-  approvedAt         DateTime?              @map("approved_at")
-  publishedAt        DateTime?              @map("published_at")
-  requestedBy        User                   @relation("GroupTherapyRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
-  hostTherapist      User                   @relation("GroupTherapyHostedBy", fields: [hostTherapistId], references: [id], onDelete: Restrict)
-  approvedBy         User?                  @relation("GroupTherapyApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
-  groupCategory      GroupCategory?         @relation(fields: [groupCategoryId], references: [id], onDelete: SetNull)
-  invites            GroupTherapyInvite[]
-  enrollments        GroupTherapyEnrollment[]
-
-  @@index([status, scheduledAt])
-  @@index([hostTherapistId, status])
-  @@index([requestedById, createdAt(sort: Desc)])
-  @@index([sessionMode, status])
-  @@map("group_therapy_sessions")
-}
-
-model GroupTherapyInvite {
-  id              String                   @id @default(uuid())
-  sessionId       String                   @map("session_id")
-  patientUserId   String                   @map("patient_user_id")
-  invitedById     String                   @map("invited_by_id")
-  status          GroupTherapyInviteStatus @default(INVITED)
-  amountMinor     BigInt                   @default(0) @map("amount_minor")
-  paymentId       String?                  @map("payment_id")
-  paymentDeadline DateTime?                @map("payment_deadline")
-  message         String?
-  acceptedAt      DateTime?                @map("accepted_at")
-  paidAt          DateTime?                @map("paid_at")
-  joinedAt        DateTime?                @map("joined_at")
-  createdAt       DateTime                 @default(now()) @map("created_at")
-  updatedAt       DateTime                 @updatedAt @map("updated_at")
-  session         GroupTherapySession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  patient         User                     @relation("GroupTherapyInvitePatient", fields: [patientUserId], references: [id], onDelete: Cascade)
-  invitedBy       User                     @relation("GroupTherapyInviteSender", fields: [invitedById], references: [id], onDelete: Restrict)
-  payment         FinancialPayment?        @relation(fields: [paymentId], references: [id], onDelete: SetNull)
-
-  @@unique([sessionId, patientUserId])
-  @@index([patientUserId, status])
-  @@index([sessionId, status])
-  @@map("group_therapy_invites")
-}
-
-model GroupTherapyEnrollment {
-  id                  String                       @id @default(uuid())
-  sessionId           String                       @map("session_id")
-  userId              String?                      @map("user_id")
-  guestName           String?                      @map("guest_name")
-  guestEmail          String?                      @map("guest_email")
-  status              GroupTherapyEnrollmentStatus @default(PAYMENT_PENDING)
-  amountMinor         BigInt                       @default(0) @map("amount_minor")
-  paymentId           String?                      @map("payment_id")
-  merchantTransaction String?                      @map("merchant_transaction")
-  paidAt              DateTime?                    @map("paid_at")
-  joinedAt            DateTime?                    @map("joined_at")
-  createdAt           DateTime                     @default(now()) @map("created_at")
-  updatedAt           DateTime                     @updatedAt @map("updated_at")
-  session             GroupTherapySession          @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  user                User?                        @relation("GroupTherapyEnrollmentUser", fields: [userId], references: [id], onDelete: SetNull)
-  payment             FinancialPayment?            @relation(fields: [paymentId], references: [id], onDelete: SetNull)
-
-  @@index([sessionId, status])
-  @@index([userId, status])
-  @@index([guestEmail, status])
-  @@map("group_therapy_enrollments")
 }
 
 model companies {
@@ -2687,35 +2589,4 @@ enum WalletCreditStatus {
   AVAILABLE
   USED
   EXPIRED
-}
-
-enum GroupTherapyMode {
-  PUBLIC
-  PRIVATE
-}
-
-enum GroupTherapyStatus {
-  DRAFT
-  PENDING_APPROVAL
-  APPROVED
-  PUBLISHED
-  LIVE
-  ENDED
-  REJECTED
-}
-
-enum GroupTherapyInviteStatus {
-  INVITED
-  ACCEPTED
-  DECLINED
-  PAYMENT_PENDING
-  PAID
-  JOINED
-}
-
-enum GroupTherapyEnrollmentStatus {
-  PAYMENT_PENDING
-  PAID
-  JOINED
-  CANCELLED
 }
