@@ -77,15 +77,15 @@ export const JitsiRoomView: React.FC<JitsiRoomViewProps> = ({
             displayName: `Anonymous_${Math.floor(Math.random() * 1000)}`,
             email: 'anonymous@manas360.com' // <-- Add this to satisfy TypeScript
             }}
-          onApiReady={(externalApi) => {
+            onApiReady={(externalApi: any) => {
             // Handle native Jitsi hangup to trigger your custom leave
             externalApi.addListener('videoConferenceLeft', () => {
               onLeave();
             });
           }}
-          getIFrameRef={(iframeRef) => {
-            iframeRef.style.height = '100%';
-            iframeRef.style.width = '100%';
+            getIFrameRef={(parentNode: HTMLDivElement) => {
+            parentNode.style.height = '100%';
+            parentNode.style.width = '100%';
           }}
         />
       </div>
