@@ -97,6 +97,7 @@ const ProviderSubscriptionConfirmationPage = lazy(() => import('./pages/provider
 const AppointmentRequestsPage = lazy(() => import('./pages/provider/AppointmentRequests'));
 const ProviderOnboardingPage = lazy(() => import('./pages/provider/ProviderOnboardingPage'));
 const ProviderVerificationPendingPage = lazy(() => import('./pages/provider/ProviderVerificationPendingPage'));
+const ProviderPortalPage = lazy(() => import('./pages/provider/ProviderPortalPage').then(m => ({ default: m.ProviderPortalPage })));
 
 const PaymentStatusPage = lazy(() => import('./pages/shared/PaymentStatus'));
 const HubLayout = lazy(() => import('./components/layout/HubLayout'));
@@ -223,6 +224,10 @@ function App() {
             <Route path="/crisis" element={<CrisisPage />} />
             <Route path="/onboarding/name" element={<OnboardingName onNext={handleOnboardingName} />} />
             <Route path="/onboarding/email" element={<OnboardingEmail userName={userName} />} />
+            
+            {/* --- NEW STANDALONE PORTAL ROUTE --- */}
+            <Route path="/provider/portal" element={<ProviderPortalPage />} />
+
             <Route
               path="/therapist-dashboard"
               element={
@@ -241,6 +246,7 @@ function App() {
             >
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<ProviderDashboard />} />
+              {/* I REMOVED the "portal" route from here so it doesn't get blocked! */}
               <Route path="patients" element={<PatientList />} />
               <Route path="patient/:patientId" element={<PatientChartLayout />}>
                 <Route index element={<Navigate to="overview" replace />} />

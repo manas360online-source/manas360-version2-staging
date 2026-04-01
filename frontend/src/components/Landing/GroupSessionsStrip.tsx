@@ -1,103 +1,93 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
-const sessions = [
-  {
-    id: 'live-anxiety',
-    theme: '😰 Anxiety Circle',
-    host: 'Dr. Priya',
-    language: 'English',
-    seats: '11/12 joined',
-    status: 'LIVE',
-    cta: '⚡ Join Now — Free',
-    tone: 'live' as const,
-  },
-  {
-    id: 'soon-grief',
-    theme: '🕊️ Grief & Loss',
-    host: 'Dr. Rajan',
-    language: 'Hindi',
-    seats: '8/10 joined',
-    status: 'Starts in 12m',
-    cta: '🔥 Join — Starting Soon',
-    tone: 'soon' as const,
-  },
-  {
-    id: 'upcoming-parenting',
-    theme: '👨‍👧 Mindful Parenting',
-    host: 'Ms. Kavitha',
-    language: 'Tamil',
-    seats: '6/15 joined',
-    status: 'In 1h 35m',
-    cta: '🔔 Remind Me',
-    tone: 'upcoming' as const,
-  },
+const DEFAULT_SESSIONS = [
+  { id: 'def1', title: 'Anxiety Circle', icon: '😨', host: 'Dr. Priya', lang: 'English', status: 'LIVE', joined: '11/12', btnText: 'Join Now — Free', bg: 'bg-[#FFF5F2]', border: 'border-[#FDE0D8]', btnColor: 'bg-[#E88A70]', hover: 'hover:bg-[#d67b63]' },
+  { id: 'def2', title: 'Grief & Loss', icon: '🕊️', host: 'Dr. Rajan', lang: 'Hindi', status: 'Starts in 12m', joined: '8/10', btnText: 'Join — Starting Soon', bg: 'bg-[#F8F9FA]', border: 'border-[#E9ECEF]', btnColor: 'bg-[#A0B3C1]', hover: 'hover:bg-[#8e9eab]' },
+  { id: 'def3', title: 'Mindful Parenting', icon: '🧘', host: 'Ms. Kavitha', lang: 'Tamil', status: 'In 1h 35m', joined: '6/15', btnText: 'Remind Me', bg: 'bg-[#F4F5F2]', border: 'border-[#E6E8E3]', btnColor: 'bg-[#2A3439]', hover: 'hover:bg-[#1f262a]' },
 ];
 
-const toneClasses = {
-  live: {
-    card: 'border-accent-coral/35 bg-accent-coral/10',
-    badge: 'bg-accent-coral text-white',
-    button: 'bg-accent-coral text-white hover:bg-accent-coral/90',
-  },
-  soon: {
-    card: 'border-gentle-blue/35 bg-gentle-blue/10',
-    badge: 'bg-gentle-blue text-charcoal',
-    button: 'bg-gentle-blue text-charcoal hover:bg-gentle-blue/90',
-  },
-  upcoming: {
-    card: 'border-calm-sage/35 bg-calm-sage/15',
-    badge: 'bg-charcoal/15 text-charcoal',
-    button: 'bg-charcoal text-cream hover:bg-charcoal/90',
-  },
-};
-
 export const GroupSessionsStrip: React.FC = () => {
+  const [liveSessions, setLiveSessions] = useState<any[]>([]);
+
+  // Function to pull real-time sessions created by the therapist
+  const loadSessions = () => {
+    const saved = localStorage.getItem('manas360_live_sessions');
+    if (saved) setLiveSessions(JSON.parse(saved));
+    else setLiveSessions([]);
+  };
+
+  useEffect(() => {
+    loadSessions();
+    window.addEventListener('sessionsUpdated', loadSessions);
+    window.addEventListener('storage', loadSessions); // Works across multiple open tabs
+    return () => {
+      window.removeEventListener('sessionsUpdated', loadSessions);
+      window.removeEventListener('storage', loadSessions);
+    };
+  }, []);
+
+  // Map the live deployed sessions to match the UI of the landing page
+  const dynamicSessions = liveSessions.map((ls) => ({
+    id: ls.id,
+    title: ls.title,
+    icon: ls.icon,
+    host: ls.host,
+    lang: 'English',
+    status: 'LIVE NOW',
+    joined: '0/15',
+    btnText: 'Join Live Room',
+    bg: 'bg-[#F0FDF4]', // Highlights dynamically created sessions in soft green
+    border: 'border-[#BBF7D0]',
+    btnColor: 'bg-[#22C55E]',
+    hover: 'hover:bg-[#16A34A]'
+  }));
+
+  // Combine dynamic with defaults to always show exactly 3 cards
+  const displaySessions = [...dynamicSessions, ...DEFAULT_SESSIONS].slice(0, 3);
+
   return (
-    <section className="border-b border-calm-sage/15 bg-white/85 px-4 py-5 sm:px-6 md:px-8 lg:px-12 xl:px-16" aria-label="Live and upcoming group sessions">
-      <div className="mx-auto max-w-6xl">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="text-sm">🔴</span>
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-charcoal/80">Live & Next 2 Hours</p>
-            <span className="rounded-full bg-calm-sage/25 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-charcoal">Free</span>
+    <section className="py-8 px-4 sm:px-6 lg:px-16 bg-[#f5f3ef] font-sans">
+      <div className="max-w-6xl mx-auto">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+            <h2 className="text-sm font-bold tracking-widest text-gray-700 uppercase">Live & Next 2 Hours</h2>
+            <span className="text-[10px] font-bold bg-gray-200/50 text-gray-600 px-3 py-1 rounded-full">FREE</span>
           </div>
-          <button type="button" className="text-xs font-semibold text-charcoal/70 transition hover:text-charcoal">
+          <button className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
             View full schedule →
           </button>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-3">
-          {sessions.map((session) => {
-            const tone = toneClasses[session.tone];
-            return (
-              <article
-                key={session.id}
-                className={`rounded-2xl border p-4 shadow-soft-xs transition duration-200 hover:-translate-y-0.5 hover:shadow-soft-sm ${tone.card}`}
-              >
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <h3 className="text-sm font-semibold text-charcoal">{session.theme}</h3>
-                  <span className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${tone.badge}`}>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {displaySessions.map((session) => (
+            <div key={session.id} className={`${session.bg} border ${session.border} rounded-3xl p-6 flex flex-col justify-between animate-in fade-in zoom-in-95 duration-500`}>
+              <div>
+                <div className="flex justify-between items-start mb-4">
+                  <h3 className="font-bold text-lg text-gray-900 flex items-center gap-2">
+                    <span className="text-xl">{session.icon}</span> {session.title}
+                  </h3>
+                  <span className={`${session.btnColor} text-white text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest`}>
                     {session.status}
                   </span>
                 </div>
-
-                <div className="mb-3 flex items-center gap-3 text-[11px] text-charcoal/70">
-                  <span>👨‍⚕️ {session.host}</span>
-                  <span>🌐 {session.language}</span>
+                <div className="flex items-center gap-4 text-xs text-gray-500 mb-6 font-medium">
+                  <span className="flex items-center gap-1.5">👨‍⚕️ {session.host}</span>
+                  <span className="flex items-center gap-1.5">🌐 {session.lang}</span>
                 </div>
-
-                <p className="mb-3 text-[11px] font-medium text-charcoal/70">👥 {session.seats}</p>
-
-                <button type="button" className={`w-full rounded-xl px-3 py-2 text-xs font-semibold transition ${tone.button}`}>
-                  {session.cta}
-                </button>
-              </article>
-            );
-          })}
+                <p className="text-xs font-bold text-gray-500 mb-6">👥 {session.joined} joined</p>
+              </div>
+              
+              <button 
+                onClick={() => window.location.href = '/#/provider/portal'}
+                className={`w-full ${session.btnColor} ${session.hover} text-white font-black tracking-wide py-3.5 rounded-xl transition-colors flex justify-center items-center gap-2 text-xs`}
+              >
+                {session.status.includes('LIVE') ? '⚡' : (session.status.includes('Starts') ? '🔥' : '🔔')} {session.btnText}
+              </button>
+            </div>
+          ))}
         </div>
       </div>
     </section>
   );
 };
-
-export default GroupSessionsStrip;
