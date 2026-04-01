@@ -35,6 +35,12 @@ const parsePositiveInt = (value: unknown, field: string, fallback?: number): num
   return Math.round(n);
 };
 
+const parseNonNegativeMinor = (value: unknown, field: string, fallback = 0): bigint => {
+  const n = Number(value ?? fallback);
+  if (!Number.isFinite(n) || n < 0) throw new AppError(`${field} must be greater than or equal to 0`, 422);
+  return BigInt(Math.round(n));
+};
+
 const mustString = (value: unknown, field: string): string => {
   const v = String(value || '').trim();
   if (!v) throw new AppError(`${field} is required`, 422);
@@ -74,8 +80,8 @@ export const createGroupTherapyRequestController = async (req: Request, res: Res
   await ensureHostTherapist(hostTherapistId);
 
   const priceMinor = isAdmin
-    ? parsePositiveInt(req.body?.priceMinor, 'priceMinor', 0)
-    : 0;
+    ? parseNonNegativeMinor(req.body?.priceMinor, 'priceMinor', 0)
+    : BigInt(0);
 
   const status: GroupTherapyStatus = isAdmin ? 'APPROVED' : 'PENDING_APPROVAL';
 
@@ -168,7 +174,7 @@ export const reviewGroupTherapyRequestController = async (req: Request, res: Res
     return;
   }
 
-  const priceMinor = parsePositiveInt(req.body?.priceMinor ?? session.priceMinor, 'priceMinor');
+  const priceMinor = parseNonNegativeMinor(req.body?.priceMinor ?? session.priceMinor, 'priceMinor');
   const maxMembers = parsePositiveInt(req.body?.maxMembers ?? session.maxMembers, 'maxMembers');
   const scheduledAt = req.body?.scheduledAt ? parseDate(req.body.scheduledAt, 'scheduledAt') : session.scheduledAt;
   const durationMinutes = parsePositiveInt(req.body?.durationMinutes ?? session.durationMinutes, 'durationMinutes');
@@ -359,24 +365,45 @@ export const confirmPublicJoinController = async (req: Request, res: Response): 
 
 export const listProviderPatientsForInviteController = async (req: Request, res: Response): Promise<void> => {
   const therapistId = authUserId(req);
-  const sessions = await db.therapySession.findMany({
-    where: { therapistProfileId: therapistId },
-    select: {
-      patientProfile: {
-        select: {
-          user: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
+  const [sessions, assignments] = await Promise.all([
+    db.therapySession.findMany({
+      where: { therapistProfileId: therapistId },
+      select: {
+        patientProfile: {
+          select: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                phone: true,
+              },
             },
           },
         },
       },
-    },
-    take: 500,
-  });
+      take: 500,
+    }),
+    db.careTeamAssignment.findMany({
+      where: {
+        providerId: therapistId,
+        status: 'ACTIVE',
+      },
+      select: {
+        patient: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+          },
+        },
+      },
+      take: 500,
+    }),
+  ]);
 
   const dedup = new Map<string, any>();
   for (const row of sessions) {
@@ -386,6 +413,19 @@ export const listProviderPatientsForInviteController = async (req: Request, res:
         id: user.id,
         name: `${String(user.firstName || '').trim()} ${String(user.lastName || '').trim()}`.trim() || 'Patient',
         email: user.email,
+        phone: user.phone,
+      });
+    }
+  }
+
+  for (const row of assignments) {
+    const user = row?.patient;
+    if (user?.id && !dedup.has(user.id)) {
+      dedup.set(user.id, {
+        id: user.id,
+        name: `${String(user.firstName || '').trim()} ${String(user.lastName || '').trim()}`.trim() || 'Patient',
+        email: user.email,
+        phone: user.phone,
       });
     }
   }

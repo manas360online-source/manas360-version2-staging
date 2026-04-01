@@ -83,9 +83,9 @@ export const groupTherapyApi = {
     return unwrap<{ transactionId: string; redirectUrl: string; enrollmentId: string; amountMinor: number }>(res.data);
   },
 
-  listProviderPatients: async (): Promise<{ items: Array<{ id: string; name: string; email?: string | null }> }> => {
+  listProviderPatients: async (): Promise<{ items: Array<{ id: string; name: string; email?: string | null; phone?: string | null }> }> => {
     const res = await http.get('/v1/group-therapy/private/patients');
-    return unwrap<{ items: Array<{ id: string; name: string; email?: string | null }> }>(res.data);
+    return unwrap<{ items: Array<{ id: string; name: string; email?: string | null; phone?: string | null }> }>(res.data);
   },
 
   createPrivateInvite: async (payload: {

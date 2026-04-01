@@ -262,9 +262,6 @@ function App() {
             <Route path="/onboarding/name" element={<OnboardingName onNext={handleOnboardingName} />} />
             <Route path="/onboarding/email" element={<OnboardingEmail userName={userName} />} />
             
-            {/* --- NEW STANDALONE PORTAL ROUTE --- */}
-            <Route path="/provider/portal" element={<ProviderPortalPage />} />
-
             <Route
               path="/therapist-dashboard"
               element={
@@ -283,7 +280,7 @@ function App() {
             >
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<ProviderDashboard />} />
-              {/* I REMOVED the "portal" route from here so it doesn't get blocked! */}
+              <Route path="portal" element={<ProviderPortalPage />} />
               <Route path="patients" element={<PatientList />} />
               <Route path="patient/:patientId" element={<PatientChartLayout />}>
                 <Route index element={<Navigate to="overview" replace />} />
