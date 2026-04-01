@@ -37,7 +37,7 @@ export type RangeParams = {
 	limit?: number;
 };
 
-export type AdminUserRole = 'patient' | 'therapist' | 'psychiatrist' | 'coach' | 'admin';
+export type AdminUserRole = 'patient' | 'therapist' | 'psychiatrist' | 'coach' | 'admin' | 'complianceofficer';
 
 export type AdminSubscriptionPlanType = 'basic' | 'premium' | 'pro';
 export type AdminSubscriptionStatus = 'active' | 'expired' | 'cancelled' | 'paused';
@@ -756,7 +756,7 @@ export const createAdminOffer = async (data: Partial<MarqueeOffer>) => {
 };
 
 export const updateAdminOffer = async (id: string, data: Partial<MarqueeOffer>) => {
-	const response = await client.patch<ApiEnvelope<MarqueeOffer>>(`/v1/admin/offers/${id}`, data);
+	const response = await client.put<ApiEnvelope<MarqueeOffer>>(`/v1/admin/offers/${id}`, data);
 	return response.data;
 };
 
@@ -794,7 +794,7 @@ export const approvePricingContract = async (id: string) => {
 };
 
 export const getAdminPricingHistory = async () => {
-	const response = await client.get<ApiEnvelope<any[]>>('/v1/admin/pricing/history');
+	const response = await client.get<ApiEnvelope<PricingContract[]>>('/v1/admin/pricing/contracts');
 	return response.data;
 };
 
@@ -846,14 +846,28 @@ export const getAuditLogs = async () => {
 	return response.data;
 };
 
-export const triggerAnalyticsExport = async () => {
-	const response = await client.post<ApiEnvelope<{ jobId: string }>>('/v1/admin/reports/export');
+export const triggerAnalyticsExport = async (
+	format: 'csv' | 'pdf' = 'csv',
+	organizationKey = 1,
+) => {
+	const from = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+	const to = new Date().toISOString();
+	const response = await client.post<ApiEnvelope<{ jobId: string }>>('/v1/admin/reports/export', {
+		format,
+		from,
+		to,
+		organizationKey,
+	});
 	return response.data;
 };
 
 export const getExportStatus = async (jobId: string) => {
 	const response = await client.get<ApiEnvelope<any>>(`/v1/admin/reports/export/${jobId}`);
 	return response.data;
+};
+
+export const getAdminExportDownloadUrl = (jobId: string): string => {
+	return `/api/v1/admin/reports/export/${encodeURIComponent(jobId)}/download`;
 };
 
 // === PHASE 5 EXTENSION: DYNAMIC GROUPS ===

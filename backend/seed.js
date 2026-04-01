@@ -8,6 +8,9 @@ const roles = {
   psychiatrist: ['read_own_profile', 'manage_sessions', 'view_earnings', 'view_assigned_patients'],
   coach: ['read_own_profile', 'manage_sessions', 'view_earnings', 'view_assigned_patients'],
   admin: ['read_all_profiles', 'manage_users', 'manage_therapists', 'manage_payments', 'view_analytics', 'manage_corporate', 'view_system_logs', 'offers_edit', 'payouts_approve', 'pricing_edit', 'dashboard', 'users_read', 'users_write', 'manage_groups'],
+  clinicaldirector: ['read_all_profiles', 'manage_users', 'manage_therapists', 'view_analytics', 'dashboard', 'users_read'],
+  financemanager: ['manage_payments', 'view_analytics', 'offers_edit', 'payouts_approve', 'pricing_edit', 'dashboard'],
+  complianceofficer: ['view_analytics', 'view_system_logs', 'audit_read', 'dashboard'],
   superadmin: ['read_all_profiles', 'manage_users', 'manage_therapists', 'manage_payments', 'view_analytics', 'manage_corporate', 'view_system_logs', 'manage_roles', 'manage_permissions', 'system_config', 'offers_edit', 'payouts_approve', 'pricing_edit', 'dashboard', 'users_read', 'users_write', 'manage_groups', 'audit_read']
 };
 

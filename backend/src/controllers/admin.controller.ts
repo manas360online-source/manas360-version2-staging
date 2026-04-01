@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { AppError } from '../middleware/error.middleware';
 import { listUsers, getUserById, verifyTherapist, verifyProvider, approveProvider, getMetrics, listSubscriptions, getUserApprovals, updateUserApprovalStatus, listLiveSessions, getFeedback, resolveFeedback, updateUserStatus, getRoles, updateRolePermissions } from '../services/admin.service';
+import { prisma } from '../config/db';
 import { sendSuccess } from '../utils/response';
 
 /**
@@ -259,4 +260,119 @@ export const updateRolePermissionsController = async (req: Request, res: Respons
 	clearPermissionsCache(roleName as any);
 
 	sendSuccess(res, updatedRole, `Role ${roleName} updated successfully`);
+};
+
+export const getUserAcceptancesController = async (req: Request, res: Response): Promise<void> => {
+	try {
+		const acceptances = await prisma.consent.findMany({
+			where: { status: 'GRANTED' },
+			include: {
+				user: {
+					select: {
+						phone: true,
+						email: true,
+					},
+				},
+			},
+			orderBy: { grantedAt: 'desc' },
+		});
+
+		const formatted = acceptances.map((a) => ({
+			id: a.id,
+			userName: a.user.phone ?? a.user.email ?? 'N/A',
+			documentType: a.consentType,
+			acceptedAt: a.grantedAt,
+			ip: typeof (a.metadata as any)?.ipAddress === 'string' ? (a.metadata as any).ipAddress : null,
+		}));
+
+		res.json({ acceptances: formatted });
+	} catch (_err) {
+		res.status(500).json({ error: 'Failed to load acceptances' });
+	}
+};
+
+export const getComplianceStatusController = async (_req: Request, res: Response): Promise<void> => {
+	try {
+		const requiredConsentTypes = ['TERMS_OF_SERVICE', 'PRIVACY_POLICY', 'INFORMED_CONSENT'];
+
+		const [totalUsers, grantedConsents] = await Promise.all([
+			prisma.user.count({ where: { isDeleted: false } }),
+			prisma.consent.findMany({
+				where: {
+					status: 'GRANTED',
+					consentType: { in: requiredConsentTypes },
+				},
+				select: {
+					userId: true,
+					consentType: true,
+				},
+			}),
+		]);
+
+		const userConsentMap = new Map<string, Set<string>>();
+		for (const consent of grantedConsents) {
+			if (!userConsentMap.has(consent.userId)) {
+				userConsentMap.set(consent.userId, new Set<string>());
+			}
+			userConsentMap.get(consent.userId)?.add(consent.consentType);
+		}
+
+		const acceptedCount = Array.from(userConsentMap.values()).filter((types) =>
+			requiredConsentTypes.every((requiredType) => types.has(requiredType)),
+		).length;
+		const pending = Math.max(totalUsers - acceptedCount, 0);
+		const compliancePercentage = totalUsers > 0 ? Math.round((acceptedCount / totalUsers) * 100) : 0;
+
+		const missingByType = requiredConsentTypes
+			.map((type) => {
+				const withType = new Set(grantedConsents.filter((consent) => consent.consentType === type).map((consent) => consent.userId)).size;
+				return { type, missing: Math.max(totalUsers - withType, 0) };
+			})
+			.filter((entry) => entry.missing > 0)
+			.map((entry) => `${entry.type.replace(/_/g, ' ')} missing for ${entry.missing} users`);
+
+		res.json({
+			compliance_percentage: compliancePercentage,
+			pending,
+			critical_gaps: missingByType,
+		});
+	} catch (_err) {
+		res.status(500).json({ error: 'Failed to load compliance status' });
+	}
+};
+
+export const getLegalDocumentsController = async (_req: Request, res: Response): Promise<void> => {
+	try {
+		const consents = await prisma.consent.findMany({
+			where: { status: 'GRANTED' },
+			select: {
+				consentType: true,
+				metadata: true,
+			},
+		});
+
+		const aggregateByType = new Map<string, { maxVersion: number; count: number }>();
+		for (const consent of consents) {
+			const type = consent.consentType;
+			const rawVersion = (consent.metadata as any)?.version;
+			const version = typeof rawVersion === 'number' && rawVersion > 0 ? rawVersion : 1;
+			const prev = aggregateByType.get(type) ?? { maxVersion: 1, count: 0 };
+			aggregateByType.set(type, {
+				maxVersion: Math.max(prev.maxVersion, version),
+				count: prev.count + 1,
+			});
+		}
+
+		const documents = Array.from(aggregateByType.entries()).map(([type, details]) => ({
+			id: type,
+			title: type.toLowerCase().split('_').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' '),
+			document_type: type.toLowerCase(),
+			current_version: details.maxVersion,
+			status: details.count > 0 ? 'PUBLISHED' : 'DRAFT',
+		}));
+
+		res.json({ documents });
+	} catch (_err) {
+		res.status(500).json({ error: 'Failed to load legal documents' });
+	}
 };

@@ -9,7 +9,17 @@ const db = prisma as any;
  * Extensible enum for user roles
  * Can be extended for superadmin, moderator, etc.
  */
-export type UserRole = 'patient' | 'therapist' | 'psychologist' | 'psychiatrist' | 'coach' | 'admin' | 'superadmin';
+export type UserRole =
+	| 'patient'
+	| 'therapist'
+	| 'psychologist'
+	| 'psychiatrist'
+	| 'coach'
+	| 'admin'
+	| 'superadmin'
+	| 'clinicaldirector'
+	| 'financemanager'
+	| 'complianceofficer';
 
 /**
  * Role hierarchy for logical grouping
@@ -21,6 +31,9 @@ export const roleHierarchy: Record<UserRole, number> = {
 	psychologist: 2,
 	psychiatrist: 2,
 	coach: 2,
+	clinicaldirector: 3,
+	financemanager: 3,
+	complianceofficer: 3,
 	admin: 3,
 	superadmin: 4,
 };
@@ -352,6 +365,24 @@ export const requirePermission = (
 		if (userDetails.isDeleted) {
 			next(new AppError('User account is deleted', 410));
 			return;
+		}
+
+		// Special handling for Compliance Officer - limited access only
+		if (String(userDetails.role).toUpperCase() === 'COMPLIANCEOFFICER') {
+			const allowedPermissions = [
+				'dashboard',
+				'view_audit',
+				'read_reports',
+				'manage_compliance',
+				'view_analytics',
+				'view_feedback'
+			];
+			for (const requiredPermission of permissions) {
+				if (!allowedPermissions.includes(requiredPermission)) {
+					_res.status(403).json({ message: 'Compliance Officer access denied' });
+					return;
+				}
+			}
 		}
 
 		const userPermissions = await getRolePermissions(userDetails.role);

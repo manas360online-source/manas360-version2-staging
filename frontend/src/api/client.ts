@@ -16,7 +16,7 @@ export class ApiClientError extends Error {
 
 const defaultApiBase = typeof window === 'undefined'
 	? 'http://localhost:3000/api'
-	: `${window.location.protocol}//${window.location.hostname}:3000/api`;
+	: '/api';
 
 const configuredBase =
 	import.meta.env.VITE_API_BASE_URL?.trim() ||

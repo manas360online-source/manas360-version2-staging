@@ -866,7 +866,7 @@ export default function TherapistDashboardPage() {
             </span>
             <div>
               <h4 className="font-display text-sm font-bold text-clay-600">{data.stats.pendingNotes} session notes pending</h4>
-              <p className="mt-1 text-xs text-clay-600">Complete clinical documentation within 24 hours to keep care continuity and compliance.</p>
+              <p className="mt-1 text-xs text-clay-600">Complete clinical documentation within 24 hours to keep care continuity and governance quality.</p>
             </div>
           </div>
           <TherapistButton variant="clay" className="w-full sm:w-auto">Write Notes</TherapistButton>

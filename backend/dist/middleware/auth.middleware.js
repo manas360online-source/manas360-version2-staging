@@ -15,6 +15,11 @@ const requireAuth = (req, _res, next) => {
     const cookieToken = req.cookies?.access_token;
     const accessToken = bearerToken ?? cookieToken;
     if (!accessToken) {
+        console.warn(`[AUTH FAILED] No access token found. 
+      URL: ${req.originalUrl}
+      Method: ${req.method}
+      Auth Header: ${req.headers.authorization ? 'Present' : 'Missing'}
+      Cookies: ${Object.keys(req.cookies || {}).join(', ')}`);
         next(new error_middleware_1.AppError('Authentication required', 401));
         return;
     }
@@ -28,7 +33,8 @@ const requireAuth = (req, _res, next) => {
         };
         next();
     }
-    catch {
+    catch (error) {
+        console.log(`[AUTH FAILED] Token verification failed. URL: ${req.originalUrl}, Error:`, error);
         next(new error_middleware_1.AppError('Invalid or expired access token', 401));
     }
 };
@@ -38,6 +44,11 @@ const requireCsrf = (req, _res, next) => {
     const csrfToken = typeof csrfFromHeader === 'string' ? csrfFromHeader : undefined;
     const cookieToken = req.cookies?.[env_1.env.csrfCookieName];
     if (!csrfToken || !cookieToken || csrfToken !== cookieToken) {
+        console.warn(`[CSRF FAILED] Token mismatch or missing. 
+      URL: ${req.originalUrl}
+      Header CSRF: ${csrfToken ? 'Present' : 'Missing'}
+      Cookie CSRF: ${cookieToken ? 'Present' : 'Missing'}
+      Match: ${csrfToken === cookieToken}`);
         next(new error_middleware_1.AppError('Invalid CSRF token', 403));
         return;
     }

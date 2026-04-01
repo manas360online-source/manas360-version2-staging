@@ -5,7 +5,7 @@ import type { PaginationMeta } from '../utils/pagination';
 
 const db = prisma as any;
 
-const mapRoleFilterToEnum = (role?: string): 'PATIENT' | 'THERAPIST' | 'PSYCHIATRIST' | 'COACH' | 'ADMIN' | undefined => {
+const mapRoleFilterToEnum = (role?: string): 'PATIENT' | 'THERAPIST' | 'PSYCHIATRIST' | 'COACH' | 'ADMIN' | 'COMPLIANCE_OFFICER' | undefined => {
 	if (!role) return undefined;
 	const normalized = role.toLowerCase();
 	if (normalized === 'patient') return 'PATIENT';
@@ -13,6 +13,7 @@ const mapRoleFilterToEnum = (role?: string): 'PATIENT' | 'THERAPIST' | 'PSYCHIAT
 	if (normalized === 'psychiatrist') return 'PSYCHIATRIST';
 	if (normalized === 'coach') return 'COACH';
 	if (normalized === 'admin') return 'ADMIN';
+	if (normalized === 'complianceofficer') return 'COMPLIANCE_OFFICER';
 	throw new AppError('Invalid role filter', 400);
 };
 
@@ -41,7 +42,7 @@ export interface AdminListUsersResponse {
 		email: string;
 		firstName: string;
 		lastName: string;
-		role: 'patient' | 'therapist' | 'psychiatrist' | 'coach' | 'admin';
+		role: 'patient' | 'therapist' | 'psychiatrist' | 'coach' | 'admin' | 'complianceofficer';
 		isTherapistVerified: boolean;
 		therapistVerifiedAt: Date | null;
 		createdAt: Date;
@@ -54,7 +55,7 @@ export interface AdminListUsersResponse {
  * List users with pagination and filtering
  *
  * Query filters:
- * - role: 'patient' | 'therapist' | 'psychiatrist' | 'coach' | 'admin' (optional)
+ * - role: 'patient' | 'therapist' | 'psychiatrist' | 'coach' | 'admin' | 'complianceofficer' (optional)
  * - status: 'active' | 'deleted' (optional)
  * - page: pagination page (default: 1)
  * - limit: items per page (default: 10, max: 50)

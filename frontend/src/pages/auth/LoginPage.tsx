@@ -31,9 +31,9 @@ export default function LoginPage() {
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
-	const resolvePostLoginRouteWithSubscription = async (candidate: string | null, role: string | undefined) => {
+	const resolvePostLoginRouteWithSubscription = async (candidate: string | null, role: string | undefined, userOverride?: any) => {
 		if (!candidate || candidate.startsWith('/auth/')) {
-			return getPostLoginRoute(user);
+			return getPostLoginRoute(userOverride || user);
 		}
 
 		const normalizedRole = String(role || '').toLowerCase();
@@ -62,7 +62,7 @@ export default function LoginPage() {
 
 		const candidate = from || afterLogin || next || null;
 		void (async () => {
-			const postLoginRoute = await resolvePostLoginRouteWithSubscription(candidate, user.role);
+			const postLoginRoute = await resolvePostLoginRouteWithSubscription(candidate, user.role, user);
 			navigate(postLoginRoute, { replace: true });
 		})();
 	}, [afterLogin, from, isAuthenticated, navigate, next, user]);
@@ -96,7 +96,7 @@ export default function LoginPage() {
 				return;
 			}
 			const candidate = from || afterLogin || next || null;
-			const postLoginRoute = await resolvePostLoginRouteWithSubscription(candidate, result.user?.role);
+			const postLoginRoute = await resolvePostLoginRouteWithSubscription(candidate, result.user?.role, result.user);
 			navigate(postLoginRoute, { replace: true });
 		} catch (err) {
 			setError(getApiErrorMessage(err, 'OTP verification failed'));
@@ -187,7 +187,6 @@ export default function LoginPage() {
 									setPhone('superadmin@manas360.com');
 									setOtpSent(true);
 									setOtp('123456');
-									window.location.href = 'http://localhost:5173/#/admin-portal/login';
 								}}
 							>
 								🚀 Login as Super Admin
@@ -201,7 +200,6 @@ export default function LoginPage() {
 										setPhone('finance@manas360.com');
 										setOtpSent(true);
 										setOtp('123456');
-										window.location.href = 'http://localhost:5173/#/admin-portal/login';
 									}}
 								>
 									💳 Finance Manager
@@ -214,7 +212,6 @@ export default function LoginPage() {
 										setPhone('clinical@manas360.com');
 										setOtpSent(true);
 										setOtp('123456');
-										window.location.href = 'http://localhost:5173/#/admin-portal/login';
 									}}
 								>
 									🏥 Clinical Director

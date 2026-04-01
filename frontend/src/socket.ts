@@ -1,7 +1,7 @@
 import { io, Socket } from 'socket.io-client';
 
 const SOCKET_URL = import.meta.env.VITE_API_URL || 
-  (window.location.hostname === 'localhost' ? 'http://localhost:3000' : window.location.origin);
+  window.location.origin;
 
 export const createSocket = (token: string): Socket => {
   return io(SOCKET_URL, {

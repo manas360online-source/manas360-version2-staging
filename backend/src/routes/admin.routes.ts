@@ -8,7 +8,7 @@ import {
 	validateAdminListSubscriptionsQuery,
 	asyncHandler,
 } from '../middleware/validate.middleware';
-import { listUsersController, getUserController, verifyProviderController, verifyTherapistController, approveProviderController, getMetricsController, listSubscriptionsController, getAdminUserApprovalsController, updateAdminUserApprovalController, getAdminLiveSessionsController, getAdminFeedbackController, resolveAdminFeedbackController, updateAdminUserStatusController, getRolesController, updateRolePermissionsController } from '../controllers/admin.controller';
+import { listUsersController, getUserController, verifyProviderController, verifyTherapistController, approveProviderController, getMetricsController, listSubscriptionsController, getAdminUserApprovalsController, updateAdminUserApprovalController, getAdminLiveSessionsController, getAdminFeedbackController, resolveAdminFeedbackController, updateAdminUserStatusController, getRolesController, updateRolePermissionsController, getUserAcceptancesController, getComplianceStatusController, getLegalDocumentsController } from '../controllers/admin.controller';
 import {
 	getAdminAnalyticsSummaryController,
 	getAdminMostUsedTemplatesController,
@@ -416,23 +416,26 @@ router.post('/pricing/contracts/:id/approve', requireAuth, requireRole('admin'),
 
 // === PHASE 5: REAL-TIME, CRISIS, REPORTS & AUDIT ===
 router.get('/metrics/live', requireAuth, requireRole('admin'), getLiveMetricsController);
-router.get('/live-sessions', requireAuth, requireRole(['admin', 'superadmin']), requirePermission('view_analytics'), asyncHandler(getAdminLiveSessionsController));
+router.get('/live-sessions', requireAuth, requireRole(['admin', 'superadmin', 'complianceofficer']), requirePermission('view_analytics'), asyncHandler(getAdminLiveSessionsController));
 
 /**
  * Support & Sentiment Dashboard
  */
-router.get('/feedback', requireAuth, requireRole('admin'), requirePermission('view_analytics'), asyncHandler(getAdminFeedbackController));
-router.post('/feedback/:id/resolve', requireAuth, requireRole('admin'), requirePermission('view_analytics'), asyncHandler(resolveAdminFeedbackController));
+router.get('/feedback', requireAuth, requireRole(['admin', 'complianceofficer']), asyncHandler(getAdminFeedbackController));
+router.post('/feedback/:id/resolve', requireAuth, requireRole(['admin', 'complianceofficer']), asyncHandler(resolveAdminFeedbackController));
 
-router.get('/crisis/alerts', requireAuth, requireRole('admin'), getCrisisAlertsController);
-router.post('/crisis/:id/respond', requireAuth, requireRole('admin'), respondToCrisisController);
+router.get('/crisis/alerts', requireAuth, requireRole(['admin', 'complianceofficer']), getCrisisAlertsController);
+router.post('/crisis/:id/respond', requireAuth, requireRole(['admin', 'complianceofficer']), respondToCrisisController);
 
-router.get('/audit', requireAuth, requireRole('admin'), getAuditLogController);
+router.get('/audit', requireAuth, requireRole(['admin', 'complianceofficer']), getAuditLogController);
+router.get('/compliance/status', requireAuth, requireRole(['admin', 'complianceofficer']), asyncHandler(getComplianceStatusController));
+router.get('/legal/documents', requireAuth, requireRole(['admin', 'complianceofficer']), asyncHandler(getLegalDocumentsController));
+router.get('/acceptances', requireAuth, requireRole(['admin', 'complianceofficer']), asyncHandler(getUserAcceptancesController));
 
 // Advanced Reporting & Exports
-router.post('/reports/export', requireAuth, requireRole('admin'), requirePermission('view_analytics'), enqueueAdminAnalyticsExportController);
-router.get('/reports/export/:jobId', requireAuth, requireRole('admin'), requirePermission('view_analytics'), getAdminAnalyticsExportStatusController);
-router.get('/reports/export/:jobId/download', requireAuth, requireRole('admin'), requirePermission('view_analytics'), downloadAdminAnalyticsExportController);
+router.post('/reports/export', requireAuth, requireRole(['admin', 'complianceofficer']), requirePermission('view_analytics'), enqueueAdminAnalyticsExportController);
+router.get('/reports/export/:jobId', requireAuth, requireRole(['admin', 'complianceofficer']), requirePermission('view_analytics'), getAdminAnalyticsExportStatusController);
+router.get('/reports/export/:jobId/download', requireAuth, requireRole(['admin', 'complianceofficer']), requirePermission('view_analytics'), downloadAdminAnalyticsExportController);
 
 // === PHASE 5 EXTENSION: DYNAMIC GROUPS ===
 router.get('/groups', requireAuth, requireRole('admin'), listGroupCategoriesController);

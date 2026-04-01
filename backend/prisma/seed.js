@@ -265,6 +265,20 @@ async function seed() {
         verifiedByUserId: null,
       },
     }).catch(() => null);
+
+    // NEW: Grant all seeded providers active platform access for immediate QA testing
+    await prisma.platformAccess.upsert({
+      where: { providerId: provider.id },
+      update: {
+        status: 'active',
+        expiryDate: plusDays(365),
+      },
+      create: {
+        providerId: provider.id,
+        status: 'active',
+        expiryDate: plusDays(365),
+      },
+    }).catch(() => null);
   }
 
   const profileByUserId = new Map();

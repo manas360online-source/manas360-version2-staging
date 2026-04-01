@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { 
   getAdminCompanyReports, 
   getAdminBICorporateSummary, 
-  triggerAnalyticsExport, 
+  triggerAnalyticsExport,
+  getAdminExportDownloadUrl,
   type AdminCompanyReport, 
   type AdminBIStats 
 } from '../../api/admin.api';
@@ -54,8 +55,7 @@ export default function Reports() {
   const downloadReport = async (id: string, format: string) => {
     // Standard implementation for file download via signed URL or direct blob
     toast.success(`Initializing secure download for ${format} report...`);
-    // Placeholder for actual browser download trigger
-    window.open(`/api/v1/admin/reports/export/${id}?format=${format.toLowerCase()}`, '_blank');
+    window.open(getAdminExportDownloadUrl(id), '_blank');
   };
 
   if (loading || !summary) return <div className="p-12 text-center text-gray-400 italic animate-pulse">Aggregating Business Intelligence data...</div>;

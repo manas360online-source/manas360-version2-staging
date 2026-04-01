@@ -1,8 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.listSubscriptionsController = exports.getMetricsController = exports.approveProviderController = exports.verifyProviderController = exports.verifyTherapistController = exports.getUserController = exports.listUsersController = void 0;
+exports.getLegalDocumentsController = exports.getComplianceStatusController = exports.getUserAcceptancesController = exports.updateRolePermissionsController = exports.getRolesController = exports.updateAdminUserStatusController = exports.resolveAdminFeedbackController = exports.getAdminFeedbackController = exports.getAdminLiveSessionsController = exports.updateAdminUserApprovalController = exports.getAdminUserApprovalsController = exports.listSubscriptionsController = exports.getMetricsController = exports.approveProviderController = exports.verifyProviderController = exports.verifyTherapistController = exports.getUserController = exports.listUsersController = void 0;
 const error_middleware_1 = require("../middleware/error.middleware");
 const admin_service_1 = require("../services/admin.service");
+const db_1 = require("../config/db");
 const response_1 = require("../utils/response");
 /**
  * GET /api/v1/admin/users
@@ -121,3 +122,212 @@ const listSubscriptionsController = async (req, res) => {
     (0, response_1.sendSuccess)(res, result, 'Subscriptions fetched successfully');
 };
 exports.listSubscriptionsController = listSubscriptionsController;
+/**
+ * GET /api/v1/admin/user-approvals
+ * Get all users pending onboarding approval
+ */
+const getAdminUserApprovalsController = async (req, res) => {
+    const users = await (0, admin_service_1.getUserApprovals)();
+    (0, response_1.sendSuccess)(res, { users }, 'Pending approvals fetched successfully');
+};
+exports.getAdminUserApprovalsController = getAdminUserApprovalsController;
+/**
+ * PATCH /api/v1/admin/user-approvals/:id
+ * Approve or Reject a user's registration
+ */
+const updateAdminUserApprovalController = async (req, res) => {
+    const userId = req.params['id'];
+    const { action, reason } = req.body;
+    if (!userId) {
+        throw new error_middleware_1.AppError('User ID is required', 400);
+    }
+    if (!['approve', 'reject'].includes(action)) {
+        throw new error_middleware_1.AppError('Invalid action. Must be "approve" or "reject"', 400);
+    }
+    await (0, admin_service_1.updateUserApprovalStatus)(userId, action, reason);
+    (0, response_1.sendSuccess)(res, null, `User ${action}ed successfully`);
+};
+exports.updateAdminUserApprovalController = updateAdminUserApprovalController;
+/**
+ * GET /api/v1/admin/live-sessions
+ * Get currently active sessions (Live Monitor)
+ */
+const getAdminLiveSessionsController = async (req, res) => {
+    const sessions = await (0, admin_service_1.listLiveSessions)();
+    (0, response_1.sendSuccess)(res, { sessions }, 'Live sessions fetched successfully');
+};
+exports.getAdminLiveSessionsController = getAdminLiveSessionsController;
+/**
+ * GET /api/v1/admin/feedback
+ * List all user feedback
+ */
+const getAdminFeedbackController = async (req, res) => {
+    const feedback = await (0, admin_service_1.getFeedback)();
+    (0, response_1.sendSuccess)(res, { feedback }, 'User feedback fetched successfully');
+};
+exports.getAdminFeedbackController = getAdminFeedbackController;
+/**
+ * POST /api/v1/admin/feedback/:id/resolve
+ * Mark a feedback item as resolved
+ */
+const resolveAdminFeedbackController = async (req, res) => {
+    const feedbackId = req.params['id'];
+    if (!feedbackId) {
+        throw new error_middleware_1.AppError('Feedback ID is required', 400);
+    }
+    await (0, admin_service_1.resolveFeedback)(feedbackId);
+    (0, response_1.sendSuccess)(res, null, 'Feedback marked as resolved');
+};
+exports.resolveAdminFeedbackController = resolveAdminFeedbackController;
+/**
+ * PATCH /api/v1/admin/users/:id/status
+ * Update a user's status (Active/Suspended/etc)
+ */
+const updateAdminUserStatusController = async (req, res) => {
+    const userId = req.params['id'];
+    const { status } = req.body;
+    if (!userId) {
+        throw new error_middleware_1.AppError('User ID is required', 400);
+    }
+    if (!status) {
+        throw new error_middleware_1.AppError('Status is required', 400);
+    }
+    await (0, admin_service_1.updateUserStatus)(userId, status);
+    (0, response_1.sendSuccess)(res, null, `User status updated to ${status} successfully`);
+};
+exports.updateAdminUserStatusController = updateAdminUserStatusController;
+/**
+ * GET /api/v1/admin/roles
+ * Fetch all dynamic roles mapping
+ */
+const getRolesController = async (req, res) => {
+    const roles = await (0, admin_service_1.getRoles)();
+    (0, response_1.sendSuccess)(res, roles, 'Roles fetched successfully');
+};
+exports.getRolesController = getRolesController;
+/**
+ * PATCH /api/v1/admin/roles/:role
+ * Update permissions for a given role
+ */
+const updateRolePermissionsController = async (req, res) => {
+    const roleName = req.params['role'];
+    const { permissions } = req.body;
+    if (!roleName) {
+        throw new error_middleware_1.AppError('Role is required', 400);
+    }
+    if (!Array.isArray(permissions)) {
+        throw new error_middleware_1.AppError('Permissions must be an array of strings', 400);
+    }
+    const updatedRole = await (0, admin_service_1.updateRolePermissions)(roleName, permissions);
+    // Clear the permissions cache dynamically to avoid circular dependencies during module init
+    const { clearPermissionsCache } = await import('../middleware/rbac.middleware');
+    clearPermissionsCache(roleName);
+    (0, response_1.sendSuccess)(res, updatedRole, `Role ${roleName} updated successfully`);
+};
+exports.updateRolePermissionsController = updateRolePermissionsController;
+const getUserAcceptancesController = async (req, res) => {
+    try {
+        const acceptances = await db_1.prisma.consent.findMany({
+            where: { status: 'GRANTED' },
+            include: {
+                user: {
+                    select: {
+                        phone: true,
+                        email: true,
+                    },
+                },
+            },
+            orderBy: { grantedAt: 'desc' },
+        });
+        const formatted = acceptances.map((a) => ({
+            id: a.id,
+            userName: a.user.phone ?? a.user.email ?? 'N/A',
+            documentType: a.consentType,
+            acceptedAt: a.grantedAt,
+            ip: typeof a.metadata?.ipAddress === 'string' ? a.metadata.ipAddress : null,
+        }));
+        res.json({ acceptances: formatted });
+    }
+    catch (_err) {
+        res.status(500).json({ error: 'Failed to load acceptances' });
+    }
+};
+exports.getUserAcceptancesController = getUserAcceptancesController;
+const getComplianceStatusController = async (_req, res) => {
+    try {
+        const requiredConsentTypes = ['TERMS_OF_SERVICE', 'PRIVACY_POLICY', 'INFORMED_CONSENT'];
+        const [totalUsers, grantedConsents] = await Promise.all([
+            db_1.prisma.user.count({ where: { isDeleted: false } }),
+            db_1.prisma.consent.findMany({
+                where: {
+                    status: 'GRANTED',
+                    consentType: { in: requiredConsentTypes },
+                },
+                select: {
+                    userId: true,
+                    consentType: true,
+                },
+            }),
+        ]);
+        const userConsentMap = new Map();
+        for (const consent of grantedConsents) {
+            if (!userConsentMap.has(consent.userId)) {
+                userConsentMap.set(consent.userId, new Set());
+            }
+            userConsentMap.get(consent.userId)?.add(consent.consentType);
+        }
+        const acceptedCount = Array.from(userConsentMap.values()).filter((types) => requiredConsentTypes.every((requiredType) => types.has(requiredType))).length;
+        const pending = Math.max(totalUsers - acceptedCount, 0);
+        const compliancePercentage = totalUsers > 0 ? Math.round((acceptedCount / totalUsers) * 100) : 0;
+        const missingByType = requiredConsentTypes
+            .map((type) => {
+            const withType = new Set(grantedConsents.filter((consent) => consent.consentType === type).map((consent) => consent.userId)).size;
+            return { type, missing: Math.max(totalUsers - withType, 0) };
+        })
+            .filter((entry) => entry.missing > 0)
+            .map((entry) => `${entry.type.replace(/_/g, ' ')} missing for ${entry.missing} users`);
+        res.json({
+            compliance_percentage: compliancePercentage,
+            pending,
+            critical_gaps: missingByType,
+        });
+    }
+    catch (_err) {
+        res.status(500).json({ error: 'Failed to load compliance status' });
+    }
+};
+exports.getComplianceStatusController = getComplianceStatusController;
+const getLegalDocumentsController = async (_req, res) => {
+    try {
+        const consents = await db_1.prisma.consent.findMany({
+            where: { status: 'GRANTED' },
+            select: {
+                consentType: true,
+                metadata: true,
+            },
+        });
+        const aggregateByType = new Map();
+        for (const consent of consents) {
+            const type = consent.consentType;
+            const rawVersion = consent.metadata?.version;
+            const version = typeof rawVersion === 'number' && rawVersion > 0 ? rawVersion : 1;
+            const prev = aggregateByType.get(type) ?? { maxVersion: 1, count: 0 };
+            aggregateByType.set(type, {
+                maxVersion: Math.max(prev.maxVersion, version),
+                count: prev.count + 1,
+            });
+        }
+        const documents = Array.from(aggregateByType.entries()).map(([type, details]) => ({
+            id: type,
+            title: type.toLowerCase().split('_').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' '),
+            document_type: type.toLowerCase(),
+            current_version: details.maxVersion,
+            status: details.count > 0 ? 'PUBLISHED' : 'DRAFT',
+        }));
+        res.json({ documents });
+    }
+    catch (_err) {
+        res.status(500).json({ error: 'Failed to load legal documents' });
+    }
+};
+exports.getLegalDocumentsController = getLegalDocumentsController;

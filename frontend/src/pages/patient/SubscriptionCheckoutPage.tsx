@@ -43,7 +43,7 @@ export default function SubscriptionCheckoutPage() {
 
   const confirmAndPay = async () => {
     if (!acceptedTerms) {
-      toast.error('Please accept terms and privacy.');
+      toast.error('Please confirm to continue.');
       return;
     }
 
@@ -122,7 +122,7 @@ export default function SubscriptionCheckoutPage() {
 
           <label className="mt-4 flex items-start gap-2 text-sm text-slate-700">
             <input type="checkbox" checked={acceptedTerms} onChange={(e) => setAcceptedTerms(e.target.checked)} />
-            <span>I agree to terms and privacy.</span>
+            <span>I confirm checkout details and continue.</span>
           </label>
 
           <div className="mt-4 flex flex-wrap gap-2">

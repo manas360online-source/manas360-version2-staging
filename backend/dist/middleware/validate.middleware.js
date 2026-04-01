@@ -631,8 +631,8 @@ exports.validateAdminListUsersQuery = [
     (0, express_validator_1.query)('role')
         .optional()
         .isString()
-        .isIn(['patient', 'therapist', 'psychiatrist', 'coach', 'admin'])
-        .withMessage('role must be one of: patient, therapist, psychiatrist, coach, admin'),
+        .isIn(['patient', 'therapist', 'psychiatrist', 'psychologist', 'coach', 'admin', 'superadmin', 'clinicaldirector', 'financemanager', 'complianceofficer'])
+        .withMessage('role must be one of: patient, therapist, psychiatrist, psychologist, coach, admin, superadmin, clinicaldirector, financemanager, complianceofficer'),
     (0, express_validator_1.query)('status')
         .optional()
         .isString()

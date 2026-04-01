@@ -13,7 +13,7 @@ const baseMetrics: TrustMetricItem[] = [
   { key: 'pricing', label: 'Starting Monthly', displayValue: '₹299' },
   { key: 'support', label: 'AI Support', displayValue: '24/7' },
   { key: 'credential', label: 'Credential Verified', displayValue: 'NMC' },
-  { key: 'compliance', label: 'Compliant', displayValue: 'DPDPA' },
+  { key: 'compliance', label: 'Privacy-Ready', displayValue: 'DPDPA' },
 ];
 
 export const TrustMetrics: React.FC = () => {

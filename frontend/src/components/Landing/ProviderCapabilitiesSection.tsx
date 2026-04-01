@@ -19,8 +19,8 @@ const capabilities = [
   },
   {
     title: '💊 Digital Prescriptions',
-    description: 'For psychiatry workflows, generate compliant digital prescriptions and medication references.',
-    tags: ['eRx Ready', 'Compliance', 'Medication Support'],
+    description: 'For psychiatry workflows, generate standards-aligned digital prescriptions and medication references.',
+    tags: ['eRx Ready', 'Governance Ready', 'Medication Support'],
   },
   {
     title: '📊 Earnings & Analytics',

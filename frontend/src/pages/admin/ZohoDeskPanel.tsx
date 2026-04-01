@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { api } from '../../api/admin.api';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
 
 import { toast } from 'react-hot-toast';
 

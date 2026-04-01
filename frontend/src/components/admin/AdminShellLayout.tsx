@@ -43,6 +43,9 @@ const navItems: NavItem[] = [
 	// SECURITY
 	{ to: '/admin/audit-trail', label: 'Audit Trail', shortLabel: 'AT', section: 'SECURITY' },
 	{ to: '/admin/audit-logs', label: 'System Logs', shortLabel: 'AL', section: 'SECURITY' },
+	{ to: '/admin/data-requests', label: 'Data Requests', shortLabel: 'DR', section: 'SECURITY' },
+	{ to: '/admin/data-privacy-hub', label: 'Data Privacy Hub', shortLabel: 'DP', section: 'SECURITY' },
+	{ to: '/admin/legal-documents', label: 'Legal Documents', shortLabel: 'LD', section: 'SECURITY' },
 	{ to: '/admin/ai-monitoring', label: 'AI Monitoring', shortLabel: 'AI', section: 'SECURITY' },
 	// SYSTEM
 	{ to: '/admin/settings', label: 'Settings', shortLabel: 'Set', section: 'SYSTEM' },
@@ -62,7 +65,57 @@ export default function AdminShellLayout() {
 	const { user, logout } = useAuth();
 
 	const userName = [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim() || user?.email || 'Admin';
-	const userEmail = typeof user?.email === 'string' ? user.email.toLowerCase() : '';
+	const userRole = String(user?.role || '').toLowerCase().replace(/_/g, '');
+
+	const complianceMenuItems: NavItem[] = useMemo(() => [
+		{ to: '/admin/compliance', label: 'Dashboard', shortLabel: 'Dash', section: 'COMPLIANCE' },
+		{ to: '/admin/audit-trail', label: 'Audit Trail', shortLabel: 'AT', section: 'COMPLIANCE' },
+		{ to: '/admin/company-reports', label: 'Reports', shortLabel: 'Rep', section: 'COMPLIANCE' },
+		{ to: '/admin/feedback', label: 'Feedback', shortLabel: 'Fb', section: 'COMPLIANCE' },
+		{ to: '/admin/compliance-documents', label: 'Legal Documents', shortLabel: 'LD', section: 'COMPLIANCE' },
+		{ to: '/admin/compliance-status', label: 'Compliance Status', shortLabel: 'CS', section: 'COMPLIANCE' },
+	], []);
+
+	const complianceAllowedPaths = useMemo(() => new Set([
+		'/admin/compliance',
+		'/admin/audit-trail',
+		'/admin/company-reports',
+		'/admin/feedback',
+		'/admin/compliance-documents',
+		'/admin/compliance-status',
+	]), []);
+
+	const roleLabel = useMemo(() => {
+		switch (userRole) {
+			case 'superadmin':
+				return 'Super Admin';
+			case 'financemanager':
+				return 'Finance Manager';
+			case 'clinicaldirector':
+				return 'Clinical Director';
+			case 'complianceofficer':
+				return 'Compliance Officer';
+			default:
+				return 'Admin';
+		}
+	}, [userRole]);
+
+	const sectionAllowlist = useMemo(() => {
+		if (userRole === 'financemanager') {
+			return new Set(['OVERVIEW', 'FINANCE', 'ANALYTICS']);
+		}
+
+		if (userRole === 'clinicaldirector') {
+			return new Set(['OVERVIEW', 'USER MANAGEMENT', 'OPERATIONS', 'SUPPORT', 'ANALYTICS']);
+		}
+
+		if (userRole === 'complianceofficer') {
+			return new Set(['OVERVIEW', 'SUPPORT', 'SECURITY']);
+		}
+
+		return null;
+	}, [userRole]);
+
 	const initials = userName
 		.split(' ')
 		.filter(Boolean)
@@ -92,15 +145,18 @@ export default function AdminShellLayout() {
 	}, []);
 
 	const sections = useMemo(() => {
+		if (userRole === 'complianceofficer') {
+			return [['COMPLIANCE', complianceMenuItems]] as Array<[string, NavItem[]]>;
+		}
+
 		const grouped = new Map<string, NavItem[]>();
 
 		for (const item of navItems) {
-			let showItem = true;
-			if (userEmail === 'finance@manas360.com') {
-				showItem = ['FINANCE', 'OVERVIEW'].includes(item.section);
-			} else if (userEmail === 'clinical@manas360.com') {
-				showItem = ['OPERATIONS', 'USER MANAGEMENT', 'SUPPORT', 'OVERVIEW', 'ANALYTICS'].includes(item.section);
-			}
+			const showItem = userRole === 'complianceofficer'
+				? complianceAllowedPaths.has(item.to)
+				: sectionAllowlist
+					? sectionAllowlist.has(item.section)
+					: true;
 
 			if (showItem) {
 				if (!grouped.has(item.section)) grouped.set(item.section, []);
@@ -108,7 +164,7 @@ export default function AdminShellLayout() {
 			}
 		}
 		return Array.from(grouped.entries());
-	}, [user?.email]);
+	}, [sectionAllowlist, userRole, complianceAllowedPaths, complianceMenuItems]);
 
 
 
@@ -196,15 +252,18 @@ export default function AdminShellLayout() {
 
 	const filteredMobileNav = useMemo(() => {
 		return mobileBottomNav.filter((item) => {
-			if (userEmail === 'finance@manas360.com') {
-				return item.label === 'Dashboard';
+			if (userRole === 'financemanager') {
+				return ['Dashboard', 'Analytics'].includes(item.label);
 			}
-			if (userEmail === 'clinical@manas360.com') {
-				return ['Dashboard', 'Users', 'Analytics', 'Tickets'].includes(item.label);
+			if (userRole === 'clinicaldirector') {
+				return ['Dashboard', 'One View', 'Analytics', 'Tickets'].includes(item.label);
+			}
+			if (userRole === 'complianceofficer') {
+				return ['Dashboard'].includes(item.label);
 			}
 			return true;
 		});
-	}, [user?.email]);
+	}, [userRole]);
 
 	return (
 		<div className="h-screen overflow-hidden bg-[#FAFAF8] text-[#1A1A1A]">
@@ -212,15 +271,15 @@ export default function AdminShellLayout() {
 				<div className={`fixed inset-0 z-40 bg-black/40 transition-opacity md:hidden ${mobileOpen ? 'opacity-100' : 'pointer-events-none opacity-0'}`} onClick={() => setMobileOpen(false)} />
 
 				<aside className={`fixed left-0 top-0 z-50 h-screen w-64 bg-[#1A1A1A] transition-transform md:hidden ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-					<AdminNav sections={sections} compact={false} initials={initials} userName={userName} userRole={userEmail === 'superadmin@manas360.com' ? 'Super Admin' : userEmail === 'finance@manas360.com' ? 'Finance Manager' : userEmail === 'clinical@manas360.com' ? 'Clinical Director' : 'Admin'} />
+					<AdminNav sections={sections} compact={false} initials={initials} userName={userName} userRole={roleLabel} />
 				</aside>
 
 				<aside className="fixed left-0 top-0 z-40 hidden h-screen w-16 bg-[#1A1A1A] md:block lg:hidden">
-					<AdminNav sections={sections} compact={true} initials={initials} userName={userName} userRole={userEmail === 'superadmin@manas360.com' ? 'Super Admin' : userEmail === 'finance@manas360.com' ? 'Finance Manager' : userEmail === 'clinical@manas360.com' ? 'Clinical Director' : 'Admin'} />
+					<AdminNav sections={sections} compact={true} initials={initials} userName={userName} userRole={roleLabel} />
 				</aside>
 
 				<aside className="fixed left-0 top-0 z-40 hidden h-screen w-64 bg-[#1A1A1A] lg:block">
-					<AdminNav sections={sections} compact={false} initials={initials} userName={userName} userRole={userEmail === 'superadmin@manas360.com' ? 'Super Admin' : userEmail === 'finance@manas360.com' ? 'Finance Manager' : userEmail === 'clinical@manas360.com' ? 'Clinical Director' : 'Admin'} />
+					<AdminNav sections={sections} compact={false} initials={initials} userName={userName} userRole={roleLabel} />
 				</aside>
 
 				<div className="flex min-w-0 flex-1 flex-col md:pl-16 lg:pl-64">

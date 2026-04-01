@@ -6,23 +6,37 @@ import {
   type AuthUser,
 } from '../api/auth';
 
-export type AppRole = 'patient' | 'therapist' | 'psychiatrist' | 'psychologist' | 'coach' | 'admin';
+export type AppRole = 
+  | 'patient' 
+  | 'therapist' 
+  | 'psychiatrist' 
+  | 'psychologist' 
+  | 'coach' 
+  | 'admin' 
+  | 'superadmin' 
+  | 'clinicaldirector'
+  | 'financemanager'
+  | 'complianceofficer';
 
 const normalizeRole = (value: unknown): AppRole | null => {
   if (typeof value !== 'string') {
     return null;
   }
 
-  const normalized = value.toLowerCase();
+  const normalized = value.toLowerCase().replace(/_/g, '');
   if (
     normalized === 'patient' ||
     normalized === 'therapist' ||
     normalized === 'psychiatrist' ||
     normalized === 'psychologist' ||
     normalized === 'coach' ||
-    normalized === 'admin'
+    normalized === 'admin' ||
+    normalized === 'superadmin' ||
+    normalized === 'clinicaldirector' ||
+    normalized === 'financemanager' ||
+    normalized === 'complianceofficer'
   ) {
-    return normalized;
+    return normalized as AppRole;
   }
 
   return null;
@@ -31,7 +45,15 @@ const normalizeRole = (value: unknown): AppRole | null => {
 export const getDefaultRouteForRole = (role: unknown): string => {
   const normalizedRole = normalizeRole(role);
   if (normalizedRole === 'psychologist') return '/provider/dashboard';
-  if (normalizedRole === 'admin') return '/admin/dashboard';
+  if (normalizedRole === 'complianceofficer') return '/admin/compliance';
+  if (
+    normalizedRole === 'admin' ||
+    normalizedRole === 'superadmin' ||
+    normalizedRole === 'clinicaldirector' ||
+    normalizedRole === 'financemanager'
+  ) {
+    return '/admin/dashboard';
+  }
   if (normalizedRole === 'psychiatrist') return '/provider/dashboard';
   if (normalizedRole === 'therapist' || normalizedRole === 'coach') return '/provider/dashboard';
   return '/patient/dashboard';
@@ -57,7 +79,15 @@ export const hasCorporateAccess = (user: AuthUser | null | undefined): boolean =
 
 export const isPlatformAdminUser = (user: AuthUser | null | undefined): boolean => {
   if (!user) return false;
-  return normalizeRole(user.role) === 'admin' && !hasCorporateAccess(user);
+  const role = normalizeRole(user.role);
+  return (
+    (role === 'admin' ||
+      role === 'superadmin' ||
+      role === 'clinicaldirector' ||
+      role === 'financemanager' ||
+      role === 'complianceofficer') &&
+    !hasCorporateAccess(user)
+  );
 };
 
 export const getPostLoginRoute = (user: AuthUser | null | undefined): string => {
@@ -70,6 +100,10 @@ export const getPostLoginRoute = (user: AuthUser | null | undefined): string => 
 
   if (hasCorporateAccess(user)) {
     return '/corporate/dashboard';
+  }
+
+  if (normalizeRole(user.role) === 'complianceofficer') {
+    return '/admin/compliance';
   }
 
   if (isPlatformAdminUser(user)) {
