@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { prisma as db } from '../config/db';
-import { zohoDesk } from '../services/zohoDesk.service';
+import { triggerZohoFlow, zohoDesk } from '../services/zohoDesk.service';
 import { sendWhatsApp } from '../services/twilio.service';
 import { io } from '../socket';
 
@@ -60,6 +60,15 @@ export const updateVerificationController = async (req: Request, res: Response) 
   if (io) {
     io.to('admin-room').emit('verification-updated', { id, status: newStatus });
   }
+
+  await triggerZohoFlow('therapist_verification_updated', {
+    therapistUserId: id,
+    action,
+    status: newStatus,
+    rejection_reason: action === 'approve' ? null : rejection_reason,
+    updatedByAdminId: (req as any).auth?.userId || null,
+    updatedAt: new Date().toISOString(),
+  });
 
   res.json({ success: true, status: newStatus });
 };

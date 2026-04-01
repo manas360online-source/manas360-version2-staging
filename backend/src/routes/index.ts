@@ -32,6 +32,7 @@ import providerDashboardRoutes from './provider-dashboard.routes';
 import gameRoutes from './game.routes';
 import walletRoutes from './wallet.routes';
 import groupTherapyRoutes from './group-therapy.routes';
+import legalRoutes from './legal.routes';
 
 
 const router = Router();
@@ -93,6 +94,7 @@ router.use('/v1', riskAnalyticsRoutes);
 router.use('/v1/game', gameRoutes);
 router.use('/v1/wallet', walletRoutes);
 router.use('/v1/group-therapy', groupTherapyRoutes);
+router.use('/v1/legal', legalRoutes);
 
 export default router;
 

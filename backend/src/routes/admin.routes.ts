@@ -8,7 +8,7 @@ import {
 	validateAdminListSubscriptionsQuery,
 	asyncHandler,
 } from '../middleware/validate.middleware';
-import { listUsersController, getUserController, verifyProviderController, verifyTherapistController, approveProviderController, getMetricsController, listSubscriptionsController, getAdminUserApprovalsController, updateAdminUserApprovalController, getAdminLiveSessionsController, getAdminFeedbackController, resolveAdminFeedbackController, updateAdminUserStatusController, getRolesController, updateRolePermissionsController, getUserAcceptancesController, getComplianceStatusController, getLegalDocumentsController } from '../controllers/admin.controller';
+import { listUsersController, getUserController, verifyProviderController, verifyTherapistController, approveProviderController, getMetricsController, listSubscriptionsController, getAdminUserApprovalsController, updateAdminUserApprovalController, getAdminLiveSessionsController, getAdminFeedbackController, resolveAdminFeedbackController, updateAdminUserStatusController, getRolesController, updateRolePermissionsController, getUserAcceptancesController, getComplianceStatusController, getLegalDocumentsController, downloadLegalDocumentController } from '../controllers/admin.controller';
 import {
 	getAdminAnalyticsSummaryController,
 	getAdminMostUsedTemplatesController,
@@ -430,6 +430,7 @@ router.post('/crisis/:id/respond', requireAuth, requireRole(['admin', 'complianc
 router.get('/audit', requireAuth, requireRole(['admin', 'complianceofficer']), getAuditLogController);
 router.get('/compliance/status', requireAuth, requireRole(['admin', 'complianceofficer']), asyncHandler(getComplianceStatusController));
 router.get('/legal/documents', requireAuth, requireRole(['admin', 'complianceofficer']), asyncHandler(getLegalDocumentsController));
+router.get('/legal/documents/:id/download', requireAuth, requireRole(['admin', 'complianceofficer']), asyncHandler(downloadLegalDocumentController));
 router.get('/acceptances', requireAuth, requireRole(['admin', 'complianceofficer']), asyncHandler(getUserAcceptancesController));
 
 // Advanced Reporting & Exports

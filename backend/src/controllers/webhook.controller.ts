@@ -98,6 +98,13 @@ export const crisisWebhookHandler = asyncHandler(async (req: Request, res: Respo
  * Generic Zoho Flow Event Handler (all 47 flows)
  */
 export const zohoFlowEventHandler = asyncHandler(async (req: Request, res: Response) => {
+  const configuredSecret = String(process.env.ZOHO_FLOW_WEBHOOK_SECRET || '').trim();
+  const incomingSecret = String(req.headers['x-zoho-flow-secret'] || '').trim();
+  if (configuredSecret && configuredSecret !== incomingSecret) {
+    logger.warn('[Webhook] Zoho Flow secret mismatch');
+    return void res.status(401).send('Invalid Zoho Flow secret');
+  }
+
   const { flowName, data } = req.body;
   logger.info(`[Webhook] Zoho Flow event: ${flowName}`, data);
   

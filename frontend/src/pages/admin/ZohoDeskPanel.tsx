@@ -11,7 +11,7 @@ interface Ticket {
   subject: string;
   status: string;
   priority: string;
-  blueprintState?: string;
+  blueprint_state?: string;
   assignee?: string;
   created: string;
 }
@@ -35,13 +35,31 @@ export default function ZohoDeskPanel() {
         api.get('/v1/admin/blueprints/status')
       ]);
 
-      setTickets(ticketsRes.data.tickets || []);
+      const ticketsPayload = ticketsRes?.data?.data?.tickets || ticketsRes?.data?.tickets || [];
+      const blueprintPayload = blueprintsRes?.data?.data || blueprintsRes?.data || {};
+
+      setTickets(ticketsPayload);
 
       // Map to match your PDF cards
       setBlueprints([
-        { title: 'Therapist Onboarding', total: blueprintsRes.data.therapistOnboarding?.total || 12, open: blueprintsRes.data.therapistOnboarding?.open || 2, color: 'blue' },
-        { title: 'Clinical Escalation', total: blueprintsRes.data.clinicalEscalation?.total || 2, open: blueprintsRes.data.clinicalEscalation?.open || 89, color: 'amber' },
-        { title: 'Insurance Claims', total: blueprintsRes.data.insuranceClaims?.total || 5, open: blueprintsRes.data.insuranceClaims?.open || 230, color: 'emerald' },
+        {
+          title: 'Therapist Onboarding',
+          total: (blueprintPayload.onboarding?.pending || 0) + (blueprintPayload.onboarding?.approved || 0) + (blueprintPayload.onboarding?.rejected || 0),
+          open: blueprintPayload.onboarding?.pending || 0,
+          color: 'blue',
+        },
+        {
+          title: 'Clinical Escalation',
+          total: (blueprintPayload.crisis?.open || 0) + (blueprintPayload.crisis?.resolved || 0),
+          open: blueprintPayload.crisis?.open || 0,
+          color: 'amber',
+        },
+        {
+          title: 'Insurance Claims',
+          total: (blueprintPayload.insurance?.in_review || 0) + (blueprintPayload.insurance?.paid || 0),
+          open: blueprintPayload.insurance?.in_review || 0,
+          color: 'emerald',
+        },
       ]);
       toast.success('Zoho Desk data synced');
     } catch (err) {
@@ -112,7 +130,7 @@ export default function ZohoDeskPanel() {
                     <td className="px-6 py-4 text-center">
                       <Badge variant={t.priority === 'High' || t.priority === 'Urgent' ? 'destructive' : 'secondary'}>{t.priority}</Badge>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600 italic">{t.blueprintState || '—'}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600 italic">{t.blueprint_state || '—'}</td>
                     <td className="px-6 py-4 text-sm font-medium">{t.assignee || 'Unassigned'}</td>
                     <td className="px-6 py-4 text-xs text-gray-400">{new Date(t.created).toLocaleDateString()}</td>
                   </tr>
