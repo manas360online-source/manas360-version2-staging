@@ -340,36 +340,3 @@ export const retryPaymentManuallyController = async (req: Request, res: Response
 
 	sendSuccess(res, result, 'Payment retry scheduled successfully');
 };
-export const getAdminCompanyReportsController = async (req: Request, res: Response): Promise<void> => {
-	const result = await adminAnalyticsService.getCompanyReports();
-	sendSuccess(res, result, 'Admin company reports fetched successfully');
-};
-
-export const getAdminBICorporateSummaryController = async (req: Request, res: Response): Promise<void> => {
-	const result = await adminAnalyticsService.getBICorporateSummary();
-	sendSuccess(res, result, 'Admin BI summary fetched successfully');
-};
-
-export const getAdminTherapistPerformanceController = async (req: Request, res: Response): Promise<void> => {
-	const result = await adminAnalyticsService.getTherapistPerformanceMetrics();
-	sendSuccess(res, result, 'Therapist performance metrics fetched successfully');
-};
-
-export const getAdminSessionAnalyticsController = async (req: Request, res: Response): Promise<void> => {
-	const days = parseOptionalNumber(req.query.days);
-	const result = await adminAnalyticsService.getSessionAnalyticsMetrics(days);
-	sendSuccess(res, result, 'Admin session analytics fetched successfully');
-};
-
-export const getAdminUserGrowthAnalyticsController = async (req: Request, res: Response): Promise<void> => {
-	const days = parseOptionalNumber(req.query.days) ?? 90;
-	const result = await adminAnalyticsService.getUserGrowthMetrics(days);
-	sendSuccess(res, result, 'User growth analytics fetched successfully');
-};
-
-export const getAdminPlatformAnalyticsController = async (req: Request, res: Response): Promise<void> => {
-	const days = parseOptionalNumber(req.query.days) ?? 90;
-	const result = await adminAnalyticsService.getPlatformAnalyticsMetrics(days);
-	sendSuccess(res, result, 'Platform analytics fetched successfully');
-};
-

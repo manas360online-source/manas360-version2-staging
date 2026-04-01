@@ -9,7 +9,17 @@ const db = prisma as any;
  * Extensible enum for user roles
  * Can be extended for superadmin, moderator, etc.
  */
-export type UserRole = 'patient' | 'therapist' | 'psychologist' | 'psychiatrist' | 'coach' | 'admin' | 'superadmin';
+export type UserRole =
+	| 'patient'
+	| 'therapist'
+	| 'psychologist'
+	| 'psychiatrist'
+	| 'coach'
+	| 'admin'
+	| 'superadmin'
+	| 'complianceofficer'
+	| 'clinicaldirector'
+	| 'financemanager';
 
 /**
  * Role hierarchy for logical grouping
@@ -21,6 +31,9 @@ export const roleHierarchy: Record<UserRole, number> = {
 	psychologist: 2,
 	psychiatrist: 2,
 	coach: 2,
+	complianceofficer: 3,
+	clinicaldirector: 3,
+	financemanager: 3,
 	admin: 3,
 	superadmin: 4,
 };

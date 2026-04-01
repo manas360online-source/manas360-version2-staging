@@ -15,6 +15,7 @@ import {
   type AdminMarketplaceMetrics,
   type AdminSystemHealthMetrics,
 } from '../../api/admin.api';
+import CentralizedLegalDocumentManagement from './CentralizedLegalDocumentManagement';
 
 const currencyFormat = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
 const numberFormat = new Intl.NumberFormat('en-IN');
@@ -44,6 +45,11 @@ function StatCard({ label, value, subtext, highlightCode }: { label: string; val
 
 const PIE_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#F43F5E', '#8B5CF6'];
 
+function isMissingAnalyticsRouteError(message: string): boolean {
+  const normalized = message.toLowerCase();
+  return normalized.includes('route not found') || (normalized.includes('404') && normalized.includes('admin'));
+}
+
 export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -72,7 +78,13 @@ export default function AdminDashboardPage() {
         setMarketMetrics(mktRes.data);
         setHealthMetrics(hltRes.data);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unable to load dashboard data');
+        const message = err instanceof Error ? err.message : 'Unable to load dashboard data';
+        if (isMissingAnalyticsRouteError(message)) {
+          // Some backend branches do not yet expose analytics routes; keep dashboard usable.
+          setError(null);
+        } else {
+          setError(message);
+        }
       } finally {
         setLoading(false);
       }
@@ -82,15 +94,25 @@ export default function AdminDashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[50vh] flex-col items-center justify-center space-y-4">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-ink-200 border-t-primary-600"></div>
-        <p className="text-sm text-ink-500">Aggregating Platform Intelligence...</p>
+      <div className="space-y-8 pb-12">
+        <CentralizedLegalDocumentManagement />
+        <div className="flex min-h-[30vh] flex-col items-center justify-center space-y-4 rounded-xl border border-ink-100 bg-white">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-ink-200 border-t-primary-600"></div>
+          <p className="text-sm text-ink-500">Aggregating Platform Intelligence...</p>
+        </div>
       </div>
     );
   }
 
   if (error) {
-    return <div className="rounded-lg border border-red-200 bg-red-50 p-4 font-medium text-red-700">{error}</div>;
+    return (
+      <div className="space-y-8 pb-12">
+        <CentralizedLegalDocumentManagement />
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 font-medium text-red-700">
+          {error}
+        </div>
+      </div>
+    );
   }
 
   // Formatting Data for Charts
@@ -103,6 +125,8 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="space-y-8 pb-12">
+      <CentralizedLegalDocumentManagement />
+
       {/* HEADER */}
       <section>
         <h2 className="font-display text-2xl font-bold tracking-tight text-ink-900">Platform Analytics</h2>

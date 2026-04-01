@@ -1,5 +1,4 @@
 import client from './client';
-export { client as api };
 
 type ApiEnvelope<T> = {
 	success: boolean;
@@ -37,7 +36,7 @@ export type RangeParams = {
 	limit?: number;
 };
 
-export type AdminUserRole = 'patient' | 'therapist' | 'psychiatrist' | 'coach' | 'admin';
+export type AdminUserRole = 'patient' | 'therapist' | 'psychiatrist' | 'coach' | 'admin' | 'complianceofficer';
 
 export type AdminSubscriptionPlanType = 'basic' | 'premium' | 'pro';
 export type AdminSubscriptionStatus = 'active' | 'expired' | 'cancelled' | 'paused';
@@ -475,23 +474,9 @@ export type AdminMarketplaceMetrics = {
 };
 
 export type AdminSystemHealthMetrics = {
-	overall: 'Healthy' | 'Degraded' | 'Critical';
-	latencyMs: number;
-	uptimePercent: number;
-	activeSessions: number;
-	activeSubscriptions: number;
-	totalTherapists: number;
 	failedPayments: number;
 	pendingPayments: number;
 	expiredSubscriptions: number;
-	services: {
-		backend: string;
-		database: string;
-		redis: string;
-		zohoDesk: string;
-		phonePe: string;
-	};
-	lastChecked: string;
 };
 
 export type AdminPaymentReliabilityDaily = {
@@ -532,402 +517,229 @@ export const getAdminMarketplaceMetrics = async (): Promise<ApiEnvelope<AdminMar
 	return (await client.get<ApiEnvelope<AdminMarketplaceMetrics>>('/v1/admin/analytics/marketplace')).data;
 };
 
-export const getAdminSystemHealth = async () => {
-	const response = await client.get<ApiEnvelope<AdminSystemHealthMetrics>>('/v1/admin/analytics/health');
-	return response.data;
-};
-
-export interface AdminCompanyReport {
-	id: string;
-	companyName: string;
-	quarter: string;
-	format: 'PDF' | 'XLSX';
-	status: 'completed' | 'failed' | 'queued' | 'processing';
-	generatedAt: string;
-}
-
-export interface AdminBIStats {
-	totalValueUnlocked: number;
-	programCost: number;
-	roi: number;
-	healthcareSavings: number;
-	roiMultiplier: number;
-}
-
-export const getAdminCompanyReports = async () => {
-	const response = await client.get<ApiEnvelope<AdminCompanyReport[]>>('/v1/admin/company-reports');
-	return response.data;
-};
-
-export const getAdminBICorporateSummary = async () => {
-	const response = await client.get<ApiEnvelope<AdminBIStats>>('/v1/admin/analytics/bi-summary');
-	return response.data;
-};
-
-export interface AdminTherapistPerformance {
-	id: string;
-	name: string;
-	sessionsCompleted: number;
-	avgRating: number;
-	utilizationPercent: number;
-	totalEarnings: number;
-	trend: number;
-}
-
-export interface AdminPerformanceSummary {
-	avgRating: string;
-	totalSessions: number;
-	utilizationPercent: number;
-}
-
-export interface TherapistPerformanceResponse {
-	therapists: AdminTherapistPerformance[];
-	summary: AdminPerformanceSummary;
-}
-
-export const getAdminTherapistPerformance = async () => {
-	const response = await client.get<ApiEnvelope<TherapistPerformanceResponse>>('/v1/admin/analytics/therapist-performance');
-	return response.data;
+export const getAdminSystemHealth = async (): Promise<ApiEnvelope<AdminSystemHealthMetrics>> => {
+	return (await client.get<ApiEnvelope<AdminSystemHealthMetrics>>('/v1/admin/analytics/health')).data;
 };
 
 export const getAdminPaymentReliabilityMetrics = async (days = 30): Promise<ApiEnvelope<AdminPaymentReliabilityMetrics>> => {
 	return (await client.get<ApiEnvelope<AdminPaymentReliabilityMetrics>>(`/v1/admin/analytics/payments?days=${encodeURIComponent(String(days))}`)).data;
 };
 
-// --- Phase 2: Enhanced Verification & Payouts ---
+// Export the raw axios client instance for pages that use `api.get(...)` directly
+export { client as api };
 
-export type AdminVerificationDocument = {
+// --- Live Sessions ---
+export type LiveSession = {
 	id: string;
-	userId: string;
-	documentType: string;
-	url: string;
-	createdAt: string;
-};
-
-export type AdminPayoutRequest = {
-	id: string;
-	providerId: string;
-	amountMinor: string;
-	currency: string;
-	status: 'REQUESTED' | 'APPROVED' | 'PAID' | 'REJECTED';
-	requestedAt: string;
-	paidAt?: string;
-	therapistAmount?: string;
-	platformAmount?: string;
-	provider: {
-		provider: {
-			firstName: string;
-			lastName: string;
-			email: string;
-			therapistProfile?: {
-				commissionOverride?: number;
-			}
-		}
-	}
-};
-
-export const getAdminVerifications = async (): Promise<ApiEnvelope<AdminUser[]>> => {
-	return (await client.get<ApiEnvelope<AdminUser[]>>('/v1/admin/verifications')).data;
-};
-
-export const getAdminVerificationDocuments = async (userId: string): Promise<ApiEnvelope<AdminVerificationDocument[]>> => {
-	return (await client.get<ApiEnvelope<AdminVerificationDocument[]>>(`/v1/admin/verifications/${encodeURIComponent(userId)}/documents`)).data;
-};
-
-export const updateAdminVerification = async (userId: string, action: 'approve' | 'reject', rejectionReason?: string): Promise<ApiEnvelope<{ status: string }>> => {
-	return (await client.patch<ApiEnvelope<{ status: string }>>(`/v1/admin/verifications/${encodeURIComponent(userId)}`, { action, rejection_reason: rejectionReason })).data;
-};
-
-export const getAdminPayouts = async (): Promise<ApiEnvelope<AdminPayoutRequest[]>> => {
-	return (await client.get<ApiEnvelope<AdminPayoutRequest[]>>('/v1/admin/payouts')).data;
-};
-
-export const approveAdminPayout = async (payoutId: string): Promise<ApiEnvelope<{ therapistAmount: number; platformAmount: number }>> => {
-	return (await client.post<ApiEnvelope<{ therapistAmount: number; platformAmount: number }>>(`/v1/admin/payouts/${encodeURIComponent(payoutId)}/approve`)).data;
-};
-
-export const toggleGlobalFreeSignups = async (days: number): Promise<ApiEnvelope<{ message: string }>> => {
-	return (await client.post<ApiEnvelope<{ message: string }>>('/v1/admin/pricing/free-toggle', { days })).data;
-};
-
-export const waiveUserSubscription = async (payload: { userId: string; planKey: string; durationDays: number; reason: string }): Promise<ApiEnvelope<{ message: string }>> => {
-	return (await client.post<ApiEnvelope<{ message: string }>>('/v1/admin/waive-subscription', payload)).data;
-};
-
-export interface ZohoTicket {
-	id: string;
-	subject: string;
-	status: string;
-	priority: string;
-	department: string;
-	blueprint_state: string;
-	assignee: string;
-	created: string;
-}
-
-export interface BlueprintStatus {
-	onboarding: { pending: number; approved: number; rejected: number };
-	crisis: { open: number; resolved: number };
-	insurance: { in_review: number; paid: number };
-}
-
-/**
- * Get tickets from Zoho Desk.
- */
-export const getAdminTickets = async (params?: { department?: string; status?: string; priority?: string }) => {
-	let url = '/v1/admin/tickets';
-	if (params) {
-		const searchParams = new URLSearchParams();
-		if (params.department) searchParams.append('department', params.department);
-		if (params.status) searchParams.append('status', params.status);
-		if (params.priority) searchParams.append('priority', params.priority);
-		const qs = searchParams.toString();
-		if (qs) url += `?${qs}`;
-	}
-	const response = await client.get<ApiEnvelope<{ tickets: ZohoTicket[]; count: number }>>(url);
-	return response.data;
-};
-
-export interface LiveSession {
-	id: string;
-	therapistName: string;
 	patientName: string;
-	startTime: string;
-	status: 'in-progress' | 'paused';
-}
-
-/**
- * Real-time Therapy Monitor
- */
-export const getAdminLiveSessions = async (): Promise<ApiEnvelope<{ sessions: LiveSession[] }>> => {
-	const response = await client.get<ApiEnvelope<{ sessions: LiveSession[] }>>('/v1/admin/live-sessions');
-	return response.data;
+	therapistName: string;
+	startedAt: string;
+	durationMinutes: number;
+	status: string;
 };
 
-/**
- * Add a comment to a Zoho ticket.
- */
-export const addTicketComment = async (ticketId: string, content: string, isPublic = false) => {
-	const response = await client.post<ApiEnvelope<any>>(`/v1/admin/tickets/${ticketId}/comment`, { content, isPublic });
-	return response.data;
+export const getAdminLiveSessions = async (): Promise<ApiEnvelope<LiveSession[]>> => {
+	return (await client.get<ApiEnvelope<LiveSession[]>>('/v1/admin/live-sessions')).data;
 };
 
-/**
- * Get blueprint status summary.
- */
-export const getBlueprintStatus = async () => {
-	const response = await client.get<ApiEnvelope<BlueprintStatus>>('/v1/admin/blueprints/status');
-	return response.data;
-};
-
-// === PHASE 4: OFFER MARQUEE & PRICING CONTRACTS ===
-
-export interface MarqueeOffer {
+// --- Reports / BI ---
+export type AdminCompanyReport = {
 	id: string;
-	text: string;
-	linkUrl?: string;
-	isActive: boolean;
-	sortOrder: number;
-}
-
-export interface PricingContract {
-	id: string;
-	version: number;
-	category: string;
-	pricingData: any;
-	status: 'draft' | 'live' | 'archived';
-	description?: string;
+	title: string;
+	period: string;
 	createdAt: string;
-	approvedBy?: string;
-	effectiveFrom?: string;
-}
-
-/**
- * Offer Marquee CRUD
- */
-export const getAdminOffers = async () => {
-	const response = await client.get<ApiEnvelope<MarqueeOffer[]>>('/v1/admin/offers');
-	return response.data;
+	status: string;
 };
 
-export const createAdminOffer = async (data: Partial<MarqueeOffer>) => {
-	const response = await client.post<ApiEnvelope<MarqueeOffer>>('/v1/admin/offers', data);
-	return response.data;
+export type AdminBIStats = {
+	totalRevenue: number;
+	totalSessions: number;
+	totalUsers: number;
+	growthRate: number;
 };
 
-export const updateAdminOffer = async (id: string, data: Partial<MarqueeOffer>) => {
-	const response = await client.patch<ApiEnvelope<MarqueeOffer>>(`/v1/admin/offers/${id}`, data);
-	return response.data;
+export const getAdminCompanyReports = async (): Promise<ApiEnvelope<AdminCompanyReport[]>> => {
+	return (await client.get<ApiEnvelope<AdminCompanyReport[]>>('/v1/admin/company-reports')).data;
 };
 
-export const deleteAdminOffer = async (id: string) => {
-	const response = await client.delete<ApiEnvelope<any>>(`/v1/admin/offers/${id}`);
-	return response.data;
+export const getAdminBICorporateSummary = async (): Promise<ApiEnvelope<AdminBIStats>> => {
+	return (await client.get<ApiEnvelope<AdminBIStats>>('/v1/admin/analytics/bi-summary')).data;
 };
 
-export const reorderAdminOffers = async (ids: string[]) => {
-	const response = await client.post<ApiEnvelope<any>>('/v1/admin/offers/reorder', { ids });
-	return response.data;
+export const triggerAnalyticsExport = async (format: 'csv' | 'pdf'): Promise<ApiEnvelope<{ exportJobKey: number }>> => {
+	const from = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+	const to = new Date().toISOString();
+	return (await client.post<ApiEnvelope<{ exportJobKey: number }>>('/v1/admin/analytics/export/async', {
+		format,
+		from,
+		to,
+		organizationKey: 1,
+	})).data;
 };
 
-export const publishAdminOffers = async () => {
-	const response = await client.post<ApiEnvelope<any>>('/v1/admin/offers/publish');
-	return response.data;
-};
-
-/**
- * Pricing Contract Versioning
- */
-export const getPricingContracts = async () => {
-	const response = await client.get<ApiEnvelope<PricingContract[]>>('/v1/admin/pricing/contracts');
-	return response.data;
-};
-
-export const createPricingDraft = async (data: { category: string; description: string; pricingData: any }) => {
-	const response = await client.post<ApiEnvelope<PricingContract>>('/v1/admin/pricing/contracts/draft', data);
-	return response.data;
-};
-
-export const approvePricingContract = async (id: string) => {
-	const response = await client.post<ApiEnvelope<PricingContract>>(`/v1/admin/pricing/contracts/${id}/approve`);
-	return response.data;
-};
-
-export const getAdminPricingHistory = async () => {
-	const response = await client.get<ApiEnvelope<any[]>>('/v1/admin/pricing/history');
-	return response.data;
-};
-
-// === PHASE 5: REAL-TIME, CRISIS, REPORTS & AUDIT ===
-
-export interface CrisisAlert {
-	id: string;
-	patientId: string;
-	severity: string;
-	trigger: string;
-	sessionId?: string;
-	status: 'pending' | 'responded';
-	respondedBy?: string;
-	resolutionNotes?: string;
-	createdAt: string;
-}
-
-export interface AuditLog {
+// --- Feedback ---
+export type FeedbackItem = {
 	id: string;
 	userId: string;
-	action: string;
-	resource: string;
-	details: any;
-	createdAt: string;
-	user?: {
-		firstName: string;
-		lastName: string;
-		email: string;
-	};
-}
-
-export const getLiveMetrics = async () => {
-	const response = await client.get<ApiEnvelope<any>>('/v1/admin/metrics/live');
-	return response.data;
-};
-
-export const getCrisisAlerts = async () => {
-	const response = await client.get<ApiEnvelope<CrisisAlert[]>>('/v1/admin/crisis/alerts');
-	return response.data;
-};
-
-export const respondToCrisis = async (id: string, data: { action: string; notes?: string }) => {
-	const response = await client.post<ApiEnvelope<any>>(`/v1/admin/crisis/${id}/respond`, data);
-	return response.data;
-};
-
-export const getAuditLogs = async () => {
-	const response = await client.get<ApiEnvelope<AuditLog[]>>('/v1/admin/audit');
-	return response.data;
-};
-
-export const triggerAnalyticsExport = async () => {
-	const response = await client.post<ApiEnvelope<{ jobId: string }>>('/v1/admin/reports/export');
-	return response.data;
-};
-
-export const getExportStatus = async (jobId: string) => {
-	const response = await client.get<ApiEnvelope<any>>(`/v1/admin/reports/export/${jobId}`);
-	return response.data;
-};
-
-// === PHASE 5 EXTENSION: DYNAMIC GROUPS ===
-
-export interface GroupCategory {
-	id: string;
-	name: string;
-	type: string;
-	description?: string;
-	max_capacity: number;
-	session_price: number;
-	is_active: boolean;
-	createdAt: string;
-}
-
-export const getGroupCategories = async () => {
-	const response = await client.get<ApiEnvelope<GroupCategory[]>>('/v1/admin/groups');
-	return response.data;
-};
-
-export const createGroupCategory = async (data: Partial<GroupCategory>) => {
-	const response = await client.post<ApiEnvelope<GroupCategory>>('/v1/admin/groups', data);
-	return response.data;
-};
-
-export const updateGroupCategory = async (id: string, data: Partial<GroupCategory>) => {
-	const response = await client.put<ApiEnvelope<GroupCategory>>(`/v1/admin/groups/${id}`, data);
-	return response.data;
-};
-
-export const deleteGroupCategory = async (id: string) => {
-	const response = await client.delete<ApiEnvelope<any>>(`/v1/admin/groups/${id}`);
-	return response.data;
-};
-
-/**
- * Support & Sentiment Dashboard
- */
-export interface FeedbackItem {
-	id: string;
 	userName: string;
-	rating: number;
-	comment: string;
-	sentiment: 'positive' | 'neutral' | 'negative';
-	createdAt: string;
+	message: string;
+	rating?: number;
 	resolved: boolean;
-}
-
-export const getAdminFeedback = async (): Promise<ApiEnvelope<{ feedback: FeedbackItem[] }>> => {
-	const response = await client.get<ApiEnvelope<{ feedback: FeedbackItem[] }>>('/v1/admin/feedback');
-	return response.data;
+	createdAt: string;
 };
 
-export const resolveAdminFeedback = async (id: string): Promise<ApiEnvelope<null>> => {
-	const response = await client.post<ApiEnvelope<null>>(`/v1/admin/feedback/${id}/resolve`);
-	return response.data;
+export const getAdminFeedback = async (): Promise<ApiEnvelope<FeedbackItem[]>> => {
+	return (await client.get<ApiEnvelope<FeedbackItem[]>>('/v1/admin/feedback')).data;
 };
 
-/**
- * Dynamic Role Management
- */
-export interface Role {
+export const resolveAdminFeedback = async (id: string): Promise<ApiEnvelope<FeedbackItem>> => {
+	return (await client.post<ApiEnvelope<FeedbackItem>>(`/v1/admin/feedback/${encodeURIComponent(id)}/resolve`)).data;
+};
+
+// --- Role Management ---
+export type Role = {
 	name: string;
-	permissions: string[];
 	description?: string;
-}
-
-export const getRoles = async (): Promise<ApiEnvelope<Role[]>> => {
-	const response = await client.get<ApiEnvelope<Role[]>>('/v1/admin/roles');
-	return response.data;
+	permissions: string[];
 };
 
-export const updateRolePermissions = async (role: string, permissions: string[]): Promise<ApiEnvelope<Role>> => {
-	const response = await client.patch<ApiEnvelope<Role>>(`/v1/admin/roles/${role}`, { permissions });
-	return response.data;
+export const getRoles = async (): Promise<{ success: boolean; data: Role[]; message?: string }> => {
+	const res = await client.get<{ success: boolean; data: Role[]; message?: string }>('/v1/admin/roles');
+	return res.data;
 };
 
+export const updateRolePermissions = async (
+	roleName: string,
+	permissions: string[],
+): Promise<{ success: boolean; message?: string }> => {
+	const res = await client.patch<{ success: boolean; message?: string }>(`/v1/admin/roles/${encodeURIComponent(roleName)}`, {
+		permissions,
+	});
+	return res.data;
+};
+
+// --- Payouts ---
+export type AdminPayout = {
+	id: string;
+	therapistId: string;
+	therapistName: string;
+	amount: number;
+	status: string;
+	requestedAt: string;
+};
+
+export const getAdminPayouts = async (): Promise<ApiEnvelope<AdminPayout[]>> => {
+	return (await client.get<ApiEnvelope<AdminPayout[]>>('/v1/admin/payouts')).data;
+};
+
+export const approveAdminPayout = async (id: string): Promise<ApiEnvelope<AdminPayout>> => {
+	return (await client.post<ApiEnvelope<AdminPayout>>(`/v1/admin/payouts/${encodeURIComponent(id)}/approve`)).data;
+};
+
+// --- Crisis Alerts ---
+export type CrisisAlert = {
+	id: string;
+	userId: string;
+	userName: string;
+	severity: string;
+	message: string;
+	respondedAt?: string;
+	createdAt: string;
+};
+
+export const getCrisisAlerts = async (): Promise<ApiEnvelope<CrisisAlert[]>> => {
+	return (await client.get<ApiEnvelope<CrisisAlert[]>>('/v1/admin/crisis/alerts')).data;
+};
+
+export const respondToCrisis = async (id: string, response: string): Promise<ApiEnvelope<CrisisAlert>> => {
+	return (await client.post<ApiEnvelope<CrisisAlert>>(`/v1/admin/crisis/${encodeURIComponent(id)}/respond`, { response })).data;
+};
+
+// --- Group Management ---
+export type AdminGroup = {
+	id: string;
+	name: string;
+	description?: string;
+	memberCount: number;
+};
+
+export const listAdminGroups = async (): Promise<ApiEnvelope<AdminGroup[]>> => {
+	return (await client.get<ApiEnvelope<AdminGroup[]>>('/v1/admin/groups')).data;
+};
+
+export const createAdminGroup = async (payload: { name: string; description?: string }): Promise<ApiEnvelope<AdminGroup>> => {
+	return (await client.post<ApiEnvelope<AdminGroup>>('/v1/admin/groups', payload)).data;
+};
+
+export const updateAdminGroup = async (id: string, payload: { name?: string; description?: string }): Promise<ApiEnvelope<AdminGroup>> => {
+	return (await client.put<ApiEnvelope<AdminGroup>>(`/v1/admin/groups/${encodeURIComponent(id)}`, payload)).data;
+};
+
+export const deleteAdminGroup = async (id: string): Promise<ApiEnvelope<unknown>> => {
+	return (await client.delete<ApiEnvelope<unknown>>(`/v1/admin/groups/${encodeURIComponent(id)}`)).data;
+};
+
+// --- Pricing Contracts ---
+export type PricingContract = {
+	id: string;
+	status: 'draft' | 'approved' | 'rejected';
+	createdAt: string;
+};
+
+export const getPricingContracts = async (): Promise<ApiEnvelope<PricingContract[]>> => {
+	return (await client.get<ApiEnvelope<PricingContract[]>>('/v1/admin/pricing/contracts')).data;
+};
+
+export const createPricingDraft = async (payload: Record<string, unknown>): Promise<ApiEnvelope<PricingContract>> => {
+	return (await client.post<ApiEnvelope<PricingContract>>('/v1/admin/pricing/contracts/draft', payload)).data;
+};
+
+export const approvePricingContract = async (id: string): Promise<ApiEnvelope<PricingContract>> => {
+	return (await client.post<ApiEnvelope<PricingContract>>(`/v1/admin/pricing/contracts/${encodeURIComponent(id)}/approve`)).data;
+};
+
+// --- Offer Management ---
+export type AdminOffer = {
+	id: string;
+	title: string;
+	description?: string;
+	active: boolean;
+	order: number;
+};
+
+export const getAdminOffers = async (): Promise<ApiEnvelope<AdminOffer[]>> => {
+	return (await client.get<ApiEnvelope<AdminOffer[]>>('/v1/admin/offers')).data;
+};
+
+export const createAdminOffer = async (payload: Omit<AdminOffer, 'id'>): Promise<ApiEnvelope<AdminOffer>> => {
+	return (await client.post<ApiEnvelope<AdminOffer>>('/v1/admin/offers', payload)).data;
+};
+
+export const updateAdminOffer = async (id: string, payload: Partial<Omit<AdminOffer, 'id'>>): Promise<ApiEnvelope<AdminOffer>> => {
+	return (await client.put<ApiEnvelope<AdminOffer>>(`/v1/admin/offers/${encodeURIComponent(id)}`, payload)).data;
+};
+
+export const deleteAdminOffer = async (id: string): Promise<ApiEnvelope<unknown>> => {
+	return (await client.delete<ApiEnvelope<unknown>>(`/v1/admin/offers/${encodeURIComponent(id)}`)).data;
+};
+
+export const reorderAdminOffers = async (orderedIds: string[]): Promise<ApiEnvelope<unknown>> => {
+	return (await client.post<ApiEnvelope<unknown>>('/v1/admin/offers/reorder', { orderedIds })).data;
+};
+
+export const publishAdminOffers = async (): Promise<ApiEnvelope<unknown>> => {
+	return (await client.post<ApiEnvelope<unknown>>('/v1/admin/offers/publish')).data;
+};
+
+// --- TherapistPerformance types ---
+export type AdminTherapistPerformance = {
+	therapistId: string;
+	name: string;
+	totalSessions: number;
+	avgRating: number;
+	revenue: number;
+};
+
+export const getAdminTherapistPerformance = async (): Promise<ApiEnvelope<AdminTherapistPerformance[]>> => {
+	return (await client.get<ApiEnvelope<AdminTherapistPerformance[]>>('/v1/admin/analytics/therapist-performance')).data;
+};

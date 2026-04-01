@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import TherapistPageShell from '../../components/therapist/dashboard/TherapistPageShell';
+
 
 type CheckboxCardProps = {
   label: string;
@@ -42,7 +42,7 @@ function CheckboxCard({ label, checked, onToggle, className = '' }: CheckboxCard
   );
 }
 
-export default function PsychiatristPrescriptionsPage() {
+export default function PsychiatristPrescriptionTab() {
   const [phase, setPhase] = useState<0 | 1 | 2 | 3 | 4 | 5 | 6 | 7>(0);
   const [showPhaseOneResult, setShowPhaseOneResult] = useState(false);
   const [showPhaseTwoResult, setShowPhaseTwoResult] = useState(false);
@@ -116,7 +116,7 @@ export default function PsychiatristPrescriptionsPage() {
       : 'rounded-2xl border border-[#e7eef8] bg-white/70 text-[#5d6675] shadow-[0_6px_14px_rgba(47,125,230,0.08)]';
 
   return (
-    <TherapistPageShell>
+    <div className="w-full">
       <section className="min-h-[650px] rounded-3xl bg-gradient-to-b from-[#dbe9f7] via-[#d8ebfa] to-[#cfe6fb] p-4 md:p-8 lg:p-12">
         <div className="mx-auto w-full max-w-5xl">
           <p className="text-center text-xs font-semibold uppercase tracking-[0.48em] text-[#6c7f9b]">Psychiatrist Portal</p>
@@ -909,6 +909,6 @@ export default function PsychiatristPrescriptionsPage() {
           ) : null}
         </div>
       </section>
-    </TherapistPageShell>
+    </div>
   );
 }

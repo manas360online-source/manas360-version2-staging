@@ -1,130 +1,178 @@
-import { useState, useEffect, useCallback } from 'react';
-import { getAdminSystemHealth, type AdminSystemHealthMetrics } from '../../api/admin.api';
-import { Card } from '../../components/ui/Card';
-import { Badge } from '../../components/ui/Badge';
-import toast from 'react-hot-toast';
+import { useEffect, useMemo, useState } from 'react';
+import { getAdminMetrics, type AdminMetrics } from '../../api/admin.api';
 
-export default function PlatformHealth() {
-  const [health, setHealth] = useState<AdminSystemHealthMetrics | null>(null);
-  const [loading, setLoading] = useState(true);
+type HealthPing = {
+  status: string;
+  server: string;
+  ok: boolean;
+  service: string;
+  timestamp: string;
+};
 
-  const fetchHealth = useCallback(async () => {
-    try {
-      const res = await getAdminSystemHealth();
-      setHealth(res.data);
-    } catch (err) {
-      console.error(err);
-      toast.error('Failed to load platform health telemetry');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+const formatDateTime = (value: string): string => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+};
+
+const getHealthUrl = (): string => {
+  const base =
+    import.meta.env.VITE_API_BASE_URL?.trim() ||
+    import.meta.env.VITE_API_URL?.trim() ||
+    'http://localhost:3000/api';
+
+  const normalized = base.endsWith('/') ? base.slice(0, -1) : base;
+  return `${normalized}/health`;
+};
+
+export default function AdminPlatformHealthPage() {
+  const [health, setHealth] = useState<HealthPing | null>(null);
+  const [metrics, setMetrics] = useState<AdminMetrics | null>(null);
+  const [apiLatencyMs, setApiLatencyMs] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchHealth();
-    const interval = setInterval(fetchHealth, 30000); // auto-refresh every 30s
-    return () => clearInterval(interval);
-  }, [fetchHealth]);
+    const loadHealth = async (): Promise<void> => {
+      setIsLoading(true);
+      setError(null);
 
-  if (loading || !health) {
-    return <div className="p-12 text-center text-gray-400 italic font-medium animate-pulse">Establishing secure link to infrastructure...</div>;
-  }
+      try {
+        const startedAt = performance.now();
+        const [healthResponse, metricsResponse] = await Promise.all([
+          fetch(getHealthUrl(), { credentials: 'include' }),
+          getAdminMetrics(),
+        ]);
 
-  const getStatusColor = (status: string) => {
-    if (status === 'Healthy') return 'bg-emerald-50 text-emerald-600 border-emerald-100';
-    if (status === 'Degraded') return 'bg-amber-50 text-amber-600 border-amber-100';
-    return 'bg-red-50 text-red-600 border-red-100';
-  };
+        if (!healthResponse.ok) {
+          throw new Error(`Health endpoint failed with status ${healthResponse.status}`);
+        }
+
+        const parsedHealth = (await healthResponse.json()) as HealthPing;
+        setHealth(parsedHealth);
+        setMetrics(metricsResponse.data);
+        setApiLatencyMs(Math.max(1, Math.round(performance.now() - startedAt)));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unable to load platform health.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    void loadHealth();
+    const timer = window.setInterval(() => {
+      void loadHealth();
+    }, 30000);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const healthStatusTone = useMemo(() => {
+    if (!health?.ok) return 'bg-red-100 text-red-700';
+    if ((apiLatencyMs || 0) > 700) return 'bg-amber-100 text-amber-700';
+    return 'bg-emerald-100 text-emerald-700';
+  }, [health?.ok, apiLatencyMs]);
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Platform Health Monitor</h1>
-          <p className="text-sm text-gray-500 mt-1 font-medium italic">Global infrastructure telemetry & service-level heartbeat (War Room Console).</p>
-        </div>
-        <Badge variant="soft" className={`px-4 py-1.5 text-[11px] font-black uppercase tracking-wider border ${getStatusColor(health.overall)}`}>
-          {health.overall} • Sync: {new Date(health.lastChecked).toLocaleTimeString()}
-        </Badge>
+    <div className="space-y-4">
+      <div className="rounded-xl border border-ink-100 bg-white p-5">
+        <h2 className="font-display text-xl font-bold text-ink-800">Platform Health</h2>
+        <p className="mt-1 text-sm text-ink-600">
+          Live service heartbeat, API responsiveness, and operational throughput indicators.
+        </p>
       </div>
 
-      {/* Infrastructure KPI Nexus */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-        <Card className="p-6 border-gray-100 shadow-soft-sm hover:shadow-soft-md transition-shadow">
-          <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Platform Uptime</p>
-          <div className="flex items-baseline gap-1">
-             <p className="text-4xl font-black text-gray-900">{health.uptimePercent}</p>
-             <span className="text-xl font-bold text-gray-400">%</span>
-          </div>
-          <div className="mt-4 h-1 w-full bg-gray-50 rounded-full overflow-hidden">
-             <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${health.uptimePercent}%` }}></div>
-          </div>
-        </Card>
-        
-        <Card className="p-6 border-gray-100 shadow-soft-sm hover:shadow-soft-md transition-shadow">
-          <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">API Latency</p>
-          <div className="flex items-baseline gap-1">
-             <p className="text-4xl font-black text-gray-900">{health.latencyMs}</p>
-             <span className="text-lg font-bold text-gray-400">ms</span>
-          </div>
-          <div className="mt-4 flex items-center gap-2">
-             <div className={`h-2 w-2 rounded-full ${health.latencyMs < 100 ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
-             <span className="text-[10px] font-bold text-gray-500 uppercase">Responders Nominal</span>
-          </div>
-        </Card>
+      {error ? <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
 
-        <Card className="p-6 border-gray-100 shadow-soft-sm hover:shadow-soft-md transition-shadow">
-          <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Active Sessions</p>
-          <p className="text-4xl font-black text-gray-900">{health.activeSessions}</p>
-          <p className="mt-4 text-[10px] font-bold text-emerald-600 uppercase tracking-tight flex items-center gap-1">
-             <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-             </span>
-             Live Clinical Traffic
-          </p>
-        </Card>
-
-        <Card className="p-6 border-gray-100 shadow-soft-sm hover:shadow-soft-md transition-shadow">
-          <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Provider Network</p>
-          <p className="text-4xl font-black text-gray-900">{health.totalTherapists}</p>
-          <p className="mt-4 text-[10px] font-bold text-gray-500 uppercase tracking-tight">Verified Therapists</p>
-        </Card>
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
+        <StatCard label="Health" value={health?.ok ? 'Healthy' : 'Degraded'} toneClass={healthStatusTone} />
+        <StatCard label="API Latency" value={apiLatencyMs ? `${apiLatencyMs} ms` : '-'} />
+        <StatCard label="Completed Sessions" value={String(metrics?.completedSessions ?? 0)} />
+        <StatCard label="Active Subscriptions" value={String(metrics?.activeSubscriptions ?? 0)} />
+        <StatCard label="Total Revenue" value={`₹${metrics?.totalRevenue ?? 0}`} />
       </div>
 
-      {/* Service Grid - Operational Intelligence */}
-      <div className="bg-white rounded-[2rem] shadow-2xl shadow-gray-100 border border-gray-100 p-8">
-        <div className="flex items-center justify-between mb-8">
-           <h2 className="text-xs font-black uppercase tracking-widest text-gray-400 italic">Service Grid Heartbeat</h2>
-           <div className="flex gap-2">
-              <Badge variant="soft" className="bg-gray-50 text-gray-400 text-[10px] font-black">TCP/HTTP Protocol</Badge>
-              <Badge variant="soft" className="bg-gray-50 text-gray-400 text-[10px] font-black">SSL: ACTIVE</Badge>
-           </div>
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.35fr_1fr]">
+        <div className="rounded-xl border border-ink-100 bg-white p-4">
+          <h3 className="font-display text-base font-bold text-ink-800">Runtime Status</h3>
+          <div className="mt-3 space-y-3 text-sm">
+            <KeyValue label="Service" value={health?.service || '-'} />
+            <KeyValue label="Server" value={health?.server || '-'} />
+            <KeyValue label="Status" value={health?.status || '-'} />
+            <KeyValue label="Last Health Ping" value={health?.timestamp ? formatDateTime(health.timestamp) : '-'} />
+            <KeyValue label="Probe Window" value="Auto-refresh every 30 seconds" />
+          </div>
         </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {Object.entries(health.services).map(([service, status]) => (
-            <div key={service} className="flex items-center justify-between bg-gray-50/50 rounded-2xl p-6 border border-gray-100 group hover:border-blue-100 hover:bg-white transition-all">
-              <div className="flex flex-col">
-                 <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Module</span>
-                 <span className="font-bold text-gray-900 text-base capitalize">{service.replace(/([A-Z])/g, ' $1')}</span>
-              </div>
-              <Badge variant="soft" className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest border transition-colors ${getStatusColor(status as string)}`}>
-                {status as string}
-              </Badge>
-            </div>
-          ))}
+
+        <div className="rounded-xl border border-ink-100 bg-white p-4">
+          <h3 className="font-display text-base font-bold text-ink-800">Operational Signals</h3>
+          <div className="mt-3 space-y-2 text-sm text-ink-700">
+            <SignalRow
+              label="Session Throughput"
+              value={`${metrics?.completedSessions ?? 0} completed`}
+              level={(metrics?.completedSessions ?? 0) > 0 ? 'normal' : 'warn'}
+            />
+            <SignalRow
+              label="Subscription Activity"
+              value={`${metrics?.activeSubscriptions ?? 0} active`}
+              level={(metrics?.activeSubscriptions ?? 0) > 0 ? 'normal' : 'warn'}
+            />
+            <SignalRow
+              label="Therapist Capacity"
+              value={`${metrics?.totalTherapists ?? 0} therapists`}
+              level={(metrics?.totalTherapists ?? 0) > 0 ? 'normal' : 'warn'}
+            />
+            <SignalRow
+              label="User Base"
+              value={`${metrics?.totalUsers ?? 0} users`}
+              level={(metrics?.totalUsers ?? 0) > 0 ? 'normal' : 'warn'}
+            />
+          </div>
+          <div className="mt-4 rounded-lg border border-dashed border-ink-200 bg-ink-50 px-3 py-2 text-xs text-ink-600">
+            This module is wired to existing backend health and admin metrics endpoints. Deep infrastructure telemetry can be added once service-level traces are exposed.
+          </div>
         </div>
       </div>
 
-      <div className="mt-12 flex flex-col items-center gap-2">
-         <p className="text-[10px] text-gray-400 uppercase font-black tracking-[0.2em] font-mono">
-           Infrastructure auto-probe active • Cycle: 30s • Version: Core-v1.4
-         </p>
-         <div className="h-1 w-32 bg-gray-100 rounded-full overflow-hidden">
-            <div className="h-full bg-blue-500 animate-progress"></div>
-         </div>
+      {isLoading ? <p className="text-sm text-ink-500">Refreshing platform health...</p> : null}
+    </div>
+  );
+}
+
+function StatCard({ label, value, toneClass }: { label: string; value: string; toneClass?: string }) {
+  return (
+    <div className="rounded-xl border border-ink-100 bg-white p-4">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-500">{label}</p>
+      <p className={`mt-1 inline-flex rounded-full px-2 py-0.5 font-display text-lg font-bold text-ink-800 ${toneClass || ''}`}>{value}</p>
+    </div>
+  );
+}
+
+function KeyValue({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-[11px] uppercase tracking-wide text-ink-500">{label}</p>
+      <p className="mt-0.5 text-sm text-ink-800">{value}</p>
+    </div>
+  );
+}
+
+function SignalRow({ label, value, level }: { label: string; value: string; level: 'normal' | 'warn' }) {
+  const dotClass = level === 'normal' ? 'bg-emerald-500' : 'bg-amber-500';
+  return (
+    <div className="flex items-center justify-between rounded-md bg-ink-50 px-2.5 py-2">
+      <div className="flex items-center gap-2">
+        <span className={`inline-block h-2 w-2 rounded-full ${dotClass}`} />
+        <span>{label}</span>
       </div>
+      <span className="font-semibold text-ink-800">{value}</span>
     </div>
   );
 }

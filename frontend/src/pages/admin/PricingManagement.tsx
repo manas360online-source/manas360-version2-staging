@@ -3,8 +3,6 @@ import { Navigate } from 'react-router-dom';
 import {
   getAdminPricingConfig,
   updateAdminPricingConfig,
-  toggleGlobalFreeSignups,
-  waiveUserSubscription,
   type AdminPricingBundleItem,
   type AdminPricingConfig,
   type AdminPricingSessionItem,
@@ -233,40 +231,6 @@ export default function AdminPricingManagementPage() {
       setSuccess('Pricing configuration updated successfully.');
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Unable to save pricing updates.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const [freeDays, setFreeDays] = useState('30');
-  const [waiveForm, setWaiveForm] = useState({ userId: '', planKey: 'basic', durationDays: '30', reason: '' });
-
-  const onToggleFree = async () => {
-    setSaving(true);
-    try {
-      await toggleGlobalFreeSignups(Number(freeDays));
-      setSuccess(`Global offer activated: New sign-ups are now free for ${freeDays} days.`);
-    } catch (err: any) {
-      setError(err?.response?.data?.message || 'Failed to update global offer.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const onWaive = async () => {
-    if (!waiveForm.userId) return;
-    setSaving(true);
-    try {
-      const resp = await waiveUserSubscription({
-        userId: waiveForm.userId,
-        planKey: waiveForm.planKey,
-        durationDays: Number(waiveForm.durationDays),
-        reason: waiveForm.reason
-      });
-      setSuccess(resp.message || 'Waiver granted successfully.');
-      setWaiveForm({ userId: '', planKey: 'basic', durationDays: '30', reason: '' });
-    } catch (err: any) {
-      setError(err?.response?.data?.message || 'Failed to grant waiver.');
     } finally {
       setSaving(false);
     }
@@ -531,89 +495,6 @@ export default function AdminPricingManagementPage() {
       >
         {saving ? 'Saving...' : 'Save Pricing Configuration'}
       </button>
-
-      {/* PHASE 2: GLOBAL OFFERS & WAIVERS */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 mt-12 pt-8 border-t border-ink-200">
-        <div className="rounded-2xl border-2 border-indigo-100 bg-white p-6 shadow-xl shadow-indigo-100/20">
-          <div className="flex items-center space-x-3 mb-6">
-            <div className="p-2 bg-indigo-600 rounded-lg">
-              <span className="text-white font-black text-xs uppercase tracking-tighter">OFFER</span>
-            </div>
-            <h3 className="font-black text-xl text-ink-900 tracking-tight">Make New Sign-ups Free</h3>
-          </div>
-          <p className="text-sm text-ink-600 mb-6 font-medium">Activate a limited-time offer where all new users get the platform free for the specified number of days.</p>
-          <div className="flex items-center gap-4">
-            <div className="relative flex-1">
-               <input
-                type="number"
-                value={freeDays}
-                onChange={(e) => setFreeDays(e.target.value)}
-                className="w-full pl-4 pr-12 py-3 bg-ink-50 border-2 border-ink-100 rounded-xl focus:border-indigo-500 outline-none font-bold text-ink-900"
-              />
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black text-ink-400 uppercase tracking-widest">Days</span>
-            </div>
-            <button
-              onClick={onToggleFree}
-              disabled={saving}
-              className="px-6 py-3 bg-indigo-600 text-white font-black text-sm rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-600/20 transition-all active:scale-95 disabled:opacity-50"
-            >
-              ACTIVATE OFFER
-            </button>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border-2 border-emerald-100 bg-white p-6 shadow-xl shadow-emerald-100/20">
-          <div className="flex items-center space-x-3 mb-6">
-            <div className="p-2 bg-emerald-600 rounded-lg">
-              <span className="text-white font-black text-xs uppercase tracking-tighter">WAIVER</span>
-            </div>
-            <h3 className="font-black text-xl text-ink-900 tracking-tight">Manual Access Waiver</h3>
-          </div>
-          <div className="space-y-4">
-            <input
-              type="text"
-              placeholder="User ID (UUID)"
-              value={waiveForm.userId}
-              onChange={(e) => setWaiveForm({ ...waiveForm, userId: e.target.value })}
-              className="w-full px-4 py-3 bg-ink-50 border-2 border-ink-100 rounded-xl focus:border-emerald-500 outline-none font-bold text-ink-900"
-            />
-            <div className="grid grid-cols-2 gap-4">
-              <select
-                value={waiveForm.planKey}
-                onChange={(e) => setWaiveForm({ ...waiveForm, planKey: e.target.value })}
-                className="px-4 py-3 bg-ink-50 border-2 border-ink-100 rounded-xl focus:border-emerald-500 outline-none font-bold text-ink-900 appearance-none"
-              >
-                <option value="basic">Basic Plan</option>
-                <option value="premium">Premium Plan</option>
-                <option value="pro">Pro Plan</option>
-              </select>
-              <div className="relative">
-                <input
-                  type="number"
-                  value={waiveForm.durationDays}
-                  onChange={(e) => setWaiveForm({ ...waiveForm, durationDays: e.target.value })}
-                  className="w-full pl-4 pr-12 py-3 bg-ink-50 border-2 border-ink-100 rounded-xl focus:border-emerald-500 outline-none font-bold text-ink-900"
-                />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black text-ink-400 uppercase tracking-widest">Days</span>
-              </div>
-            </div>
-            <input
-              type="text"
-              placeholder="Reason (e.g. Beta Tester, Partner)"
-              value={waiveForm.reason}
-              onChange={(e) => setWaiveForm({ ...waiveForm, reason: e.target.value })}
-              className="w-full px-4 py-3 bg-ink-50 border-2 border-ink-100 rounded-xl focus:border-emerald-500 outline-none font-bold text-ink-900"
-            />
-            <button
-              onClick={onWaive}
-              disabled={saving || !waiveForm.userId}
-              className="w-full py-4 bg-emerald-600 text-white font-black text-sm rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-600/20 transition-all active:scale-95 disabled:opacity-50"
-            >
-              GRANT FREE ACCESS
-            </button>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

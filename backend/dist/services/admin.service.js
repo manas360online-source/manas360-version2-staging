@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.listSubscriptions = exports.getMetrics = exports.approveProvider = exports.verifyProvider = exports.verifyTherapist = exports.getUserById = exports.listUsers = void 0;
+exports.getAdminLiveSessions = exports.listSubscriptions = exports.getMetrics = exports.approveProvider = exports.verifyProvider = exports.verifyTherapist = exports.getUserById = exports.listUsers = void 0;
 const db_1 = require("../config/db");
 const error_middleware_1 = require("../middleware/error.middleware");
 const pagination_1 = require("../utils/pagination");
@@ -19,6 +19,8 @@ const mapRoleFilterToEnum = (role) => {
         return 'COACH';
     if (normalized === 'admin')
         return 'ADMIN';
+    if (normalized === 'complianceofficer')
+        return 'COMPLIANCE_OFFICER';
     throw new error_middleware_1.AppError('Invalid role filter', 400);
 };
 const mapPlanTypeToEnum = (planType) => {
@@ -51,7 +53,7 @@ const mapSubscriptionStatusToEnum = (status) => {
  * List users with pagination and filtering
  *
  * Query filters:
- * - role: 'patient' | 'therapist' | 'psychiatrist' | 'coach' | 'admin' (optional)
+ * - role: 'patient' | 'therapist' | 'psychiatrist' | 'coach' | 'admin' | 'complianceofficer' (optional)
  * - status: 'active' | 'deleted' (optional)
  * - page: pagination page (default: 1)
  * - limit: items per page (default: 10, max: 50)
@@ -426,3 +428,43 @@ const listSubscriptions = async (page, limit, { planType, status, } = {}) => {
     };
 };
 exports.listSubscriptions = listSubscriptions;
+/**
+ * Get active therapy sessions for admin/compliance monitoring.
+ * Includes latest GPS metrics (empathy, depth, crisis) from session_monitoring.
+ */
+const getAdminLiveSessions = async () => {
+    // Query active sessions from the 'sessions' table and join with 'session_monitoring'
+    // and user profiles to get names.
+    const sessions = await db.$queryRawUnsafe(`
+    SELECT 
+      s.id,
+      t.first_name || ' ' || t.last_name as therapist_name,
+      p.first_name || ' ' || p.last_name as patient_name,
+      s.started_at as start_time,
+      s.status,
+      m.latest_empathy_score as empathy_score,
+      m.latest_depth_level as depth_level,
+      m.latest_crisis_risk as crisis_risk
+    FROM sessions s
+    LEFT JOIN session_monitoring m ON s.id = m.session_id AND m.status = 'active'
+    LEFT JOIN users t ON s.therapist_id = t.id
+    LEFT JOIN users p ON s.patient_id = p.id
+    WHERE s.status = 'in-progress'
+    ORDER BY s.started_at DESC
+  `);
+    return {
+        sessions: sessions.map((s) => ({
+            id: s.id,
+            therapistName: s.therapist_name || 'Therapist',
+            patientName: s.patient_name || 'Patient',
+            startTime: s.start_time,
+            status: s.status,
+            metrics: s.empathy_score !== null ? {
+                empathyScore: Number(s.empathy_score),
+                depthLevel: s.depth_level || 'surface',
+                crisisRisk: s.crisis_risk || 'low'
+            } : undefined
+        }))
+    };
+};
+exports.getAdminLiveSessions = getAdminLiveSessions;

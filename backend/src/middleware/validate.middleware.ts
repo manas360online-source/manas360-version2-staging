@@ -729,8 +729,8 @@ export const validateAdminListUsersQuery: RequestHandler[] = [
 	query('role')
 		.optional()
 		.isString()
-		.isIn(['patient', 'therapist', 'psychiatrist', 'coach', 'admin'])
-		.withMessage('role must be one of: patient, therapist, psychiatrist, coach, admin'),
+		.isIn(['patient', 'therapist', 'psychiatrist', 'coach', 'admin', 'complianceofficer'])
+		.withMessage('role must be one of: patient, therapist, psychiatrist, coach, admin, complianceofficer'),
 	query('status')
 		.optional()
 		.isString()

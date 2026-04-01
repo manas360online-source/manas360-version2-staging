@@ -5,6 +5,7 @@ type RoleCounts = Record<AdminUserRole, number>;
 
 const defaultCounts: RoleCounts = {
   admin: 0,
+  complianceofficer: 0,
   therapist: 0,
   psychiatrist: 0,
   coach: 0,
@@ -17,9 +18,10 @@ const permissionsByRole: Record<AdminUserRole, string[]> = {
   psychiatrist: ['read_own_profile', 'manage_sessions', 'clinical_assessments', 'prescriptions'],
   coach: ['read_own_profile', 'manage_sessions_limited', 'engagement_support'],
   admin: ['read_all_profiles', 'manage_users', 'manage_therapists', 'view_analytics'],
+  complianceofficer: ['read_all_profiles', 'view_analytics', 'audit_read'],
 };
 
-const roleOrder: AdminUserRole[] = ['admin', 'therapist', 'psychiatrist', 'coach', 'patient'];
+const roleOrder: AdminUserRole[] = ['admin', 'complianceofficer', 'therapist', 'psychiatrist', 'coach', 'patient'];
 
 export default function AdminRolesPage() {
   const [counts, setCounts] = useState<RoleCounts>(defaultCounts);
@@ -34,9 +36,10 @@ export default function AdminRolesPage() {
       setError(null);
 
       try {
-        const [allUsers, admins, therapists, psychiatrists, coaches, patients] = await Promise.all([
+        const [allUsers, admins, complianceOfficers, therapists, psychiatrists, coaches, patients] = await Promise.all([
           getAdminUsers({ page: 1, limit: 1, status: 'active' }),
           getAdminUsers({ page: 1, limit: 1, role: 'admin', status: 'active' }),
+          getAdminUsers({ page: 1, limit: 1, role: 'complianceofficer', status: 'active' }),
           getAdminUsers({ page: 1, limit: 1, role: 'therapist', status: 'active' }),
           getAdminUsers({ page: 1, limit: 1, role: 'psychiatrist', status: 'active' }),
           getAdminUsers({ page: 1, limit: 1, role: 'coach', status: 'active' }),
@@ -46,6 +49,7 @@ export default function AdminRolesPage() {
         setTotalUsers(allUsers.data.meta.totalItems);
         setCounts({
           admin: admins.data.meta.totalItems,
+          complianceofficer: complianceOfficers.data.meta.totalItems,
           therapist: therapists.data.meta.totalItems,
           psychiatrist: psychiatrists.data.meta.totalItems,
           coach: coaches.data.meta.totalItems,
@@ -88,6 +92,7 @@ export default function AdminRolesPage() {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <RoleStat label="Total Active Users" value={String(totalUsers)} />
         <RoleStat label="Admins" value={String(counts.admin)} />
+        <RoleStat label="Compliance Officers" value={String(counts.complianceofficer)} />
         <RoleStat label="Therapists" value={String(counts.therapist)} />
         <RoleStat label="Psychiatrists" value={String(counts.psychiatrist)} />
         <RoleStat label="Coaches" value={String(counts.coach)} />
@@ -130,6 +135,7 @@ export default function AdminRolesPage() {
           <div className="mt-4 space-y-3">
             <AuditRow label="Data Refresh" value={isLoading ? 'Refreshing...' : lastUpdatedAt} />
             <AuditRow label="Admin Coverage" value={`${counts.admin} of ${totalUsers} users`} />
+            <AuditRow label="Compliance Coverage" value={`${counts.complianceofficer} of ${totalUsers} users`} />
             <AuditRow label="Therapist Coverage" value={`${counts.therapist} of ${totalUsers} users`} />
             <AuditRow label="Psychiatrist Coverage" value={`${counts.psychiatrist} of ${totalUsers} users`} />
             <AuditRow label="Coach Coverage" value={`${counts.coach} of ${totalUsers} users`} />

@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>13.12A — MANAS360 Workflow Automation: Zoho Flow Setup & Tech Specs</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--sage:#4A6741;--sage-dark:#2D4128;--sage-light:#e8f0e5;--clay:#C4956A;--cream:#FFFDF7;--ink:#1a1a1a;--muted:#6b6b6b;--border:#d4ddd0;--white:#fff;--code-bg:#1e2a1e;--code-text:#d4e8d0;--warn-bg:#fff8e1;--warn-border:#f9a825;--info-bg:#e3f2fd;--info-border:#1976d2;--crit-bg:#fce4ec;--crit-border:#c62828}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);line-height:1.7;font-size:15px}
+.doc-header{background:linear-gradient(135deg,var(--sage-dark),var(--sage));color:white;padding:48px 60px}
+.doc-header h1{font-family:'Outfit',sans-serif;font-size:28px;font-weight:800;margin-bottom:6px}
+.doc-header .subtitle{font-size:14px;opacity:.75;margin-bottom:16px}
+.doc-meta{display:flex;gap:24px;flex-wrap:wrap;font-size:12px;opacity:.7}
+.doc-meta span{display:flex;align-items:center;gap:4px}
+.container{max-width:1100px;margin:0 auto;padding:40px 60px 80px}
+h2{font-family:'Outfit',sans-serif;font-size:22px;font-weight:700;color:var(--sage-dark);margin:48px 0 16px;padding-bottom:8px;border-bottom:2px solid var(--sage)}
+h3{font-family:'Outfit',sans-serif;font-size:17px;font-weight:600;color:var(--ink);margin:32px 0 12px}
+h4{font-size:14px;font-weight:600;color:var(--sage);margin:20px 0 8px;text-transform:uppercase;letter-spacing:.5px}
+p{margin-bottom:12px}
+.callout{padding:14px 18px;border-radius:8px;margin:16px 0;font-size:13px;line-height:1.6}
+.callout-warn{background:var(--warn-bg);border-left:4px solid var(--warn-border)}
+.callout-info{background:var(--info-bg);border-left:4px solid var(--info-border)}
+.callout-crit{background:var(--crit-bg);border-left:4px solid var(--crit-border)}
+.callout strong{display:block;margin-bottom:4px}
+code{font-family:'JetBrains Mono',monospace;font-size:12.5px;background:#edf2ea;padding:2px 6px;border-radius:3px;color:var(--sage-dark)}
+pre{background:var(--code-bg);color:var(--code-text);padding:20px 24px;border-radius:10px;overflow-x:auto;margin:14px 0;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.65}
+pre code{background:none;padding:0;color:inherit}
+table{width:100%;border-collapse:collapse;margin:16px 0;font-size:13px}
+th{background:var(--sage);color:white;padding:10px 12px;text-align:left;font-weight:600;font-size:12px}
+td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+tr:nth-child(even) td{background:#f8faf6}
+.tag{display:inline-block;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:600;margin-right:4px}
+.tag-auto{background:#c8e6c9;color:#2e7d32}
+.tag-partial{background:#fff9c4;color:#f57f17}
+.tag-manual{background:#ffcdd2;color:#c62828}
+.tag-done{background:#c8e6c9;color:#2e7d32}
+.tag-high{background:#ffcdd2;color:#c62828}
+.tag-med{background:#fff9c4;color:#f57f17}
+.tag-low{background:#c8e6c9;color:#2e7d32}
+.flow-block{background:var(--white);border:1.5px solid var(--border);border-radius:10px;padding:20px 24px;margin:16px 0}
+.flow-block-title{font-family:'Outfit',sans-serif;font-size:14px;font-weight:700;color:var(--sage-dark);margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.flow-block-title .wf-id{background:var(--sage);color:white;padding:2px 8px;border-radius:4px;font-size:11px;font-family:'JetBrains Mono',monospace}
+.step-chain{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:10px 0;font-size:12px}
+.step-node{background:var(--sage-light);border:1px solid var(--sage);padding:4px 10px;border-radius:6px;font-weight:500;font-size:11px}
+.step-arrow{color:var(--sage);font-weight:700}
+.toc{background:var(--white);border:1px solid var(--border);border-radius:10px;padding:24px 28px;margin:24px 0}
+.toc h3{margin-top:0}
+.toc ol{padding-left:20px}
+.toc li{margin:4px 0;font-size:13px}
+.toc a{color:var(--sage);text-decoration:none;font-weight:500}
+.toc a:hover{text-decoration:underline}
+.savings-bar{display:flex;align-items:center;gap:8px;margin:4px 0}
+.savings-bar .bar{height:6px;border-radius:3px;background:var(--sage)}
+.savings-bar .label{font-size:11px;color:var(--muted);min-width:120px}
+@media(max-width:768px){.container,.doc-header{padding:24px 20px}pre{font-size:11px;padding:14px}}
+@media print{body{font-size:11px}pre{font-size:9px}.doc-header{padding:24px}}
+</style>
+</head>
+<body>
+
+<div class="doc-header">
+  <h1>13.12A — Workflow Automation: Zoho Flow</h1>
+  <div class="subtitle">Setup, Configuration, Deluge Scripts & Integration Specs for 47 MANAS360 Workflows</div>
+  <div class="doc-meta">
+    <span>📅 March 2026</span>
+    <span>📋 Version 2.0 (Zoho Flow Migration)</span>
+    <span>🎯 Target: 96% Automation (45/47 Workflows)</span>
+    <span>💰 Savings: ₹6.1L/month</span>
+    <span>🔧 Stack: Zoho Flow + ZeptoMail + Zoho Campaigns + Zoho Sign + PhonePe + AWS</span>
+  </div>
+</div>
+
+<div class="container">
+
+<!-- TOC -->
+<div class="toc">
+  <h3>Table of Contents</h3>
+  <ol>
+    <li><a href="#s1">Executive Summary & Migration Context</a></li>
+    <li><a href="#s2">Zoho Flow Architecture Overview</a></li>
+    <li><a href="#s3">Connection Setup & API Keys</a></li>
+    <li><a href="#s4">Workflow Category 1: User Onboarding & Registration (7 flows)</a></li>
+    <li><a href="#s5">Workflow Category 2: Clinical Operations (12 flows)</a></li>
+    <li><a href="#s6">Workflow Category 3: Payment & Billing (6 flows)</a></li>
+    <li><a href="#s7">Workflow Category 4: Communication & Notifications (8 flows)</a></li>
+    <li><a href="#s8">Workflow Category 5: Content & Assessments (5 flows)</a></li>
+    <li><a href="#s9">Workflow Category 6: Analytics & Reporting (4 flows)</a></li>
+    <li><a href="#s10">Workflow Category 7: Crisis Management (3 flows)</a></li>
+    <li><a href="#s11">Workflow Category 8: Compliance & Documentation (2 flows)</a></li>
+    <li><a href="#s12">Deluge Custom Function Library</a></li>
+    <li><a href="#s13">Webhook Schemas & Payloads</a></li>
+    <li><a href="#s14">Error Handling & Retry Patterns</a></li>
+    <li><a href="#s15">Automation Priority Matrix & Roadmap</a></li>
+    <li><a href="#s16">Cost & ROI Summary</a></li>
+  </ol>
+</div>
+
+<!-- S1 -->
+<h2 id="s1">1. Executive Summary & Migration Context</h2>
+
+<div class="callout callout-warn">
+  <strong>⚠️ Migration Note: n8n → Zoho Flow</strong>
+  The original Workflow Automation Audit (Dec 2024) specified n8n as the orchestration engine. MANAS360 has standardized on the Zoho ecosystem (Zoho Flow, Zoho Campaigns, ZeptoMail, Zoho Sign, Zoho Desk). This document translates all 47 workflows into Zoho Flow configurations with Deluge custom functions where native connectors are insufficient.
+</div>
+
+<table>
+  <tr><th>Metric</th><th>Current State</th><th>Target (12 Weeks)</th></tr>
+  <tr><td>Total Workflows</td><td>47</td><td>47</td></tr>
+  <tr><td>Fully Automated</td><td>18 (38%)</td><td>45 (96%)</td></tr>
+  <tr><td>Partially Automated</td><td>12 (26%)</td><td>0 (0%)</td></tr>
+  <tr><td>Manual</td><td>17 (36%)</td><td>2 (4%)*</td></tr>
+  <tr><td>Manual Hours/Week</td><td>~120 hours</td><td>~15 hours</td></tr>
+  <tr><td>Monthly Labor Cost</td><td>₹2,40,000</td><td>₹30,000</td></tr>
+  <tr><td>Orchestration Engine</td><td>n8n (self-hosted)</td><td>Zoho Flow (SaaS)</td></tr>
+</table>
+<p style="font-size:12px;color:var(--muted)">*2 workflows requiring human judgment: edge-case credential verification and high-value payout fraud review (&gt;₹50K).</p>
+
+<h3>Why Zoho Flow over n8n</h3>
+<table>
+  <tr><th>Factor</th><th>n8n (Original)</th><th>Zoho Flow (Current)</th></tr>
+  <tr><td>Hosting</td><td>Self-hosted on AWS (maintenance overhead)</td><td>SaaS — zero infra management</td></tr>
+  <tr><td>Zoho Integration</td><td>Generic API connectors</td><td>Native 1-click connectors to entire Zoho suite</td></tr>
+  <tr><td>Deluge Scripts</td><td>Not supported</td><td>Native — custom logic within flows</td></tr>
+  <tr><td>Zoho Sign</td><td>REST API only</td><td>Native trigger/action blocks</td></tr>
+  <tr><td>ZeptoMail</td><td>HTTP node</td><td>Native connector</td></tr>
+  <tr><td>Cost</td><td>$299/mo + AWS hosting (~$80/mo)</td><td>₹1,500/mo (Professional plan)</td></tr>
+  <tr><td>Skill Requirement</td><td>DevOps + Node.js</td><td>Low-code + Deluge (lighter skill set)</td></tr>
+</table>
+
+<!-- S2 -->
+<h2 id="s2">2. Zoho Flow Architecture Overview</h2>
+
+<pre><code>┌─────────────────────────────────────────────────────────────────┐
+│                     MANAS360 ZOHO FLOW HUB                      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  TRIGGERS                    ACTIONS                            │
+│  ────────                    ───────                            │
+│  • Webhook (PhonePe, AWS)    • Zoho Desk: Create/Update Ticket  │
+│  • Zoho Desk: New Ticket     • ZeptoMail: Send Transactional    │
+│  • Zoho Sign: Doc Signed     • Zoho Campaigns: Add to List      │
+│  • Zoho Campaigns: Event     • Zoho Sign: Send for Signature    │
+│  • Schedule (Cron)           • Webhook: Call External API       │
+│  • Zoho CRM: New Record      • Deluge: Custom Function          │
+│  • Custom API (REST)         • AWS Lambda: Invoke               │
+│                              • PhonePe: Payment API             │
+│                              • Supabase: DB CRUD (via REST)     │
+│                              • Twilio: SMS (via HTTP)           │
+│                                                                 │
+│  CONNECTIONS (Pre-configured)                                   │
+│  ────────────────────────────                                   │
+│  Zoho Desk  │ Zoho Sign  │ ZeptoMail  │ Zoho Campaigns         │
+│  Zoho CRM   │ Zoho Analytics │ Supabase (REST) │ PhonePe       │
+│  AWS Lambda │ Twilio (HTTP)  │ Agora (HTTP)    │ Bhashini      │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘</code></pre>
+
+<h3>Zoho Flow Plan Requirements</h3>
+<table>
+  <tr><th>Feature</th><th>Required Plan</th><th>Why</th></tr>
+  <tr><td>Multi-step flows</td><td>Professional</td><td>Most MANAS360 flows are 5-15 steps</td></tr>
+  <tr><td>Deluge custom functions</td><td>Professional</td><td>Complex business logic (matching, scoring, fraud)</td></tr>
+  <tr><td>Webhooks (incoming)</td><td>Professional</td><td>PhonePe callbacks, AWS SNS, Agora events</td></tr>
+  <tr><td>Scheduled flows</td><td>Professional</td><td>Daily cron: renewals, reminders, license checks</td></tr>
+  <tr><td>Conditional branching</td><td>Standard+</td><td>IF/ELSE on assessment scores, payment status</td></tr>
+  <tr><td>Task limit</td><td>Professional: 20,000 tasks/mo</td><td>Estimated usage: ~12,000 tasks/mo at 1K patients</td></tr>
+</table>
+
+<!-- S3 -->
+<h2 id="s3">3. Connection Setup & API Keys</h2>
+
+<div class="callout callout-info">
+  <strong>ℹ️ Setup Order</strong>
+  Create all connections BEFORE building flows. Each connection is created once and reused across all flows that need it.
+</div>
+
+<h4>3.1 Zoho Suite (Auto-connected)</h4>
+<p>Zoho Desk, Zoho Sign, ZeptoMail, Zoho Campaigns, Zoho CRM, and Zoho Analytics connect automatically within the same Zoho org. No API keys needed — just authorize when adding the first action block.</p>
+
+<h4>3.2 External Connections</h4>
+<table>
+  <tr><th>Connection</th><th>Type</th><th>Config</th><th>Env Vars</th></tr>
+  <tr>
+    <td><strong>Supabase (PostgreSQL)</strong></td>
+    <td>REST API (Custom Connection)</td>
+    <td>Base URL: <code>https://&lt;project-id&gt;.supabase.co/rest/v1</code><br>Auth Header: <code>apikey: &lt;SUPABASE_ANON_KEY&gt;</code><br>+ <code>Authorization: Bearer &lt;SUPABASE_SERVICE_ROLE_KEY&gt;</code></td>
+    <td><code>SUPABASE_URL</code><br><code>SUPABASE_ANON_KEY</code><br><code>SUPABASE_SERVICE_KEY</code></td>
+  </tr>
+  <tr>
+    <td><strong>PhonePe Payment Gateway</strong></td>
+    <td>Webhook (incoming) + REST (outgoing)</td>
+    <td>Webhook URL: Zoho Flow generates this<br>Outgoing: <code>https://api.phonepe.com/apis/hermes</code><br>Headers: <code>X-VERIFY: SHA256(payload + salt_key) + ### + salt_index</code></td>
+    <td><code>PHONEPE_MERCHANT_ID</code><br><code>PHONEPE_SALT_KEY</code><br><code>PHONEPE_SALT_INDEX</code></td>
+  </tr>
+  <tr>
+    <td><strong>Twilio (SMS/IVR)</strong></td>
+    <td>HTTP Action (Basic Auth)</td>
+    <td>URL: <code>https://api.twilio.com/2010-04-01/Accounts/&lt;SID&gt;/Messages.json</code><br>Auth: Basic <code>&lt;ACCOUNT_SID&gt;:&lt;AUTH_TOKEN&gt;</code></td>
+    <td><code>TWILIO_SID</code><br><code>TWILIO_AUTH_TOKEN</code><br><code>TWILIO_FROM_NUMBER</code></td>
+  </tr>
+  <tr>
+    <td><strong>AWS Lambda</strong></td>
+    <td>HTTP Action (AWS Signature v4)</td>
+    <td>Region: <code>ap-south-1</code><br>Endpoint: <code>https://lambda.ap-south-1.amazonaws.com/2015-03-31/functions/&lt;name&gt;/invocations</code></td>
+    <td><code>AWS_ACCESS_KEY_ID</code><br><code>AWS_SECRET_ACCESS_KEY</code></td>
+  </tr>
+  <tr>
+    <td><strong>Claude API (AnytimeBUDDY)</strong></td>
+    <td>HTTP Action</td>
+    <td>URL: <code>https://api.anthropic.com/v1/messages</code><br>Headers: <code>x-api-key</code>, <code>anthropic-version: 2023-06-01</code></td>
+    <td><code>ANTHROPIC_API_KEY</code></td>
+  </tr>
+  <tr>
+    <td><strong>Bhashini (Multilingual)</strong></td>
+    <td>HTTP Action</td>
+    <td>URL: <code>https://dhruva-api.bhashini.gov.in</code><br>Auth: <code>Authorization: &lt;ULCA_API_KEY&gt;</code></td>
+    <td><code>BHASHINI_API_KEY</code><br><code>BHASHINI_USER_ID</code></td>
+  </tr>
+</table>
+
+<h4>3.3 Zoho Flow Connection Creation Script</h4>
+<pre><code>// Deluge: Create Supabase REST connection helper
+// Use this in any Zoho Flow custom function to call Supabase
+
+Map headers = Map();
+headers.put("apikey", zoho.flow.getVariable("SUPABASE_ANON_KEY"));
+headers.put("Authorization", "Bearer " + zoho.flow.getVariable("SUPABASE_SERVICE_KEY"));
+headers.put("Content-Type", "application/json");
+headers.put("Prefer", "return=representation");
+
+// Example: Insert patient record
+Map patient = Map();
+patient.put("email", input.email);
+patient.put("phone", input.phone);
+patient.put("name", input.name);
+patient.put("anonymous_id", "ANON-" + zoho.currenttime.toLong());
+patient.put("subscription_tier", "free");
+patient.put("lifecycle_stage", "new");
+
+response = invokeurl
+[
+  url: zoho.flow.getVariable("SUPABASE_URL") + "/rest/v1/patients"
+  type: POST
+  headers: headers
+  parameters: patient.toString()
+];
+return response;</code></pre>
+
+<!-- S4 -->
+<h2 id="s4">4. Category 1: User Onboarding & Registration (7 Flows)</h2>
+
+<div class="flow-block">
+  <div class="flow-block-title"><span class="wf-id">WF-1.1</span> Patient Registration <span class="tag tag-done">✅ DONE</span></div>
+  <p><strong>Trigger:</strong> Webhook — Frontend sends POST to Zoho Flow webhook URL on signup completion</p>
+  <div class="step-chain">
+    <span class="step-node">Webhook: Signup Data</span>
+    <span class="step-arrow">→</span>
+    <span class="step-node">Deluge: Validate + Dedup</span>
+    <span class="step-arrow">→</span>
+    <span class="step-node">Supabase: INSERT patient</span>
+    <span class="step-arrow">→</span>
+    <span class="step-node">Twilio: Send OTP SMS</span>
+    <span class="step-arrow">→</span>
+    <span class="step-node">ZeptoMail: Welcome Email</span>
+    <span class="step-arrow">→</span>
+    <span class="step-node">Zoho Campaigns: Add to "New Patients" list</span>
+  </div>
+  
+  <h4>Zoho Flow Configuration</h4>
+  <pre><code>Flow Name: MANS360_Patient_Registration
+Trigger: Webhook (POST)
+  Webhook URL: https://flow.zoho.in/webhook/incoming?... (auto-generated)
+  Payload Schema:
+  {
+    "email": "string",
+    "phone": "string (10-digit)",
+    "name": "string",
+    "age": "integer",
+    "gender": "string (M/F/O)",
+    "location_city": "string",
+    "location_state": "string",
+    "consent_granted": "boolean",
+    "consent_timestamp": "ISO 8601"
+  }
+
+Step 1: Deluge — Validate & Check Duplicates
+Step 2: IF consent_granted == false → STOP (log rejection)
+Step 3: Supabase REST → INSERT into 'patients' table
+Step 4: Twilio HTTP → Send welcome SMS
+Step 5: ZeptoMail → Send welcome email (template: 'patient_welcome_v2')
+Step 6: Zoho Campaigns → Add contact to "New Patients" mailing list
+Step 7: Deluge → Track event to analytics (Supabase 'events' table)</code></pre>
+
+  <h4>Deluge: Validation Custom Function</h4>
+  <pre><code>// WF-1.1 Step 1: Validate patient registration data
+// Input: webhook payload
+
+email = input.get("email").trim().toLowerCase();
+phone = input.get("phone").trim();
+
+// Email format check
+if (!email.matches("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"))
+{
+  return {"status": "error", "message": "Invalid email format"};
+}
+
+// Phone: 10 digits, Indian mobile
+if (!phone.matches("[6-9][0-9]{9}"))
+{
+  return {"status": "error", "message": "Invalid Indian mobile number"};
+}
+
+// Age check
+age = input.get("age").toNumber();
+if (age < 13)
+{
+  return {"status": "error", "message": "Minimum age 13 required"};
+}
+
+// Duplicate check via Supabase
+headers = Map();
+headers.put("apikey", zoho.flow.getVariable("SUPABASE_ANON_KEY"));
+headers.put("Authorization", "Bearer " + zoho.flow.getVariable("SUPABASE_SERVICE_KEY"));
+
+dupCheck = invokeurl
+[
+  url: zoho.flow.getVariable("SUPABASE_URL") + "/rest/v1/patients?or=(email.eq." + encodeUrl(email) + ",phone.eq." + phone + ")&select=id"
+  type: GET
+  headers: headers
+];
+
+if (dupCheck.size() > 0)
+{
+  return {"status": "duplicate", "existing_id": dupCheck.get(0).get("id")};
+}
+
+return {
+  "status": "valid",
+  "email": email,
+  "phone": phone,
+  "anonymous_id": "ANON-" + zoho.currenttime.toLong(),
+  "consent_id": "CON-" + zoho.currenttime.toLong()
+};</code></pre>
+</div>
+
+<div class="flow-block">
+  <div class="flow-block-title"><span class="wf-id">WF-1.2</span> Therapist Registration & Onboarding <span class="tag tag-high">🔴 HIGH PRIORITY</span></div>
+  <p><strong>Trigger:</strong> Webhook — Frontend sends POST when therapist submits application</p>
+  <p><strong>Current:</strong> 40% automated (credential verification manual) → <strong>Target:</strong> 95% automated</p>
+  <p><strong>Savings:</strong> 15 hrs/week → 1 hr/week (₹56,000/month)</p>
+  
+  <div class="step-chain">
+    <span class="step-node">Webhook: Application</span>
+    <span class="step-arrow">→</span>
+    <span class="step-node">Deluge: Validate</span>
+    <span class="step-arrow">→</span>
+    <span class="step-node">AWS S3: Store Docs</span>
+    <span class="step-arrow">→</span>
+    <span class="step-node">Deluge: NMC/RCI API Verify</span>
+    <span class="step-arrow">→</span>
+    <span class="step-node">IF Flagged → Zoho Desk Ticket</span>
+    <span class="step-arrow">→</span>
+    <span class="step-node">Zoho Sign: Contract</span>
+    <span class="step-arrow">→</span>
+    <span class="step-node">Training Enrollment</span>
+    <span class="step-arrow">→</span>
+    <span class="step-node">Profile Activation</span>
+  </div>
+
+  <h4>Zoho Flow Configuration</h4>
+  <pre><code>Flow Name: MANS360_Therapist_Onboarding
+Trigger: Webhook (POST)
+
+Step 1: Deluge — Validate therapist data
+Step 2: HTTP Action — Upload certificates to AWS S3
+        URL: https://s3.ap-south-1.amazonaws.com/mans360-docs/therapist-certs/
+        Method: PUT
+        Headers: AWS Signature v4
+        Body: Base64 encoded PDF
+
+Step 3: Deluge — Call NMC/RCI Verification API
+        // See Deluge function below
+
+Step 4: Decision — IF verification_status == "flagged"
+        YES → Create Zoho Desk ticket (Department: Clinical, Priority: High)
+              Assign to: TADM role for manual review
+        NO  → Continue to Step 5
+
+Step 5: Zoho Sign — Send Independent Contractor Agreement
+        Template: "MANS360_Therapist_ICA_v3"
+        Pre-fill: name, license_number, session_rate, bank_ifsc
+        Recipient: therapist email
+        Signing order: 1. Therapist  2. MANS360 Legal (CCA role)
+
+Step 6: Wait — Until Zoho Sign status == "completed"
+        Timeout: 7 days
+        On timeout: ZeptoMail reminder → Wait 3 more days → Close application
+
+Step 7: Supabase REST — UPDATE therapist SET contract_signed = true
+
+Step 8: ZeptoMail — Send training enrollment email
+        Template: "therapist_training_welcome"
+        Include: 5-module training link, quiz link, certification info
+
+Step 9: Wait — Until training_completed == true (webhook from LMS)
+        Timeout: 14 days
+
+Step 10: Deluge — Activation gate check
+         License verified ✓ AND Contract signed ✓ 
+         AND Training completed ✓ AND Bank details verified ✓
+         → UPDATE therapist SET status = 'active'
+
+Step 11: ZeptoMail — Activation congratulations email
+Step 12: Twilio HTTP — Activation SMS
+Step 13: Supabase — Track event: 'therapist_activated'</code></pre>
+
+  <h4>Deluge: NMC/RCI Credential Verification</h4>
+  <pre><code>// WF-1.2 Step 3: Verify therapist license via NMC/RCI API
+// Input: license_number, full_name, qualification
+
+license = input.get("license_number").trim();
+name = input.get("full_name").trim();
+
+// Call NMC Doctor Registration API
+nmcResponse = invokeurl
+[
+  url: "https://www.nmc.org.in/MCIRest/open/getDataFromService?service=searchDoctor"
+  type: POST
+  parameters: {"registrationNo": license, "doctorName": name}
+];
+
+// Parse response
+if (nmcResponse.get("totalCount") == 0)
+{
+  // Try State Medical Council fallback
+  smcResponse = invokeurl
+  [
+    url: zoho.flow.getVariable("SMC_API_URL") + "/verify"
+    type: POST
+    headers: {"Authorization": "Bearer " + zoho.flow.getVariable("SMC_API_KEY")}
+    parameters: {"license": license, "name": name}
+  ];
+  
+  if (smcResponse.get("status") != "active")
+  {
+    return {
+      "verification_status": "flagged",
+      "reason": "License not found in NMC or SMC databases",
+      "requires_manual_review": true
+    };
+  }
+}
+
+// Check for suspended/expired
+docRecord = nmcResponse.get("doctors").get(0);
+if (docRecord.get("status") == "Suspended" || docRecord.get("status") == "Expired")
+{
+  return {
+    "verification_status": "rejected",
+    "reason": "License " + docRecord.get("status"),
+    "requires_manual_review": false
+  };
+}
+
+// Name match check (fuzzy)
+registeredName = docRecord.get("doctorName").toLowerCase();
+inputName = name.toLowerCase();
+if (!registeredName.contains(inputName.getSuffix(" ")) && !inputName.contains(registeredName.getSuffix(" ")))
+{
+  return {
+    "verification_status": "flagged", 
+    "reason": "Name mismatch: registered='" + registeredName + "' vs input='" + inputName + "'",
+    "requires_manual_review": true
+  };
+}
+
+return {
+  "verification_status": "verified",
+  "nmc_record": docRecord,
+  "verified_at": zoho.currenttime
+};</code></pre>
+</div>
+
+<div class="flow-block">
+  <div class="flow-block-title"><span class="wf-id">WF-1.3</span> Patient Assessment (PHQ-9/GAD-7) <span class="tag tag-done">✅ DONE</span></div>
+  <p><strong>Trigger:</strong> Webhook — Frontend sends completed assessment answers</p>
+  <div class="step-chain">
+    <span class="step-node">Webhook: Answers</span>
+    <span class="step-arrow">→</span>
+    <span class="step-node">Deluge: Score Calculation</span>
+    <span class="step-arrow">→</span>
+    <span class="step-node">Supabase: Store Results</span>
+    <span class="step-arrow">→</span>
+    <span class="step-node">IF Score ≥ 20 → Crisis Flow (WF-7.1)</span>
+    <span class="step-arrow">→</span>
+    <span class="step-node">Deluge: Match Algorithm</span>
+    <span class="step-arrow">→</span>
+    <span class="step-node">Supabase: Create Leads</span>
+  </div>
+
+  <h4>Deluge: PHQ-9 Scoring + Crisis Detection</h4>
+  <pre><code>// WF-1.3: PHQ-9 scoring with crisis detection
+answers = input.get("answers"); // List of 9 integers (0-3)
+assessment_type = input.get("type"); // "phq9" or "gad7"
+
+total_score = 0;
+for each answer in answers
+{
+  total_score = total_score + answer.toNumber();
+}
+
+// Severity classification
+severity = "minimal";
+if (total_score >= 5) { severity = "mild"; }
+if (total_score >= 10) { severity = "moderate"; }
+if (total_score >= 15) { severity = "moderately_severe"; }
+if (total_score >= 20) { severity = "severe"; }
+
+// Crisis detection: Q9 (suicidal ideation) > 0 OR total >= 20
+q9_score = answers.get(8).toNumber();
+is_crisis = (q9_score > 0 || total_score >= 20);
+
+result = Map();
+result.put("total_score", total_score);
+result.put("severity", severity);
+result.put("is_crisis", is_crisis);
+result.put("q9_suicidal_ideation", q9_score);
+result.put("assessment_type", assessment_type);
+result.put("assessed_at", zoho.currenttime);
+
+return result;
+// Downstream: IF is_crisis == true → trigger WF-7.1 via sub-flow</code></pre>
+</div>
+
+<div class="flow-block">
+  <div class="flow-block-title"><span class="wf-id">WF-1.4</span> ASHA Worker Onboarding <span class="tag tag-med">🟡 MEDIUM</span></div>
+  <p><strong>Trigger:</strong> Zoho Desk ticket in "Engineering" department with tag "asha_bulk_import"</p>
+  <p><strong>Savings:</strong> 8 hrs/week → 0.5 hrs/week (₹30,000/month)</p>
+  <div class="step-chain">
+    <span class="step-node">Zoho Desk Ticket</span>
+    <span class="step-arrow">→</span>
+    <span class="step-node">Deluge: Parse CSV Attachment</span>
+    <span class="step-arrow">→</span>
+    <span class="step-node">Loop: For Each Worker</span>
+    <span class="step-arrow">→</span>
+    <span class="step-node">Supabase: Create Account</span>
+    <span class="step-arrow">→</span>
+    <span class="step-node">Twilio: SMS Credentials</span>
+    <span class="step-arrow">→</span>
+    <span class="step-node">Zoho Campaigns: Enroll in Training</span>
+  </div>
+  
+  <pre><code>Flow Name: MANS360_ASHA_Bulk_Onboard
+Trigger: Zoho Desk → New Ticket
+  Condition: Department == "Engineering" AND Tag contains "asha_bulk_import"
+
+Step 1: Get attachment from ticket (CSV file)
+Step 2: Deluge — Parse CSV, validate phone numbers, dedup
+Step 3: FOR EACH valid row:
+  3a: Supabase POST → Create user (role='asha_worker')
+  3b: Generate random 6-digit password
+  3c: Twilio HTTP → SMS: "Welcome to MANS360. Login: [phone] / Password: [pwd]"
+  3d: Zoho Campaigns → Add to "ASHA Training" list
+Step 4: Deluge — Generate summary report (total, success, failed, duplicates)
+Step 5: Zoho Desk → Update ticket with report, close ticket</code></pre>
+</div>
+
+<div class="callout callout-info">
+  <strong>ℹ️ Remaining WF-1.5 to WF-1.7</strong>
+  Workflows 1.5 (Corporate HR Onboarding), 1.6 (Coach Registration), and 1.7 (NRI Patient Registration) follow the same pattern as WF-1.1/1.2 with role-specific variations. Zoho Flow configurations are structurally identical — only the validation rules, Supabase table, and email templates change. Full configs available in the supplementary Zoho Flow export package.
+</div>
+
+<!-- S5 -->
+<h2 id="s5">5. Category 2: Clinical Operations (12 Flows)</h2>
+
+<div class="flow-block">
+  <div class="flow-block-title"><span class="wf-id">WF-2.1</span> Session Booking <span class="tag tag-done">✅ 90% DONE</span></div>
+  <p><strong>Trigger:</strong> Webhook — Frontend sends booking request</p>
+  <div class="step-chain">
+    <span class="step-node">Webhook: Book</span>
+    <span class="step-arrow">→</span>
+    <span class="step-node">Supabase: Check Availability</span>
+    <span class="step-arrow">→</span>
+    <span class="step-node">Supabase: Lock Slot (10min)</span>
+    <span class="step-arrow">→</span>
+    <span class="step-node">PhonePe: Create Payment</span>
+    <span class="step-arrow">→</span>
+    <span class="step-node">Wait: Payment Callback</span>
+    <span class="step-arrow">→</span>
+    <span class="step-node">Agora: Gen Video Link</span>
+    <span class="step-arrow">→</span>
+    <span class="step-node">ZeptoMail + Twilio: Confirm</span>
+    <span class="step-arrow">→</span>
+    <span class="step-node">Schedule: Reminders</span>
+  </div>
+
+  <h4>PhonePe Payment Integration (Deluge)</h4>
+  <pre><code>// WF-2.1: Create PhonePe payment order
+merchantId = zoho.flow.getVariable("PHONEPE_MERCHANT_ID");
+saltKey = zoho.flow.getVariable("PHONEPE_SALT_KEY");
+saltIndex = zoho.flow.getVariable("PHONEPE_SALT_INDEX");
+
+transactionId = "MANS-" + zoho.currenttime.toLong() + "-" + input.get("booking_id");
+amount = input.get("session_price").toNumber() * 100; // paisa
+
+payload = Map();
+payload.put("merchantId", merchantId);
+payload.put("merchantTransactionId", transactionId);
+payload.put("merchantUserId", input.get("patient_id"));
+payload.put("amount", amount);
+payload.put("redirectUrl", "https://app.mans360.co/payment/callback");
+payload.put("redirectMode", "REDIRECT");
+payload.put("callbackUrl", zoho.flow.getVariable("ZOHO_FLOW_WEBHOOK_PAYMENT_CALLBACK"));
+payload.put("paymentInstrument", {"type": "PAY_PAGE"});
+
+// Base64 encode
+payloadB64 = zoho.encryption.base64Encode(payload.toString());
+
+// SHA256 checksum
+checksumInput = payloadB64 + "/pg/v1/pay" + saltKey;
+checksum = zoho.encryption.sha256(checksumInput) + "###" + saltIndex;
+
+// Call PhonePe
+response = invokeurl
+[
+  url: "https://api.phonepe.com/apis/hermes/pg/v1/pay"
+  type: POST
+  headers: {
+    "Content-Type": "application/json",
+    "X-VERIFY": checksum
+  }
+  parameters: {"request": payloadB64}
+];
+
+return {
+  "transaction_id": transactionId,
+  "payment_url": response.get("data").get("instrumentResponse").get("redirectInfo").get("url"),
+  "status": response.get("success")
+};</code></pre>
+</div>
+
+<div class="flow-block">
+  <div class="flow-block-title"><span class="wf-id">WF-2.2</span> AI-Assisted Session Notes <span class="tag tag-high">🔴 HIGH PRIORITY</span></div>
+  <p><strong>Current:</strong> 20% automated → <strong>Target:</strong> 80% automated</p>
+  <p><strong>Savings:</strong> 50 hrs/week → 10 hrs/week (₹1,60,000/month) — HIGHEST ROI workflow</p>
+
+  <div class="step-chain">
+    <span class="step-node">Webhook: Session End</span>
+    <span class="step-arrow">→</span>
+    <span class="step-node">Claude API: Generate Draft Note</span>
+    <span class="step-arrow">→</span>
+    <span class="step-node">Supabase: Store Draft</span>
+    <span class="step-arrow">→</span>
+    <span class="step-node">ZeptoMail: Notify Therapist</span>
+    <span class="step-arrow">→</span>
+    <span class="step-node">Wait: Therapist Approval</span>
+    <span class="step-arrow">→</span>
+    <span class="step-node">Supabase: Finalize + Encrypt</span>
+  </div>
+
+  <h4>Deluge: Claude API Session Note Generation</h4>
+  <pre><code>// WF-2.2: Generate session notes using Claude API
+sessionData = input.get("session_summary");
+template = input.get("note_template"); // SOAP, Progress, etc.
+patientHistory = input.get("patient_context");
+
+systemPrompt = "You are a clinical documentation assistant for MANAS360, a mental health platform in India. Generate professional clinical session notes in " + template + " format. Be concise, clinically accurate, and DPDPA-compliant. Never include patient PII in the note — use anonymous identifiers only. Write in third person clinical language.";
+
+userPrompt = "Session summary: " + sessionData + "\n\nPatient context (anonymized): " + patientHistory + "\n\nGenerate a complete " + template + " note with: Subjective, Objective, Assessment, and Plan sections.";
+
+response = invokeurl
+[
+  url: "https://api.anthropic.com/v1/messages"
+  type: POST
+  headers: {
+    "x-api-key": zoho.flow.getVariable("ANTHROPIC_API_KEY"),
+    "anthropic-version": "2023-06-01",
+    "Content-Type": "application/json"
+  }
+  parameters: {
+    "model": "claude-sonnet-4-20250514",
+    "max_tokens": 1500,
+    "system": systemPrompt,
+    "messages": [{"role": "user", "content": userPrompt}]
+  }.toString()
+];
+
+generatedNote = response.get("content").get(0).get("text");
+return {
+  "draft_note": generatedNote,
+  "template_used": template,
+  "generated_at": zoho.currenttime,
+  "requires_therapist_review": true,
+  "ai_confidence": "high"
+};</code></pre>
+</div>
+
+<div class="flow-block">
+  <div class="flow-block-title"><span class="wf-id">WF-2.3</span> Patient-Therapist Matching Algorithm <span class="tag tag-done">✅ DONE</span></div>
+  <p><strong>Trigger:</strong> Sub-flow called by WF-1.3 (Assessment completion)</p>
+  
+  <h4>Deluge: 100-Point Matching Algorithm</h4>
+  <pre><code>// WF-2.3: Patient-therapist matching (100-point scoring)
+patientScore = input.get("phq9_score").toNumber();
+patientLang = input.get("language_pref");
+patientCity = input.get("city");
+patientState = input.get("state");
+patientNeed = input.get("primary_need"); // depression, anxiety, trauma, etc.
+
+// Determine required specialization from assessment
+specialization = "general";
+if (patientScore >= 15) { specialization = "depression"; }
+if (input.get("gad7_score") != null && input.get("gad7_score").toNumber() >= 10)
+{
+  specialization = "anxiety";
+}
+if (patientNeed == "trauma") { specialization = "trauma"; }
+
+// Query active therapists from Supabase
+headers = Map();
+headers.put("apikey", zoho.flow.getVariable("SUPABASE_ANON_KEY"));
+headers.put("Authorization", "Bearer " + zoho.flow.getVariable("SUPABASE_SERVICE_KEY"));
+
+therapists = invokeurl
+[
+  url: zoho.flow.getVariable("SUPABASE_URL") + "/rest/v1/therapists?status=eq.active&has_availability=eq.true&select=*"
+  type: GET
+  headers: headers
+];
+
+// Score each therapist
+matches = List();
+for each t in therapists
+{
+  score = 0;
+  
+  // Specialization match (40 points)
+  specs = t.get("specializations"); // comma-separated
+  if (specs.contains(specialization)) { score = score + 40; }
+  else if (specs.contains("general")) { score = score + 15; }
+  
+  // Language match (20 points)
+  langs = t.get("languages");
+  if (langs.contains(patientLang)) { score = score + 20; }
+  
+  // Location match (15 points)
+  if (t.get("city") == patientCity) { score = score + 15; }
+  else if (t.get("state") == patientState) { score = score + 10; }
+  else { score = score + 5; } // Remote is always available
+  
+  // Experience (10 points)
+  exp = t.get("years_experience").toNumber();
+  score = score + ifnull(exp * 2, 0).min(10);
+  
+  // Availability (10 points)
+  openSlots = t.get("open_slots_this_week").toNumber();
+  score = score + ifnull(openSlots, 0).min(10);
+  
+  // Rating (5 points)
+  rating = t.get("avg_rating").toNumber();
+  score = score + ifnull(rating, 0).min(5);
+  
+  matches.add({"therapist_id": t.get("id"), "name": t.get("name"), "score": score});
+}
+
+// Sort by score descending, return top 10
+matches.sort("score", false);
+topMatches = matches.subList(0, matches.size().min(10));
+
+return {"matches": topMatches, "total_considered": therapists.size()};</code></pre>
+</div>
+
+<div class="callout callout-info">
+  <strong>ℹ️ Remaining Clinical Workflows (WF-2.4 to WF-2.12)</strong>
+  WF-2.4 (Lead Purchase), WF-2.5 (ASHA Referral), WF-2.6 (Session Reminders), WF-2.7 (Post-Session Feedback), WF-2.8 (Treatment Plan Auto-Generation), WF-2.9 (Progress Chart Updates), WF-2.10 (Adherence Tracking), WF-2.11 (Re-engagement for Inactive Patients), WF-2.12 (Therapist Performance Scoring). All follow the webhook → Deluge → Supabase → notification pattern. Full Zoho Flow export package includes all 12 configs.
+</div>
+
+<!-- S6 -->
+<h2 id="s6">6. Category 3: Payment & Billing (6 Flows)</h2>
+
+<div class="flow-block">
+  <div class="flow-block-title"><span class="wf-id">WF-3.2</span> Recurring Subscription Billing <span class="tag tag-med">🟡 MEDIUM</span></div>
+  <p><strong>Trigger:</strong> Scheduled — Daily at 02:00 IST</p>
+  <p><strong>Savings:</strong> 10 hrs/week → 1 hr/week (₹36,000/month + revenue recovery)</p>
+
+  <pre><code>Flow Name: MANS360_Daily_Renewal_Check
+Trigger: Schedule → Daily at 02:00 IST
+
+Step 1: Supabase GET → SELECT * FROM subscriptions 
+        WHERE end_date = CURRENT_DATE AND status = 'active'
+
+Step 2: FOR EACH expiring subscription:
+  2a: PhonePe → Create recurring charge (saved UPI/card)
+  2b: IF payment success:
+      → Supabase UPDATE: end_date += period, status = 'active'
+      → ZeptoMail: "Subscription renewed" (template: renewal_success)
+      → Supabase: INSERT invoice record
+  2c: IF payment failed:
+      → Supabase UPDATE: status = 'payment_failed'
+      → ZeptoMail: "Payment failed — update method" (template: payment_retry)
+      → Twilio SMS: "MANS360: Payment failed. Update: [link]"
+      → Schedule retry: +24h, +48h, +72h (3 retries)
+
+Step 3: After 72h grace period with 3 failed retries:
+  → Supabase UPDATE: status = 'expired', tier = 'free'
+  → ZeptoMail: "Subscription expired" (template: sub_expired)
+  → Zoho Campaigns: Move to "Churned" segment
+  → Track event: 'subscription_churned'</code></pre>
+</div>
+
+<div class="flow-block">
+  <div class="flow-block-title"><span class="wf-id">WF-3.3</span> Therapist Wallet & Payouts <span class="tag tag-med">🟡 MEDIUM</span></div>
+  <p><strong>Trigger:</strong> Webhook — Session marked 'completed'</p>
+  <p><strong>Revenue split:</strong> 60% therapist / 40% MANAS360</p>
+
+  <h4>Deluge: Payout Fraud Detection</h4>
+  <pre><code>// WF-3.3: Fraud check before processing payout
+therapistId = input.get("therapist_id");
+payoutAmount = input.get("amount").toNumber();
+
+// Fetch therapist history
+headers = Map();
+headers.put("apikey", zoho.flow.getVariable("SUPABASE_ANON_KEY"));
+headers.put("Authorization", "Bearer " + zoho.flow.getVariable("SUPABASE_SERVICE_KEY"));
+
+profile = invokeurl
+[
+  url: zoho.flow.getVariable("SUPABASE_URL") + "/rest/v1/therapists?id=eq." + therapistId + "&select=*"
+  type: GET
+  headers: headers
+].get(0);
+
+flagged = false;
+reasons = List();
+
+// Rule 1: First payout within 7 days of joining
+joinDate = profile.get("created_at").toDate();
+daysSinceJoin = ((zoho.currenttime.toLong() - joinDate.toLong()) / 86400000).toNumber();
+if (daysSinceJoin < 7)
+{
+  flagged = true;
+  reasons.add("First payout within " + daysSinceJoin + " days of joining");
+}
+
+// Rule 2: Payout > ₹50,000 (high-value review)
+if (payoutAmount > 50000)
+{
+  flagged = true;
+  reasons.add("High-value payout: ₹" + payoutAmount);
+}
+
+// Rule 3: No completed sessions but wallet has funds
+sessions = invokeurl
+[
+  url: zoho.flow.getVariable("SUPABASE_URL") + "/rest/v1/sessions?therapist_id=eq." + therapistId + "&status=eq.completed&select=id"
+  type: GET
+  headers: headers
+];
+if (sessions.size() == 0)
+{
+  flagged = true;
+  reasons.add("No completed sessions but requesting payout");
+}
+
+// Rule 4: Multiple payout requests in 24h
+recentPayouts = invokeurl
+[
+  url: zoho.flow.getVariable("SUPABASE_URL") + "/rest/v1/payouts?therapist_id=eq." + therapistId + "&created_at=gte." + (zoho.currenttime.subDay(1)).toString("yyyy-MM-dd'T'HH:mm:ss") + "&select=id"
+  type: GET
+  headers: headers
+];
+if (recentPayouts.size() > 1)
+{
+  flagged = true;
+  reasons.add(recentPayouts.size() + " payout requests in last 24h");
+}
+
+return {
+  "flagged": flagged,
+  "reasons": reasons,
+  "auto_approve": !flagged,
+  "requires_manual_review": (flagged && payoutAmount > 50000)
+};</code></pre>
+</div>
+
+<!-- S7-S11 Summary -->
+<h2 id="s7">7–11. Categories 4–8: Summary Configurations</h2>
+
+<table>
+  <tr><th>WF ID</th><th>Workflow Name</th><th>Zoho Flow Trigger</th><th>Key Actions</th><th>Status</th><th>Savings/Mo</th></tr>
+  <tr><td>4.1</td><td>Welcome Email Sequence</td><td>Sub-flow from WF-1.1</td><td>Zoho Campaigns: 5-email drip (Day 0,1,3,7,14)</td><td><span class="tag tag-done">✅</span></td><td>—</td></tr>
+  <tr><td>4.2</td><td>Session Reminders</td><td>Schedule: Hourly check</td><td>ZeptoMail + Twilio: 24h, 1h, 10min before</td><td><span class="tag tag-done">✅</span></td><td>—</td></tr>
+  <tr><td>4.3</td><td>Crisis Alert Notifications</td><td>Sub-flow from WF-1.3</td><td>Twilio SMS (therapist + ops) + Zoho Desk ticket + IVR auto-dial</td><td><span class="tag tag-done">✅</span></td><td>—</td></tr>
+  <tr><td>4.4–4.8</td><td>Re-engagement, Feedback, NPS</td><td>Schedule / Webhook</td><td>Zoho Campaigns segments + ZeptoMail</td><td><span class="tag tag-partial">⚠️</span></td><td>₹20K</td></tr>
+  <tr><td>5.1–5.5</td><td>Training, Quiz, Certificates</td><td>Webhook from LMS</td><td>Deluge scoring + PDF gen + S3 + ZeptoMail</td><td><span class="tag tag-done">✅</span></td><td>₹80K</td></tr>
+  <tr><td>6.1–6.4</td><td>Analytics, Outcome Tracking</td><td>Schedule: Daily/Weekly</td><td>Supabase aggregate → Zoho Analytics push</td><td><span class="tag tag-partial">⚠️</span></td><td>₹40K</td></tr>
+  <tr><td>7.1</td><td>Crisis Management</td><td>Sub-flow (real-time)</td><td>Twilio + Zoho Desk + IVR escalation</td><td><span class="tag tag-done">✅</span></td><td>—</td></tr>
+  <tr><td>7.2–7.3</td><td>Post-Crisis Follow-up</td><td>Schedule: 24h after</td><td>ZeptoMail + Therapist reminder</td><td><span class="tag tag-done">✅</span></td><td>—</td></tr>
+  <tr><td>8.1</td><td>DPDPA Data Deletion</td><td>Zoho Desk ticket</td><td>Deluge: purge Supabase + S3 + audit log</td><td><span class="tag tag-partial">⚠️</span></td><td>₹10K</td></tr>
+  <tr><td>8.2</td><td>Contract/NDA Management</td><td>Zoho Sign: Doc completed</td><td>S3 storage + Supabase status update</td><td><span class="tag tag-done">✅</span></td><td>—</td></tr>
+</table>
+
+<!-- S12 -->
+<h2 id="s12">12. Deluge Custom Function Library</h2>
+
+<p>All Deluge functions are stored in Zoho Flow under <strong>Settings → Custom Functions</strong>. Below is the master index:</p>
+
+<table>
+  <tr><th>Function Name</th><th>Used By</th><th>Description</th></tr>
+  <tr><td><code>validate_patient_registration</code></td><td>WF-1.1</td><td>Email + phone + age + dedup validation</td></tr>
+  <tr><td><code>validate_therapist_credentials</code></td><td>WF-1.2</td><td>NMC/RCI API license verification + name match</td></tr>
+  <tr><td><code>calculate_phq9_score</code></td><td>WF-1.3</td><td>PHQ-9/GAD-7 scoring + crisis detection</td></tr>
+  <tr><td><code>match_therapist_patient</code></td><td>WF-2.3</td><td>100-point matching algorithm</td></tr>
+  <tr><td><code>create_phonepe_payment</code></td><td>WF-2.1, WF-3.1</td><td>PhonePe order creation with checksum</td></tr>
+  <tr><td><code>verify_phonepe_callback</code></td><td>WF-3.1</td><td>Verify PhonePe webhook signature</td></tr>
+  <tr><td><code>generate_session_notes</code></td><td>WF-2.2</td><td>Claude API clinical note generation</td></tr>
+  <tr><td><code>detect_payout_fraud</code></td><td>WF-3.3</td><td>4-rule fraud detection for payouts</td></tr>
+  <tr><td><code>parse_csv_bulk_import</code></td><td>WF-1.4</td><td>CSV parsing + validation for ASHA imports</td></tr>
+  <tr><td><code>send_sms_via_twilio</code></td><td>Multiple</td><td>Reusable Twilio SMS sender</td></tr>
+  <tr><td><code>supabase_query</code></td><td>Multiple</td><td>Reusable Supabase REST helper (GET/POST/PATCH)</td></tr>
+  <tr><td><code>encrypt_clinical_data</code></td><td>WF-2.2, WF-5.2</td><td>AES-256 encryption wrapper for clinical records</td></tr>
+</table>
+
+<!-- S13 -->
+<h2 id="s13">13. Webhook Schemas & Payloads</h2>
+
+<h4>13.1 Incoming Webhooks (External → Zoho Flow)</h4>
+
+<pre><code>// PhonePe Payment Callback
+POST /webhook/phonepe-callback
+{
+  "response": "BASE64_ENCODED_PAYLOAD",
+  "merchantId": "MANS360_LIVE",
+  "merchantTransactionId": "MANS-1711234567890-BK001",
+  "transactionId": "T2403221234567890",
+  "amount": 29900,  // paisa
+  "state": "COMPLETED",  // COMPLETED | FAILED | PENDING
+  "responseCode": "SUCCESS",
+  "paymentInstrument": {
+    "type": "UPI",
+    "utr": "123456789012"
+  }
+}
+
+// Zoho Sign Document Completed Callback
+// Auto-configured when Zoho Sign trigger is added in Flow
+{
+  "action_type": "SignCompleted",
+  "requests": {
+    "request_id": "12345678",
+    "request_status": "completed",
+    "document_ids": ["DOC001"],
+    "owner_email": "legal@mans360.co",
+    "actions": [
+      {
+        "action_type": "SIGN",
+        "recipient_email": "therapist@example.com",
+        "action_status": "SIGNED",
+        "signing_time": "2026-03-22T10:30:00+05:30"
+      }
+    ]
+  }
+}
+
+// Frontend Session Completion Callback
+POST /webhook/session-completed
+{
+  "session_id": "SES-001",
+  "booking_id": "BK-001",
+  "therapist_id": "PSY-001",
+  "patient_id": "PAT-001",
+  "duration_minutes": 52,
+  "session_type": "video",
+  "completed_at": "2026-03-22T11:52:00+05:30",
+  "recording_consent": true,
+  "session_summary_keywords": ["anxiety", "work_stress", "sleep"]
+}</code></pre>
+
+<!-- S14 -->
+<h2 id="s14">14. Error Handling & Retry Patterns</h2>
+
+<pre><code>// Standard Zoho Flow error handling pattern for all MANAS360 flows
+
+// In Zoho Flow: Add "On Error" handler to each critical step
+// Configuration:
+//   Retry: 3 attempts, exponential backoff (30s, 120s, 300s)
+//   On final failure: Execute error handler sub-flow
+
+// Error Handler Sub-Flow: MANS360_Error_Logger
+// Trigger: Called by any flow on final failure
+
+Flow: MANS360_Error_Logger
+Step 1: Deluge — Format error details
+  {
+    "flow_name": input.get("flow_name"),
+    "step_failed": input.get("step"),
+    "error_message": input.get("error"),
+    "payload": input.get("original_payload"),
+    "timestamp": zoho.currenttime,
+    "severity": input.get("severity")  // LOW, MEDIUM, HIGH, CRITICAL
+  }
+
+Step 2: Supabase POST → INSERT into 'flow_errors' table
+
+Step 3: IF severity == "CRITICAL" or severity == "HIGH":
+  → Zoho Desk: Create ticket (Department: Engineering, Priority: Urgent)
+  → Twilio SMS → Tech Admin (TADM) phone
+  → ZeptoMail → dev-support@mans360.co
+
+Step 4: IF severity == "MEDIUM" or severity == "LOW":
+  → Zoho Desk: Create ticket (Priority: Normal)
+  → ZeptoMail → dev-support@mans360.co</code></pre>
+
+<!-- S15 -->
+<h2 id="s15">15. Automation Priority Matrix & Roadmap</h2>
+
+<table>
+  <tr><th>Priority</th><th>Workflow</th><th>Impact</th><th>Effort</th><th>Timeline</th><th>Savings/Mo</th></tr>
+  <tr><td>P0 ⭐</td><td>AI Session Notes (WF-2.2)</td><td>🔴 HIGH</td><td>MEDIUM (4 wks)</td><td>Week 1-4</td><td>₹1,60,000</td></tr>
+  <tr><td>P0 ⭐</td><td>Therapist Credential Verify (WF-1.2)</td><td>🔴 HIGH</td><td>LOW (1 wk)</td><td>Week 1-2</td><td>₹56,000</td></tr>
+  <tr><td>P0 ⭐</td><td>ASHA Worker Onboarding (WF-1.4)</td><td>🔴 HIGH</td><td>LOW (1 wk)</td><td>Week 1-2</td><td>₹30,000</td></tr>
+  <tr><td>P1</td><td>Recurring Payment Retries (WF-3.2)</td><td>🔴 HIGH</td><td>LOW (2 wks)</td><td>Week 3-4</td><td>₹36,000</td></tr>
+  <tr><td>P1</td><td>ASHA Referral Follow-up (WF-2.5)</td><td>🟡 MED</td><td>LOW (2 wks)</td><td>Week 3-4</td><td>₹76,000</td></tr>
+  <tr><td>P1</td><td>Daily Outcome Reporting (WF-6.1)</td><td>🟡 MED</td><td>LOW (1 wk)</td><td>Week 3</td><td>₹40,000</td></tr>
+  <tr><td>P2</td><td>Payout Fraud Detection (WF-3.3)</td><td>🟡 MED</td><td>MEDIUM (3 mo)</td><td>Week 9-12</td><td>₹28,000</td></tr>
+  <tr><td>P2</td><td>Insurance Claim Submission (WF-4.1)</td><td>🔴 HIGH</td><td>MEDIUM (4 wks)</td><td>Week 5-8</td><td>₹60,000</td></tr>
+  <tr><td>P2</td><td>School Program Enrollment</td><td>🟡 MED</td><td>LOW (2 wks)</td><td>Week 5-6</td><td>₹44,000</td></tr>
+  <tr><td>P3</td><td>Churn Prediction Model</td><td>🟢 LOW</td><td>HIGH (3 mo)</td><td>Backlog</td><td>₹80,000</td></tr>
+</table>
+
+<!-- S16 -->
+<h2 id="s16">16. Cost & ROI Summary</h2>
+
+<table>
+  <tr><th>Item</th><th>Monthly Cost</th><th>Annual Cost</th></tr>
+  <tr><td>Zoho Flow Professional</td><td>₹1,500</td><td>₹18,000</td></tr>
+  <tr><td>Zoho Campaigns (included in Zoho One)</td><td>—</td><td>—</td></tr>
+  <tr><td>ZeptoMail (10K emails/mo)</td><td>₹250</td><td>₹3,000</td></tr>
+  <tr><td>Zoho Sign (included in Zoho One)</td><td>—</td><td>—</td></tr>
+  <tr><td>Twilio SMS (~5K/mo)</td><td>₹3,000</td><td>₹36,000</td></tr>
+  <tr><td>Claude API (AnytimeBUDDY + Notes)</td><td>₹8,000</td><td>₹96,000</td></tr>
+  <tr><td><strong>Total Platform Cost</strong></td><td><strong>₹12,750</strong></td><td><strong>₹1,53,000</strong></td></tr>
+  <tr style="background:#e8f5e9"><td><strong>Monthly Automation Savings</strong></td><td colspan="2"><strong>₹6,10,000/month (₹73.2L/year)</strong></td></tr>
+  <tr style="background:#e8f5e9"><td><strong>Net Monthly Savings</strong></td><td colspan="2"><strong>₹5,97,250/month (₹71.7L/year)</strong></td></tr>
+  <tr style="background:#e8f5e9"><td><strong>Payback Period</strong></td><td colspan="2"><strong>1.5 months</strong></td></tr>
+</table>
+
+<div class="callout callout-warn">
+  <strong>📎 Supplementary Deliverables (Separate Files)</strong>
+  • Zoho Flow export JSON (all 47 flow configs — import directly)<br>
+  • Deluge function library (.ds files — 12 custom functions)<br>
+  • Webhook test payloads (Postman collection)<br>
+  • Supabase migration SQL (tables, indexes, views referenced by flows)
+</div>
+
+</div>
+</body>
+</html>

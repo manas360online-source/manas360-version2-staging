@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.listSubscriptionsController = exports.getMetricsController = exports.approveProviderController = exports.verifyProviderController = exports.verifyTherapistController = exports.getUserController = exports.listUsersController = void 0;
+exports.getAdminLiveSessionsController = exports.listSubscriptionsController = exports.getMetricsController = exports.approveProviderController = exports.verifyProviderController = exports.verifyTherapistController = exports.getUserController = exports.listUsersController = void 0;
 const error_middleware_1 = require("../middleware/error.middleware");
 const admin_service_1 = require("../services/admin.service");
 const response_1 = require("../utils/response");
@@ -121,3 +121,12 @@ const listSubscriptionsController = async (req, res) => {
     (0, response_1.sendSuccess)(res, result, 'Subscriptions fetched successfully');
 };
 exports.listSubscriptionsController = listSubscriptionsController;
+/**
+ * GET /api/v1/admin/live-sessions
+ * Get real-time overview of active sessions for monitoring.
+ */
+const getAdminLiveSessionsController = async (req, res) => {
+    const result = await (0, admin_service_1.getAdminLiveSessions)();
+    (0, response_1.sendSuccess)(res, result, 'Live sessions fetched successfully');
+};
+exports.getAdminLiveSessionsController = getAdminLiveSessionsController;
