@@ -26,6 +26,7 @@ services:
 
   backend:
     build: ./backend
+<<<<<<< HEAD
     restart: no
     environment:
       NODE_ENV: development
@@ -42,14 +43,28 @@ services:
       JWT_ACCESS_EXPIRES_IN: 15m
       JWT_REFRESH_EXPIRES_IN: 7d
       COOKIE_DOMAIN: localhost
+=======
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      PORT: "5000"
+      DATABASE_URL: postgresql://manas360:manas360@db:5432/manas360
+      REDIS_URL: redis://redis:6379
+>>>>>>> c6144ef (Local features before syncing with latest GitHub)
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_started
     ports:
+<<<<<<< HEAD
       - "5001:5000"
     command: ["sh", "-c", "sleep 3600"]
+=======
+      - "5000:5000"
+    command: ["sh", "-c", "npx prisma@4.16.2 generate && node dist/server.js"]
+>>>>>>> c6144ef (Local features before syncing with latest GitHub)
 
   ai_engine:
     build:
