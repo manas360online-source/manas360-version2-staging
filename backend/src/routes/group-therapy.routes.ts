@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.middleware';
 import { requireRole } from '../middleware/rbac.middleware';
 import { asyncHandler } from '../middleware/validate.middleware';
+import { sendSuccess } from '../utils/response';
 import {
   confirmPrivateInvitePaymentController,
   confirmPublicJoinController,
@@ -23,7 +24,12 @@ const router = Router();
 
 const providerRoles = ['therapist', 'psychologist', 'psychiatrist', 'coach'] as const;
 
-// Public discovery + guest join payment flow
+// Test endpoint to verify public routes work
+router.get('/public/health', (_req, res) => {
+  res.status(200).json({ status: 'ok', message: 'Public group-therapy endpoint is accessible' });
+});
+
+// Public discovery + guest join payment flow (NO AUTH REQUIRED)
 router.get('/public/sessions', asyncHandler(listPublicPublishedGroupTherapySessionsController));
 router.post('/public/sessions/:sessionId/join/payment-intent', asyncHandler(createPublicJoinPaymentIntentController));
 router.post('/public/sessions/:sessionId/join/confirm', asyncHandler(confirmPublicJoinController));
