@@ -658,6 +658,153 @@ async function seed() {
     }
   }
 
+  // Seed Group Therapy Sessions
+  const groupTherapySessions = [
+    {
+      title: 'Anxiety Circle - Morning Session',
+      topic: 'Anxiety Management',
+      description: 'Learn evidence-based techniques to manage anxiety symptoms including breathing exercises, cognitive restructuring, and exposure therapy.',
+      mode: 'PUBLIC',
+      status: 'PUBLISHED',
+      offset: 0, // Today
+      durationMinutes: 60,
+      maxMembers: 12,
+      priceMinor: BigInt(0), // Free
+      allowGuestJoin: true,
+      requiresPayment: false,
+    },
+    {
+      title: 'Grief & Loss Support Group',
+      topic: 'Bereavement & Grief',
+      description: 'A compassionate space to process loss and grief with trained facilitators and supportive peers.',
+      mode: 'PUBLIC',
+      status: 'PUBLISHED',
+      offset: 0.2, // 12 minutes from now
+      durationMinutes: 90,
+      maxMembers: 10,
+      priceMinor: BigInt(0), // Free
+      allowGuestJoin: true,
+      requiresPayment: false,
+    },
+    {
+      title: 'Mindful Parenting Workshop',
+      topic: 'Parenting & Family Wellness',
+      description: 'Develop mindful parenting skills to create a more peaceful and connected family environment.',
+      mode: 'PUBLIC',
+      status: 'PUBLISHED',
+      offset: 1.08, // 1 hour 35 minutes from now
+      durationMinutes: 75,
+      maxMembers: 15,
+      priceMinor: BigInt(0), // Free
+      allowGuestJoin: true,
+      requiresPayment: false,
+    },
+    {
+      title: 'Depression Recovery Circle',
+      topic: 'Depression Management',
+      description: 'Peer-led discussion group focusing on recovery strategies, medication management, and lifestyle changes for depression.',
+      mode: 'PUBLIC',
+      status: 'PUBLISHED',
+      offset: 0.5, // 30 minutes from now
+      durationMinutes: 60,
+      maxMembers: 8,
+      priceMinor: BigInt(0), // Free
+      allowGuestJoin: true,
+      requiresPayment: false,
+    },
+    {
+      title: 'Trauma-Informed Care Workshop',
+      topic: 'Trauma Recovery',
+      description: 'Safe and structured environment for trauma survivors to learn healing techniques including EMDR basics and somatic experiencing.',
+      mode: 'PUBLIC',
+      status: 'PUBLISHED',
+      offset: 2, // 2 hours from now
+      durationMinutes: 90,
+      maxMembers: 10,
+      priceMinor: BigInt(0), // Free
+      allowGuestJoin: true,
+      requiresPayment: false,
+    },
+  ];
+
+  const adminUser = adminsSeed[0];
+  const adminObj = persistedUsers.find(u => u.role === 'ADMIN');
+
+  for (let idx = 0; idx < groupTherapySessions.length; idx++) {
+    const sessionData = groupTherapySessions[idx];
+    const therapist = therapistUsers[idx % therapistUsers.length];
+    if (!therapist) continue;
+
+    const scheduledAt = new Date();
+    scheduledAt.setHours(scheduledAt.getHours() + Math.floor(sessionData.offset));
+    scheduledAt.setMinutes(scheduledAt.getMinutes() + (sessionData.offset % 1) * 60);
+
+    await prisma.groupTherapySession.upsert({
+      where: { id: `group-therapy-seed-${idx}` },
+      update: {
+        title: sessionData.title,
+        status: sessionData.status,
+        publishedAt: new Date(),
+        approvedAt: new Date(),
+        approvedById: adminObj?.id,
+      },
+      create: {
+        id: `group-therapy-seed-${idx}`,
+        title: sessionData.title,
+        topic: sessionData.topic,
+        description: sessionData.description,
+        sessionMode: sessionData.mode,
+        status: sessionData.status,
+        requestedById: therapist.id,
+        hostTherapistId: therapist.id,
+        approvedById: adminObj?.id,
+        scheduledAt,
+        durationMinutes: sessionData.durationMinutes,
+        maxMembers: sessionData.maxMembers,
+        priceMinor: sessionData.priceMinor,
+        allowGuestJoin: sessionData.allowGuestJoin,
+        requiresAdminGate: false,
+        requiresPayment: sessionData.requiresPayment,
+        jitsiRoomName: `group-therapy-${idx}-${Date.now()}`,
+        publishAt: new Date(),
+        publishedAt: new Date(),
+        approvedAt: new Date(),
+      },
+    }).catch(() => null);
+  }
+
+  // Add a few enrollments to the first session to show joined counts
+  const firstSession = await prisma.groupTherapySession.findFirst({
+    where: { id: 'group-therapy-seed-0' },
+  });
+
+  if (firstSession) {
+    for (let i = 0; i < 5; i++) {
+      const patient = patientUsers[i];
+      if (!patient) continue;
+
+      await prisma.groupTherapyEnrollment.upsert({
+        where: {
+          sessionId_patientUserId_guestEmail: {
+            sessionId: firstSession.id,
+            patientUserId: patient.id,
+            guestEmail: null,
+          },
+        },
+        update: {
+          status: 'JOINED',
+        },
+        create: {
+          sessionId: firstSession.id,
+          patientUserId: patient.id,
+          enrolledByAdminId: adminObj?.id,
+          status: 'JOINED',
+          joinedAt: new Date(),
+        },
+      }).catch(() => null);
+    }
+  }
+
   for (const patient of patientUsers) {
     const profile = profileByUserId.get(patient.id);
     if (!profile) continue;
