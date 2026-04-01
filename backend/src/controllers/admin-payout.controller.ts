@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma as db } from '../config/db';
 import { io } from '../socket';
+import { triggerZohoFlow } from '../services/zohoDesk.service';
 
 /**
  * GET /api/v1/admin/payouts
@@ -93,6 +94,16 @@ export const approvePayoutController = async (req: Request, res: Response) => {
     if (io) {
       io.to('admin-room').emit('payout-processed', { id, amount: therapistAmount });
     }
+
+    await triggerZohoFlow('payout_processed', {
+      payoutRequestId: id,
+      providerId: payout.providerId,
+      therapistAmount,
+      platformAmount,
+      currency: payout.currency,
+      approvedByAdminId: (req as any).auth?.userId || null,
+      paidAt: new Date().toISOString(),
+    });
 
     res.json({ 
       success: true, 
