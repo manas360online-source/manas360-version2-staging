@@ -76,6 +76,13 @@ export default function SignupPage() {
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [acceptedTerms, setAcceptedTerms] = useState(false);
+	const [aadhaar, setAadhaar] = useState('');
+	const [otpForAadhaar, setOtpForAadhaar] = useState('');
+	const [isAadhaarVerified, setIsAadhaarVerified] = useState(false);
+	const [isAadhaarOtpSent, setIsAadhaarOtpSent] = useState(false);
+	const [isAadhaarOtpLoading, setIsAadhaarOtpLoading] = useState(false);
+	const [maskedAadhaar, setMaskedAadhaar] = useState('');
+	const [generatedAadhaarOtp, setGeneratedAadhaarOtp] = useState('');
 	const [providerAgreementsAccepted, setProviderAgreementsAccepted] = useState<Record<ProviderAgreementKey, boolean>>({
 		THERAPIST_IC_AGREEMENT: false,
 		THERAPIST_NDA: false,
@@ -101,6 +108,13 @@ export default function SignupPage() {
 
 	useEffect(() => {
 		if (!isProviderFlow) {
+			setAadhaar('');
+			setOtpForAadhaar('');
+			setIsAadhaarVerified(false);
+			setIsAadhaarOtpSent(false);
+			setIsAadhaarOtpLoading(false);
+			setMaskedAadhaar('');
+			setGeneratedAadhaarOtp('');
 			setProviderAgreementsAccepted({
 				THERAPIST_IC_AGREEMENT: false,
 				THERAPIST_NDA: false,
@@ -169,9 +183,67 @@ export default function SignupPage() {
 		setShowPatientTermsModal(false);
 	};
 
+	const maskAadhaar = (value: string): string => {
+		const digits = value.replace(/\D/g, '').slice(0, 12);
+		if (digits.length < 4) return '**** **** ****';
+		return `**** **** ${digits.slice(-4)}`;
+	};
+
+	const sendAadhaarOtp = () => {
+		if (!isProviderFlow) return;
+		const digits = aadhaar.replace(/\D/g, '').slice(0, 12);
+		if (digits.length !== 12) {
+			setError('Please enter a valid 12-digit Aadhaar number.');
+			return;
+		}
+
+		setIsAadhaarOtpLoading(true);
+		setError(null);
+		const mockOtp = Math.floor(100000 + Math.random() * 900000).toString();
+		setGeneratedAadhaarOtp(mockOtp);
+		setIsAadhaarVerified(false);
+		setIsAadhaarOtpSent(true);
+		setOtpForAadhaar('');
+		setTimeout(() => {
+			setIsAadhaarOtpLoading(false);
+			// TODO: Replace this mock OTP flow with a real Aadhaar eKYC provider integration.
+			console.log('Mock Aadhaar OTP:', mockOtp);
+		}, 400);
+	};
+
+	const verifyAadhaarOtp = () => {
+		if (!isProviderFlow) return;
+		if (!isAadhaarOtpSent) {
+			setError('Please send Aadhaar OTP first.');
+			return;
+		}
+
+		const enteredOtp = otpForAadhaar.replace(/\D/g, '').slice(0, 6);
+		if (enteredOtp.length !== 6) {
+			setError('Please enter a valid 6-digit Aadhaar OTP.');
+			return;
+		}
+
+		if (enteredOtp !== generatedAadhaarOtp) {
+			setIsAadhaarVerified(false);
+			setError('Invalid Aadhaar OTP.');
+			return;
+		}
+
+		setError(null);
+		setIsAadhaarVerified(true);
+		setMaskedAadhaar(maskAadhaar(aadhaar));
+		setAadhaar('');
+	};
+
 	const requestOtp = async () => {
 		if (!isProviderFlow && !acceptedTerms) {
 			setError('Please accept Terms & Conditions to continue.');
+			return;
+		}
+
+		if (isProviderFlow && !isAadhaarVerified) {
+			setError('Please complete Aadhaar verification to continue.');
 			return;
 		}
 
@@ -299,6 +371,51 @@ export default function SignupPage() {
 
 						{isProviderFlow ? (
 							<div className="rounded-2xl border border-calm-sage/30 bg-white p-4">
+								<p className="text-sm font-semibold text-wellness-text">Aadhaar Verification</p>
+								<p className="mt-1 text-xs text-wellness-muted">
+									Providers must verify Aadhaar before phone OTP registration.
+								</p>
+								<div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
+									<Input
+										id="provider-aadhaar"
+										label="Aadhaar Number"
+										inputMode="numeric"
+										maxLength={12}
+										placeholder="12-digit Aadhaar"
+										value={aadhaar}
+										onChange={(event) => setAadhaar(event.target.value.replace(/\D/g, '').slice(0, 12))}
+										disabled={isAadhaarVerified || isAadhaarOtpLoading}
+										required
+									/>
+									<Button type="button" onClick={sendAadhaarOtp} loading={isAadhaarOtpLoading} className="min-h-[48px] sm:self-end">
+										{isAadhaarOtpLoading ? 'Sending...' : 'Send OTP'}
+									</Button>
+								</div>
+
+								{isAadhaarOtpSent && !isAadhaarVerified ? (
+									<div className="mt-2 grid gap-2 sm:grid-cols-[1fr_auto]">
+										<Input
+											id="provider-aadhaar-otp"
+											label="Aadhaar OTP"
+											inputMode="numeric"
+											pattern="\\d{6}"
+											maxLength={6}
+											placeholder="6-digit OTP"
+											value={otpForAadhaar}
+											onChange={(event) => setOtpForAadhaar(event.target.value.replace(/\D/g, '').slice(0, 6))}
+											required
+										/>
+										<Button type="button" onClick={verifyAadhaarOtp} className="min-h-[48px] sm:self-end">
+											Verify Aadhaar
+										</Button>
+									</div>
+								) : null}
+
+								{isAadhaarVerified ? (
+									<p className="mt-2 text-xs font-medium text-emerald-700">Aadhaar verified: {maskedAadhaar}</p>
+								) : null}
+
+								<div className="my-4 h-px bg-calm-sage/20" />
 								<p className="text-sm font-semibold text-wellness-text">Provider Legal Agreements</p>
 								<p className="mt-1 text-xs text-wellness-muted">
 									To register as a provider, read each agreement fully and accept it.
