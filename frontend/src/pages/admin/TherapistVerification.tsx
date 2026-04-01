@@ -205,7 +205,7 @@ export default function TherapistVerification() {
       </Modal>
 
       <p className="text-[10px] text-gray-400 mt-12 text-center uppercase font-bold tracking-widest font-mono">
-        Clinical Gatekeeper Protocol • API: Admin.v1 • HIPAA/DPDPA Compliance Node
+        Clinical Gatekeeper Protocol • API: Admin.v1 • HIPAA/DPDPA Governance Node
       </p>
     </div>
   );

@@ -14,9 +14,9 @@ export type AppRole =
   | 'coach' 
   | 'admin' 
   | 'superadmin' 
-  | 'complianceofficer'
   | 'clinicaldirector'
-  | 'financemanager';
+  | 'financemanager'
+  | 'complianceofficer';
 
 const normalizeRole = (value: unknown): AppRole | null => {
   if (typeof value !== 'string') {
@@ -32,9 +32,9 @@ const normalizeRole = (value: unknown): AppRole | null => {
     normalized === 'coach' ||
     normalized === 'admin' ||
     normalized === 'superadmin' ||
-    normalized === 'complianceofficer' ||
     normalized === 'clinicaldirector' ||
-    normalized === 'financemanager'
+    normalized === 'financemanager' ||
+    normalized === 'complianceofficer'
   ) {
     return normalized as AppRole;
   }
@@ -45,10 +45,10 @@ const normalizeRole = (value: unknown): AppRole | null => {
 export const getDefaultRouteForRole = (role: unknown): string => {
   const normalizedRole = normalizeRole(role);
   if (normalizedRole === 'psychologist') return '/provider/dashboard';
+  if (normalizedRole === 'complianceofficer') return '/admin/compliance';
   if (
     normalizedRole === 'admin' ||
     normalizedRole === 'superadmin' ||
-    normalizedRole === 'complianceofficer' ||
     normalizedRole === 'clinicaldirector' ||
     normalizedRole === 'financemanager'
   ) {
@@ -80,7 +80,14 @@ export const hasCorporateAccess = (user: AuthUser | null | undefined): boolean =
 export const isPlatformAdminUser = (user: AuthUser | null | undefined): boolean => {
   if (!user) return false;
   const role = normalizeRole(user.role);
-  return (role === 'admin' || role === 'complianceofficer') && !hasCorporateAccess(user);
+  return (
+    (role === 'admin' ||
+      role === 'superadmin' ||
+      role === 'clinicaldirector' ||
+      role === 'financemanager' ||
+      role === 'complianceofficer') &&
+    !hasCorporateAccess(user)
+  );
 };
 
 export const getPostLoginRoute = (user: AuthUser | null | undefined): string => {
@@ -93,6 +100,10 @@ export const getPostLoginRoute = (user: AuthUser | null | undefined): string => 
 
   if (hasCorporateAccess(user)) {
     return '/corporate/dashboard';
+  }
+
+  if (normalizeRole(user.role) === 'complianceofficer') {
+    return '/admin/compliance';
   }
 
   if (isPlatformAdminUser(user)) {

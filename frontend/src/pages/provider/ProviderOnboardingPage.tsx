@@ -770,7 +770,7 @@ function ProviderOnboardingPage() {
               <div className="space-y-4 rounded-xl border border-amber-200 bg-amber-50 p-5">
                 <p className="text-sm font-semibold text-amber-900">Ethics & Professional Conduct Agreement</p>
                 <p className="text-xs leading-5 text-amber-800">
-                  By submitting this application, I confirm that: (1) all information provided is accurate and complete; (2) I hold the qualifications and registration stated; (3) I will conduct sessions in accordance with the ethical guidelines of my professional body; (4) I have read and agree to the MANAS360 Provider Code of Conduct.
+                  By submitting this application, I confirm that: (1) all information provided is accurate and complete; (2) I hold the qualifications and registration stated; (3) I will conduct sessions in accordance with the ethical guidelines of my professional body.
                 </p>
                 <label className="flex cursor-pointer items-start gap-3">
                   <input

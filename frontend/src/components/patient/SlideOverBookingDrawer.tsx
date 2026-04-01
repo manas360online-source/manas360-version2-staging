@@ -382,10 +382,6 @@ export default function SlideOverBookingDrawer({
                 </div>
               </div>
 
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-                <p className="font-medium">24-Hour Cancellation Policy</p>
-                <p className="mt-1 text-xs opacity-90">Appointments cancelled with less than 24 hours notice may be subject to a cancellation fee.</p>
-              </div>
             </div>
           )}
 

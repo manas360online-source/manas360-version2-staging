@@ -50,7 +50,7 @@ export default function AdminDataPrivacyHubPage() {
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-blue-600 text-sm font-bold text-white">M</div>
               <div className="min-w-0">
                 <p className="truncate text-2xl font-bold leading-tight tracking-tight text-slate-900">MANAS360</p>
-                <p className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">COMPLIANCE SUITE</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">PRIVACY SUITE</p>
               </div>
             </button>
 
@@ -97,7 +97,7 @@ export default function AdminDataPrivacyHubPage() {
             <h3 className="text-[36px] leading-[1.05] font-bold text-teal-100">Legal Contact</h3>
             <p className="mt-5 text-xs font-semibold uppercase tracking-wider text-blue-300">Data Protection Officer</p>
             <p className="mt-1 text-[22px] font-semibold">Mahan S.</p>
-            <p className="text-[16px] text-slate-300">Compliance & Privacy Lead</p>
+            <p className="text-[16px] text-slate-300">Privacy Operations Lead</p>
             <p className="mt-5 text-xs font-semibold uppercase tracking-wider text-blue-300">Inquiries</p>
             <p className="mt-1 text-[20px] font-semibold">privacy@manas360.com</p>
           </div>

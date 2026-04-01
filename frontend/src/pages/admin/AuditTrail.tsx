@@ -124,7 +124,7 @@ export default function AuditTrail() {
             <h1 className="text-3xl font-bold tracking-tight text-slate-900 font-outfit">Audit Trail</h1>
           </div>
           <p className="text-slate-500 max-w-2xl font-inter">
-            Immutable security and compliance log. Track every administrative action across the platform for accountability and security oversight.
+            Immutable security and governance log. Track every administrative action across the platform for accountability and security oversight.
           </p>
         </div>
         

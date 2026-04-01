@@ -53,6 +53,8 @@ const AdminPortalLoginPage = lazy(() => import('./pages/admin/AdminPortalLoginPa
 const AdminDashboardPage = lazy(() => import('./pages/admin/Dashboard'));
 const AdminDataPrivacyHubPage = lazy(() => import('./pages/admin/AdminDataPrivacyHubPage'));
 const CentralizedLegalDocumentManagement = lazy(() => import('./pages/admin/CentralizedLegalDocumentManagement'));
+const ComplianceDashboard = lazy(() => import('./pages/admin/ComplianceDashboard'));
+const LegalDocuments = lazy(() => import('./pages/admin/LegalDocuments'));
 const AdminShellLayout = lazy(() => import('./components/admin/AdminShellLayout'));
 const AdminEntryGate = lazy(() => import('./components/admin/AdminEntryGate'));
 const AdminUsersPage = lazy(() => import('./pages/admin/Users'));
@@ -163,6 +165,15 @@ interface AssessmentData {
 function DashboardRedirect() {
   const { user } = useAuth();
   return <Navigate to={getPostLoginRoute(user)} replace />;
+}
+
+function AdminDashboardGate() {
+  const { user } = useAuth();
+  const role = String(user?.role || '').toLowerCase().replace(/_/g, '');
+  if (role === 'complianceofficer') {
+    return <Navigate to="/admin/compliance" replace />;
+  }
+  return <AdminDashboardPage />;
 }
 
 function LegacyProviderLiveSessionRedirect() {
@@ -421,8 +432,8 @@ function App() {
               }
             >
               <Route element={<AdminShellLayout />}>
-                <Route index element={<Navigate to="dashboard" replace />} />
-                <Route path="dashboard" element={<AdminDashboardPage />} />
+                <Route index element={<DashboardRedirect />} />
+                <Route path="dashboard" element={<AdminDashboardGate />} />
                 <Route path="platform-analytics" element={<PlatformAnalytics />} />
                 <Route path="user-approvals" element={<UserApprovals />} />
                 <Route path="therapist-verification" element={<TherapistVerification />} />
@@ -455,7 +466,9 @@ function App() {
                 <Route path="roles" element={<RoleManagement />} />
                 <Route path="feedback" element={<AdminSectionPage title="Feedback" description="Collect and analyze user and provider feedback loops for product quality." bullets={['NPS and CSAT trends', 'Feedback themes', 'Feature request clusters', 'Escalation tagging']} />} />
                 <Route path="audit-logs" element={<AuditTrail />} />
-                <Route path="compliance" element={<AdminSectionPage title="Compliance" description="Track DPDPA/HIPAA controls, policy adherence, and privacy operations." bullets={['Consent lifecycle logs', 'Data access events', 'Compliance readiness status', 'Policy exception management']} />} />
+                <Route path="/admin/compliance-documents" element={<LegalDocuments />} />
+                <Route path="/admin/compliance" element={<ComplianceDashboard />} />
+                <Route path="/admin/compliance-status" element={<ComplianceDashboard />} />
                 <Route path="data-requests" element={<AdminSectionPage title="Data Requests" description="Manage export, deletion, and data-subject requests with approvals." bullets={['Export requests', 'Deletion requests', 'Legal hold checks', 'Request SLA and closure']} />} />
                 <Route path="data-privacy-hub" element={<AdminDataPrivacyHubPage />} />
                 <Route path="legal-documents" element={<CentralizedLegalDocumentManagement />} />
@@ -465,6 +478,7 @@ function App() {
                 <Route path="settings" element={<AdminSettingsPage />} />
               </Route>
             </Route>
+
             <Route
               path="/corporate/dashboard"
               element={

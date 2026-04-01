@@ -1,4 +1,4 @@
-import { Brain, CheckCircle2, Info, Mic, Minimize2, Sparkles, StickyNote, X } from 'lucide-react';
+import { Brain, CheckCircle2, Info, Mic, Minimize2, StickyNote, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
@@ -10,7 +10,7 @@ import {
   type PatientOverviewData,
   updatePatientNote,
 } from '../../api/provider';
-import { therapistApi, type AiClinicalSummary } from '../../api/therapist.api';
+import { type AiClinicalSummary } from '../../api/therapist.api';
 import { generateMeetingLink, type MeetingLinkResponse } from '../../api/videoSession';
 import VideoRoom from '../../components/jitsi/VideoRoom';
 import { StatusLight, type ConnectionStatus } from '../../components/shared/StatusLight';
@@ -58,8 +58,8 @@ export default function VideoSessionPage() {
   const [noteId, setNoteId] = useState<string | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [showSavedIndicator, setShowSavedIndicator] = useState(false);
-  const [isGeneratingAiDraft, setIsGeneratingAiDraft] = useState(false);
-  const [aiInsights, setAiInsights] = useState<AiClinicalSummary | null>(null);
+  const [isGeneratingAiDraft] = useState(false);
+  const [aiInsights] = useState<AiClinicalSummary | null>(null);
   const [cbtTemplateOptions, setCbtTemplateOptions] = useState<CbtAssignmentTemplateOption[]>([]);
   const [selectedTemplateType, setSelectedTemplateType] = useState('');
   const [isAssigningCbtTemplate, setIsAssigningCbtTemplate] = useState(false);
@@ -67,9 +67,9 @@ export default function VideoSessionPage() {
   const [activeTab, setActiveTab] = useState<WorkspaceTab>('patient-info');
   const [isOverviewOverlayOpen, setIsOverviewOverlayOpen] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('good');
-  const [voiceEmpathyScore, setVoiceEmpathyScore] = useState<number>(70);
+  const [, setVoiceEmpathyScore] = useState<number>(70);
   const [voiceEmpathyReason, setVoiceEmpathyReason] = useState('Waiting for voice input');
-  const [crisisDetected, setCrisisDetected] = useState(false);
+  const [, setCrisisDetected] = useState(false);
   const [crisisModalDismissed, setCrisisModalDismissed] = useState(false);
   const [aiInsightInput, setAiInsightInput] = useState('');
   const [voiceMessages, setVoiceMessages] = useState<{ text: string; timestamp: string }[]>([]);
@@ -382,7 +382,6 @@ export default function VideoSessionPage() {
   }, [assessmentNotes, autosaveNotes, isProvider, objectiveNotes, planNotes, quickNotes]);
 
   const aiUnlockCountdown = Math.max(0, MIN_AUDIO_CAPTURE_SECONDS - elapsedSeconds);
-  const canGenerateAiDraft = isProvider && aiUnlockCountdown === 0 && Boolean(sessionId);
   const isMoodAnalyzing = aiUnlockCountdown > 0 || isGeneratingAiDraft;
   const latestPhq9 = useMemo(
     () => patientOverview?.recentAssessments?.find((item) => item.type === 'PHQ-9') || null,
@@ -416,27 +415,6 @@ export default function VideoSessionPage() {
     if (normalized === 'analyzing tone...') return 'bg-slate-100 text-slate-700 border-slate-200';
     return 'bg-sky-100 text-sky-700 border-sky-200';
   }, [moodMonitorLabel]);
-
-  const handleGenerateAiDraft = async () => {
-    if (hasAuthError) return;
-    if (!canGenerateAiDraft || !sessionId) return;
-
-    setIsGeneratingAiDraft(true);
-    setError(null);
-    try {
-      const summary = await therapistApi.generateAiSessionNote(sessionId);
-      setAiInsights(summary);
-    } catch (requestError: any) {
-      if (requestError?.response?.status === 401) {
-        setHasAuthError(true);
-        setError(null);
-        return;
-      }
-      setError(String(requestError?.response?.data?.message || requestError?.message || 'Unable to generate AI draft'));
-    } finally {
-      setIsGeneratingAiDraft(false);
-    }
-  };
 
   const handleQuickAssignTemplate = async () => {
     if (hasAuthError) return;

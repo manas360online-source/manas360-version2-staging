@@ -178,7 +178,7 @@ export async function initSocket(server: http.Server) {
     
     if ((role === 'therapist' || role === 'provider') && session.therapistProfileId === userId) return true;
     
-    if (role === 'admin' || role === 'superadmin') return true;
+    if (role === 'admin' || role === 'superadmin' || role === 'complianceofficer') return true;
     return false;
   }
 
@@ -189,7 +189,7 @@ export async function initSocket(server: http.Server) {
     console.info('socket.connect', { socketId: socket.id, userId: user?.id, role: user?.role });
 
     // Automatically join admins to the admin-room
-    if (user?.role === 'admin') {
+    if (user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'complianceofficer') {
       socket.join('admin-room');
       console.info('socket.join_admin_room', { userId: user.id });
     }

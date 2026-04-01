@@ -41,7 +41,7 @@ export default function ProviderSubscriptionCheckoutPage() {
 
   const confirmAndPay = async () => {
     if (!acceptedTerms) {
-      toast.error('Please accept provider terms and revenue split policy.');
+      toast.error('Please confirm to continue.');
       return;
     }
 
@@ -121,7 +121,7 @@ export default function ProviderSubscriptionCheckoutPage() {
 
           <label className="mt-4 flex items-start gap-2 text-sm text-slate-700">
             <input type="checkbox" checked={acceptedTerms} onChange={(e) => setAcceptedTerms(e.target.checked)} />
-            <span>I agree to provider terms and revenue split policy.</span>
+            <span>I confirm checkout details and continue.</span>
           </label>
 
           <div className="mt-4 flex flex-wrap gap-2">

@@ -116,7 +116,10 @@ export default function PsychiatristPrescriptionsPage() {
       : 'rounded-2xl border border-[#e7eef8] bg-white/70 text-[#5d6675] shadow-[0_6px_14px_rgba(47,125,230,0.08)]';
 
   return (
-    <TherapistPageShell>
+    <TherapistPageShell
+      title="Prescription Guidance"
+      subtitle="Psychiatrist medication management workflow"
+    >
       <section className="min-h-[650px] rounded-3xl bg-gradient-to-b from-[#dbe9f7] via-[#d8ebfa] to-[#cfe6fb] p-4 md:p-8 lg:p-12">
         <div className="mx-auto w-full max-w-5xl">
           <p className="text-center text-xs font-semibold uppercase tracking-[0.48em] text-[#6c7f9b]">Psychiatrist Portal</p>

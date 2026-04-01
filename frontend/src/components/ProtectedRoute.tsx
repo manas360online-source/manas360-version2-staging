@@ -12,9 +12,9 @@ type ProtectedRouteProps = {
 		| 'coach'
 		| 'admin'
 		| 'superadmin'
-		| 'complianceofficer'
 		| 'clinicaldirector'
 		| 'financemanager'
+		| 'complianceofficer'
 	>;
 };
 
@@ -37,9 +37,9 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
 		const isAdminRole =
 			userRole === 'admin' ||
 			userRole === 'superadmin' ||
-			userRole === 'complianceofficer' ||
 			userRole === 'clinicaldirector' ||
-			userRole === 'financemanager';
+			userRole === 'financemanager' ||
+			userRole === 'complianceofficer';
 
 		const fallback = isAdminRole
 			? '/admin-portal/login'

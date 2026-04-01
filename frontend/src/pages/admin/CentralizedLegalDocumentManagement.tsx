@@ -51,7 +51,7 @@ export default function CentralizedLegalDocumentManagement() {
             <span className="block text-[#2d6cdf]">Document Management</span>
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-[#66728a]">
-            The single source of truth for platform agreements, DPDPA 2023 compliance oversight, and automated risk mitigation.
+            The single source of truth for platform agreements, DPDPA 2023 privacy oversight, and automated risk mitigation.
           </p>
         </header>
 
@@ -63,24 +63,30 @@ export default function CentralizedLegalDocumentManagement() {
             description="DPDPA-compliant consent and digital signature acceptance"
             icon={<UserRound className="h-4 w-4" />}
             isClickable
-            onClick={() => navigate('/admin/onboarding')}
+            onClick={() => navigate('/admin/users')}
           />
           <LegalFeatureCard
             title="NRI Legal Protection"
             description="Jurisdiction and liability waivers for international users"
             icon={<FileText className="h-4 w-4" />}
             variant="danger"
+            isClickable
+            onClick={() => navigate('/admin/data-privacy-hub')}
           />
           <LegalFeatureCard
-            title="Compliance Console"
-            description="Manage document versioning, repository, and compliance tracking"
+            title="Governance Console"
+            description="Manage document versioning, repository, and governance tracking"
             icon={<FileText className="h-4 w-4" />}
             variant="dark"
+            isClickable
+            onClick={() => navigate('/admin/compliance')}
           />
           <LegalFeatureCard
             title="Patient Rights Portal"
             description="Access, correction, and data deletion under DPDPA"
             icon={<Shield className="h-4 w-4" />}
+            isClickable
+            onClick={() => navigate('/admin/data-requests')}
           />
           </div>
         </div>

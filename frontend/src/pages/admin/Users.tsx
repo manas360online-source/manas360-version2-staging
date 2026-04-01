@@ -12,6 +12,7 @@ const DEFAULT_META: AdminUsersMeta = {
 
 const roleBadgeClass: Record<AdminUserRole, string> = {
 	admin: 'bg-red-100 text-red-700',
+	complianceofficer: 'bg-sky-100 text-sky-700',
 	therapist: 'bg-blue-100 text-blue-700',
 	psychiatrist: 'bg-violet-100 text-violet-700',
 	coach: 'bg-amber-100 text-amber-700',

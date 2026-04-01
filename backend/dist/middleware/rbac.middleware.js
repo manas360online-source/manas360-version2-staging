@@ -14,9 +14,9 @@ exports.roleHierarchy = {
     psychologist: 2,
     psychiatrist: 2,
     coach: 2,
-    complianceofficer: 3,
     clinicaldirector: 3,
     financemanager: 3,
+    complianceofficer: 3,
     admin: 3,
     superadmin: 4,
 };
@@ -284,6 +284,23 @@ const requirePermission = (requiredPermissions) => {
         if (userDetails.isDeleted) {
             next(new error_middleware_1.AppError('User account is deleted', 410));
             return;
+        }
+        // Special handling for Compliance Officer - limited access only
+        if (String(userDetails.role).toUpperCase() === 'COMPLIANCEOFFICER') {
+            const allowedPermissions = [
+                'dashboard',
+                'view_audit',
+                'read_reports',
+                'manage_compliance',
+                'view_analytics',
+                'view_feedback'
+            ];
+            for (const requiredPermission of permissions) {
+                if (!allowedPermissions.includes(requiredPermission)) {
+                    _res.status(403).json({ message: 'Compliance Officer access denied' });
+                    return;
+                }
+            }
         }
         const userPermissions = await getRolePermissions(userDetails.role);
         // Check if user has any of the required permissions

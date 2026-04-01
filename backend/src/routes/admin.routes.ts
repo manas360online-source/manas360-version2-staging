@@ -8,7 +8,7 @@ import {
 	validateAdminListSubscriptionsQuery,
 	asyncHandler,
 } from '../middleware/validate.middleware';
-import { listUsersController, getUserController, verifyProviderController, verifyTherapistController, approveProviderController, getMetricsController, listSubscriptionsController, getAdminLiveSessionsController } from '../controllers/admin.controller';
+import { listUsersController, getUserController, verifyProviderController, verifyTherapistController, approveProviderController, getMetricsController, listSubscriptionsController, getAdminUserApprovalsController, updateAdminUserApprovalController, getAdminLiveSessionsController, getAdminFeedbackController, resolveAdminFeedbackController, updateAdminUserStatusController, getRolesController, updateRolePermissionsController, getUserAcceptancesController, getComplianceStatusController, getLegalDocumentsController } from '../controllers/admin.controller';
 import {
 	getAdminAnalyticsSummaryController,
 	getAdminMostUsedTemplatesController,
@@ -24,12 +24,12 @@ import {
 	getAdminProviderMetricsController,
 	getAdminMarketplaceMetricsController,
 	getAdminSystemHealthController,
-	// getAdminCompanyReportsController,
-	// getAdminBICorporateSummaryController,
-	// getAdminTherapistPerformanceController,
-	// getAdminSessionAnalyticsController,
-	// getAdminUserGrowthAnalyticsController,
-	// getAdminPlatformAnalyticsController,
+	getAdminCompanyReportsController,
+	getAdminBICorporateSummaryController,
+	getAdminTherapistPerformanceController,
+	getAdminSessionAnalyticsController,
+	getAdminUserGrowthAnalyticsController,
+	getAdminPlatformAnalyticsController,
 } from '../controllers/admin-analytics.controller';
 import { getAdminModuleSummaryController } from '../controllers/admin-module.controller';
 import { adminAnalyticsExportRateLimiter } from '../middleware/rateLimiter.middleware';
@@ -105,7 +105,7 @@ const router = Router();
  *   - page: pagination page number (default: 1)
  *   - limit: items per page (default: 10, max: 50)
  */
-router.get('/users', requireAuth, requireRole(['admin', 'superadmin', 'clinicaldirector']), ...validateAdminListUsersQuery, asyncHandler(listUsersController));
+router.get('/users', requireAuth, requireRole(['admin', 'superadmin']), ...validateAdminListUsersQuery, asyncHandler(listUsersController));
 
 /**
  * GET /api/v1/admin/users/:id
@@ -115,7 +115,7 @@ router.get('/users', requireAuth, requireRole(['admin', 'superadmin', 'clinicald
  */
 router.get('/users/:id', requireAuth, requireRole(['admin', 'superadmin']), ...validateAdminGetUserIdParam, asyncHandler(getUserController));
 
-// router.patch('/users/:id/status', requireAuth, requireRole(['admin', 'superadmin']), asyncHandler(updateAdminUserStatusController));
+router.patch('/users/:id/status', requireAuth, requireRole(['admin', 'superadmin']), asyncHandler(updateAdminUserStatusController));
 
 /**
  * PATCH /api/v1/admin/therapists/:id/verify
@@ -137,7 +137,7 @@ router.patch(
 router.post(
 	'/verify-provider/:id',
 	requireAuth,
-	requireRole(['admin', 'superadmin', 'clinicaldirector']),
+	requireRole('admin'),
 	requirePermission('manage_therapists'),
 	...validateTherapistProfileIdParam,
 	asyncHandler(verifyProviderController),
@@ -161,13 +161,13 @@ router.post(
  * GET /api/v1/admin/user-approvals
  * Get all users pending onboarding approval
  */
-// router.get('/user-approvals', requireAuth, requireRole(['admin', 'superadmin']), requirePermission('manage_users'), asyncHandler(getAdminUserApprovalsController));
+router.get('/user-approvals', requireAuth, requireRole(['admin', 'superadmin']), requirePermission('manage_users'), asyncHandler(getAdminUserApprovalsController));
 
 /**
  * PATCH /api/v1/admin/user-approvals/:id
  * Approve or Reject a user's registration
  */
-// router.patch('/user-approvals/:id', requireAuth, requireRole(['admin', 'superadmin']), requirePermission('manage_users'), asyncHandler(updateAdminUserApprovalController));
+router.patch('/user-approvals/:id', requireAuth, requireRole(['admin', 'superadmin']), requirePermission('manage_users'), asyncHandler(updateAdminUserApprovalController));
 
 /**
  * GET /api/v1/admin/metrics
@@ -193,11 +193,11 @@ router.get('/metrics', requireAuth, requireRole('admin'), requirePermission('vie
  *   - limit: items per page (default: 10, max: 50)
  * Response: Paginated list of subscriptions with user and plan details
  */
-router.get('/subscriptions', requireAuth, requireRole(['admin', 'superadmin', 'financemanager']), ...validateAdminListSubscriptionsQuery, asyncHandler(listSubscriptionsController));
+router.get('/subscriptions', requireAuth, requireRole('admin'), ...validateAdminListSubscriptionsQuery, asyncHandler(listSubscriptionsController));
 
-router.get('/pricing', requireAuth, requireRole(['admin', 'superadmin', 'financemanager']), asyncHandler(getAdminPricingConfigController));
-router.put('/pricing', requireAuth, requireRole(['admin', 'superadmin', 'financemanager']), asyncHandler(updateAdminPricingConfigController));
-router.patch('/pricing', requireAuth, requireRole(['admin', 'superadmin', 'financemanager']), asyncHandler(updateAdminPricingConfigController));
+router.get('/pricing', requireAuth, requireRole('admin'), asyncHandler(getAdminPricingConfigController));
+router.put('/pricing', requireAuth, requireRole('admin'), asyncHandler(updateAdminPricingConfigController));
+router.patch('/pricing', requireAuth, requireRole('admin'), asyncHandler(updateAdminPricingConfigController));
 
 router.get('/screening/templates', requireAuth, requireRole('admin'), asyncHandler(listScreeningTemplatesAdminController));
 router.post('/screening/templates', requireAuth, requireRole('admin'), asyncHandler(createScreeningTemplateAdminController));
@@ -224,13 +224,13 @@ router.get('/modules/:module/summary', requireAuth, requireRole('admin'), asyncH
 
 // ==================== DASHBOARD & CORE ====================
 router.get('/analytics/health', requireAuth, requireRole('admin'), asyncHandler(getAdminSystemHealthController));
-// router.get('/company-reports', requireAuth, requireRole(['admin', 'superadmin']), asyncHandler(getAdminCompanyReportsController));
-// router.get('/analytics/bi-summary', requireAuth, requireRole(['admin', 'superadmin']), asyncHandler(getAdminBICorporateSummaryController));
-// router.get('/analytics/therapist-performance', requireAuth, requireRole(['admin', 'superadmin']), asyncHandler(getAdminTherapistPerformanceController));
+router.get('/company-reports', requireAuth, requireRole(['admin', 'superadmin']), asyncHandler(getAdminCompanyReportsController));
+router.get('/analytics/bi-summary', requireAuth, requireRole(['admin', 'superadmin']), asyncHandler(getAdminBICorporateSummaryController));
+router.get('/analytics/therapist-performance', requireAuth, requireRole(['admin', 'superadmin']), asyncHandler(getAdminTherapistPerformanceController));
 router.get('/analytics/reliability', requireAuth, requireRole('admin'), asyncHandler(getAdminPaymentReliabilityController));
-// router.get('/analytics/user-growth', requireAuth, requireRole(['admin', 'superadmin']), asyncHandler(getAdminUserGrowthAnalyticsController));
-// router.get('/analytics/sessions', requireAuth, requireRole(['admin', 'superadmin']), asyncHandler(getAdminSessionAnalyticsController));
-// router.get('/analytics/platform', requireAuth, requireRole(['admin', 'superadmin']), asyncHandler(getAdminPlatformAnalyticsController));
+router.get('/analytics/user-growth', requireAuth, requireRole(['admin', 'superadmin']), asyncHandler(getAdminUserGrowthAnalyticsController));
+router.get('/analytics/sessions', requireAuth, requireRole(['admin', 'superadmin']), asyncHandler(getAdminSessionAnalyticsController));
+router.get('/analytics/platform', requireAuth, requireRole(['admin', 'superadmin']), asyncHandler(getAdminPlatformAnalyticsController));
 
 /**
  * GET /api/v1/admin/analytics/summary
@@ -386,12 +386,12 @@ router.get(
 );
 
 // === PHASE 2: ENHANCED VERIFICATION + PAYOUTS + WAIVERS ===
-router.get('/verifications', requireAuth, requireRole(['admin', 'superadmin', 'clinicaldirector']), requirePermission('manage_therapists'), asyncHandler(getVerificationsController));
+router.get('/verifications', requireAuth, requireRole('admin'), requirePermission('manage_therapists'), asyncHandler(getVerificationsController));
 router.get('/verifications/:id/documents', requireAuth, requireRole('admin'), requirePermission('manage_therapists'), asyncHandler(getVerificationDocumentsController));
 router.patch('/verifications/:id', requireAuth, requireRole('admin'), requirePermission('manage_therapists'), asyncHandler(updateVerificationController));
 
-router.get('/payouts', requireAuth, requireRole(['admin', 'superadmin', 'financemanager']), requirePermission('payouts_approve'), asyncHandler(getPayoutsController));
-router.post('/payouts/:id/approve', requireAuth, requireRole(['admin', 'superadmin', 'financemanager']), requirePermission('payouts_approve'), asyncHandler(approvePayoutController));
+router.get('/payouts', requireAuth, requireRole('admin'), requirePermission('payouts_approve'), asyncHandler(getPayoutsController));
+router.post('/payouts/:id/approve', requireAuth, requireRole('admin'), requirePermission('payouts_approve'), asyncHandler(approvePayoutController));
 
 router.post('/waive-subscription', requireAuth, requireRole('admin'), asyncHandler(waiveSubscriptionController));
 router.post('/pricing/free-toggle', requireAuth, requireRole('admin'), requirePermission('pricing_edit'), asyncHandler(toggleGlobalFreeController));
@@ -421,18 +421,21 @@ router.get('/live-sessions', requireAuth, requireRole(['admin', 'superadmin', 'c
 /**
  * Support & Sentiment Dashboard
  */
-// router.get('/feedback', requireAuth, requireRole('admin'), requirePermission('view_analytics'), asyncHandler(getAdminFeedbackController));
-// router.post('/feedback/:id/resolve', requireAuth, requireRole('admin'), requirePermission('view_analytics'), asyncHandler(resolveAdminFeedbackController));
+router.get('/feedback', requireAuth, requireRole(['admin', 'complianceofficer']), asyncHandler(getAdminFeedbackController));
+router.post('/feedback/:id/resolve', requireAuth, requireRole(['admin', 'complianceofficer']), asyncHandler(resolveAdminFeedbackController));
 
-router.get('/crisis/alerts', requireAuth, requireRole(['admin', 'superadmin', 'complianceofficer']), getCrisisAlertsController);
-router.post('/crisis/:id/respond', requireAuth, requireRole(['admin', 'superadmin', 'complianceofficer']), respondToCrisisController);
+router.get('/crisis/alerts', requireAuth, requireRole(['admin', 'complianceofficer']), getCrisisAlertsController);
+router.post('/crisis/:id/respond', requireAuth, requireRole(['admin', 'complianceofficer']), respondToCrisisController);
 
-router.get('/audit', requireAuth, requireRole(['admin', 'superadmin', 'complianceofficer']), getAuditLogController);
+router.get('/audit', requireAuth, requireRole(['admin', 'complianceofficer']), getAuditLogController);
+router.get('/compliance/status', requireAuth, requireRole(['admin', 'complianceofficer']), asyncHandler(getComplianceStatusController));
+router.get('/legal/documents', requireAuth, requireRole(['admin', 'complianceofficer']), asyncHandler(getLegalDocumentsController));
+router.get('/acceptances', requireAuth, requireRole(['admin', 'complianceofficer']), asyncHandler(getUserAcceptancesController));
 
 // Advanced Reporting & Exports
-router.post('/reports/export', requireAuth, requireRole('admin'), requirePermission('view_analytics'), enqueueAdminAnalyticsExportController);
-router.get('/reports/export/:jobId', requireAuth, requireRole('admin'), requirePermission('view_analytics'), getAdminAnalyticsExportStatusController);
-router.get('/reports/export/:jobId/download', requireAuth, requireRole('admin'), requirePermission('view_analytics'), downloadAdminAnalyticsExportController);
+router.post('/reports/export', requireAuth, requireRole(['admin', 'complianceofficer']), requirePermission('view_analytics'), enqueueAdminAnalyticsExportController);
+router.get('/reports/export/:jobId', requireAuth, requireRole(['admin', 'complianceofficer']), requirePermission('view_analytics'), getAdminAnalyticsExportStatusController);
+router.get('/reports/export/:jobId/download', requireAuth, requireRole(['admin', 'complianceofficer']), requirePermission('view_analytics'), downloadAdminAnalyticsExportController);
 
 // === PHASE 5 EXTENSION: DYNAMIC GROUPS ===
 router.get('/groups', requireAuth, requireRole('admin'), listGroupCategoriesController);
@@ -441,7 +444,7 @@ router.put('/groups/:id', requireAuth, requireRole('admin'), updateGroupCategory
 router.delete('/groups/:id', requireAuth, requireRole('admin'), deleteGroupCategoryController);
 
 // === DYNAMIC ROLE MANAGEMENT ===
-// router.get('/roles', requireAuth, requireRole('superadmin'), asyncHandler(getRolesController));
-// router.patch('/roles/:role', requireAuth, requireRole('superadmin'), asyncHandler(updateRolePermissionsController));
+router.get('/roles', requireAuth, requireRole('superadmin'), asyncHandler(getRolesController));
+router.patch('/roles/:role', requireAuth, requireRole('superadmin'), asyncHandler(updateRolePermissionsController));
 
 export default router;

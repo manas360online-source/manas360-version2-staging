@@ -74,7 +74,20 @@ const getCompanyAdminMeta = async (userId: string) => {
 
 const isPlatformAdminAccount = async (user: { id: string; role?: string | null }): Promise<boolean> => {
 	const role = String(user.role || '').toUpperCase();
-	if (role !== 'ADMIN') {
+	const normalizedRole = role.replace(/[-\s]/g, '_');
+	const platformRoles = new Set([
+		'ADMIN',
+		'SUPERADMIN',
+		'SUPER_ADMIN',
+		'CLINICALDIRECTOR',
+		'CLINICAL_DIRECTOR',
+		'FINANCEMANAGER',
+		'FINANCE_MANAGER',
+		'COMPLIANCEOFFICER',
+		'COMPLIANCE_OFFICER',
+	]);
+
+	if (!platformRoles.has(normalizedRole) && !platformRoles.has(role.replace(/_/g, ''))) {
 		return false;
 	}
 
