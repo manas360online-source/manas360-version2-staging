@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { getApiErrorMessage, providerRegister } from '../../api/auth';
 import { useAuth } from '../../context/AuthContext';
 
@@ -770,7 +770,14 @@ function ProviderOnboardingPage() {
               <div className="space-y-4 rounded-xl border border-amber-200 bg-amber-50 p-5">
                 <p className="text-sm font-semibold text-amber-900">Ethics & Professional Conduct Agreement</p>
                 <p className="text-xs leading-5 text-amber-800">
-                  By submitting this application, I confirm that: (1) all information provided is accurate and complete; (2) I hold the qualifications and registration stated; (3) I will conduct sessions in accordance with the ethical guidelines of my professional body.
+                  By submitting this application, I confirm that: (1) all information provided is accurate and complete; (2) I hold the qualifications and registration stated; (3) I will conduct sessions in accordance with the ethical guidelines of my professional body; and (4) I have reviewed the applicable legal agreements.
+                </p>
+                <p className="text-xs leading-5 text-amber-900">
+                  Review agreements:{' '}
+                  <Link to="/legal/therapist-ic-agreement" className="underline">Therapist IC Agreement</Link>,{' '}
+                  <Link to="/legal/therapist-nda" className="underline">Therapist NDA</Link>,{' '}
+                  <Link to="/terms" className="underline">Terms of Service</Link>, and{' '}
+                  <Link to="/privacy" className="underline">Privacy Policy</Link>.
                 </p>
                 <label className="flex cursor-pointer items-start gap-3">
                   <input

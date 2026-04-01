@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { patientApi } from '../../api/patient';
@@ -16,8 +16,11 @@ export default function SubscriptionCheckoutPage() {
   const wallet = Number((balance as any)?.total_balance || 0);
   const [cart, setCart] = useState(loadCart());
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [canAcceptTerms, setCanAcceptTerms] = useState(false);
   const [promoCode, setPromoCode] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const termsScrollRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const loaded = loadCart();
@@ -82,6 +85,24 @@ export default function SubscriptionCheckoutPage() {
     }
   };
 
+  const openTermsModal = () => {
+    setShowTermsModal(true);
+    setCanAcceptTerms(false);
+  };
+
+  const handleTermsScroll = () => {
+    const node = termsScrollRef.current;
+    if (!node) return;
+    const reachedBottom = node.scrollTop + node.clientHeight >= node.scrollHeight - 8;
+    if (reachedBottom) setCanAcceptTerms(true);
+  };
+
+  const acceptTermsFromModal = () => {
+    if (!canAcceptTerms) return;
+    setAcceptedTerms(true);
+    setShowTermsModal(false);
+  };
+
   return (
     <div className="min-h-screen bg-[#fffdf7] px-4 py-8">
       <div className="mx-auto max-w-4xl space-y-6">
@@ -121,8 +142,22 @@ export default function SubscriptionCheckoutPage() {
           </label>
 
           <label className="mt-4 flex items-start gap-2 text-sm text-slate-700">
-            <input type="checkbox" checked={acceptedTerms} onChange={(e) => setAcceptedTerms(e.target.checked)} />
-            <span>I confirm checkout details and continue.</span>
+            <input
+              type="checkbox"
+              checked={acceptedTerms}
+              readOnly
+              onClick={(event) => {
+                event.preventDefault();
+                openTermsModal();
+              }}
+            />
+            <button
+              type="button"
+              onClick={openTermsModal}
+              className="text-left underline text-emerald-700"
+            >
+              I agree to the Terms of Service, Privacy Policy, and Refund &amp; Cancellation Policy.
+            </button>
           </label>
 
           <div className="mt-4 flex flex-wrap gap-2">
@@ -133,6 +168,40 @@ export default function SubscriptionCheckoutPage() {
           </div>
         </section>
       </div>
+
+      {showTermsModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-2xl rounded-2xl bg-white p-5 shadow-xl">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-slate-900">Terms & Conditions</h2>
+              <button type="button" onClick={() => setShowTermsModal(false)} className="rounded-md border border-slate-300 px-2 py-1 text-xs">Close</button>
+            </div>
+            <p className="mb-2 text-xs text-slate-500">Read fully and scroll to the bottom to enable agreement.</p>
+            <div
+              ref={termsScrollRef}
+              onScroll={handleTermsScroll}
+              className="max-h-80 overflow-y-auto rounded-lg border border-slate-200 p-4 text-sm leading-6 text-slate-700"
+            >
+              <p className="mb-3">1. You agree to use MANAS360 services responsibly and only for lawful wellness and care purposes.</p>
+              <p className="mb-3">2. Your data will be processed according to platform privacy and security standards and applicable law.</p>
+              <p className="mb-3">3. Billing, refunds, and cancellations are governed by the published policy and session timelines.</p>
+              <p className="mb-3">4. You consent to platform communication, transaction records, and compliance-related auditing.</p>
+              <p>5. By agreeing, you confirm you have read and understood the legal terms before payment.</p>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" onClick={() => setShowTermsModal(false)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">Cancel</button>
+              <button
+                type="button"
+                onClick={acceptTermsFromModal}
+                disabled={!canAcceptTerms}
+                className="rounded-lg bg-[#4a6741] px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                I have read and agree
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
