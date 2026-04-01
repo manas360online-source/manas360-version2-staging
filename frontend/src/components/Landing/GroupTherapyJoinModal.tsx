@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, AlertCircle, User, Mail } from 'lucide-react';
+import { X, AlertCircle, User, Phone } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { groupTherapyApi } from '../../api/groupTherapy';
 
@@ -25,7 +25,7 @@ export const GroupTherapyJoinModal: React.FC<GroupTherapyJoinModalProps> = ({
 }) => {
   const [joinMode, setJoinMode] = useState<'registered' | 'guest' | null>(null);
   const [guestName, setGuestName] = useState('');
-  const [guestEmail, setGuestEmail] = useState('');
+  const [guestPhone, setGuestPhone] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleRegisteredJoin = async () => {
@@ -38,7 +38,7 @@ export const GroupTherapyJoinModal: React.FC<GroupTherapyJoinModalProps> = ({
     try {
       const payment = await groupTherapyApi.createPublicJoinPaymentIntent(session.sessionId || session.id, {
         guestName: `${userProfile.firstName} ${userProfile.lastName}`,
-        guestEmail: userProfile.email || '',
+        guestEmail: userProfile.phone || '',
       });
 
       if (payment.redirectUrl) {
@@ -54,15 +54,15 @@ export const GroupTherapyJoinModal: React.FC<GroupTherapyJoinModalProps> = ({
   };
 
   const handleGuestJoin = async () => {
-    if (!guestName.trim() || !guestEmail.trim()) {
-      toast.error('Please provide your name and email.');
+    if (!guestName.trim() || !guestPhone.trim()) {
+      toast.error('Please provide your name and phone number.');
       return;
     }
 
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(guestEmail)) {
-      toast.error('Please enter a valid email address.');
+    // Basic phone validation (India +91, 10 digits)
+    const phoneRegex = /^[+]?[0-9\s\-()]{10,14}$/;
+    if (!phoneRegex.test(guestPhone)) {
+      toast.error('Please enter a valid phone number.');
       return;
     }
 
@@ -70,7 +70,7 @@ export const GroupTherapyJoinModal: React.FC<GroupTherapyJoinModalProps> = ({
     try {
       const payment = await groupTherapyApi.createPublicJoinPaymentIntent(session.sessionId || session.id, {
         guestName: guestName.trim(),
-        guestEmail: guestEmail.trim(),
+        guestEmail: guestPhone.trim(),
       });
 
       if (payment.redirectUrl) {
@@ -235,10 +235,10 @@ export const GroupTherapyJoinModal: React.FC<GroupTherapyJoinModalProps> = ({
                     <User size={16} className="text-green-600" />
                     <span className="text-sm text-gray-700">{userProfile?.firstName} {userProfile?.lastName}</span>
                   </div>
-                  {userProfile?.email && (
+                  {userProfile?.phone && (
                     <div className="flex items-center gap-2">
-                      <Mail size={16} className="text-green-600" />
-                      <span className="text-sm text-gray-700">{userProfile.email}</span>
+                      <Phone size={16} className="text-green-600" />
+                      <span className="text-sm text-gray-700">{userProfile.phone}</span>
                     </div>
                   )}
                 </div>
@@ -267,50 +267,50 @@ export const GroupTherapyJoinModal: React.FC<GroupTherapyJoinModalProps> = ({
               <p className="text-sm text-gray-600">Join as a guest. Your privacy is our priority.</p>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Your Name</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Full Name</label>
                 <div className="relative">
                   <User className="absolute left-3 top-3 text-gray-400" size={18} />
                   <input
                     type="text"
-                    placeholder="Enter your name"
+                    placeholder="e.g., Rajesh Kumar"
                     value={guestName}
                     onChange={(e) => setGuestName(e.target.value)}
                     className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
                     disabled={isLoading}
                   />
                 </div>
-                <p className="text-xs text-gray-500 mt-1">Your first and last name</p>
+                <p className="text-xs text-gray-500 mt-1">Your full name for session records</p>
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Email Address</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Phone Number</label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-3 text-gray-400" size={18} />
+                  <span className="absolute left-3 top-3 text-gray-400">📱</span>
                   <input
-                    type="email"
-                    placeholder="your@email.com"
-                    value={guestEmail}
-                    onChange={(e) => setGuestEmail(e.target.value)}
+                    type="tel"
+                    placeholder="+91 98765 43210"
+                    value={guestPhone}
+                    onChange={(e) => setGuestPhone(e.target.value)}
                     className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
                     disabled={isLoading}
                   />
                 </div>
-                <p className="text-xs text-gray-500 mt-1">We'll use this to send session reminders</p>
+                <p className="text-xs text-gray-500 mt-1">We'll use this to send session reminders and receipts</p>
               </div>
 
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                 <p className="text-xs text-blue-900">
-                  <strong>Privacy:</strong> Your information is encrypted and never shared with active members.
+                  <strong>Privacy & Consent:</strong> Your phone number is used only for session reminders and receipts. All information is encrypted and confidential.
                 </p>
               </div>
 
               <div className="flex gap-3 pt-2">
                 <button
                   onClick={handleGuestJoin}
-                  disabled={isLoading}
+                  disabled={isLoading || !guestName.trim() || !guestPhone.trim()}
                   className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white font-semibold py-3 rounded-lg transition-colors"
                 >
-                  {isLoading ? 'Processing...' : 'Join as Guest'}
+                  {isLoading ? 'Processing...' : 'Join Session'}
                 </button>
                 <button
                   onClick={() => setJoinMode(null)}

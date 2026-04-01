@@ -1,4 +1,5 @@
 import { http } from '../lib/http';
+import { publicHttp } from './publicHttp';
 
 export type GroupTherapySession = {
   id: string;
@@ -25,7 +26,7 @@ const unwrap = <T = any>(payload: any): T => {
 
 export const groupTherapyApi = {
   listPublicSessions: async (): Promise<{ items: GroupTherapySession[] }> => {
-    const res = await http.get('/v1/group-therapy/public/sessions');
+    const res = await publicHttp.get('/v1/group-therapy/public/sessions');
     return unwrap<{ items: GroupTherapySession[] }>(res.data);
   },
 
@@ -78,7 +79,7 @@ export const groupTherapyApi = {
     sessionId: string,
     payload?: { guestName?: string; guestEmail?: string },
   ) => {
-    const res = await http.post(`/v1/group-therapy/public/sessions/${encodeURIComponent(sessionId)}/join/payment-intent`, payload || {});
+    const res = await publicHttp.post(`/v1/group-therapy/public/sessions/${encodeURIComponent(sessionId)}/join/payment-intent`, payload || {});
     return unwrap<{ transactionId: string; redirectUrl: string; enrollmentId: string; amountMinor: number }>(res.data);
   },
 
