@@ -90,9 +90,12 @@ const Feedback = lazy(() => import('./pages/admin/Feedback'));
 const AllUsers = lazy(() => import('./pages/admin/AllUsers'));
 const CertificationsPage = lazy(() => import('./pages/CertificationsPage'));
 const CertificationLandingPage = lazy(() => import('./pages/CertificationLandingPage'));
-const CancellationRefundPolicyPage = lazy(() => import('./pages/legal/CancellationRefundPolicyPage'));
-const TermsOfUsePage = lazy(() => import('./pages/legal/TermsOfUsePage'));
-const PrivacyPolicyPage = lazy(() => import('./pages/legal/PrivacyPolicyPage'));
+const TermsOfService = lazy(() => import('./pages/legal/TermsOfService'));
+const PrivacyPolicy = lazy(() => import('./pages/legal/PrivacyPolicy'));
+const RefundAndCancellationPolicy = lazy(() => import('./pages/legal/RefundAndCancellationPolicy'));
+const TherapistICAgr = lazy(() => import('./pages/legal/TherapistICAgr'));
+const TherapistNDA = lazy(() => import('./pages/legal/TherapistNDA'));
+const TherapistDataProcessingAgr = lazy(() => import('./pages/legal/TherapistDataProcessingAgr'));
 const CorporateAnalyticsPage = lazy(() => import('./pages/corporate/CorporateAnalyticsPage'));
 const CorporateEmployeeDirectoryPage = lazy(() => import('./pages/corporate/CorporateEmployeeDirectoryPage'));
 const CorporateEnrollmentPage = lazy(() => import('./pages/corporate/CorporateEnrollmentPage'));
@@ -558,9 +561,12 @@ function App() {
             <Route path="/ai-chat" element={<Navigate to="/patient/messages" replace />} />
             <Route path="/profile" element={<Navigate to="/patient/profile" replace />} />
             <Route path="/settings" element={<Navigate to="/patient/settings" replace />} />
-            <Route path="/terms" element={<TermsOfUsePage />} />
-            <Route path="/privacy" element={<PrivacyPolicyPage />} />
-            <Route path="/refunds" element={<CancellationRefundPolicyPage />} />
+            <Route path="/terms" element={<TermsOfService />} />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/refunds" element={<RefundAndCancellationPolicy />} />
+            <Route path="/legal/therapist-ic-agreement" element={<TherapistICAgr />} />
+            <Route path="/legal/therapist-nda" element={<TherapistNDA />} />
+            <Route path="/legal/therapist-data-processing" element={<TherapistDataProcessingAgr />} />
             {/* Certificate verification — standalone, no layout, accessible via QR scan */}
             <Route path="/verify/:certId" element={<CertificateVerificationPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />

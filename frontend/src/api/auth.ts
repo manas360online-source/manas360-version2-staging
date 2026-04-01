@@ -62,6 +62,11 @@ export interface ProviderRegisterPayload {
 	digitalSignature: string;
 }
 
+export interface SignupConsentPayload {
+	acceptedTerms: boolean;
+	acceptedDocuments?: string[];
+}
+
 export const getApiErrorMessage = (error: unknown, fallback = 'Request failed'): string => {
 	const axiosError = error as AxiosError<{ message?: string }>;
 	return axiosError.response?.data?.message ?? fallback;
@@ -107,7 +112,7 @@ export const googleLogin = async (idToken: string): Promise<AuthUser> => {
 
 export const signupWithPhone = async (
 	phone: string,
-	profile?: { name?: string; role?: 'patient' | 'therapist' | 'psychiatrist' | 'coach' },
+	profile?: { name?: string; role?: 'patient' | 'therapist' | 'psychiatrist' | 'psychologist' | 'coach' },
 ): Promise<{ userId: string; phone: string; message: string; devOtp?: string }> => {
 	const normalizedPhone = normalizePhoneForAuth(phone);
 	const response = await http.post<ApiEnvelope<{ userId: string; phone: string; message: string; devOtp?: string }>>('/auth/signup/phone', {
@@ -117,9 +122,17 @@ export const signupWithPhone = async (
 	return response.data.data;
 };
 
-export const verifyPhoneSignupOtp = async (phone: string, otp: string): Promise<{ user: AuthUser; sessionId: string }> => {
+export const verifyPhoneSignupOtp = async (
+	phone: string,
+	otp: string,
+	consent?: SignupConsentPayload,
+): Promise<{ user: AuthUser; sessionId: string }> => {
 	const normalizedPhone = normalizePhoneForAuth(phone);
-	const response = await http.post<ApiEnvelope<{ user: AuthUser; sessionId: string }>>('/auth/verify/phone-otp', { phone: normalizedPhone, otp });
+	const response = await http.post<ApiEnvelope<{ user: AuthUser; sessionId: string }>>('/auth/verify/phone-otp', {
+		phone: normalizedPhone,
+		otp,
+		...(consent || {}),
+	});
 	return response.data.data;
 };
 

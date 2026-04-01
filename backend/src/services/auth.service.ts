@@ -48,10 +48,11 @@ const nowPlusMinutes = (minutes: number): Date => new Date(Date.now() + minutes 
 
 const nowPlusDays = (days: number): Date => new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 
-const toPrismaUserRole = (role: PublicUserRole): 'PATIENT' | 'THERAPIST' | 'PSYCHIATRIST' | 'COACH' => {
+const toPrismaUserRole = (role: PublicUserRole): 'PATIENT' | 'THERAPIST' | 'PSYCHIATRIST' | 'PSYCHOLOGIST' | 'COACH' => {
 	if (role === 'patient') return 'PATIENT';
 	if (role === 'therapist') return 'THERAPIST';
 	if (role === 'psychiatrist') return 'PSYCHIATRIST';
+	if (role === 'psychologist') return 'PSYCHOLOGIST';
 	return 'COACH';
 };
 
@@ -417,6 +418,11 @@ export const verifyPhoneOtp = async (input: VerifyPhoneOtpInput, meta: RequestMe
 		throw new AppError('Invalid OTP', 400);
 	}
 
+	const isFirstPhoneVerification = !Boolean(user.phoneVerified);
+	if (isFirstPhoneVerification && !input.acceptedTerms) {
+		throw new AppError('Please accept Terms & Conditions to register', 422);
+	}
+
 	await db.user.update({
 		where: { id: user.id },
 		data: {
@@ -425,6 +431,53 @@ export const verifyPhoneOtp = async (input: VerifyPhoneOtpInput, meta: RequestMe
 			phoneVerificationOtpExpiresAt: null,
 		},
 	});
+
+	if (isFirstPhoneVerification && input.acceptedTerms) {
+		const defaultConsentTypes = ['TERMS_OF_SERVICE', 'PRIVACY_POLICY', 'INFORMED_CONSENT'];
+		const optionalConsentTypes = new Set([
+			'THERAPIST_IC_AGREEMENT',
+			'THERAPIST_NDA',
+			'THERAPIST_DATA_PROCESSING_AGREEMENT',
+		]);
+
+		const acceptedFromInput = Array.isArray(input.acceptedDocuments)
+			? input.acceptedDocuments
+				.map((doc) => String(doc).trim().toUpperCase())
+				.filter((doc) => optionalConsentTypes.has(doc))
+			: [];
+
+		const consentTypes = Array.from(new Set([...defaultConsentTypes, ...acceptedFromInput]));
+		const existing = await db.consent.findMany({
+			where: {
+				userId: String(user.id),
+				status: 'GRANTED',
+				consentType: { in: consentTypes },
+			},
+			select: { consentType: true },
+		});
+
+		const existingTypes = new Set<string>(existing.map((entry: { consentType: string }) => entry.consentType));
+		const now = new Date();
+		const toCreate = consentTypes
+			.filter((consentType) => !existingTypes.has(consentType))
+			.map((consentType) => ({
+				userId: String(user.id),
+				consentType,
+				purpose: 'REGISTRATION',
+				status: 'GRANTED',
+				grantedAt: now,
+				metadata: {
+					source: 'signup_phone_otp',
+					ipAddress: meta.ipAddress || null,
+					userAgent: meta.userAgent || null,
+					version: 1,
+				},
+			}));
+
+		if (toCreate.length > 0) {
+			await db.consent.createMany({ data: toCreate });
+		}
+	}
 
 	const tokenPair = await issueSessionTokens(String(user.id), meta);
 	const therapistProfile = await db.therapistProfile.findUnique({
