@@ -48,6 +48,7 @@ const PatientOnboardingPage = lazy(() => import('./pages/patient/PatientOnboardi
 const DailyCheckInPage = lazy(() => import('./pages/patient/DailyCheckInPage'));
 const HitASixerGamePage = lazy(() => import('./pages/patient/HitASixerGamePage'));
 const WalletPage = lazy(() => import('./pages/patient/WalletPage'));
+const GroupTherapySessionsPage = lazy(() => import('./pages/patient/GroupTherapySessionsPage'));
 const VideoSessionPage = lazy(() => import('./pages/shared/VideoSessionPage'));
 const AdminPortalLoginPage = lazy(() => import('./pages/admin/AdminPortalLoginPage'));
 const AdminDashboardPage = lazy(() => import('./pages/admin/Dashboard'));
@@ -559,6 +560,7 @@ function App() {
               <Route path="game" element={<HitASixerGamePage />} />
               <Route path="hit-a-sixer" element={<HitASixerGamePage />} />
               <Route path="wallet" element={<WalletPage />} />
+              <Route path="group-therapy" element={<GroupTherapySessionsPage />} />
             </Route>
             <Route path="/providers/:id" element={<Navigate to="/patient/sessions" replace />} />
             <Route path="/book/:providerId" element={<Navigate to="/patient/sessions" replace />} />

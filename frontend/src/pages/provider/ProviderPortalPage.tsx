@@ -8,6 +8,7 @@ import { PatientGroupVibes } from '../../components/providers/PatientGroupVibes'
 import { JitsiRoomView } from '../../components/providers/JitsiRoomView';
 import { AdmitPatientScreen } from '../../components/providers/AdmitPatientScreen';
 import { DeploySessionModal } from '../../components/providers/DeploySessionModal';
+import { groupTherapyApi } from '../../api/groupTherapy';
 
 export const ProviderPortalPage: React.FC = () => {
   const [activeView, setActiveView] = useState<'therapist' | 'patient'>('therapist');
@@ -15,17 +16,46 @@ export const ProviderPortalPage: React.FC = () => {
   const [admittingPatient, setAdmittingPatient] = useState<string | null>(null);
   const [isDeployModalOpen, setIsDeployModalOpen] = useState(false);
   
-  const [deployedGroupVibes, setDeployedGroupVibes] = useState<any[]>(() => {
-    const saved = localStorage.getItem('manas360_live_sessions');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [deployedGroupVibes, setDeployedGroupVibes] = useState<any[]>([]);
+  const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
 
   const [privateSessions, setPrivateSessions] = useState<any[]>([]);
 
   useEffect(() => {
-    localStorage.setItem('manas360_live_sessions', JSON.stringify(deployedGroupVibes));
-    window.dispatchEvent(new Event('sessionsUpdated'));
-  }, [deployedGroupVibes]);
+    const loadMySessions = async () => {
+      try {
+        const result = await groupTherapyApi.listMyRequests();
+        const rows = Array.isArray(result.items) ? result.items : [];
+
+        const pending = rows.filter((row: any) => row.status === 'PENDING_APPROVAL').length;
+        setPendingApprovalCount(pending);
+
+        const approved = rows
+          .filter((row: any) => ['APPROVED', 'PUBLISHED', 'LIVE'].includes(String(row.status || '').toUpperCase()))
+          .map((row: any) => ({
+            id: row.id,
+            title: row.title,
+            icon: '🧠',
+            host: 'Assigned Therapist',
+            startTime: row.scheduledAt,
+            durationMinutes: row.durationMinutes,
+            maxMembers: row.maxMembers,
+            joinedCount: Number(row.joinedCount || 0),
+            status: row.status,
+            desc: row.topic,
+          }));
+
+        setDeployedGroupVibes(approved);
+        localStorage.setItem('manas360_live_sessions', JSON.stringify(approved));
+        window.dispatchEvent(new Event('sessionsUpdated'));
+      } catch {
+        const saved = localStorage.getItem('manas360_live_sessions');
+        setDeployedGroupVibes(saved ? JSON.parse(saved) : []);
+      }
+    };
+
+    void loadMySessions();
+  }, []);
 
   const handleLeaveRoom = () => {
     if (activeRoom) {
@@ -65,18 +95,20 @@ export const ProviderPortalPage: React.FC = () => {
           setIsDeployModalOpen(false);
           
           if (details.type === 'group') {
-            const newVibe = { 
-              ...details.vibe, 
-              id: Date.now(), 
-              host: 'Dr. Emily Chen',
-              startTime: details.startTime,
-              durationMinutes: details.durationMinutes
-            };
-            setDeployedGroupVibes(prev => {
-              if (prev.find(v => v.title === newVibe.title)) return prev;
-              return [newVibe, ...prev]; 
+            groupTherapyApi.createRequest({
+              title: details.name,
+              topic: details.vibe?.description || details.name,
+              description: details.vibe?.description || details.name,
+              sessionMode: 'PUBLIC',
+              scheduledAt: details.startTime || new Date().toISOString(),
+              durationMinutes: details.durationMinutes || 60,
+              maxMembers: 10,
+            }).then(() => {
+              setPendingApprovalCount(prev => prev + 1);
+              toast.success(`Submitted '${details.name}' for admin approval`);
+            }).catch((error: any) => {
+              toast.error(error?.response?.data?.message || 'Unable to submit request');
             });
-            toast.success(`Scheduled '${details.name}'!`);
           } else {
             const newPatientName = details.name || 'Private Client';
             // Format time for private list
@@ -112,7 +144,7 @@ export const ProviderPortalPage: React.FC = () => {
                 <div className="bg-blue-600 p-2 rounded-lg text-white font-bold text-xl w-10 h-10 flex items-center justify-center">M</div>
                 <div>
                   <h1 className="text-lg font-bold tracking-tight text-blue-900 leading-none">MANAS360 PORTAL</h1>
-                  <p className="text-[10px] text-gray-500 mt-1 font-bold uppercase">Dr. Emily Chen ★★★★★ (42 Sessions)</p>
+                  <p className="text-[10px] text-gray-500 mt-1 font-bold uppercase">Pending approvals: {pendingApprovalCount}</p>
                 </div>
               </div>
               <button onClick={() => setIsDeployModalOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-full text-[10px] font-black tracking-widest uppercase flex items-center gap-2 transition-all shadow-md shadow-blue-200">

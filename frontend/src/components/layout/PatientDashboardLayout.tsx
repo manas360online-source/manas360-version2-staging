@@ -25,6 +25,7 @@ const mainNavItems = [
   { to: '/patient/dashboard', label: 'Dashboard', icon: Home },
   { to: '/patient/therapy-plan', label: 'My Therapy Plan', icon: ClipboardList },
   { to: '/patient/sessions', label: 'My Care', icon: CalendarDays, badge: '1 upcoming' },
+  { to: '/patient/group-therapy', label: 'Group Therapy', icon: CalendarDays, badge: 'Live' },
 ];
 
 const selfCareNavItems = [
@@ -132,6 +133,7 @@ export default function PatientDashboardLayout() {
     '/patient/notifications': 'Notifications',
     '/patient/progress': 'My Progress',
     '/patient/provider-messages': 'Messages',
+    '/patient/group-therapy': 'Group Therapy',
   };
   const pageTitle = Object.entries(pageTitleMap).find(([path]) => location.pathname.startsWith(path))?.[1] || 'Dashboard';
 

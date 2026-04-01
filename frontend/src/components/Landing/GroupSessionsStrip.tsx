@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
+import { groupTherapyApi } from '../../api/groupTherapy';
 
 const DEFAULT_SESSIONS = [
   { id: 'def1', title: 'Anxiety Circle', icon: '😨', host: 'Dr. Priya', lang: 'English', status: 'LIVE', joined: '11/12', btnText: 'Join Now — Free', bg: 'bg-[#FFF5F2]', border: 'border-[#FDE0D8]', btnColor: 'bg-[#E88A70]', hover: 'hover:bg-[#d67b63]' },
@@ -10,19 +12,25 @@ export const GroupSessionsStrip: React.FC = () => {
   const [liveSessions, setLiveSessions] = useState<any[]>([]);
 
   // Function to pull real-time sessions created by the therapist
-  const loadSessions = () => {
-    const saved = localStorage.getItem('manas360_live_sessions');
-    if (saved) setLiveSessions(JSON.parse(saved));
-    else setLiveSessions([]);
+  const loadSessions = async () => {
+    try {
+      const res = await groupTherapyApi.listPublicSessions();
+      setLiveSessions(Array.isArray(res.items) ? res.items : []);
+    } catch {
+      const saved = localStorage.getItem('manas360_live_sessions');
+      if (saved) setLiveSessions(JSON.parse(saved));
+      else setLiveSessions([]);
+    }
   };
 
   useEffect(() => {
-    loadSessions();
-    window.addEventListener('sessionsUpdated', loadSessions);
-    window.addEventListener('storage', loadSessions); // Works across multiple open tabs
+    void loadSessions();
+    const refresh = () => { void loadSessions(); };
+    window.addEventListener('sessionsUpdated', refresh);
+    window.addEventListener('storage', refresh); // Works across multiple open tabs
     return () => {
-      window.removeEventListener('sessionsUpdated', loadSessions);
-      window.removeEventListener('storage', loadSessions);
+      window.removeEventListener('sessionsUpdated', refresh);
+      window.removeEventListener('storage', refresh);
     };
   }, []);
 
@@ -30,17 +38,44 @@ export const GroupSessionsStrip: React.FC = () => {
   const dynamicSessions = liveSessions.map((ls) => ({
     id: ls.id,
     title: ls.title,
-    icon: ls.icon,
-    host: ls.host,
+    icon: '🧠',
+    host: `Dr. ${String(ls?.hostTherapist?.firstName || '').trim() || 'MANAS360 Therapist'}`,
     lang: 'English',
-    status: 'LIVE NOW',
-    joined: '0/15',
-    btnText: 'Join Live Room',
+    status: String(ls.status || 'LIVE NOW').replace(/_/g, ' '),
+    joined: `${Number(ls.joinedCount || 0)}/${Number(ls.maxMembers || 0)}`,
+    btnText: Number(ls.priceMinor || 0) > 0 ? `Join for ₹${Math.round(Number(ls.priceMinor || 0) / 100)}` : 'Join Session',
+    sessionId: ls.id,
     bg: 'bg-[#F0FDF4]', // Highlights dynamically created sessions in soft green
     border: 'border-[#BBF7D0]',
     btnColor: 'bg-[#22C55E]',
     hover: 'hover:bg-[#16A34A]'
   }));
+
+  const handleJoin = async (session: any) => {
+    if (!session.sessionId) {
+      window.location.href = '/#/auth/login';
+      return;
+    }
+
+    try {
+      const guestName = window.prompt('Enter your name to join this session:', 'Guest User') || '';
+      const guestEmail = window.prompt('Enter your email:', '') || '';
+      if (!guestName.trim() || !guestEmail.trim()) {
+        toast.error('Name and email are required to continue.');
+        return;
+      }
+
+      const payment = await groupTherapyApi.createPublicJoinPaymentIntent(session.sessionId, {
+        guestName: guestName.trim(),
+        guestEmail: guestEmail.trim(),
+      });
+
+      if (!payment.redirectUrl) throw new Error('Payment link not available');
+      window.location.href = payment.redirectUrl;
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || error?.message || 'Unable to start join checkout.');
+    }
+  };
 
   // Combine dynamic with defaults to always show exactly 3 cards
   const displaySessions = [...dynamicSessions, ...DEFAULT_SESSIONS].slice(0, 3);
@@ -79,7 +114,7 @@ export const GroupSessionsStrip: React.FC = () => {
               </div>
               
               <button 
-                onClick={() => window.location.href = '/#/provider/portal'}
+                onClick={() => void handleJoin(session)}
                 className={`w-full ${session.btnColor} ${session.hover} text-white font-black tracking-wide py-3.5 rounded-xl transition-colors flex justify-center items-center gap-2 text-xs`}
               >
                 {session.status.includes('LIVE') ? '⚡' : (session.status.includes('Starts') ? '🔥' : '🔔')} {session.btnText}

@@ -5,6 +5,7 @@ import {
   updateGroupCategory, 
   type GroupCategory 
 } from '../../api/admin.api';
+import { groupTherapyApi } from '../../api/groupTherapy';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
@@ -14,6 +15,7 @@ export default function GroupManagement() {
   const [groups, setGroups] = useState<GroupCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
+  const [requestQueue, setRequestQueue] = useState<any[]>([]);
   const [newGroup, setNewGroup] = useState<Partial<GroupCategory>>({
     name: '',
     type: 'therapy_group',
@@ -35,9 +37,48 @@ export default function GroupManagement() {
     }
   }, []);
 
+  const fetchQueue = useCallback(async () => {
+    try {
+      const res = await groupTherapyApi.listAdminQueue();
+      setRequestQueue(Array.isArray(res.items) ? res.items : []);
+    } catch {
+      setRequestQueue([]);
+    }
+  }, []);
+
   useEffect(() => {
     fetchGroups();
-  }, [fetchGroups]);
+    void fetchQueue();
+  }, [fetchGroups, fetchQueue]);
+
+  const approveRequest = async (request: any) => {
+    try {
+      await groupTherapyApi.reviewRequest(request.id, {
+        decision: 'approve',
+        title: request.title,
+        topic: request.topic,
+        maxMembers: request.maxMembers || 10,
+        durationMinutes: request.durationMinutes || 60,
+        priceMinor: Number(request.priceMinor || 149900),
+        allowGuestJoin: true,
+        requiresPayment: true,
+      });
+      toast.success('Request approved with pricing and capacity governance');
+      void fetchQueue();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Approval failed');
+    }
+  };
+
+  const publishRequest = async (id: string) => {
+    try {
+      await groupTherapyApi.publishRequest(id);
+      toast.success('Session published to landing and patient dashboards');
+      void fetchQueue();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Publish failed');
+    }
+  };
 
   const handleCreateGroup = async () => {
     if (!newGroup.name || !newGroup.type) {
@@ -225,6 +266,53 @@ export default function GroupManagement() {
                   </tr>
                 ))
               )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-soft-sm border border-gray-100 overflow-hidden mt-8">
+        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-gray-50/30">
+          <h3 className="font-bold text-gray-800 text-base uppercase tracking-wider">Therapist Group Therapy Approval Queue</h3>
+          <Badge variant="secondary" className="text-[10px] font-black">{requestQueue.length} Requests</Badge>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="bg-gray-50/50 border-b border-gray-100 text-[11px] font-bold uppercase text-gray-400 tracking-wider">
+                <th className="px-6 py-4">Title / Topic</th>
+                <th className="px-6 py-4">Host</th>
+                <th className="px-6 py-4 text-center">Schedule</th>
+                <th className="px-6 py-4 text-center">Mode</th>
+                <th className="px-6 py-4 text-center">Status</th>
+                <th className="px-6 py-4 text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50 text-sm">
+              {requestQueue.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center text-gray-400 italic">No pending requests.</td>
+                </tr>
+              ) : requestQueue.map((row) => (
+                <tr key={row.id} className="hover:bg-gray-50/30 transition-colors">
+                  <td className="px-6 py-4">
+                    <p className="font-bold text-gray-900">{row.title}</p>
+                    <p className="text-xs text-gray-500">{row.topic}</p>
+                  </td>
+                  <td className="px-6 py-4 text-xs text-gray-600">{row.hostTherapist?.firstName} {row.hostTherapist?.lastName}</td>
+                  <td className="px-6 py-4 text-center text-xs text-gray-600">{new Date(row.scheduledAt).toLocaleString()}</td>
+                  <td className="px-6 py-4 text-center text-xs font-bold">{row.sessionMode}</td>
+                  <td className="px-6 py-4 text-center text-xs font-bold">{row.status}</td>
+                  <td className="px-6 py-4 text-center flex gap-2 justify-center">
+                    {row.status === 'PENDING_APPROVAL' && (
+                      <Button size="sm" onClick={() => void approveRequest(row)} className="h-8 px-3 text-[10px]">Approve + Set Governance</Button>
+                    )}
+                    {row.status === 'APPROVED' && (
+                      <Button size="sm" onClick={() => void publishRequest(row.id)} className="h-8 px-3 text-[10px] bg-emerald-600 hover:bg-emerald-700">Publish</Button>
+                    )}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

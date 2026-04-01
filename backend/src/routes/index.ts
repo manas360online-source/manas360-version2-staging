@@ -31,6 +31,7 @@ import soundRoutes from './sound.routes';
 import providerDashboardRoutes from './provider-dashboard.routes';
 import gameRoutes from './game.routes';
 import walletRoutes from './wallet.routes';
+import groupTherapyRoutes from './group-therapy.routes';
 
 
 const router = Router();
@@ -91,6 +92,7 @@ router.use('/v1', riskAnalyticsRoutes);
 // Mount game and wallet routes for patient-facing game features and wallet APIs
 router.use('/v1/game', gameRoutes);
 router.use('/v1/wallet', walletRoutes);
+router.use('/v1/group-therapy', groupTherapyRoutes);
 
 export default router;
 
