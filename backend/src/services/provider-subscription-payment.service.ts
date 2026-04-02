@@ -32,14 +32,13 @@ export const initiateProviderSubscriptionPayment = async (
 	if (plan.price === 0) throw new AppError('Free plan does not require payment', 422);
 
 	const existingSubscription = await prisma.providerSubscription.findUnique({ where: { providerId } }).catch(() => null);
-	const isSameActivePlan = Boolean(
+	const isAnyActiveSubscription = Boolean(
 		existingSubscription
 		&& String(existingSubscription.status || '').toLowerCase() === 'active'
-		&& new Date(existingSubscription.expiryDate).getTime() > Date.now()
-		&& String(existingSubscription.plan || '').toLowerCase() === String(planKey).toLowerCase(),
+		&& new Date(existingSubscription.expiryDate).getTime() > Date.now(),
 	);
-	if (isSameActivePlan) {
-		throw new AppError('This provider plan is already active', 409);
+	if (isAnyActiveSubscription) {
+		throw new AppError('An active provider subscription already exists', 409);
 	}
 
 	const requestedIdempotencyKey = String(options?.idempotencyKey || '').trim();

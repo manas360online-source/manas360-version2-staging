@@ -89,6 +89,7 @@ model User {
   providerExtraQuestionsCreated ProviderExtraQuestion[]
   providerSubscription          ProviderSubscription?
   providerWallet                ProviderWallet?             @relation("ProviderWalletOwner")
+  qrCodesCreated                QrCode[]                    @relation("QrCodeCreatedBy")
   riskScores                    RiskScore[]                 @relation("UserRiskScores")
   bookingIntentsAsPatient       SessionBookingIntent[]      @relation("BookingIntentPatient")
   bookingIntentsAsProvider      SessionBookingIntent[]      @relation("BookingIntentProvider")
@@ -143,6 +144,27 @@ model Role {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@map("roles")
+}
+
+model QrCode {
+  code        String   @id
+  redirectUrl String   @map("redirect_url")
+  templateId  String   @default("classic-black") @map("template_id")
+  stylePreset String   @default("rounded") @map("style_preset")
+  foregroundColor String @default("#0F172A") @map("foreground_color")
+  backgroundColor String @default("#FFFFFF") @map("background_color")
+  logoUrl     String?  @map("logo_url")
+  isActive    Boolean  @default(true) @map("is_active")
+  scanCount   Int      @default(0) @map("scan_count")
+  connectedCount Int   @default(0) @map("connected_count")
+  createdById String?  @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdBy   User?    @relation("QrCodeCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([createdById])
+  @@index([createdAt])
+  @@map("qr_codes")
 }
 
 model CareTeamAssignment {

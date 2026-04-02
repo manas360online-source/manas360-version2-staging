@@ -1,7 +1,10 @@
 import { io, Socket } from 'socket.io-client';
+import { getApiBaseUrl } from './lib/runtimeEnv';
 
-const SOCKET_URL = import.meta.env.VITE_API_URL || 
-  window.location.origin;
+const apiBaseUrl = getApiBaseUrl();
+const SOCKET_URL = /^https?:\/\//i.test(apiBaseUrl)
+  ? apiBaseUrl.replace(/\/api\/?$/i, '')
+  : window.location.origin;
 
 export const createSocket = (token: string): Socket => {
   return io(SOCKET_URL, {

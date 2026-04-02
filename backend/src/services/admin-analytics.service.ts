@@ -533,79 +533,90 @@ export class AdminAnalyticsService {
 		};
 	}
 	async getTherapistPerformanceMetrics() {
-		// Fetch all therapists with their profiles and basic user info
-		const therapists = await db.therapistProfile.findMany({
-			where: { isDeleted: false },
-			include: {
-				user: {
-					select: {
-						firstName: true,
-						lastName: true,
+		try {
+			// Fetch all therapists with their profiles and basic user info
+			const therapists = await db.therapistProfile.findMany({
+				where: { isDeleted: false },
+				include: {
+					user: {
+						select: {
+							firstName: true,
+							lastName: true,
+						},
 					},
 				},
-			},
-		});
+			});
 
-		const now = new Date();
-		const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-		const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+			const now = new Date();
+			const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+			const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
 
-		const performanceData = await Promise.all(
-			therapists.map(async (profile: any) => {
-				const currentSessions = await db.therapySession.count({
-					where: {
-						therapistProfileId: profile.id,
-						status: 'COMPLETED',
-						dateTime: { gte: thirtyDaysAgo },
-					},
-				});
+			const revenueLedgerAvailable = Boolean((db as any)?.revenueLedger?.aggregate);
 
-				const previousSessions = await db.therapySession.count({
-					where: {
-						therapistProfileId: profile.id,
-						status: 'COMPLETED',
-						dateTime: { gte: sixtyDaysAgo, lt: thirtyDaysAgo },
-					},
-				});
+			const performanceData = await Promise.all(
+				therapists.map(async (profile: any) => {
+					const currentSessions = await db.therapySession.count({
+						where: {
+							therapistProfileId: profile.id,
+							status: 'COMPLETED',
+							dateTime: { gte: thirtyDaysAgo },
+						},
+					});
 
-				const totalSessions = await db.therapySession.count({
-					where: {
-						therapistProfileId: profile.id,
-						status: 'COMPLETED',
-					},
-				});
+					const previousSessions = await db.therapySession.count({
+						where: {
+							therapistProfileId: profile.id,
+							status: 'COMPLETED',
+							dateTime: { gte: sixtyDaysAgo, lt: thirtyDaysAgo },
+						},
+					});
 
-				const revenue = await db.revenueLedger.aggregate({
-					where: {
-						type: 'SESSION',
-						referenceId: { not: null },
-					},
-					_sum: {
-						providerShareMinor: true,
-					},
-				});
+					const totalSessions = await db.therapySession.count({
+						where: {
+							therapistProfileId: profile.id,
+							status: 'COMPLETED',
+						},
+					});
 
-				const trend = previousSessions === 0 ? 100 : Math.round(((currentSessions - previousSessions) / previousSessions) * 100);
+					let totalEarningsMinor = 0;
+					if (revenueLedgerAvailable) {
+						const revenue = await db.revenueLedger.aggregate({
+							where: {
+								type: 'SESSION',
+								referenceId: { not: null },
+							},
+							_sum: {
+								providerShareMinor: true,
+							},
+						});
+						totalEarningsMinor = Number(revenue?._sum?.providerShareMinor || 0);
+					}
 
-				return {
-					id: profile.userId,
-					name: `${profile.user.firstName} ${profile.user.lastName}`.trim() || 'Anonymous Provider',
-					sessionsCompleted: totalSessions,
-					avgRating: profile.averageRating || 0,
-					utilizationPercent: Math.min(100, Math.round((totalSessions / 10) * 5)),
-					totalEarnings: Number(revenue._sum.providerShareMinor || 0) / 100,
-					trend,
-				};
-			})
-		);
+					const trend = previousSessions === 0 ? 100 : Math.round(((currentSessions - previousSessions) / previousSessions) * 100);
 
-		const summary = {
-			avgRating: performanceData.length > 0 ? (performanceData.reduce((acc, curr) => acc + curr.avgRating, 0) / performanceData.length).toFixed(1) : 0,
-			totalSessions: performanceData.reduce((acc, curr) => acc + curr.sessionsCompleted, 0),
-			utilizationPercent: performanceData.length > 0 ? Math.round(performanceData.reduce((acc, curr) => acc + curr.utilizationPercent, 0) / performanceData.length) : 0,
-		};
+					return {
+						id: profile.userId,
+						name: `${profile.user.firstName} ${profile.user.lastName}`.trim() || 'Anonymous Provider',
+						sessionsCompleted: totalSessions,
+						avgRating: profile.averageRating || 0,
+						utilizationPercent: Math.min(100, Math.round((totalSessions / 10) * 5)),
+						totalEarnings: totalEarningsMinor / 100,
+						trend,
+					};
+				})
+			);
 
-		return { therapists: performanceData, summary };
+			const summary = {
+				avgRating: performanceData.length > 0 ? (performanceData.reduce((acc, curr) => acc + curr.avgRating, 0) / performanceData.length).toFixed(1) : 0,
+				totalSessions: performanceData.reduce((acc, curr) => acc + curr.sessionsCompleted, 0),
+				utilizationPercent: performanceData.length > 0 ? Math.round(performanceData.reduce((acc, curr) => acc + curr.utilizationPercent, 0) / performanceData.length) : 0,
+			};
+
+			return { therapists: performanceData, summary };
+		} catch (error) {
+			console.error('[ADMIN ANALYTICS] Therapist performance failed:', error);
+			return { therapists: [], summary: { avgRating: '0.0', totalSessions: 0, utilizationPercent: 0 } };
+		}
 	}
 
 	async getSessionAnalyticsMetrics(days = 30) {

@@ -23,6 +23,7 @@ const navItems: NavItem[] = [
 	{ to: '/admin/live-sessions', label: 'Sessions', shortLabel: 'Ses', section: 'OPERATIONS' },
 	{ to: '/admin/templates', label: 'Screening Framework Modification', shortLabel: 'Tpl', section: 'OPERATIONS' },
 	{ to: '/admin/groups', label: 'Group Therapy Management', shortLabel: 'Grp', section: 'OPERATIONS' },
+	{ to: '/admin/qr-codes', label: 'QR Codes', shortLabel: 'QR', section: 'OPERATIONS' },
 	{ to: '/admin/crisis-console', label: 'Crisis Console', shortLabel: 'CRC', section: 'OPERATIONS' },
 	// FINANCE
 	{ to: '/admin/revenue', label: 'Revenue', shortLabel: 'Rev', section: 'FINANCE' },

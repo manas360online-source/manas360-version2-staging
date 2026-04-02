@@ -197,19 +197,21 @@ const withFallbackChain = async <T>(requests: Array<() => Promise<T>>): Promise<
 export const patientApi = {
   getDashboard: async () =>
     withFallbackChain([
+      async () => (await http.get('/v1/patient/dashboard')).data,
       async () => (await http.get('/patient/dashboard')).data,
-      async () => (await http.get('/patient/dashboard')).data,
+      async () => (await http.get('/v1/patient/dashboard')).data,
     ]),
   getDashboardV2: async () =>
     withFallbackChain([
+      async () => (await http.get('/v1/patient/dashboard')).data,
       async () => (await http.get('/patient/dashboard')).data,
-      async () => (await http.get('/patient/dashboard')).data,
+      async () => (await http.get('/v1/patient/dashboard')).data,
     ]),
   changePassword: async (payload: { currentPassword: string; newPassword: string; confirmPassword: string }) =>
-    (await http.patch('/users/me/password', payload)).data,
-  getActiveSessions: async () => (await http.get('/users/me/sessions')).data,
+    (await http.patch('/v1/users/me/password', payload)).data,
+  getActiveSessions: async () => (await http.get('/v1/users/me/sessions')).data,
   revokeSession: async (id: string) => (await http.delete(`/v1/users/me/sessions/${encodeURIComponent(id)}`)).data,
-  revokeAllSessions: async () => (await http.delete('/users/me/sessions')).data,
+  revokeAllSessions: async () => (await http.delete('/v1/users/me/sessions')).data,
   getSettings: async () => (await http.get('/patient/settings')).data,
   updateSettings: async (settings: Record<string, any>) => (await http.put('/patient/settings', { settings })).data,
   getSupportCenter: async () => (await http.get('/patient/support')).data,
@@ -232,9 +234,10 @@ export const patientApi = {
     (await http.post('/payments/verify', payload)).data,
   getUpcomingSessions: async () =>
     withFallbackChain([
+      async () => (await http.get('/v1/sessions/upcoming')).data,
       async () => (await http.get('/sessions/upcoming')).data,
       async () => {
-        const sessions = (await http.get('/patients/me/sessions')).data;
+        const sessions = (await http.get('/v1/patients/me/sessions')).data;
         const rows = sessions?.data ?? sessions;
         return Array.isArray(rows)
           ? rows.filter((item: any) => String(item?.status || '').toLowerCase() !== 'completed')
@@ -243,8 +246,9 @@ export const patientApi = {
     ]),
   getSessionHistory: async () =>
     withFallbackChain([
+      async () => (await http.get('/v1/sessions/history')).data,
       async () => (await http.get('/sessions/history')).data,
-      async () => (await http.get('/patients/me/sessions')).data,
+      async () => (await http.get('/v1/patients/me/sessions')).data,
     ]),
   getSessionDetail: async (id: string) => (await http.get(`/v1/sessions/${encodeURIComponent(id)}`)).data,
   downloadSessionPdf: async (id: string) =>
@@ -281,7 +285,7 @@ export const patientApi = {
     return response.data?.data ?? response.data;
   },
   getStructuredAssessmentHistory: async () => {
-    const response = await http.get('/free-screening/history');
+    const response = await http.get('/v1/free-screening/history');
     return response.data?.data ?? response.data;
   },
   getJourneyRecommendation: async (): Promise<JourneyRecommendationResponse> =>
@@ -373,6 +377,7 @@ export const patientApi = {
     };
 
     return withFallbackChain([
+      async () => (await http.post('/v1/patients/me/daily-checkin', v1Payload)).data,
       async () => (await http.post('/patients/me/daily-checkin', v1Payload)).data,
       async () => (await http.post('/patient/me/daily-checkin', v1Payload)).data,
       async () => (await http.post('/patient/daily-checkin', legacyPayload)).data,
@@ -453,17 +458,18 @@ export const patientApi = {
     medicalHistory?: string;
     carrier?: string;
     emergencyContact?: { name: string; relation: string; phone: string };
-  }) => (await http.post('/patients/profile', payload)).data,
+  }) => (await http.post('/v1/patients/profile', payload)).data,
   getMyProfile: async () =>
     withFallbackChain([
+      async () => (await http.get('/v1/patients/me/profile')).data,
       async () => (await http.get('/patients/me/profile')).data,
       async () => (await http.get('/patient/me/profile')).data,
     ]),
   getSubscription: async () => {
     const response = await withFallbackChain([
+      async () => (await http.get('/v1/patient/subscription')).data,
       async () => (await http.get('/patient/subscription')).data,
-      async () => (await http.get('/patient/subscription')).data,
-      async () => (await http.get('/subscription')).data,
+      async () => (await http.get('/v1/subscription')).data,
       async () => (await http.get('/subscription')).data,
     ]);
     return unwrapPayload(response);
@@ -628,17 +634,21 @@ export const patientApi = {
   completeExercise: async (id: string) => (await http.patch(`/patient/exercises/${encodeURIComponent(id)}/complete`)).data,
   getTherapyPlan: async (week?: number) =>
     withFallbackChain([
+      async () => (await http.get('/v1/patients/me/therapy-plan', { params: week ? { week } : undefined })).data,
       async () => (await http.get('/patients/me/therapy-plan', { params: week ? { week } : undefined })).data,
+      async () => (await http.get('/v1/therapy-plan', { params: week ? { week } : undefined })).data,
       async () => (await http.get('/therapy-plan', { params: week ? { week } : undefined })).data,
     ]),
   completeTherapyPlanTask: async (id: string) => (await http.patch(`/v1/therapy-plan/tasks/${encodeURIComponent(id)}/complete`)).data,
   getPetState: async () =>
     withFallbackChain([
+      async () => (await http.get('/v1/patients/me/pets/state')).data,
       async () => (await http.get('/patient/pets/state')).data,
       async () => (await http.get('/patients/me/pets/state')).data,
     ]),
   upsertPetState: async (payload: { selectedPet: 'koi' | 'pup' | 'owl'; vitality: number; unlockedItems: string[]; isPremium: boolean }) =>
     withFallbackChain([
+      async () => (await http.put('/v1/patients/me/pets/state', payload)).data,
       async () => (await http.put('/patient/pets/state', payload)).data,
       async () => (await http.put('/patients/me/pets/state', payload)).data,
     ]),

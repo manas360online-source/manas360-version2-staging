@@ -30,6 +30,7 @@ export default function LoginPage() {
 	const [devOtp, setDevOtp] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const adminPortalLogin = '/admin-portal/login';
 
 	const resolvePostLoginRouteWithSubscription = async (candidate: string | null, role: string | undefined, userOverride?: any) => {
 		if (!candidate || candidate.startsWith('/auth/')) {
@@ -188,11 +189,9 @@ export default function LoginPage() {
 								variant="soft" 
 								size="sm"
 				className="text-xs py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-100"
-								onClick={() => {
-									setPhone('superadmin@manas360.com');
-									setOtpSent(true);
-									setOtp('123456');
-								}}
+								onClick={() => navigate(adminPortalLogin, {
+									state: { identifier: 'superadmin@manas360.com', password: 'Admin@123' },
+								})}
 							>
 								🚀 Login as Super Admin
 							</Button>
@@ -201,11 +200,9 @@ export default function LoginPage() {
 									variant="soft" 
 									size="sm"
 									className="text-[10px] py-1.5"
-									onClick={() => {
-										setPhone('finance@manas360.com');
-										setOtpSent(true);
-										setOtp('123456');
-									}}
+									onClick={() => navigate(adminPortalLogin, {
+										state: { identifier: 'finance@manas360.com', password: 'Admin@123' },
+									})}
 								>
 									💳 Finance Manager
 								</Button>
@@ -213,11 +210,9 @@ export default function LoginPage() {
 									variant="soft" 
 									size="sm"
 									className="text-[10px] py-1.5"
-									onClick={() => {
-										setPhone('clinical@manas360.com');
-										setOtpSent(true);
-										setOtp('123456');
-									}}
+									onClick={() => navigate(adminPortalLogin, {
+										state: { identifier: 'clinical@manas360.com', password: 'Admin@123' },
+									})}
 								>
 									🏥 Clinical Director
 								</Button>

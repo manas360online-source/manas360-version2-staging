@@ -27,14 +27,13 @@ export const initiatePatientSubscriptionPayment = async (
 	if (!plan) throw new AppError('Invalid subscription plan', 422);
 
 	const existingSubscription = await prisma.patientSubscription.findUnique({ where: { userId } }).catch(() => null);
-	const isSameActivePlan = Boolean(
+	const isAnyActiveSubscription = Boolean(
 		existingSubscription
 		&& String(existingSubscription.status || '').toLowerCase() === 'active'
-		&& new Date(existingSubscription.renewalDate).getTime() > Date.now()
-		&& String(existingSubscription.planName || '').trim().toLowerCase() === String(plan.name || '').trim().toLowerCase(),
+		&& new Date(existingSubscription.renewalDate).getTime() > Date.now(),
 	);
-	if (isSameActivePlan) {
-		throw new AppError('This subscription plan is already active', 409);
+	if (isAnyActiveSubscription) {
+		throw new AppError('An active subscription already exists', 409);
 	}
 
 	const initiatedAttempts = await prisma.financialPayment.findMany({

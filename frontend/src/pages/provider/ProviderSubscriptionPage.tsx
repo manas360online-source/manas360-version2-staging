@@ -92,6 +92,7 @@ export default function ProviderSubscriptionPage() {
             <div className="grid gap-6 md:grid-cols-2">
               {/* Monthly Card */}
               <button
+                type="button"
                 onClick={() => setSelectedPlatformCycle('monthly')}
                 className={`relative flex flex-col p-8 rounded-3xl border-2 transition-all text-left ${
                   selectedPlatformCycle === 'monthly' ? 'border-[#1f6f5f] bg-[#1f6f5f]/5 shadow-xl shadow-[#1f6f5f]/10' : 'border-slate-200 bg-white'
@@ -113,6 +114,7 @@ export default function ProviderSubscriptionPage() {
 
               {/* Quarterly Card */}
               <button
+                type="button"
                 onClick={() => setSelectedPlatformCycle('quarterly')}
                 className={`relative flex flex-col p-8 rounded-3xl border-2 transition-all text-left ${
                   selectedPlatformCycle === 'quarterly' ? 'border-[#1f6f5f] bg-[#1f6f5f]/5 shadow-xl shadow-[#1f6f5f]/10' : 'border-slate-200 bg-white'
@@ -137,6 +139,7 @@ export default function ProviderSubscriptionPage() {
 
               <div className="md:col-span-2 mt-4">
                 <button
+                  type="button"
                   onClick={handlePlatformPayment}
                   disabled={loading}
                   className="w-full flex items-center justify-center gap-3 bg-[#1f6f5f] hover:bg-[#145347] text-white font-black py-4 rounded-2xl shadow-xl shadow-[#1f6f5f]/20 transition-all disabled:opacity-50"
@@ -181,6 +184,7 @@ export default function ProviderSubscriptionPage() {
                   </p>
                   {!isOnboardingComplete && isPlatformActive && (
                     <button 
+                      type="button"
                       onClick={() => navigate('/onboarding/provider-setup')}
                       className="mt-3 text-xs font-black text-[#1f6f5f] hover:underline"
                     >
@@ -220,6 +224,7 @@ export default function ProviderSubscriptionPage() {
                   </ul>
 
                   <button
+                    type="button"
                     disabled={!canChoosePlan}
                     onClick={() => startFlow(plan.id)}
                     className={`w-full rounded-2xl py-3.5 text-sm font-black transition-all ${

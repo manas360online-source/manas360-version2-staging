@@ -1,4 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
+import { getApiBaseUrl } from '../lib/runtimeEnv';
 
 /**
  * Public HTTP client for unauthenticated API endpoints.
@@ -6,10 +7,7 @@ import axios, { AxiosInstance } from 'axios';
  * Safe for public endpoints like /v1/group-therapy/public/sessions
  */
 
-const baseURL =
-  import.meta.env.VITE_API_BASE_URL?.trim() ||
-  import.meta.env.VITE_API_URL?.trim() ||
-  '/api';
+const baseURL = getApiBaseUrl();
 
 const publicHttpInstance: AxiosInstance = axios.create({
   baseURL,
