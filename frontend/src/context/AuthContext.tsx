@@ -199,6 +199,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const currentUser = await meApi();
       setUser(currentUser);
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.removeItem(authProbeBlockKey);
+      }
     } catch (error: any) {
       setUser(null);
       clearSessionHint();

@@ -23,12 +23,21 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [socket, setSocket] = useState<Socket | null>(null);
   const [liveMetrics, setLiveMetrics] = useState<any | null>(null);
 
+  const getStoredToken = (): string | null => {
+    try {
+      const storage = globalThis?.localStorage as { getItem?: (key: string) => string | null } | undefined;
+      return typeof storage?.getItem === 'function' ? storage.getItem('token') : null;
+    } catch {
+      return null;
+    }
+  };
+
   useEffect(() => {
     // If user is authenticated, initialize socket
     // AuthContext usually provides user object after successful login
     // we need the token too. 
     // AuthContext sometimes stores it in localStorage.
-    const token = localStorage.getItem('token'); 
+    const token = getStoredToken();
     
     if (user && token) {
       const s = initSocket(token);

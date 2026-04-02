@@ -562,7 +562,7 @@ function triggerReward(key,btn){
   if(EFFECTS[key])EFFECTS[key]();
   const candidates=ANIM_MAP[key]||[];
   let match=null;
-  for(const name of candidates){match=animations.find(a=>a[1].toLowerCase().replace(/[\s_]/g,'')===name.toLowerCase().replace(/[\s_]/g,''))||animations.find(a=>a[1].toLowerCase().includes(name.toLowerCase()));if(match)break;}
+  for(const name of candidates){match=animations.find(a=>a[1].toLowerCase().replace(/[\\s_]/g,'')===name.toLowerCase().replace(/[\\s_]/g,''))||animations.find(a=>a[1].toLowerCase().includes(name.toLowerCase()));if(match)break;}
   if(!match)match=animations[0];
   if(match){
     const isEndo=['breathe','laugh','play_time'].includes(key);

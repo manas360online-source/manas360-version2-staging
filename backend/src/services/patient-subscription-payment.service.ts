@@ -82,7 +82,8 @@ export const initiatePatientSubscriptionPayment = async (
 	const hasPhonePeOAuth = Boolean(String(process.env.PHONEPE_CLIENT_ID || '').trim())
 		&& Boolean(String(process.env.PHONEPE_CLIENT_SECRET || '').trim());
 	const shouldBypass = ((env.allowDevPaymentBypass && env.nodeEnv !== 'production' && !hasPhonePeOAuth) || env.subscriptionPaymentBypass);
-	const canFallbackWithoutGateway = env.nodeEnv !== 'production' || env.subscriptionPaymentBypass;
+	// Only allow local success fallback when bypass is explicitly enabled.
+	const canFallbackWithoutGateway = shouldBypass;
 	const amountMinor = Math.max(
 		0,
 		Math.round(

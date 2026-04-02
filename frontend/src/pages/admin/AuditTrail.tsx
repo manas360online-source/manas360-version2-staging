@@ -52,7 +52,7 @@ export default function AuditTrail() {
   }, []);
 
   const filteredAndSortedLogs = useMemo(() => {
-    let result = logs.filter(log =>
+    const result = logs.filter(log =>
       log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
       log.details.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (log.adminName && log.adminName.toLowerCase().includes(searchTerm.toLowerCase())) ||

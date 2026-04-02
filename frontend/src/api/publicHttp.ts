@@ -6,29 +6,13 @@ import axios, { AxiosInstance } from 'axios';
  * Safe for public endpoints like /v1/group-therapy/public/sessions
  */
 
-const defaultApiBaseUrl = typeof window === 'undefined'
-  ? 'http://localhost:3000/api'
-  : '/api';
-
-const rawBaseUrl =
+const baseURL =
   import.meta.env.VITE_API_BASE_URL?.trim() ||
   import.meta.env.VITE_API_URL?.trim() ||
-  defaultApiBaseUrl;
-
-const normalizeBaseUrl = (url: string): string => {
-  let normalized = url.trim();
-  if (
-    typeof window !== 'undefined'
-    && /(^|\.)manas360\.com$/i.test(window.location.hostname)
-    && normalized.includes('localhost:3000')
-  ) {
-    return '/api';
-  }
-  return normalized.replace(/\/+$/, '');
-};
+  '/api';
 
 const publicHttpInstance: AxiosInstance = axios.create({
-  baseURL: normalizeBaseUrl(rawBaseUrl),
+  baseURL,
   withCredentials: false, // Do NOT send cookies/auth
   headers: {
     'Content-Type': 'application/json',
@@ -44,10 +28,10 @@ publicHttpInstance.interceptors.request.use((config: any) => {
   delete config.headers.Authorization;
   delete config.headers['x-csrf-token'];
   delete config.headers['x-auth-token'];
-  
+
   // Ensure credentials are not sent
   config.withCredentials = false;
-  
+
   return config;
 });
 

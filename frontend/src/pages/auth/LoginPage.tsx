@@ -98,7 +98,12 @@ export default function LoginPage() {
 			const candidate = from || afterLogin || next || null;
 			const postLoginRoute = await resolvePostLoginRouteWithSubscription(candidate, result.user?.role, result.user);
 			navigate(postLoginRoute, { replace: true });
-		} catch (err) {
+		} catch (err: any) {
+			const message = String(err?.response?.data?.message || '');
+			if (Number(err?.response?.status) === 422 && message.toLowerCase().includes('accept terms')) {
+				navigate(`/auth/signup?phone=${encodeURIComponent(phone.trim())}`, { replace: true });
+				return;
+			}
 			setError(getApiErrorMessage(err, 'OTP verification failed'));
 		} finally {
 			setLoading(false);
@@ -195,7 +200,7 @@ export default function LoginPage() {
 								<Button 
 									variant="soft" 
 									size="sm"
-				  className="text-[10px] py-1.5"
+									className="text-[10px] py-1.5"
 									onClick={() => {
 										setPhone('finance@manas360.com');
 										setOtpSent(true);
@@ -207,7 +212,7 @@ export default function LoginPage() {
 								<Button 
 									variant="soft" 
 									size="sm"
-				  className="text-[10px] py-1.5"
+									className="text-[10px] py-1.5"
 									onClick={() => {
 										setPhone('clinical@manas360.com');
 										setOtpSent(true);
