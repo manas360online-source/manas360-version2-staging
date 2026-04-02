@@ -14,6 +14,7 @@ const toCompactToken = (value: string, maxLength: number): string =>
 interface PatientSubscriptionPaymentOptions {
 	amountMinorOverride?: number;
 	idempotencyKey?: string;
+	redirectUrlOverride?: string;
 	metadata?: Record<string, unknown>;
 }
 
@@ -78,7 +79,9 @@ export const initiatePatientSubscriptionPayment = async (
 
 	const userToken = toCompactToken(userId, 8) || 'user';
 	const transactionId = `SUB_${userToken}_${Date.now()}`;
-	const shouldBypass = (env.allowDevPaymentBypass && env.nodeEnv !== 'production') || env.subscriptionPaymentBypass;
+	const hasPhonePeOAuth = Boolean(String(process.env.PHONEPE_CLIENT_ID || '').trim())
+		&& Boolean(String(process.env.PHONEPE_CLIENT_SECRET || '').trim());
+	const shouldBypass = ((env.allowDevPaymentBypass && env.nodeEnv !== 'production' && !hasPhonePeOAuth) || env.subscriptionPaymentBypass);
 	const canFallbackWithoutGateway = env.nodeEnv !== 'production' || env.subscriptionPaymentBypass;
 	const amountMinor = Math.max(
 		0,
@@ -89,6 +92,8 @@ export const initiatePatientSubscriptionPayment = async (
 		),
 	);
 	const frontendBaseUrl = env.frontendUrl;
+	const paymentStatusBase = `${frontendBaseUrl}/#/payment/status`;
+	const redirectUrlTarget = String(options?.redirectUrlOverride || `${paymentStatusBase}?transactionId=${transactionId}&status=SUCCESS`).trim();
 	const callbackUrl = `${env.apiUrl}${env.apiPrefix}/v1/payments/phonepe/webhook`;
 	const cycleKey = new Date().toISOString().slice(0, 10);
 	const subscriptionIdempotencyKey = requestedIdempotencyKey || `sub_init:${userId}:${planKey}:${cycleKey}`;
@@ -96,7 +101,7 @@ export const initiatePatientSubscriptionPayment = async (
 	let redirectUrl: string;
 	if (shouldBypass) {
 		// Short-circuit: no gateway call, pretend success and jump to local success page.
-		redirectUrl = `${frontendBaseUrl}/payment/status?id=${transactionId}&status=SUCCESS`;
+		redirectUrl = redirectUrlTarget;
 	} else {
 		try {
 			redirectUrl = await initiatePhonePePayment({
@@ -104,7 +109,7 @@ export const initiatePatientSubscriptionPayment = async (
 				userId,
 				amountInPaise: amountMinor,
 				callbackUrl,
-				redirectUrl: `${frontendBaseUrl}/payment/status?id=${transactionId}&status=SUCCESS`,
+				redirectUrl: redirectUrlTarget,
 			});
 		} catch (error: any) {
 			if (!canFallbackWithoutGateway) {
@@ -116,7 +121,7 @@ export const initiatePatientSubscriptionPayment = async (
 				nodeEnv: env.nodeEnv,
 				error: error?.message,
 			});
-			redirectUrl = `${frontendBaseUrl}/payment/status?id=${transactionId}&status=SUCCESS`;
+			redirectUrl = redirectUrlTarget;
 		}
 	}
 
@@ -135,6 +140,7 @@ export const initiatePatientSubscriptionPayment = async (
 					plan: planKey,
 					redirectUrl,
 					idempotencyKey: subscriptionIdempotencyKey,
+					redirectUrlOverride: String(options?.redirectUrlOverride || '').trim() || undefined,
 					...(options?.metadata || {}),
 				}
 			}

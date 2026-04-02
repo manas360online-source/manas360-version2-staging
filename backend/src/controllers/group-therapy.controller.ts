@@ -4,6 +4,7 @@ import { AppError } from '../middleware/error.middleware';
 import { sendSuccess } from '../utils/response';
 import { env } from '../config/env';
 import { initiatePhonePePayment } from '../services/phonepe.service';
+import { io } from '../socket';
 
 const db = prisma as any;
 
@@ -249,7 +250,7 @@ export const listPublicPublishedGroupTherapySessionsController = async (_req: Re
 
 const createPhonePeRedirect = async (transactionId: string, userIdentity: string, amountMinor: number): Promise<string> => {
   const callbackUrl = `${env.apiUrl}${env.apiPrefix}/v1/payments/phonepe/webhook`;
-  const redirectUrl = `${env.frontendUrl}/payment/status?transactionId=${encodeURIComponent(transactionId)}`;
+  const redirectUrl = `${env.frontendUrl}/#/payment/status?transactionId=${encodeURIComponent(transactionId)}`;
 
   return initiatePhonePePayment({
     transactionId,
@@ -295,7 +296,7 @@ export const createPublicJoinPaymentIntentController = async (req: Request, res:
   const userIdentity = authId || `guest_${guestEmail}`;
   const redirectUrl = amountMinor > 0 && session.requiresPayment
     ? await createPhonePeRedirect(transactionId, userIdentity, amountMinor)
-    : `${env.frontendUrl}/payment/status?transactionId=${encodeURIComponent(transactionId)}&status=SUCCESS`;
+    : `${env.frontendUrl}/#/payment/status?transactionId=${encodeURIComponent(transactionId)}&status=SUCCESS`;
 
   const payment = await db.financialPayment.create({
     data: {
@@ -444,6 +445,13 @@ export const createPrivateInviteController = async (req: Request, res: Response)
   if (session.sessionMode !== 'PRIVATE') throw new AppError('Private invite requires a private session', 422);
   if (session.hostTherapistId !== therapistId) throw new AppError('Only host therapist can invite patients', 403);
 
+  const [patient, therapist] = await Promise.all([
+    db.user.findUnique({ where: { id: patientUserId }, select: { id: true, role: true } }),
+    db.user.findUnique({ where: { id: therapistId }, select: { firstName: true, lastName: true, name: true } }),
+  ]);
+
+  if (!patient) throw new AppError('Patient not found', 404);
+
   const invite = await db.groupTherapyInvite.upsert({
     where: {
       sessionId_patientUserId: { sessionId, patientUserId },
@@ -467,6 +475,45 @@ export const createPrivateInviteController = async (req: Request, res: Response)
       message: String(req.body?.message || '').trim() || null,
       paymentDeadline: req.body?.paymentDeadline ? parseDate(req.body.paymentDeadline, 'paymentDeadline') : null,
     },
+  });
+
+  const therapistName = String(
+    therapist?.name
+      || `${therapist?.firstName || ''} ${therapist?.lastName || ''}`.trim()
+      || 'Your therapist',
+  );
+
+  const joinPath = '/patient/group-therapy';
+  const inviteLink = `${String(env.frontendUrl || '').replace(/\/$/, '')}${joinPath}`;
+
+  const notification = await db.notification.create({
+    data: {
+      userId: patientUserId,
+      type: 'GROUP_THERAPY_PRIVATE_INVITE',
+      title: 'Private group therapy invite received',
+      message: `${therapistName} shared a private group therapy invite with you. Open and respond to continue.`,
+      payload: {
+        inviteId: invite.id,
+        sessionId: invite.sessionId,
+        sessionTitle: session.title,
+        scheduledAt: session.scheduledAt?.toISOString?.() || session.scheduledAt,
+        amountMinor: Number(invite.amountMinor || amountMinor),
+        paymentDeadline: invite.paymentDeadline?.toISOString?.() || invite.paymentDeadline,
+        status: invite.status,
+        inviteLink,
+        joinPath,
+      },
+      sentAt: new Date(),
+    },
+  });
+
+  io?.to(`inbox:${patientUserId}`).emit('group_therapy_invite_notification', {
+    id: String(notification.id),
+    type: notification.type,
+    title: notification.title,
+    message: notification.message,
+    payload: notification.payload,
+    createdAt: notification.createdAt,
   });
 
   sendSuccess(res, invite, 'Private invite sent', 201);

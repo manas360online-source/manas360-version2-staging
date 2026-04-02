@@ -7,7 +7,8 @@ import {
 	cancelProviderSubscription,
 	getProviderLeadStats,
 } from '../services/provider-subscription.service';
-import { initiateProviderSubscriptionPayment } from '../services/provider-subscription-payment.service';
+import { activatePlatformAccess } from '../services/platform-access.service';
+import { initiateProviderSubscriptionPayment, initiateProviderPlatformPayment } from '../services/provider-subscription-payment.service';
 import { applyCreditsForPayment } from '../services/wallet.service';
 import { createPendingSubscriptionComponents } from '../services/provider-subscription.pending.service';
 import {
@@ -121,6 +122,78 @@ export const checkoutProviderSubscriptionController = async (req: Request, res: 
 	if (walletResult.amountUsed > 0) {
 		walletUsedMinor = walletResult.amountUsed;
 		finalAmountMinor = walletResult.finalAmount;
+	}
+
+	if (finalAmountMinor <= 0) {
+		const activationRef = idempotencyKey || `prov_checkout_${providerId}_${Date.now()}`;
+		const activated = await activateProviderSubscription(providerId, leadPlanKey, activationRef);
+		await activatePlatformAccess(providerId, platformCycle, activationRef);
+		await createPendingSubscriptionComponents({
+			providerId,
+			leadPlanKey,
+			platformCycle,
+			addons: { hot: hotQty, warm: warmQty, cold: coldQty },
+			merchantTransactionId: activationRef,
+			metadata: {
+				flow: 'provider_checkout_v2',
+				idempotencyKey,
+				promoCode,
+			},
+		});
+
+		sendSuccess(res, {
+			planDetails: activated,
+			redirectUrl: null,
+			breakdown: {
+				platformMinor,
+				leadPlanMinor,
+				addonsMinor,
+				expectedSubtotalMinor,
+				expectedGstMinor,
+				expectedTotalMinor,
+				walletUsedMinor,
+				finalAmountMinor,
+			},
+		}, 'Provider subscription activated without external payment');
+		return;
+	}
+
+	if (leadPlanKey === 'free') {
+		const activationRef = idempotencyKey || `prov_checkout_${providerId}_${Date.now()}`;
+		const payment = await initiateProviderPlatformPayment(providerId, platformCycle, finalAmountMinor, {
+			redirectUrlOverride: `${process.env.FRONTEND_URL || ''}/#/provider/confirmation?mode=activated`,
+			idempotencyKey: activationRef,
+			requireGateway: true,
+		});
+
+		await createPendingSubscriptionComponents({
+			providerId,
+			leadPlanKey,
+			platformCycle,
+			addons: { hot: hotQty, warm: warmQty, cold: coldQty },
+			merchantTransactionId: payment.transactionId,
+			metadata: {
+				flow: 'provider_checkout_v2_platform_only',
+				idempotencyKey,
+				promoCode,
+				walletUsedMinor,
+			},
+		});
+
+		sendSuccess(res, {
+			...payment,
+			breakdown: {
+				platformMinor,
+				leadPlanMinor,
+				addonsMinor,
+				expectedSubtotalMinor,
+				expectedGstMinor,
+				expectedTotalMinor,
+				walletUsedMinor,
+				finalAmountMinor,
+			},
+		}, 'Payment initiated. Redirecting to PhonePe...', 201);
+		return;
 	}
 
 	// Step 1: Initiate payment

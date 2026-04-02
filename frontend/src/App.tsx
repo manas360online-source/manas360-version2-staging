@@ -69,18 +69,16 @@ const TherapistVerification = lazy(() => import('./pages/admin/TherapistVerifica
 const AdminPendingProvidersPage = lazy(() => import('./pages/admin/PendingProviders'));
 const AdminRevenuePage = lazy(() => import('./pages/admin/Revenue'));
 const AdminSettingsPage = lazy(() => import('./pages/admin/Settings'));
-const AdminPricingManagementPage = lazy(() => import('./pages/admin/PricingManagement'));
 const ClinicalAssistantPage = lazy(() => import('./pages/admin/ClinicalAssistantPage'));
 const AdminSectionPage = lazy(() => import('./pages/admin/AdminSectionPage'));
 const AdminTemplatesPage = lazy(() => import('./pages/admin/Templates'));
 const AdminPayoutsPage = lazy(() => import('./pages/admin/Payouts'));
 const ZohoDeskPanel = lazy(() => import('./pages/admin/ZohoDeskPanel'));
 const OfferMarqueeEditor = lazy(() => import('./pages/admin/OfferMarqueeEditor'));
-const PricingContracts = lazy(() => import('./pages/admin/PricingContracts'));
+const PricingSubscriptionsPage = lazy(() => import('./pages/admin/PricingSubscriptions'));
 const CrisisConsole = lazy(() => import('./pages/admin/CrisisConsole'));
 const AuditTrail = lazy(() => import('./pages/admin/AuditTrail'));
 const GroupManagement = lazy(() => import('./pages/admin/GroupManagement'));
-const PricingVersions = lazy(() => import('./pages/admin/PricingVersions'));
 const TherapistPerformance = lazy(() => import('./pages/admin/TherapistPerformance'));
 const SessionAnalytics = lazy(() => import('./pages/admin/SessionAnalytics'));
 const UserGrowthAnalytics = lazy(() => import('./pages/admin/UserGrowthAnalytics'));
@@ -127,6 +125,8 @@ const TherapistLiveSessionPage = lazy(() => import('./pages/therapist/TherapistL
 const ProviderPortalPage = lazy(() => import('./pages/provider/ProviderPortalPage').then(m => ({ default: m.ProviderPortalPage })));
 
 const PaymentStatusPage = lazy(() => import('./pages/shared/PaymentStatus'));
+const UniversalCheckoutPage = lazy(() => import('./pages/shared/UniversalCheckout'));
+const UniversalPaymentSuccessPage = lazy(() => import('./pages/shared/UniversalPaymentSuccess'));
 const HubLayout = lazy(() => import('./components/layout/HubLayout'));
 const PatientList = lazy(() => import('./pages/provider/Patients/PatientList'));
 const PatientChartLayout = lazy(() => import('./components/layout/PatientChartLayout'));
@@ -351,7 +351,7 @@ function App() {
               path="/provider/checkout"
               element={
                 <ProtectedRoute allowedRoles={['therapist', 'psychiatrist', 'psychologist', 'coach']}>
-                  <ProviderSubscriptionCheckoutPage />
+                  <UniversalCheckoutPage />
                 </ProtectedRoute>
               }
             />
@@ -359,7 +359,7 @@ function App() {
               path="/provider/confirmation"
               element={
                 <ProtectedRoute allowedRoles={['therapist', 'psychiatrist', 'psychologist', 'coach']}>
-                  <ProviderSubscriptionConfirmationPage />
+                  <UniversalPaymentSuccessPage />
                 </ProtectedRoute>
               }
             />
@@ -397,7 +397,15 @@ function App() {
               path="/checkout"
               element={
                 <ProtectedRoute allowedRoles={['patient']}>
-                  <SubscriptionCheckoutPage />
+                  <UniversalCheckoutPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/universal/checkout"
+              element={
+                <ProtectedRoute allowedRoles={['patient', 'therapist', 'psychiatrist', 'psychologist', 'coach']}>
+                  <UniversalCheckoutPage />
                 </ProtectedRoute>
               }
             />
@@ -405,7 +413,15 @@ function App() {
               path="/confirmation"
               element={
                 <ProtectedRoute allowedRoles={['patient']}>
-                  <SubscriptionConfirmationPage />
+                  <UniversalPaymentSuccessPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/universal/payment-success"
+              element={
+                <ProtectedRoute allowedRoles={['patient', 'therapist', 'psychiatrist', 'psychologist', 'coach']}>
+                  <UniversalPaymentSuccessPage />
                 </ProtectedRoute>
               }
             />
@@ -455,7 +471,8 @@ function App() {
                 <Route path="all-users" element={<AllUsers />} />
                 <Route path="templates" element={<AdminTemplatesPage />} />
                 <Route path="revenue" element={<AdminRevenuePage />} />
-                <Route path="pricing-management" element={<AdminPricingManagementPage />} />
+                <Route path="pricing-management" element={<PricingSubscriptionsPage />} />
+                <Route path="pricing-subscriptions" element={<PricingSubscriptionsPage />} />
                 <Route path="payouts" element={<AdminPayoutsPage />} />
                 <Route path="invoices" element={<AdminSectionPage title="Invoices" description="Track invoices, collections, refunds, and payment disputes." bullets={['Invoice lifecycle tracking', 'Corporate and individual invoices', 'Refund analytics', 'Collection status by segment']} />} />
                 <Route path="payment-reliability" element={<AdminSectionPage title="Payment Reliability" description="Monitor payment success, retries, failures, and settlement reliability trends." bullets={['Success vs failed transactions', 'Retry conversion trends', 'Decline reason distribution', 'Settlement health indicators']} />} />
@@ -465,8 +482,6 @@ function App() {
                 <Route path="mental-health-trends" element={<AdminSectionPage title="Mental Health Trends" description="Monitor category-level trends to plan interventions and workforce readiness." bullets={['Depression and anxiety trends', 'Sleep and stress categories', 'High-risk cluster detection', 'Program outcome comparisons']} />} />
                 <Route path="zoho-desk" element={<ZohoDeskPanel />} />
                 <Route path="offer-marquee" element={<OfferMarqueeEditor />} />
-                <Route path="pricing-versions" element={<PricingVersions />} />
-                <Route path="pricing-contracts" element={<PricingContracts />} />
                 <Route path="crisis-console" element={<CrisisConsole />} />
                 <Route path="audit-trail" element={<AuditTrail />} />
                 <Route path="groups" element={<GroupManagement />} />

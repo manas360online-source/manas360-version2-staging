@@ -7,6 +7,12 @@ import {
 	initiateRefundController,
 	getRefundStatusController,
 } from '../controllers/payment.controller';
+import {
+	initiateUniversalPaymentController,
+	confirmUniversalPaymentController,
+	verifyUniversalPaymentController,
+	getUniversalInvoiceController,
+} from '../controllers/payment.controller';
 import { requireAuth } from '../middleware/auth.middleware';
 import { requireRole } from '../middleware/rbac.middleware';
 import { requireSubscription } from '../middleware/subscription.middleware';
@@ -30,5 +36,11 @@ router.get('/status/:transactionId', asyncHandler(getPhonePeStatusController));
 // Refund routes
 router.post('/refund', requireAuth, requireRole('patient'), paymentRateLimiter, asyncHandler(initiateRefundController));
 router.get('/refund/:refundId/status', requireAuth, requireRole('patient'), asyncHandler(getRefundStatusController));
+
+// Universal payment routes (for all plan types)
+router.post('/universal/initiate', requireAuth, paymentRateLimiter, asyncHandler(initiateUniversalPaymentController));
+router.post('/universal/confirm', requireAuth, paymentRateLimiter, asyncHandler(confirmUniversalPaymentController));
+router.get('/universal/verify', requireAuth, asyncHandler(verifyUniversalPaymentController));
+router.get('/universal/invoice/:orderId', requireAuth, asyncHandler(getUniversalInvoiceController));
 
 export default router;

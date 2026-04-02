@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getPricingContracts, createPricingDraft, approvePricingContract } from '../../api/admin.api';
+import { getPricingContracts, createPricingDraft, approvePricingContract, getAdminPricingConfig } from '../../api/admin.api';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Card } from '../../components/ui/Card';
@@ -7,15 +7,23 @@ import toast from 'react-hot-toast';
 
 export default function PricingVersions() {
   const [versions, setVersions] = useState<any[]>([]);
+  const [pricingConfig, setPricingConfig] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchVersions = useCallback(async () => {
     try {
-      // The backend returns contracts in one endpoint, which include history in others.
-      // For this unified view, we'll fetch all contracts (which includes draft/live/archived states).
-      const res = await getPricingContracts();
-      // Backend returns ApiEnvelope { success: true, data: [...] }
-      setVersions(res.data || []);
+      const [contractsRes, pricingRes] = await Promise.allSettled([
+        getPricingContracts(),
+        getAdminPricingConfig(),
+      ]);
+
+      if (contractsRes.status === 'fulfilled') {
+        setVersions(contractsRes.value.data || []);
+      }
+
+      if (pricingRes.status === 'fulfilled') {
+        setPricingConfig(pricingRes.value.data || null);
+      }
     } catch (err) {
       console.error(err);
       toast.error('Failed to load pricing versions');
@@ -28,12 +36,47 @@ export default function PricingVersions() {
     fetchVersions();
   }, [fetchVersions]);
 
+  const buildDraftTemplate = (category: string) => {
+    const platformFee = Number(pricingConfig?.platformFee?.monthlyFee ?? 99);
+    const sessionPricing = (pricingConfig?.sessionPricing || []).map((row: any) => ({
+      providerType: row.providerType,
+      durationMinutes: row.durationMinutes,
+      price: row.price,
+      providerShare: row.providerShare,
+      platformShare: row.platformShare,
+      active: row.active,
+    }));
+    const premiumBundles = (pricingConfig?.premiumBundles || []).map((row: any) => ({
+      bundleName: row.bundleName,
+      minutes: row.minutes,
+      price: row.price,
+      active: row.active,
+    }));
+    const platformPlans = (pricingConfig?.platformPlans || []).map((row: any) => ({
+      planKey: row.planKey,
+      planName: row.planName,
+      price: row.price,
+      billingCycle: row.billingCycle,
+      active: row.active,
+      description: row.description ?? null,
+    }));
+
+    return {
+      category,
+      platform_fee: platformFee,
+      sessionPricing,
+      premiumBundles,
+      plans: platformPlans,
+      pricing_scope: category,
+    };
+  };
+
   const createDraft = async (category: string) => {
     try {
       await createPricingDraft({
         category,
-        pricingData: { platform_fee_percent: 40, session_fee: 999 }, // default template
-        description: `New ${category} draft created from admin portal`
+        pricingData: buildDraftTemplate(category),
+        description: `New ${category} draft created from admin portal using current pricing snapshot`
       });
       toast.success(`Draft created for ${category}`);
       fetchVersions();

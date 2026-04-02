@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getLegalDocumentsController = exports.getComplianceStatusController = exports.getUserAcceptancesController = exports.updateRolePermissionsController = exports.getRolesController = exports.updateAdminUserStatusController = exports.resolveAdminFeedbackController = exports.getAdminFeedbackController = exports.getAdminLiveSessionsController = exports.updateAdminUserApprovalController = exports.getAdminUserApprovalsController = exports.listSubscriptionsController = exports.getMetricsController = exports.approveProviderController = exports.verifyProviderController = exports.verifyTherapistController = exports.getUserController = exports.listUsersController = void 0;
+exports.downloadLegalDocumentController = exports.getLegalDocumentsController = exports.getComplianceStatusController = exports.getUserAcceptancesController = exports.updateRolePermissionsController = exports.getRolesController = exports.updateAdminUserStatusController = exports.resolveAdminFeedbackController = exports.getAdminFeedbackController = exports.getAdminLiveSessionsController = exports.updateAdminUserApprovalController = exports.getAdminUserApprovalsController = exports.listSubscriptionsController = exports.getMetricsController = exports.approveProviderController = exports.verifyProviderController = exports.verifyTherapistController = exports.getUserController = exports.listUsersController = void 0;
 const error_middleware_1 = require("../middleware/error.middleware");
 const admin_service_1 = require("../services/admin.service");
 const db_1 = require("../config/db");
@@ -331,3 +331,59 @@ const getLegalDocumentsController = async (_req, res) => {
     }
 };
 exports.getLegalDocumentsController = getLegalDocumentsController;
+const downloadLegalDocumentController = async (req, res) => {
+    try {
+        const id = String(req.params?.id || '').trim();
+        if (!id) {
+            res.status(400).json({ error: 'Document id is required' });
+            return;
+        }
+        const latestConsent = await db_1.prisma.consent.findFirst({
+            where: {
+                consentType: id,
+                status: 'GRANTED',
+            },
+            orderBy: { grantedAt: 'desc' },
+            select: {
+                consentType: true,
+                metadata: true,
+                grantedAt: true,
+            },
+        });
+        if (!latestConsent) {
+            res.status(404).json({ error: 'Document not found' });
+            return;
+        }
+        const version = Number(latestConsent.metadata?.version || 1);
+        const readableType = latestConsent.consentType
+            .toLowerCase()
+            .split('_')
+            .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+            .join(' ');
+        const lines = [
+            `MANAS360 - ${readableType}`,
+            `Version: ${version}`,
+            `Effective Date: ${new Date(latestConsent.grantedAt).toISOString()}`,
+            '',
+            'This legal artifact is generated from accepted consent records.',
+            'For canonical legal text, refer to the corresponding legal policy page in MANAS360.',
+            '',
+            'Core clauses:',
+            '1. Platform usage is permitted only for lawful wellness and care purposes.',
+            '2. Data processing follows applicable privacy and security laws and standards.',
+            '3. Billing, refunds, and cancellations are governed by published policy timelines.',
+            '4. Users consent to communication records, transaction records, and compliance auditing.',
+            '5. By accepting, users confirm they have read and understood the legal terms.',
+            '',
+            `Document ID: ${id}`,
+        ];
+        const fileName = `${latestConsent.consentType.toLowerCase()}-v${version}.txt`;
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+        res.status(200).send(lines.join('\n'));
+    }
+    catch (_err) {
+        res.status(500).json({ error: 'Failed to download legal document' });
+    }
+};
+exports.downloadLegalDocumentController = downloadLegalDocumentController;

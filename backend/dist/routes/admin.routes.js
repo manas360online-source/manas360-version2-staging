@@ -257,6 +257,7 @@ router.post('/crisis/:id/respond', auth_middleware_1.requireAuth, (0, rbac_middl
 router.get('/audit', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'complianceofficer']), admin_audit_controller_1.getAuditLogController);
 router.get('/compliance/status', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'complianceofficer']), (0, validate_middleware_1.asyncHandler)(admin_controller_1.getComplianceStatusController));
 router.get('/legal/documents', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'complianceofficer']), (0, validate_middleware_1.asyncHandler)(admin_controller_1.getLegalDocumentsController));
+router.get('/legal/documents/:id/download', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'complianceofficer']), (0, validate_middleware_1.asyncHandler)(admin_controller_1.downloadLegalDocumentController));
 router.get('/acceptances', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'complianceofficer']), (0, validate_middleware_1.asyncHandler)(admin_controller_1.getUserAcceptancesController));
 // Advanced Reporting & Exports
 router.post('/reports/export', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'complianceofficer']), (0, rbac_middleware_1.requirePermission)('view_analytics'), admin_analytics_controller_1.enqueueAdminAnalyticsExportController);

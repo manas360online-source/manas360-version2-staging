@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { checkoutProviderSubscription, upgradeProviderSubscription } from '../../api/provider';
+import { checkoutProviderSubscription } from '../../api/provider';
 import { useWallet } from '../../hooks/useWallet';
 import {
   clearProviderCart,
@@ -50,13 +50,6 @@ export default function ProviderSubscriptionCheckoutPage() {
 
     setSubmitting(true);
     try {
-      if (cart.leadPlanId === 'free') {
-        await upgradeProviderSubscription({ planKey: 'free' });
-        clearProviderCart();
-        navigate('/provider/confirmation?mode=free', { replace: true });
-        return;
-      }
-
       const idempotencyKey = `provider_checkout:${cart.leadPlanId}:${Date.now()}`;
       const result = await checkoutProviderSubscription({
         leadPlanKey: cart.leadPlanId,
@@ -72,7 +65,9 @@ export default function ProviderSubscriptionCheckoutPage() {
 
       const redirectUrl = String((result as any)?.redirectUrl || '').trim();
       if (!redirectUrl) {
-        throw new Error('Payment link not received.');
+        clearProviderCart();
+        navigate('/provider/confirmation?mode=activated', { replace: true });
+        return;
       }
 
       window.location.href = redirectUrl;

@@ -229,8 +229,14 @@ export const initiatePhonePePayment = async (input: {
 	amountInPaise: number;
 	callbackUrl: string;
 	redirectUrl: string;
+	expireAfterSeconds?: number; // GUIDELINE COMPLIANCE: Set order expiry (min 300, max 3600)
 	metadata?: any;
 }) => {
+	// GUIDELINE: Amount must be >= 100 paise (₹1.00)
+	if (!Number.isFinite(input.amountInPaise) || input.amountInPaise < 100) {
+		throw new AppError('Amount must be at least 100 paise (₹1.00)', 422);
+	}
+
 	logger.info('[PhonePe] Initiating payment', {
 		transactionId: input.transactionId,
 		userId: input.userId,
@@ -252,9 +258,18 @@ export const initiatePhonePePayment = async (input: {
 	};
 
 	const endpoint = '/checkout/v2/pay';
+	// GUIDELINE: expireAfter must be between 300 and 3600 seconds; default 1800 (30 min)
+	const expireAfterSeconds = input.expireAfterSeconds ?? 1800;
+	if (expireAfterSeconds < 300 || expireAfterSeconds > 3600) {
+		logger.warn('[PhonePe] expireAfter outside recommended range [300-3600], clamping', {
+			requested: expireAfterSeconds,
+		});
+	}
+
 	const v2Payload = {
 		merchantOrderId: input.transactionId,
 		amount: input.amountInPaise,
+		expireAfter: Math.max(300, Math.min(3600, expireAfterSeconds)), // GUIDELINE: Set expiry
 		paymentFlow: {
 			type: 'PG_CHECKOUT',
 			merchantUrls: {
@@ -408,7 +423,25 @@ export const checkPhonePeStatus = async (merchantTransactionId: string) => {
 			state: response.data?.data?.state,
 		});
 
-		return response.data;
+		// GUIDELINE COMPLIANCE: Avoid strict deserialization; support flexible response shapes
+		const responseData = response.data || {};
+		const dataBlock = responseData.data || {};
+		
+		// GUIDELINE: Rely ONLY on root-level state parameter for payment status determination
+		const state = String(dataBlock?.state || '').trim().toUpperCase();
+		logger.info('[PhonePe] Extracted state from response', {
+			merchantTransactionId,
+			state,
+			allPaymentStates: dataBlock?.paymentDetails?.map((p: any) => p.state),
+		});
+
+		return {
+			...responseData,
+			data: {
+				...dataBlock,
+				state, // GUIDELINE: Ensure state is clearly extracted
+			},
+		};
 	} catch (error: any) {
 		const upstreamCode = String(error?.response?.data?.code || '').toUpperCase();
 		const shouldRetryWithFallback = upstreamCode === 'API_MAPPING_NOT_FOUND' || upstreamCode === 'API MAPPING NOT FOUND';

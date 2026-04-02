@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { 
   getPricingContracts, 
   createPricingDraft, 
-  approvePricingContract, 
+  approvePricingContract,
+  getAdminPricingConfig,
+  type AdminPricingConfig,
   type PricingContract 
 } from '../../api/admin.api';
 import { Card } from '../../components/ui/Card';
@@ -24,14 +26,34 @@ import toast from 'react-hot-toast';
 
 export default function PricingContracts() {
   const [contracts, setContracts] = useState<PricingContract[]>([]);
+  const [pricingConfig, setPricingConfig] = useState<AdminPricingConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedContract, setSelectedContract] = useState<PricingContract | null>(null);
   const [showApproveModal, setShowApproveModal] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+
+  const categoryCards = useMemo(() => [
+    { key: 'patient', label: 'patient' },
+    { key: 'provider', label: 'provider' },
+    { key: 'corporate', label: 'corporate' },
+    { key: 'sessions', label: 'sessions' },
+    { key: 'addons', label: 'addons' },
+  ], []);
 
   const fetchContracts = async () => {
     try {
-      const res = await getPricingContracts();
-      setContracts(res.data);
+      const [contractsRes, pricingRes] = await Promise.allSettled([
+        getPricingContracts(),
+        getAdminPricingConfig(),
+      ]);
+
+      if (contractsRes.status === 'fulfilled') {
+        setContracts(contractsRes.value.data || []);
+      }
+
+      if (pricingRes.status === 'fulfilled') {
+        setPricingConfig(pricingRes.value.data);
+      }
     } catch (err) {
       toast.error('Failed to load pricing history');
     } finally {
@@ -43,18 +65,68 @@ export default function PricingContracts() {
     fetchContracts();
   }, []);
 
-  const handleCreateDraft = async (category: string) => {
-    const live = contracts.find(c => c.category === category && c.status === 'live');
-    if (!live) return toast.error('No live version found to base draft on');
+  const buildDraftTemplate = (category: string) => {
+    const platformFee = Number(pricingConfig?.platformFee?.monthlyFee ?? 99);
+    const surchargePercent = Number(pricingConfig?.surchargePercent ?? 20);
+    const sessionPricing = (pricingConfig?.sessionPricing || []).map((row) => ({
+      providerType: row.providerType,
+      durationMinutes: row.durationMinutes,
+      price: row.price,
+      providerShare: row.providerShare,
+      platformShare: row.platformShare,
+      active: row.active,
+    }));
+    const premiumBundles = (pricingConfig?.premiumBundles || []).map((row) => ({
+      bundleName: row.bundleName,
+      minutes: row.minutes,
+      price: row.price,
+      active: row.active,
+    }));
 
+    if (category === 'sessions') {
+      return {
+        category,
+        platform_fee: platformFee,
+        preferred_time_surcharge: surchargePercent,
+        sessionPricing,
+        pricing_scope: 'session_rates',
+      };
+    }
+
+    if (category === 'addons') {
+      return {
+        category,
+        platform_fee: platformFee,
+        preferred_time_surcharge: surchargePercent,
+        premiumBundles,
+        pricing_scope: 'bundles',
+      };
+    }
+
+    return {
+      category,
+      platform_fee: platformFee,
+      preferred_time_surcharge: surchargePercent,
+      sessionPricing,
+      premiumBundles,
+      pricing_scope: 'full_contract_snapshot',
+    };
+  };
+
+  const handleCreateDraft = async (category: string) => {
     try {
+      const live = contracts.find((c) => c.category === category && c.status === 'live');
+      const pricingData = live?.pricingData ?? buildDraftTemplate(category);
+
       await createPricingDraft({
         category,
-        description: `New version based on v${live.version}`,
-        pricingData: live.pricingData
+        description: live
+          ? `New version based on v${live.version}`
+          : `Initial draft created from the current admin pricing snapshot`,
+        pricingData,
       });
       fetchContracts();
-      toast.success('Draft v' + (live.version+1) + ' created');
+      toast.success(live ? `Draft v${live.version + 1} created` : `Draft created for ${category}`);
     } catch (err) {
       toast.error('Draft creation failed');
     }
@@ -75,7 +147,12 @@ export default function PricingContracts() {
 
   if (loading) return <div className="flex h-96 items-center justify-center"><Loader /></div>;
 
-  const categories = ['patient', 'provider', 'corporate'];
+  const categories = categoryCards;
+
+  const openDetails = (contract: PricingContract) => {
+    setSelectedContract(contract);
+    setShowDetailsModal(true);
+  };
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto">
@@ -88,19 +165,21 @@ export default function PricingContracts() {
 
       {/* Grid for each category */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {categories.map(cat => {
-          const live = contracts.find(c => c.category === cat && c.status === 'live');
-          const draft = contracts.find(c => c.category === cat && c.status === 'draft');
+        {categories.map((cat) => {
+          const live = contracts.find((c) => c.category === cat.key && c.status === 'live');
+          const draft = contracts.find((c) => c.category === cat.key && c.status === 'draft');
 
           return (
-            <Card key={cat} className="p-5 border-t-4 border-t-calm-sage">
+            <Card key={cat.key} className="p-5 border-t-4 border-t-calm-sage">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="uppercase tracking-widest text-xs font-bold text-gray-400">{cat}</h3>
+                <h3 className="uppercase tracking-widest text-xs font-bold text-gray-400">{cat.label}</h3>
                 <Settings className="h-4 w-4 text-gray-300" />
               </div>
               <div className="mb-6">
                 <p className="text-2xl font-bold text-gray-800">v{live?.version || '0'}</p>
-                <Badge variant="success" size="sm" className="mt-1">CURRENTLY LIVE</Badge>
+                <Badge variant={live ? 'success' : 'secondary'} size="sm" className="mt-1">
+                  {live ? 'CURRENTLY LIVE' : 'NO LIVE VERSION'}
+                </Badge>
               </div>
 
               <div className="space-y-2">
@@ -115,7 +194,7 @@ export default function PricingContracts() {
                     </button>
                   </div>
                 ) : (
-                  <Button variant="soft" fullWidth onClick={() => handleCreateDraft(cat)}>
+                  <Button variant="soft" fullWidth onClick={() => handleCreateDraft(cat.key)}>
                     Create New Draft
                   </Button>
                 )}
@@ -165,7 +244,7 @@ export default function PricingContracts() {
                   </td>
                   <td className="px-6 py-4">
                     <button 
-                      onClick={() => setSelectedContract(contract)} 
+                      onClick={() => openDetails(contract)} 
                       className="text-calm-sage hover:underline flex items-center gap-1"
                     >
                       <FileText className="h-3 w-3" /> Details
@@ -177,6 +256,61 @@ export default function PricingContracts() {
           </table>
         </div>
       </Card>
+
+      {/* Contract Details Modal */}
+      <Modal
+        isOpen={showDetailsModal}
+        onClose={() => {
+          setShowDetailsModal(false);
+          setSelectedContract(null);
+        }}
+        title="Pricing Contract Details"
+      >
+        {selectedContract ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                <p className="text-[10px] font-bold uppercase text-gray-400">Category</p>
+                <p className="mt-1 font-semibold text-gray-800 capitalize">{selectedContract.category}</p>
+              </div>
+              <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                <p className="text-[10px] font-bold uppercase text-gray-400">Version</p>
+                <p className="mt-1 font-semibold text-gray-800">v{selectedContract.version}</p>
+              </div>
+              <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                <p className="text-[10px] font-bold uppercase text-gray-400">Status</p>
+                <p className="mt-1 font-semibold text-gray-800 uppercase">{selectedContract.status}</p>
+              </div>
+              <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                <p className="text-[10px] font-bold uppercase text-gray-400">Created At</p>
+                <p className="mt-1 font-semibold text-gray-800">{new Date(selectedContract.createdAt).toLocaleString()}</p>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-gray-100 bg-white p-4">
+              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-gray-400">Description</p>
+              <p className="text-sm text-gray-700">{selectedContract.description || '—'}</p>
+            </div>
+
+            <div className="rounded-xl border border-gray-100 bg-white p-4">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Pricing Data</p>
+                <p className="text-[10px] uppercase text-gray-400">JSON snapshot</p>
+              </div>
+              <pre className="max-h-72 overflow-auto rounded-lg bg-gray-950 p-3 text-xs leading-5 text-gray-100">
+{JSON.stringify(selectedContract.pricingData, null, 2)}
+              </pre>
+            </div>
+
+            <div className="flex items-center justify-end gap-2">
+              <Button variant="ghost" onClick={() => {
+                setShowDetailsModal(false);
+                setSelectedContract(null);
+              }}>Close</Button>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
 
       {/* Approval Modal */}
       <Modal 
@@ -199,7 +333,7 @@ export default function PricingContracts() {
           <div className="flex items-center gap-4 py-4 justify-center">
             <div className="text-center opacity-50">
               <p className="text-[10px] uppercase font-bold text-gray-400 mb-1">Current Live</p>
-              <Badge variant="soft">v{selectedContract && selectedContract.version - 1}</Badge>
+              <Badge variant="soft">v{selectedContract ? Math.max(selectedContract.version - 1, 0) : 0}</Badge>
             </div>
             <ArrowRight className="h-5 w-5 text-gray-300" />
             <div className="text-center">

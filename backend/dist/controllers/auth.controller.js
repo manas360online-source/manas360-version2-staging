@@ -233,6 +233,10 @@ const verifyPhoneOtpController = async (req, res) => {
     const result = await (0, auth_service_1.verifyPhoneOtp)({
         phone: (0, auth_validator_1.validatePhone)(req.body.phone),
         otp: (0, auth_validator_1.validateOtp)(req.body.otp),
+        acceptedTerms: Boolean(req.body.acceptedTerms),
+        acceptedDocuments: Array.isArray(req.body.acceptedDocuments)
+            ? req.body.acceptedDocuments.filter((value) => typeof value === 'string' && value.trim().length > 0)
+            : undefined,
     }, getRequestMeta(req));
     setAuthCookies(req, res, result.accessToken, result.refreshToken);
     // Augment user payload with subscription flags for immediate client routing
