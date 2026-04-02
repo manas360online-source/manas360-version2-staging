@@ -777,7 +777,13 @@ export default function SettingsPage() {
     const subscription = billingData.subscription;
     const statusRaw = String(subscription?.status || '').toLowerCase();
     const planName = String(
-      subscription?.plan?.name || subscription?.plan?.displayName || subscription?.plan?.key || 'Free Tier',
+      subscription?.plan?.name
+      || subscription?.plan?.displayName
+      || subscription?.plan?.key
+      || subscription?.planName
+      || subscription?.plan_key
+      || subscription?.planKey
+      || 'Free Tier',
     );
 
     const parseDateValue = (value?: string | null) => {

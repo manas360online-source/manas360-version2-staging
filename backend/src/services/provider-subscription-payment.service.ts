@@ -99,7 +99,7 @@ export const initiateProviderSubscriptionPayment = async (
 	const hasPhonePeOAuth = Boolean(String(process.env.PHONEPE_CLIENT_ID || '').trim())
 		&& Boolean(String(process.env.PHONEPE_CLIENT_SECRET || '').trim());
 	const shouldBypass = env.allowDevPaymentBypass && env.nodeEnv !== 'production' && !hasPhonePeOAuth;
-	const canFallbackWithoutGateway = env.nodeEnv !== 'production';
+	const canFallbackWithoutGateway = shouldBypass;
 	const frontendBaseUrl = env.frontendUrl;
 	const paymentStatusBase = `${frontendBaseUrl}/#/payment/status`;
 	const redirectUrlTarget = String(options?.redirectUrlOverride || `${paymentStatusBase}?transactionId=${transactionId}&status=SUCCESS`).trim();
@@ -215,7 +215,7 @@ export const initiateProviderPlatformPayment = async (
 		&& Boolean(String(process.env.PHONEPE_CLIENT_SECRET || '').trim());
 	const requireGateway = Boolean(options?.requireGateway);
 	const shouldBypass = !requireGateway && env.allowDevPaymentBypass && env.nodeEnv !== 'production' && !hasPhonePeOAuth;
-	const canFallbackWithoutGateway = !requireGateway && env.nodeEnv !== 'production';
+	const canFallbackWithoutGateway = shouldBypass;
 	const frontendBaseUrl = env.frontendUrl;
 	const paymentStatusBase = `${frontendBaseUrl}/#/payment/status`;
 	const redirectUrlTarget = String(options?.redirectUrlOverride || `${paymentStatusBase}?transactionId=${transactionId}&status=SUCCESS`).trim();

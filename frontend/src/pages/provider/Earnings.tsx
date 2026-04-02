@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { fetchProviderEarnings } from '../../api/provider';
+import ProviderWalletSummaryCard from '../../components/provider/ProviderWalletSummaryCard';
 
 const formatCurrency = (minor: number): string =>
 	new Intl.NumberFormat('en-IN', {
@@ -25,17 +26,23 @@ export default function Earnings() {
 	const earningsQuery = useQuery({
 		queryKey: ['providerEarnings'],
 		queryFn: fetchProviderEarnings,
+		refetchInterval: 15000,
+		refetchOnWindowFocus: true,
 	});
 
 	const data = earningsQuery.data;
+	const availableBalanceMinor = Math.max(
+		0,
+		Number(data?.summary?.availableBalanceMinor ?? 0),
+	);
 
 	return (
 		<div className="space-y-6">
 			<section className="rounded-[28px] border border-[#D9E1D5] bg-[radial-gradient(circle_at_top_left,_rgba(74,103,65,0.18),_transparent_38%),linear-gradient(135deg,#F8FBF5_0%,#FFFFFF_62%)] p-8 shadow-[0_18px_60px_rgba(31,41,55,0.06)]">
 				<p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#6B7B68]">Practice Metrics</p>
-				<h1 className="mt-3 text-3xl font-semibold text-[#23313A]">Earnings</h1>
+				<h1 className="mt-3 text-3xl font-semibold text-[#23313A]">Provider Wallet</h1>
 				<p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-					Track revenue across confirmed and completed sessions, monitor pending payouts, and review recent transaction activity.
+					Session earnings only. No manual top-up. After a session is completed, provider share is reflected in pending payouts and then moves to available balance after payout processing.
 				</p>
 			</section>
 
@@ -55,25 +62,33 @@ export default function Earnings() {
 			) : (
 				<>
 					<section className="grid gap-4 md:grid-cols-3">
-						{[
-							{ label: 'Total Earnings', value: formatCurrency(data.summary.totalEarningsMinor), note: `Rate ${formatCurrency(data.summary.sessionRateMinor)} per session` },
-							{ label: 'Pending Payouts', value: formatCurrency(data.summary.pendingPayoutsMinor), note: 'Current unsettled wallet balance' },
-							{ label: 'Sessions This Month', value: String(data.summary.sessionsThisMonth), note: 'Confirmed or completed sessions' },
-						].map((card) => (
-							<div key={card.label} className="rounded-[24px] border border-[#DCE5D9] bg-white p-6 shadow-sm">
-								<p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#6B7B68]">{card.label}</p>
-								<p className="mt-4 text-4xl font-semibold tracking-tight text-[#23313A]">{card.value}</p>
-								<p className="mt-3 text-sm text-slate-500">{card.note}</p>
-							</div>
-						))}
+						<ProviderWalletSummaryCard
+							title="Total Earned"
+							amountMinor={Number(data.summary.totalEarningsMinor || 0)}
+							note={`Lifetime session earnings • base rate ${formatCurrency(data.summary.sessionRateMinor)}`}
+							accent="slate"
+						/>
+						<ProviderWalletSummaryCard
+							title="Available Balance"
+							amountMinor={availableBalanceMinor}
+							note="Ready for withdrawal request"
+							accent="emerald"
+						/>
+						<ProviderWalletSummaryCard
+							title="Pending Payouts"
+							amountMinor={Number(data.summary.pendingPayoutsMinor || 0)}
+							note="From completed sessions, awaiting payout release"
+							accent="amber"
+						/>
 					</section>
 
 					<section className="rounded-[24px] border border-[#DCE5D9] bg-white p-6 shadow-sm">
 						<div className="flex items-center justify-between gap-4">
 							<div>
-								<p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#6B7B68]">Monthly Trend</p>
-								<h2 className="mt-2 text-xl font-semibold text-[#23313A]">Last 6 months</h2>
+								<p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#6B7B68]">Wallet Throughput</p>
+								<h2 className="mt-2 text-xl font-semibold text-[#23313A]">Last 6 months session revenue</h2>
 							</div>
+							<p className="text-xs text-slate-500">{data.summary.sessionsThisMonth} sessions this month</p>
 						</div>
 						<div className="mt-6 grid gap-4 md:grid-cols-6">
 							{data.monthlyTrend.map((month) => (
@@ -89,13 +104,14 @@ export default function Earnings() {
 					<section className="rounded-[24px] border border-[#DCE5D9] bg-white p-6 shadow-sm">
 						<div>
 							<p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#6B7B68]">Recent Transactions</p>
-							<h2 className="mt-2 text-xl font-semibold text-[#23313A]">Revenue activity</h2>
+							<h2 className="mt-2 text-xl font-semibold text-[#23313A]">Wallet transaction activity</h2>
 						</div>
 
 						<div className="mt-6 overflow-x-auto">
 							<table className="min-w-full divide-y divide-[#E8EDE4] text-sm">
 								<thead>
 									<tr className="text-left text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+										<th className="pb-3 pr-4">Session ID</th>
 										<th className="pb-3 pr-4">Date</th>
 										<th className="pb-3 pr-4">Patient Name</th>
 										<th className="pb-3 pr-4">Amount</th>
@@ -105,13 +121,14 @@ export default function Earnings() {
 								<tbody className="divide-y divide-[#EEF2EA]">
 									{data.recentTransactions.length === 0 ? (
 										<tr>
-											<td colSpan={4} className="py-8 text-center text-sm text-slate-500">
+											<td colSpan={5} className="py-8 text-center text-sm text-slate-500">
 												No qualifying session revenue yet.
 											</td>
 										</tr>
 									) : (
 										data.recentTransactions.map((transaction) => (
 											<tr key={transaction.id}>
+												<td className="py-4 pr-4 font-mono text-xs text-slate-600">{transaction.bookingReferenceId || transaction.id}</td>
 												<td className="py-4 pr-4 text-slate-600">{formatDate(transaction.date)}</td>
 												<td className="py-4 pr-4 font-medium text-[#23313A]">{transaction.patientName}</td>
 												<td className="py-4 pr-4 font-semibold text-[#23313A]">{formatCurrency(transaction.amountMinor)}</td>
