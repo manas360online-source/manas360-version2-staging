@@ -52,9 +52,9 @@ const validateOtp = (value) => {
 exports.validateOtp = validateOtp;
 const validatePublicSignupRole = (value) => {
     const role = assertString(value, 'role').toLowerCase();
-    if (role === 'patient' || role === 'therapist' || role === 'psychiatrist' || role === 'coach') {
+    if (role === 'patient' || role === 'therapist' || role === 'psychiatrist' || role === 'psychologist' || role === 'coach') {
         return role;
     }
-    throw new error_middleware_1.AppError('Invalid role. Allowed roles: patient, therapist, psychiatrist, coach', 400);
+    throw new error_middleware_1.AppError('Invalid role. Allowed roles: patient, therapist, psychiatrist, psychologist, coach', 400);
 };
 exports.validatePublicSignupRole = validatePublicSignupRole;

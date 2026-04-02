@@ -13,7 +13,7 @@ const assertStringToken = (value: JwtValue): jwt.JwtPayload => {
 	return value;
 };
 
-export const createAccessToken = (payload: Omit<JwtAccessPayload, 'type'>): string => {
+export const createAccessToken = (payload: Omit<JwtAccessPayload, 'type'> & { permissions?: Record<string, boolean> }): string => {
 	return jwt.sign(
 		{ ...payload, type: 'access' },
 		env.jwtAccessSecret,
@@ -49,7 +49,7 @@ export const verifyRefreshToken = (token: string): JwtRefreshPayload => {
 	return decoded as JwtRefreshPayload;
 };
 
-export const createTokenPair = (userId: string, sessionId: string): TokenPair => {
+export const createTokenPair = (userId: string, sessionId: string, permissions?: Record<string, boolean>): TokenPair => {
 	const refreshJti = randomUUID();
 	const accessJti = randomUUID();
 
@@ -57,6 +57,7 @@ export const createTokenPair = (userId: string, sessionId: string): TokenPair =>
 		sub: userId,
 		sessionId,
 		jti: accessJti,
+		...(permissions ? { permissions } : {}),
 	});
 
 	const refreshToken = createRefreshToken({

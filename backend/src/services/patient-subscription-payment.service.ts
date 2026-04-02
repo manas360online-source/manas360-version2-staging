@@ -11,7 +11,18 @@ const toCompactToken = (value: string, maxLength: number): string =>
 		.slice(0, maxLength)
 		.toLowerCase();
 
-export const initiatePatientSubscriptionPayment = async (userId: string, planKey: string) => {
+interface PatientSubscriptionPaymentOptions {
+	amountMinorOverride?: number;
+	idempotencyKey?: string;
+	redirectUrlOverride?: string;
+	metadata?: Record<string, unknown>;
+}
+
+export const initiatePatientSubscriptionPayment = async (
+	userId: string,
+	planKey: string,
+	options?: PatientSubscriptionPaymentOptions,
+) => {
 	const plan = await getActivePlatformPlan(planKey);
 	if (!plan) throw new AppError('Invalid subscription plan', 422);
 
@@ -35,10 +46,16 @@ export const initiatePatientSubscriptionPayment = async (userId: string, planKey
 		take: 20,
 	}).catch(() => [] as any[]);
 
-	const matchingAttempts = initiatedAttempts.filter((row: any) =>
-		String(row?.metadata?.type || '') === 'patient_subscription'
-		&& String(row?.metadata?.plan || '') === String(planKey),
-	);
+	const requestedIdempotencyKey = String(options?.idempotencyKey || '').trim();
+	const matchingAttempts = initiatedAttempts.filter((row: any) => {
+		const isPlanMatch =
+			String(row?.metadata?.type || '') === 'patient_subscription'
+			&& String(row?.metadata?.plan || '') === String(planKey);
+
+		if (!isPlanMatch) return false;
+		if (!requestedIdempotencyKey) return true;
+		return String(row?.captureIdempotencyKey || row?.metadata?.idempotencyKey || '') === requestedIdempotencyKey;
+	});
 
 	const latestAttempt = matchingAttempts[0] as any;
 	if (latestAttempt) {
@@ -62,29 +79,50 @@ export const initiatePatientSubscriptionPayment = async (userId: string, planKey
 
 	const userToken = toCompactToken(userId, 8) || 'user';
 	const transactionId = `SUB_${userToken}_${Date.now()}`;
-	const shouldBypass = false;
-	const amountMinor = Math.max(0, Math.round(Number(plan.price || 0) * 100));
+	const hasPhonePeOAuth = Boolean(String(process.env.PHONEPE_CLIENT_ID || '').trim())
+		&& Boolean(String(process.env.PHONEPE_CLIENT_SECRET || '').trim());
+	const shouldBypass = ((env.allowDevPaymentBypass && env.nodeEnv !== 'production' && !hasPhonePeOAuth) || env.subscriptionPaymentBypass);
+	const canFallbackWithoutGateway = env.nodeEnv !== 'production' || env.subscriptionPaymentBypass;
+	const amountMinor = Math.max(
+		0,
+		Math.round(
+			Number.isFinite(Number(options?.amountMinorOverride))
+				? Number(options?.amountMinorOverride)
+				: Number(plan.price || 0) * 100,
+		),
+	);
 	const frontendBaseUrl = env.frontendUrl;
+	const paymentStatusBase = `${frontendBaseUrl}/#/payment/status`;
+	const redirectUrlTarget = String(options?.redirectUrlOverride || `${paymentStatusBase}?transactionId=${transactionId}&status=SUCCESS`).trim();
 	const callbackUrl = `${env.apiUrl}${env.apiPrefix}/v1/payments/phonepe/webhook`;
 	const cycleKey = new Date().toISOString().slice(0, 10);
-	const subscriptionIdempotencyKey = `sub_init:${userId}:${planKey}:${cycleKey}`;
+	const subscriptionIdempotencyKey = requestedIdempotencyKey || `sub_init:${userId}:${planKey}:${cycleKey}`;
 
 	let redirectUrl: string;
-	try {
-		redirectUrl = await initiatePhonePePayment({
-			transactionId,
-			userId,
-			amountInPaise: amountMinor,
-			callbackUrl,
-			redirectUrl: `${frontendBaseUrl}/payment/status?id=${transactionId}&status=SUCCESS`,
-		});
-	} catch (error: any) {
-		if (!shouldBypass) {
-			throw new AppError(error?.message || 'PhonePe Payment Initiation Failed', 502);
+	if (shouldBypass) {
+		// Short-circuit: no gateway call, pretend success and jump to local success page.
+		redirectUrl = redirectUrlTarget;
+	} else {
+		try {
+			redirectUrl = await initiatePhonePePayment({
+				transactionId,
+				userId,
+				amountInPaise: amountMinor,
+				callbackUrl,
+				redirectUrl: redirectUrlTarget,
+			});
+		} catch (error: any) {
+			if (!canFallbackWithoutGateway) {
+				throw new AppError(error?.message || 'PhonePe Payment Initiation Failed', 502);
+			}
+			// Non-production fallback: continue with local redirect when gateway is unavailable.
+			logger.warn('[PhonePe] Falling back to local redirect after patient payment initiation failure', {
+				transactionId,
+				nodeEnv: env.nodeEnv,
+				error: error?.message,
+			});
+			redirectUrl = redirectUrlTarget;
 		}
-		// Bypass mode: mock a success redirect
-		logger.info('[PhonePe] Bypassing patient payment initiation in development mode', { transactionId });
-		redirectUrl = `${frontendBaseUrl}/payment/status?id=${transactionId}&status=SUCCESS`;
 	}
 
 	// Mandatory: Create financialPayment record for reconciliation worker
@@ -102,6 +140,8 @@ export const initiatePatientSubscriptionPayment = async (userId: string, planKey
 					plan: planKey,
 					redirectUrl,
 					idempotencyKey: subscriptionIdempotencyKey,
+					redirectUrlOverride: String(options?.redirectUrlOverride || '').trim() || undefined,
+					...(options?.metadata || {}),
 				}
 			}
 		});
@@ -134,18 +174,21 @@ export const initiatePatientSubscriptionPayment = async (userId: string, planKey
 			where: { userId },
 			update: {
 				planName: plan.name,
-				price: amountMinor,
+				price: Number(plan.price || 0),
 				status: 'active',
 				renewalDate: nextRenewalDate,
+				autoRenew: true,
+				billingCycle: 'monthly',
 				updatedAt: new Date(),
 			},
 			create: {
 				userId,
 				planName: plan.name,
-				price: amountMinor,
+				price: Number(plan.price || 0),
 				status: 'active',
 				renewalDate: nextRenewalDate,
 				billingCycle: 'monthly',
+				autoRenew: true,
 			}
 		});
 	}

@@ -18,8 +18,13 @@ const sso_service_2 = require("./services/sso.service");
 const gps_routes_1 = require("./routes/gps.routes");
 const paymentReconciliation_1 = require("./cron/paymentReconciliation");
 const lead_distribution_cron_1 = require("./cron/lead-distribution.cron");
+const phonepe_service_1 = require("./services/phonepe.service");
+const admin_metrics_controller_1 = require("./controllers/admin-metrics.controller");
+const socket_2 = require("./socket");
 const startServer = async () => {
     await (0, db_1.connectDatabase)();
+    // Initialize PhonePe OAuth token refresh (proactive background refresh)
+    await (0, phonepe_service_1.initializePhonePeTokenRefresh)();
     // ensure SSO tables exist
     void (0, sso_service_1.ensureSsoTables)()
         .then(async () => {
@@ -63,8 +68,21 @@ const startServer = async () => {
     setInterval(() => {
         (0, paymentReconciliation_1.reconcilePendingPayments)().catch(err => console.error('[CRON] Reconciliation failed', err));
     }, 30000);
+    // Real-time Metrics Push (every 30s)
+    setInterval(async () => {
+        try {
+            const metrics = await (0, admin_metrics_controller_1.calculateLiveMetrics)();
+            if (socket_2.io) {
+                socket_2.io.to('admin-room').emit('metrics-update', metrics);
+            }
+        }
+        catch (err) {
+            console.error('[CRON] Metrics push failed', err);
+        }
+    }, 30000);
     const shutdown = async (signal) => {
         console.log(`${signal} received. Shutting down gracefully...`);
+        (0, phonepe_service_1.cleanupPhonePeTokenRefresh)();
         server.close(async () => {
             await (0, db_1.disconnectDatabase)();
             process.exit(0);

@@ -5,7 +5,7 @@ import type { PaginationMeta } from '../utils/pagination';
 
 const db = prisma as any;
 
-const mapRoleFilterToEnum = (role?: string): 'PATIENT' | 'THERAPIST' | 'PSYCHIATRIST' | 'COACH' | 'ADMIN' | undefined => {
+const mapRoleFilterToEnum = (role?: string): 'PATIENT' | 'THERAPIST' | 'PSYCHIATRIST' | 'COACH' | 'ADMIN' | 'COMPLIANCE_OFFICER' | undefined => {
 	if (!role) return undefined;
 	const normalized = role.toLowerCase();
 	if (normalized === 'patient') return 'PATIENT';
@@ -13,6 +13,7 @@ const mapRoleFilterToEnum = (role?: string): 'PATIENT' | 'THERAPIST' | 'PSYCHIAT
 	if (normalized === 'psychiatrist') return 'PSYCHIATRIST';
 	if (normalized === 'coach') return 'COACH';
 	if (normalized === 'admin') return 'ADMIN';
+	if (normalized === 'complianceofficer') return 'COMPLIANCE_OFFICER';
 	throw new AppError('Invalid role filter', 400);
 };
 
@@ -41,7 +42,7 @@ export interface AdminListUsersResponse {
 		email: string;
 		firstName: string;
 		lastName: string;
-		role: 'patient' | 'therapist' | 'psychiatrist' | 'coach' | 'admin';
+		role: 'patient' | 'therapist' | 'psychiatrist' | 'coach' | 'admin' | 'complianceofficer';
 		isTherapistVerified: boolean;
 		therapistVerifiedAt: Date | null;
 		createdAt: Date;
@@ -54,7 +55,7 @@ export interface AdminListUsersResponse {
  * List users with pagination and filtering
  *
  * Query filters:
- * - role: 'patient' | 'therapist' | 'psychiatrist' | 'coach' | 'admin' (optional)
+ * - role: 'patient' | 'therapist' | 'psychiatrist' | 'coach' | 'admin' | 'complianceofficer' (optional)
  * - status: 'active' | 'deleted' (optional)
  * - page: pagination page (default: 1)
  * - limit: items per page (default: 10, max: 50)
@@ -103,9 +104,11 @@ export const listUsers = async (
 			select: {
 				id: true,
 				email: true,
+				phone: true,
 				firstName: true,
 				lastName: true,
 				role: true,
+				status: true,
 				isTherapistVerified: true,
 				therapistVerifiedAt: true,
 				createdAt: true,
@@ -119,9 +122,11 @@ export const listUsers = async (
 		data: users.map((user: any) => ({
 			id: user.id,
 			email: user.email,
+			phone: user.phone || 'N/A',
 			firstName: user.firstName,
 			lastName: user.lastName,
 			role: String(user.role).toLowerCase(),
+			status: String(user.status).toLowerCase(),
 			isTherapistVerified: Boolean(user.isTherapistVerified),
 			therapistVerifiedAt: user.therapistVerifiedAt ?? null,
 			createdAt: user.createdAt,
@@ -585,4 +590,208 @@ export const listSubscriptions = async (
 		data,
 		meta: buildPaginationMeta(totalItems, normalized),
 	};
+};
+
+/**
+ * Get all users pending onboarding approval
+ */
+export const getUserApprovals = async (): Promise<any[]> => {
+	const users = await db.user.findMany({
+		where: {
+			onboardingStatus: 'PENDING',
+			isDeleted: false,
+		},
+		select: {
+			id: true,
+			firstName: true,
+			lastName: true,
+			email: true,
+			phone: true,
+			role: true,
+			createdAt: true,
+			therapistProfile: {
+				select: { id: true }
+			},
+		},
+		orderBy: { createdAt: 'desc' },
+	});
+
+	if (users.length === 0) return [];
+
+	const userIds = users.map(u => u.id);
+	const docs = await db.providerDocument.findMany({
+		where: { userId: { in: userIds } }
+	});
+
+	return users.map((u: any) => {
+		const userDocs = docs.filter(d => d.userId === u.id);
+		const documentUrl = userDocs.length > 0 ? userDocs[0].url : null;
+		
+		return {
+			id: u.id,
+			fullName: `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() || 'New User',
+			email: u.email,
+			phone: u.phone,
+			role: String(u.role).toLowerCase(),
+			status: 'pending',
+			registeredAt: u.createdAt,
+			documentUrl: documentUrl,
+		};
+	});
+};
+
+/**
+ * Approve or Reject a user's registration
+ */
+export const updateUserApprovalStatus = async (
+	userId: string,
+	action: 'approve' | 'reject',
+	reason?: string,
+): Promise<void> => {
+	const status = action === 'approve' ? 'COMPLETED' : 'REJECTED';
+
+	await db.user.update({
+		where: { id: userId },
+		data: {
+			onboardingStatus: status,
+			...(action === 'approve' ? { isTherapistVerified: true, therapistVerifiedAt: new Date() } : {}),
+		},
+	});
+	
+	// Implementation note: In a real system, we would also send an email/notification here
+	// and potentially log the rejection reason.
+};
+
+/**
+ * List currently active sessions (Live Monitor)
+ */
+export const listLiveSessions = async (): Promise<any[]> => {
+	// Find session IDs with at least one ONLINE participant
+	const activePresences = await prisma.sessionPresence.findMany({
+		where: { status: 'ONLINE' },
+		select: { sessionId: true },
+		distinct: ['sessionId'],
+	});
+
+	if (activePresences.length === 0) return [];
+
+	const activeSessionIds = activePresences.map((p: any) => p.sessionId);
+
+	const sessions = await db.therapySession.findMany({
+		where: {
+			id: { in: activeSessionIds },
+			status: 'CONFIRMED',
+		},
+		include: {
+			patientProfile: {
+				include: {
+					user: {
+						select: { firstName: true, lastName: true },
+					},
+				},
+			},
+			therapistProfile: {
+				select: { firstName: true, lastName: true },
+			},
+		},
+	});
+
+	return sessions.map((s: any) => ({
+		id: s.id,
+		therapistName: `${s.therapistProfile?.firstName ?? ''} ${s.therapistProfile?.lastName ?? ''}`.trim() || 'Therapist',
+		patientName: `${s.patientProfile?.user?.firstName ?? ''} ${s.patientProfile?.user?.lastName ?? ''}`.trim() || 'Patient',
+		startTime: s.dateTime.toISOString(),
+		status: 'in-progress', // Since they have active presence
+	}));
+};
+
+/**
+ * List all user feedback
+ */
+export const getFeedback = async (): Promise<any[]> => {
+	try {
+		if (!db.userFeedback) return [];
+
+		const feedback = await db.userFeedback.findMany({
+			include: {
+				user: {
+					select: {
+						firstName: true,
+						lastName: true,
+					},
+				},
+			},
+			orderBy: { createdAt: 'desc' },
+		});
+
+		if (!feedback) return [];
+
+		return feedback.map((f: any) => ({
+			id: f.id,
+			userName: `${f.user?.firstName ?? ''} ${f.user?.lastName ?? ''}`.trim() || 'Anonymous',
+			rating: f.rating,
+			comment: f.comment,
+			sentiment: f.sentiment.toLowerCase(),
+			createdAt: f.createdAt.toISOString(),
+			resolved: f.resolved,
+		}));
+	} catch (err: any) {
+		// UserFeedback model may not exist yet or table is missing – return empty list
+		return [];
+	}
+};
+
+/**
+ * Mark feedback as resolved
+ */
+export const resolveFeedback = async (feedbackId: string): Promise<void> => {
+	const feedback = await db.userFeedback.findUnique({ where: { id: feedbackId } });
+	if (!feedback) {
+		throw new AppError('Feedback not found', 404);
+	}
+
+	await db.userFeedback.update({
+		where: { id: feedbackId },
+		data: { resolved: true },
+	});
+};
+
+/**
+ * Update user status (Active/Suspended/etc)
+ */
+export const updateUserStatus = async (userId: string, status: string): Promise<void> => {
+	const normalizedStatus = status.toUpperCase();
+	if (!['ACTIVE', 'SUSPENDED', 'DISABLED'].includes(normalizedStatus)) {
+		throw new AppError('Invalid status. Must be ACTIVE, SUSPENDED, or DISABLED', 400);
+	}
+
+	const user = await db.user.findUnique({ where: { id: userId } });
+	if (!user) {
+		throw new AppError('User not found', 404);
+	}
+
+	await db.user.update({
+		where: { id: userId },
+		data: { status: normalizedStatus as any },
+	});
+};
+
+/**
+ * Get all roles and permissions
+ */
+export const getRoles = async (): Promise<any[]> => {
+	return await db.role.findMany({
+		orderBy: { name: 'asc' },
+	});
+};
+
+/**
+ * Update permissions for a specific role
+ */
+export const updateRolePermissions = async (roleName: string, permissions: string[]): Promise<any> => {
+	const role = await db.role.update({
+		where: { name: roleName },
+		data: { permissions },
+	});
+	return role;
 };

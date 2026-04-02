@@ -7,6 +7,7 @@ import { GlobalAudioProvider } from './context/GlobalAudioContext';
 import GlobalAudioPlayerConsole from './components/audio/GlobalAudioPlayerConsole';
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 import { AuthProvider, getPostLoginRoute, useAuth } from './context/AuthContext';
+import { SocketProvider } from './context/SocketContext';
 import { Assessment } from './pages/Assessment'
 import { ResultsPage } from './pages/Results'
 import { CrisisPage } from './pages/Crisis'
@@ -31,6 +32,7 @@ const ProgressPage = lazy(() => import('./pages/patient/ProgressPage'));
 const SupportPage = lazy(() => import('./pages/patient/SupportPage'));
 const TherapyPlanPage = lazy(() => import('./pages/patient/TherapyPlanPage'));
 const PricingPage = lazy(() => import('./pages/patient/PricingPage'));
+const SubscriptionAddonsPage = lazy(() => import('./pages/patient/SubscriptionAddonsPage'));
 const PatientTimelinePage = lazy(() => import('./pages/patient/PatientTimelinePage'));
 const ReportsPage = lazy(() => import('./pages/patient/ReportsPage'));
 const PatientReportDownloadPage = lazy(() => import('./pages/patient/PatientReportDownloadPage'));
@@ -42,30 +44,55 @@ const BuddyChatPage = lazy(() => import('./pages/patient/BuddyChatPage'));
 const ProviderMessagesPage = lazy(() => import('./pages/patient/ProviderMessagesPage'));
 const PatientOnboardingPage = lazy(() => import('./pages/patient/PatientOnboardingPage'));
 const DailyCheckInPage = lazy(() => import('./pages/patient/DailyCheckInPage'));
+const HitASixerGamePage = lazy(() => import('./pages/patient/HitASixerGamePage'));
+const WalletPage = lazy(() => import('./pages/patient/WalletPage'));
+const GroupTherapySessionsPage = lazy(() => import('./pages/patient/GroupTherapySessionsPage'));
 const VideoSessionPage = lazy(() => import('./pages/shared/VideoSessionPage'));
 const AdminPortalLoginPage = lazy(() => import('./pages/admin/AdminPortalLoginPage'));
 const AdminDashboardPage = lazy(() => import('./pages/admin/Dashboard'));
+const AdminDataPrivacyHubPage = lazy(() => import('./pages/admin/AdminDataPrivacyHubPage'));
+const CentralizedLegalDocumentManagement = lazy(() => import('./pages/admin/CentralizedLegalDocumentManagement'));
+const ComplianceDashboard = lazy(() => import('./pages/admin/ComplianceDashboard'));
+const LegalDocuments = lazy(() => import('./pages/admin/LegalDocuments'));
 const AdminShellLayout = lazy(() => import('./components/admin/AdminShellLayout'));
 const AdminEntryGate = lazy(() => import('./components/admin/AdminEntryGate'));
 const AdminUsersPage = lazy(() => import('./pages/admin/Users'));
 const AdminRolesPage = lazy(() => import('./pages/admin/Roles'));
 const AdminCompaniesPage = lazy(() => import('./pages/admin/Companies'));
 const AdminCompanySubscriptionsPage = lazy(() => import('./pages/admin/CompanySubscriptions'));
-const AdminCompanyReportsPage = lazy(() => import('./pages/admin/CompanyReports'));
+const AdminReportsPage = lazy(() => import('./pages/admin/Reports'));
+const PlatformAnalytics = lazy(() => import('./pages/admin/PlatformAnalytics'));
 const AdminPlatformHealthPage = lazy(() => import('./pages/admin/PlatformHealth'));
-const AdminVerificationPage = lazy(() => import('./pages/admin/Verification'));
+const TherapistVerification = lazy(() => import('./pages/admin/TherapistVerification'));
 const AdminPendingProvidersPage = lazy(() => import('./pages/admin/PendingProviders'));
 const AdminRevenuePage = lazy(() => import('./pages/admin/Revenue'));
 const AdminSettingsPage = lazy(() => import('./pages/admin/Settings'));
-const AdminPricingManagementPage = lazy(() => import('./pages/admin/PricingManagement'));
 const ClinicalAssistantPage = lazy(() => import('./pages/admin/ClinicalAssistantPage'));
 const AdminSectionPage = lazy(() => import('./pages/admin/AdminSectionPage'));
 const AdminTemplatesPage = lazy(() => import('./pages/admin/Templates'));
+const AdminPayoutsPage = lazy(() => import('./pages/admin/Payouts'));
+const ZohoDeskPanel = lazy(() => import('./pages/admin/ZohoDeskPanel'));
+const OfferMarqueeEditor = lazy(() => import('./pages/admin/OfferMarqueeEditor'));
+const PricingSubscriptionsPage = lazy(() => import('./pages/admin/PricingSubscriptions'));
+const CrisisConsole = lazy(() => import('./pages/admin/CrisisConsole'));
+const AuditTrail = lazy(() => import('./pages/admin/AuditTrail'));
+const GroupManagement = lazy(() => import('./pages/admin/GroupManagement'));
+const TherapistPerformance = lazy(() => import('./pages/admin/TherapistPerformance'));
+const SessionAnalytics = lazy(() => import('./pages/admin/SessionAnalytics'));
+const UserGrowthAnalytics = lazy(() => import('./pages/admin/UserGrowthAnalytics'));
+const RoleManagement = lazy(() => import('./pages/admin/RoleManagement'));
+const UserApprovals = lazy(() => import('./pages/admin/UserApprovals'));
+const LiveSessions = lazy(() => import('./pages/admin/LiveSessions'));
+const Feedback = lazy(() => import('./pages/admin/Feedback'));
+const AllUsers = lazy(() => import('./pages/admin/AllUsers'));
 const CertificationsPage = lazy(() => import('./pages/CertificationsPage'));
 const CertificationLandingPage = lazy(() => import('./pages/CertificationLandingPage'));
-const CancellationRefundPolicyPage = lazy(() => import('./pages/legal/CancellationRefundPolicyPage'));
-const TermsOfUsePage = lazy(() => import('./pages/legal/TermsOfUsePage'));
-const PrivacyPolicyPage = lazy(() => import('./pages/legal/PrivacyPolicyPage'));
+const TermsOfService = lazy(() => import('./pages/legal/TermsOfService'));
+const PrivacyPolicy = lazy(() => import('./pages/legal/PrivacyPolicy'));
+const RefundAndCancellationPolicy = lazy(() => import('./pages/legal/RefundAndCancellationPolicy'));
+const TherapistICAgr = lazy(() => import('./pages/legal/TherapistICAgr'));
+const TherapistNDA = lazy(() => import('./pages/legal/TherapistNDA'));
+const TherapistDataProcessingAgr = lazy(() => import('./pages/legal/TherapistDataProcessingAgr'));
 const CorporateAnalyticsPage = lazy(() => import('./pages/corporate/CorporateAnalyticsPage'));
 const CorporateEmployeeDirectoryPage = lazy(() => import('./pages/corporate/CorporateEmployeeDirectoryPage'));
 const CorporateEnrollmentPage = lazy(() => import('./pages/corporate/CorporateEnrollmentPage'));
@@ -86,10 +113,16 @@ const ProviderEarningsPage = lazy(() => import('./pages/provider/Earnings'));
 const ProviderSettingsPage = lazy(() => import('./pages/provider/Settings'));
 const ProviderDashboard = lazy(() => import('./pages/provider/Dashboard/ProviderDashboard'));
 const ProviderSubscriptionPage = lazy(() => import('./pages/provider/ProviderSubscriptionPage'));
+const ProviderSubscriptionAddonsPage = lazy(() => import('./pages/provider/ProviderSubscriptionAddonsPage'));
 const AppointmentRequestsPage = lazy(() => import('./pages/provider/AppointmentRequests'));
 const ProviderOnboardingPage = lazy(() => import('./pages/provider/ProviderOnboardingPage'));
 const ProviderVerificationPendingPage = lazy(() => import('./pages/provider/ProviderVerificationPendingPage'));
+const TherapistLiveSessionPage = lazy(() => import('./pages/therapist/TherapistLiveSessionPage'));
+const ProviderPortalPage = lazy(() => import('./pages/provider/ProviderPortalPage').then(m => ({ default: m.ProviderPortalPage })));
+
 const PaymentStatusPage = lazy(() => import('./pages/shared/PaymentStatus'));
+const UniversalCheckoutPage = lazy(() => import('./pages/shared/UniversalCheckout'));
+const UniversalPaymentSuccessPage = lazy(() => import('./pages/shared/UniversalPaymentSuccess'));
 const HubLayout = lazy(() => import('./components/layout/HubLayout'));
 const PatientList = lazy(() => import('./pages/provider/Patients/PatientList'));
 const PatientChartLayout = lazy(() => import('./components/layout/PatientChartLayout'));
@@ -97,7 +130,7 @@ const ChartOverview = lazy(() => import('./pages/provider/Patients/Tabs/ChartOve
 const SessionNotes = lazy(() => import('./pages/provider/Patients/Tabs/SessionNotes'));
 const Assessments = lazy(() => import('./pages/provider/Patients/Tabs/Assessments'));
 const PlanStudio = lazy(() => import('./pages/provider/Patients/Tabs/PlanStudio'));
-const Prescriptions = lazy(() => import('./pages/provider/Patients/Tabs/Prescriptions'));
+const Prescriptions = lazy(() => import('./pages/provider/PrescriptionGateway'));
 const LabOrders = lazy(() => import('./pages/provider/Patients/Tabs/LabOrders'));
 const GoalsAndHabits = lazy(() => import('./pages/provider/Patients/Tabs/GoalsAndHabits'));
 
@@ -135,6 +168,15 @@ function DashboardRedirect() {
   return <Navigate to={getPostLoginRoute(user)} replace />;
 }
 
+function AdminDashboardGate() {
+  const { user } = useAuth();
+  const role = String(user?.role || '').toLowerCase().replace(/_/g, '');
+  if (role === 'complianceofficer') {
+    return <Navigate to="/admin/compliance" replace />;
+  }
+  return <AdminDashboardPage />;
+}
+
 function LegacyProviderLiveSessionRedirect() {
   const { sessionId = '' } = useParams<{ sessionId: string }>();
   return <Navigate to={`/provider/live-session/${sessionId}`} replace />;
@@ -160,9 +202,10 @@ function App() {
 
   return (
     <AuthProvider>
-      <GlobalAudioProvider>
-        <Toaster
-          position="top-center"
+      <SocketProvider>
+        <GlobalAudioProvider>
+          <Toaster
+            position="top-center"
           toastOptions={{
             duration: 3500,
             style: {
@@ -214,6 +257,7 @@ function App() {
             <Route path="/crisis" element={<CrisisPage />} />
             <Route path="/onboarding/name" element={<OnboardingName onNext={handleOnboardingName} />} />
             <Route path="/onboarding/email" element={<OnboardingEmail userName={userName} />} />
+            
             <Route
               path="/therapist-dashboard"
               element={
@@ -232,6 +276,7 @@ function App() {
             >
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<ProviderDashboard />} />
+              <Route path="portal" element={<ProviderPortalPage />} />
               <Route path="patients" element={<PatientList />} />
               <Route path="patient/:patientId" element={<PatientChartLayout />}>
                 <Route index element={<Navigate to="overview" replace />} />
@@ -255,9 +300,15 @@ function App() {
               <Route path="earnings" element={<ProviderEarningsPage />} />
               <Route path="appointments" element={<AppointmentRequestsPage />} />
               <Route path="subscription" element={<ProviderSubscriptionPage />} />
+              <Route path="platform-payment" element={<Navigate to="/provider/subscription" replace />} />
+              <Route path="plans" element={<ProviderSubscriptionPage />} />
+              <Route path="plans/addons" element={<ProviderSubscriptionAddonsPage />} />
+              <Route path="checkout" element={<UniversalCheckoutPage />} />
+              <Route path="confirmation" element={<UniversalPaymentSuccessPage />} />
               <Route path="messages" element={<ProviderInboxPage />} />
+
               <Route path="settings" element={<ProviderSettingsPage />} />
-              <Route path="live-session/:sessionId" element={<VideoSessionPage />} />
+              <Route path="live-session/:sessionId" element={<TherapistLiveSessionPage />} />
             </Route>
             <Route
               path="/onboarding/provider-setup"
@@ -268,6 +319,46 @@ function App() {
               }
             />
             <Route path="/provider/onboarding" element={<Navigate to="/onboarding/provider-setup" replace />} />
+            <Route
+              path="/provider/platform-payment"
+              element={
+                <ProtectedRoute allowedRoles={['therapist', 'psychiatrist', 'psychologist', 'coach']}>
+                  <Navigate to="/provider/subscription" replace />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/provider/plans"
+              element={
+                <ProtectedRoute allowedRoles={['therapist', 'psychiatrist', 'psychologist', 'coach']}>
+                  <ProviderSubscriptionPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/provider/plans/addons"
+              element={
+                <ProtectedRoute allowedRoles={['therapist', 'psychiatrist', 'psychologist', 'coach']}>
+                  <ProviderSubscriptionAddonsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/provider/checkout"
+              element={
+                <ProtectedRoute allowedRoles={['therapist', 'psychiatrist', 'psychologist', 'coach']}>
+                  <UniversalCheckoutPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/provider/confirmation"
+              element={
+                <ProtectedRoute allowedRoles={['therapist', 'psychiatrist', 'psychologist', 'coach']}>
+                  <UniversalPaymentSuccessPage />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/provider/verification-pending"
               element={
@@ -282,6 +373,54 @@ function App() {
             <Route path="/psychologist/*" element={<Navigate to="/provider/dashboard" replace />} />
             <Route path="/auth/signup" element={<SignupPage />} />
             <Route path="/payment/status" element={<PaymentStatusPage />} />
+            <Route
+              path="/plans"
+              element={
+                <ProtectedRoute allowedRoles={['patient']}>
+                  <PricingPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/plans/addons"
+              element={
+                <ProtectedRoute allowedRoles={['patient']}>
+                  <SubscriptionAddonsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/checkout"
+              element={
+                <ProtectedRoute allowedRoles={['patient']}>
+                  <UniversalCheckoutPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/universal/checkout"
+              element={
+                <ProtectedRoute allowedRoles={['patient', 'therapist', 'psychiatrist', 'psychologist', 'coach']}>
+                  <UniversalCheckoutPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/confirmation"
+              element={
+                <ProtectedRoute allowedRoles={['patient']}>
+                  <UniversalPaymentSuccessPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/universal/payment-success"
+              element={
+                <ProtectedRoute allowedRoles={['patient', 'therapist', 'psychiatrist', 'psychologist', 'coach']}>
+                  <UniversalPaymentSuccessPage />
+                </ProtectedRoute>
+              }
+            />
             <Route path="/admin-portal/login" element={<AdminPortalLoginPage />} />
             <Route path="/corporate/login" element={<Navigate to="/auth/login" replace />} />
             <Route
@@ -312,39 +451,52 @@ function App() {
               }
             >
               <Route element={<AdminShellLayout />}>
-                <Route index element={<Navigate to="dashboard" replace />} />
-                <Route path="dashboard" element={<AdminDashboardPage />} />
-                <Route path="platform-analytics" element={<AdminSectionPage title="Platform Analytics" description="Growth, monetization, retention, and operational analytics across the platform." bullets={['User growth by role', 'Revenue trends and cohorts', 'Session completion and drop rates', 'Subscription funnel and churn intelligence']} />} />
-                <Route path="user-approvals" element={<AdminSectionPage title="User Approvals" description="Approve, reject, and monitor pending user onboarding requests." bullets={['Pending approval queue', 'KYC validation status', 'Approval SLA tracking', 'Escalation workflow']} />} />
-                <Route path="therapist-verification" element={<AdminVerificationPage />} />
+                <Route index element={<DashboardRedirect />} />
+                <Route path="dashboard" element={<AdminDashboardGate />} />
+                <Route path="platform-analytics" element={<PlatformAnalytics />} />
+                <Route path="user-approvals" element={<UserApprovals />} />
+                <Route path="therapist-verification" element={<TherapistVerification />} />
                 <Route path="pending-providers" element={<AdminPendingProvidersPage />} />
                 <Route path="users" element={<AdminUsersPage />} />
                 <Route path="roles" element={<AdminRolesPage />} />
                 <Route path="companies" element={<AdminCompaniesPage />} />
                 <Route path="company-subscriptions" element={<AdminCompanySubscriptionsPage />} />
-                <Route path="company-reports" element={<AdminCompanyReportsPage />} />
-                <Route path="live-sessions" element={<AdminSectionPage title="Live Sessions" description="Monitor active sessions, disruptions, and quality metrics in real-time." bullets={['Live session monitor', 'Drop/disconnect alerts', 'Therapist capacity overview', 'Session intervention controls']} />} />
+                <Route path="company-reports" element={<AdminReportsPage />} />
+                <Route path="live-sessions" element={<LiveSessions />} />
+                <Route path="feedback" element={<Feedback />} />
+                <Route path="all-users" element={<AllUsers />} />
                 <Route path="templates" element={<AdminTemplatesPage />} />
-                <Route path="crisis-alerts" element={<AdminSectionPage title="Crisis Alerts" description="Triage and escalate high-risk events with defined safety protocols." bullets={['Suicide risk alerts', 'Escalate to psychiatrist', 'Emergency protocol status', 'Resolution timeline']} />} />
                 <Route path="revenue" element={<AdminRevenuePage />} />
-                <Route path="pricing-management" element={<AdminPricingManagementPage />} />
-                <Route path="payouts" element={<AdminSectionPage title="Payouts" description="Review provider payouts, schedules, holds, and reconciliation exceptions." bullets={['Scheduled payout runs', 'Manual adjustments', 'Failed transfer handling', 'Payout audit log']} />} />
+                <Route path="pricing-management" element={<PricingSubscriptionsPage />} />
+                <Route path="pricing-subscriptions" element={<PricingSubscriptionsPage />} />
+                <Route path="payouts" element={<AdminPayoutsPage />} />
                 <Route path="invoices" element={<AdminSectionPage title="Invoices" description="Track invoices, collections, refunds, and payment disputes." bullets={['Invoice lifecycle tracking', 'Corporate and individual invoices', 'Refund analytics', 'Collection status by segment']} />} />
-                <Route path="user-growth" element={<AdminSectionPage title="User Growth Analytics" description="Analyze growth trends across patients, therapists, corporate users, and partners." bullets={['Monthly active users by role', 'Acquisition vs activation', 'Retention cohorts', 'Regional growth patterns']} />} />
-                <Route path="session-analytics" element={<AdminSectionPage title="Session Analytics" description="Track platform-wide session quality, throughput, and completion metrics." bullets={['Sessions per day/week/month', 'Completion and dropout rates', 'Average session duration', 'Service line distribution']} />} />
-                <Route path="therapist-performance" element={<AdminSectionPage title="Therapist Performance" description="Benchmark provider outcomes, ratings, and engagement effectiveness." bullets={['Sessions completed', 'Patient ratings', 'Improvement score trend', 'Retention and revisit rates']} />} />
+                <Route path="payment-reliability" element={<AdminSectionPage title="Payment Reliability" description="Monitor payment success, retries, failures, and settlement reliability trends." bullets={['Success vs failed transactions', 'Retry conversion trends', 'Decline reason distribution', 'Settlement health indicators']} />} />
+                <Route path="user-growth" element={<UserGrowthAnalytics />} />
+                <Route path="session-analytics" element={<SessionAnalytics />} />
+                <Route path="therapist-performance" element={<TherapistPerformance />} />
                 <Route path="mental-health-trends" element={<AdminSectionPage title="Mental Health Trends" description="Monitor category-level trends to plan interventions and workforce readiness." bullets={['Depression and anxiety trends', 'Sleep and stress categories', 'High-risk cluster detection', 'Program outcome comparisons']} />} />
-                <Route path="support-tickets" element={<AdminSectionPage title="Support Tickets" description="Operational support queue with category insights and SLA compliance." bullets={['Open vs resolved volume', 'Ticket category analytics', 'Average resolution time', 'Satisfaction tracking']} />} />
+                <Route path="zoho-desk" element={<ZohoDeskPanel />} />
+                <Route path="offer-marquee" element={<OfferMarqueeEditor />} />
+                <Route path="crisis-console" element={<CrisisConsole />} />
+                <Route path="audit-trail" element={<AuditTrail />} />
+                <Route path="groups" element={<GroupManagement />} />
+                <Route path="roles" element={<RoleManagement />} />
                 <Route path="feedback" element={<AdminSectionPage title="Feedback" description="Collect and analyze user and provider feedback loops for product quality." bullets={['NPS and CSAT trends', 'Feedback themes', 'Feature request clusters', 'Escalation tagging']} />} />
-                <Route path="audit-logs" element={<AdminSectionPage title="Audit Logs" description="Security-grade activity timeline for admin actions and sensitive operations." bullets={['User login and role changes', 'Account suspension events', 'Payment and billing actions', 'Immutable audit export']} />} />
-                <Route path="compliance" element={<AdminSectionPage title="Compliance" description="Track DPDPA/HIPAA controls, policy adherence, and privacy operations." bullets={['Consent lifecycle logs', 'Data access events', 'Compliance readiness status', 'Policy exception management']} />} />
+                <Route path="audit-logs" element={<AuditTrail />} />
+                <Route path="/admin/compliance-documents" element={<LegalDocuments />} />
+                <Route path="/admin/compliance" element={<ComplianceDashboard />} />
+                <Route path="/admin/compliance-status" element={<ComplianceDashboard />} />
                 <Route path="data-requests" element={<AdminSectionPage title="Data Requests" description="Manage export, deletion, and data-subject requests with approvals." bullets={['Export requests', 'Deletion requests', 'Legal hold checks', 'Request SLA and closure']} />} />
+                <Route path="data-privacy-hub" element={<AdminDataPrivacyHubPage />} />
+                <Route path="legal-documents" element={<CentralizedLegalDocumentManagement />} />
                 <Route path="platform-health" element={<AdminPlatformHealthPage />} />
                 <Route path="ai-monitoring" element={<AdminSectionPage title="AI Monitoring" description="Supervise AI safety, moderation outcomes, and risk alert precision." bullets={['Self-harm detection quality', 'Prompt/response moderation', 'Flagged response queue', 'Model safety policy controls']} />} />
                 <Route path="clinical-assistant" element={<ClinicalAssistantPage />} />
                 <Route path="settings" element={<AdminSettingsPage />} />
               </Route>
             </Route>
+
             <Route
               path="/corporate/dashboard"
               element={
@@ -409,8 +561,14 @@ function App() {
               <Route path="reports" element={<ReportsPage />} />
               <Route path="reports/shared/:id" element={<PatientReportDownloadPage />} />
               <Route path="notifications" element={<NotificationsPage />} />
-              <Route path="pricing" element={<PricingPage />} />
+              <Route path="plans/addons" element={<SubscriptionAddonsPage />} />
+              <Route path="checkout" element={<Navigate to="/checkout" replace />} />
+              <Route path="confirmation" element={<Navigate to="/confirmation" replace />} />
               <Route path="check-in" element={<DailyCheckInPage />} />
+              <Route path="game" element={<HitASixerGamePage />} />
+              <Route path="hit-a-sixer" element={<HitASixerGamePage />} />
+              <Route path="wallet" element={<WalletPage />} />
+              <Route path="group-therapy" element={<GroupTherapySessionsPage />} />
             </Route>
             <Route path="/providers/:id" element={<Navigate to="/patient/sessions" replace />} />
             <Route path="/book/:providerId" element={<Navigate to="/patient/sessions" replace />} />
@@ -419,9 +577,12 @@ function App() {
             <Route path="/ai-chat" element={<Navigate to="/patient/messages" replace />} />
             <Route path="/profile" element={<Navigate to="/patient/profile" replace />} />
             <Route path="/settings" element={<Navigate to="/patient/settings" replace />} />
-            <Route path="/terms" element={<TermsOfUsePage />} />
-            <Route path="/privacy" element={<PrivacyPolicyPage />} />
-            <Route path="/refunds" element={<CancellationRefundPolicyPage />} />
+            <Route path="/terms" element={<TermsOfService />} />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/refunds" element={<RefundAndCancellationPolicy />} />
+            <Route path="/legal/therapist-ic-agreement" element={<TherapistICAgr />} />
+            <Route path="/legal/therapist-nda" element={<TherapistNDA />} />
+            <Route path="/legal/therapist-data-processing" element={<TherapistDataProcessingAgr />} />
             {/* Certificate verification — standalone, no layout, accessible via QR scan */}
             <Route path="/verify/:certId" element={<CertificateVerificationPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
@@ -429,7 +590,8 @@ function App() {
         </Suspense>
         <GlobalAudioPlayerConsole />
       </GlobalAudioProvider>
-    </AuthProvider>
+    </SocketProvider>
+  </AuthProvider>
   )
 }
 

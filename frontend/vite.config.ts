@@ -2,6 +2,11 @@ import { defineConfig } from 'vitest/config'
 import path from 'path'
 import react from '@vitejs/plugin-react'
 
+const hmrProtocol = (process.env.VITE_HMR_PROTOCOL as 'ws' | 'wss' | undefined) || 'ws'
+const hmrHost = process.env.VITE_HMR_HOST || undefined
+const hmrPort = Number(process.env.VITE_HMR_PORT || 5173)
+const hmrClientPort = Number(process.env.VITE_HMR_CLIENT_PORT || process.env.VITE_HMR_PORT || 5173)
+
 // https://vitejs.dev/config/
 export default defineConfig({
   resolve: {
@@ -22,6 +27,14 @@ export default defineConfig({
     allowedHosts: true, // ✅ CORRECT: Must be boolean true, not 'all'
     open: false,
     cors: true,
+    hmr: {
+      // Explicit HMR websocket settings fix common localhost/proxy websocket failures.
+      protocol: hmrProtocol,
+      // Keep host undefined by default so browser hostname is used (works for localhost/LAN/tunnels).
+      host: hmrHost,
+      port: hmrPort,
+      clientPort: hmrClientPort,
+    },
     proxy: {
       '/api': {
         target: process.env.VITE_BACKEND_URL || 'http://localhost:3000',

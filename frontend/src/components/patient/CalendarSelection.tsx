@@ -47,6 +47,8 @@ export default function CalendarSelection({ onDateTimeSelect, onCancel }: Calend
       setTimeSlotsError(null);
       try {
         const day = selectedDate.getDay();
+        let subscriptionError = false;
+        let subscriptionErrorMsg = '';
         const results = await Promise.all(
           SLOT_TEMPLATES.map(async (slot) => {
             const startMinute = toMinuteOfDay(slot.startTime);
@@ -56,18 +58,31 @@ export default function CalendarSelection({ onDateTimeSelect, onCancel }: Calend
                 daysOfWeek: [day],
                 timeSlots: [{ startMinute, endMinute }],
               },
+              undefined,
+              { context: 'Standard' },
             );
-
-            const count = Number(response?.count ?? response?.providers?.length ?? 0);
+            if (response?.error && response.status === 403) {
+              subscriptionError = true;
+              subscriptionErrorMsg = response.message || 'Active subscription required to check availability.';
+              return { ...slot, availableCount: null };
+            }
+            if (response?.error) {
+              throw new Error(response.message || 'Unknown error');
+            }
+            const count = Number(response?.count ?? (response as any)?.providers?.length ?? 0);
             return {
               ...slot,
               availableCount: Number.isFinite(count) ? count : 0,
             };
           }),
         );
-
-        setTimeSlots(results);
-      } catch {
+        if (subscriptionError) {
+          setTimeSlotsError('SUBSCRIPTION_REQUIRED:' + subscriptionErrorMsg);
+          setTimeSlots(SLOT_TEMPLATES.map((slot) => ({ ...slot, availableCount: null })));
+        } else {
+          setTimeSlots(results);
+        }
+      } catch (err) {
         setTimeSlotsError('Could not check live availability right now. Please try another time or retry.');
         setTimeSlots(SLOT_TEMPLATES.map((slot) => ({ ...slot, availableCount: null })));
       } finally {
@@ -211,11 +226,25 @@ export default function CalendarSelection({ onDateTimeSelect, onCancel }: Calend
                 </div>
               )}
 
-              {timeSlotsError && (
+              {timeSlotsError && timeSlotsError.startsWith('SUBSCRIPTION_REQUIRED:') ? (
+                <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 flex flex-col items-center">
+                  <div className="mb-2 font-semibold">Subscribe to platform fee to check provider availability.</div>
+                  <div className="mb-2">{timeSlotsError.replace('SUBSCRIPTION_REQUIRED:', '')}</div>
+                  <button
+                    className="rounded-lg bg-teal-600 px-4 py-2 text-white font-semibold mt-2 hover:bg-teal-700 transition-colors"
+                    onClick={() => {
+                      const returnTo = window.location.pathname + window.location.search + window.location.hash;
+                      window.location.href = `http://localhost:5173/payment/status?id=SUB_653d1e79_1774602028060&status=SUCCESS#/plans?returnTo=${encodeURIComponent(returnTo)}`;
+                    }}
+                  >
+                    Subscribe to Platform Fee
+                  </button>
+                </div>
+              ) : timeSlotsError ? (
                 <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                   {timeSlotsError}
                 </div>
-              )}
+              ) : null}
 
               {timeSlots.map((slot) => (
                 <button

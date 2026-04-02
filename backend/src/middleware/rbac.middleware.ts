@@ -9,7 +9,17 @@ const db = prisma as any;
  * Extensible enum for user roles
  * Can be extended for superadmin, moderator, etc.
  */
-export type UserRole = 'patient' | 'therapist' | 'psychologist' | 'psychiatrist' | 'coach' | 'admin' | 'superadmin';
+export type UserRole =
+	| 'patient'
+	| 'therapist'
+	| 'psychologist'
+	| 'psychiatrist'
+	| 'coach'
+	| 'admin'
+	| 'superadmin'
+	| 'clinicaldirector'
+	| 'financemanager'
+	| 'complianceofficer';
 
 /**
  * Role hierarchy for logical grouping
@@ -21,6 +31,9 @@ export const roleHierarchy: Record<UserRole, number> = {
 	psychologist: 2,
 	psychiatrist: 2,
 	coach: 2,
+	clinicaldirector: 3,
+	financemanager: 3,
+	complianceofficer: 3,
 	admin: 3,
 	superadmin: 4,
 };
@@ -31,6 +44,7 @@ export const roleHierarchy: Record<UserRole, number> = {
  * Key: userId, Value: { role, timestamp }
  */
 const roleCache = new Map<string, { role: UserRole; timestamp: number; isDeleted: boolean }>();
+const permissionsCache = new Map<UserRole, { permissions: string[]; timestamp: number }>();
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 /**
@@ -42,6 +56,41 @@ export const clearRoleCache = (userId?: string): void => {
 	} else {
 		roleCache.clear();
 	}
+};
+
+/**
+ * Clear permissions cache (useful after permission updates)
+ */
+export const clearPermissionsCache = (roleName?: UserRole): void => {
+	if (roleName) {
+		permissionsCache.delete(roleName);
+	} else {
+		permissionsCache.clear();
+	}
+};
+
+/**
+ * Get role permissions from DB or cache
+ */
+const getRolePermissions = async (roleName: UserRole): Promise<string[]> => {
+	const cached = permissionsCache.get(roleName);
+	if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+		return cached.permissions;
+	}
+
+	const roleData = await db.role.findUnique({
+		where: { name: roleName },
+		select: { permissions: true },
+	});
+
+	const permissions = roleData?.permissions || [];
+	
+	permissionsCache.set(roleName, {
+		permissions,
+		timestamp: Date.now(),
+	});
+
+	return permissions;
 };
 
 /**
@@ -76,15 +125,16 @@ const getUserRole = async (userId: string): Promise<{ role: UserRole; isDeleted:
 		return null;
 	}
 
-	// Cache the result
+	// Cache the result (map super_admin to superadmin for generic convention)
+	const cleanRole = String(user.role).toLowerCase().replace('_', '') as UserRole;
 	roleCache.set(userId, {
-		role: String(user.role).toLowerCase() as UserRole,
+		role: cleanRole,
 		timestamp: Date.now(),
 		isDeleted: false,
 	});
 
 	return {
-		role: String(user.role).toLowerCase() as UserRole,
+		role: cleanRole,
 		isDeleted: false,
 	};
 };
@@ -130,6 +180,7 @@ export const requireRole = (
 			const userId = req.auth?.userId;
 
 			if (!userId) {
+				console.log(`[RBAC] No userId found in req.auth on URL: ${req.originalUrl}. req.auth exists:`, !!req.auth);
 				next(new AppError('Authentication required', 401));
 				return;
 			}
@@ -149,11 +200,15 @@ export const requireRole = (
 				return;
 			}
 
-			// Check if user's role is in allowed roles
-			if (!roles.includes(userDetails.role)) {
+			// Check if user's role is in allowed roles OR satisfies hierarchy
+			const userRank = roleHierarchy[userDetails.role] || 0;
+			const isAllowedByExplicitRole = roles.includes(userDetails.role);
+			const isAllowedByHierarchy = roles.some(role => userRank >= (roleHierarchy[role] || 0));
+
+			if (!isAllowedByExplicitRole && !isAllowedByHierarchy) {
 				// Log unauthorized attempt for security audit
 				console.warn(
-					`[RBAC] Unauthorized access attempt - userId: ${userId}, userRole: ${userDetails.role}, requiredRoles: ${roles.join(',')}`,
+					`[RBAC] Access denied - userId: ${userId}, userRole: ${userDetails.role}, requiredRoles: ${roles.join(',')}, rank: ${userRank}`,
 				);
 
 				next(
@@ -312,38 +367,25 @@ export const requirePermission = (
 			return;
 		}
 
-		// TODO: Map roles to permissions and check
-		// For now, map roles directly to permissions
-		const rolePermissions: Record<UserRole, string[]> = {
-			patient: ['read_own_profile', 'book_session', 'view_therapists', 'submit_assessments', 'view_own_sessions'],
-			therapist: ['read_own_profile', 'manage_sessions', 'view_earnings', 'build_templates', 'view_assigned_patients'],
-			psychologist: ['read_own_profile', 'manage_assessments', 'manage_reports', 'view_assigned_patients', 'manage_risk'],
-			psychiatrist: ['read_own_profile', 'manage_sessions', 'view_earnings', 'view_assigned_patients'],
-			coach: ['read_own_profile', 'manage_sessions', 'view_earnings', 'view_assigned_patients'],
-			admin: [
-				'read_all_profiles', 
-				'manage_users', 
-				'manage_therapists', 
-				'manage_payments',
-				'view_analytics', 
-				'manage_corporate', 
-				'view_system_logs'
-			],
-			superadmin: [
-				'read_all_profiles',
-				'manage_users',
-				'manage_therapists',
-				'manage_payments',
+		// Special handling for Compliance Officer - limited access only
+		if (String(userDetails.role).toUpperCase() === 'COMPLIANCEOFFICER') {
+			const allowedPermissions = [
+				'dashboard',
+				'view_audit',
+				'read_reports',
+				'manage_compliance',
 				'view_analytics',
-				'manage_corporate',
-				'view_system_logs',
-				'manage_roles',
-				'manage_permissions',
-				'system_config',
-			],
-		};
+				'view_feedback'
+			];
+			for (const requiredPermission of permissions) {
+				if (!allowedPermissions.includes(requiredPermission)) {
+					_res.status(403).json({ message: 'Compliance Officer access denied' });
+					return;
+				}
+			}
+		}
 
-		const userPermissions = rolePermissions[userDetails.role] || [];
+		const userPermissions = await getRolePermissions(userDetails.role);
 
 		// Check if user has any of the required permissions
 		const hasPermission = permissions.some(perm => userPermissions.includes(perm));

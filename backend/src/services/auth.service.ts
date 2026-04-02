@@ -1,3 +1,16 @@
+// Role to permissions mapping for JWT
+const permissionsMap: Record<string, Record<string, boolean>> = {
+	super_admin: { dashboard: true, users_read: true, users_write: true, verifications_approve: true, pricing_edit: true, payouts_approve: true, crisis_respond: true, offers_edit: true, audit_read: true },
+	clinical_director: { dashboard: true, users_read: true, verifications_approve: true, crisis_respond: true },
+	finance_manager: { dashboard: true, revenue: true, payouts_approve: true, pricing_edit: true },
+	therapist: { dashboard: true, own_earnings: true },
+	// Add all 11 profiles as needed
+	admin: { dashboard: true, users_read: true, users_write: true },
+	patient: {},
+	psychiatrist: { dashboard: true },
+	psychologist: { dashboard: true },
+	coach: { dashboard: true },
+};
 import { randomBytes } from 'crypto';
 import { authenticator } from 'otplib';
 import { OAuth2Client } from 'google-auth-library';
@@ -35,10 +48,11 @@ const nowPlusMinutes = (minutes: number): Date => new Date(Date.now() + minutes 
 
 const nowPlusDays = (days: number): Date => new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 
-const toPrismaUserRole = (role: PublicUserRole): 'PATIENT' | 'THERAPIST' | 'PSYCHIATRIST' | 'COACH' => {
+const toPrismaUserRole = (role: PublicUserRole): 'PATIENT' | 'THERAPIST' | 'PSYCHIATRIST' | 'PSYCHOLOGIST' | 'COACH' => {
 	if (role === 'patient') return 'PATIENT';
 	if (role === 'therapist') return 'THERAPIST';
 	if (role === 'psychiatrist') return 'PSYCHIATRIST';
+	if (role === 'psychologist') return 'PSYCHOLOGIST';
 	return 'COACH';
 };
 
@@ -61,7 +75,20 @@ const getCompanyAdminMeta = async (userId: string) => {
 
 const isPlatformAdminAccount = async (user: { id: string; role?: string | null }): Promise<boolean> => {
 	const role = String(user.role || '').toUpperCase();
-	if (role !== 'ADMIN') {
+	const normalizedRole = role.replace(/[-\s]/g, '_');
+	const platformRoles = new Set([
+		'ADMIN',
+		'SUPERADMIN',
+		'SUPER_ADMIN',
+		'CLINICALDIRECTOR',
+		'CLINICAL_DIRECTOR',
+		'FINANCEMANAGER',
+		'FINANCE_MANAGER',
+		'COMPLIANCEOFFICER',
+		'COMPLIANCE_OFFICER',
+	]);
+
+	if (!platformRoles.has(normalizedRole) && !platformRoles.has(role.replace(/_/g, ''))) {
 		return false;
 	}
 
@@ -167,6 +194,7 @@ const audit = async (
 };
 
 const issueSessionTokens = async (userId: string, meta: RequestMeta) => {
+	const user = await db.user.findUnique({ where: { id: userId }, select: { role: true } });
 	const createdSession = await db.authSession.create({
 		data: {
 			userId,
@@ -180,7 +208,11 @@ const issueSessionTokens = async (userId: string, meta: RequestMeta) => {
 		select: { id: true },
 	});
 
-	const tokenPair = createTokenPair(userId, createdSession.id);
+	// Normalize role to lower case for mapping
+	const role = String(user?.role || '').toLowerCase();
+	const permissions = permissionsMap[role] || {};
+
+	const tokenPair = createTokenPair(userId, createdSession.id, permissions);
 	const refreshTokenHash = hashOpaqueToken(tokenPair.refreshToken);
 
 	await db.authSession.update({
@@ -386,6 +418,11 @@ export const verifyPhoneOtp = async (input: VerifyPhoneOtpInput, meta: RequestMe
 		throw new AppError('Invalid OTP', 400);
 	}
 
+	const isFirstPhoneVerification = !Boolean(user.phoneVerified);
+	if (isFirstPhoneVerification && !input.acceptedTerms) {
+		throw new AppError('Please accept Terms & Conditions to register', 422);
+	}
+
 	await db.user.update({
 		where: { id: user.id },
 		data: {
@@ -395,6 +432,53 @@ export const verifyPhoneOtp = async (input: VerifyPhoneOtpInput, meta: RequestMe
 		},
 	});
 
+	if (isFirstPhoneVerification && input.acceptedTerms) {
+		const defaultConsentTypes = ['TERMS_OF_SERVICE', 'PRIVACY_POLICY', 'INFORMED_CONSENT'];
+		const optionalConsentTypes = new Set([
+			'THERAPIST_IC_AGREEMENT',
+			'THERAPIST_NDA',
+			'THERAPIST_DATA_PROCESSING_AGREEMENT',
+		]);
+
+		const acceptedFromInput = Array.isArray(input.acceptedDocuments)
+			? input.acceptedDocuments
+				.map((doc) => String(doc).trim().toUpperCase())
+				.filter((doc) => optionalConsentTypes.has(doc))
+			: [];
+
+		const consentTypes = Array.from(new Set([...defaultConsentTypes, ...acceptedFromInput]));
+		const existing = await db.consent.findMany({
+			where: {
+				userId: String(user.id),
+				status: 'GRANTED',
+				consentType: { in: consentTypes },
+			},
+			select: { consentType: true },
+		});
+
+		const existingTypes = new Set<string>(existing.map((entry: { consentType: string }) => entry.consentType));
+		const now = new Date();
+		const toCreate = consentTypes
+			.filter((consentType) => !existingTypes.has(consentType))
+			.map((consentType) => ({
+				userId: String(user.id),
+				consentType,
+				purpose: 'REGISTRATION',
+				status: 'GRANTED',
+				grantedAt: now,
+				metadata: {
+					source: 'signup_phone_otp',
+					ipAddress: meta.ipAddress || null,
+					userAgent: meta.userAgent || null,
+					version: 1,
+				},
+			}));
+
+		if (toCreate.length > 0) {
+			await db.consent.createMany({ data: toCreate });
+		}
+	}
+
 	const tokenPair = await issueSessionTokens(String(user.id), meta);
 	const therapistProfile = await db.therapistProfile.findUnique({
 		where: { userId: String(user.id) },
@@ -403,6 +487,24 @@ export const verifyPhoneOtp = async (input: VerifyPhoneOtpInput, meta: RequestMe
 	const companyAdminMeta = await resolveUserCompanyMeta(String(user.id), user.email);
 
 	await audit('LOGIN_SUCCESS', 'success', meta, { userId: user.id, phone: user.phone });
+
+
+	// Determine if provider needs to pay the platform fee before onboarding
+	let requiresPlatformPayment = false;
+	try {
+		const providerRoles = new Set(['THERAPIST', 'PSYCHIATRIST', 'PSYCHOLOGIST', 'COACH']);
+		const roleUpper = String(user.role || '').toUpperCase();
+		if (providerRoles.has(roleUpper)) {
+			const activeSub = await db.providerSubscription.findFirst({ where: { providerId: String(user.id), status: 'active' } });
+			const onboardingCompleted = Boolean((therapistProfile as any)?.onboardingCompleted);
+			if (!activeSub && !onboardingCompleted) {
+				requiresPlatformPayment = true;
+			}
+		}
+	} catch (err) {
+		// Fail closed: if DB check errors, do not block login — just log and continue
+		console.error('[AUTH] Error checking provider subscription status:', err);
+	}
 
 	return {
 		user: {
@@ -417,6 +519,7 @@ export const verifyPhoneOtp = async (input: VerifyPhoneOtpInput, meta: RequestMe
 			therapistVerifiedAt: (user as any).therapistVerifiedAt ?? null,
 			providerOnboardingCompleted: Boolean((therapistProfile as any)?.onboardingCompleted),
 			providerProfileVerified: Boolean((therapistProfile as any)?.isVerified),
+			requiresPlatformPayment,
 			...companyAdminMeta,
 		},
 		...tokenPair,
@@ -503,6 +606,22 @@ export const loginWithPassword = async (input: LoginInput, meta: RequestMeta) =>
 	const companyAdminMeta = await resolveUserCompanyMeta(String(user.id), user.email);
 	await audit('LOGIN_SUCCESS', 'success', meta, { userId: user.id, email: user.email, phone: user.phone });
 
+	// Determine if provider needs to pay the platform fee before onboarding
+	let requiresPlatformPayment = false;
+	try {
+		const providerRoles = new Set(['THERAPIST', 'PSYCHIATRIST', 'PSYCHOLOGIST', 'COACH']);
+		const roleUpper = String(user.role || '').toUpperCase();
+		if (providerRoles.has(roleUpper)) {
+			const activeSub = await db.providerSubscription.findFirst({ where: { providerId: String(user.id), status: 'active' } });
+			const onboardingCompleted = Boolean((therapistProfile as any)?.onboardingCompleted);
+			if (!activeSub && !onboardingCompleted) {
+				requiresPlatformPayment = true;
+			}
+		}
+	} catch (err) {
+		console.error('[AUTH] Error checking provider subscription status:', err);
+	}
+
 	return {
 		user: {
 			id: String(user.id),
@@ -516,6 +635,7 @@ export const loginWithPassword = async (input: LoginInput, meta: RequestMeta) =>
 			therapistVerifiedAt: (user as any).therapistVerifiedAt ?? null,
 			providerOnboardingCompleted: Boolean((therapistProfile as any)?.onboardingCompleted),
 			providerProfileVerified: Boolean((therapistProfile as any)?.isVerified),
+			requiresPlatformPayment,
 			...companyAdminMeta,
 		},
 		...tokenPair,
@@ -579,6 +699,22 @@ export const loginWithGoogle = async (input: GoogleLoginInput, meta: RequestMeta
 	const companyAdminMeta = await resolveUserCompanyMeta(String(user.id), user.email);
 	await audit('LOGIN_SUCCESS', 'success', meta, { userId: user.id, email: user.email });
 
+	// Determine if provider needs to pay the platform fee before onboarding
+	let requiresPlatformPayment = false;
+	try {
+		const providerRoles = new Set(['THERAPIST', 'PSYCHIATRIST', 'PSYCHOLOGIST', 'COACH']);
+		const roleUpper = String(user.role || '').toUpperCase();
+		if (providerRoles.has(roleUpper)) {
+			const activeSub = await db.providerSubscription.findFirst({ where: { providerId: String(user.id), status: 'active' } });
+			const onboardingCompleted = Boolean((therapistProfile as any)?.onboardingCompleted);
+			if (!activeSub && !onboardingCompleted) {
+				requiresPlatformPayment = true;
+			}
+		}
+	} catch (err) {
+		console.error('[AUTH] Error checking provider subscription status:', err);
+	}
+
 	return {
 		user: {
 			id: String(user.id),
@@ -592,6 +728,7 @@ export const loginWithGoogle = async (input: GoogleLoginInput, meta: RequestMeta
 			therapistVerifiedAt: (user as any).therapistVerifiedAt ?? null,
 			providerOnboardingCompleted: Boolean((therapistProfile as any)?.onboardingCompleted),
 			providerProfileVerified: Boolean((therapistProfile as any)?.isVerified),
+			requiresPlatformPayment,
 			...companyAdminMeta,
 		},
 		...tokenPair,

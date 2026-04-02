@@ -348,7 +348,7 @@ const handlePaymentDeadLetter = async (input: {
 			if (channel === 'patient_subscription' && payment.patientId) {
 				// Find active patient subscription
 				const subscription = await db.patientSubscription.findFirst({
-					where: { patientId: payment.patientId, status: { in: ['ACTIVE', 'RENEWAL_PENDING'] } },
+					where: { patientId: payment.patientId, status: { in: ['ACTIVE', 'RENEWAL_PENDING', 'active', 'renewal_pending', 'trial', 'grace'] } },
 					select: { id: true, patientId: true },
 				});
 
@@ -371,7 +371,7 @@ const handlePaymentDeadLetter = async (input: {
 			} else if (channel === 'provider_subscription' && payment.providerId) {
 				// Find active provider subscription
 				const subscription = await db.providerSubscription.findFirst({
-					where: { providerId: payment.providerId, status: { in: ['ACTIVE', 'RENEWAL_PENDING'] } },
+					where: { providerId: payment.providerId, status: { in: ['ACTIVE', 'RENEWAL_PENDING', 'active', 'renewal_pending', 'trial', 'grace'] } },
 					select: { id: true, providerId: true },
 				});
 

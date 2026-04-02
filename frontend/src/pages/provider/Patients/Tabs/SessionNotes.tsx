@@ -311,7 +311,7 @@ export default function SessionNotes() {
             <p className="mt-3 text-sm text-red-600">We could not save this note. Please try again.</p>
           )}
           {!createNoteMutation.isError && selectedNote && isSigned && (
-            <p className="mt-3 text-sm text-[#4A6741]">This signed note is read-only for clinical compliance.</p>
+            <p className="mt-3 text-sm text-[#4A6741]">This signed note is read-only for clinical governance.</p>
           )}
           {!selectedNote && (
             <p className="mt-3 text-sm text-slate-500">Creating a new note as {providerName}.</p>

@@ -31,13 +31,13 @@ export default function LoginPage() {
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
-	const resolvePostLoginRouteWithSubscription = async (candidate: string | null, role: string | undefined) => {
+	const resolvePostLoginRouteWithSubscription = async (candidate: string | null, role: string | undefined, userOverride?: any) => {
 		if (!candidate || candidate.startsWith('/auth/')) {
-			return getPostLoginRoute(user);
+			return getPostLoginRoute(userOverride || user);
 		}
 
 		const normalizedRole = String(role || '').toLowerCase();
-		const isPricingTarget = candidate.startsWith('/patient/pricing');
+		const isPricingTarget = candidate.startsWith('/plans');
 		if (normalizedRole !== 'patient' || !isPricingTarget) {
 			return candidate;
 		}
@@ -62,7 +62,7 @@ export default function LoginPage() {
 
 		const candidate = from || afterLogin || next || null;
 		void (async () => {
-			const postLoginRoute = await resolvePostLoginRouteWithSubscription(candidate, user.role);
+			const postLoginRoute = await resolvePostLoginRouteWithSubscription(candidate, user.role, user);
 			navigate(postLoginRoute, { replace: true });
 		})();
 	}, [afterLogin, from, isAuthenticated, navigate, next, user]);
@@ -88,8 +88,15 @@ export default function LoginPage() {
 		try {
 			const result = await verifyPhoneSignupOtp(phone.trim(), otp.trim());
 			await checkAuth({ force: true });
+			// Redirect patients without subscription to plans
+			if ((result.user as any)?.requiresSubscription) {
+				const candidate = from || afterLogin || next || null;
+				const returnTo = candidate || '/';
+				navigate(`/plans?returnTo=${encodeURIComponent(returnTo)}`, { replace: true });
+				return;
+			}
 			const candidate = from || afterLogin || next || null;
-			const postLoginRoute = await resolvePostLoginRouteWithSubscription(candidate, result.user?.role);
+			const postLoginRoute = await resolvePostLoginRouteWithSubscription(candidate, result.user?.role, result.user);
 			navigate(postLoginRoute, { replace: true });
 		} catch (err) {
 			setError(getApiErrorMessage(err, 'OTP verification failed'));
@@ -102,6 +109,11 @@ export default function LoginPage() {
 		<div className="responsive-page">
 			<div className="responsive-container py-6 sm:py-10">
 				<div className="mx-auto w-full max-w-lg rounded-3xl border border-calm-sage/20 bg-wellness-surface p-5 shadow-soft-md sm:p-8">
+					<div className="mb-3">
+						<Link to="/" className="text-sm text-calm-sage underline underline-offset-2 hover:text-wellness-text">
+							Back to Home
+						</Link>
+					</div>
 					<h1 className="text-2xl font-semibold text-wellness-text sm:text-3xl">Welcome back</h1>
 					<p className="mt-2 text-sm text-wellness-muted sm:text-base">Login with your phone number and OTP.</p>
 
@@ -161,6 +173,55 @@ export default function LoginPage() {
 							Register here
 						</Link>
 					</p>
+
+					<div className="mt-10 pt-6 border-t border-gray-100">
+						<p className="text-[10px] uppercase font-bold text-gray-400 mb-4 text-center tracking-widest">
+							Developer Sandbox — Quick Admin Login
+						</p>
+						<div className="grid grid-cols-1 gap-2">
+							<Button 
+								variant="soft" 
+								size="sm"
+				className="text-xs py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-100"
+								onClick={() => {
+									setPhone('superadmin@manas360.com');
+									setOtpSent(true);
+									setOtp('123456');
+								}}
+							>
+								🚀 Login as Super Admin
+							</Button>
+							<div className="grid grid-cols-2 gap-2">
+								<Button 
+									variant="soft" 
+									size="sm"
+				  className="text-[10px] py-1.5"
+									onClick={() => {
+										setPhone('finance@manas360.com');
+										setOtpSent(true);
+										setOtp('123456');
+									}}
+								>
+									💳 Finance Manager
+								</Button>
+								<Button 
+									variant="soft" 
+									size="sm"
+				  className="text-[10px] py-1.5"
+									onClick={() => {
+										setPhone('clinical@manas360.com');
+										setOtpSent(true);
+										setOtp('123456');
+									}}
+								>
+									🏥 Clinical Director
+								</Button>
+							</div>
+						</div>
+						<p className="mt-2 text-[9px] text-gray-400 text-center italic">
+							Note: Click a role then click "Verify and Login". Uses dev bypass.
+						</p>
+					</div>
 				</div>
 			</div>
 		</div>

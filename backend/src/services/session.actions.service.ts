@@ -7,7 +7,27 @@ import cuid from 'cuid';
 
 export class SessionActionsService {
   async ensureOwnership(therapistId: string, sessionId: string) {
-    const session = await prisma.patientSession.findUnique({ where: { id: sessionId }, include: { template: true } });
+    const session = await prisma.patientSession.findUnique({
+      where: { id: sessionId },
+      include: {
+        template: true,
+        patientProfile: {
+          select: {
+            id: true,
+            userId: true,
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                name: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
+    });
     if (!session) throw new AppError('Session not found', 404);
     if (!session.template || String(session.template.therapistId) !== String(therapistId)) throw new AppError('Forbidden', 403);
     return session;
@@ -38,10 +58,27 @@ export class SessionActionsService {
   }
 
   async sendReminder(therapistId: string, sessionId: string, via: 'email' | 'sms' | 'both' = 'email', templateId?: string, options: { requestorId?: string } = {}) {
-    await this.ensureOwnership(therapistId, sessionId);
+    const session = await this.ensureOwnership(therapistId, sessionId);
+    const patientUserId = String(session.patientProfile?.userId || '');
+    const patientName = String(
+      session.patientProfile?.user?.name
+        || `${String(session.patientProfile?.user?.firstName || '').trim()} ${String(session.patientProfile?.user?.lastName || '').trim()}`.trim()
+        || 'Patient',
+    );
+    const therapistName = String(
+      `${String((session as any)?.template?.therapist?.firstName || '').trim()} ${String((session as any)?.template?.therapist?.lastName || '').trim()}`.trim() ||
+      'Your therapist',
+    );
 
-    // enqueue placeholder notification
-    const ev = await publishPlaceholderNotificationEvent({ eventType: 'REMINDER', entityType: 'PATIENT_SESSION', entityId: sessionId, payload: { via, templateId } });
+    const ev = await publishPlaceholderNotificationEvent({
+      eventType: 'REMINDER',
+      entityType: 'PATIENT_SESSION',
+      entityId: sessionId,
+      userId: patientUserId,
+      title: 'Session reminder',
+      message: `${therapistName} sent a reminder for your upcoming session.`,
+      payload: { via, templateId, patientName, therapistName },
+    });
 
     await prisma.sessionAuditLog.create({ data: { sessionId, userId: options.requestorId || therapistId, action: 'REMIND', entityType: 'PATIENT_SESSION', entityId: sessionId, changes: { queued: true, event: ev } } } as any);
 

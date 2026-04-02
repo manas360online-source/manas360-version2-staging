@@ -656,7 +656,7 @@ export default function AssessmentsPage() {
           <p className="text-sm font-semibold text-indigo-900">Advanced assessments are part of Platform Access.</p>
           <p className="mt-1 text-xs text-indigo-800">Upgrade to unlock PHQ-9 and GAD-7. Daily checks remain available.</p>
           <Link
-            to="/patient/pricing"
+            to="/plans"
             className="mt-3 inline-flex min-h-[36px] items-center rounded-xl bg-indigo-600 px-3 text-xs font-semibold text-white hover:bg-indigo-500"
           >
             Unlock Platform Access
@@ -857,7 +857,7 @@ export default function AssessmentsPage() {
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               <Link
-                to="/patient/pricing"
+                to="/plans"
                 className="inline-flex min-h-[36px] items-center rounded-xl bg-indigo-600 px-3 text-xs font-semibold text-white hover:bg-indigo-500"
               >
                 View Platform Plan

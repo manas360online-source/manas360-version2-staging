@@ -468,16 +468,86 @@ export const patientApi = {
     ]);
     return unwrapPayload(response);
   },
+  getGameEligibility: async () => {
+    const response = await withFallbackChain([
+      async () => (await http.get('/v1/game/eligibility')).data,
+      async () => (await http.get('/game/eligibility')).data,
+    ]);
+    const raw = unwrapPayload(response);
+    // Timing info may be in 'timing' (new) or 'data' (legacy/unwrapped)
+    const timing = raw?.timing || raw?.data || raw || {};
+    return {
+      ...raw,
+      ...timing,
+      eligible: !!raw?.eligible,
+      reason: raw?.error || raw?.message || (raw?.eligible ? 'Eligible' : 'Not eligible'),
+      timeLeft: timing?.time_remaining_seconds
+        ? `${Math.floor(timing.time_remaining_seconds / 3600)}h ${Math.floor((timing.time_remaining_seconds % 3600) / 60)}m`
+        : '0h 0m',
+    };
+  },
+  playGame: async () => {
+    const response = await withFallbackChain([
+      async () => (await http.post('/v1/game/play')).data,
+      async () => (await http.post('/game/play')).data,
+    ]);
+    const raw = unwrapPayload(response);
+
+    // Map backend response { outcome, prize: { amount }, wallet: { new_balance } }
+    // to frontend expected { outcome, credit, newBalance }
+    return {
+      outcome: raw?.outcome,
+      credit: raw?.prize?.amount ?? raw?.wallet?.credit_added ?? 0,
+      newBalance: raw?.wallet?.new_balance ?? 0,
+      success: raw?.success
+    };
+  },
+  getGameWinners: async (limit = 10) => {
+    const response = await withFallbackChain([
+      async () => (await http.get('/v1/game/winners', { params: { limit } })).data,
+      async () => (await http.get('/game/winners', { params: { limit } })).data,
+    ]);
+    return unwrapPayload(response);
+  },
+  getWalletBalance: async () => {
+    const response = await withFallbackChain([
+      async () => (await http.get('/v1/wallet/balance')).data,
+      async () => (await http.get('/wallet/balance')).data,
+    ]);
+    return unwrapPayload(response);
+  },
+  applyWalletCredits: async (payload: { referenceId?: string; referenceType?: string; bookingId?: string; amount: number }) => {
+    const response = await http.post('/v1/wallet/apply', payload);
+    return unwrapPayload(response.data);
+  },
   createSessionPayment: async (payload: { providerId: string; amountMinor: number; currency?: string }) => {
     const response = await http.post('/v1/payments/sessions', payload);
     return unwrapPayload(response.data);
   },
-  upgradeSubscription: async (payload: { planKey: string }) => {
+  upgradeSubscription: async (payload: { planKey: string; redirectUrl?: string }) => {
     const response = await withFallbackChain([
       async () => (await http.patch('/v1/patient/subscription/upgrade', payload)).data,
       async () => (await http.patch('/patient/subscription/upgrade', payload)).data,
       async () => (await http.patch('/v1/subscription/upgrade', payload)).data,
       async () => (await http.patch('/subscription/upgrade', payload)).data,
+    ]);
+    return unwrapPayload(response);
+  },
+  checkoutSubscription: async (payload: {
+    planKey: string;
+    addons: Record<string, unknown>;
+    subtotalMinor: number;
+    gstMinor: number;
+    totalMinor: number;
+    acceptedTerms: boolean;
+    promoCode?: string;
+    idempotencyKey?: string;
+  }) => {
+    const response = await withFallbackChain([
+      async () => (await http.post('/v1/subscription/checkout', payload)).data,
+      async () => (await http.post('/v1/patient/subscription/checkout', payload)).data,
+      async () => (await http.post('/patient/subscription/checkout', payload)).data,
+      async () => (await http.post('/subscription/checkout', payload)).data,
     ]);
     return unwrapPayload(response);
   },
@@ -745,6 +815,12 @@ export const patientApi = {
       timeSlots: Array<{ startMinute: number; endMinute: number }>;
     },
     providerType?: string,
+    options?: {
+      concerns?: string[];
+      languages?: string[];
+      modes?: string[];
+      context?: 'Standard' | 'Corporate' | 'Night' | 'Buddy' | 'Crisis';
+    },
   ) => {
     const query = new URLSearchParams();
     availabilityPrefs.daysOfWeek.forEach((day) => {
@@ -756,11 +832,22 @@ export const patientApi = {
     if (providerType && providerType !== 'ALL') {
       query.append('providerType', providerType);
     }
-    const response = (await http.get(`/v1/patient/providers/smart-match?${query}`)).data;
-    const payload = response?.data ?? response;
-    const providers = Array.isArray(payload?.providers) ? payload.providers : [];
-    const count = Number(payload?.count ?? providers.length ?? 0);
-    return { providers, count };
+    (options?.concerns || []).forEach((concern) => query.append('concerns', concern));
+    (options?.languages || []).forEach((language) => query.append('languages', language));
+    (options?.modes || []).forEach((mode) => query.append('modes', mode));
+    if (options?.context) query.append('context', options.context);
+    try {
+      const response = (await http.get(`/v1/patient/providers/smart-match?${query}`)).data;
+      const payload = response?.data ?? response;
+      const providers = Array.isArray(payload?.providers) ? payload.providers : [];
+      const count = Number(payload?.count ?? providers.length ?? 0);
+      return { providers, count };
+    } catch (err: any) {
+      // Axios error shape
+      const status = err?.response?.status;
+      const message = err?.response?.data?.message || err?.message || 'Unknown error';
+      return { error: true, status, message };
+    }
   },
 
   createAppointmentRequest: async (payload: {

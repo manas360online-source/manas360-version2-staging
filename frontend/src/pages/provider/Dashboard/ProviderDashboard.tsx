@@ -226,7 +226,7 @@ export default function ProviderDashboard() {
 
                 <button
                   type="button"
-                  onClick={() => navigate(`/provider/live-session/${item.id}`)}
+                  onClick={() => navigate(`/video-session/${item.id}`)}
                   className="rounded-md bg-[#4A6741] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#3d5736]"
                 >
                   Start Session

@@ -501,5 +501,5 @@ export default function TherapyPlanPage() {
       </div>
 
     </div>
-  );;
+  );
 }

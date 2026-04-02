@@ -687,7 +687,7 @@ export default function AIChatPage() {
                 <h3 className="text-base font-bold text-amber-900">Premium Limit Reached</h3>
                 <p className="text-sm text-amber-800/80 mt-0.5">You've reached your free daily message limit. Upgrade for 24/7 unlimited access.</p>
               </div>
-              <Link to="/patient/pricing" className="shrink-0 rounded-xl bg-amber-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-amber-700 transition">
+              <Link to="/plans" className="shrink-0 rounded-xl bg-amber-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-amber-700 transition">
                 View Plans
               </Link>
             </div>

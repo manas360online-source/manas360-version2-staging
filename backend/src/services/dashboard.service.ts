@@ -4,6 +4,19 @@ import { env } from '../config/env';
 
 const REDIS_URL = process.env.REDIS_URL || env.redisUrl || 'redis://127.0.0.1:6379';
 
+function createSafeRedisClient() {
+  const r = createClient({
+    url: REDIS_URL,
+    socket: {
+      reconnectStrategy: () => false,
+    },
+  });
+  r.on('error', () => {
+    // Presence cache is optional for dashboard responses.
+  });
+  return r;
+}
+
 type ListOpts = {
   therapistUserId: string;
   limit?: number;
@@ -112,7 +125,7 @@ export async function listTherapistSessions(opts: ListOpts) {
 
   // presence merge (best-effort)
   try {
-    const r = createClient({ url: REDIS_URL });
+    const r = createSafeRedisClient();
     await r.connect();
     const sessionKeys = page.map((s: any) => `session:presence:${String(s.id)}`);
     const patientKeys = page.map((s: any) => `user:presence:${String(s.patientProfileId)}`);
@@ -169,7 +182,7 @@ export async function getTherapistSessionDetail(therapistUserId: string, session
   // presence
   let presence = { patientOnline: false, sessionActive: false };
   try {
-    const r = createClient({ url: REDIS_URL });
+    const r = createSafeRedisClient();
     await r.connect();
     const sessionVal = await r.get(`session:presence:${sessionId}`);
     const patientVal = await r.get(`user:presence:${String(session.patientProfileId)}`);

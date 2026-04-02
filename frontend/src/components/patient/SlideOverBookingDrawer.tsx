@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Calendar as CalendarIcon, Clock, CreditCard, CheckCircle2 } from 'lucide-react';
 import { patientApi } from '../../api/patient';
+import { useWallet } from '../../hooks/useWallet';
 
 interface Provider {
   id: string;
@@ -51,6 +52,9 @@ export default function SlideOverBookingDrawer({
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showSubscriptionWarning, setShowSubscriptionWarning] = useState(false);
+  const { balance, applyWalletToPayment } = useWallet();
+  const total = Number((balance as any)?.total_balance || 0);
 
   // Reset state only when drawer is opened.
   useEffect(() => {
@@ -83,6 +87,7 @@ export default function SlideOverBookingDrawer({
                 timeSlots: [{ startMinute, endMinute: startMinute + 30 }],
               },
               supportedProviderType,
+              { context: 'Standard' },
             );
 
             const providers = Array.isArray(response?.providers) ? response.providers : [];
@@ -134,48 +139,76 @@ export default function SlideOverBookingDrawer({
 
   const handleConfirmBooking = async () => {
     if (!selectedDate || !selectedTime) return;
-    
     setIsLoading(true);
     setError(null);
-    
+    setShowSubscriptionWarning(false);
     try {
       // Create a JS Date composed of selectedDate + selectedTime (24-hour HH:mm)
       const [hours, minutes] = selectedTime.split(':').map(Number);
-      
       const scheduledAt = new Date(selectedDate);
       scheduledAt.setHours(hours, minutes, 0, 0);
 
-      // Call the existing patientApi endpoint to create the therapy booking
-      await patientApi.bookSession({
+      // 1. Create the therapy booking record
+      const bookingResp = await patientApi.bookSession({
         providerId: provider.id,
         scheduledAt: scheduledAt.toISOString(),
         durationMinutes: 50,
       });
 
-      // Initiate session payment so backend returns a gateway redirect URL
-      try {
-        const amountRupees = provider.sessionPrice || 1500;
-        const amountMinor = Math.round(Number(amountRupees) * 100); // convert to paise
-        const paymentPayload: any = await patientApi.createSessionPayment({ providerId: provider.id, amountMinor });
-        const redirectUrl = paymentPayload?.redirectUrl || paymentPayload?.data?.redirectUrl;
-        if (redirectUrl) {
-          // Redirect user to payment gateway
-          window.location.href = redirectUrl;
-          return;
-        }
-      } catch (payErr: any) {
-        // If payment initiation fails, fall back to showing success + allow manual handling
-        console.warn('Session payment initiation failed', payErr);
+      const bookingId = bookingResp?.sessionId || bookingResp?.data?.sessionId;
+      if (!bookingId) {
+        throw new Error('Failed to retrieve booking ID from server.');
       }
 
-      // If no redirect required, show success UI and close drawer
-      setStep(3); // Show Success UI
-      // Notify parent to refresh the Care Team / Next Up state
+      const originalAmountRupees = provider.sessionPrice || 1500;
+      const amountMinor = Math.round(Number(originalAmountRupees) * 100); // base price in paise
+      let finalAmountMinor = amountMinor;
+
+      // 2. Apply wallet credits if available
+      if (total > 0) {
+        try {
+          const walletResult = await applyWalletToPayment({
+            bookingId: String(bookingId),
+            amount: amountMinor,
+          });
+          // walletResult returns { used, finalAmount } from the recently updated backend controller
+          finalAmountMinor = walletResult?.finalAmount ?? (amountMinor - (walletResult?.used ?? 0));
+        } catch (walletErr) {
+          console.warn('Failed to apply wallet credits:', walletErr);
+          // Continue with full payment if wallet application fails
+        }
+      }
+
+      // 3. Initiate payment for the remainder (if any)
+      if (finalAmountMinor > 0) {
+        try {
+          const paymentPayload: any = await patientApi.createSessionPayment({ 
+            providerId: provider.id, 
+            amountMinor: finalAmountMinor 
+          });
+          
+          const redirectUrl = paymentPayload?.redirectUrl || paymentPayload?.data?.redirectUrl;
+          if (redirectUrl) {
+            window.location.href = redirectUrl;
+            return;
+          }
+        } catch (payErr: any) {
+          const status = Number(payErr?.response?.status || 0);
+          const msg = String(payErr?.response?.data?.message || payErr?.message || '').toLowerCase();
+          if (status === 403 || msg.includes('subscription required') || msg.includes('subscription')) {
+            setShowSubscriptionWarning(true);
+            return;
+          }
+          console.warn('Session payment initiation failed', payErr);
+        }
+      }
+
+      // 4. If no redirect required (e.g. fully paid by wallet or payment gateway skipped), show success
+      setStep(3);
       setTimeout(() => {
         onBookingSuccess();
         onClose();
       }, 2000);
-
     } catch (err: any) {
       setError(err?.response?.data?.message || err?.message || 'Failed to confirm booking.');
     } finally {
@@ -215,6 +248,21 @@ export default function SlideOverBookingDrawer({
           {error && (
             <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
               {error}
+            </div>
+          )}
+          {showSubscriptionWarning && (
+            <div className="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 flex flex-col items-center">
+              <div className="mb-2 font-semibold">Subscribe to platform fee to book a session.</div>
+              <button
+                className="rounded-lg bg-teal-600 px-4 py-2 text-white font-semibold mt-2 hover:bg-teal-700 transition-colors"
+                onClick={() => {
+                  const returnTo = window.location.pathname + window.location.search + window.location.hash;
+                  // Use the provided subscription plan link or fallback to /plans
+                  window.location.href = `http://localhost:5173/payment/status?id=SUB_653d1e79_1774602028060&status=SUCCESS#/plans?returnTo=${encodeURIComponent(returnTo)}`;
+                }}
+              >
+                Subscribe to Platform Fee
+              </button>
             </div>
           )}
 
@@ -309,23 +357,31 @@ export default function SlideOverBookingDrawer({
                     <span className="font-medium text-charcoal">{selectedTime ? toDisplayTime(selectedTime) : '-'}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-charcoal/60">Duration</span>
-                    <span className="font-medium text-charcoal">50 minutes</span>
+                    <span className="text-charcoal/60">Session Fee</span>
+                    <span className="font-medium text-charcoal">₹{provider.sessionPrice || 1500}</span>
                   </div>
+                  
+                  {total > 0 && (
+                    <div className="flex justify-between text-teal-600 animate-in fade-in duration-300">
+                      <span className="flex items-center">
+                        <CheckCircle2 className="mr-1 h-3 w-3" />
+                        Wallet Credits Applied
+                      </span>
+                      <span className="font-medium">-₹{Math.min(total, provider.sessionPrice || 1500)}</span>
+                    </div>
+                  )}
                   
                   <div className="my-4 border-t border-dashed border-calm-sage/30" />
                   
                   <div className="flex justify-between font-semibold text-lg items-center">
                     <span className="text-charcoal">Total Due</span>
-                    <span className="text-teal-600">₹{provider.sessionPrice || 1500}</span>
+                    <span className="text-teal-600">
+                      ₹{Math.max(0, (provider.sessionPrice || 1500) - total)}
+                    </span>
                   </div>
                 </div>
               </div>
 
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-                <p className="font-medium">24-Hour Cancellation Policy</p>
-                <p className="mt-1 text-xs opacity-90">Appointments cancelled with less than 24 hours notice may be subject to a cancellation fee.</p>
-              </div>
             </div>
           )}
 

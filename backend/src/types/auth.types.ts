@@ -4,7 +4,7 @@ export interface RequestMeta {
 	device?: string;
 }
 
-export type PublicUserRole = 'patient' | 'therapist' | 'psychiatrist' | 'coach';
+export type PublicUserRole = 'patient' | 'therapist' | 'psychiatrist' | 'psychologist' | 'coach';
 
 export interface RegisterPhoneInput {
 	phone: string;
@@ -15,6 +15,8 @@ export interface RegisterPhoneInput {
 export interface VerifyPhoneOtpInput {
 	phone: string;
 	otp: string;
+	acceptedTerms?: boolean;
+	acceptedDocuments?: string[];
 }
 
 export interface LoginInput {

@@ -24,13 +24,6 @@
 import { AudioExtractor } from './AudioExtractor';
 import { AIEngineClient } from './AIEngineClient';
 
-declare global {
-  interface Window {
-    // Jitsi External API constructor – added by external_api.js
-    JitsiMeetExternalAPI?: new (domain: string, options: JitsiOptions) => JitsiAPI;
-  }
-}
-
 interface JitsiOptions {
   roomName: string;
   parentNode: HTMLElement;
@@ -70,6 +63,7 @@ export interface JitsiSessionManagerOptions {
   aiEngineUrl?: string;
   /** Callbacks */
   onGPSUpdate?: (metrics: Record<string, unknown>) => void;
+  onTranscriptUpdate?: (transcript: Record<string, unknown>) => void;
   onCrisisAlert?: (alert: Record<string, unknown>) => void;
   onConnectionState?: (connected: boolean) => void;
 }
@@ -86,7 +80,11 @@ export class JitsiSessionManager {
 
   /** Mount the Jitsi iframe and set up AI Engine connection (therapist only). */
   async init(): Promise<void> {
-    if (!window.JitsiMeetExternalAPI) {
+    const jitsiCtor = (window as unknown as {
+      JitsiMeetExternalAPI?: new (domain: string, options: JitsiOptions) => JitsiAPI;
+    }).JitsiMeetExternalAPI;
+
+    if (!jitsiCtor) {
       throw new Error(
         'JitsiMeetExternalAPI not loaded. ' +
         'Add <script src="https://your-jitsi-domain/external_api.js"> to your page.',
@@ -95,7 +93,7 @@ export class JitsiSessionManager {
 
     const { domain, roomName, container, jitsiJwt, displayName, isTherapist } = this.opts;
 
-    this.api = new window.JitsiMeetExternalAPI(domain, {
+    this.api = new jitsiCtor(domain, {
       roomName,
       parentNode: container,
       userInfo: displayName ? { displayName } : undefined,
@@ -148,18 +146,18 @@ export class JitsiSessionManager {
   // ─── Private ────────────────────────────────────────────────────────────────
 
   private _initAIEngine(): void {
-    const { sessionId, aiEngineUrl, onGPSUpdate, onCrisisAlert, onConnectionState } = this.opts;
+    const { sessionId, aiEngineUrl, onGPSUpdate, onTranscriptUpdate, onCrisisAlert, onConnectionState } = this.opts;
 
     if (!aiEngineUrl) return;
 
     this.aiClient = new AIEngineClient({
       url: aiEngineUrl,
       sessionId,
-      monitoringId: this.opts.monitoringId,
       userRole: 'therapist',
     });
 
     if (onGPSUpdate) this.aiClient.onGPSUpdate(onGPSUpdate);
+    if (onTranscriptUpdate) this.aiClient.onTranscriptUpdate(onTranscriptUpdate);
     if (onCrisisAlert) this.aiClient.onCrisisAlert(onCrisisAlert);
     if (onConnectionState) this.aiClient.onConnectionState(onConnectionState);
 

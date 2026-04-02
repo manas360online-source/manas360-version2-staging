@@ -1,25 +1,36 @@
-import { Brain, CheckCircle2, Info, Minimize2, Sparkles, StickyNote, X, AlertCircle, Mic, Video } from 'lucide-react';
+import { Brain, CheckCircle2, Info, Mic, Minimize2, StickyNote, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   createPatientNote,
+  fetchCbtAssignmentTemplates,
   fetchPatientOverview,
+  quickAssignCbtTemplate,
+  type CbtAssignmentTemplateOption,
   type PatientOverviewData,
   updatePatientNote,
 } from '../../api/provider';
-import { therapistApi, type AiClinicalSummary } from '../../api/therapist.api';
+import { type AiClinicalSummary } from '../../api/therapist.api';
 import { generateMeetingLink, type MeetingLinkResponse } from '../../api/videoSession';
 import VideoRoom from '../../components/jitsi/VideoRoom';
+import { StatusLight, type ConnectionStatus } from '../../components/shared/StatusLight';
 import GPSDashboard from '../../components/therapist/GPSDashboard';
-import { useAuth } from '../../context/AuthContext';
-import { useVideoSession } from '../../context/VideoSessionContext';
 import useAuthToken from '../../hooks/useAuthToken';
 import { http } from '../../lib/http';
+import { useAuth } from '../../context/AuthContext';
+import { useVideoSession } from '../../context/VideoSessionContext';
 
 const providerRoles = new Set(['therapist', 'psychiatrist', 'psychologist', 'coach']);
-const MIN_AUDIO_CAPTURE_SECONDS = 300;
+const MIN_AUDIO_CAPTURE_SECONDS = 15;
+const AI_ENGINE_WS_URL = import.meta.env.VITE_AI_ENGINE_WS_URL || 'ws://localhost:8765';
 type WorkspaceTab = 'patient-info' | 'clinical-notes' | 'ai-insights';
-type SessionViewMode = 'split' | 'video' | 'workspace';
+
+
+
+
+
+
+
 
 const formatSessionDate = (value?: string | null): string => {
   if (!value) return 'Not available';
@@ -31,9 +42,7 @@ const formatSessionDate = (value?: string | null): string => {
 export default function VideoSessionPage() {
   const { sessionId = '' } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
-  const { token: accessToken } = useAuthToken();
   const { startSession, endSession, setIsMinimized, elapsedSeconds } = useVideoSession();
 
   const [meetingData, setMeetingData] = useState<MeetingLinkResponse | null>(null);
@@ -49,18 +58,39 @@ export default function VideoSessionPage() {
   const [noteId, setNoteId] = useState<string | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [showSavedIndicator, setShowSavedIndicator] = useState(false);
-  const [isGeneratingAiDraft, setIsGeneratingAiDraft] = useState(false);
-  const [aiInsights, setAiInsights] = useState<AiClinicalSummary | null>(null);
+  const [isGeneratingAiDraft] = useState(false);
+  const [aiInsights] = useState<AiClinicalSummary | null>(null);
+  const [cbtTemplateOptions, setCbtTemplateOptions] = useState<CbtAssignmentTemplateOption[]>([]);
+  const [selectedTemplateType, setSelectedTemplateType] = useState('');
+  const [isAssigningCbtTemplate, setIsAssigningCbtTemplate] = useState(false);
+  const [quickAssignFeedback, setQuickAssignFeedback] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<WorkspaceTab>('patient-info');
   const [isOverviewOverlayOpen, setIsOverviewOverlayOpen] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('good');
+  const [, setVoiceEmpathyScore] = useState<number>(70);
+  const [voiceEmpathyReason, setVoiceEmpathyReason] = useState('Waiting for voice input');
+  const [, setCrisisDetected] = useState(false);
+  const [crisisModalDismissed, setCrisisModalDismissed] = useState(false);
+  const [aiInsightInput, setAiInsightInput] = useState('');
+  const [voiceMessages, setVoiceMessages] = useState<{ text: string; timestamp: string }[]>([]);
+  const [isSpeechListening, setIsSpeechListening] = useState(false);
+  const [isSpeechAutoEnabled, setIsSpeechAutoEnabled] = useState(false);
+  const [hasSpeechPermission, setHasSpeechPermission] = useState(false);
+  const [speechError, setSpeechError] = useState<string | null>(null);
+  const [speechStatus, setSpeechStatus] = useState<string | null>(null);
   const [monitoringId, setMonitoringId] = useState<string>('');
-  const [viewMode, setViewMode] = useState<SessionViewMode>('split');
-  const [mediaPermissionStatus, setMediaPermissionStatus] = useState<'checking' | 'granted' | 'denied' | 'unknown'>('checking');
+
+  const { token: accessToken } = useAuthToken();
 
   const saveInFlightRef = useRef(false);
   const lastSavedPayloadRef = useRef('');
   const savedIndicatorTimerRef = useRef<number | null>(null);
-  const gpsStopCalledRef = useRef(false);
+  const speechRecognitionRef = useRef<any>(null);
+  const speechBaseTextRef = useRef('');
+  const speechFinalTextRef = useRef('');
+  const aiInsightInputRef = useRef('');
+  const speechSilenceTimerRef = useRef<number | null>(null);
+  const voiceMessagesContainerRef = useRef<HTMLDivElement | null>(null);
 
   const normalizedRole = String(user?.role || '').toLowerCase();
   const isProvider = providerRoles.has(normalizedRole);
@@ -68,52 +98,7 @@ export default function VideoSessionPage() {
     const full = `${String(user?.firstName || '').trim()} ${String(user?.lastName || '').trim()}`.trim();
     return full || String(user?.email || 'Provider');
   }, [user?.email, user?.firstName, user?.lastName]);
-
-  const isFocusMode = searchParams.get('focus') === '1';
-
-  const toggleFocusMode = useCallback(() => {
-    const next = new URLSearchParams(searchParams);
-    if (isFocusMode) {
-      next.delete('focus');
-    } else {
-      next.set('focus', '1');
-    }
-    setSearchParams(next, { replace: true });
-  }, [isFocusMode, searchParams, setSearchParams]);
-
-  const checkMediaPermissions = useCallback(async () => {
-    try {
-      setMediaPermissionStatus('checking');
-      const permissionStatus = await navigator.permissions.query({ name: 'camera' as any });
-      if (permissionStatus.state === 'denied') {
-        setMediaPermissionStatus('denied');
-      } else if (permissionStatus.state === 'granted') {
-        setMediaPermissionStatus('granted');
-      } else {
-        setMediaPermissionStatus('unknown');
-      }
-    } catch {
-      setMediaPermissionStatus('unknown');
-    }
-  }, []);
-
-  const requestMediaAccess = useCallback(async () => {
-    try {
-      setMediaPermissionStatus('checking');
-      await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-      setMediaPermissionStatus('granted');
-    } catch (err: any) {
-      if (err?.name === 'NotAllowedError' || err?.message?.includes('denied')) {
-        setMediaPermissionStatus('denied');
-      } else {
-        setMediaPermissionStatus('unknown');
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    void checkMediaPermissions();
-  }, [checkMediaPermissions]);
+  const isSpeechSupported = false; // Disabled in favor of AI Engine transcriptions
 
   useEffect(() => {
     let active = true;
@@ -175,45 +160,6 @@ export default function VideoSessionPage() {
     };
   }, [hasAuthError, isProvider, sessionId, startSession]);
 
-  const stopGpsMonitoring = useCallback(async () => {
-    if (!sessionId || gpsStopCalledRef.current) return;
-    gpsStopCalledRef.current = true;
-    try {
-      await http.post(`/v1/gps/sessions/${sessionId}/end`);
-    } catch {
-      // Ignore GPS teardown errors on exit paths.
-    }
-  }, [sessionId]);
-
-  useEffect(() => {
-    let active = true;
-
-    if (hasAuthError || !isProvider || !sessionId) {
-      return () => {
-        active = false;
-      };
-    }
-
-    const startGpsMonitoring = async () => {
-      try {
-        gpsStopCalledRef.current = false;
-        const response = await http.post<{ monitoringId: string }>(`/v1/gps/sessions/${sessionId}/start`);
-        if (!active) return;
-        setMonitoringId(String(response.data?.monitoringId || ''));
-      } catch {
-        if (!active) return;
-        setMonitoringId('');
-      }
-    };
-
-    void startGpsMonitoring();
-
-    return () => {
-      active = false;
-      void stopGpsMonitoring();
-    };
-  }, [hasAuthError, isProvider, sessionId, stopGpsMonitoring]);
-
   useEffect(() => {
     let active = true;
 
@@ -251,6 +197,32 @@ export default function VideoSessionPage() {
     };
   }, [hasAuthError, meetingData?.patientId]);
 
+  // Start GPS Monitoring session
+  useEffect(() => {
+    if (!sessionId || !isProvider) return;
+    let cancelled = false;
+
+    const startGps = async () => {
+      try {
+        const res = await http.post<{ monitoringId: string }>(`/v1/gps/sessions/${sessionId}/start`);
+        if (!cancelled) {
+          setMonitoringId(res.data?.monitoringId || '');
+        }
+      } catch (err) {
+        console.warn('[VideoSessionPage] Failed to start GPS monitoring:', err);
+      }
+    };
+
+    void startGps();
+
+    return () => {
+      cancelled = true;
+      if (sessionId) {
+        void http.post(`/v1/gps/sessions/${sessionId}/end`).catch(() => {});
+      }
+    };
+  }, [sessionId, isProvider]);
+
   useEffect(() => {
     return () => {
       if (savedIndicatorTimerRef.current) {
@@ -258,6 +230,77 @@ export default function VideoSessionPage() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    if (hasAuthError || !isProvider) {
+      return () => {
+        active = false;
+      };
+    }
+
+    const loadTemplateOptions = async () => {
+      try {
+        const templates = await fetchCbtAssignmentTemplates();
+        if (!active) return;
+        const options = Array.isArray(templates) ? templates : [];
+        setCbtTemplateOptions(options);
+        setSelectedTemplateType((current) => current || options[0]?.templateType || '');
+      } catch {
+        if (!active) return;
+        setCbtTemplateOptions([]);
+      }
+    };
+
+    void loadTemplateOptions();
+
+    return () => {
+      active = false;
+    };
+  }, [hasAuthError, isProvider]);
+
+  // Voice-driven empathy traffic light (Real-time AI Engine integration)
+  const handleGPSUpdate = useCallback((metrics: Record<string, any>) => {
+    const empathyScore = Number(metrics.empathyScore || 0);
+    const crisisRisk = String(metrics.crisisRisk || 'low').toLowerCase();
+    const sentiment = String(metrics.sentiment || 'neutral').toLowerCase();
+    const suggestion = String(metrics.aiSuggestion || '');
+
+    let status: ConnectionStatus = 'good';
+    if (crisisRisk === 'high' || empathyScore < 40) {
+      status = 'poor';
+    } else if (empathyScore < 70 || sentiment === 'negative') {
+      status = 'caution';
+    }
+
+    setConnectionStatus(status);
+    setVoiceEmpathyScore(empathyScore);
+    setVoiceEmpathyReason(suggestion || `Empathy: ${empathyScore}% | ${sentiment.toUpperCase()}`);
+    setCrisisDetected(crisisRisk === 'high');
+  }, []);
+
+  const handleTranscriptUpdate = useCallback((transcript: Record<string, any>) => {
+    const text = String(transcript.text || '').trim();
+    if (!text) return;
+
+    setVoiceMessages((prev) => {
+      const timestamp = new Date()
+        .toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return [...prev, { text, timestamp }];
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!voiceMessagesContainerRef.current) return;
+    voiceMessagesContainerRef.current.scrollTop = voiceMessagesContainerRef.current.scrollHeight;
+  }, [voiceMessages]);
+
+  useEffect(() => {
+    if (connectionStatus !== 'poor') {
+      setCrisisModalDismissed(false);
+    }
+  }, [connectionStatus]);
 
   const autosaveNotes = useCallback(async () => {
     if (hasAuthError) return;
@@ -339,7 +382,6 @@ export default function VideoSessionPage() {
   }, [assessmentNotes, autosaveNotes, isProvider, objectiveNotes, planNotes, quickNotes]);
 
   const aiUnlockCountdown = Math.max(0, MIN_AUDIO_CAPTURE_SECONDS - elapsedSeconds);
-  const canGenerateAiDraft = isProvider && aiUnlockCountdown === 0 && Boolean(sessionId);
   const isMoodAnalyzing = aiUnlockCountdown > 0 || isGeneratingAiDraft;
   const latestPhq9 = useMemo(
     () => patientOverview?.recentAssessments?.find((item) => item.type === 'PHQ-9') || null,
@@ -374,24 +416,29 @@ export default function VideoSessionPage() {
     return 'bg-sky-100 text-sky-700 border-sky-200';
   }, [moodMonitorLabel]);
 
-  const handleGenerateAiDraft = async () => {
+  const handleQuickAssignTemplate = async () => {
     if (hasAuthError) return;
-    if (!canGenerateAiDraft || !sessionId) return;
+    if (!meetingData?.patientId) {
+      setQuickAssignFeedback('Unable to identify patient for assignment.');
+      return;
+    }
+    if (!selectedTemplateType || isAssigningCbtTemplate) {
+      return;
+    }
 
-    setIsGeneratingAiDraft(true);
-    setError(null);
+    setIsAssigningCbtTemplate(true);
+    setQuickAssignFeedback(null);
     try {
-      const summary = await therapistApi.generateAiSessionNote(sessionId);
-      setAiInsights(summary);
+      const result = await quickAssignCbtTemplate(meetingData.patientId, selectedTemplateType);
+      setQuickAssignFeedback(`Assigned: ${result.title} to the patient Daily Check-in Hub.`);
     } catch (requestError: any) {
       if (requestError?.response?.status === 401) {
         setHasAuthError(true);
-        setError(null);
         return;
       }
-      setError(String(requestError?.response?.data?.message || requestError?.message || 'Unable to generate AI draft'));
+      setQuickAssignFeedback(String(requestError?.response?.data?.message || requestError?.message || 'Failed to assign template.'));
     } finally {
-      setIsGeneratingAiDraft(false);
+      setIsAssigningCbtTemplate(false);
     }
   };
 
@@ -400,11 +447,193 @@ export default function VideoSessionPage() {
     navigate('/provider/dashboard');
   };
 
-  const handleEndCall = useCallback(async () => {
-    await stopGpsMonitoring();
-    endSession();
-    navigate('/provider/dashboard');
-  }, [endSession, navigate, stopGpsMonitoring]);
+  const clearSpeechSilenceTimer = useCallback(() => {
+    if (speechSilenceTimerRef.current) {
+      window.clearTimeout(speechSilenceTimerRef.current);
+      speechSilenceTimerRef.current = null;
+    }
+  }, []);
+
+  const commitVoiceMessage = useCallback((rawText?: string) => {
+    const text = String(rawText ?? aiInsightInputRef.current).trim();
+    if (!text) return;
+
+    setVoiceMessages((previous) => {
+      const last = previous[previous.length - 1];
+      if (last?.text === text) return previous;
+      const timestamp = new Date()
+        .toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })
+        .replace(/\s/g, '');
+      return [...previous, { text, timestamp }];
+    });
+
+    aiInsightInputRef.current = '';
+    setAiInsightInput('');
+    speechBaseTextRef.current = '';
+    speechFinalTextRef.current = '';
+    setSpeechStatus('Captured after 3s silence. Keep speaking to add more.');
+  }, []);
+
+  const queueSilenceCommit = useCallback((textToCommit: string) => {
+    clearSpeechSilenceTimer();
+    speechSilenceTimerRef.current = window.setTimeout(() => {
+      commitVoiceMessage(textToCommit);
+    }, 3000);
+  }, [clearSpeechSilenceTimer, commitVoiceMessage]);
+
+  const startSpeechRecognition = useCallback(async () => {
+    if (!isSpeechSupported) {
+      setSpeechError('Speech recognition is not supported in this browser.');
+      return;
+    }
+
+    if (speechRecognitionRef.current || isSpeechListening) {
+      return;
+    }
+
+    if (!hasSpeechPermission && navigator.mediaDevices?.getUserMedia) {
+      try {
+        const mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaStream.getTracks().forEach((track) => track.stop());
+        setHasSpeechPermission(true);
+      } catch {
+        setSpeechError('Microphone permission is blocked. Please allow microphone access and try again.');
+        setSpeechStatus(null);
+        return;
+      }
+    }
+
+    const browserWindow = window as any;
+    const SpeechRecognition = browserWindow.SpeechRecognition || browserWindow.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = navigator.language || 'en-US';
+
+    recognition.onstart = () => {
+      setSpeechError(null);
+      setIsSpeechListening(true);
+      setSpeechStatus('Listening... start speaking now.');
+      clearSpeechSilenceTimer();
+      speechBaseTextRef.current = aiInsightInput.trim();
+      speechFinalTextRef.current = '';
+    };
+
+    recognition.onresult = (event: any) => {
+      let finalizedChunk = '';
+      let interimChunk = '';
+
+      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+        const transcriptPart = String(event.results[index]?.[0]?.transcript || '').trim();
+        if (!transcriptPart) continue;
+        if (event.results[index].isFinal) {
+          finalizedChunk += `${transcriptPart} `;
+        } else {
+          interimChunk += `${transcriptPart} `;
+        }
+      }
+
+      const normalizedFinalizedChunk = finalizedChunk.trim();
+      if (normalizedFinalizedChunk) {
+        speechFinalTextRef.current = `${speechFinalTextRef.current} ${normalizedFinalizedChunk}`.trim();
+      }
+
+      const composedText = `${speechBaseTextRef.current} ${speechFinalTextRef.current} ${interimChunk.trim()}`.trim();
+      aiInsightInputRef.current = composedText;
+      setAiInsightInput(composedText);
+      setSpeechStatus(composedText ? 'Listening and transcribing...' : 'Listening...');
+      if (composedText) {
+        queueSilenceCommit(composedText);
+      }
+    };
+
+    recognition.onerror = (event: any) => {
+      const errorCode = String(event?.error || 'unknown');
+      if (errorCode !== 'aborted') {
+        if (errorCode === 'not-allowed' || errorCode === 'service-not-allowed') {
+          setSpeechError('Microphone permission is blocked. Please allow microphone access and try again.');
+          setIsSpeechAutoEnabled(false);
+          setSpeechStatus('Voice input stopped.');
+        } else if (errorCode === 'audio-capture') {
+          setSpeechError('No microphone was found. Connect a mic and try again.');
+          setIsSpeechAutoEnabled(false);
+          setSpeechStatus('Voice input stopped.');
+        } else if (errorCode === 'network') {
+          setSpeechError('Speech recognition service is unavailable in this browser session. If using Brave, enable Google speech services or try Chrome.');
+          setIsSpeechAutoEnabled(false);
+          setSpeechStatus('Voice input stopped.');
+        } else if (errorCode === 'no-speech') {
+          setSpeechError(null);
+          setSpeechStatus('No speech detected. Keep talking...');
+        } else {
+          setSpeechError(`Could not capture speech (${errorCode}). Please try again.`);
+          setIsSpeechAutoEnabled(false);
+          setSpeechStatus('Voice input stopped.');
+        }
+      }
+    };
+
+    recognition.onend = () => {
+      setIsSpeechListening(false);
+      clearSpeechSilenceTimer();
+      setSpeechStatus(isSpeechAutoEnabled ? 'Reconnecting microphone...' : null);
+      speechRecognitionRef.current = null;
+    };
+
+    speechRecognitionRef.current = recognition;
+    recognition.start();
+  }, [aiInsightInput, clearSpeechSilenceTimer, hasSpeechPermission, isSpeechAutoEnabled, isSpeechListening, isSpeechSupported, queueSilenceCommit]);
+
+  const handleToggleSpeechInput = useCallback(async () => {
+    if (isSpeechAutoEnabled) {
+      setIsSpeechAutoEnabled(false);
+      setSpeechStatus(null);
+      clearSpeechSilenceTimer();
+      commitVoiceMessage();
+      if (speechRecognitionRef.current) {
+        speechRecognitionRef.current.stop();
+      }
+      return;
+    }
+
+    setIsSpeechAutoEnabled(true);
+    setSpeechStatus('Starting microphone...');
+    await startSpeechRecognition();
+  }, [clearSpeechSilenceTimer, commitVoiceMessage, isSpeechAutoEnabled, startSpeechRecognition]);
+
+  useEffect(() => {
+    if (!isSpeechAutoEnabled) return;
+    if (activeTab !== 'ai-insights') return;
+    if (isSpeechListening) return;
+
+    const restartTimer = window.setTimeout(() => {
+      void startSpeechRecognition();
+    }, 250);
+
+    return () => {
+      window.clearTimeout(restartTimer);
+    };
+  }, [activeTab, isSpeechAutoEnabled, isSpeechListening, startSpeechRecognition]);
+
+  useEffect(() => {
+    if (activeTab === 'ai-insights') return;
+    if (!isSpeechAutoEnabled) return;
+    setSpeechStatus(null);
+    if (speechRecognitionRef.current) {
+      speechRecognitionRef.current.stop();
+    }
+  }, [activeTab, isSpeechAutoEnabled]);
+
+  useEffect(() => {
+    return () => {
+      clearSpeechSilenceTimer();
+      if (speechRecognitionRef.current) {
+        speechRecognitionRef.current.stop();
+        speechRecognitionRef.current = null;
+      }
+    };
+  }, [clearSpeechSilenceTimer]);
 
   if (loading) {
     return (
@@ -430,71 +659,36 @@ export default function VideoSessionPage() {
     );
   }
 
-  const showVideoSection = viewMode === 'split' || viewMode === 'video';
-  const showWorkspaceSection = viewMode === 'split' || viewMode === 'workspace';
-
   return (
-    <div className="flex flex-col h-[calc(100vh-2rem)] gap-4">
-      {mediaPermissionStatus === 'denied' ? (
-        <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-          <AlertCircle className="h-5 w-5 flex-shrink-0 text-amber-600" />
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-amber-900">Camera and microphone access denied</p>
-            <p className="text-xs text-amber-800">Grant permission in browser settings to use video features.</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => void requestMediaAccess()}
-            className="inline-flex flex-shrink-0 items-center gap-1 rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-500"
-          >
-            <Mic className="h-3.5 w-3.5" />
-            <Video className="h-3.5 w-3.5" />
-            Retry
-          </button>
-        </div>
-      ) : null}
-
-      <div className={`grid flex-1 grid-cols-1 gap-4 ${viewMode === 'split' ? 'xl:grid-cols-[minmax(0,65%)_minmax(0,35%)]' : ''}`}>
-        {showVideoSection ? (
-        <section className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-slate-950 shadow-sm">
-          <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3 text-white">
-          <div>
-            <p className="text-sm font-semibold">Live Session</p>
-            <p className="text-[11px] text-slate-300">Room: {meetingData.meetingRoomName}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={toggleFocusMode}
-              className="inline-flex items-center gap-1 rounded-md border border-white/20 bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-white"
-            >
-              {isFocusMode ? 'Exit Focus' : 'Focus Mode'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode(viewMode === 'video' ? 'split' : 'video')}
-              className="inline-flex items-center gap-1 rounded-md border border-white/20 bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-white"
-            >
-              {viewMode === 'video' ? 'Show Split' : 'Video Only'}
-            </button>
-            <button
-              type="button"
-              onClick={handleOpenDashboardInPip}
-              className="inline-flex items-center gap-1 rounded-md border border-white/20 bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-white"
-            >
-              <Minimize2 className="h-3.5 w-3.5" />
-              Open Dashboard (PiP)
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                void handleEndCall();
-              }}
-              className="inline-flex items-center gap-1 rounded-md bg-rose-600 px-2.5 py-1.5 text-xs font-semibold text-white"
-            >
-              <X className="h-3.5 w-3.5" />
-              End Call
-            </button>
+    <div className="grid h-[calc(100vh-2rem)] grid-cols-1 gap-4 xl:grid-cols-[minmax(0,65%)_minmax(0,35%)]">
+      <section className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-slate-950 shadow-sm">
+        <div className="flex flex-col gap-3 border-b border-slate-800 px-4 py-3 text-white">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold">Live Session</p>
+              <p className="text-[11px] text-slate-300">Room: {meetingData.meetingRoomName}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleOpenDashboardInPip}
+                className="inline-flex items-center gap-1 rounded-md border border-white/20 bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-white"
+              >
+                <Minimize2 className="h-3.5 w-3.5" />
+                Open Dashboard (PiP)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  endSession();
+                  navigate('/provider/dashboard');
+                }}
+                className="inline-flex items-center gap-1 rounded-md bg-rose-600 px-2.5 py-1.5 text-xs font-semibold text-white"
+              >
+                <X className="h-3.5 w-3.5" />
+                End Call
+              </button>
+            </div>
           </div>
         </div>
         <div className="min-h-0 flex-1">
@@ -505,31 +699,26 @@ export default function VideoSessionPage() {
             jitsiJwt={meetingData.jitsiJwt}
             className="h-full w-full"
             onEndCall={() => {
-              void handleEndCall();
+              endSession();
+              navigate('/provider/dashboard');
             }}
+            isTherapist={isProvider}
+            aiEngineUrl={AI_ENGINE_WS_URL}
+            onGPSUpdate={handleGPSUpdate}
+            onTranscriptUpdate={handleTranscriptUpdate}
           />
         </div>
       </section>
-        ) : null}
 
-      {showWorkspaceSection ? (
       <section className="relative flex min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <header className="border-b border-slate-200 px-4 py-3">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-semibold text-slate-800">Clinical Workspace</p>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setViewMode(viewMode === 'workspace' ? 'split' : 'workspace')}
-                className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700"
-              >
-                {viewMode === 'workspace' ? 'Show Split' : 'Workspace Only'}
-              </button>
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
-                {canGenerateAiDraft ? 'AI draft unlocked' : `AI draft unlocks in ${aiUnlockCountdown}s`}
-              </span>
+            <div className="grid grid-cols-1 items-center gap-3 sm:grid-cols-[1fr_minmax(220px,320px)_1fr] sm:gap-4">
+            <p className="justify-self-start text-sm font-semibold text-slate-800 whitespace-nowrap">Clinical Workspace</p>
+            <div className="flex items-center gap-2 justify-self-start sm:justify-self-end">
+              <StatusLight status={connectionStatus} horizontal={true} />
             </div>
           </div>
+          <p className="mt-2 text-[11px] text-slate-500">TherapeuticGPS from live voice input: {voiceEmpathyReason}</p>
           <div className="mt-3 grid grid-cols-3 gap-2">
             <button
               type="button"
@@ -556,7 +745,7 @@ export default function VideoSessionPage() {
                 activeTab === 'ai-insights' ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-700'
               }`}
             >
-              AI Insights
+              TherapeuticGPS
             </button>
           </div>
         </header>
@@ -575,13 +764,40 @@ export default function VideoSessionPage() {
                 Live patient context for quick reference.
               </div>
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <div className="min-w-[180px] flex-1">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Session Protocol Tips</p>
-                  <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-slate-700">
-                    <li>Reflect and validate first before reframing.</li>
-                    <li>Anchor one practical CBT task before ending session.</li>
-                  </ul>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-[180px] flex-1">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Session Protocol Tips</p>
+                    <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-slate-700">
+                      <li>Reflect and validate first before reframing.</li>
+                      <li>Anchor one practical CBT task before ending session.</li>
+                    </ul>
+                  </div>
+                  <div className="w-full max-w-[240px] space-y-2">
+                    <label className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Quick Assign</label>
+                    <select
+                      value={selectedTemplateType}
+                      onChange={(event) => setSelectedTemplateType(event.target.value)}
+                      className="w-full rounded-md border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-700"
+                    >
+                      {cbtTemplateOptions.map((template) => (
+                        <option key={template.templateType} value={template.templateType}>
+                          {template.title}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => void handleQuickAssignTemplate()}
+                      disabled={!selectedTemplateType || isAssigningCbtTemplate}
+                      className="w-full rounded-md bg-slate-900 px-2.5 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {isAssigningCbtTemplate ? 'Assigning...' : 'Quick Assign'}
+                    </button>
+                  </div>
                 </div>
+                {quickAssignFeedback ? (
+                  <p className="mt-2 text-[11px] text-slate-600">{quickAssignFeedback}</p>
+                ) : null}
               </div>
               <div className="space-y-2 rounded-xl border border-slate-200 p-3 text-xs text-slate-700">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Clinical Summary</p>
@@ -674,15 +890,6 @@ export default function VideoSessionPage() {
 
           {activeTab === 'ai-insights' ? (
             <div className="space-y-3">
-              {monitoringId && accessToken ? (
-                <div className="rounded-xl border border-slate-200 bg-white p-2">
-                  <GPSDashboard
-                    sessionId={sessionId}
-                    monitoringId={monitoringId}
-                    accessToken={accessToken}
-                  />
-                </div>
-              ) : null}
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">Mood Monitor</p>
@@ -691,46 +898,116 @@ export default function VideoSessionPage() {
                     {moodMonitorLabel}
                   </span>
                 </div>
-                <div className="mt-2 flex items-center justify-between gap-2">
-                  <p className="text-[11px] text-slate-600">
-                    {canGenerateAiDraft
-                      ? 'At least 5 minutes captured. AI draft ready.'
-                      : `AI draft unlocks in ${aiUnlockCountdown}s`}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => void handleGenerateAiDraft()}
-                    disabled={!canGenerateAiDraft || isGeneratingAiDraft}
-                    className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-semibold transition ${
-                      canGenerateAiDraft
-                        ? 'border border-indigo-200 bg-indigo-600 text-white hover:bg-indigo-500'
-                        : 'border border-slate-200 bg-white text-slate-700 disabled:cursor-not-allowed disabled:opacity-50'
-                    }`}
-                  >
-                    <Sparkles className="h-3.5 w-3.5" />
-                    {isGeneratingAiDraft ? 'Generating...' : 'Generate AI Draft'}
-                  </button>
-                </div>
-              </div>
 
-              {aiInsights ? (
-                <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700">
-                  <p className="font-semibold text-slate-800">Manas AI Insights</p>
-                  {aiInsights.moodSentiment ? (
-                    <div className="space-y-1">
-                      <p><span className="font-semibold">Sentiment:</span> {aiInsights.moodSentiment.primaryEmotionalState || 'n/a'}</p>
-                      <p><span className="font-semibold">Volatility:</span> {aiInsights.moodSentiment.emotionalVolatilityScore}/10</p>
-                      <p><span className="font-semibold">Anxiety:</span> {aiInsights.moodSentiment.anxietyLevelScore}/10</p>
+                <div className="mt-3 h-[280px] rounded-xl border border-slate-200 bg-white p-3">
+                  <div className="flex h-full min-h-0 flex-col">
+                    <div
+                      ref={voiceMessagesContainerRef}
+                      className="mt-3 min-h-0 flex-1 overflow-y-auto rounded-lg border border-slate-100 bg-slate-50 p-2.5"
+                    >
+                      {voiceMessages.length ? (
+                        <div className="space-y-2">
+                          {voiceMessages.map((msgItem, index) => {
+                            const text = typeof msgItem === 'string' ? msgItem : msgItem.text;
+                            const timestamp = typeof msgItem === 'string' ? '' : msgItem.timestamp;
+                            if (!text) return null;
+                            
+                            return (
+                              <div key={`msg-${index}`} className="flex flex-col gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-2 text-xs">
+                                {timestamp && (
+                                  <span className="text-[10px] font-medium text-slate-400">
+                                    {timestamp}
+                                  </span>
+                                )}
+                                <span className="text-slate-700">
+                                  {text}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-xs text-slate-500">
+                          Messages will be stored here once you pause speaking for 3 seconds.
+                        </div>
+                      )}
                     </div>
-                  ) : null}
-                  <div className="space-y-1 border-t border-slate-100 pt-2">
-                    <p><span className="font-semibold">S:</span> {aiInsights.soapNote.subjective || 'n/a'}</p>
-                    <p><span className="font-semibold">O:</span> {aiInsights.soapNote.objective || 'n/a'}</p>
-                    <p><span className="font-semibold">A:</span> {aiInsights.soapNote.assessment || 'n/a'}</p>
-                    <p><span className="font-semibold">P:</span> {aiInsights.soapNote.plan || 'n/a'}</p>
+
+                    <div className="mt-3 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2 py-2">
+                      <input
+                        value={aiInsightInput}
+                        onChange={(event) => {
+                          aiInsightInputRef.current = event.target.value;
+                          setAiInsightInput(event.target.value);
+                          if (event.target.value.trim()) {
+                            queueSilenceCommit(event.target.value);
+                          } else {
+                            clearSpeechSilenceTimer();
+                          }
+                        }}
+                        placeholder="Speak or type here... message auto-saves after 3s silence"
+                        className="flex-1 border-none bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleToggleSpeechInput}
+                        disabled={!isSpeechSupported}
+                        className={`inline-flex h-8 w-8 items-center justify-center rounded-full border transition ${
+                          isSpeechListening || isSpeechAutoEnabled
+                            ? 'border-rose-200 bg-rose-100 text-rose-600'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100'
+                        } disabled:cursor-not-allowed disabled:opacity-50`}
+                        aria-label={isSpeechAutoEnabled ? 'Stop voice input' : 'Start voice input'}
+                        title={isSpeechAutoEnabled ? 'Stop voice input' : 'Start voice input'}
+                      >
+                        <Mic className={`h-4 w-4 ${isSpeechListening ? 'animate-pulse' : ''}`} />
+                      </button>
+                    </div>
                   </div>
                 </div>
-              ) : null}
+
+                {speechStatus ? <p className="mt-2 text-[11px] text-slate-500">{speechStatus}</p> : null}
+                {speechError ? <p className="mt-1 text-[11px] text-rose-600">{speechError}</p> : null}
+
+                {connectionStatus === 'good' ? (
+                  <div className="mt-4 rounded-xl border-2 border-emerald-300 bg-emerald-50 p-4 shadow-sm">
+                    <div className="mb-3 flex items-center gap-2">
+                      <span className="text-lg">✨</span>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">Therapeutic Remedy</p>
+                    </div>
+                    <p className="text-xs font-semibold text-emerald-900 mb-2">Positive Connection</p>
+                    <p className="text-xs italic text-emerald-900 leading-relaxed">
+                      "Maintain this positive therapeutic alliance. The patient reflects stability and openness. Continue with the current CBT re-attribution or behavioral activation plan."
+                    </p>
+                  </div>
+                ) : null}
+
+                {connectionStatus === 'caution' ? (
+                  <div className="mt-4 rounded-xl border-2 border-amber-400 bg-amber-50 p-4">
+                    <div className="mb-3 flex items-center gap-2">
+                      <span className="text-lg">⚠️</span>
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-900">Wellness Remedies</p>
+                    </div>
+                    <p className="text-xs font-semibold text-amber-900 mb-2">Warning Support</p>
+                    <p className="text-xs italic text-amber-900 leading-relaxed">
+                      "Ensure you are getting 7–9 hours of quality sleep and staying hydrated. Consider a short 20–minute power nap or gentle stretching to boost energy. If fatigue persists, consult a healthcare provider to rule out underlying issues."
+                    </p>
+                  </div>
+                ) : null}
+
+                {connectionStatus === 'poor' ? (
+                  <div className="mt-4 rounded-xl border-2 border-rose-400 bg-rose-50 p-4">
+                    <div className="mb-3 flex items-center gap-2">
+                      <span className="text-lg">🚨</span>
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-rose-900">Wellness Remedies</p>
+                    </div>
+                    <p className="text-xs font-semibold text-rose-900 mb-2">Alert Response</p>
+                    <p className="text-xs italic text-rose-900 leading-relaxed">
+                      "Please reach out for help immediately. Contact a suicide prevention hotline like Vandrevala Foundation (9999664555) or AASRA (9820466726) in India, or call your local emergency services. Do not stay alone: reach out to a trusted friend, family member, or healthcare professional."
+                    </p>
+                  </div>
+                ) : null}
+              </div>
             </div>
           ) : null}
         </div>
@@ -796,9 +1073,46 @@ export default function VideoSessionPage() {
             </div>
           </div>
         ) : null}
+
+        {isProvider && monitoringId && accessToken && (
+          <GPSDashboard
+            sessionId={sessionId}
+            monitoringId={monitoringId}
+            accessToken={accessToken}
+          />
+        )}
+
+        {connectionStatus === 'poor' && !crisisModalDismissed ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+            <div className="mx-4 w-full max-w-md rounded-3xl border-4 border-rose-400 bg-white p-6 shadow-2xl">
+              <div className="mb-6 flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-rose-100">
+                  <span className="text-2xl">⚠️</span>
+                </div>
+                <div>
+                  <p className="text-xl font-bold text-slate-900">ALERT</p>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-rose-600">High Distress / Crisis Detected</p>
+                </div>
+              </div>
+
+              <div className="mb-6 rounded-2xl bg-slate-900 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-white mb-3">Immediate Advice</p>
+                <p className="text-sm italic text-white leading-relaxed">
+                  "Please reach out for help immediately. Contact a suicide prevention hotline like Vandrevala Foundation (9999664555) or AASRA (9820466726) in India, or call your local emergency services. Do not stay alone; reach out to a trusted friend, family member, or healthcare professional right now."
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setCrisisModalDismissed(true)}
+                className="w-full rounded-full bg-blue-600 px-6 py-3 text-sm font-bold uppercase tracking-wide text-white transition hover:bg-blue-700"
+              >
+                Understood
+              </button>
+            </div>
+          </div>
+        ) : null}
       </section>
-      ) : null}
-      </div>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import React from 'react';
 
 export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
-  variant?: 'default' | 'success' | 'warning' | 'info' | 'soft';
+  variant?: 'default' | 'success' | 'warning' | 'info' | 'soft' | 'secondary' | 'destructive';
   size?: 'sm' | 'md' | 'lg';
   children: React.ReactNode;
 }
@@ -39,6 +39,8 @@ export const Badge: React.FC<BadgeProps> = ({
     warning: 'bg-amber-100 text-amber-700',
     info: 'bg-gentle-blue/30 text-gentle-blue',
     soft: 'bg-soft-lavender/20 text-soft-lavender',
+    secondary: 'bg-ink-100 text-ink-600 border border-ink-200',
+    destructive: 'bg-rose-100 text-rose-700',
   };
 
   // Combine styles

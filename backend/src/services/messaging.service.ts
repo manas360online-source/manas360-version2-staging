@@ -68,6 +68,24 @@ export interface ProviderConversationListItem {
   hasMessageHistory: boolean;
 }
 
+type ConversationProviderProfile = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  providerType: string | null;
+  profileImageUrl: string | null;
+};
+
+type ConversationPatientProfile = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  name: string | null;
+  email: string | null;
+  profileImageUrl: string | null;
+};
+
 /**
  * All conversations for a patient, enriched with provider info + unread counts.
  * The patient's primary therapist (first active CareTeamAssignment) is marked
@@ -84,27 +102,63 @@ export async function getPatientConversations(patientId: string): Promise<Conver
   const conversations = await prisma.directConversation.findMany({
     where: { patientId },
     orderBy: { lastMessageAt: 'desc' },
-    include: {
-      provider: {
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          role: true,
-          providerType: true,
-          profileImageUrl: true,
-          therapistProfile: { select: { specializations: true } },
-        },
-      },
-      messages: {
-        where: { senderRole: { not: 'patient' }, readAt: null },
-        select: { id: true },
-      },
+    select: {
+      id: true,
+      providerId: true,
+      isSupport: true,
+      lastMessageAt: true,
+      lastMessageText: true,
     },
   });
 
+  if (!conversations.length) return [];
+
+  const providerIds = Array.from(new Set(conversations.map((conversation) => conversation.providerId)));
+  const [providers, unreadCounts] = await Promise.all([
+    prisma.user.findMany({
+      where: { id: { in: providerIds } },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        providerType: true,
+        profileImageUrl: true,
+      },
+    }),
+    prisma.directMessage.groupBy({
+      by: ['conversationId'],
+      where: {
+        conversationId: { in: conversations.map((conversation) => conversation.id) },
+        senderRole: { not: 'patient' },
+        readAt: null,
+      },
+      _count: { _all: true },
+    }),
+  ]);
+
+  const providerById = new Map<string, ConversationProviderProfile>(
+    (providers as ConversationProviderProfile[]).map((provider) => [provider.id, provider]),
+  );
+  const unreadByConversationId = new Map(
+    unreadCounts.map((row) => [row.conversationId, row._count._all]),
+  );
+
   return conversations.map((c) => {
-    const p = c.provider;
+    const p = providerById.get(c.providerId);
+    if (!p) {
+      return {
+        id: c.id,
+        providerName: 'Provider',
+        providerRole: 'Therapist',
+        providerAvatar: null,
+        lastMessage: c.lastMessageText,
+        lastMessageAt: c.lastMessageAt,
+        unreadCount: unreadByConversationId.get(c.id) ?? 0,
+        isSupport: c.isSupport,
+        isPinned: c.providerId === primaryProviderId,
+      };
+    }
     const name = [p.firstName, p.lastName].filter(Boolean).join(' ') || 'Provider';
     const role = String(p.providerType || p.role || 'Therapist');
     return {
@@ -114,9 +168,9 @@ export async function getPatientConversations(patientId: string): Promise<Conver
       providerAvatar: p.profileImageUrl,
       lastMessage: c.lastMessageText,
       lastMessageAt: c.lastMessageAt,
-      unreadCount: c.messages.length,
+      unreadCount: unreadByConversationId.get(c.id) ?? 0,
       isSupport: c.isSupport,
-      isPinned: c.provider.id === primaryProviderId,
+      isPinned: c.providerId === primaryProviderId,
     };
   });
 }
@@ -174,43 +228,65 @@ export async function getProviderConversations(providerId: string): Promise<Prov
       providerId,
       patientId: { in: patientIds },
     },
-    include: {
-      patient: {
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          name: true,
-          email: true,
-          profileImageUrl: true,
-        },
-      },
-      messages: {
-        where: {
-          senderRole: 'patient',
-          readAt: null,
-        },
-        select: { id: true },
-      },
+    select: {
+      id: true,
+      patientId: true,
+      lastMessageText: true,
+      lastMessageAt: true,
     },
   });
 
+  if (!conversations.length) return [];
+
+  const [patients, unreadCounts] = await Promise.all([
+    prisma.user.findMany({
+      where: { id: { in: patientIds } },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        name: true,
+        email: true,
+        profileImageUrl: true,
+      },
+    }),
+    prisma.directMessage.groupBy({
+      by: ['conversationId'],
+      where: {
+        conversationId: { in: conversations.map((conversation) => conversation.id) },
+        senderRole: 'patient',
+        readAt: null,
+      },
+      _count: { _all: true },
+    }),
+  ]);
+
+  const patientById = new Map<string, ConversationPatientProfile>(
+    (patients as ConversationPatientProfile[]).map((patient) => [patient.id, patient]),
+  );
+  const unreadByConversationId = new Map(
+    unreadCounts.map((row) => [row.conversationId, row._count._all]),
+  );
+
   return conversations
-    .map((conversation) => ({
-      id: conversation.id,
-      patientId: conversation.patient.id,
-      patientName:
-        [conversation.patient.firstName, conversation.patient.lastName].filter(Boolean).join(' ') ||
-        conversation.patient.name ||
-        'Patient',
-      patientEmail: conversation.patient.email,
-      patientAvatar: conversation.patient.profileImageUrl,
-      lastMessage: conversation.lastMessageText,
-      lastMessageAt: conversation.lastMessageAt,
-      unreadCount: conversation.messages.length,
-      hasSessionHistory: sessionPatientSet.has(conversation.patientId),
-      hasMessageHistory: messagePatientSet.has(conversation.patientId),
-    }))
+    .map((conversation) => {
+      const patient = patientById.get(conversation.patientId);
+      return {
+        id: conversation.id,
+        patientId: conversation.patientId,
+        patientName:
+          (patient
+            ? [patient.firstName, patient.lastName].filter(Boolean).join(' ') || patient.name || 'Patient'
+            : 'Patient'),
+        patientEmail: patient?.email,
+        patientAvatar: patient?.profileImageUrl,
+        lastMessage: conversation.lastMessageText,
+        lastMessageAt: conversation.lastMessageAt,
+        unreadCount: unreadByConversationId.get(conversation.id) ?? 0,
+        hasSessionHistory: sessionPatientSet.has(conversation.patientId),
+        hasMessageHistory: messagePatientSet.has(conversation.patientId),
+      };
+    })
     .sort((left, right) => {
       const leftTs = left.lastMessageAt ? new Date(left.lastMessageAt).getTime() : 0;
       const rightTs = right.lastMessageAt ? new Date(right.lastMessageAt).getTime() : 0;

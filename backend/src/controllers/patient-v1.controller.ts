@@ -58,10 +58,8 @@ import {
 	completeTreatmentPlanTask,
 	getMyTreatmentPlan,
 } from '../services/treatment-plan.service';
-import {
-	getPatientSharedReportDownloadPayload,
-	getPatientSharedReportMeta,
-} from '../services/patient-shared-report.service';
+import { getPatientSharedReportMeta, getPatientSharedReportDownloadPayload } from '../services/patient-shared-report.service';
+import { applyCreditsForPayment, getOrCreateWallet } from '../services/wallet.service';
 
 const renderPdfBuffer = async (write: (doc: any) => void): Promise<Buffer> =>
 	new Promise((resolve, reject) => {
@@ -611,7 +609,7 @@ export const upgradePatientSubscriptionController = async (req: Request, res: Re
 	}
 
 	const userId = authUserId(req);
-	const { planKey } = req.body;
+	const { planKey, redirectUrl } = req.body;
 
 	if (!planKey) {
 		throw new AppError('planKey is required', 422);
@@ -626,13 +624,95 @@ export const upgradePatientSubscriptionController = async (req: Request, res: Re
 	// Free plan: activate immediately using legacy logic
 	if (plan.price === 0) {
 		const data = await reactivatePatientSubscription(userId, undefined, plan.key);
-		sendSuccess(res, data, 'Free plan activated');
+		sendSuccess(res, { ...data, redirectUrl }, 'Free plan activated');
 		return;
 	}
 
 	// Paid plan: initiate PhonePe payment (supports dev bypass)
-	const data = await initiatePatientSubscriptionPayment(userId, planKey);
+	const data = await initiatePatientSubscriptionPayment(userId, planKey, { metadata: { redirectUrl } });
 	sendSuccess(res, data, 'Payment initiated');
+};
+
+export const checkoutPatientSubscriptionController = async (req: Request, res: Response): Promise<void> => {
+	if (!req.auth?.userId) {
+		throw new AppError('Authentication required - invalid or missing credentials', 401);
+	}
+
+	const userId = authUserId(req);
+	const planKey = String(req.body?.planKey || '').trim();
+	const acceptedTerms = Boolean(req.body?.acceptedTerms);
+	const subtotalMinor = Math.max(0, Math.round(Number(req.body?.subtotalMinor || 0)));
+	const gstMinor = Math.max(0, Math.round(Number(req.body?.gstMinor || 0)));
+	const totalMinor = Math.max(0, Math.round(Number(req.body?.totalMinor || 0)));
+	const addons = req.body?.addons && typeof req.body.addons === 'object' ? req.body.addons : {};
+	const promoCode = req.body?.promoCode ? String(req.body.promoCode).trim() : undefined;
+	const idempotencyKey = req.body?.idempotencyKey ? String(req.body.idempotencyKey).trim() : undefined;
+
+	if (!planKey) {
+		throw new AppError('planKey is required', 422);
+	}
+
+	if (!acceptedTerms) {
+		throw new AppError('You must accept terms and privacy', 422);
+	}
+
+	const plan = await getActivePlatformPlan(planKey);
+	if (!plan) {
+		throw new AppError('Invalid plan key', 422);
+	}
+
+	if (plan.price === 0) {
+		const data = await reactivatePatientSubscription(userId, undefined, plan.key);
+		sendSuccess(res, data, 'Free plan activated');
+		return;
+	}
+
+	const expectedGstMinor = Math.round(subtotalMinor * 0.18);
+	const expectedTotalMinor = subtotalMinor + expectedGstMinor;
+
+	if (Math.abs(gstMinor - expectedGstMinor) > 1) {
+		throw new AppError('GST mismatch. Please refresh checkout and retry.', 422);
+	}
+
+	if (!totalMinor || Math.abs(totalMinor - expectedTotalMinor) > 1) {
+		throw new AppError('Invalid checkout total. Total must be subtotal plus GST.', 422);
+	}
+
+	let finalAmountMinor = expectedTotalMinor;
+	let walletUsedMinor = 0;
+
+	// Auto-apply wallet credits
+	const walletResult = await applyCreditsForPayment({
+		userId,
+		referenceId: idempotencyKey || `sub_checkout_${Date.now()}`,
+		referenceType: 'patient_subscription',
+		amountMinor: expectedTotalMinor,
+	});
+
+	if (walletResult.amountUsed > 0) {
+		walletUsedMinor = walletResult.amountUsed;
+		finalAmountMinor = walletResult.finalAmount;
+	}
+
+	const data = await initiatePatientSubscriptionPayment(userId, planKey, {
+		amountMinorOverride: finalAmountMinor,
+		idempotencyKey,
+		metadata: {
+			checkout: {
+				subtotalMinor,
+				gstMinor,
+				totalMinor,
+				walletUsedMinor,
+				finalAmountMinor,
+				addons,
+				promoCode,
+				acceptedTerms,
+				createdAt: new Date().toISOString(),
+			},
+		},
+	});
+
+	sendSuccess(res, data, 'Checkout payment initiated');
 };
 
 export const downgradePatientSubscriptionController = async (req: Request, res: Response): Promise<void> => {

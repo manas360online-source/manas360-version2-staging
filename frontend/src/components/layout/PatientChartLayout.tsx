@@ -30,6 +30,7 @@ const tabConfig: Record<ProviderKind, TabItem[]> = {
     { label: 'Overview', path: 'overview' },
     { label: 'Session Notes', path: 'notes' },
     { label: 'Assessments', path: 'assessments' },
+    { label: 'Prescriptions', path: 'prescriptions' },
     { label: 'Care Team', path: 'care-team' },
   ],
   COACH: [

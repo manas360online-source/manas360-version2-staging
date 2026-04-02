@@ -28,12 +28,10 @@ export default function PersistentVideoLayout({ children }: PersistentVideoLayou
   } = useVideoSession();
 
   const displayName = buildDisplayName(user?.firstName, user?.lastName, user?.email);
-  const isProviderLiveSessionRoute = /^\/provider\/live-session\/.+/.test(location.pathname);
-
   const handleMaximizeFromPip = () => {
-    // Provider shell owns persistent video state, so always restore the provider live-session route.
-    if (sessionId && location.pathname !== `/provider/live-session/${sessionId}`) {
-      navigate(`/provider/live-session/${sessionId}`);
+    // Restore the dedicated session route to avoid rendering a duplicated fullscreen room on dashboard pages.
+    if (sessionId && location.pathname !== `/video-session/${sessionId}`) {
+      navigate(`/video-session/${sessionId}`);
     }
     setIsMinimized(false);
   };
@@ -77,7 +75,7 @@ export default function PersistentVideoLayout({ children }: PersistentVideoLayou
               />
             </div>
           </div>
-        ) : !isProviderLiveSessionRoute ? (
+        ) : (
           <div className="fixed inset-0 z-50 bg-black">
             <div className="absolute right-4 top-4 z-10 flex items-center gap-2">
               <button
@@ -108,7 +106,7 @@ export default function PersistentVideoLayout({ children }: PersistentVideoLayou
               onEndCall={endSession}
             />
           </div>
-        ) : null
+        )
       ) : null}
     </div>
   );

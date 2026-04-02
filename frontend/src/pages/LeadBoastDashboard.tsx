@@ -1,9 +1,39 @@
 import React, { useState, useEffect } from 'react';
-import { MOCK_LEADS } from '../CertificationConstants';
 import { Clock, Phone, Mail, AlertTriangle, Shield, CheckCircle } from 'lucide-react';
 import { Lead } from '../CertificationTypes';
 import { Skeleton } from '../components/Skeleton';
 import { SEO } from '../components/SEO';
+import { fetchProviderLeadStats, fetchProviderLeads } from '../api/provider';
+
+const buildFallbackLeads = (): Lead[] => [
+    {
+        id: 1,
+        name: 'Amit Sharma',
+        age: 28,
+        concern: 'Anxiety & Work Stress',
+        severity: 'High',
+        exclusiveUntil: new Date(Date.now() + 1000 * 60 * 60 * 5).toISOString(),
+        isContacted: false,
+    },
+    {
+        id: 2,
+        name: 'Priya Patel',
+        age: 34,
+        concern: 'Post-partum depression',
+        severity: 'Medium',
+        exclusiveUntil: new Date(Date.now() + 1000 * 60 * 60 * 2).toISOString(),
+        isContacted: true,
+    },
+    {
+        id: 3,
+        name: 'Vikram Singh',
+        age: 45,
+        concern: 'Sleep disorders',
+        severity: 'Low',
+        exclusiveUntil: new Date(Date.now() - 1000 * 60 * 60 * 1).toISOString(),
+        isContacted: false,
+    },
+];
 
 const CountdownTimer: React.FC<{ targetDate: string }> = ({ targetDate }) => {
   const [timeLeftString, setTimeLeftString] = useState('');
@@ -42,14 +72,44 @@ const CountdownTimer: React.FC<{ targetDate: string }> = ({ targetDate }) => {
 };
 
 export const LeadBoostDashboard: React.FC = () => {
-    const [leads, setLeads] = useState<Lead[]>(MOCK_LEADS as any);
+    const [leads, setLeads] = useState<Lead[]>([]);
     const [loading, setLoading] = useState(true);
+    const [stats, setStats] = useState<{ exclusiveConversion?: string; generalConversion?: string } | null>(null);
 
     useEffect(() => {
-        const timer = setTimeout(() => {
-            setLoading(false);
-        }, 800);
-        return () => clearTimeout(timer);
+        const load = async () => {
+            try {
+                const [leadRows, leadStats] = await Promise.all([
+                    fetchProviderLeads(),
+                    fetchProviderLeadStats(),
+                ]);
+
+                const normalized = Array.isArray(leadRows)
+                    ? leadRows.map((lead: any, index: number) => ({
+                        id: Number(lead.id || index + 1),
+                        name: String(lead.patientName || lead.name || lead.title || 'Lead'),
+                        age: Number(lead.age || lead.patientAge || 0),
+                        concern: String(lead.concern || lead.issue || lead.primaryConcern || 'General care'),
+                        severity: String(lead.severity || lead.priority || 'Low') as Lead['severity'],
+                        exclusiveUntil: String(lead.exclusiveUntil || lead.expiresAt || lead.createdAt || new Date().toISOString()),
+                        isContacted: Boolean(lead.isContacted || lead.contacted || false),
+                    }))
+                    : [];
+
+                setLeads(normalized.length ? normalized : buildFallbackLeads());
+                setStats({
+                    exclusiveConversion: leadStats?.exclusiveConversionRate ? `${leadStats.exclusiveConversionRate}%` : undefined,
+                    generalConversion: leadStats?.generalConversionRate ? `${leadStats.generalConversionRate}%` : undefined,
+                });
+            } catch {
+                setLeads(buildFallbackLeads());
+                setStats(null);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        void load();
     }, []);
 
     const handleMarkContacted = (id: number) => {
@@ -155,11 +215,11 @@ export const LeadBoostDashboard: React.FC = () => {
                             <div className="space-y-4">
                                 <div className="flex justify-between items-center pb-3 border-b border-slate-50">
                                     <span className="text-slate-500 text-sm">Exclusive Conversion</span>
-                                    <span className="font-bold text-green-600">32%</span>
+                                    <span className="font-bold text-green-600">{stats?.exclusiveConversion || '32%'}</span>
                                 </div>
                                 <div className="flex justify-between items-center pb-3 border-b border-slate-50">
                                     <span className="text-slate-500 text-sm">General Conversion</span>
-                                    <span className="font-bold text-slate-800">8%</span>
+                                    <span className="font-bold text-slate-800">{stats?.generalConversion || '8%'}</span>
                                 </div>
                             </div>
                         </div>

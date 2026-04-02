@@ -4,13 +4,24 @@ import { useAuth } from '../context/AuthContext';
 
 type ProtectedRouteProps = {
 	children: ReactNode;
-	allowedRoles?: Array<'patient' | 'therapist' | 'psychiatrist' | 'psychologist' | 'coach' | 'admin'>;
+	allowedRoles?: Array<
+		| 'patient'
+		| 'therapist'
+		| 'psychiatrist'
+		| 'psychologist'
+		| 'coach'
+		| 'admin'
+		| 'superadmin'
+		| 'clinicaldirector'
+		| 'financemanager'
+		| 'complianceofficer'
+	>;
 };
 
 export default function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
 	const { isAuthenticated, loading, user } = useAuth();
 	const location = useLocation();
-	const userRole = String(user?.role || '').toLowerCase();
+	const userRole = String(user?.role || '').toLowerCase().replace(/_/g, '');
 	const isProviderRole = userRole === 'therapist' || userRole === 'psychiatrist' || userRole === 'psychologist' || userRole === 'coach';
 
 	if (loading) {
@@ -23,7 +34,14 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
 	}
 
 	if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(userRole as any)) {
-		const fallback = userRole === 'admin'
+		const isAdminRole =
+			userRole === 'admin' ||
+			userRole === 'superadmin' ||
+			userRole === 'clinicaldirector' ||
+			userRole === 'financemanager' ||
+			userRole === 'complianceofficer';
+
+		const fallback = isAdminRole
 			? '/admin-portal/login'
 			: userRole === 'psychologist'
 				? '/provider/dashboard'
@@ -47,7 +65,16 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
 		const onboardingStatus = String(user?.onboardingStatus || '').toUpperCase();
 		const onboardingRoute = '/onboarding/provider-setup';
 		const verificationRoute = '/provider/verification-pending';
+		const subscriptionRoute = '/provider/subscription';
 		const verified = Boolean(user?.isTherapistVerified);
+
+		// NEW: Enforce platform payment BEFORE onboarding
+		if (!user?.platformAccessActive) {
+			if (location.pathname !== subscriptionRoute) {
+				return <Navigate to={subscriptionRoute} replace />;
+			}
+			return <>{children}</>;
+		}
 
 		if (onboardingStatus !== 'COMPLETED') {
 			if (location.pathname !== onboardingRoute) {

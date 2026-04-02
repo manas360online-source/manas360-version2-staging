@@ -650,9 +650,12 @@ export const uploadPatientDocument = async (req: Request, res: Response): Promis
 			select: { providerId: true },
 		});
 		for (const assignment of assignments) {
-			// Emit to provider inbox room
-			const { notifyProviderLabUpload } = await import('../routes/gps.routes');
-			notifyProviderLabUpload(assignment.providerId, {
+			// Emit to provider inbox room when notifier is available.
+			const gpsRoutesModule = (await import('../routes/gps.routes')) as Record<string, unknown>;
+			const notifyProviderLabUpload = gpsRoutesModule.notifyProviderLabUpload as
+				| ((providerId: string, payload: Record<string, unknown>) => void)
+				| undefined;
+			notifyProviderLabUpload?.(assignment.providerId, {
 				documentId: doc.id,
 				patientId: userId,
 				title: doc.title,

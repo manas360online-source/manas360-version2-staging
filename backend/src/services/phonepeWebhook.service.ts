@@ -115,7 +115,50 @@ export const processOrderCompletedEvent = async (payload: any): Promise<void> =>
 		},
 	});
 
-	// Update session as confirmed
+	// ── Provider Platform Access activation ──
+	const paymentMeta = (payment.metadata as any) || {};
+	if (
+		String(paymentMeta.type || '') === 'provider_platform_access'
+		|| String(paymentMeta.flow || '') === 'provider_platform_access'
+		|| String(merchantTransactionId).startsWith('PROV_PA_')
+	) {
+		const billingCycle = String(paymentMeta.billingCycle || 'monthly');
+		const providerId = String(payment.providerId || '');
+		if (providerId) {
+			try {
+				const { activatePlatformAccess } = await import('./platform-access.service');
+				await activatePlatformAccess(providerId, billingCycle, merchantTransactionId);
+				logger.info('[PhonePeWebhook] Platform access activated', { providerId, billingCycle });
+			} catch (err: any) {
+				logger.error('[PhonePeWebhook] Platform access activation failed', {
+					providerId,
+					error: err?.message,
+				});
+			}
+		}
+		return; // Platform access handled — no session to update
+	}
+
+	// ── Provider Lead Plan / Checkout activation (PROV_SUB_ prefix) ──
+	if (String(merchantTransactionId).startsWith('PROV_SUB_') || String(paymentMeta.type || '') === 'provider_subscription') {
+		const planKey = String(paymentMeta.plan || paymentMeta.planKey || 'free');
+		const providerId = String(payment.providerId || '');
+		if (providerId && planKey && planKey !== 'free') {
+			try {
+				const { activateProviderSubscription } = await import('./provider-subscription.service');
+				await activateProviderSubscription(providerId, planKey as any, merchantTransactionId);
+				logger.info('[PhonePeWebhook] Provider subscription activated', { providerId, planKey });
+			} catch (err: any) {
+				logger.error('[PhonePeWebhook] Provider subscription activation failed', {
+					providerId,
+					error: err?.message,
+				});
+			}
+		}
+		return;
+	}
+
+	// Update session as confirmed (patient session payments)
 	if (payment.sessionId) {
 		await prisma.financialSession.update({
 			where: { id: payment.sessionId },

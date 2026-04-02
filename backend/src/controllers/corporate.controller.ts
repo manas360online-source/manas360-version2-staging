@@ -24,6 +24,7 @@ import {
   updateCorporateSessionAllocations,
   updateCorporateSettings,
   submitCorporateDemoRequest,
+  requestCorporateOtp,
   createCorporateAccount,
 } from '../services/corporate.service';
 
@@ -233,6 +234,11 @@ export const updateCorporateSettingsController = async (req: Request, res: Respo
 export const submitCorporateDemoRequestController = async (req: Request, res: Response): Promise<void> => {
   const data = await submitCorporateDemoRequest(req.body || {});
   sendSuccess(res, data, 'Corporate demo request submitted successfully', 201);
+};
+
+export const requestCorporateOtpController = async (req: Request, res: Response): Promise<void> => {
+  const data = await requestCorporateOtp(req.body || {});
+  sendSuccess(res, data, 'Corporate OTP sent successfully', 201);
 };
 
 export const createCorporateAccountController = async (req: Request, res: Response): Promise<void> => {

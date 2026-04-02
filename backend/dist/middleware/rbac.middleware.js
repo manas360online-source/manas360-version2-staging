@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.requireMinimumRole = exports.requirePermission = exports.requireCorporateMemberAccess = exports.requireAdminRole = exports.requireTherapistRole = exports.requirePatientRole = exports.requireRole = exports.clearRoleCache = exports.roleHierarchy = void 0;
+exports.requireMinimumRole = exports.requirePermission = exports.requireCorporateMemberAccess = exports.requireAdminRole = exports.requireTherapistRole = exports.requirePatientRole = exports.requireRole = exports.clearPermissionsCache = exports.clearRoleCache = exports.roleHierarchy = void 0;
 const db_1 = require("../config/db");
 const error_middleware_1 = require("./error.middleware");
 const db = db_1.prisma;
@@ -14,6 +14,9 @@ exports.roleHierarchy = {
     psychologist: 2,
     psychiatrist: 2,
     coach: 2,
+    clinicaldirector: 3,
+    financemanager: 3,
+    complianceofficer: 3,
     admin: 3,
     superadmin: 4,
 };
@@ -23,6 +26,7 @@ exports.roleHierarchy = {
  * Key: userId, Value: { role, timestamp }
  */
 const roleCache = new Map();
+const permissionsCache = new Map();
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 /**
  * Clear role cache (useful after role updates)
@@ -36,6 +40,37 @@ const clearRoleCache = (userId) => {
     }
 };
 exports.clearRoleCache = clearRoleCache;
+/**
+ * Clear permissions cache (useful after permission updates)
+ */
+const clearPermissionsCache = (roleName) => {
+    if (roleName) {
+        permissionsCache.delete(roleName);
+    }
+    else {
+        permissionsCache.clear();
+    }
+};
+exports.clearPermissionsCache = clearPermissionsCache;
+/**
+ * Get role permissions from DB or cache
+ */
+const getRolePermissions = async (roleName) => {
+    const cached = permissionsCache.get(roleName);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+        return cached.permissions;
+    }
+    const roleData = await db.role.findUnique({
+        where: { name: roleName },
+        select: { permissions: true },
+    });
+    const permissions = roleData?.permissions || [];
+    permissionsCache.set(roleName, {
+        permissions,
+        timestamp: Date.now(),
+    });
+    return permissions;
+};
 /**
  * Get user role with caching
  *
@@ -65,14 +100,15 @@ const getUserRole = async (userId) => {
     if (!user) {
         return null;
     }
-    // Cache the result
+    // Cache the result (map super_admin to superadmin for generic convention)
+    const cleanRole = String(user.role).toLowerCase().replace('_', '');
     roleCache.set(userId, {
-        role: String(user.role).toLowerCase(),
+        role: cleanRole,
         timestamp: Date.now(),
         isDeleted: false,
     });
     return {
-        role: String(user.role).toLowerCase(),
+        role: cleanRole,
         isDeleted: false,
     };
 };
@@ -112,6 +148,7 @@ const requireRole = (allowedRoles) => {
             // Extract user ID from JWT (populated by requireAuth middleware)
             const userId = req.auth?.userId;
             if (!userId) {
+                console.log(`[RBAC] No userId found in req.auth on URL: ${req.originalUrl}. req.auth exists:`, !!req.auth);
                 next(new error_middleware_1.AppError('Authentication required', 401));
                 return;
             }
@@ -127,10 +164,13 @@ const requireRole = (allowedRoles) => {
                 next(new error_middleware_1.AppError('User account is deleted. Please contact support.', 410));
                 return;
             }
-            // Check if user's role is in allowed roles
-            if (!roles.includes(userDetails.role)) {
+            // Check if user's role is in allowed roles OR satisfies hierarchy
+            const userRank = exports.roleHierarchy[userDetails.role] || 0;
+            const isAllowedByExplicitRole = roles.includes(userDetails.role);
+            const isAllowedByHierarchy = roles.some(role => userRank >= (exports.roleHierarchy[role] || 0));
+            if (!isAllowedByExplicitRole && !isAllowedByHierarchy) {
                 // Log unauthorized attempt for security audit
-                console.warn(`[RBAC] Unauthorized access attempt - userId: ${userId}, userRole: ${userDetails.role}, requiredRoles: ${roles.join(',')}`);
+                console.warn(`[RBAC] Access denied - userId: ${userId}, userRole: ${userDetails.role}, requiredRoles: ${roles.join(',')}, rank: ${userRank}`);
                 next(new error_middleware_1.AppError(`Access denied. Required role(s): ${roles.join(' or ')}. Your role: ${userDetails.role}`, 403));
                 return;
             }
@@ -245,37 +285,24 @@ const requirePermission = (requiredPermissions) => {
             next(new error_middleware_1.AppError('User account is deleted', 410));
             return;
         }
-        // TODO: Map roles to permissions and check
-        // For now, map roles directly to permissions
-        const rolePermissions = {
-            patient: ['read_own_profile', 'book_session', 'view_therapists', 'submit_assessments', 'view_own_sessions'],
-            therapist: ['read_own_profile', 'manage_sessions', 'view_earnings', 'build_templates', 'view_assigned_patients'],
-            psychologist: ['read_own_profile', 'manage_assessments', 'manage_reports', 'view_assigned_patients', 'manage_risk'],
-            psychiatrist: ['read_own_profile', 'manage_sessions', 'view_earnings', 'view_assigned_patients'],
-            coach: ['read_own_profile', 'manage_sessions', 'view_earnings', 'view_assigned_patients'],
-            admin: [
-                'read_all_profiles',
-                'manage_users',
-                'manage_therapists',
-                'manage_payments',
+        // Special handling for Compliance Officer - limited access only
+        if (String(userDetails.role).toUpperCase() === 'COMPLIANCEOFFICER') {
+            const allowedPermissions = [
+                'dashboard',
+                'view_audit',
+                'read_reports',
+                'manage_compliance',
                 'view_analytics',
-                'manage_corporate',
-                'view_system_logs'
-            ],
-            superadmin: [
-                'read_all_profiles',
-                'manage_users',
-                'manage_therapists',
-                'manage_payments',
-                'view_analytics',
-                'manage_corporate',
-                'view_system_logs',
-                'manage_roles',
-                'manage_permissions',
-                'system_config',
-            ],
-        };
-        const userPermissions = rolePermissions[userDetails.role] || [];
+                'view_feedback'
+            ];
+            for (const requiredPermission of permissions) {
+                if (!allowedPermissions.includes(requiredPermission)) {
+                    _res.status(403).json({ message: 'Compliance Officer access denied' });
+                    return;
+                }
+            }
+        }
+        const userPermissions = await getRolePermissions(userDetails.role);
         // Check if user has any of the required permissions
         const hasPermission = permissions.some(perm => userPermissions.includes(perm));
         if (!hasPermission) {

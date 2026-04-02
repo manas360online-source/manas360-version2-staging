@@ -478,7 +478,15 @@ export const getMyTherapistSessions = async (userId: string, query: TherapistSes
 	// Merge presence info (best-effort) from Redis for sessions and patients in this page
 	try {
 		const REDIS_URL = process.env.REDIS_URL || env.redisUrl || 'redis://127.0.0.1:6379';
-		const r = createClient({ url: REDIS_URL });
+		const r = createClient({
+			url: REDIS_URL,
+			socket: {
+				reconnectStrategy: () => false,
+			},
+		});
+		r.on('error', () => {
+			// Presence cache is optional.
+		});
 		await r.connect();
 		const sessionKeys = sessions.map((s) => `session:presence:${String(s.id)}`);
 		const patientKeys = patientIds.map((p) => `user:presence:${String(p)}`);

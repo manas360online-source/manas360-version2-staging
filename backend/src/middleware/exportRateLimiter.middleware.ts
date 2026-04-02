@@ -4,13 +4,28 @@ import { env } from '../config/env';
 import { AppError } from './error.middleware';
 
 const REDIS_URL = process.env.REDIS_URL || env.redisUrl || 'redis://127.0.0.1:6379';
-const client = createClient({ url: REDIS_URL });
+const client = createClient({
+  url: REDIS_URL,
+  socket: {
+    reconnectStrategy: () => false,
+  },
+});
+let redisAvailable = false;
+let redisWarned = false;
 const isTestEnv = process.env.NODE_ENV === 'test';
 if (!isTestEnv) {
   client.on('error', (error) => {
-    console.warn('[exportRateLimiter] Redis unavailable, failing open', error);
+    if (!redisWarned) {
+      console.warn('[exportRateLimiter] Redis unavailable, failing open', error);
+      redisWarned = true;
+    }
+    redisAvailable = false;
   });
-  void client.connect().catch(() => {});
+  void client.connect().then(() => {
+    redisAvailable = true;
+  }).catch(() => {
+    redisAvailable = false;
+  });
 }
 
 /**
@@ -19,6 +34,7 @@ if (!isTestEnv) {
  * - per-session: max 2 exports per 10 minutes
  */
 export const exportRateLimiter = async (req: Request, res: Response, next: NextFunction) => {
+  if (!redisAvailable) return next();
   try {
     const therapistId = req.auth?.userId;
     const sessionId = String(req.params.id || '');

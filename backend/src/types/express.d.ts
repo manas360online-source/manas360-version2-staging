@@ -149,7 +149,17 @@ declare global {
 				userId: string;
 				sessionId: string;
 				jti: string;
-				role?: 'patient' | 'therapist' | 'psychiatrist' | 'coach' | 'admin' | 'superadmin';
+				role?:
+					| 'patient'
+					| 'therapist'
+					| 'psychiatrist'
+					| 'psychologist'
+					| 'coach'
+					| 'admin'
+					| 'superadmin'
+					| 'clinicaldirector'
+					| 'financemanager'
+					| 'complianceofficer';
 			};
 			validatedUserUpdate?: ProfileUpdatePayload;
 			validatedChangePassword?: ChangePasswordPayload;

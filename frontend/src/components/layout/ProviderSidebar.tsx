@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Home, Users, Calendar, Settings, MessageSquare, CreditCard, LogOut, ClipboardCheck, Star } from 'lucide-react';
+import { Home, Users, Calendar, Settings, MessageSquare, CreditCard, LogOut, ClipboardCheck, Star, Radio } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 export const ProviderSidebar = () => {
@@ -29,6 +29,7 @@ export const ProviderSidebar = () => {
           { label: 'My Patients', path: '/provider/patients', icon: <Users size={18} /> },
           { label: 'Calendar', path: '/provider/calendar', icon: <Calendar size={18} /> },
           { label: 'Appointments', path: '/provider/appointments', icon: <ClipboardCheck size={18} /> },
+          { label: 'Group Therapy', path: '/provider/portal', icon: <Radio size={18} /> },
         ]
       }
     ];

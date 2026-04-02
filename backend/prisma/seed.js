@@ -88,7 +88,8 @@ const createUsersByRole = ({ role, count, predefined = [] }) => {
     const rolePrefix = rolePrefixMap[role] || '70009';
     const phone = `+91${rolePrefix}${String(serial).padStart(5, '0')}`;
     generated.push({
-      email: `${suffix}@demo.com`,
+      // For most roles the system uses phone+OTP; keep email only for platform admins
+      email: role === 'ADMIN' ? `${suffix}@demo.com` : null,
       phone,
       firstName: role.slice(0, 1) + role.slice(1).toLowerCase(),
       lastName: `User${index}`,
@@ -116,8 +117,13 @@ async function upsertUser(userInput, passwordHash) {
         therapistVerifiedByUserId: null,
       };
 
+  // Upsert by email when present, otherwise by phone (phone-first identity)
+  const whereClause = email ? { email } : { phone };
+  const isPlatformAdmin = role === 'ADMIN';
+  const passwordForCreate = isPlatformAdmin ? passwordHash : null;
+
   return prisma.user.upsert({
-    where: { email },
+    where: whereClause,
     update: {
       firstName,
       lastName,
@@ -126,17 +132,18 @@ async function upsertUser(userInput, passwordHash) {
       role,
       providerType,
       provider: 'LOCAL',
-      emailVerified: true,
+      // For non-admins prefer phone verification as primary
+      emailVerified: isPlatformAdmin && !!email,
       phoneVerified: true,
       isDeleted: false,
       status: 'ACTIVE',
-      passwordHash,
+      passwordHash: passwordForCreate,
       failedLoginAttempts: 0,
       lockUntil: null,
       ...providerFlags,
     },
     create: {
-      email,
+      email: email || null,
       phone,
       firstName,
       lastName,
@@ -144,10 +151,10 @@ async function upsertUser(userInput, passwordHash) {
       role,
       providerType,
       provider: 'LOCAL',
-      emailVerified: true,
+      emailVerified: isPlatformAdmin && !!email,
       phoneVerified: true,
       status: 'ACTIVE',
-      passwordHash,
+      passwordHash: passwordForCreate,
       ...providerFlags,
     },
   });
@@ -160,41 +167,43 @@ async function seed() {
     role: 'PATIENT',
     count: 20,
     predefined: [
-      { email: 'patient@demo.com', phone: '+917000100001', firstName: 'Patient', lastName: 'Demo', role: 'PATIENT' },
-      { email: 'free@demo.com', phone: '+917000100002', firstName: 'Free', lastName: 'Plan', role: 'PATIENT' },
-      { email: 'basic@demo.com', phone: '+917000100003', firstName: 'Basic', lastName: 'Plan', role: 'PATIENT' },
-      { email: 'premium@demo.com', phone: '+917000100004', firstName: 'Premium', lastName: 'Plan', role: 'PATIENT' },
+      { email: null, phone: '+917000100001', firstName: 'Patient', lastName: 'Demo', role: 'PATIENT' },
+      { email: null, phone: '+917000100002', firstName: 'Free', lastName: 'Plan', role: 'PATIENT' },
+      { email: null, phone: '+917000100003', firstName: 'Monthly', lastName: 'Plan', role: 'PATIENT' },
+      { email: null, phone: '+917000100004', firstName: 'Quarterly', lastName: 'Plan', role: 'PATIENT' },
+      { email: null, phone: '+917000100005', firstName: 'Premium', lastName: 'Plan', role: 'PATIENT' },
     ],
   });
 
   const therapistsSeed = createUsersByRole({
     role: 'THERAPIST',
     count: 10,
-    predefined: [{ email: 'therapist@demo.com', phone: '+917000200001', firstName: 'Therapist', lastName: 'Demo', role: 'THERAPIST' }],
+    predefined: [{ email: null, phone: '+917000200001', firstName: 'Therapist', lastName: 'Demo', role: 'THERAPIST' }],
   });
 
   const coachesSeed = createUsersByRole({
     role: 'COACH',
     count: 5,
-    predefined: [{ email: 'coach@demo.com', phone: '+917000300001', firstName: 'Coach', lastName: 'Demo', role: 'COACH' }],
+    predefined: [{ email: null, phone: '+917000300001', firstName: 'Coach', lastName: 'Demo', role: 'COACH' }],
   });
 
   const psychiatristsSeed = createUsersByRole({
     role: 'PSYCHIATRIST',
     count: 3,
-    predefined: [{ email: 'psychiatrist@demo.com', phone: '+917000400001', firstName: 'Psychiatrist', lastName: 'Demo', role: 'PSYCHIATRIST' }],
+    predefined: [{ email: null, phone: '+917000400001', firstName: 'Psychiatrist', lastName: 'Demo', role: 'PSYCHIATRIST' }],
   });
 
   const psychologistsSeed = createUsersByRole({
     role: 'PSYCHOLOGIST',
     count: 4,
-    predefined: [{ email: 'psychologist@demo.com', phone: '+917000500001', firstName: 'Psychologist', lastName: 'Demo', role: 'PSYCHOLOGIST' }],
+    predefined: [{ email: null, phone: '+917000500001', firstName: 'Psychologist', lastName: 'Demo', role: 'PSYCHOLOGIST' }],
   });
 
   const adminsSeed = createUsersByRole({
     role: 'ADMIN',
     count: 1,
     predefined: [
+      // Keep platform admin email/password intact
       { email: 'admin@demo.com', phone: '+917000600001', firstName: 'Admin', lastName: 'Demo', role: 'ADMIN' },
     ],
   });
@@ -205,12 +214,19 @@ async function seed() {
     persistedUsers.push(await upsertUser(userData, passwordHash));
   }
 
-  const usersByEmail = new Map(persistedUsers.map((user) => [String(user.email).toLowerCase(), user]));
-  const patientUsers = patientsSeed.map((row) => usersByEmail.get(row.email.toLowerCase())).filter(Boolean);
-  const therapistUsers = therapistsSeed.map((row) => usersByEmail.get(row.email.toLowerCase())).filter(Boolean);
-  const coachUsers = coachesSeed.map((row) => usersByEmail.get(row.email.toLowerCase())).filter(Boolean);
-  const psychiatristUsers = psychiatristsSeed.map((row) => usersByEmail.get(row.email.toLowerCase())).filter(Boolean);
-  const psychologistUsers = psychologistsSeed.map((row) => usersByEmail.get(row.email.toLowerCase())).filter(Boolean);
+  // Map persisted users by phone for phone-first lookups. Fall back to email when present.
+  const usersByPhone = new Map(persistedUsers.map((user) => [String(user.phone || '').trim(), user]));
+  const usersByEmailOrPhone = (row) => {
+    if (row.phone) return usersByPhone.get(row.phone);
+    if (row.email) return persistedUsers.find((u) => String(u.email || '').toLowerCase() === String(row.email || '').toLowerCase());
+    return null;
+  };
+
+  const patientUsers = patientsSeed.map((row) => usersByEmailOrPhone(row)).filter(Boolean);
+  const therapistUsers = therapistsSeed.map((row) => usersByEmailOrPhone(row)).filter(Boolean);
+  const coachUsers = coachesSeed.map((row) => usersByEmailOrPhone(row)).filter(Boolean);
+  const psychiatristUsers = psychiatristsSeed.map((row) => usersByEmailOrPhone(row)).filter(Boolean);
+  const psychologistUsers = psychologistsSeed.map((row) => usersByEmailOrPhone(row)).filter(Boolean);
   const providerUsers = [...therapistUsers, ...coachUsers, ...psychiatristUsers, ...psychologistUsers].filter(Boolean);
 
   // Ensure TherapistProfile rows exist for all seeded provider roles
@@ -247,6 +263,20 @@ async function seed() {
         isVerified: true,
         verifiedAt: new Date(),
         verifiedByUserId: null,
+      },
+    }).catch(() => null);
+
+    // NEW: Grant all seeded providers active platform access for immediate QA testing
+    await prisma.platformAccess.upsert({
+      where: { providerId: provider.id },
+      update: {
+        status: 'active',
+        expiryDate: plusDays(365),
+      },
+      create: {
+        providerId: provider.id,
+        status: 'active',
+        expiryDate: plusDays(365),
       },
     }).catch(() => null);
   }
@@ -345,15 +375,24 @@ async function seed() {
     }
   }
 
-  const planByEmail = {
-    'free@demo.com': { planName: 'Free Plan', price: 0, billingCycle: 'monthly', status: 'active' },
-    'basic@demo.com': { planName: 'Basic Plan', price: 999, billingCycle: 'monthly', status: 'active' },
-    'premium@demo.com': { planName: 'Premium Plan', price: 2499, billingCycle: 'monthly', status: 'active' },
+  // Assign plans by phone for seeded patients (email is optional/removed)
+  const planByPhone = {
+    '+917000100002': { planName: 'Free Plan', price: 0, billingCycle: 'monthly', status: 'active' },
+    '+917000100003': { planName: 'Monthly Plan', price: 99, billingCycle: 'monthly', status: 'active' },
+    '+917000100004': { planName: 'Quarterly Plan', price: 279, billingCycle: 'quarterly', status: 'active' },
+    '+917000100005': { planName: 'Premium Monthly Plan', price: 299, billingCycle: 'monthly', status: 'active' },
   };
 
+  const randomPlans = [
+    { planName: 'Free Plan', price: 0, billingCycle: 'monthly', status: 'active' },
+    { planName: 'Monthly Plan', price: 99, billingCycle: 'monthly', status: 'active' },
+    { planName: 'Quarterly Plan', price: 279, billingCycle: 'quarterly', status: 'active' },
+    { planName: 'Premium Monthly Plan', price: 299, billingCycle: 'monthly', status: 'active' },
+  ];
+
   for (const patient of patientUsers) {
-    const email = String(patient.email || '').toLowerCase();
-    const plan = planByEmail[email] || { planName: randomItem(['Free Plan', 'Basic Plan', 'Premium Plan']), price: randomItem([0, 999, 2499]), billingCycle: 'monthly', status: 'active' };
+    const phone = String(patient.phone || '');
+    const plan = planByPhone[phone] || randomItem(randomPlans);
 
     await prisma.patientSubscription.upsert({
       where: { userId: patient.id },
@@ -362,8 +401,10 @@ async function seed() {
         price: plan.price,
         billingCycle: plan.billingCycle,
         status: plan.status,
-        autoRenew: plan.price > 0,
-        renewalDate: plusDays(30),
+        // For stable staging QA: prevent auto-renew logic from overriding the seeded plan.
+        autoRenew: false,
+        // Put renewal far in the future so `ensureSubscriptionRecord()` won't switch plans.
+        renewalDate: plusDays(365),
       },
       create: {
         userId: patient.id,
@@ -371,8 +412,10 @@ async function seed() {
         price: plan.price,
         billingCycle: plan.billingCycle,
         status: plan.status,
-        autoRenew: plan.price > 0,
-        renewalDate: plusDays(30),
+        // For stable staging QA: prevent auto-renew logic from overriding the seeded plan.
+        autoRenew: false,
+        // Put renewal far in the future so `ensureSubscriptionRecord()` won't switch plans.
+        renewalDate: plusDays(365),
       },
     });
   }
@@ -615,6 +658,153 @@ async function seed() {
     }
   }
 
+  // Seed Group Therapy Sessions
+  const groupTherapySessions = [
+    {
+      title: 'Anxiety Circle - Morning Session',
+      topic: 'Anxiety Management',
+      description: 'Learn evidence-based techniques to manage anxiety symptoms including breathing exercises, cognitive restructuring, and exposure therapy.',
+      mode: 'PUBLIC',
+      status: 'PUBLISHED',
+      offset: 0, // Today
+      durationMinutes: 60,
+      maxMembers: 12,
+      priceMinor: BigInt(0), // Free
+      allowGuestJoin: true,
+      requiresPayment: false,
+    },
+    {
+      title: 'Grief & Loss Support Group',
+      topic: 'Bereavement & Grief',
+      description: 'A compassionate space to process loss and grief with trained facilitators and supportive peers.',
+      mode: 'PUBLIC',
+      status: 'PUBLISHED',
+      offset: 0.2, // 12 minutes from now
+      durationMinutes: 90,
+      maxMembers: 10,
+      priceMinor: BigInt(0), // Free
+      allowGuestJoin: true,
+      requiresPayment: false,
+    },
+    {
+      title: 'Mindful Parenting Workshop',
+      topic: 'Parenting & Family Wellness',
+      description: 'Develop mindful parenting skills to create a more peaceful and connected family environment.',
+      mode: 'PUBLIC',
+      status: 'PUBLISHED',
+      offset: 1.08, // 1 hour 35 minutes from now
+      durationMinutes: 75,
+      maxMembers: 15,
+      priceMinor: BigInt(0), // Free
+      allowGuestJoin: true,
+      requiresPayment: false,
+    },
+    {
+      title: 'Depression Recovery Circle',
+      topic: 'Depression Management',
+      description: 'Peer-led discussion group focusing on recovery strategies, medication management, and lifestyle changes for depression.',
+      mode: 'PUBLIC',
+      status: 'PUBLISHED',
+      offset: 0.5, // 30 minutes from now
+      durationMinutes: 60,
+      maxMembers: 8,
+      priceMinor: BigInt(0), // Free
+      allowGuestJoin: true,
+      requiresPayment: false,
+    },
+    {
+      title: 'Trauma-Informed Care Workshop',
+      topic: 'Trauma Recovery',
+      description: 'Safe and structured environment for trauma survivors to learn healing techniques including EMDR basics and somatic experiencing.',
+      mode: 'PUBLIC',
+      status: 'PUBLISHED',
+      offset: 2, // 2 hours from now
+      durationMinutes: 90,
+      maxMembers: 10,
+      priceMinor: BigInt(0), // Free
+      allowGuestJoin: true,
+      requiresPayment: false,
+    },
+  ];
+
+  const adminUser = adminsSeed[0];
+  const adminObj = persistedUsers.find(u => u.role === 'ADMIN');
+
+  for (let idx = 0; idx < groupTherapySessions.length; idx++) {
+    const sessionData = groupTherapySessions[idx];
+    const therapist = therapistUsers[idx % therapistUsers.length];
+    if (!therapist) continue;
+
+    const scheduledAt = new Date();
+    scheduledAt.setHours(scheduledAt.getHours() + Math.floor(sessionData.offset));
+    scheduledAt.setMinutes(scheduledAt.getMinutes() + (sessionData.offset % 1) * 60);
+
+    await prisma.groupTherapySession.upsert({
+      where: { id: `group-therapy-seed-${idx}` },
+      update: {
+        title: sessionData.title,
+        status: sessionData.status,
+        publishedAt: new Date(),
+        approvedAt: new Date(),
+        approvedById: adminObj?.id,
+      },
+      create: {
+        id: `group-therapy-seed-${idx}`,
+        title: sessionData.title,
+        topic: sessionData.topic,
+        description: sessionData.description,
+        sessionMode: sessionData.mode,
+        status: sessionData.status,
+        requestedById: therapist.id,
+        hostTherapistId: therapist.id,
+        approvedById: adminObj?.id,
+        scheduledAt,
+        durationMinutes: sessionData.durationMinutes,
+        maxMembers: sessionData.maxMembers,
+        priceMinor: sessionData.priceMinor,
+        allowGuestJoin: sessionData.allowGuestJoin,
+        requiresAdminGate: false,
+        requiresPayment: sessionData.requiresPayment,
+        jitsiRoomName: `group-therapy-${idx}-${Date.now()}`,
+        publishAt: new Date(),
+        publishedAt: new Date(),
+        approvedAt: new Date(),
+      },
+    }).catch(() => null);
+  }
+
+  // Add a few enrollments to the first session to show joined counts
+  const firstSession = await prisma.groupTherapySession.findFirst({
+    where: { id: 'group-therapy-seed-0' },
+  });
+
+  if (firstSession) {
+    for (let i = 0; i < 5; i++) {
+      const patient = patientUsers[i];
+      if (!patient) continue;
+
+      await prisma.groupTherapyEnrollment.upsert({
+        where: {
+          sessionId_patientUserId_guestEmail: {
+            sessionId: firstSession.id,
+            patientUserId: patient.id,
+            guestEmail: null,
+          },
+        },
+        update: {
+          status: 'JOINED',
+        },
+        create: {
+          sessionId: firstSession.id,
+          patientUserId: patient.id,
+          enrolledByAdminId: adminObj?.id,
+          status: 'JOINED',
+          joinedAt: new Date(),
+        },
+      }).catch(() => null);
+    }
+  }
+
   for (const patient of patientUsers) {
     const profile = profileByUserId.get(patient.id);
     if (!profile) continue;
@@ -661,6 +851,11 @@ async function seed() {
 
   console.log('Seed complete ✅');
   console.log(`Default password for seeded users: ${DEFAULT_PASSWORD}`);
+  console.log('Patient plan test users (phone + plan):');
+  console.log('  +917000100002 -> Free Plan');
+  console.log('  +917000100003 -> Monthly Plan (INR 99 / month)');
+  console.log('  +917000100004 -> Quarterly Plan (INR 279 / quarter)');
+  console.log('  +917000100005 -> Premium Monthly Plan (INR 299 / month)');
 }
 
 seed()

@@ -2,8 +2,15 @@ import { prisma } from '../config/db';
 import { AppError } from '../middleware/error.middleware';
 import { PROVIDER_PLANS, LEAD_MARKETPLACE_PRICES, getDiscountedLeadPrice, type ProviderPlanKey } from '../config/providerPlans';
 import { logger } from '../utils/logger';
+import { isSubscriptionValidForMatching } from './subscription.helper';
 
 const db = prisma;
+const ACTIVE_PROVIDER_STATUSES = ['active', 'trial', 'grace', 'ACTIVE', 'TRIAL', 'GRACE'];
+
+const isProviderLeadEligible = (sub: { status?: string | null; plan?: string | null; expiryDate?: Date | null; metadata?: any } | null): boolean => {
+	if (!sub) return false;
+	return isSubscriptionValidForMatching(sub);
+};
 
 /**
  * Shuffle an array in-place (Fisher-Yates) for fairness within tiers.
@@ -32,8 +39,8 @@ const shuffle = <T>(arr: T[]): T[] => {
 export const distributeWeeklyLeads = async () => {
 	const activeProviders = await db.providerSubscription.findMany({
 		where: {
-			status: 'active',
-			plan: { not: 'free' },
+			status: { in: ACTIVE_PROVIDER_STATUSES as any },
+			plan: { notIn: ['free', 'FREE'] as any },
 			expiryDate: { gte: new Date() },
 		},
 	});
@@ -160,10 +167,13 @@ export const getProviderLeads = async (providerId: string) => {
  * Fix 10: Enforces free plan cannot access marketplace.
  */
 export const getMarketplaceLeads = async (providerId: string) => {
-	const sub = await db.providerSubscription.findUnique({ where: { providerId } });
+	const sub = await db.providerSubscription.findUnique({ 
+		where: { providerId },
+		select: { status: true, plan: true, expiryDate: true, metadata: true }
+	});
 
 	// Fix 10: Free plan and no-subscription blocked
-	if (!sub || sub.plan === 'free' || sub.status !== 'active') {
+	if (!isProviderLeadEligible(sub as any)) {
 		throw new AppError('Marketplace access requires an active paid subscription', 403);
 	}
 
@@ -203,10 +213,13 @@ export const getMarketplaceLeads = async (providerId: string) => {
  * Fix 10: Free plan cannot purchase.
  */
 export const purchaseMarketplaceLead = async (providerId: string, leadId: string) => {
-	const sub = await db.providerSubscription.findUnique({ where: { providerId } });
+	const sub = await db.providerSubscription.findUnique({ 
+		where: { providerId },
+		select: { status: true, plan: true, expiryDate: true, metadata: true }
+	});
 
 	// Fix 10: Block free plan and inactive subscriptions
-	if (!sub || sub.plan === 'free' || sub.status !== 'active') {
+	if (!isProviderLeadEligible(sub as any)) {
 		throw new AppError('Marketplace access requires an active paid subscription', 403);
 	}
 
@@ -304,4 +317,39 @@ export const auditLeadConsistency = async () => {
 	}
 
 	return { audited: orphanPurchases.length, fixed: fixedCount };
+};
+
+/**
+ * Reset weekly lead counters for active/trial/grace providers.
+ * Runs before weekly distribution so quota accounting starts clean each week.
+ */
+export const resetWeeklyLeadCounters = async () => {
+	const now = new Date();
+	const weekStart = new Date(now);
+	const day = weekStart.getDay();
+	const diff = day === 0 ? -6 : 1 - day;
+	weekStart.setDate(weekStart.getDate() + diff);
+	weekStart.setHours(0, 0, 0, 0);
+
+	const updated = await db.providerSubscription.updateMany({
+		where: {
+			status: { in: ACTIVE_PROVIDER_STATUSES as any },
+			plan: { notIn: ['free', 'FREE'] as any },
+			OR: [
+				{ weekStartsAt: { lt: weekStart } },
+				{ leadsUsedThisWeek: { gt: 0 } },
+			],
+		},
+		data: {
+			leadsUsedThisWeek: 0,
+			weekStartsAt: weekStart,
+		},
+	});
+
+	logger.info('[LeadDistribution] Weekly lead counters reset', {
+		updatedProviders: updated.count,
+		weekStart,
+	});
+
+	return { reset: updated.count, weekStart };
 };

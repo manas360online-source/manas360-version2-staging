@@ -10,6 +10,15 @@ const admin_module_controller_1 = require("../controllers/admin-module.controlle
 const rateLimiter_middleware_1 = require("../middleware/rateLimiter.middleware");
 const pricing_controller_1 = require("../controllers/pricing.controller");
 const free_screening_admin_controller_1 = require("../controllers/free-screening-admin.controller");
+const admin_verification_controller_1 = require("../controllers/admin-verification.controller");
+const admin_payout_controller_1 = require("../controllers/admin-payout.controller");
+const admin_pricing_controller_1 = require("../controllers/admin-pricing.controller");
+const admin_tickets_controller_1 = require("../controllers/admin-tickets.controller");
+const admin_offer_controller_1 = require("../controllers/admin-offer.controller");
+const admin_metrics_controller_1 = require("../controllers/admin-metrics.controller");
+const admin_crisis_controller_1 = require("../controllers/admin-crisis.controller");
+const admin_audit_controller_1 = require("../controllers/admin-audit.controller");
+const admin_groups_controller_1 = require("../controllers/admin-groups.controller");
 const router = (0, express_1.Router)();
 /**
  * GET /api/v1/admin/users
@@ -20,14 +29,15 @@ const router = (0, express_1.Router)();
  *   - page: pagination page number (default: 1)
  *   - limit: items per page (default: 10, max: 50)
  */
-router.get('/users', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('manage_users'), ...validate_middleware_1.validateAdminListUsersQuery, (0, validate_middleware_1.asyncHandler)(admin_controller_1.listUsersController));
+router.get('/users', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin']), ...validate_middleware_1.validateAdminListUsersQuery, (0, validate_middleware_1.asyncHandler)(admin_controller_1.listUsersController));
 /**
  * GET /api/v1/admin/users/:id
  * Get a single user by ID
  * Route parameters:
  *   - id: user identifier
  */
-router.get('/users/:id', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('read_all_profiles'), ...validate_middleware_1.validateAdminGetUserIdParam, (0, validate_middleware_1.asyncHandler)(admin_controller_1.getUserController));
+router.get('/users/:id', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin']), ...validate_middleware_1.validateAdminGetUserIdParam, (0, validate_middleware_1.asyncHandler)(admin_controller_1.getUserController));
+router.patch('/users/:id/status', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin']), (0, validate_middleware_1.asyncHandler)(admin_controller_1.updateAdminUserStatusController));
 /**
  * PATCH /api/v1/admin/therapists/:id/verify
  * Verify therapist credentials
@@ -45,6 +55,16 @@ router.post('/verify-provider/:id', auth_middleware_1.requireAuth, (0, rbac_midd
  *   - id: provider user ID
  */
 router.post('/approve-provider/:id', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('manage_therapists'), (0, validate_middleware_1.asyncHandler)(admin_controller_1.approveProviderController));
+/**
+ * GET /api/v1/admin/user-approvals
+ * Get all users pending onboarding approval
+ */
+router.get('/user-approvals', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin']), (0, rbac_middleware_1.requirePermission)('manage_users'), (0, validate_middleware_1.asyncHandler)(admin_controller_1.getAdminUserApprovalsController));
+/**
+ * PATCH /api/v1/admin/user-approvals/:id
+ * Approve or Reject a user's registration
+ */
+router.patch('/user-approvals/:id', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin']), (0, rbac_middleware_1.requirePermission)('manage_users'), (0, validate_middleware_1.asyncHandler)(admin_controller_1.updateAdminUserApprovalController));
 /**
  * GET /api/v1/admin/metrics
  * Get comprehensive platform metrics
@@ -90,6 +110,15 @@ router.get('/screening/provider-questions', auth_middleware_1.requireAuth, (0, r
  * Generic real-time summary for admin module pages.
  */
 router.get('/modules/:module/summary', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, validate_middleware_1.asyncHandler)(admin_module_controller_1.getAdminModuleSummaryController));
+// ==================== DASHBOARD & CORE ====================
+router.get('/analytics/health', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, validate_middleware_1.asyncHandler)(admin_analytics_controller_1.getAdminSystemHealthController));
+router.get('/company-reports', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin']), (0, validate_middleware_1.asyncHandler)(admin_analytics_controller_1.getAdminCompanyReportsController));
+router.get('/analytics/bi-summary', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin']), (0, validate_middleware_1.asyncHandler)(admin_analytics_controller_1.getAdminBICorporateSummaryController));
+router.get('/analytics/therapist-performance', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin']), (0, validate_middleware_1.asyncHandler)(admin_analytics_controller_1.getAdminTherapistPerformanceController));
+router.get('/analytics/reliability', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, validate_middleware_1.asyncHandler)(admin_analytics_controller_1.getAdminPaymentReliabilityController));
+router.get('/analytics/user-growth', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin']), (0, validate_middleware_1.asyncHandler)(admin_analytics_controller_1.getAdminUserGrowthAnalyticsController));
+router.get('/analytics/sessions', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin']), (0, validate_middleware_1.asyncHandler)(admin_analytics_controller_1.getAdminSessionAnalyticsController));
+router.get('/analytics/platform', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin']), (0, validate_middleware_1.asyncHandler)(admin_analytics_controller_1.getAdminPlatformAnalyticsController));
 /**
  * GET /api/v1/admin/analytics/summary
  * Query params:
@@ -121,6 +150,31 @@ router.get('/analytics/templates', auth_middleware_1.requireAuth, (0, rbac_middl
  *   - lastTherapistKey: bigint (optional, keyset cursor)
  */
 router.get('/analytics/utilization', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, validate_middleware_1.asyncHandler)(admin_analytics_controller_1.getAdminTherapistUtilizationController));
+/**
+ * GET /api/v1/admin/analytics/revenue
+ * Get revenue analytics dashboard data
+ */
+router.get('/analytics/revenue', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('view_analytics'), (0, validate_middleware_1.asyncHandler)(admin_analytics_controller_1.getAdminRevenueAnalyticsController));
+/**
+ * GET /api/v1/admin/analytics/user-metrics
+ * Get user metrics and growth analytics
+ */
+router.get('/analytics/users', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('view_analytics'), (0, validate_middleware_1.asyncHandler)(admin_analytics_controller_1.getAdminUserMetricsController));
+/**
+ * GET /api/v1/admin/analytics/provider-metrics
+ * Get provider performance and utilization metrics
+ */
+router.get('/analytics/providers', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('view_analytics'), (0, validate_middleware_1.asyncHandler)(admin_analytics_controller_1.getAdminProviderMetricsController));
+/**
+ * GET /api/v1/admin/analytics/marketplace-metrics
+ * Get marketplace (lead matching, supply/demand) metrics
+ */
+router.get('/analytics/marketplace', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('view_analytics'), (0, validate_middleware_1.asyncHandler)(admin_analytics_controller_1.getAdminMarketplaceMetricsController));
+/**
+ * GET /api/v1/admin/analytics/system-health
+ * Get system health and infrastructure metrics
+ */
+router.get('/analytics/health', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('view_analytics'), (0, validate_middleware_1.asyncHandler)(admin_analytics_controller_1.getAdminSystemHealthController));
 /**
  * GET /api/v1/admin/analytics/payments
  * Query params:
@@ -167,103 +221,54 @@ router.get('/analytics/export/:exportJobKey/status', auth_middleware_1.requireAu
  * GET /api/v1/admin/analytics/export/:exportJobKey/download
  * Download completed async export output.
  */
+router.get('/analytics/export/:exportJobKey/download', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('view_analytics'), (0, validate_middleware_1.asyncHandler)(admin_analytics_controller_1.downloadAdminAnalyticsExportController));
+// === PHASE 2: ENHANCED VERIFICATION + PAYOUTS + WAIVERS ===
+router.get('/verifications', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('manage_therapists'), (0, validate_middleware_1.asyncHandler)(admin_verification_controller_1.getVerificationsController));
+router.get('/verifications/:id/documents', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('manage_therapists'), (0, validate_middleware_1.asyncHandler)(admin_verification_controller_1.getVerificationDocumentsController));
+router.patch('/verifications/:id', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('manage_therapists'), (0, validate_middleware_1.asyncHandler)(admin_verification_controller_1.updateVerificationController));
+router.get('/payouts', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('payouts_approve'), (0, validate_middleware_1.asyncHandler)(admin_payout_controller_1.getPayoutsController));
+router.post('/payouts/:id/approve', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('payouts_approve'), (0, validate_middleware_1.asyncHandler)(admin_payout_controller_1.approvePayoutController));
+router.post('/waive-subscription', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, validate_middleware_1.asyncHandler)(admin_pricing_controller_1.waiveSubscriptionController));
+router.post('/pricing/free-toggle', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('pricing_edit'), (0, validate_middleware_1.asyncHandler)(admin_pricing_controller_1.toggleGlobalFreeController));
+// === PHASE 3: ZOHO DESK + ZOHO FLOW INTEGRATION ===
+router.get('/tickets', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), admin_tickets_controller_1.getZohoTicketsController);
+router.post('/tickets/:id/comment', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), admin_tickets_controller_1.addZohoCommentController);
+router.get('/blueprints/status', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), admin_tickets_controller_1.getBlueprintStatusController);
+// === PHASE 4: OFFER MARQUEE + PRICING CONTRACTS ===
+router.get('/offers', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('offers_edit'), admin_offer_controller_1.getOffersController);
+router.post('/offers', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('offers_edit'), admin_offer_controller_1.createOfferController);
+router.put('/offers/:id', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('offers_edit'), admin_offer_controller_1.updateOfferController);
+router.delete('/offers/:id', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('offers_edit'), admin_offer_controller_1.deleteOfferController);
+router.post('/offers/reorder', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('offers_edit'), admin_offer_controller_1.reorderOffersController);
+router.post('/offers/publish', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('offers_edit'), admin_offer_controller_1.publishOffersController);
+router.get('/pricing/contracts', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), admin_pricing_controller_1.getPricingContractsController);
+router.post('/pricing/contracts/draft', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('pricing_edit'), admin_pricing_controller_1.createPricingDraftController);
+router.post('/pricing/contracts/:id/approve', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('pricing_edit'), admin_pricing_controller_1.approvePricingContractController);
+// === PHASE 5: REAL-TIME, CRISIS, REPORTS & AUDIT ===
+router.get('/metrics/live', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), admin_metrics_controller_1.getLiveMetricsController);
+router.get('/live-sessions', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin', 'complianceofficer']), (0, rbac_middleware_1.requirePermission)('view_analytics'), (0, validate_middleware_1.asyncHandler)(admin_controller_1.getAdminLiveSessionsController));
 /**
- * POST /api/v1/admin/waive-subscription
- * Admin grants a subscription without charging the user (free access).
- * Skips PhonePe entirely. Logs as ADMIN_WAIVER_GRANTED.
- * Generates a dummy transaction audit record.
+ * Support & Sentiment Dashboard
  */
-router.post('/waive-subscription', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, validate_middleware_1.asyncHandler)(async (req, res) => {
-    const { prisma } = await import('../config/db');
-    const { logger } = await import('../utils/logger');
-    const { randomUUID } = await import('crypto');
-    const adminId = req.auth?.userId;
-    const userId = String(req.body.userId ?? '').trim();
-    const planKey = String(req.body.planKey ?? 'basic').trim();
-    const durationDays = Number(req.body.durationDays) || 30;
-    const reason = String(req.body.reason ?? 'Admin waiver').trim();
-    if (!userId) {
-        return res.status(422).json({ success: false, message: 'userId is required' });
-    }
-    const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, role: true } });
-    if (!user) {
-        return res.status(404).json({ success: false, message: 'User not found' });
-    }
-    const role = String(user.role || '').toUpperCase();
-    const expiryDate = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000);
-    const dummyTxId = `WAIVER_${Date.now()}_${randomUUID().substring(0, 8)}`;
-    // Create a financial record for audit trail
-    await prisma.financialPayment.create({
-        data: {
-            id: randomUUID(),
-            razorpayPaymentId: dummyTxId,
-            status: 'CAPTURED',
-            amountMinor: 0,
-            currency: 'INR',
-            patientId: role === 'PATIENT' ? userId : undefined,
-            providerId: role !== 'PATIENT' ? userId : undefined,
-            metadata: {
-                action: 'ADMIN_WAIVER',
-                adminId,
-                reason,
-                planKey,
-                durationDays
-            }
-        }
-    });
-    if (['THERAPIST', 'PSYCHIATRIST', 'PSYCHOLOGIST', 'COACH'].includes(role)) {
-        await prisma.providerSubscription.upsert({
-            where: { providerId: userId },
-            create: {
-                providerId: userId,
-                plan: planKey,
-                status: 'active',
-                startDate: new Date(),
-                expiryDate,
-                leadsUsedThisWeek: 0,
-            },
-            update: {
-                plan: planKey,
-                status: 'active',
-                startDate: new Date(),
-                expiryDate,
-                leadsUsedThisWeek: 0,
-            },
-        });
-    }
-    else {
-        await prisma.patientSubscription.upsert({
-            where: { userId },
-            create: {
-                userId,
-                planName: planKey,
-                price: 0,
-                status: 'active',
-                autoRenew: false,
-                renewalDate: expiryDate,
-            },
-            update: {
-                planName: planKey,
-                price: 0,
-                status: 'active',
-                autoRenew: false,
-                renewalDate: expiryDate,
-            },
-        });
-    }
-    logger.info('[AdminWaiver] ADMIN_WAIVER_GRANTED', {
-        adminId,
-        userId,
-        role,
-        planKey,
-        durationDays,
-        expiryDate: expiryDate.toISOString(),
-        reason,
-        dummyTxId
-    });
-    res.status(200).json({
-        success: true,
-        message: `Subscription waived for user ${userId}. Plan: ${planKey}, Duration: ${durationDays} days. Record: ${dummyTxId}`,
-    });
-}));
+router.get('/feedback', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'complianceofficer']), (0, validate_middleware_1.asyncHandler)(admin_controller_1.getAdminFeedbackController));
+router.post('/feedback/:id/resolve', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'complianceofficer']), (0, validate_middleware_1.asyncHandler)(admin_controller_1.resolveAdminFeedbackController));
+router.get('/crisis/alerts', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'complianceofficer']), admin_crisis_controller_1.getCrisisAlertsController);
+router.post('/crisis/:id/respond', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'complianceofficer']), admin_crisis_controller_1.respondToCrisisController);
+router.get('/audit', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'complianceofficer']), admin_audit_controller_1.getAuditLogController);
+router.get('/compliance/status', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'complianceofficer']), (0, validate_middleware_1.asyncHandler)(admin_controller_1.getComplianceStatusController));
+router.get('/legal/documents', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'complianceofficer']), (0, validate_middleware_1.asyncHandler)(admin_controller_1.getLegalDocumentsController));
+router.get('/legal/documents/:id/download', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'complianceofficer']), (0, validate_middleware_1.asyncHandler)(admin_controller_1.downloadLegalDocumentController));
+router.get('/acceptances', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'complianceofficer']), (0, validate_middleware_1.asyncHandler)(admin_controller_1.getUserAcceptancesController));
+// Advanced Reporting & Exports
+router.post('/reports/export', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'complianceofficer']), (0, rbac_middleware_1.requirePermission)('view_analytics'), admin_analytics_controller_1.enqueueAdminAnalyticsExportController);
+router.get('/reports/export/:jobId', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'complianceofficer']), (0, rbac_middleware_1.requirePermission)('view_analytics'), admin_analytics_controller_1.getAdminAnalyticsExportStatusController);
+router.get('/reports/export/:jobId/download', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'complianceofficer']), (0, rbac_middleware_1.requirePermission)('view_analytics'), admin_analytics_controller_1.downloadAdminAnalyticsExportController);
+// === PHASE 5 EXTENSION: DYNAMIC GROUPS ===
+router.get('/groups', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), admin_groups_controller_1.listGroupCategoriesController);
+router.post('/groups', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), admin_groups_controller_1.createGroupCategoryController);
+router.put('/groups/:id', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), admin_groups_controller_1.updateGroupCategoryController);
+router.delete('/groups/:id', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), admin_groups_controller_1.deleteGroupCategoryController);
+// === DYNAMIC ROLE MANAGEMENT ===
+router.get('/roles', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('superadmin'), (0, validate_middleware_1.asyncHandler)(admin_controller_1.getRolesController));
+router.patch('/roles/:role', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('superadmin'), (0, validate_middleware_1.asyncHandler)(admin_controller_1.updateRolePermissionsController));
 exports.default = router;

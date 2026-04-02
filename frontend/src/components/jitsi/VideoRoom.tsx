@@ -8,6 +8,10 @@ type VideoRoomProps = {
   jitsiJwt?: string | null;
   className?: string;
   onEndCall?: () => void;
+  isTherapist?: boolean;
+  aiEngineUrl?: string;
+  onTranscriptUpdate?: (transcript: Record<string, unknown>) => void;
+  onGPSUpdate?: (metrics: Record<string, unknown>) => void;
 };
 
 const loadJitsiScript = (domain: string): Promise<void> => {
@@ -26,7 +30,7 @@ const loadJitsiScript = (domain: string): Promise<void> => {
   });
 };
 
-export default function VideoRoom({ sessionId, roomName, displayName, jitsiJwt, className, onEndCall }: VideoRoomProps) {
+export default function VideoRoom({ sessionId, roomName, displayName, jitsiJwt, className, onEndCall, isTherapist, aiEngineUrl, onTranscriptUpdate, onGPSUpdate }: VideoRoomProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const managerRef = useRef<JitsiSessionManager | null>(null);
   const jitsiApiRef = useRef<{ dispose: () => void; addEventListeners?: (listeners: Record<string, () => void>) => void } | null>(null);
@@ -73,8 +77,11 @@ export default function VideoRoom({ sessionId, roomName, displayName, jitsiJwt, 
           container: containerRef.current,
           displayName,
           jitsiJwt: jitsiJwt || undefined,
-          isTherapist: false,
+          isTherapist: !!isTherapist,
           sessionId,
+          aiEngineUrl,
+          onTranscriptUpdate,
+          onGPSUpdate,
         });
 
         managerRef.current = manager;

@@ -44,12 +44,14 @@ model User {
   therapistVerifiedByUserId     String?
   providerType                  ProviderType?               @map("provider_type")
   companyId                     String?                     @map("company_id")
-  companyKey                    String?                     @map("company_key")
-  isCompanyAdmin                Boolean                     @default(false) @map("is_company_admin")
   status                        UserStatus                  @default(ACTIVE)
   onboardingStatus              OnboardingStatus?
+  companyKey                    String?                     @map("company_key")
+  isCompanyAdmin                Boolean                     @default(false) @map("is_company_admin")
+  permissions                   Json?                       @default("{}")
   aiConversations               AIConversation[]
   auditEventsAsActor            AuditEvent[]                @relation("AuditEventsActor")
+  auditLogs                     AuditLog[]
   authAuditLogs                 AuthAuditLog[]
   authSessions                  AuthSession[]
   careTeamAssignmentsCreated    CareTeamAssignment[]        @relation("CareTeamAssignmentCreator")
@@ -68,6 +70,13 @@ model User {
   goalsAsProvider               Goal[]                      @relation("GoalProvider")
   labOrdersAsPatient            LabOrder[]                  @relation("LabOrderPatient")
   labOrdersAsProvider           LabOrder[]                  @relation("LabOrderProvider")
+  leadAssignments               LeadAssignment[]
+  groupTherapyRequests          GroupTherapySession[]        @relation("GroupTherapyRequestedBy")
+  groupTherapyHosting           GroupTherapySession[]        @relation("GroupTherapyHostedBy")
+  groupTherapyApprovals         GroupTherapySession[]        @relation("GroupTherapyApprovedBy")
+  groupTherapyInvitesReceived   GroupTherapyInvite[]         @relation("GroupTherapyInvitePatient")
+  groupTherapyInvitesSent       GroupTherapyInvite[]         @relation("GroupTherapyInviteSender")
+  groupTherapyEnrollments       GroupTherapyEnrollment[]     @relation("GroupTherapyEnrollmentUser")
   patientLeads                  Lead[]                      @relation("LeadPatient")
   providerLeads                 Lead[]                      @relation("LeadProvider")
   subscriptions                 MarketplaceSubscription[]   @relation("UserSubscriptions")
@@ -75,14 +84,16 @@ model User {
   moodPredictions               MoodPrediction[]            @relation("UserMoodPredictions")
   notifications                 Notification[]
   patientInvoices               PatientInvoice[]
+  patient_pathway_state         patient_pathway_state?
   patientPaymentMethod          PatientPaymentMethod?
   patientProfile                PatientProfile?
   patientSubscription           PatientSubscription?
-  providerSubscription          ProviderSubscription?
   phq9Assessments               PHQ9Assessment[]            @relation("UserPHQ9Assessments")
+  platformAccess                PlatformAccess?
   prescriptionsAsPatient        Prescription[]              @relation("PrescriptionPatient")
   prescriptionsAsProvider       Prescription[]              @relation("PrescriptionProvider")
   providerExtraQuestionsCreated ProviderExtraQuestion[]
+  providerSubscription          ProviderSubscription?
   providerWallet                ProviderWallet?             @relation("ProviderWalletOwner")
   riskScores                    RiskScore[]                 @relation("UserRiskScores")
   bookingIntentsAsPatient       SessionBookingIntent[]      @relation("BookingIntentPatient")
@@ -97,7 +108,6 @@ model User {
   therapyBookings               TherapySession[]
   grantedCapabilities           UserCapability[]            @relation("UserCapabilitiesGrantor")
   userCapabilities              UserCapability[]            @relation("UserCapabilitiesOwner")
-  leadAssignments               LeadAssignment[]            // Therapist's assigned leads
 
   @@index([email])
   @@index([phone])
@@ -128,6 +138,17 @@ model UserCapability {
   @@index([capability, isEffective])
   @@index([computedAt])
   @@map("user_capabilities")
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  permissions String[]
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("roles")
 }
 
 model CareTeamAssignment {
@@ -317,6 +338,8 @@ model TherapistProfile {
   certifications      String[]          @default([])
   baseLatitude        Float?            @map("base_latitude")
   baseLongitude       Float?            @map("base_longitude")
+  commissionOverride  Int?              @map("commission_override")
+  rejectionReason     String?           @map("rejection_reason")
   user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
@@ -684,21 +707,21 @@ model TherapistCareTeamMember {
 }
 
 model SessionBookingIntent {
-  id                String              @id @default(uuid())
-  patientId         String
-  providerId        String
-  scheduledAt       DateTime
-  durationMinute    Int                 @default(50)
-  amountMinor       BigInt
-  currency          String              @default("INR")
-  merchantTransactionId   String              @unique
-  razorpayPaymentId String?
-  status            BookingIntentStatus @default(PENDING)
-  sessionId         String?
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-  patient           User                @relation("BookingIntentPatient", fields: [patientId], references: [id], onDelete: Cascade)
-  provider          User                @relation("BookingIntentProvider", fields: [providerId], references: [id])
+  id                    String              @id @default(uuid())
+  patientId             String
+  providerId            String
+  scheduledAt           DateTime
+  durationMinute        Int                 @default(50)
+  amountMinor           BigInt
+  currency              String              @default("INR")
+  razorpayPaymentId     String?
+  status                BookingIntentStatus @default(PENDING)
+  sessionId             String?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  merchantTransactionId String              @unique
+  patient               User                @relation("BookingIntentPatient", fields: [patientId], references: [id], onDelete: Cascade)
+  provider              User                @relation("BookingIntentProvider", fields: [providerId], references: [id])
 
   @@index([patientId, status, createdAt])
   @@index([providerId, scheduledAt])
@@ -982,24 +1005,24 @@ model ExportLog {
 }
 
 model FinancialSession {
-  id                  String                 @id @default(uuid())
-  patientId           String
-  providerId          String
-  status              FinancialSessionStatus @default(PENDING_PAYMENT)
-  expectedAmountMinor BigInt
-  currency            String                 @default("INR")
-  idempotencyKey      String                 @unique
-  merchantTransactionId     String?                @unique
-  confirmedAt         DateTime?
-  completedAt         DateTime?
-  expiredAt           DateTime?
-  createdAt           DateTime               @default(now())
-  updatedAt           DateTime               @updatedAt
-  payments            FinancialPayment[]     @relation("SessionPayments")
-  patient             User                   @relation("FinancialPatient", fields: [patientId], references: [id])
-  provider            User                   @relation("FinancialProvider", fields: [providerId], references: [id])
-  revenueLedger       RevenueLedger[]        @relation("SessionRevenueLedger")
-  walletTransactions  WalletTransaction[]    @relation("SessionWalletTransactions")
+  id                    String                 @id @default(uuid())
+  patientId             String
+  providerId            String
+  status                FinancialSessionStatus @default(PENDING_PAYMENT)
+  expectedAmountMinor   BigInt
+  currency              String                 @default("INR")
+  idempotencyKey        String                 @unique
+  confirmedAt           DateTime?
+  completedAt           DateTime?
+  expiredAt             DateTime?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  merchantTransactionId String?                @unique
+  payments              FinancialPayment[]     @relation("SessionPayments")
+  patient               User                   @relation("FinancialPatient", fields: [patientId], references: [id])
+  provider              User                   @relation("FinancialProvider", fields: [providerId], references: [id])
+  revenueLedger         RevenueLedger[]        @relation("SessionRevenueLedger")
+  walletTransactions    WalletTransaction[]    @relation("SessionWalletTransactions")
 
   @@index([patientId, status])
   @@index([providerId, status])
@@ -1025,19 +1048,19 @@ model Lead {
   createdAt              DateTime          @default(now())
   updatedAt              DateTime          @updatedAt
   paymentStatus          LeadPaymentStatus @default(NOT_REQUIRED)
-  merchantTransactionId        String?           @unique
   razorpayPaymentId      String?           @unique
   paymentCapturedAt      DateTime?
   channel                LeadChannel       @default(CONSUMER)
   tier                   LeadTier?
   visibleAt              DateTime?
-  issue                  String[]          @default([])           // ["anxiety", "depression", etc.]
-  verificationLevel      String            @default("email")      // "email" | "phone" | "complete"
-  quality                Int               @default(50)           // Quality score 0-100
-  exclusivity            String            @default("shared")     // "shared" | "semi-exclusive" | "exclusive"
+  issue                  String[]          @default([])
+  verificationLevel      String            @default("email")
+  quality                Int               @default(50)
+  exclusivity            String            @default("shared")
+  merchantTransactionId  String?           @unique
+  assignments            LeadAssignment[]
   patient                User              @relation("LeadPatient", fields: [patientId], references: [id])
   provider               User?             @relation("LeadProvider", fields: [providerId], references: [id], onDelete: Restrict)
-  assignments            LeadAssignment[]                           // Track therapist assignments
 
   @@index([status, createdAt(sort: Desc)])
   @@index([providerId, status])
@@ -1055,30 +1078,32 @@ model FinancialPayment {
   id                    String                 @id @default(uuid())
   sessionId             String?
   providerId            String?
-  patientId             String?
   providerGateway       String                 @default("PHONEPE")
-  merchantTransactionId String                 @unique
   razorpayPaymentId     String?                @unique
   status                FinancialPaymentStatus @default(INITIATED)
   amountMinor           BigInt
   currency              String                 @default("INR")
-  metadata              Json?
   therapistShareMinor   BigInt                 @default(0)
   platformShareMinor    BigInt                 @default(0)
   captureIdempotencyKey String?                @unique
   capturedAt            DateTime?
   failedAt              DateTime?
   failureReason         String?
-  retryCount            Int                    @default(0)
-  nextRetryAt           DateTime?
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
   paymentType           FinancialPaymentType   @default(PROVIDER_FEE)
+  metadata              Json?
+  patientId             String?
+  retryCount            Int                    @default(0)
+  nextRetryAt           DateTime?
+  merchantTransactionId String                 @unique
   wallet                ProviderWallet?        @relation("WalletPayments", fields: [providerId], references: [providerId])
   session               FinancialSession?      @relation("SessionPayments", fields: [sessionId], references: [id])
+  groupTherapyInvites   GroupTherapyInvite[]
+  groupTherapyEnrollments GroupTherapyEnrollment[]
+  refunds               FinancialRefund[]      @relation("PaymentRefunds")
   revenueLedger         RevenueLedger[]        @relation("PaymentRevenueLedger")
   walletTransactions    WalletTransaction[]    @relation("PaymentWalletTransactions")
-  refunds               FinancialRefund[]      @relation("PaymentRefunds")
 
   @@index([sessionId, status])
   @@index([providerId, status])
@@ -1090,25 +1115,25 @@ model FinancialPayment {
 }
 
 model FinancialRefund {
-  id                       String                  @id @default(uuid())
-  paymentId                String?
-  merchantRefundId         String                  @unique
-  originalMerchantOrderId  String
-  phonePeRefundId          String?                 @unique
-  status                   FinancialRefundStatus   @default(PENDING)
-  amountMinor              BigInt
-  currency                 String                  @default("INR")
-  reason                   String?
-  responseData             Json?
-  retrievedAt              DateTime?
-  completedAt              DateTime?
-  failedAt                 DateTime?
-  failureReason            String?
-  retryCount               Int                     @default(0)
-  nextRetryAt              DateTime?
-  createdAt                DateTime                @default(now())
-  updatedAt                DateTime                @updatedAt
-  payment                  FinancialPayment?       @relation("PaymentRefunds", fields: [paymentId], references: [id])
+  id                      String                @id @default(uuid())
+  paymentId               String?
+  merchantRefundId        String                @unique
+  originalMerchantOrderId String
+  phonePeRefundId         String?               @unique
+  status                  FinancialRefundStatus @default(PENDING)
+  amountMinor             BigInt
+  currency                String                @default("INR")
+  reason                  String?
+  responseData            Json?
+  retrievedAt             DateTime?
+  completedAt             DateTime?
+  failedAt                DateTime?
+  failureReason           String?
+  retryCount              Int                   @default(0)
+  nextRetryAt             DateTime?
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
+  payment                 FinancialPayment?     @relation("PaymentRefunds", fields: [paymentId], references: [id])
 
   @@index([paymentId, status])
   @@index([status, nextRetryAt])
@@ -1116,6 +1141,31 @@ model FinancialRefund {
   @@index([originalMerchantOrderId])
   @@index([createdAt])
   @@map("financial_refunds")
+}
+
+model UniversalCheckoutPayment {
+  id                    String                     @id @default(uuid())
+  type                  String                     @db.VarChar(50) // 'provider' | 'patient'
+  planId                String                     @db.VarChar(255)
+  baseAmountMinor       BigInt                     @default(0) // Amount in paise
+  gstMinor              BigInt                     @default(0)  // GST in paise
+  totalAmountMinor      BigInt                     @default(0)  // Total incl GST
+  walletUsedMinor       BigInt                     @default(0)  // Wallet deduction
+  finalAmountMinor      BigInt                     @default(0)  // Final amount to pay
+  status                UniversalCheckoutStatus   @default(INITIATED)
+  idempotencyKey        String                    @unique
+  phonepeTransactionId  String?                   @unique
+  planDetails           Json?                     // Activation details
+  createdAt             DateTime                  @default(now())
+  completedAt           DateTime?
+  failedAt              DateTime?
+  updatedAt             DateTime                  @updatedAt
+
+  @@index([type, planId])
+  @@index([status, createdAt])
+  @@index([phonepeTransactionId])
+  @@index([idempotencyKey])
+  @@map("universal_checkout_payments")
 }
 
 model ProviderWallet {
@@ -1185,6 +1235,8 @@ model PayoutRequest {
   rejectionReason        String?
   bankReference          String?             @unique
   idempotencyKey         String              @unique
+  platformAmount         BigInt?             @map("platform_amount")
+  therapistAmount        BigInt?             @map("therapist_amount")
   provider               ProviderWallet      @relation("WalletPayouts", fields: [providerId], references: [providerId])
   walletTransactions     WalletTransaction[] @relation("PayoutWalletTransactions")
 
@@ -1193,25 +1245,34 @@ model PayoutRequest {
   @@map("payout_requests")
 }
 
+model GlobalSettings {
+  key       String   @id
+  value     String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("global_settings")
+}
+
 model MarketplaceSubscription {
-  id                     String                @id @default(uuid())
-  userId                 String
-  domain                 SubscriptionDomain
-  plan                   SubscriptionPlan
-  status                 SubscriptionStatus    @default(PAST_DUE)
-  providerGateway        String                @default("PHONEPE")
-  phonepeSubscriptionId String                @unique
+  id                    String                @id @default(uuid())
+  userId                String
+  domain                SubscriptionDomain
+  plan                  SubscriptionPlan
+  status                SubscriptionStatus    @default(PAST_DUE)
+  providerGateway       String                @default("PHONEPE")
+  currentPeriodStart    DateTime?
+  currentPeriodEnd      DateTime?
+  nextBillingDate       DateTime?
+  cancelledAt           DateTime?
+  expiredAt             DateTime?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
   phonepePlanId         String
-  currentPeriodStart     DateTime?
-  currentPeriodEnd       DateTime?
-  nextBillingDate        DateTime?
-  cancelledAt            DateTime?
-  expiredAt              DateTime?
-  createdAt              DateTime              @default(now())
-  updatedAt              DateTime              @updatedAt
-  user                   User                  @relation("UserSubscriptions", fields: [userId], references: [id])
-  revenueLedger          RevenueLedger[]       @relation("SubscriptionRevenueLedger")
-  invoices               SubscriptionInvoice[] @relation("SubscriptionInvoices")
+  phonepeSubscriptionId String                @unique
+  user                  User                  @relation("UserSubscriptions", fields: [userId], references: [id])
+  revenueLedger         RevenueLedger[]       @relation("SubscriptionRevenueLedger")
+  invoices              SubscriptionInvoice[] @relation("SubscriptionInvoices")
 
   @@index([userId, domain, status])
   @@index([status, nextBillingDate])
@@ -1235,20 +1296,21 @@ model SubscriptionInvoice {
 }
 
 model PatientSubscription {
-  id           String   @id @default(uuid())
-  userId       String   @unique
-  planName     String
-  price        Int
-  billingCycle String
-  status       String
-  paymentId    String?
-  autoRenew    Boolean  @default(true)
-  processing   Boolean  @default(false)
+  id                  String    @id @default(uuid())
+  userId              String    @unique
+  price               Int
+  status              String
+  autoRenew           Boolean   @default(true)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  paymentId           String?
+  billingCycle        String
+  planName            String
+  renewalDate         DateTime
+  processing          Boolean   @default(false)
   processingStartedAt DateTime?
-  renewalDate  DateTime
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  metadata            Json?
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([status])
   @@index([status, processing])
@@ -1256,7 +1318,7 @@ model PatientSubscription {
 }
 
 model SubscriptionHistory {
-  id                String   @id @default(uuid())
+  id                String                   @id @default(uuid())
   subscriptionType  String
   subscriptionRefId String?
   patientUserId     String?
@@ -1268,11 +1330,11 @@ model SubscriptionHistory {
   oldPrice          Int?
   newPrice          Int?
   paymentId         String?
-  transactionId     String?
   reason            SubscriptionChangeReason
   metadata          Json?
-  changedAt         DateTime @default(now())
-  createdAt         DateTime @default(now())
+  changedAt         DateTime                 @default(now())
+  createdAt         DateTime                 @default(now())
+  transactionId     String?
 
   @@index([subscriptionType, changedAt])
   @@index([patientUserId, changedAt])
@@ -1648,6 +1710,721 @@ model UserPet {
   @@map("user_pets")
 }
 
+model PatientPlanConfig {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  name      String
+  price     Int
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("patient_plan_configs")
+}
+
+model ProviderSubscription {
+  id                  String                    @id @default(uuid())
+  providerId          String                    @unique
+  plan                ProviderPlan
+  price               Int
+  leadsPerWeek        Int
+  startDate           DateTime                  @default(now())
+  expiryDate          DateTime
+  status              String
+  autoRenew           Boolean                   @default(false)
+  paymentId           String?
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+  processing          Boolean                   @default(false)
+  processingStartedAt DateTime?
+  tier                ProviderSubscriptionTier?
+  bonusLeads          Int                       @default(0)
+  billingCycle        String                    @default("monthly")
+  leadsUsedThisWeek   Int                       @default(0)
+  totalLeadsReceived  Int                       @default(0)
+  weekStartsAt        DateTime                  @default(now())
+  lastAssignedAt      DateTime?
+  metadata            Json?
+  provider            User                      @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([status, processing])
+  @@index([tier])
+  @@index([leadsUsedThisWeek])
+  @@map("provider_subscriptions")
+}
+
+model PlatformAccess {
+  id           String   @id @default(uuid())
+  providerId   String   @unique
+  billingCycle String
+  amountMinor  Int
+  status       String   @default("active")
+  autoRenew    Boolean  @default(true)
+  startDate    DateTime @default(now())
+  expiryDate   DateTime
+  paymentId    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  provider     User     @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([providerId, status])
+  @@index([status, expiryDate])
+  @@map("platform_access")
+}
+
+model LeadPurchase {
+  id         String   @id @default(uuid())
+  providerId String
+  leadId     String
+  price      Int
+  discount   Int      @default(0)
+  finalPrice Int
+  status     String
+  paymentId  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([providerId, leadId])
+  @@index([providerId, status])
+  @@index([leadId])
+  @@map("lead_purchases")
+}
+
+model LeadAssignment {
+  id            String    @id @default(uuid())
+  leadId        String
+  therapistId   String
+  assignedAt    DateTime  @default(now())
+  respondedAt   DateTime?
+  responseTime  Int?
+  convertedAt   DateTime?
+  sessionBooked Boolean   @default(false)
+  status        String    @default("assigned")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lead          Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  therapist     User      @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+
+  @@unique([leadId, therapistId])
+  @@index([therapistId, respondedAt])
+  @@index([therapistId, convertedAt])
+  @@index([therapistId, status])
+  @@index([assignedAt])
+  @@map("lead_assignments")
+}
+
+model ProviderPlanConfig {
+  id        String   @id @default(uuid())
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("provider_plan_configs")
+}
+
+model SSOTenant {
+  id              Int      @id @default(autoincrement())
+  key             String   @unique
+  name            String
+  provider        String
+  issuer          String?
+  clientId        String?  @map("client_id")
+  clientSecret    String?  @map("client_secret")
+  metadataUrl     String?  @map("metadata_url")
+  allowedDomains  String[] @map("allowed_domains")
+  config          Json?
+  enabled         Boolean  @default(true)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @default(now()) @map("updated_at")
+  ownerCompanyKey String?  @map("owner_company_key")
+
+  @@map("sso_tenants")
+}
+
+model SSOIdentity {
+  id              Int      @id @default(autoincrement())
+  userId          String   @map("user_id")
+  tenantKey       String   @map("tenant_key")
+  provider        String
+  providerSubject String   @map("provider_subject")
+  email           String?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @default(now()) @map("updated_at")
+
+  @@unique([tenantKey, provider, providerSubject])
+  @@map("sso_identities")
+}
+
+model CorporateOtpRequest {
+  id          String   @id @default(uuid())
+  phone       String
+  otpHash     String
+  companyName String
+  companySize String?
+  industry    String?
+  country     String?
+  contactName String?
+  email       String?
+  status      String   @default("PENDING")
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([phone, status])
+  @@index([status, expiresAt])
+  @@map("corporate_otp_requests")
+}
+
+model PlatformAccessPending {
+  id           String    @id @default(uuid())
+  providerId   String
+  billingCycle String
+  amountMinor  Int
+  paymentId    String?
+  activatedAt  DateTime?
+  expiryDate   DateTime
+  status       String    @default("pending")
+  metadata     Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([providerId, paymentId])
+  @@index([providerId, status])
+  @@index([status, activatedAt])
+  @@map("platform_access_pending")
+}
+
+model LeadPlanPending {
+  id           String    @id @default(uuid())
+  providerId   String
+  planKey      String
+  billingCycle String
+  amountMinor  Int
+  leadsPerWeek Int
+  trialDays    Int       @default(21)
+  paymentId    String?
+  activatedAt  DateTime?
+  renewalDate  DateTime
+  status       String    @default("pending")
+  metadata     Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([providerId, paymentId])
+  @@index([providerId, status])
+  @@index([status, activatedAt])
+  @@map("lead_plan_pending")
+}
+
+model MarketplaceLeadBundlePending {
+  id            String    @id @default(uuid())
+  providerId    String
+  bundleKey     String
+  hotLeads      Int
+  warmLeads     Int
+  coldLeads     Int
+  amountMinor   Int
+  paymentId     String?
+  activatedAt   DateTime?
+  expiryDate    DateTime
+  status        String    @default("pending")
+  usedHotLeads  Int       @default(0)
+  usedWarmLeads Int       @default(0)
+  usedColdLeads Int       @default(0)
+  metadata      Json?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([providerId, paymentId])
+  @@index([providerId, status])
+  @@index([status, activatedAt])
+  @@map("marketplace_lead_bundle_pending")
+}
+
+model DailyGamePlay {
+  id           String   @id @default(uuid())
+  userId       String
+  date         DateTime @db.Date
+  sixesHit     Int      @default(0)
+  ballsPlayed  Int      @default(0)
+  didWin       Boolean  @default(false)
+  prizeAmount  Int?
+  lastPlayedAt DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId, lastPlayedAt])
+  @@map("daily_game_play")
+}
+
+model UserWallet {
+  id            String                  @id @default(uuid())
+  userId        String                  @unique
+  balance       Int                     @default(0)
+  lastTxnDate   DateTime?
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+  bookingUsages BookingWalletUsage[]
+  transactions  UserWalletTransaction[]
+  credits       WalletCredit[]
+
+  @@map("user_wallets")
+}
+
+model UserWalletTransaction {
+  id              String                @id @default(uuid())
+  amount          Int
+  description     String
+  walletId        String
+  transactionType WalletTransactionType
+  balanceAfter    Int
+  referenceId     String?
+  createdAt       DateTime              @default(now())
+  wallet          UserWallet            @relation(fields: [walletId], references: [id])
+
+  @@index([walletId, createdAt(sort: Desc)])
+  @@map("user_wallet_transactions")
+}
+
+model WalletCredit {
+  id        String             @id @default(uuid())
+  amount    Int
+  source    String
+  walletId  String
+  status    WalletCreditStatus @default(AVAILABLE)
+  expiresAt DateTime?
+  usedAt    DateTime?
+  createdAt DateTime           @default(now())
+  wallet    UserWallet         @relation(fields: [walletId], references: [id])
+
+  @@index([walletId, status])
+  @@map("wallet_credits")
+}
+
+model BookingWalletUsage {
+  id         String     @id @default(uuid())
+  walletId   String
+  bookingId  String     @unique
+  amountUsed Int
+  createdAt  DateTime   @default(now())
+  wallet     UserWallet @relation(fields: [walletId], references: [id])
+
+  @@index([walletId])
+  @@map("booking_wallet_usages")
+}
+
+model MarqueeOffer {
+  id        String   @id @default(uuid())
+  text      String
+  linkUrl   String?
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  isDeleted Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("marquee_offers")
+}
+
+model PricingVersion {
+  id            String    @id @default(uuid())
+  version       Int       @default(1)
+  category      String
+  pricingData   Json      @map("pricing_data")
+  status        String    @default("draft")
+  description   String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  approvedBy    String?   @map("approved_by")
+  effectiveFrom DateTime? @map("effective_from")
+  archivedAt    DateTime? @map("archived_at")
+
+  @@map("pricing_versions")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  action    String
+  resource  String
+  details   Json?    @map("details")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([resource, action])
+  @@map("audit_logs")
+}
+
+model CrisisAlert {
+  id              String   @id @default(uuid())
+  patientId       String   @map("patient_id")
+  severity        String   @default("high")
+  status          String   @default("pending")
+  respondedBy     String?  @map("responded_by")
+  resolutionNotes String?  @map("resolution_notes")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([status, createdAt(sort: Desc)])
+  @@map("crisis_alerts")
+}
+
+model GroupCategory {
+  id           String   @id @default(uuid())
+  name         String   @unique
+  type         String
+  description  String?
+  maxCapacity  Int      @default(15) @map("max_capacity")
+  sessionPrice Float    @map("session_price")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  sessions     GroupTherapySession[]
+
+  @@map("group_categories")
+}
+
+model GroupTherapySession {
+  id                 String                 @id @default(uuid())
+  title              String
+  topic              String
+  description        String?
+  sessionMode        GroupTherapyMode       @default(PUBLIC) @map("session_mode")
+  status             GroupTherapyStatus     @default(PENDING_APPROVAL)
+  requestedById      String                 @map("requested_by_id")
+  hostTherapistId    String                 @map("host_therapist_id")
+  approvedById       String?                @map("approved_by_id")
+  groupCategoryId    String?                @map("group_category_id")
+  scheduledAt        DateTime               @map("scheduled_at")
+  durationMinutes    Int                    @default(60) @map("duration_minutes")
+  maxMembers         Int                    @default(10) @map("max_members")
+  priceMinor         BigInt                 @default(0) @map("price_minor")
+  allowGuestJoin     Boolean                @default(true) @map("allow_guest_join")
+  requiresAdminGate  Boolean                @default(true) @map("requires_admin_gate")
+  requiresPayment    Boolean                @default(true) @map("requires_payment")
+  jitsiRoomName      String?                @map("jitsi_room_name")
+  publishAt          DateTime?              @map("publish_at")
+  rejectionReason    String?                @map("rejection_reason")
+  createdAt          DateTime               @default(now()) @map("created_at")
+  updatedAt          DateTime               @updatedAt @map("updated_at")
+  approvedAt         DateTime?              @map("approved_at")
+  publishedAt        DateTime?              @map("published_at")
+  requestedBy        User                   @relation("GroupTherapyRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+  hostTherapist      User                   @relation("GroupTherapyHostedBy", fields: [hostTherapistId], references: [id], onDelete: Restrict)
+  approvedBy         User?                  @relation("GroupTherapyApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  groupCategory      GroupCategory?         @relation(fields: [groupCategoryId], references: [id], onDelete: SetNull)
+  invites            GroupTherapyInvite[]
+  enrollments        GroupTherapyEnrollment[]
+
+  @@index([status, scheduledAt])
+  @@index([hostTherapistId, status])
+  @@index([requestedById, createdAt(sort: Desc)])
+  @@index([sessionMode, status])
+  @@map("group_therapy_sessions")
+}
+
+model GroupTherapyInvite {
+  id              String                   @id @default(uuid())
+  sessionId       String                   @map("session_id")
+  patientUserId   String                   @map("patient_user_id")
+  invitedById     String                   @map("invited_by_id")
+  status          GroupTherapyInviteStatus @default(INVITED)
+  amountMinor     BigInt                   @default(0) @map("amount_minor")
+  paymentId       String?                  @map("payment_id")
+  paymentDeadline DateTime?                @map("payment_deadline")
+  message         String?
+  acceptedAt      DateTime?                @map("accepted_at")
+  paidAt          DateTime?                @map("paid_at")
+  joinedAt        DateTime?                @map("joined_at")
+  createdAt       DateTime                 @default(now()) @map("created_at")
+  updatedAt       DateTime                 @updatedAt @map("updated_at")
+  session         GroupTherapySession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  patient         User                     @relation("GroupTherapyInvitePatient", fields: [patientUserId], references: [id], onDelete: Cascade)
+  invitedBy       User                     @relation("GroupTherapyInviteSender", fields: [invitedById], references: [id], onDelete: Restrict)
+  payment         FinancialPayment?        @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  @@unique([sessionId, patientUserId])
+  @@index([patientUserId, status])
+  @@index([sessionId, status])
+  @@map("group_therapy_invites")
+}
+
+model GroupTherapyEnrollment {
+  id                  String                       @id @default(uuid())
+  sessionId           String                       @map("session_id")
+  userId              String?                      @map("user_id")
+  guestName           String?                      @map("guest_name")
+  guestEmail          String?                      @map("guest_email")
+  status              GroupTherapyEnrollmentStatus @default(PAYMENT_PENDING)
+  amountMinor         BigInt                       @default(0) @map("amount_minor")
+  paymentId           String?                      @map("payment_id")
+  merchantTransaction String?                      @map("merchant_transaction")
+  paidAt              DateTime?                    @map("paid_at")
+  joinedAt            DateTime?                    @map("joined_at")
+  createdAt           DateTime                     @default(now()) @map("created_at")
+  updatedAt           DateTime                     @updatedAt @map("updated_at")
+  session             GroupTherapySession          @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user                User?                        @relation("GroupTherapyEnrollmentUser", fields: [userId], references: [id], onDelete: SetNull)
+  payment             FinancialPayment?            @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  @@index([sessionId, status])
+  @@index([userId, status])
+  @@index([guestEmail, status])
+  @@map("group_therapy_enrollments")
+}
+
+model companies {
+  id                          String                        @id
+  companyKey                  String                        @unique
+  name                        String
+  employeeLimit               Int                           @default(300)
+  sessionQuota                Int                           @default(200)
+  ssoProvider                 String                        @default("Google Workspace")
+  privacyPolicy               String                        @default("Only aggregate analytics are visible to HR. Individual therapy notes, diagnosis, medications, and provider details are never shown.")
+  supportEmail                String                        @default("enterprise-support@manas360.com")
+  supportPhone                String                        @default("+91-80-4000-3600")
+  supportSla                  String                        @default("Priority support within 4 business hours.")
+  createdAt                   DateTime                      @default(now())
+  updatedAt                   DateTime                      @default(now())
+  domain                      String?
+  company_departments         company_departments[]
+  company_employees           company_employees[]
+  company_session_allocations company_session_allocations[]
+  corporate_campaigns         corporate_campaigns[]
+  corporate_invoices          corporate_invoices[]
+  corporate_monthly_metrics   corporate_monthly_metrics[]
+  corporate_payment_methods   corporate_payment_methods[]
+  corporate_programs          corporate_programs[]
+  corporate_reports           corporate_reports[]
+  corporate_workshops         corporate_workshops[]
+}
+
+model company_departments {
+  id                          String                        @id
+  companyId                   String
+  name                        String
+  riskIndicator               String                        @default("MODERATE")
+  createdAt                   DateTime                      @default(now())
+  updatedAt                   DateTime                      @default(now())
+  companies                   companies                     @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  company_employees           company_employees[]
+  company_session_allocations company_session_allocations[]
+
+  @@unique([companyId, name])
+}
+
+model company_employees {
+  id                  String               @id
+  companyId           String
+  departmentId        String?
+  employeeCode        String?
+  name                String
+  email               String
+  location            String?
+  managerName         String?
+  riskBand            String               @default("LOW")
+  phq9Score           Int                  @default(0)
+  gad7Score           Int                  @default(0)
+  sessionsUsed        Int                  @default(0)
+  engagementScore     Int                  @default(0)
+  preferredService    String               @default("Stress therapy")
+  isActive            Boolean              @default(true)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @default(now())
+  companies           companies            @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  company_departments company_departments? @relation(fields: [departmentId], references: [id], onUpdate: NoAction)
+
+  @@unique([companyId, email])
+}
+
+model company_session_allocations {
+  id                  String              @id
+  companyId           String
+  departmentId        String
+  allocatedSessions   Int                 @default(0)
+  usedSessions        Int                 @default(0)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @default(now())
+  companies           companies           @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  company_departments company_departments @relation(fields: [departmentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([companyId, departmentId])
+}
+
+model corporate_campaigns {
+  id             String    @id
+  companyId      String
+  title          String
+  audience       String
+  startDate      DateTime  @db.Date
+  endDate        DateTime  @db.Date
+  reachCount     Int       @default(0)
+  engagementRate Int       @default(0)
+  status         String    @default("ACTIVE")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @default(now())
+  companies      companies @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model corporate_demo_requests {
+  id          String   @id
+  companyName String
+  companyKey  String?
+  workEmail   String
+  companySize String?
+  industry    String?
+  country     String?
+  contactName String?
+  phone       String?
+  status      String   @default("NEW")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now())
+
+  @@index([workEmail])
+}
+
+model corporate_invoices {
+  id            String    @id
+  companyId     String
+  invoiceCode   String
+  title         String
+  billingPeriod String
+  amountPaise   Int       @default(0)
+  currency      String    @default("INR")
+  status        String    @default("DUE")
+  dueDate       DateTime? @db.Date
+  paidDate      DateTime? @db.Date
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @default(now())
+  companies     companies @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([companyId, invoiceCode])
+}
+
+model corporate_monthly_metrics {
+  id                String    @id
+  companyId         String
+  monthLabel        String
+  sessionsUsed      Int       @default(0)
+  sessionsAllocated Int       @default(0)
+  activeUsers       Int       @default(0)
+  stressScore       Int       @default(0)
+  utilizationRate   Int       @default(0)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @default(now())
+  companies         companies @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([companyId, monthLabel])
+}
+
+model corporate_payment_methods {
+  id         String    @id
+  companyId  String
+  methodType String
+  label      String
+  details    String
+  isPrimary  Boolean   @default(false)
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @default(now())
+  companies  companies @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model corporate_programs {
+  id                String    @id
+  companyId         String
+  title             String
+  durationWeeks     Int       @default(4)
+  employeesEnrolled Int       @default(0)
+  completionRate    Int       @default(0)
+  status            String    @default("ACTIVE")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @default(now())
+  companies         companies @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model corporate_reports {
+  id          String    @id
+  companyId   String
+  reportType  String
+  quarter     String
+  format      String
+  downloadUrl String?
+  generatedAt DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+  companies   companies @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model corporate_workshops {
+  id           String    @id
+  companyId    String
+  title        String
+  provider     String
+  department   String
+  workshopDate DateTime  @db.Date
+  attendees    Int       @default(0)
+  status       String    @default("SCHEDULED")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @default(now())
+  companies    companies @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model patient_pathway_state {
+  id          String   @id
+  user_id     String   @unique
+  pathway     String   @db.VarChar(50)
+  reason      String?
+  metadata    Json     @default("{}")
+  selected_at DateTime @default(now()) @db.Timestamp(6)
+  updated_at  DateTime @default(now()) @db.Timestamp(6)
+  users       User     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model platform_subscription {
+  id            String   @id
+  plan_key      String   @unique @db.VarChar(50)
+  plan_name     String   @db.VarChar(100)
+  price         Int
+  billing_cycle String   @db.VarChar(50)
+  description   String?
+  active        Boolean  @default(true)
+  created_at    DateTime @default(now()) @db.Timestamp(6)
+  updated_at    DateTime @default(now()) @db.Timestamp(6)
+}
+
+model product_addons {
+  id         String   @id
+  addon_key  String   @unique @db.VarChar(50)
+  addon_name String   @db.VarChar(100)
+  price      Int
+  active     Boolean  @default(true)
+  created_at DateTime @default(now()) @db.Timestamp(6)
+  updated_at DateTime @default(now()) @db.Timestamp(6)
+}
+
+model session_pricing {
+  id               String   @id
+  provider_type    String   @db.VarChar(50)
+  duration_minutes Int
+  price            Int
+  provider_share   Int
+  platform_share   Int
+  active           Boolean  @default(true)
+  created_at       DateTime @default(now()) @db.Timestamp(6)
+  updated_at       DateTime @default(now()) @db.Timestamp(6)
+
+  @@unique([provider_type, duration_minutes])
+}
+
+model system_settings {
+  key        String   @id @db.VarChar(100)
+  value      String   @db.VarChar(100)
+  updated_at DateTime @default(now()) @db.Timestamp(6)
+}
+
 enum UserRole {
   PATIENT
   THERAPIST
@@ -1656,6 +2433,9 @@ enum UserRole {
   COACH
   PSYCHOLOGIST
   SUPER_ADMIN
+  COMPLIANCE_OFFICER
+  CLINICAL_DIRECTOR
+  FINANCE_MANAGER
 }
 
 enum UserStatus {
@@ -1774,9 +2554,9 @@ enum FinancialPaymentStatus {
   PENDING_CAPTURE
   CAPTURED
   FAILED
-  EXPIRED
   REFUNDED
   PARTIAL_REFUNDED
+  EXPIRED
 }
 
 enum FinancialPaymentType {
@@ -1787,6 +2567,14 @@ enum FinancialPaymentType {
 enum FinancialRefundStatus {
   PENDING
   CONFIRMED
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum UniversalCheckoutStatus {
+  INITIATED
+  PENDING_PAYMENT
   COMPLETED
   FAILED
   CANCELLED
@@ -1910,18 +2698,6 @@ enum PlanActivityType {
   SESSION_BOOKING
 }
 
-model PatientPlanConfig {
-  id          String   @id @default(uuid())
-  key         String   @unique
-  name        String
-  price       Int
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@map("patient_plan_configs")
-}
-
 enum ProviderPlan {
   free
   basic
@@ -1935,117 +2711,44 @@ enum ProviderSubscriptionTier {
   SCALE
 }
 
-model ProviderSubscription {
-  id                    String                    @id @default(uuid())
-  providerId            String                    @unique
-  plan                  ProviderPlan
-  tier                  ProviderSubscriptionTier? // "STARTER" | "GROWTH" | "SCALE"
-  price                 Int
-  leadsPerWeek          Int
-  bonusLeads            Int                       @default(0)          // For GROWTH: always 1
-  startDate             DateTime                  @default(now())
-  expiryDate            DateTime
-  billingCycle          String                    @default("monthly")   // Monthly recurring
-  status                String                    // "active" | "expired" | "cancelled"
-  autoRenew             Boolean                   @default(false)
-  processing            Boolean                   @default(false)
-  processingStartedAt   DateTime?
-  paymentId             String?
-  leadsUsedThisWeek     Int                       @default(0)          // Reset every Sunday 00:00 UTC
-  totalLeadsReceived    Int                       @default(0)          // Lifetime metric
-  weekStartsAt          DateTime                  @default(now())      // Track week boundary
-  lastAssignedAt        DateTime?                 // For fair rotation
-  createdAt             DateTime                  @default(now())
-  updatedAt             DateTime                  @updatedAt
-  provider              User                      @relation(fields: [providerId], references: [id], onDelete: Cascade)
-
-  @@index([status])
-  @@index([status, processing])
-  @@index([tier])
-  @@index([leadsUsedThisWeek])
-  @@map("provider_subscriptions")
+enum WalletTransactionType {
+  CREDIT
+  DEBIT
 }
 
-model LeadPurchase {
-  id          String   @id @default(uuid())
-  providerId  String
-  leadId      String
-  price       Int
-  discount    Int      @default(0)
-  finalPrice  Int
-  status      String   // "pending" | "success" | "failed"
-  paymentId   String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@index([providerId, status])
-  @@index([leadId])
-  @@unique([providerId, leadId])
-  @@map("lead_purchases")
+enum WalletCreditStatus {
+  AVAILABLE
+  USED
+  EXPIRED
 }
 
-model LeadAssignment {
-  id              String    @id @default(uuid())
-  leadId          String
-  therapistId     String
-  assignedAt      DateTime  @default(now())
-  respondedAt     DateTime?
-  responseTime    Int?                            // Minutes from assignedAt to respondedAt
-  convertedAt     DateTime?                       // ONLY when patient books first paid session
-  sessionBooked   Boolean   @default(false)
-  status          String    @default("assigned")  // "assigned" | "responded" | "converted" | "expired" | "declined"
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  lead            Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  therapist       User      @relation(fields: [therapistId], references: [id], onDelete: Cascade)
-
-  @@unique([leadId, therapistId])
-  @@index([therapistId, respondedAt])
-  @@index([therapistId, convertedAt])
-  @@index([therapistId, status])
-  @@index([assignedAt])
-  @@map("lead_assignments")
+enum GroupTherapyMode {
+  PUBLIC
+  PRIVATE
 }
 
-model ProviderPlanConfig {
-  id        String   @id @default(uuid())
-  data      Json
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("provider_plan_configs")
+enum GroupTherapyStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  PUBLISHED
+  LIVE
+  ENDED
+  REJECTED
 }
 
-model SSOTenant {
-  id              Int      @id @default(autoincrement())
-  key             String   @unique
-  name            String
-  provider        String
-  issuer          String?
-  clientId        String?  @map("client_id")
-  clientSecret    String?  @map("client_secret")
-  metadataUrl     String?  @map("metadata_url")
-  allowedDomains  String[] @map("allowed_domains")
-  config          Json?
-  enabled         Boolean  @default(true)
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @default(now()) @map("updated_at")
-  ownerCompanyKey String?  @map("owner_company_key")
-
-  @@map("sso_tenants")
+enum GroupTherapyInviteStatus {
+  INVITED
+  ACCEPTED
+  DECLINED
+  PAYMENT_PENDING
+  PAID
+  JOINED
 }
 
-model SSOIdentity {
-  id              Int      @id @default(autoincrement())
-  userId          String   @map("user_id")
-  tenantKey       String   @map("tenant_key")
-  provider        String
-  providerSubject String   @map("provider_subject")
-  email           String?
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @default(now()) @map("updated_at")
-
-  @@unique([tenantKey, provider, providerSubject])
-  @@map("sso_identities")
+enum GroupTherapyEnrollmentStatus {
+  PAYMENT_PENDING
+  PAID
+  JOINED
+  CANCELLED
 }
-

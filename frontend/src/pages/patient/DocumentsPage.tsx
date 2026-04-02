@@ -98,7 +98,7 @@ export default function DocumentsPage() {
   // Poll for new documents (session summaries) and notify in real-time
   useEffect(() => {
     let mounted = true;
-    let knownIds = new Set(docs.map((d) => d.id));
+    const knownIds = new Set(docs.map((d) => d.id));
 
     const poll = async () => {
       try {

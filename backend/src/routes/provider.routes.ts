@@ -43,6 +43,7 @@ import {
 } from '../controllers/provider.controller';
 import { requireAuth } from '../middleware/auth.middleware';
 import { requireRole, type UserRole } from '../middleware/rbac.middleware';
+import { requireProviderSubscription } from '../middleware/subscription.middleware';
 import { asyncHandler } from '../middleware/validate.middleware';
 
 const router = Router();
@@ -127,6 +128,7 @@ router.post('/meeting-link/:sessionId', requireAuth, requireRole(providerRoles),
 import {
 	getProviderSubscriptionController,
 	upgradeProviderSubscriptionController,
+	checkoutProviderSubscriptionController,
 	cancelProviderSubscriptionController,
 	getProviderLeadsController,
 	getProviderLeadStatsController,
@@ -138,10 +140,21 @@ import {
 router.get('/plans', asyncHandler(getProviderPlansController)); // public
 router.get('/subscription', requireAuth, requireRole(providerRoles), asyncHandler(getProviderSubscriptionController));
 router.patch('/subscription/upgrade', requireAuth, requireRole(providerRoles), asyncHandler(upgradeProviderSubscriptionController));
+router.post('/subscription/checkout', requireAuth, requireRole(providerRoles), asyncHandler(checkoutProviderSubscriptionController));
 router.patch('/subscription/cancel', requireAuth, requireRole(providerRoles), asyncHandler(cancelProviderSubscriptionController));
-router.get('/leads', requireAuth, requireRole(providerRoles), asyncHandler(getProviderLeadsController));
-router.get('/lead-stats', requireAuth, requireRole(providerRoles), asyncHandler(getProviderLeadStatsController));
-router.get('/marketplace', requireAuth, requireRole(providerRoles), asyncHandler(getProviderMarketplaceController));
-router.post('/marketplace/purchase', requireAuth, requireRole(providerRoles), asyncHandler(purchaseMarketplaceLeadController));
+router.get('/leads', requireAuth, requireRole(providerRoles), requireProviderSubscription, asyncHandler(getProviderLeadsController));
+router.get('/lead-stats', requireAuth, requireRole(providerRoles), requireProviderSubscription, asyncHandler(getProviderLeadStatsController));
+router.get('/marketplace', requireAuth, requireRole(providerRoles), requireProviderSubscription, asyncHandler(getProviderMarketplaceController));
+router.post('/marketplace/purchase', requireAuth, requireRole(providerRoles), requireProviderSubscription, asyncHandler(purchaseMarketplaceLeadController));
+
+// ── Platform Access ──
+import {
+	getPlatformAccessController,
+	initiatePlatformAccessController,
+} from '../controllers/platform-access.controller';
+
+router.get('/platform-access', requireAuth, requireRole(providerRoles), asyncHandler(getPlatformAccessController));
+router.post('/platform-access/initiate', requireAuth, requireRole(providerRoles), asyncHandler(initiatePlatformAccessController));
 
 export default router;
+

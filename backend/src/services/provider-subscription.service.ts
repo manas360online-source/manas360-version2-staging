@@ -2,6 +2,7 @@ import { AppError } from '../middleware/error.middleware';
 import { prisma } from '../config/db';
 import { PROVIDER_PLANS, type ProviderPlanKey } from '../config/providerPlans';
 import { PLAN_CONFIG } from '../config/plans';
+import { calculateGraceEndDate } from './subscription.helper';
 
 const db = prisma as any;
 const SUBSCRIPTION_LOCK_TIMEOUT_MS = 5 * 60 * 1000;
@@ -182,6 +183,12 @@ export const activateProviderSubscription = async (
 
 		const mappedTier = resolveTierForPlan(planKey);
 		const tierConfig = mappedTier ? (PLAN_CONFIG as any)[mappedTier] : null;
+		const currentStatus = String(current?.status || '').toLowerCase();
+		const hasPaidSubscriptionAlready = Number(current?.price || 0) > 0
+			&& ['active', 'trial', 'grace'].includes(currentStatus);
+		const nextStatus = hasPaidSubscriptionAlready ? 'active' : 'trial';
+		const expiryDays = nextStatus === 'trial' ? 15 : plan.durationDays;
+		const trialEndDate = nextStatus === 'trial' ? new Date(new Date().getTime() + 15 * 24 * 60 * 60 * 1000).toISOString() : undefined;
 
 		const next = await db.providerSubscription.update({
 			where: { providerId },
@@ -192,12 +199,17 @@ export const activateProviderSubscription = async (
 				leadsPerWeek: Number(tierConfig?.leadsPerWeek ?? plan.leadsPerWeek),
 				bonusLeads: Number(tierConfig?.bonusLeads ?? 0),
 				startDate: new Date(),
-				expiryDate: calculateExpiry(plan.durationDays),
-				status: 'active',
-				autoRenew: true,
+				expiryDate: calculateExpiry(expiryDays),
+				status: nextStatus,
+				autoRenew: false, // Lead Plans are manual/one-time — no auto-renew
 				paymentId: paymentId || undefined,
 				leadsUsedThisWeek: 0,
 				weekStartsAt: new Date(),
+				metadata: nextStatus === 'trial' ? {
+					trialEndDate,
+					graceEndDate: null,
+					isFirstActivation: true
+				} : undefined,
 			},
 		});
 
@@ -241,6 +253,76 @@ export const cancelProviderSubscription = async (providerId: string) => {
 			oldPrice: Number(current?.price || 0),
 			newPrice: Number(next.price || 0),
 			reason: 'PROVIDER_MANUAL_CANCEL',
+		});
+
+		return next;
+	});
+};
+
+export const getProviderSubscriptionBanner = async (providerId: string) => {
+	const sub = await db.providerSubscription.findUnique({
+		where: { providerId },
+		select: { status: true, metadata: true },
+	});
+
+	if (!sub) return null;
+
+	const status = String(sub.status || '').toLowerCase();
+	if (status === 'locked') {
+		return {
+			type: 'locked' as const,
+			message: 'Leads are paused. Renew now to continue receiving patients.',
+		};
+	}
+
+	if (status === 'grace') {
+		const graceEndDate = sub?.metadata?.graceEndDate || null;
+		const formattedDate = graceEndDate ? new Date(graceEndDate).toISOString() : null;
+		return {
+			type: 'grace' as const,
+			message: `Grace period active until ${formattedDate || 'soon'}. Renew to avoid lock.`,
+			graceEndDate: formattedDate,
+		};
+	}
+
+	return null;
+};
+
+export const markProviderSubscriptionPaymentFailed = async (providerId: string, paymentId?: string) => {
+	return withProviderSubscriptionLock(providerId, async (current) => {
+		if (!current) {
+			throw new AppError('No active subscription found', 404);
+		}
+
+		const graceEndDate = calculateGraceEndDate().toISOString();
+		const currentMetadata = current?.metadata && typeof current.metadata === 'object'
+			? current.metadata
+			: {};
+
+		const next = await db.providerSubscription.update({
+			where: { providerId },
+			data: {
+				status: 'grace',
+				metadata: {
+					...currentMetadata,
+					graceEndDate,
+				},
+			},
+		});
+
+		await recordProviderSubscriptionHistory({
+			providerId,
+			subscriptionRefId: String(next.id),
+			oldPlan: String(current?.plan || ''),
+			newPlan: String(next.plan || ''),
+			oldStatus: String(current?.status || ''),
+			newStatus: String(next.status || ''),
+			oldPrice: Number(current?.price || 0),
+			newPrice: Number(next.price || 0),
+			paymentId,
+			transactionId: paymentId,
+			reason: 'OTHER',
+			metadata: { event: 'PAYMENT_FAILED', graceEndDate },
 		});
 
 		return next;

@@ -16,7 +16,7 @@ export class ApiClientError extends Error {
 
 const defaultApiBase = typeof window === 'undefined'
 	? 'http://localhost:3000/api'
-	: `${window.location.protocol}//${window.location.hostname}:3000/api`;
+	: '/api';
 
 const configuredBase =
 	import.meta.env.VITE_API_BASE_URL?.trim() ||
@@ -95,6 +95,13 @@ const client = {
 			credentials: 'include',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify(body ?? {}),
+		});
+		return parseResponse<T>(res);
+	},
+	async delete<T = any>(url: string) {
+		const res = await fetch(joinUrl(url), {
+			method: 'DELETE',
+			credentials: 'include',
 		});
 		return parseResponse<T>(res);
 	},

@@ -7,18 +7,21 @@ import { getApiErrorMessage } from '../../api/auth';
 import { useAuth } from '../../context/AuthContext';
 
 type Mode = 'demo' | 'create';
+type CreateStep = 'details' | 'otp';
 
 const inputClassName =
   'w-full rounded-xl border border-[#D9E0DA] bg-white px-3 py-2.5 text-sm text-[#18302E] shadow-sm outline-none transition focus:border-[#4E8F86] focus:ring-2 focus:ring-[#4E8F86]/20';
 
 export default function CorporateOnboardingPage() {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { checkAuth } = useAuth();
 
   const [mode, setMode] = useState<Mode>('demo');
+  const [createStep, setCreateStep] = useState<CreateStep>('details');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [devOtp, setDevOtp] = useState<string | null>(null);
 
   const [companyName, setCompanyName] = useState('');
   const [workEmail, setWorkEmail] = useState('');
@@ -27,7 +30,7 @@ export default function CorporateOnboardingPage() {
   const [country, setCountry] = useState('India');
   const [contactName, setContactName] = useState('');
   const [phone, setPhone] = useState('');
-  const [password, setPassword] = useState('');
+  const [otp, setOtp] = useState('');
 
   const modeCopy = useMemo(
     () => ({
@@ -47,6 +50,57 @@ export default function CorporateOnboardingPage() {
     [],
   );
 
+  const requestOtp = async (event: FormEvent) => {
+    event.preventDefault();
+    setError(null);
+    setLoading(true);
+    setDevOtp(null);
+
+    try {
+      const result = await corporateApi.requestCorporateOtp({
+        companyName,
+        phone,
+        companySize,
+        industry,
+        country,
+        contactName,
+        email: workEmail || undefined,
+      });
+      setCreateStep('otp');
+      setDevOtp(result.devOtp || null);
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Failed to send OTP'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verifyOtpAndCreate = async (event: FormEvent) => {
+    event.preventDefault();
+    setError(null);
+    setLoading(true);
+
+    try {
+      await corporateApi.createCorporateAccount({
+        companyName,
+        phone,
+        otp,
+        companySize,
+        industry,
+        country,
+        contactName,
+        email: workEmail || undefined,
+      });
+
+      await checkAuth({ force: true });
+      navigate('/corporate/dashboard', { replace: true });
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'OTP verification failed'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setError(null);
@@ -57,34 +111,19 @@ export default function CorporateOnboardingPage() {
       if (mode === 'demo') {
         await corporateApi.requestDemo({
           companyName,
-          workEmail,
           companySize,
           industry,
           country,
           contactName,
           phone,
+          email: workEmail || undefined,
         });
         setSuccess('Demo request submitted. Our enterprise team will contact you shortly.');
         return;
       }
 
-      if (!password || password.length < 8) {
-        setError('Password must be at least 8 characters.');
-        return;
-      }
-
-      await corporateApi.createCorporateAccount({
-        companyName,
-        workEmail,
-        password,
-        companySize,
-        industry,
-        country,
-        contactName,
-      });
-
-      await login(workEmail, password);
-      navigate('/corporate/dashboard', { replace: true });
+      // Create mode is now handled in two steps (request OTP + verify)
+      // This shouldn't be reached in create mode
     } catch (err) {
       setError(getApiErrorMessage(err, 'Unable to process corporate onboarding request.'));
     } finally {
@@ -154,49 +193,88 @@ export default function CorporateOnboardingPage() {
             <h2 className="mt-4 font-display text-2xl font-bold text-[#193D3A]">{modeCopy[mode].title}</h2>
             <p className="mt-1 text-sm text-[#446662]">{modeCopy[mode].subtitle}</p>
 
-            <form className="mt-5 space-y-3" onSubmit={onSubmit}>
-              <Field label="Company Name" icon={<Building2 className="h-4 w-4" />}>
-                <input className={inputClassName} value={companyName} onChange={(e) => setCompanyName(e.target.value)} required />
-              </Field>
+            <form className="mt-5 space-y-3" onSubmit={mode === 'demo' ? onSubmit : (createStep === 'details' ? requestOtp : verifyOtpAndCreate)}>
+              {mode === 'create' && createStep === 'otp' ? (
+                <>
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                    <p className="text-xs font-medium text-blue-900">
+                      OTP sent to <strong>{phone}</strong>. Please enter it below.
+                    </p>
+                  </div>
 
-              <Field label="Work Email" icon={<Mail className="h-4 w-4" />}>
-                <input className={inputClassName} type="email" value={workEmail} onChange={(e) => setWorkEmail(e.target.value)} required />
-              </Field>
+                  <Field label="Enter OTP" icon={<ShieldCheck className="h-4 w-4" />}>
+                    <input
+                      className={inputClassName}
+                      inputMode="numeric"
+                      pattern="\\d{6}"
+                      maxLength={6}
+                      placeholder="6-digit OTP"
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      required
+                      autoFocus
+                    />
+                  </Field>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label="Company Size" icon={<Users className="h-4 w-4" />}>
-                  <input className={inputClassName} value={companySize} onChange={(e) => setCompanySize(e.target.value)} placeholder="200" />
-                </Field>
-                <Field label="Industry" icon={<BriefcaseBusiness className="h-4 w-4" />}>
-                  <input className={inputClassName} value={industry} onChange={(e) => setIndustry(e.target.value)} />
-                </Field>
-              </div>
+                  {devOtp ? (
+                    <p className="text-xs text-[#5A7873]">
+                      Development OTP: <span className="font-semibold">{devOtp}</span>
+                    </p>
+                  ) : null}
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label="Country" icon={<Globe2 className="h-4 w-4" />}>
-                  <input className={inputClassName} value={country} onChange={(e) => setCountry(e.target.value)} />
-                </Field>
-                <Field label="Contact Name" icon={<User2 className="h-4 w-4" />}>
-                  <input className={inputClassName} value={contactName} onChange={(e) => setContactName(e.target.value)} />
-                </Field>
-              </div>
-
-              {mode === 'demo' ? (
-                <Field label="Phone (optional)" icon={<User2 className="h-4 w-4" />}>
-                  <input className={inputClassName} value={phone} onChange={(e) => setPhone(e.target.value)} />
-                </Field>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCreateStep('details');
+                      setOtp('');
+                      setDevOtp(null);
+                    }}
+                    className="text-xs text-[#4E8F86] underline hover:text-[#3B6B66]"
+                  >
+                    Change phone number
+                  </button>
+                </>
               ) : (
-                <Field label="Create Password" icon={<ShieldCheck className="h-4 w-4" />}>
-                  <input
-                    className={inputClassName}
-                    type="password"
-                    minLength={8}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Minimum 8 characters"
-                    required
-                  />
-                </Field>
+                <>
+                  <Field label="Company Name" icon={<Building2 className="h-4 w-4" />}>
+                    <input className={inputClassName} value={companyName} onChange={(e) => setCompanyName(e.target.value)} required />
+                  </Field>
+
+                  {mode === 'demo' && (
+                    <Field label="Work Email (Optional)" icon={<Mail className="h-4 w-4" />}>
+                      <input className={inputClassName} type="email" value={workEmail} onChange={(e) => setWorkEmail(e.target.value)} />
+                    </Field>
+                  )}
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <Field label="Company Size" icon={<Users className="h-4 w-4" />}>
+                      <input className={inputClassName} value={companySize} onChange={(e) => setCompanySize(e.target.value)} placeholder="200" />
+                    </Field>
+                    <Field label="Industry" icon={<BriefcaseBusiness className="h-4 w-4" />}>
+                      <input className={inputClassName} value={industry} onChange={(e) => setIndustry(e.target.value)} />
+                    </Field>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <Field label="Country" icon={<Globe2 className="h-4 w-4" />}>
+                      <input className={inputClassName} value={country} onChange={(e) => setCountry(e.target.value)} />
+                    </Field>
+                    <Field label="Contact Name" icon={<User2 className="h-4 w-4" />}>
+                      <input className={inputClassName} value={contactName} onChange={(e) => setContactName(e.target.value)} />
+                    </Field>
+                  </div>
+
+                  <Field label="Phone Number" icon={<User2 className="h-4 w-4" />}>
+                    <input
+                      className={inputClassName}
+                      type="tel"
+                      placeholder="+919876543210"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      required
+                    />
+                  </Field>
+                </>
               )}
 
               {error ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p> : null}
@@ -207,11 +285,13 @@ export default function CorporateOnboardingPage() {
                 disabled={loading}
                 className="inline-flex w-full items-center justify-center rounded-xl bg-[#1E6C61] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#18574F] disabled:cursor-not-allowed disabled:opacity-70"
               >
-                {loading ? 'Processing...' : modeCopy[mode].cta}
+                {loading ? 'Processing...' : (mode === 'demo' ? modeCopy[mode].cta : (createStep === 'details' ? 'Send OTP' : 'Create Account & Login'))}
               </button>
 
               <p className="text-xs text-[#5A7873]">
-                Employees will continue to use the same normal login flow. Corporate access is enabled automatically by account mapping.
+                {mode === 'demo' 
+                  ? 'Our enterprise team will contact you to discuss your requirements and timeline.' 
+                  : 'Employees will continue to use the same normal login flow. Corporate access is enabled automatically by account mapping.'}
               </p>
             </form>
           </section>

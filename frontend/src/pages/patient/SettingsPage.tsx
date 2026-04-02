@@ -774,71 +774,167 @@ export default function SettingsPage() {
   );
 
   const renderBilling = () => {
-    const status = String(billingData.subscription?.status || '').toLowerCase();
-    const isActive = status === 'active' || status === 'trialing' || status === 'renewed';
-    const planName = String(billingData.subscription?.plan?.name || billingData.subscription?.plan?.key || 'Free Tier');
-    const expiryDate = billingData.subscription?.expiryDate ? new Date(billingData.subscription.expiryDate).toLocaleDateString() : 'Never';
+    const subscription = billingData.subscription;
+    const statusRaw = String(subscription?.status || '').toLowerCase();
+    const planName = String(
+      subscription?.plan?.name || subscription?.plan?.displayName || subscription?.plan?.key || 'Free Tier',
+    );
+
+    const parseDateValue = (value?: string | null) => {
+      if (!value) return null;
+      const parsed = new Date(value);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    };
+
+    const renewalDateValue = parseDateValue(subscription?.expiryDate || subscription?.renewalDate);
+    const renewalDate = renewalDateValue
+      ? renewalDateValue.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+      : '—';
+
+    const getStatusLabel = (value: string) => {
+      if (!value) return 'Locked';
+      if (value.includes('trial')) return 'Trial';
+      if (value.includes('active') || value.includes('renewed')) return 'Active';
+      if (value.includes('past_due') || value.includes('grace') || value.includes('unpaid')) return 'Grace';
+      if (value.includes('locked') || value.includes('inactive') || value.includes('cancel')) return 'Locked';
+      return 'Locked';
+    };
+
+    const statusLabel = getStatusLabel(statusRaw);
+    const statusBadgeClasses: Record<string, string> = {
+      Active: 'border-emerald-100 bg-emerald-50 text-emerald-700',
+      Trial: 'border-amber-100 bg-amber-50 text-amber-900',
+      Grace: 'border-amber-100 bg-amber-50 text-amber-900',
+      Locked: 'border-rose-100 bg-rose-50 text-rose-700',
+    };
+    const statusBadgeClass = statusBadgeClasses[statusLabel] ?? statusBadgeClasses.Locked;
+
+    const historyRecords = Array.isArray(billingData.invoices) ? billingData.invoices : [];
+    const sortedHistory = [...historyRecords].sort((a, b) => {
+      const aTs = parseDateValue(a?.createdAt)?.getTime() ?? 0;
+      const bTs = parseDateValue(b?.createdAt)?.getTime() ?? 0;
+      return bTs - aTs;
+    });
+
+    const formatInvoicePlanName = (entry: any) =>
+      String(entry?.plan?.name || entry?.planName || entry?.plan?.key || entry?.planKey || entry?.description || '—');
+
+    const isRetryable = (statusValue: string) => /(failed|declined|error|cancel)/.test(statusValue);
 
     return (
       <div className="space-y-4">
-        {billingError && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{billingError}</div>}
+        {billingError && (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{billingError}</div>
+        )}
         {billingLoading ? (
           <div className="rounded-xl border border-calm-sage/20 bg-white/80 p-4 text-sm text-charcoal/70">Loading billing details...</div>
         ) : (
           <>
-            <section className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-indigo-700">Current Subscription</p>
-              <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-lg font-semibold text-indigo-950">{planName}</h3>
-                  {isActive ? (
-                    <p className="mt-1 text-sm text-indigo-900">
-                      Active until <span className="font-semibold">{expiryDate}</span>
-                    </p>
-                  ) : (
-                    <p className="mt-1 text-sm text-indigo-900 font-semibold">
-                      Your subscription is currently inactive.
-                    </p>
-                  )}
+            <section className="rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-soft-sm">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Billing &amp; Subscription</p>
+              <div className="mt-3 space-y-3">
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-charcoal/60">Plan</p>
+                    <p className="text-lg font-semibold text-charcoal">{planName}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-charcoal/60">Status</p>
+                    <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${statusBadgeClass}`}>
+                      {statusLabel}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-charcoal/60">Renewal Date</p>
+                    <p className="text-sm font-semibold text-charcoal">{renewalDate}</p>
+                  </div>
                 </div>
-                <Link
-                  to="/patient/pricing"
-                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500"
-                >
-                  Manage / Upgrade Plan
-                </Link>
+                <div className="flex flex-wrap justify-end">
+                  <Link
+                    to="/plans"
+                    className="rounded-full border border-slate-200 bg-slate-900 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:bg-slate-800"
+                  >
+                    Manage / Upgrade Plan
+                  </Link>
+                </div>
               </div>
             </section>
 
-            <div className="rounded-xl border border-calm-sage/20 bg-white/80 p-4">
-            <p className="text-sm font-semibold text-charcoal">Payment Method</p>
-            <p className="mt-1 text-sm text-charcoal/75">
-              {billingData.paymentMethod
-                ? `${billingData.paymentMethod.cardBrand || 'Card'} •••• ${billingData.paymentMethod.cardLast4 || '----'}`
-                : 'No registered payment methods'}
-            </p>
-            </div>
+            <section className="rounded-2xl border border-calm-sage/20 bg-white/80 p-4 shadow-soft-sm">
+              <p className="text-sm font-semibold text-charcoal">Payment Method</p>
+              <p className="mt-1 text-sm text-charcoal/75">
+                {billingData.paymentMethod
+                  ? `${billingData.paymentMethod.cardBrand || 'Card'} •••• ${billingData.paymentMethod.cardLast4 || '----'}`
+                  : 'No registered payment methods'}
+              </p>
+            </section>
 
-            <div className="rounded-xl border border-calm-sage/20 bg-white/80 p-4">
-            <p className="text-sm font-semibold text-charcoal">Billing History</p>
-            {billingData.invoices.length === 0 ? (
-              <p className="mt-2 text-sm text-charcoal/65">No invoices found.</p>
-            ) : (
-              <div className="mt-2 space-y-2">
-                {billingData.invoices.slice(0, 10).map((invoice: any, index: number) => (
-                  <div key={`invoice-${invoice.id || index}`} className="flex items-center justify-between rounded-lg border border-calm-sage/15 bg-white px-3 py-2">
-                    <div>
-                      <p className="text-sm font-medium text-charcoal">{formatCurrencyInr(Number(invoice.amount || 0))}</p>
-                      <p className="text-xs text-charcoal/60">{invoice.createdAt ? new Date(invoice.createdAt).toLocaleDateString() : 'Date N/A'}</p>
-                    </div>
-                    <span className="rounded-full bg-calm-sage/15 px-2 py-0.5 text-[11px] font-semibold text-calm-sage">
-                      {String(invoice.status || 'unknown').toUpperCase()}
-                    </span>
-                  </div>
-                ))}
+            <section className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-soft-sm">
+              <p className="text-sm font-semibold text-charcoal">Subscription History</p>
+              <div className="mt-3 overflow-x-auto">
+                <table className="min-w-full text-left text-sm">
+                  <thead>
+                    <tr className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                      <th className="px-3 py-2">Date</th>
+                      <th className="px-3 py-2">Plan</th>
+                      <th className="px-3 py-2">Amount (incl. GST)</th>
+                      <th className="px-3 py-2">Status</th>
+                      <th className="px-3 py-2">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedHistory.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-3 py-4 text-sm text-charcoal/60">
+                          No invoices found.
+                        </td>
+                      </tr>
+                    ) : (
+                      sortedHistory.map((invoice: any, index: number) => {
+                        const invoiceDateValue = parseDateValue(
+                          invoice.createdAt || invoice.invoiceDate || invoice.updatedAt,
+                        );
+                        const invoiceDate = invoiceDateValue
+                          ? invoiceDateValue.toLocaleDateString('en-IN', {
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric',
+                            })
+                          : '—';
+                        const statusText = String(invoice.status || 'unknown').toUpperCase();
+                        const retryable = isRetryable(String(invoice.status || ''));
+                        const amountValue = Number(invoice.amount || invoice.total || invoice.amountMinor || 0);
+
+                        return (
+                          <tr key={`invoice-${invoice.id || index}`} className="border-b border-slate-100">
+                            <td className="px-3 py-3 font-medium text-charcoal">{invoiceDate}</td>
+                            <td className="px-3 py-3 text-charcoal/80">{formatInvoicePlanName(invoice)}</td>
+                            <td className="px-3 py-3 text-charcoal">{formatCurrencyInr(amountValue)}</td>
+                            <td className="px-3 py-3 text-charcoal">
+                              <span className="rounded-full border border-slate-200/80 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+                                {statusText}
+                              </span>
+                            </td>
+                            <td className="px-3 py-3">
+                              {retryable ? (
+                                <Link
+                                  to="/plans"
+                                  className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-900 transition hover:bg-amber-100"
+                                >
+                                  Retry
+                                </Link>
+                              ) : (
+                                <span className="text-xs text-charcoal/60">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
               </div>
-            )}
-            </div>
+            </section>
           </>
         )}
       </div>

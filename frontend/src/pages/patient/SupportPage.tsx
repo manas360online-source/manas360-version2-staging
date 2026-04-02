@@ -59,9 +59,9 @@ const helpArticles: HelpArticle[] = [
   {
     id: 'privacy-data',
     title: 'Privacy, Encryption, and Data Safety',
-    summary: 'Who can access your data, how we protect records, and compliance safeguards.',
+    summary: 'Who can access your data, how we protect records, and governance safeguards.',
     category: 'privacy',
-    keywords: ['privacy', 'encrypted', 'security', 'PHQ-9', 'compliance'],
+    keywords: ['privacy', 'encrypted', 'security', 'PHQ-9', 'governance'],
   },
   {
     id: 'anytime-buddy-basics',
@@ -97,7 +97,7 @@ const categoryCards: Array<{
     id: 'privacy',
     title: 'Privacy & Security',
     subtitle: 'Understand exactly what is protected and visible.',
-    bullets: ['Who can see my PHQ-9 scores?', 'Is my data encrypted?', 'HIPAA/Data compliance'],
+    bullets: ['Who can see my PHQ-9 scores?', 'Is my data encrypted?', 'HIPAA/Data governance'],
     icon: Lock,
   },
   {

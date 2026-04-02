@@ -1,10 +1,3 @@
-// Notify provider of new lab upload
-export function notifyProviderLabUpload(providerId: string, payload: any) {
-  const io = require('../socket').io;
-  const room = `inbox:${providerId}`;
-  io.to(room).emit('provider:lab-upload', payload);
-  console.log('notifyProviderLabUpload ->', { room, payloadPreview: { documentId: payload.documentId, patientId: payload.patientId, title: payload.title } });
-}
 /**
  * GPS Meter REST routes
  * POST   /v1/gps/sessions/:sessionId/start    – therapist starts GPS monitoring
@@ -42,22 +35,58 @@ import prisma from '../config/db';
 const router = Router();
 const db = prisma as any;
 
+const isMissingRelationError = (error: unknown): boolean => {
+  if (!error || typeof error !== 'object') return false;
+  const dbError = error as { code?: string; message?: string };
+  return dbError.code === '42P01' || String(dbError.message || '').toLowerCase().includes('does not exist');
+};
+
+const getSessionOwnership = async (
+  sessionId: string,
+): Promise<{ therapistUserId: string; patientUserId: string }> => {
+  const rows: any[] = await db.$queryRawUnsafe(
+    `SELECT ts.therapist_profile_id AS therapist_user_id,
+            pp.user_id             AS patient_user_id
+       FROM therapy_sessions ts
+       JOIN patient_profiles pp ON pp.id = ts.patient_profile_id
+      WHERE ts.id = $1::uuid
+      LIMIT 1`,
+    sessionId,
+  );
+
+  if (!Array.isArray(rows) || !rows.length) {
+    throw new AppError('Session not found', 404);
+  }
+
+  const therapistUserId = String(rows[0]?.therapist_user_id || '').trim();
+  const patientUserId = String(rows[0]?.patient_user_id || '').trim();
+  if (!therapistUserId || !patientUserId) {
+    throw new AppError('Session participant mapping is invalid', 422);
+  }
+
+  return { therapistUserId, patientUserId };
+};
+
 // Socket.io instance – injected at startup via setSocketIO()
 let _io: IOServer | null = null;
 export function setSocketIO(io: IOServer): void {
   _io = io;
 }
 
-// Notify patient inbox about a newly created document
-export function notifyPatientDocument(patientId: string, payload: Record<string, any>): void {
-  try {
-    if (!_io) return;
-    const room = `inbox:${patientId}`;
-    console.log('notifyPatientDocument ->', { room, payloadPreview: { id: payload.id, title: payload.title } });
-    _io.to(room).emit('patient:document:new', payload);
-  } catch (e) {
-    console.warn('notifyPatientDocument failed', e);
-  }
+export function notifyPatientDocument(patientUserId: string, payload: Record<string, unknown>): void {
+  if (!_io) return;
+  _io.to(`user:${patientUserId}`).emit('patient:document', {
+    ...payload,
+    timestamp: new Date().toISOString(),
+  });
+}
+
+export function notifyProviderLabUpload(providerUserId: string, payload: Record<string, unknown>): void {
+  if (!_io) return;
+  _io.to(`user:${providerUserId}`).emit('provider:lab-upload', {
+    ...payload,
+    timestamp: new Date().toISOString(),
+  });
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -68,15 +97,8 @@ async function assertTherapistOwnsSession(
   sessionId: string,
 ): Promise<void> {
   const userId = (req as any).auth?.userId;
-  const rows: any[] = await db.$queryRawUnsafe(
-    `SELECT "therapistProfileId" AS therapist_profile_id
-       FROM "therapy_sessions"
-      WHERE "id" = $1
-      LIMIT 1`,
-    sessionId,
-  );
-  if (!rows.length) throw new AppError('Session not found', 404);
-  if (rows[0].therapist_profile_id !== userId) throw new AppError('Forbidden', 403);
+  const { therapistUserId } = await getSessionOwnership(sessionId);
+  if (therapistUserId !== userId) throw new AppError('Forbidden', 403);
 }
 
 // ── POST /sessions/:sessionId/start ──────────────────────────────────────────
@@ -86,19 +108,14 @@ router.post('/sessions/:sessionId/start', requireAuth, async (req: Request, res:
     const sessionId = String(req.params.sessionId);
     await assertTherapistOwnsSession(req, sessionId);
 
-    const sessionRows: any[] = await db.$queryRawUnsafe(
-      `SELECT "therapistProfileId" AS therapist_profile_id,
-              "patientProfileId" AS patient_profile_id
-         FROM "therapy_sessions"
-        WHERE "id" = $1
-        LIMIT 1`,
-      sessionId,
-    );
-    const { therapist_profile_id, patient_profile_id } = sessionRows[0];
-
-    const monitoringId = await initSessionMonitoring(sessionId, therapist_profile_id, patient_profile_id);
+    const { therapistUserId, patientUserId } = await getSessionOwnership(sessionId);
+    const monitoringId = await initSessionMonitoring(sessionId, therapistUserId, patientUserId);
     res.status(201).json({ monitoringId });
   } catch (err) {
+    if (isMissingRelationError(err)) {
+      res.status(200).json({ monitoringId: null, status: 'unavailable' });
+      return;
+    }
     next(err);
   }
 });
@@ -118,6 +135,10 @@ router.post('/sessions/:sessionId/end', requireAuth, async (req: Request, res: R
 
     res.json({ message: 'GPS session ended', analytics });
   } catch (err) {
+    if (isMissingRelationError(err)) {
+      res.status(200).json({ message: 'GPS monitoring unavailable', analytics: null });
+      return;
+    }
     next(err);
   }
 });
@@ -140,6 +161,10 @@ router.get('/sessions/:sessionId/status', requireAuth, async (req: Request, res:
       latestCrisisRisk: monitoring.latest_crisis_risk,
     });
   } catch (err) {
+    if (isMissingRelationError(err)) {
+      res.status(200).json({ monitoringId: null, status: 'unavailable' });
+      return;
+    }
     next(err);
   }
 });
