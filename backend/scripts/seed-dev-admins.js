@@ -48,6 +48,7 @@ async function run() {
     { email: 'superadmin@manas360.com', phone: 'superadmin@manas360.com', firstName: 'Super', lastName: 'Admin' },
     { email: 'finance@manas360.com', phone: 'finance@manas360.com', firstName: 'Finance', lastName: 'Manager' },
     { email: 'clinical@manas360.com', phone: 'clinical@manas360.com', firstName: 'Clinical', lastName: 'Director' },
+    { email: 'compliance@manas360.com', phone: 'compliance@manas360.com', firstName: 'Compliance', lastName: 'Officer' },
   ];
 
   const results = [];
