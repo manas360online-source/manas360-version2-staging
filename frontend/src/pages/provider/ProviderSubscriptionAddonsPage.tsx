@@ -12,6 +12,7 @@ export default function ProviderSubscriptionAddonsPage() {
   const [leadPlanId, setLeadPlanId] = useState<'free' | 'basic' | 'standard' | 'premium'>('basic');
   const [platformCycle, setPlatformCycle] = useState<'monthly' | 'quarterly'>('monthly');
   const [addons, setAddons] = useState<ProviderAddonSelection>({ hot: 0, warm: 0, cold: 0 });
+  const providerPlanId = leadPlanId === 'free' ? 'lead-free' : leadPlanId === 'basic' ? 'lead-basic' : leadPlanId === 'standard' ? 'lead-standard' : 'lead-premium';
 
   useEffect(() => {
     const cart = loadProviderCart();
@@ -24,7 +25,7 @@ export default function ProviderSubscriptionAddonsPage() {
     setAddons(cart.addons);
 
     if (cart.leadPlanId === 'free') {
-      navigate('/provider/checkout', { replace: true });
+      navigate('/provider/checkout?type=provider&planId=lead-free', { replace: true });
     }
   }, [navigate]);
 
@@ -44,7 +45,7 @@ export default function ProviderSubscriptionAddonsPage() {
       addons,
       updatedAt: new Date().toISOString(),
     });
-    navigate('/provider/checkout');
+    navigate(`/provider/checkout?type=provider&planId=${providerPlanId}`);
   };
 
   return (
