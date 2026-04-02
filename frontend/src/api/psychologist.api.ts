@@ -89,11 +89,11 @@ export type PsychologistPatientOverview = {
 
 export const psychologistApi = {
   getDashboard: async (): Promise<PsychologistDashboardResponse> => {
-    const res = await http.get('/v1/psychologist/me/dashboard');
+    const res = await http.get('/psychologist/me/dashboard');
     return unwrap<PsychologistDashboardResponse>(res.data);
   },
   getPatients: async (params?: { search?: string }): Promise<{ items: PsychologistPatientItem[] }> => {
-    const res = await http.get('/v1/psychologist/me/patients', { params });
+    const res = await http.get('/psychologist/me/patients', { params });
     return unwrap<{ items: PsychologistPatientItem[] }>(res.data);
   },
   getPatientOverview: async (patientId: string): Promise<PsychologistPatientOverview> => {
@@ -101,11 +101,11 @@ export const psychologistApi = {
     return unwrap<PsychologistPatientOverview>(res.data);
   },
   getAssessments: async (params?: { patientId?: string }): Promise<{ items: PsychologistAssessmentItem[] }> => {
-    const res = await http.get('/v1/psychologist/me/assessments', { params });
+    const res = await http.get('/psychologist/me/assessments', { params });
     return unwrap<{ items: PsychologistAssessmentItem[] }>(res.data);
   },
   getReports: async (params?: { patientId?: string }): Promise<{ items: PsychologistReportItem[] }> => {
-    const res = await http.get('/v1/psychologist/me/reports', { params });
+    const res = await http.get('/psychologist/me/reports', { params });
     return unwrap<{ items: PsychologistReportItem[] }>(res.data);
   },
   cloneReportForPatient: async (reportId: string): Promise<{ id: string; status: string }> => {
@@ -113,7 +113,7 @@ export const psychologistApi = {
     return unwrap<{ id: string; status: string }>(res.data);
   },
   getPatientReportClones: async (params?: { patientId?: string }): Promise<{ items: PsychologistPatientReportCloneItem[] }> => {
-    const res = await http.get('/v1/psychologist/me/patient-reports', { params });
+    const res = await http.get('/psychologist/me/patient-reports', { params });
     return unwrap<{ items: PsychologistPatientReportCloneItem[] }>(res.data);
   },
   sharePatientReportClone: async (cloneId: string): Promise<{ id: string; status: string; sharePath: string; expiresAt: string }> => {
@@ -121,15 +121,15 @@ export const psychologistApi = {
     return unwrap<{ id: string; status: string; sharePath: string; expiresAt: string }>(res.data);
   },
   getTests: async (params?: { patientId?: string }): Promise<{ items: Array<any> }> => {
-    const res = await http.get('/v1/psychologist/me/tests', { params });
+    const res = await http.get('/psychologist/me/tests', { params });
     return unwrap<{ items: Array<any> }>(res.data);
   },
   getSchedule: async (): Promise<{ items: Array<any> }> => {
-    const res = await http.get('/v1/psychologist/me/schedule');
+    const res = await http.get('/psychologist/me/schedule');
     return unwrap<{ items: Array<any> }>(res.data);
   },
   getMessages: async (): Promise<{ items: Array<any> }> => {
-    const res = await http.get('/v1/psychologist/me/messages');
+    const res = await http.get('/psychologist/me/messages');
     return unwrap<{ items: Array<any> }>(res.data);
   },
 };

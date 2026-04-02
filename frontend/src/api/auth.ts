@@ -102,7 +102,7 @@ export const login = async (payload: LoginPayload): Promise<AuthUser> => {
 };
 
 export const providerRegister = async (payload: ProviderRegisterPayload): Promise<void> => {
-	await http.post<ApiEnvelope<unknown>>('/v1/provider/onboarding', payload);
+	await http.post<ApiEnvelope<unknown>>('/provider/onboarding', payload);
 };
 
 export const googleLogin = async (idToken: string): Promise<AuthUser> => {

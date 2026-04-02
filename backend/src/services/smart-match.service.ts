@@ -677,7 +677,24 @@ export const createAppointmentRequest = async (
     }
   });
 
-  // TODO: Send notifications to providers
+  // Persist in-app notifications so selected providers can see incoming requests.
+  await prisma.notification.createMany({
+    data: providers.map((provider) => ({
+      userId: String(provider.id),
+      type: 'SMART_MATCH_APPOINTMENT_REQUEST',
+      title: 'New smart-match appointment request',
+      message: 'A patient has requested a session. Review and accept this request to lock the booking.',
+      payload: {
+        appointmentRequestId: appointmentRequest.id,
+        patientId: input.patientId,
+        preferredSpecialization: input.preferredSpecialization || null,
+        availabilityPrefs: input.availabilityPrefs,
+        durationMinutes: input.durationMinutes || 50,
+        requestStatus: 'PENDING',
+      },
+      sentAt: new Date(),
+    })),
+  }).catch(() => null);
 
   return {
     appointmentRequestId: appointmentRequest.id,
@@ -780,8 +797,46 @@ export const acceptAppointmentRequest = async (
     },
   });
 
-  // TODO: Send notification to patient with payment action required
-  // TODO: Send cancellation notifications to rejected providers
+  const acceptedProviderName = `${providerEntry?.name || ''}`.trim() || 'A provider';
+
+  await prisma.notification.create({
+    data: {
+      userId: String(appointmentRequest.patientId),
+      type: 'SMART_MATCH_PAYMENT_REQUIRED',
+      title: 'Provider accepted your request',
+      message: `${acceptedProviderName} accepted your request. Complete payment within 6 hours to confirm your session.`,
+      payload: {
+        appointmentRequestId: updated.id,
+        providerId: input.providerId,
+        scheduledAt: updated.scheduledAt?.toISOString(),
+        paymentDeadlineAt: paymentDeadlineAt.toISOString(),
+        amountMinor,
+        requestStatus: 'ACCEPTED_BY_PROVIDER',
+      },
+      sentAt: new Date(),
+    },
+  }).catch(() => null);
+
+  const cancelledProviderIds = providers
+    .filter((p: any) => String(p.providerId) !== String(input.providerId))
+    .map((p: any) => String(p.providerId));
+
+  if (cancelledProviderIds.length > 0) {
+    await prisma.notification.createMany({
+      data: cancelledProviderIds.map((providerId) => ({
+        userId: providerId,
+        type: 'SMART_MATCH_REQUEST_CLOSED',
+        title: 'Appointment request closed',
+        message: 'This request was accepted by another provider and is no longer available.',
+        payload: {
+          appointmentRequestId: updated.id,
+          acceptedProviderId: input.providerId,
+          requestStatus: 'CLOSED',
+        },
+        sentAt: new Date(),
+      })),
+    }).catch(() => null);
+  }
 
   return {
     status: updated.status,
@@ -832,7 +887,21 @@ export const rejectAppointmentRequest = async (
     },
   });
 
-  // TODO: Send notification to patient if all rejected
+  if (allRejected) {
+    await prisma.notification.create({
+      data: {
+        userId: String(appointmentRequest.patientId),
+        type: 'SMART_MATCH_ALL_REJECTED',
+        title: 'No provider accepted yet',
+        message: 'All selected providers rejected this request. Please submit a new request with different providers.',
+        payload: {
+          appointmentRequestId,
+          requestStatus: 'REJECTED_BY_ALL',
+        },
+        sentAt: new Date(),
+      },
+    }).catch(() => null);
+  }
 
   return {
     status: newStatus,
@@ -860,8 +929,37 @@ export const autoExpirePaymentDeadlines = async (): Promise<void> => {
       },
     });
 
-    // TODO: Send notification to patient that booking expired
-    // TODO: Send notification to provider that booking was cancelled
+    const acceptedProviderId = booking.acceptedProviderId ? String(booking.acceptedProviderId) : null;
+
+    await prisma.notification.create({
+      data: {
+        userId: String(booking.patientId),
+        type: 'SMART_MATCH_BOOKING_EXPIRED',
+        title: 'Payment window expired',
+        message: 'Your booking request expired because payment was not completed in time.',
+        payload: {
+          appointmentRequestId: booking.id,
+          requestStatus: 'EXPIRED',
+        },
+        sentAt: now,
+      },
+    }).catch(() => null);
+
+    if (acceptedProviderId) {
+      await prisma.notification.create({
+        data: {
+          userId: acceptedProviderId,
+          type: 'SMART_MATCH_REQUEST_EXPIRED',
+          title: 'Booking expired',
+          message: 'The patient did not complete payment in time. This booking has expired.',
+          payload: {
+            appointmentRequestId: booking.id,
+            requestStatus: 'EXPIRED',
+          },
+          sentAt: now,
+        },
+      }).catch(() => null);
+    }
   }
 };
 

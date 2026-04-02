@@ -26,8 +26,7 @@ const navItems: NavItem[] = [
 	{ to: '/admin/crisis-console', label: 'Crisis Console', shortLabel: 'CRC', section: 'OPERATIONS' },
 	// FINANCE
 	{ to: '/admin/revenue', label: 'Revenue', shortLabel: 'Rev', section: 'FINANCE' },
-	{ to: '/admin/pricing-versions', label: 'Pricing Versions', shortLabel: 'PV', section: 'FINANCE' },
-	{ to: '/admin/pricing-contracts', label: 'Pricing History', shortLabel: 'PH', section: 'FINANCE' },
+	{ to: '/admin/pricing-subscriptions', label: 'Pricing & Subscriptions', shortLabel: 'PS', section: 'FINANCE' },
 	{ to: '/admin/offer-marquee', label: 'Offer Marquee', shortLabel: 'OM', section: 'FINANCE' },
 	{ to: '/admin/payouts', label: 'Payouts', shortLabel: 'Pyt', section: 'FINANCE' },
 	{ to: '/admin/invoices', label: 'Invoices', shortLabel: 'Inv', section: 'FINANCE' },

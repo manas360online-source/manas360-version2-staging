@@ -25,7 +25,7 @@ describe('patientApi security calls', () => {
       confirmPassword: 'New@1234',
     });
 
-    expect(http.patch).toHaveBeenCalledWith('/v1/users/me/password', {
+    expect(http.patch).toHaveBeenCalledWith('/users/me/password', {
       currentPassword: 'Old@1234',
       newPassword: 'New@1234',
       confirmPassword: 'New@1234',
@@ -37,8 +37,8 @@ describe('patientApi security calls', () => {
     await patientApi.revokeSession('session-uuid');
     await patientApi.revokeAllSessions();
 
-    expect(http.get).toHaveBeenCalledWith('/v1/users/me/sessions');
-    expect(http.delete).toHaveBeenCalledWith('/v1/users/me/sessions/session-uuid');
-    expect(http.delete).toHaveBeenCalledWith('/v1/users/me/sessions');
+    expect(http.get).toHaveBeenCalledWith('/users/me/sessions');
+    expect(http.delete).toHaveBeenCalledWith('/users/me/sessions/session-uuid');
+    expect(http.delete).toHaveBeenCalledWith('/users/me/sessions');
   });
 });

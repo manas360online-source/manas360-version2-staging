@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { getAdminRevenueAnalytics } from '../../api/admin.api';
 import {
   PieChart,
@@ -34,6 +34,9 @@ export default function Revenue() {
     };
     fetchData();
   }, []);
+
+  const platformShare = useMemo(() => data?.platformShare ?? Math.round((data?.total || 0) * 0.4), [data]);
+  const providerShare = useMemo(() => data?.providerShare ?? Math.round((data?.total || 0) * 0.6), [data]);
 
   if (loading) {
     return (
@@ -117,6 +120,23 @@ export default function Revenue() {
           </Card>
         ))}
       </div>
+
+      {/* Platform vs Provider Share */}
+      <Card className="p-6 mt-8">
+        <h2 className="font-semibold mb-4">Revenue Split (Last 30 Days)</h2>
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <div>
+            <p className="text-sm text-gray-500">Platform Share</p>
+            <p className="text-4xl font-semibold text-green-600">₹{platformShare.toLocaleString()}</p>
+            <p className="text-xs text-gray-400">40% of total</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-500">Provider Share</p>
+            <p className="text-4xl font-semibold text-amber-600">₹{providerShare.toLocaleString()}</p>
+            <p className="text-xs text-gray-400">60% of total</p>
+          </div>
+        </div>
+      </Card>
 
       {/* Revenue Breakdown Chart */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

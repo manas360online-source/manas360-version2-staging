@@ -36,9 +36,14 @@ const sound_routes_1 = __importDefault(require("./sound.routes"));
 const provider_dashboard_routes_1 = __importDefault(require("./provider-dashboard.routes"));
 const game_routes_1 = __importDefault(require("./game.routes"));
 const wallet_routes_1 = __importDefault(require("./wallet.routes"));
+const group_therapy_routes_1 = __importDefault(require("./group-therapy.routes"));
+const legal_routes_1 = __importDefault(require("./legal.routes"));
 const router = (0, express_1.Router)();
+const shared_routes_1 = __importDefault(require("./shared.routes"));
 // Defensive public pricing route for landing page
 router.get('/public/pricing/:category', pricing_controller_1.getLivePricingController);
+// Mount shared routes for plans and other public data
+router.use('/v1/shared', shared_routes_1.default);
 router.get('/health', (_req, res) => {
     res.status(200).json({
         status: 'ok',
@@ -50,6 +55,8 @@ router.get('/health', (_req, res) => {
 });
 router.use('/auth', auth_routes_1.default);
 router.use('/v1/auth', auth_routes_1.default);
+// Mount specific public group-therapy routes before broad /v1 routes.
+router.use('/v1/group-therapy', group_therapy_routes_1.default);
 router.use('/v1', patient_v1_routes_1.default);
 router.use('/patient', patient_self_routes_1.default);
 router.use('/v1/patient', patient_self_routes_1.default);
@@ -91,4 +98,5 @@ router.use('/v1', riskAnalytics_routes_1.default);
 // Mount game and wallet routes for patient-facing game features and wallet APIs
 router.use('/v1/game', game_routes_1.default);
 router.use('/v1/wallet', wallet_routes_1.default);
+router.use('/v1/legal', legal_routes_1.default);
 exports.default = router;

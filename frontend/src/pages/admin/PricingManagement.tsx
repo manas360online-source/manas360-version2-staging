@@ -5,6 +5,7 @@ import {
   updateAdminPricingConfig,
   toggleGlobalFreeSignups,
   waiveUserSubscription,
+  type AdminPricingPlanItem,
   type AdminPricingBundleItem,
   type AdminPricingConfig,
   type AdminPricingSessionItem,
@@ -21,6 +22,15 @@ type BundleEdit = {
   bundleName: string;
   minutes: number;
   price: number;
+};
+
+type PlanEdit = {
+  planKey: string;
+  planName: string;
+  price: number;
+  billingCycle: string;
+  active: boolean;
+  description?: string | null;
 };
 
 const labelForProviderType = (value: string): string => {
@@ -42,6 +52,7 @@ export default function AdminPricingManagementPage() {
 
   const [platformFee, setPlatformFee] = useState('99');
   const [surcharge, setSurcharge] = useState('20');
+  const [planRows, setPlanRows] = useState<PlanEdit[]>([]);
   const [sessionRows, setSessionRows] = useState<SessionEdit[]>([]);
   const [bundleRows, setBundleRows] = useState<BundleEdit[]>([]);
   const [showChangedOnly, setShowChangedOnly] = useState(true);
@@ -55,6 +66,16 @@ export default function AdminPricingManagementPage() {
       setConfig(data);
       setPlatformFee(String(data?.platformFee?.monthlyFee ?? 99));
       setSurcharge(String(data?.surchargePercent ?? 20));
+      setPlanRows(
+        (data?.platformPlans || []).map((row: AdminPricingPlanItem) => ({
+          planKey: row.planKey,
+          planName: row.planName,
+          price: row.price,
+          billingCycle: row.billingCycle,
+          active: row.active,
+          description: row.description ?? null,
+        })),
+      );
       setSessionRows(
         (data?.sessionPricing || []).map((row: AdminPricingSessionItem) => ({
           providerType: row.providerType,
@@ -185,6 +206,12 @@ export default function AdminPricingManagementPage() {
     setBundleRows(next);
   };
 
+  const updatePlanRow = (index: number, patch: Partial<PlanEdit>) => {
+    const next = [...planRows];
+    next[index] = { ...next[index], ...patch };
+    setPlanRows(next);
+  };
+
   const onSave = async () => {
     setError(null);
     setSuccess(null);
@@ -203,8 +230,9 @@ export default function AdminPricingManagementPage() {
 
     const invalidSession = sessionRows.some((row) => !Number.isFinite(row.price) || row.price < 0);
     const invalidBundle = bundleRows.some((row) => !Number.isFinite(row.price) || row.price < 0);
-    if (invalidSession || invalidBundle) {
-      setError('All session and bundle prices must be valid non-negative numbers.');
+    const invalidPlan = planRows.some((row) => !row.planKey.trim() || !row.planName.trim() || !row.billingCycle.trim() || !Number.isFinite(row.price) || row.price < 0);
+    if (invalidSession || invalidBundle || invalidPlan) {
+      setError('All plan, session, and bundle prices must be valid non-negative numbers.');
       return;
     }
 
@@ -213,6 +241,14 @@ export default function AdminPricingManagementPage() {
       await updateAdminPricingConfig({
         platform_fee: nextPlatformFee,
         preferred_time_surcharge: nextSurcharge,
+        plans: planRows.map((row) => ({
+          planKey: row.planKey,
+          planName: row.planName,
+          price: row.price,
+          billingCycle: row.billingCycle,
+          description: row.description ?? null,
+          active: row.active,
+        })),
         session_pricing: sessionRows.map((row) => ({
           providerType: row.providerType,
           durationMinutes: row.durationMinutes,
@@ -439,6 +475,73 @@ export default function AdminPricingManagementPage() {
               className="mt-1 w-full rounded-lg border border-ink-100 px-3 py-2 text-sm outline-none ring-sage-500 focus:ring-2"
             />
           </label>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-ink-100 bg-white p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="font-display text-base font-bold text-ink-800">Subscription Plans</h3>
+          <p className="text-xs text-ink-500">Edit plan name, billing cycle, price, and active state.</p>
+        </div>
+        <div className="mt-3 overflow-x-auto">
+          <table className="min-w-full divide-y divide-ink-100">
+            <thead className="bg-ink-50">
+              <tr>
+                <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-ink-500">Key</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-ink-500">Plan Name</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-ink-500">Billing Cycle</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-ink-500">Price</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-ink-500">Active</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-ink-100">
+              {planRows.map((row, index) => (
+                <tr key={row.planKey}>
+                  <td className="px-3 py-2 text-sm text-ink-500">{row.planKey}</td>
+                  <td className="px-3 py-2">
+                    <input
+                      type="text"
+                      value={row.planName}
+                      onChange={(event) => updatePlanRow(index, { planName: event.target.value })}
+                      className="w-full rounded-lg border border-ink-100 px-2 py-1.5 text-sm outline-none ring-sage-500 focus:ring-2"
+                    />
+                  </td>
+                  <td className="px-3 py-2">
+                    <select
+                      value={row.billingCycle}
+                      onChange={(event) => updatePlanRow(index, { billingCycle: event.target.value })}
+                      className="w-full rounded-lg border border-ink-100 px-2 py-1.5 text-sm outline-none ring-sage-500 focus:ring-2"
+                    >
+                      <option value="none">None</option>
+                      <option value="monthly">Monthly</option>
+                      <option value="quarterly">Quarterly</option>
+                      <option value="yearly">Yearly</option>
+                    </select>
+                  </td>
+                  <td className="px-3 py-2">
+                    <input
+                      type="number"
+                      min={0}
+                      value={row.price}
+                      onChange={(event) => updatePlanRow(index, { price: Number(event.target.value) })}
+                      className="w-32 rounded-lg border border-ink-100 px-2 py-1.5 text-sm outline-none ring-sage-500 focus:ring-2"
+                    />
+                  </td>
+                  <td className="px-3 py-2">
+                    <label className="inline-flex items-center gap-2 text-sm text-ink-700">
+                      <input
+                        type="checkbox"
+                        checked={row.active}
+                        onChange={(event) => updatePlanRow(index, { active: event.target.checked })}
+                        className="h-4 w-4 rounded border border-ink-200"
+                      />
+                      Enabled
+                    </label>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 

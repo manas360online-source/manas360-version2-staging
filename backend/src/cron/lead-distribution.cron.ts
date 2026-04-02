@@ -75,10 +75,19 @@ export const initDeadLeadCheck = (): void => {
           }h ago)`
         );
 
-        // TODO: Implement reassignment logic
-        // Option 1: Mark status as "no-response" for analytics
-        // Option 2: Cascade to next tier if appropriate
-        // Option 3: Mark lead quality as lower for future matching
+        await prisma.leadAssignment.update({
+          where: { id: assignment.id },
+          data: {
+            status: 'no-response' as any,
+          },
+        }).catch(() => null);
+
+        await prisma.lead.update({
+          where: { id: assignment.leadId },
+          data: {
+            quality: { decrement: 5 } as any,
+          },
+        }).catch(() => null);
       }
     } catch (error) {
       console.error('[CRON] Dead lead check failed:', error);

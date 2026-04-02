@@ -37,6 +37,7 @@ import {
   updatePatientSettingsController,
   updatePatientPaymentMethodController,
   upgradePatientSubscriptionController,
+  checkoutPatientSubscriptionController,
 } from '../controllers/patient-v1.controller';
 import { addDailyCheckInController } from '../controllers/patient.controller';
 import { getMyPetStateController, upsertMyPetStateController } from '../controllers/pet.controller';
@@ -75,6 +76,7 @@ router.post('/support/tickets', requireAuth, requireRole('patient'), asyncHandle
 
 router.get('/subscription', requireAuth, requireRole('patient'), asyncHandler(getPatientSubscriptionController));
 router.patch('/subscription/upgrade', requireAuth, requireRole('patient'), asyncHandler(upgradePatientSubscriptionController));
+router.post('/subscription/checkout', requireAuth, requireRole('patient'), asyncHandler(checkoutPatientSubscriptionController));
 router.patch('/subscription/downgrade', requireAuth, requireRole('patient'), asyncHandler(downgradePatientSubscriptionController));
 router.patch('/subscription/cancel', requireAuth, requireRole('patient'), asyncHandler(cancelPatientSubscriptionController));
 router.patch('/subscription/reactivate', requireAuth, requireRole('patient'), asyncHandler(reactivatePatientSubscriptionController));

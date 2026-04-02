@@ -376,3 +376,63 @@ export const getLegalDocumentsController = async (_req: Request, res: Response):
 		res.status(500).json({ error: 'Failed to load legal documents' });
 	}
 };
+
+export const downloadLegalDocumentController = async (req: Request, res: Response): Promise<void> => {
+	try {
+		const id = String(req.params?.id || '').trim();
+		if (!id) {
+			res.status(400).json({ error: 'Document id is required' });
+			return;
+		}
+
+		const latestConsent = await prisma.consent.findFirst({
+			where: {
+				consentType: id,
+				status: 'GRANTED',
+			},
+			orderBy: { grantedAt: 'desc' },
+			select: {
+				consentType: true,
+				metadata: true,
+				grantedAt: true,
+			},
+		});
+
+		if (!latestConsent) {
+			res.status(404).json({ error: 'Document not found' });
+			return;
+		}
+
+		const version = Number((latestConsent.metadata as any)?.version || 1);
+		const readableType = latestConsent.consentType
+			.toLowerCase()
+			.split('_')
+			.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+			.join(' ');
+
+		const lines = [
+			`MANAS360 - ${readableType}`,
+			`Version: ${version}`,
+			`Effective Date: ${new Date(latestConsent.grantedAt).toISOString()}`,
+			'',
+			'This legal artifact is generated from accepted consent records.',
+			'For canonical legal text, refer to the corresponding legal policy page in MANAS360.',
+			'',
+			'Core clauses:',
+			'1. Platform usage is permitted only for lawful wellness and care purposes.',
+			'2. Data processing follows applicable privacy and security laws and standards.',
+			'3. Billing, refunds, and cancellations are governed by published policy timelines.',
+			'4. Users consent to communication records, transaction records, and compliance auditing.',
+			'5. By accepting, users confirm they have read and understood the legal terms.',
+			'',
+			`Document ID: ${id}`,
+		];
+
+		const fileName = `${latestConsent.consentType.toLowerCase()}-v${version}.txt`;
+		res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+		res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+		res.status(200).send(lines.join('\n'));
+	} catch (_err) {
+		res.status(500).json({ error: 'Failed to download legal document' });
+	}
+};

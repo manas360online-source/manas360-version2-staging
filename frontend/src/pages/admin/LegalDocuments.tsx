@@ -52,7 +52,7 @@ export default function LegalDocuments() {
                   <Badge variant="default">{doc.status}</Badge>
                 </td>
                 <td className="px-6 py-4 text-center">
-                  <Button variant="secondary" size="sm" onClick={() => window.open(`/api/v1/legal/documents/${doc.id}`)}>
+                  <Button variant="secondary" size="sm" onClick={() => window.open(`/api/v1/admin/legal/documents/${doc.id}/download`)}>
                     Download PDF
                   </Button>
                 </td>

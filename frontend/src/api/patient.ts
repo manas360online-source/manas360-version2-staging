@@ -197,26 +197,26 @@ const withFallbackChain = async <T>(requests: Array<() => Promise<T>>): Promise<
 export const patientApi = {
   getDashboard: async () =>
     withFallbackChain([
-      async () => (await http.get('/v1/patient/dashboard')).data,
+      async () => (await http.get('/patient/dashboard')).data,
       async () => (await http.get('/patient/dashboard')).data,
     ]),
   getDashboardV2: async () =>
     withFallbackChain([
       async () => (await http.get('/patient/dashboard')).data,
-      async () => (await http.get('/v1/patient/dashboard')).data,
+      async () => (await http.get('/patient/dashboard')).data,
     ]),
   changePassword: async (payload: { currentPassword: string; newPassword: string; confirmPassword: string }) =>
-    (await http.patch('/v1/users/me/password', payload)).data,
-  getActiveSessions: async () => (await http.get('/v1/users/me/sessions')).data,
+    (await http.patch('/users/me/password', payload)).data,
+  getActiveSessions: async () => (await http.get('/users/me/sessions')).data,
   revokeSession: async (id: string) => (await http.delete(`/v1/users/me/sessions/${encodeURIComponent(id)}`)).data,
-  revokeAllSessions: async () => (await http.delete('/v1/users/me/sessions')).data,
+  revokeAllSessions: async () => (await http.delete('/users/me/sessions')).data,
   getSettings: async () => (await http.get('/patient/settings')).data,
   updateSettings: async (settings: Record<string, any>) => (await http.put('/patient/settings', { settings })).data,
   getSupportCenter: async () => (await http.get('/patient/support')).data,
   createSupportTicket: async (payload: { subject: string; message: string; category?: string; priority?: string }) =>
     (await http.post('/patient/support/tickets', payload)).data,
   listProviders: async (params?: { specialization?: string; language?: string; minPrice?: number; maxPrice?: number; page?: number; limit?: number }) =>
-    (await http.get('/v1/providers', { params })).data,
+    (await http.get('/providers', { params })).data,
   getProvider: async (id: string) => (await http.get(`/v1/providers/${encodeURIComponent(id)}`)).data,
   bookSession: async (payload: {
     providerId: string;
@@ -227,14 +227,14 @@ export const patientApi = {
     preferredTime?: boolean;
     preferredWindow?: string;
   }) =>
-    (await http.post('/v1/sessions/book', payload)).data,
+    (await http.post('/sessions/book', payload)).data,
   verifyPayment: async (payload: { merchantTransactionId: string; transactionId: string; signature: string }) =>
-    (await http.post('/v1/payments/verify', payload)).data,
+    (await http.post('/payments/verify', payload)).data,
   getUpcomingSessions: async () =>
     withFallbackChain([
-      async () => (await http.get('/v1/sessions/upcoming')).data,
+      async () => (await http.get('/sessions/upcoming')).data,
       async () => {
-        const sessions = (await http.get('/v1/patients/me/sessions')).data;
+        const sessions = (await http.get('/patients/me/sessions')).data;
         const rows = sessions?.data ?? sessions;
         return Array.isArray(rows)
           ? rows.filter((item: any) => String(item?.status || '').toLowerCase() !== 'completed')
@@ -243,8 +243,8 @@ export const patientApi = {
     ]),
   getSessionHistory: async () =>
     withFallbackChain([
-      async () => (await http.get('/v1/sessions/history')).data,
-      async () => (await http.get('/v1/patients/me/sessions')).data,
+      async () => (await http.get('/sessions/history')).data,
+      async () => (await http.get('/patients/me/sessions')).data,
     ]),
   getSessionDetail: async (id: string) => (await http.get(`/v1/sessions/${encodeURIComponent(id)}`)).data,
   downloadSessionPdf: async (id: string) =>
@@ -252,22 +252,22 @@ export const patientApi = {
   downloadInvoicePdf: async (id: string) =>
     (await http.get(`/v1/sessions/${encodeURIComponent(id)}/documents/invoice`, { responseType: 'blob' })).data,
   submitAssessment: async (payload: { type: string; score?: number; answers?: number[] }) =>
-    (await http.post('/v1/assessments/submit', payload)).data,
+    (await http.post('/assessments/submit', payload)).data,
 	submitPHQ9: async (answers: number[]) =>
-		(await http.post('/v1/assessments/phq9', { answers })).data,
+		(await http.post('/assessments/phq9', { answers })).data,
   submitQuickScreeningJourney: async (payload: JourneyQuickScreeningRequest): Promise<JourneyRecommendationResponse> =>
-    (await http.post('/v1/patient-journey/quick-screening', payload)).data,
+    (await http.post('/patient-journey/quick-screening', payload)).data,
   submitClinicalJourney: async (payload: JourneyClinicalRequest): Promise<JourneyRecommendationResponse> =>
-    (await http.post('/v1/patient-journey/clinical-assessment', payload)).data,
+    (await http.post('/patient-journey/clinical-assessment', payload)).data,
   startStructuredAssessment: async (payload: { templateKey: string }): Promise<StructuredAssessmentStartResponse> => {
     try {
-      const response = await http.post('/v1/free-screening/start/me', payload);
+      const response = await http.post('/free-screening/start/me', payload);
       return response.data?.data ?? response.data;
     } catch (err: any) {
       const status = Number(err?.response?.status || 0);
       if (status === 401) {
         // Not authenticated — fall back to public free-screening start endpoint
-        const publicResp = await http.post('/v1/free-screening/start', payload);
+        const publicResp = await http.post('/free-screening/start', payload);
         return publicResp.data?.data ?? publicResp.data;
       }
       throw err;
@@ -281,18 +281,18 @@ export const patientApi = {
     return response.data?.data ?? response.data;
   },
   getStructuredAssessmentHistory: async () => {
-    const response = await http.get('/v1/free-screening/history');
+    const response = await http.get('/free-screening/history');
     return response.data?.data ?? response.data;
   },
   getJourneyRecommendation: async (): Promise<JourneyRecommendationResponse> =>
-    (await http.get('/v1/patient-journey/recommendation')).data,
+    (await http.get('/patient-journey/recommendation')).data,
   selectJourneyPathway: async (payload: JourneySelectPathwayRequest): Promise<JourneySelectPathwayResponse> =>
-    (await http.post('/v1/patient-journey/select-pathway', payload)).data,
-  addMood: async (payload: { mood: number; note?: string }) => (await http.post('/v1/mood', payload)).data,
+    (await http.post('/patient-journey/select-pathway', payload)).data,
+  addMood: async (payload: { mood: number; note?: string }) => (await http.post('/mood', payload)).data,
   getMoodHistory: async () =>
     withFallbackChain([
       async () => (await http.get('/patient/mood/history')).data,
-      async () => (await http.get('/v1/mood/history')).data,
+      async () => (await http.get('/mood/history')).data,
     ]),
   getMoodLogs: async () => (await http.get('/patient/mood')).data,
   getMoodToday: async () =>
@@ -306,7 +306,7 @@ export const patientApi = {
       async () => {
         const history = await withFallbackChain<any[]>([
           async () => (await http.get('/patient/mood/history')).data,
-          async () => (await http.get('/v1/mood/history')).data,
+          async () => (await http.get('/mood/history')).data,
         ]);
         const rows = Array.isArray(history) ? history : [];
         const avg = rows.length
@@ -373,7 +373,7 @@ export const patientApi = {
     };
 
     return withFallbackChain([
-      async () => (await http.post('/v1/patients/me/daily-checkin', v1Payload)).data,
+      async () => (await http.post('/patients/me/daily-checkin', v1Payload)).data,
       async () => (await http.post('/patient/me/daily-checkin', v1Payload)).data,
       async () => (await http.post('/patient/daily-checkin', legacyPayload)).data,
     ]);
@@ -434,11 +434,11 @@ export const patientApi = {
 
     const tryChain = await withFallbackChain<any>([
       async () => (await http.get('/patient/progress')).data,
-      async () => (await http.get('/v1/patient/progress')).data,
+      async () => (await http.get('/patient/progress')).data,
       async () => {
         const dashboard = await withFallbackChain<any>([
           async () => (await http.get('/patient/dashboard')).data,
-          async () => (await http.get('/v1/patient/dashboard')).data,
+          async () => (await http.get('/patient/dashboard')).data,
         ]);
         return dashboard;
       },
@@ -453,24 +453,24 @@ export const patientApi = {
     medicalHistory?: string;
     carrier?: string;
     emergencyContact?: { name: string; relation: string; phone: string };
-  }) => (await http.post('/v1/patients/profile', payload)).data,
+  }) => (await http.post('/patients/profile', payload)).data,
   getMyProfile: async () =>
     withFallbackChain([
-      async () => (await http.get('/v1/patients/me/profile')).data,
+      async () => (await http.get('/patients/me/profile')).data,
       async () => (await http.get('/patient/me/profile')).data,
     ]),
   getSubscription: async () => {
     const response = await withFallbackChain([
-      async () => (await http.get('/v1/patient/subscription')).data,
       async () => (await http.get('/patient/subscription')).data,
-      async () => (await http.get('/v1/subscription')).data,
+      async () => (await http.get('/patient/subscription')).data,
+      async () => (await http.get('/subscription')).data,
       async () => (await http.get('/subscription')).data,
     ]);
     return unwrapPayload(response);
   },
   getGameEligibility: async () => {
     const response = await withFallbackChain([
-      async () => (await http.get('/v1/game/eligibility')).data,
+      async () => (await http.get('/game/eligibility')).data,
       async () => (await http.get('/game/eligibility')).data,
     ]);
     const raw = unwrapPayload(response);
@@ -488,7 +488,7 @@ export const patientApi = {
   },
   playGame: async () => {
     const response = await withFallbackChain([
-      async () => (await http.post('/v1/game/play')).data,
+      async () => (await http.post('/game/play')).data,
       async () => (await http.post('/game/play')).data,
     ]);
     const raw = unwrapPayload(response);
@@ -504,31 +504,31 @@ export const patientApi = {
   },
   getGameWinners: async (limit = 10) => {
     const response = await withFallbackChain([
-      async () => (await http.get('/v1/game/winners', { params: { limit } })).data,
+      async () => (await http.get('/game/winners', { params: { limit } })).data,
       async () => (await http.get('/game/winners', { params: { limit } })).data,
     ]);
     return unwrapPayload(response);
   },
   getWalletBalance: async () => {
     const response = await withFallbackChain([
-      async () => (await http.get('/v1/wallet/balance')).data,
+      async () => (await http.get('/wallet/balance')).data,
       async () => (await http.get('/wallet/balance')).data,
     ]);
     return unwrapPayload(response);
   },
   applyWalletCredits: async (payload: { referenceId?: string; referenceType?: string; bookingId?: string; amount: number }) => {
-    const response = await http.post('/v1/wallet/apply', payload);
+    const response = await http.post('/wallet/apply', payload);
     return unwrapPayload(response.data);
   },
   createSessionPayment: async (payload: { providerId: string; amountMinor: number; currency?: string }) => {
-    const response = await http.post('/v1/payments/sessions', payload);
+    const response = await http.post('/payments/sessions', payload);
     return unwrapPayload(response.data);
   },
   upgradeSubscription: async (payload: { planKey: string; redirectUrl?: string }) => {
     const response = await withFallbackChain([
-      async () => (await http.patch('/v1/patient/subscription/upgrade', payload)).data,
       async () => (await http.patch('/patient/subscription/upgrade', payload)).data,
-      async () => (await http.patch('/v1/subscription/upgrade', payload)).data,
+      async () => (await http.patch('/patient/subscription/upgrade', payload)).data,
+      async () => (await http.patch('/subscription/upgrade', payload)).data,
       async () => (await http.patch('/subscription/upgrade', payload)).data,
     ]);
     return unwrapPayload(response);
@@ -544,63 +544,63 @@ export const patientApi = {
     idempotencyKey?: string;
   }) => {
     const response = await withFallbackChain([
-      async () => (await http.post('/v1/patient/subscription/checkout', payload)).data,
+      async () => (await http.post('/subscription/checkout', payload)).data,
       async () => (await http.post('/patient/subscription/checkout', payload)).data,
-      async () => (await http.post('/v1/subscription/checkout', payload)).data,
+      async () => (await http.post('/patient/subscription/checkout', payload)).data,
       async () => (await http.post('/subscription/checkout', payload)).data,
     ]);
     return unwrapPayload(response);
   },
   downgradeSubscription: async () => {
     const response = await withFallbackChain([
-      async () => (await http.patch('/v1/patient/subscription/downgrade')).data,
       async () => (await http.patch('/patient/subscription/downgrade')).data,
-      async () => (await http.patch('/v1/subscription/downgrade')).data,
+      async () => (await http.patch('/patient/subscription/downgrade')).data,
+      async () => (await http.patch('/subscription/downgrade')).data,
       async () => (await http.patch('/subscription/downgrade')).data,
     ]);
     return unwrapPayload(response);
   },
   cancelSubscription: async () =>
     withFallbackChain([
-      async () => (await http.patch('/v1/patient/subscription/cancel')).data,
       async () => (await http.patch('/patient/subscription/cancel')).data,
-      async () => (await http.patch('/v1/subscription/cancel')).data,
+      async () => (await http.patch('/patient/subscription/cancel')).data,
+      async () => (await http.patch('/subscription/cancel')).data,
       async () => (await http.patch('/subscription/cancel')).data,
     ]),
   reactivateSubscription: async () =>
     withFallbackChain([
-      async () => (await http.patch('/v1/patient/subscription/reactivate')).data,
       async () => (await http.patch('/patient/subscription/reactivate')).data,
-      async () => (await http.patch('/v1/subscription/reactivate')).data,
+      async () => (await http.patch('/patient/subscription/reactivate')).data,
+      async () => (await http.patch('/subscription/reactivate')).data,
       async () => (await http.patch('/subscription/reactivate')).data,
     ]),
   setSubscriptionAutoRenew: async (autoRenew: boolean) =>
     withFallbackChain([
-      async () => (await http.patch('/v1/patient/subscription/auto-renew', { autoRenew })).data,
       async () => (await http.patch('/patient/subscription/auto-renew', { autoRenew })).data,
-      async () => (await http.patch('/v1/subscription/auto-renew', { autoRenew })).data,
+      async () => (await http.patch('/patient/subscription/auto-renew', { autoRenew })).data,
+      async () => (await http.patch('/subscription/auto-renew', { autoRenew })).data,
       async () => (await http.patch('/subscription/auto-renew', { autoRenew })).data,
     ]),
   getPaymentMethod: async () =>
     withFallbackChain([
-      async () => (await http.get('/v1/payment-method')).data,
+      async () => (await http.get('/payment-method')).data,
       async () => (await http.get('/payment-method')).data,
       async () => (await http.get('/patient/payment-method')).data,
-      async () => (await http.get('/v1/patient/payment-method')).data,
+      async () => (await http.get('/patient/payment-method')).data,
     ]),
   updatePaymentMethod: async (payload: { cardLast4: string; cardBrand: string; expiryMonth: number; expiryYear: number }) =>
     withFallbackChain([
-      async () => (await http.put('/v1/payment-method', payload)).data,
+      async () => (await http.put('/payment-method', payload)).data,
       async () => (await http.put('/payment-method', payload)).data,
       async () => (await http.put('/patient/payment-method', payload)).data,
-      async () => (await http.put('/v1/patient/payment-method', payload)).data,
+      async () => (await http.put('/patient/payment-method', payload)).data,
     ]),
   getInvoices: async () =>
     withFallbackChain([
-      async () => (await http.get('/v1/invoices')).data,
+      async () => (await http.get('/invoices')).data,
       async () => (await http.get('/invoices')).data,
       async () => (await http.get('/patient/invoices')).data,
-      async () => (await http.get('/v1/patient/invoices')).data,
+      async () => (await http.get('/patient/invoices')).data,
     ]),
   downloadInvoice: async (id: string) =>
     withFallbackChain([
@@ -613,24 +613,24 @@ export const patientApi = {
   logWellnessLibraryActivity: async (payload: { title: string; duration?: number; category?: string; kind?: 'audio' | 'interactive' }) =>
     withV1Fallback(
       async () => (await http.post('/patient/exercises/library', payload)).data,
-      async () => (await http.post('/v1/exercises/library', payload)).data,
+      async () => (await http.post('/exercises/library', payload)).data,
     ),
   completeExercise: async (id: string) => (await http.patch(`/patient/exercises/${encodeURIComponent(id)}/complete`)).data,
   getTherapyPlan: async (week?: number) =>
     withFallbackChain([
-      async () => (await http.get('/v1/patients/me/therapy-plan', { params: week ? { week } : undefined })).data,
-      async () => (await http.get('/v1/therapy-plan', { params: week ? { week } : undefined })).data,
+      async () => (await http.get('/patients/me/therapy-plan', { params: week ? { week } : undefined })).data,
+      async () => (await http.get('/therapy-plan', { params: week ? { week } : undefined })).data,
     ]),
   completeTherapyPlanTask: async (id: string) => (await http.patch(`/v1/therapy-plan/tasks/${encodeURIComponent(id)}/complete`)).data,
   getPetState: async () =>
     withFallbackChain([
       async () => (await http.get('/patient/pets/state')).data,
-      async () => (await http.get('/v1/patients/me/pets/state')).data,
+      async () => (await http.get('/patients/me/pets/state')).data,
     ]),
   upsertPetState: async (payload: { selectedPet: 'koi' | 'pup' | 'owl'; vitality: number; unlockedItems: string[]; isPremium: boolean }) =>
     withFallbackChain([
       async () => (await http.put('/patient/pets/state', payload)).data,
-      async () => (await http.put('/v1/patients/me/pets/state', payload)).data,
+      async () => (await http.put('/patients/me/pets/state', payload)).data,
     ]),
   getActiveCbtAssignments: async (): Promise<ActiveCbtAssignment[]> => {
     try {
@@ -639,7 +639,7 @@ export const patientApi = {
     } catch (error) {
       // Fallback: try alternative endpoint
       try {
-        const response = await http.get('/v1/cbt-assignments/active');
+        const response = await http.get('/cbt-assignments/active');
         return response.data?.data ?? response.data ?? [];
       } catch {
         // If both fail, return empty array to prevent dashboard crash
@@ -660,7 +660,7 @@ export const patientApi = {
   },
   getPricing: async () =>
     withFallbackChain([
-      async () => (await http.get('/v1/pricing')).data,
+      async () => (await http.get('/pricing')).data,
       async () => (await http.get('/pricing')).data,
     ]),
   aiChat: async (payload: { message: string; bot_type?: 'mood_ai' | 'clinical_ai'; response_style?: 'concise' | 'detailed' }) =>
@@ -671,12 +671,12 @@ export const patientApi = {
     })).data,
   getCurrentRisk: async (userId: string) =>
     (await http.get(`/v1/risk/${encodeURIComponent(userId)}/current`)).data,
-  getNotifications: async () => (await http.get('/v1/notifications')).data,
+  getNotifications: async () => (await http.get('/notifications')).data,
   markNotificationRead: async (id: string) => (await http.patch(`/v1/notifications/${encodeURIComponent(id)}/read`)).data,
     // Progress & Analytics
     getInsights: async () => {
       try {
-        const res = await http.get('/v1/patient/insights');
+        const res = await http.get('/patient/insights');
         return res.data?.data ?? res.data;
       } catch (err: any) {
         const status = Number(err?.response?.status || 0);
@@ -697,7 +697,7 @@ export const patientApi = {
     },
     getReports: async () =>
       withFallbackChain([
-        async () => (await http.get('/v1/patient/reports')).data,
+        async () => (await http.get('/patient/reports')).data,
         async () => (await http.get('/patient/reports')).data,
       ]),
     getSharedReportMeta: async (id: string) =>
@@ -712,7 +712,7 @@ export const patientApi = {
       ]),
     generateCompleteHealthSummary: async () => {
       try {
-        const resp = await http.post('/v1/patient/reports/health-summary', {}, { responseType: 'blob' });
+        const resp = await http.post('/patient/reports/health-summary', {}, { responseType: 'blob' });
         return resp.data;
       } catch (err: any) {
         const status = Number(err?.response?.status || 0);
@@ -737,11 +737,11 @@ export const patientApi = {
     // Documents
     getDocuments: async () =>
       withFallbackChain([
-        async () => (await http.get('/v1/patient/documents')).data,
+        async () => (await http.get('/patient/documents')).data,
         async () => (await http.get('/patient/documents')).data,
       ]),
     uploadDocument: async (payload: FormData) =>
-      (await http.post('/v1/patient/documents/upload', payload, {
+      (await http.post('/patient/documents/upload', payload, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })).data,
     getDocumentDownloadUrl: async (id: string) =>
@@ -752,13 +752,13 @@ export const patientApi = {
     // Care Team
     getMyProviders: async () =>
       withFallbackChain([
-        async () => (await http.get('/v1/patient/care-team')).data,
+        async () => (await http.get('/patient/care-team')).data,
         async () => (await http.get('/patient/care-team')).data,
       ]),
     getAvailableProviders: async (params?: { specialization?: string; language?: string; maxPrice?: number; role?: string }) =>
       withFallbackChain([
-        async () => (await http.get('/v1/patient/providers/available', { params })).data,
-        async () => (await http.get('/v1/providers', { params })).data,
+        async () => (await http.get('/patient/providers/available', { params })).data,
+        async () => (await http.get('/providers', { params })).data,
       ]),
       requestAppointmentToPreferredProviders: async (payload: {
         providerIds: string[];
@@ -769,18 +769,18 @@ export const patientApi = {
         urgency?: string;
         note?: string;
       }) =>
-        (await http.post('/v1/patient/appointments/request', payload)).data,
+        (await http.post('/patient/appointments/request', payload)).data,
       confirmProposedAppointmentSlot: async (payload: {
         requestRef: string;
         providerId: string;
         proposedStartAt?: string;
         accept: boolean;
       }) =>
-        (await http.post('/v1/patient/appointments/confirm-slot', payload)).data,
+        (await http.post('/patient/appointments/confirm-slot', payload)).data,
     // Messaging
     getConversations: async () =>
       withFallbackChain([
-        async () => (await http.get('/v1/patient/messages/conversations')).data,
+        async () => (await http.get('/patient/messages/conversations')).data,
         async () => (await http.get('/patient/messages/conversations')).data,
         async () => ([]),
       ]),
@@ -792,12 +792,12 @@ export const patientApi = {
       ]),
     sendMessage: async (payload: { conversationId: string; content: string }) =>
       withFallbackChain([
-        async () => (await http.post('/v1/patient/messages', payload)).data,
+        async () => (await http.post('/patient/messages', payload)).data,
         async () => (await http.post('/patient/messages', payload)).data,
       ]),
       startConversation: async (payload: { providerId: string }) =>
         withFallbackChain([
-          async () => (await http.post('/v1/patient/messages/start', payload)).data,
+          async () => (await http.post('/patient/messages/start', payload)).data,
           async () => (await http.post('/patient/messages/start', payload)).data,
         ]),
       markMessagesRead: async (conversationId: string) =>
@@ -858,11 +858,11 @@ export const patientApi = {
     providerIds: string[];
     preferredSpecialization?: string;
     durationMinutes?: number;
-  }) => (await http.post('/v1/patient/appointments/smart-match', payload)).data,
+  }) => (await http.post('/patient/appointments/smart-match', payload)).data,
 
   getPendingAppointmentRequests: async () =>
-    (await http.get('/v1/patient/appointments/requests/pending')).data,
+    (await http.get('/patient/appointments/requests/pending')).data,
 
   getPaymentPendingRequest: async () =>
-    (await http.get('/v1/patient/appointments/payment-pending')).data,
+    (await http.get('/patient/appointments/payment-pending')).data,
   };

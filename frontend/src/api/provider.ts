@@ -372,39 +372,39 @@ const unwrap = <T>(response: Envelope<T>): T => {
 };
 
 export const fetchProviderDashboard = async (): Promise<DashboardData> => {
-  const response = await http.get<Envelope<DashboardData>>('/v1/provider/dashboard');
+  const response = await http.get<Envelope<DashboardData>>('/provider/dashboard');
   return unwrap<DashboardData>(response.data);
 };
 
 export const fetchProviderPatients = async (): Promise<PatientListItem[]> => {
-  const response = await http.get<Envelope<PatientListItem[]>>('/v1/provider/patients');
+  const response = await http.get<Envelope<PatientListItem[]>>('/provider/patients');
   return unwrap<PatientListItem[]>(response.data);
 };
 
 export const fetchProviderEarnings = async (): Promise<ProviderEarningsResponse> => {
-	const response = await http.get<Envelope<ProviderEarningsResponse>>('/v1/provider/earnings');
+	const response = await http.get<Envelope<ProviderEarningsResponse>>('/provider/earnings');
 	return unwrap<ProviderEarningsResponse>(response.data);
 };
 
 export const fetchProviderCalendarSessions = async (): Promise<ProviderCalendarSession[]> => {
-  const response = await http.get<Envelope<ProviderCalendarSession[]>>('/v1/provider/calendar');
+  const response = await http.get<Envelope<ProviderCalendarSession[]>>('/provider/calendar');
   return unwrap<ProviderCalendarSession[]>(response.data);
 };
 
 export const fetchProviderSettings = async (): Promise<ProviderSettingsResponse> => {
-  const response = await http.get<Envelope<ProviderSettingsResponse>>('/v1/provider/settings');
+  const response = await http.get<Envelope<ProviderSettingsResponse>>('/provider/settings');
   return unwrap<ProviderSettingsResponse>(response.data);
 };
 
 export const updateProviderSettings = async (
   payload: UpdateProviderSettingsPayload,
 ): Promise<ProviderSettingsResponse> => {
-  const response = await http.put<Envelope<ProviderSettingsResponse>>('/v1/provider/settings', payload);
+  const response = await http.put<Envelope<ProviderSettingsResponse>>('/provider/settings', payload);
   return unwrap<ProviderSettingsResponse>(response.data);
 };
 
 export const fetchProviderConversations = async (): Promise<ProviderConversationSummary[]> => {
-  const response = await http.get<Envelope<ProviderConversationSummary[]>>('/v1/provider/messages/conversations');
+  const response = await http.get<Envelope<ProviderConversationSummary[]>>('/provider/messages/conversations');
   return unwrap<ProviderConversationSummary[]>(response.data);
 };
 
@@ -414,7 +414,7 @@ export const fetchProviderMessages = async (conversationId: string): Promise<Pro
 };
 
 export const sendProviderMessage = async (payload: SendProviderMessagePayload): Promise<ProviderDirectMessage> => {
-  const response = await http.post<Envelope<ProviderDirectMessage>>('/v1/provider/messages', payload);
+  const response = await http.post<Envelope<ProviderDirectMessage>>('/provider/messages', payload);
   return unwrap<ProviderDirectMessage>(response.data);
 };
 
@@ -641,7 +641,7 @@ export interface CareTeamAssignment {
 }
 
 export const fetchProviderCareTeam = async (): Promise<CareTeamAssignment[]> => {
-  const response = await http.get<Envelope<CareTeamAssignment[]>>('/v1/provider/care-team');
+  const response = await http.get<Envelope<CareTeamAssignment[]>>('/provider/care-team');
   return unwrap<CareTeamAssignment[]>(response.data);
 };
 
@@ -675,7 +675,7 @@ export interface AppointmentRequestItem {
 }
 
 export const fetchPendingAppointmentRequests = async (): Promise<AppointmentRequestItem[]> => {
-  const response = await http.get<Envelope<AppointmentRequestItem[]>>('/v1/provider/appointments/pending');
+  const response = await http.get<Envelope<AppointmentRequestItem[]>>('/provider/appointments/pending');
   return unwrap<AppointmentRequestItem[]>(response.data);
 };
 
@@ -713,42 +713,42 @@ export const fetchPatientDocuments = async (patientId: string): Promise<PatientD
 // ============ PROVIDER SUBSCRIPTION & LEADS ============
 
 export const fetchProviderSubscription = async () => {
-  const response = await http.get<Envelope<any>>('/v1/provider/subscription');
+  const response = await http.get<Envelope<any>>('/provider/subscription');
   return unwrap<any>(response.data);
 };
 
 export const upgradeProviderSubscription = async (payload: { planKey: string }) => {
-  const response = await http.patch<Envelope<any>>('/v1/provider/subscription/upgrade', payload);
+  const response = await http.patch<Envelope<any>>('/provider/subscription/upgrade', payload);
   return unwrap<any>(response.data);
 };
 
 export const cancelProviderSubscription = async () => {
-  const response = await http.patch<Envelope<any>>('/v1/provider/subscription/cancel');
+  const response = await http.patch<Envelope<any>>('/provider/subscription/cancel');
   return unwrap<any>(response.data);
 };
 
 export const fetchProviderPlans = async () => {
-  const response = await http.get<Envelope<any[]>>('/v1/provider/plans');
+  const response = await http.get<Envelope<any[]>>('/provider/plans');
   return unwrap<any[]>(response.data);
 };
 
 export const fetchProviderLeads = async () => {
-  const response = await http.get<Envelope<any[]>>('/v1/provider/leads');
+  const response = await http.get<Envelope<any[]>>('/provider/leads');
   return unwrap<any[]>(response.data);
 };
 
 export const fetchProviderLeadStats = async () => {
-  const response = await http.get<Envelope<any>>('/v1/provider/lead-stats');
+  const response = await http.get<Envelope<any>>('/provider/lead-stats');
   return unwrap<any>(response.data);
 };
 
 export const fetchProviderMarketplace = async () => {
-  const response = await http.get<Envelope<any[]>>('/v1/provider/marketplace');
+  const response = await http.get<Envelope<any[]>>('/provider/marketplace');
   return unwrap<any[]>(response.data);
 };
 
 export const purchaseProviderLead = async (leadId: string) => {
-  const response = await http.post<Envelope<any>>('/v1/provider/marketplace/purchase', { leadId });
+  const response = await http.post<Envelope<any>>('/provider/marketplace/purchase', { leadId });
   return unwrap<any>(response.data);
 };
 
@@ -769,7 +769,7 @@ export interface ProviderCheckoutPayload {
 }
 
 export const checkoutProviderSubscription = async (payload: ProviderCheckoutPayload) => {
-  const response = await http.post<Envelope<any>>('/v1/provider/subscription/checkout', payload);
+  const response = await http.post<Envelope<any>>('/provider/subscription/checkout', payload);
   return unwrap<any>(response.data);
 };
 
@@ -785,12 +785,12 @@ export interface ProviderPlatformStatus {
 }
 
 export const fetchProviderPlatformStatus = async (): Promise<ProviderPlatformStatus> => {
-  const response = await http.get<Envelope<ProviderPlatformStatus>>('/v1/provider/platform-access');
+  const response = await http.get<Envelope<ProviderPlatformStatus>>('/provider/platform-access');
   return unwrap<ProviderPlatformStatus>(response.data);
 };
 
 export const initiateProviderPlatformPayment = async (payload: { billingCycle: 'monthly' | 'quarterly' }) => {
-  const response = await http.post<Envelope<any>>('/v1/provider/platform-access/initiate', payload);
+  const response = await http.post<Envelope<any>>('/provider/platform-access/initiate', payload);
   return unwrap<any>(response.data);
 };
 
