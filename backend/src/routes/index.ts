@@ -33,6 +33,7 @@ import gameRoutes from './game.routes';
 import walletRoutes from './wallet.routes';
 import groupTherapyRoutes from './group-therapy.routes';
 import legalRoutes from './legal.routes';
+import qrRoutes from './qr.routes';
 
 
 const router = Router();
@@ -100,6 +101,7 @@ router.use('/v1', riskAnalyticsRoutes);
 router.use('/v1/game', gameRoutes);
 router.use('/v1/wallet', walletRoutes);
 router.use('/v1/legal', legalRoutes);
+router.use('/v1/qr', qrRoutes);
 
 export default router;
 

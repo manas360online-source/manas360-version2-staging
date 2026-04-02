@@ -1,14 +1,16 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { getApiErrorMessage } from '../../api/auth';
 import { hasCorporateAccess, isPlatformAdminUser, useAuth } from '../../context/AuthContext';
 
 export default function AdminPortalLoginPage() {
 	const { isAuthenticated, user, login, logout } = useAuth();
 	const navigate = useNavigate();
+	const location = useLocation();
+	const locationState = location.state as { identifier?: string; password?: string } | null;
 
-	const [identifier, setIdentifier] = useState('');
-	const [password, setPassword] = useState('');
+	const [identifier, setIdentifier] = useState(locationState?.identifier ?? '');
+	const [password, setPassword] = useState(locationState?.password ?? '');
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 

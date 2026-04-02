@@ -223,6 +223,9 @@ export const getUniversalInvoiceController = async (req: Request, res: Response)
 	if (!orderId) throw new AppError('orderId is required', 422);
 
 	const payment = await prisma.universalCheckoutPayment.findUnique({ where: { id: orderId } });
+	if (!payment) {
+		throw new AppError('Payment not found', 404);
+	}
 
 	const invoice = {
 		orderId: payment.id,
@@ -535,6 +538,24 @@ export const getUniversalInvoiceController = async (req: Request, res: Response)
 						data: { status: 'COMPLETED', completedAt: new Date(), planDetails: activated as any },
 					});
 					return void sendSuccess(res, { payment: updated }, 'Payment completed', 200);
+				}
+
+				if (state === 'FAILED' || state === 'DECLINED' || state === 'PAYMENT_ERROR') {
+					const failed = await prisma.universalCheckoutPayment.update({
+						where: { id: payment.id },
+						data: { status: 'FAILED', failedAt: new Date() },
+					});
+					return void sendSuccess(res, { payment: failed }, 'Payment failed', 200);
+				}
+
+				if (state === 'PENDING' || state === 'PAYMENT_PENDING') {
+					if (payment.status !== 'PENDING_PAYMENT') {
+						const pending = await prisma.universalCheckoutPayment.update({
+							where: { id: payment.id },
+							data: { status: 'PENDING_PAYMENT' },
+						});
+						return void sendSuccess(res, { payment: pending }, 'Payment pending', 200);
+					}
 				}
 			}
 

@@ -215,7 +215,14 @@ export default function UniversalCheckout() {
 
       window.location.href = redirectUrl;
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || err?.message || 'Checkout failed.');
+      const status = Number(err?.response?.status || 0);
+      const message = String(err?.response?.data?.message || err?.message || 'Checkout failed.');
+      if (status === 409 || /already.*active|active subscription/i.test(message)) {
+        toast.error(message || 'You already have an active subscription.');
+        navigate(mode === 'provider' ? '/provider/settings' : '/patient/settings?section=billing', { replace: true });
+      } else {
+        toast.error(message);
+      }
     } finally {
       setSubmitting(false);
     }

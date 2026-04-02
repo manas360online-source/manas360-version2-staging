@@ -60,6 +60,14 @@ const normalizePaymentDetails = (raw: any, fallback: { type: string; planId: str
   const total = resolveMoney(raw?.amount ?? raw?.totalAmount ?? raw?.finalAmount, raw?.totalAmountMinor ?? raw?.finalAmountMinor);
   const wallet = resolveMoney(raw?.walletUsed, raw?.walletUsedMinor);
 
+  const normalizedStatus = String(raw?.status || '').toUpperCase();
+  const status: PaymentDetails['status'] =
+    normalizedStatus === 'COMPLETED'
+      ? 'COMPLETED'
+      : normalizedStatus === 'FAILED'
+        ? 'FAILED'
+        : 'PENDING';
+
   return {
     orderId: String(raw?.orderId || raw?.id || fallback.orderId || ''),
     type: (String(raw?.type || fallback.type || 'patient').toLowerCase() === 'provider' ? 'provider' : 'patient'),
@@ -72,7 +80,7 @@ const normalizePaymentDetails = (raw: any, fallback: { type: string; planId: str
     paidAmount: total,
     paymentMethod: String(raw?.paymentMethod || 'PhonePe'),
     transactionId: String(raw?.transactionId || raw?.phonepeTransactionId || raw?.id || fallback.orderId || ''),
-    status: (String(raw?.status || 'COMPLETED').toUpperCase() as PaymentDetails['status']),
+    status,
     timestamp: String(raw?.completedAt || raw?.updatedAt || raw?.createdAt || new Date().toISOString()),
     features: Array.isArray(raw?.features) ? raw.features : undefined,
     validUntil: raw?.validUntil ? String(raw.validUntil) : undefined,
@@ -193,6 +201,37 @@ export default function PaymentSuccessPage() {
                 className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
               >
                 Back to Plans
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (payment.status !== 'COMPLETED') {
+    const failed = payment.status === 'FAILED';
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <Card className={`max-w-lg w-full ${failed ? 'border-red-200' : 'border-amber-200'}`}>
+          <CardContent className="pt-6">
+            <div className="text-center mb-6">
+              <h2 className={`text-2xl font-bold mb-2 ${failed ? 'text-red-900' : 'text-amber-900'}`}>
+                {failed ? 'Payment Failed' : 'Payment Pending'}
+              </h2>
+              <p className={failed ? 'text-red-700' : 'text-amber-700'}>
+                {failed ? 'Your payment was not completed. Please try again.' : 'Your payment is still being processed. Please check status again.'}
+              </p>
+            </div>
+            <div className="space-y-3">
+              <Button onClick={() => navigate(`/payment/status?transactionId=${encodeURIComponent(transactionId || payment.orderId)}`)} variant="secondary" className="w-full">
+                Check Payment Status
+              </Button>
+              <Button
+                onClick={() => navigate(`/universal/checkout?type=${type}${planId ? `&planId=${planId}` : ''}`)}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                Retry Checkout
               </Button>
             </div>
           </CardContent>

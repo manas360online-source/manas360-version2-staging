@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { http } from '../lib/http';
+import { getApiBaseUrl } from '../lib/runtimeEnv';
 
-const apiBase =
-  import.meta.env.VITE_API_BASE_URL?.trim() ||
-  import.meta.env.VITE_API_URL?.trim() ||
-  '/api';
+const apiBase = getApiBaseUrl();
 
 function clientIdForTab() {
   const key = 'manas360:presence:clientId';
