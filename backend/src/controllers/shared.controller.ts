@@ -54,6 +54,19 @@ async function getProviderPlan(planId: string) {
 	// For now, return mock data structure
 
 	const plans: Record<string, any> = {
+		'lead-free': {
+			id: 'lead-free',
+			name: 'Free Plan',
+			description: 'Profile only access',
+			baseAmount: 0,
+			gstPercentage: 18,
+			features: [
+				'Basic profile',
+				'Profile visibility',
+				'No marketplace access',
+			],
+			validityDays: null,
+		},
 		'lead-basic': {
 			id: 'lead-basic',
 			name: 'Basic Plan',
@@ -203,6 +216,15 @@ export const getAllPlansController = async (req: Request, res: Response): Promis
 
 async function getAllProviderPlans() {
 	const plans: Record<string, any> = {
+		'lead-free': {
+			id: 'lead-free',
+			name: 'Free Plan',
+			description: 'Profile only access',
+			baseAmount: 0,
+			gstPercentage: 18,
+			features: ['Basic profile', 'Profile visibility', 'No marketplace access'],
+			validityDays: null,
+		},
 		'lead-basic': {
 			id: 'lead-basic',
 			name: 'Basic Plan',

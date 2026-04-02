@@ -33,8 +33,6 @@ const SupportPage = lazy(() => import('./pages/patient/SupportPage'));
 const TherapyPlanPage = lazy(() => import('./pages/patient/TherapyPlanPage'));
 const PricingPage = lazy(() => import('./pages/patient/PricingPage'));
 const SubscriptionAddonsPage = lazy(() => import('./pages/patient/SubscriptionAddonsPage'));
-const SubscriptionCheckoutPage = lazy(() => import('./pages/patient/SubscriptionCheckoutPage'));
-const SubscriptionConfirmationPage = lazy(() => import('./pages/patient/SubscriptionConfirmationPage'));
 const PatientTimelinePage = lazy(() => import('./pages/patient/PatientTimelinePage'));
 const ReportsPage = lazy(() => import('./pages/patient/ReportsPage'));
 const PatientReportDownloadPage = lazy(() => import('./pages/patient/PatientReportDownloadPage'));
@@ -116,8 +114,6 @@ const ProviderSettingsPage = lazy(() => import('./pages/provider/Settings'));
 const ProviderDashboard = lazy(() => import('./pages/provider/Dashboard/ProviderDashboard'));
 const ProviderSubscriptionPage = lazy(() => import('./pages/provider/ProviderSubscriptionPage'));
 const ProviderSubscriptionAddonsPage = lazy(() => import('./pages/provider/ProviderSubscriptionAddonsPage'));
-const ProviderSubscriptionCheckoutPage = lazy(() => import('./pages/provider/ProviderSubscriptionCheckoutPage'));
-const ProviderSubscriptionConfirmationPage = lazy(() => import('./pages/provider/ProviderSubscriptionConfirmationPage'));
 const AppointmentRequestsPage = lazy(() => import('./pages/provider/AppointmentRequests'));
 const ProviderOnboardingPage = lazy(() => import('./pages/provider/ProviderOnboardingPage'));
 const ProviderVerificationPendingPage = lazy(() => import('./pages/provider/ProviderVerificationPendingPage'));
@@ -307,8 +303,8 @@ function App() {
               <Route path="platform-payment" element={<Navigate to="/provider/subscription" replace />} />
               <Route path="plans" element={<ProviderSubscriptionPage />} />
               <Route path="plans/addons" element={<ProviderSubscriptionAddonsPage />} />
-              <Route path="checkout" element={<ProviderSubscriptionCheckoutPage />} />
-              <Route path="confirmation" element={<ProviderSubscriptionConfirmationPage />} />
+              <Route path="checkout" element={<UniversalCheckoutPage />} />
+              <Route path="confirmation" element={<UniversalPaymentSuccessPage />} />
               <Route path="messages" element={<ProviderInboxPage />} />
 
               <Route path="settings" element={<ProviderSettingsPage />} />
@@ -566,8 +562,8 @@ function App() {
               <Route path="reports/shared/:id" element={<PatientReportDownloadPage />} />
               <Route path="notifications" element={<NotificationsPage />} />
               <Route path="plans/addons" element={<SubscriptionAddonsPage />} />
-              <Route path="checkout" element={<SubscriptionCheckoutPage />} />
-              <Route path="confirmation" element={<SubscriptionConfirmationPage />} />
+              <Route path="checkout" element={<Navigate to="/checkout" replace />} />
+              <Route path="confirmation" element={<Navigate to="/confirmation" replace />} />
               <Route path="check-in" element={<DailyCheckInPage />} />
               <Route path="game" element={<HitASixerGamePage />} />
               <Route path="hit-a-sixer" element={<HitASixerGamePage />} />

@@ -46,7 +46,7 @@ export default function ProviderSubscriptionPage() {
       updatedAt: new Date().toISOString(),
     });
     if (leadPlanId === 'free') {
-      navigate('/provider/checkout');
+        navigate('/provider/checkout?type=provider&planId=lead-free');
       return;
     }
     navigate('/provider/plans/addons');

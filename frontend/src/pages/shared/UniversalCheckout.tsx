@@ -22,6 +22,16 @@ interface SharedPlan {
 
 type CheckoutMode = 'patient' | 'provider';
 
+const buildProviderFreePlan = () => ({
+  id: 'lead-free',
+  name: 'Platform Access',
+  description: 'Activate provider platform access before choosing a growth plan.',
+  baseAmount: 0,
+  gstPercentage: 18,
+  features: ['Platform access', 'Profile verification', 'Required for lead plans'],
+  validityDays: null,
+});
+
 const PATIENT_PLAN_MAP: Record<string, string> = {
   free: 'patient-free',
   monthly: 'patient-1month',
@@ -76,6 +86,7 @@ export default function UniversalCheckout() {
         setError('');
         setLoading(true);
         let selectedPlanId = queryPlanId;
+        let useLocalProviderFallback = false;
 
         if (mode === 'provider') {
           const cart = loadProviderCart();
@@ -83,6 +94,9 @@ export default function UniversalCheckout() {
             setProviderCart(cart);
             if (!selectedPlanId) {
               selectedPlanId = PROVIDER_PLAN_MAP[cart.leadPlanId] || '';
+            }
+            if (cart.leadPlanId === 'free') {
+              useLocalProviderFallback = true;
             }
           } else {
             setProviderCart(null);
@@ -99,7 +113,9 @@ export default function UniversalCheckout() {
           }
         }
 
-        if (selectedPlanId) {
+        if (mode === 'provider' && useLocalProviderFallback && selectedPlanId === 'lead-free') {
+          setSharedPlan(buildProviderFreePlan());
+        } else if (selectedPlanId) {
           const response = await http.get(`/v1/shared/plans/${mode}/${selectedPlanId}`);
           const data = response.data;
           setSharedPlan(data?.data?.plan || data?.plan || null);
