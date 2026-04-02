@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { Link } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { MegaPanel, MegaNavOption } from './MegaPanel';
 
@@ -170,33 +171,49 @@ export const MegaNav: React.FC<MegaNavProps> = ({ tone = 'dark' }) => {
 
   return (
     <div ref={rootRef} className="relative" onMouseLeave={handleDesktopLeave}>
-      <nav className={`mt-2 hidden items-center justify-between gap-0.5 border-t px-0.5 pt-1.5 md:flex ${isLight ? 'border-calm-sage/12' : 'border-cream/10'}`} aria-label="Mega navigation tabs">
-        {tabs.map((tab) => {
-          const isActive = activeTab === tab.label;
+      <nav
+        className={`mx-auto mt-2 hidden w-full max-w-7xl items-center justify-between gap-0.5 border-t px-3 pt-1.5 md:flex ${isLight ? 'border-calm-sage/12' : 'border-cream/10'}`}
+        aria-label="Mega navigation tabs"
+      >
+        <div className="flex flex-1 items-center gap-0.5">
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.label;
 
-          return (
-            <button
-              key={tab.label}
-              type="button"
-              onMouseEnter={() => handleDesktopEnter(tab.label)}
-              onFocus={() => handleDesktopEnter(tab.label)}
-              onClick={() => setActiveTab(isActive ? null : tab.label)}
-              className={`min-h-[36px] flex-1 whitespace-nowrap border-b-2 border-transparent px-2.5 py-1.5 text-[13px] font-medium tracking-wide transition-all duration-300 ease-out ${
-                isActive
-                  ? isLight
-                    ? 'border-b-gentle-blue text-charcoal'
-                    : 'border-b-gentle-blue text-cream [text-shadow:0_0_10px_rgba(157,173,190,0.45)]'
-                  : isLight
-                    ? 'text-charcoal/70 hover:border-b-gentle-blue/70 hover:text-charcoal'
-                    : 'text-cream/80 hover:border-b-gentle-blue/80 hover:text-cream'
-              }`}
-              aria-expanded={isActive}
-              aria-controls={`panel-${tab.label}`}
-            >
-              {tab.label}
-            </button>
-          );
-        })}
+            return (
+              <button
+                key={tab.label}
+                type="button"
+                onMouseEnter={() => handleDesktopEnter(tab.label)}
+                onFocus={() => handleDesktopEnter(tab.label)}
+                onClick={() => setActiveTab(isActive ? null : tab.label)}
+                className={`min-h-[36px] flex-1 whitespace-nowrap border-b-2 border-transparent px-2.5 py-1.5 text-[13px] font-medium tracking-wide transition-all duration-300 ease-out ${
+                  isActive
+                    ? isLight
+                      ? 'border-b-gentle-blue text-charcoal'
+                      : 'border-b-gentle-blue text-cream [text-shadow:0_0_10px_rgba(157,173,190,0.45)]'
+                    : isLight
+                      ? 'text-charcoal/70 hover:border-b-gentle-blue/70 hover:text-charcoal'
+                      : 'text-cream/80 hover:border-b-gentle-blue/80 hover:text-cream'
+                }`}
+                aria-expanded={isActive}
+                aria-controls={`panel-${tab.label}`}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <Link
+          to="/my-digital-clinic"
+          className={`whitespace-nowrap rounded-full px-4 py-2 text-[13px] font-medium tracking-wide transition-all duration-300 ${
+            isLight
+              ? 'text-charcoal/70 hover:text-charcoal'
+              : 'text-cream/75 hover:text-cream'
+          }`}
+        >
+          MyDigitalClinic
+        </Link>
       </nav>
 
       <div

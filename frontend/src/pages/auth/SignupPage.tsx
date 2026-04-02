@@ -130,7 +130,8 @@ export default function SignupPage() {
 		const container = patientTermsScrollRef.current;
 		if (!container) return;
 		container.scrollTop = 0;
-		setCanAcceptPatientTerms(false);
+		const scrollAvailable = container.scrollHeight > container.clientHeight + 2;
+		setCanAcceptPatientTerms(!scrollAvailable);
 	}, [showPatientTermsModal]);
 
 	const openAgreement = (key: ProviderAgreementKey) => {
@@ -267,6 +268,20 @@ export default function SignupPage() {
 	};
 
 	const location = useLocation();
+
+	useEffect(() => {
+		const query = new URLSearchParams(location.search);
+		const prefillPhone = query.get('phone');
+		const reason = query.get('reason');
+
+		if (prefillPhone && !phone) {
+			setPhone(prefillPhone);
+		}
+
+		if (reason === 'terms' && !otpSent && !error) {
+			setError('Please review and accept Terms & Conditions to complete registration.');
+		}
+	}, [location.search, phone, otpSent, error]);
 
 	const resolveReturnTo = (): string => {
 		const qp = new URLSearchParams(location.search);

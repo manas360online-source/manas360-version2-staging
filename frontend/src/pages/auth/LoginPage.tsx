@@ -99,7 +99,24 @@ export default function LoginPage() {
 			const postLoginRoute = await resolvePostLoginRouteWithSubscription(candidate, result.user?.role, result.user);
 			navigate(postLoginRoute, { replace: true });
 		} catch (err) {
-			setError(getApiErrorMessage(err, 'OTP verification failed'));
+			const message = getApiErrorMessage(err, 'OTP verification failed');
+			const normalized = message.toLowerCase();
+
+			if (normalized.includes('terms') && normalized.includes('register')) {
+				const query = new URLSearchParams();
+				if (phone.trim()) {
+					query.set('phone', phone.trim());
+				}
+				const candidate = from || afterLogin || next || null;
+				if (candidate) {
+					query.set('next', candidate);
+				}
+				query.set('reason', 'terms');
+				navigate(`/auth/signup?${query.toString()}`, { replace: true });
+				return;
+			}
+
+			setError(message);
 		} finally {
 			setLoading(false);
 		}
