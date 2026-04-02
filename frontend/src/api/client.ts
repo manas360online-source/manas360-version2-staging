@@ -39,7 +39,7 @@ const normalizeBaseUrl = (url: string): string => {
 };
 
 const normalizeApiPath = (baseUrl: string, path: string): string => {
-	if (!path.startsWith('/v1/')) {
+	if (!path.startsWith('/')) {
 		return path;
 	}
 
@@ -58,7 +58,7 @@ const joinUrl = (path: string): string => {
 
 const isExpectedAuthFailure = (status: number, url: string): boolean => {
 	if (status === 401 && url.includes('/auth/me')) return true;
-	if ((status === 401 || status === 403) && url.includes('/v1/admin/pricing')) return true;
+	if ((status === 401 || status === 403) && url.includes('/admin/pricing')) return true;
 	return false;
 };
 
