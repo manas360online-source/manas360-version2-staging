@@ -1,4 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
+import { http } from '../lib/http';
+
+const apiBase =
+  import.meta.env.VITE_API_BASE_URL?.trim() ||
+  import.meta.env.VITE_API_URL?.trim() ||
+  '/api';
 
 function clientIdForTab() {
   const key = 'manas360:presence:clientId';
@@ -21,11 +27,7 @@ export default function usePresence({ sessionId, role, token }: { sessionId: str
 
     const sendHeartbeat = async () => {
       try {
-        await fetch('/v1/presence/heartbeat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
-          body: JSON.stringify({ sessionId, clientId: clientId.current, role }),
-        });
+        await http.post('/v1/presence/heartbeat', { sessionId, clientId: clientId.current, role });
       } catch (e) {
         // ignore
       }
@@ -33,10 +35,8 @@ export default function usePresence({ sessionId, role, token }: { sessionId: str
 
     const refreshPresence = async () => {
       try {
-        const r = await fetch(`/v1/presence/session/${sessionId}`, { headers: { Authorization: token ? `Bearer ${token}` : '' } });
-        if (!r.ok) return;
-        const body = await r.json();
-        setPresence(body.presence || []);
+        const response = await http.get(`/v1/presence/session/${sessionId}`);
+        setPresence(response.data?.presence || []);
       } catch (e) {
         // ignore
       }
@@ -55,10 +55,14 @@ export default function usePresence({ sessionId, role, token }: { sessionId: str
       try {
         const payload = JSON.stringify({ sessionId, clientId: clientId.current, role });
         if (navigator.sendBeacon) {
-          navigator.sendBeacon('/v1/presence/unload', payload);
+          navigator.sendBeacon(`${apiBase}/v1/presence/unload`, payload);
         } else {
           // best-effort
-          fetch('/v1/presence/unload', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' }, body: payload });
+          fetch(`${apiBase}/v1/presence/unload`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
+            body: payload,
+          });
         }
       } catch (e) {
         // ignore
@@ -73,7 +77,7 @@ export default function usePresence({ sessionId, role, token }: { sessionId: str
       // best-effort unload call
       try {
         const payload = JSON.stringify({ sessionId, clientId: clientId.current, role });
-        if (navigator.sendBeacon) navigator.sendBeacon('/v1/presence/unload', payload);
+        if (navigator.sendBeacon) navigator.sendBeacon(`${apiBase}/v1/presence/unload`, payload);
       } catch (e) {}
     };
   }, [sessionId, role, token]);

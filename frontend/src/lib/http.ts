@@ -1,59 +1,9 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
 
-const defaultApiBaseUrl = typeof window === 'undefined'
-	? 'http://localhost:3000/api'
-	: '/api';
-
-const rawBaseUrl =
+const baseURL =
 	import.meta.env.VITE_API_BASE_URL?.trim() ||
 	import.meta.env.VITE_API_URL?.trim() ||
-	defaultApiBaseUrl;
-
-const normalizeBaseUrl = (url: string): string => {
-	let normalized = url.trim();
-	// If the app is served from production (manas360.com) but the build still has
-	// VITE_API_BASE_URL pointing to localhost, override to same-origin relative API.
-	// This prevents production pages from calling http://localhost:3000/* in the browser.
-	if (
-		typeof window !== 'undefined'
-		&& /(^|\.)manas360\.com$/i.test(window.location.hostname)
-		&& normalized.includes('localhost:3000')
-	) {
-		return '/api';
-	}
-	if (normalized.startsWith('https://manas360.com')) {
-		normalized = normalized.replace('https://manas360.com', 'https://www.manas360.com');
-	}
-
-	if (typeof window !== 'undefined' && /^https:\/\/(www\.)?manas360\.com\/api(\/v1)?/i.test(normalized)) {
-		// Keep API calls on the exact same origin that served the app to avoid host-only cookie mismatches.
-		const path = normalized.includes('/api/v1') ? '/api/v1' : '/api';
-		return `${window.location.origin}${path}`;
-	}
-
-	return normalized.replace(/\/+$/, '');
-};
-
-const normalizeApiPath = (baseUrl: string, path: string): string => {
-	if (!path.startsWith('/v1/')) {
-		return path;
-	}
-
-	return baseUrl.endsWith('/api/v1') ? path.replace(/^\/v1/, '') : path;
-};
-
-const configuredBaseUrl = (() => {
-	if (typeof window === 'undefined') {
-		return normalizeBaseUrl(rawBaseUrl);
-	}
-
-	// Avoid mixed-content when frontend is HTTPS and API URL is HTTP.
-	if (window.location.protocol === 'https:' && rawBaseUrl.startsWith('http://')) {
-		return normalizeBaseUrl(rawBaseUrl.replace(/^http:\/\//, 'https://'));
-	}
-
-	return normalizeBaseUrl(rawBaseUrl);
-})();
+	'/api';
 
 const getCookieValue = (cookieName: string): string | null => {
 	if (typeof document === 'undefined') {
@@ -85,7 +35,7 @@ const refreshAccessToken = async (): Promise<void> => {
 		const csrfToken = getCookieValue(csrfCookieName);
 
 		await axios.post(
-			`${configuredBaseUrl}/auth/refresh`,
+			`${baseURL}/auth/refresh`,
 			{},
 			{
 				withCredentials: true,
@@ -104,7 +54,7 @@ const refreshAccessToken = async (): Promise<void> => {
 let httpInstance: AxiosInstance | any;
 if (axios && typeof (axios as any).create === 'function') {
 	httpInstance = (axios as any).create({
-		baseURL: configuredBaseUrl,
+		baseURL,
 		withCredentials: true,
 		headers: {
 			'Content-Type': 'application/json',
@@ -128,13 +78,6 @@ const isExpectedAuthFailure = (status: number | undefined, url: string): boolean
 };
 
 if (http && http.interceptors && http.interceptors.response && typeof http.interceptors.response.use === 'function') {
-	http.interceptors.request.use((config: any) => {
-		if (typeof config?.url === 'string') {
-			config.url = normalizeApiPath(String(config.baseURL || configuredBaseUrl), config.url);
-		}
-		return config;
-	});
-
 	http.interceptors.response.use(
 		(response: AxiosResponse) => response,
 		async (error: any) => {
