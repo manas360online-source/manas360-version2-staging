@@ -40,17 +40,17 @@ export const groupTherapyApi = {
     maxMembers: number;
     hostTherapistId?: string;
   }): Promise<GroupTherapySession> => {
-    const res = await http.post('/group-therapy/requests', payload);
+    const res = await http.post('/v1/group-therapy/requests', payload);
     return unwrap<GroupTherapySession>(res.data);
   },
 
   listMyRequests: async (): Promise<{ items: GroupTherapySession[] }> => {
-    const res = await http.get('/group-therapy/requests/mine');
+    const res = await http.get('/v1/group-therapy/requests/mine');
     return unwrap<{ items: GroupTherapySession[] }>(res.data);
   },
 
   listAdminQueue: async (): Promise<{ items: any[] }> => {
-    const res = await http.get('/group-therapy/admin/requests');
+    const res = await http.get('/v1/group-therapy/admin/requests');
     return unwrap<{ items: any[] }>(res.data);
   },
 
@@ -84,7 +84,7 @@ export const groupTherapyApi = {
   },
 
   listProviderPatients: async (): Promise<{ items: Array<{ id: string; name: string; email?: string | null; phone?: string | null }> }> => {
-    const res = await http.get('/group-therapy/private/patients');
+    const res = await http.get('/v1/group-therapy/private/patients');
     return unwrap<{ items: Array<{ id: string; name: string; email?: string | null; phone?: string | null }> }>(res.data);
   },
 
@@ -95,12 +95,12 @@ export const groupTherapyApi = {
     message?: string;
     paymentDeadline?: string;
   }) => {
-    const res = await http.post('/group-therapy/private/invites', payload);
+    const res = await http.post('/v1/group-therapy/private/invites', payload);
     return unwrap<any>(res.data);
   },
 
   listMyPrivateInvites: async (): Promise<{ items: any[] }> => {
-    const res = await http.get('/group-therapy/private/invites/mine');
+    const res = await http.get('/v1/group-therapy/private/invites/mine');
     return unwrap<{ items: any[] }>(res.data);
   },
 

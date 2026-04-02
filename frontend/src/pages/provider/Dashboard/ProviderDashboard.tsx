@@ -2,6 +2,8 @@ import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import { useProviderDashboard } from '../../../hooks/useProviderDashboard';
+import { useQuery } from '@tanstack/react-query';
+import { fetchProviderEarnings } from '../../../api/provider';
 import type { SmartAlertItem } from '../../../api/provider';
 
 type ProviderKind = 'THERAPIST' | 'PSYCHIATRIST' | 'COACH' | 'PSYCHOLOGIST';
@@ -110,6 +112,12 @@ export default function ProviderDashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { data, isLoading, isError, refetch } = useProviderDashboard();
+  const earningsQuery = useQuery({
+    queryKey: ['providerEarnings', 'dashboard-widget'],
+    queryFn: fetchProviderEarnings,
+    staleTime: 60 * 1000,
+    refetchInterval: 30 * 1000,
+  });
 
   const providerRole = useMemo(() => toProviderKind(user?.role), [user?.role]);
   const stats = roleStats[providerRole];
@@ -174,16 +182,31 @@ export default function ProviderDashboard() {
   }
 
   const todaySessions = data?.todaySessions || [];
+  const availableMinor = Math.max(0, Number(earningsQuery.data?.summary?.availableBalanceMinor ?? 0));
 
   return (
     <div className="space-y-6">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-800">
-          Good morning, Dr. {user?.firstName || 'Provider'} 👋
-        </h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Here is your practice overview for today.
-        </p>
+      <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">
+            Good morning, Dr. {user?.firstName || 'Provider'} 👋
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Here is your practice overview for today.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => navigate('/provider/earnings')}
+          className="rounded-2xl border border-emerald-200 bg-white px-5 py-4 text-left shadow-sm transition hover:border-emerald-300 hover:shadow"
+        >
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-700">Wallet</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-800">
+            {`₹${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(availableMinor / 100)}`}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">Available for withdrawal</p>
+        </button>
       </div>
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">

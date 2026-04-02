@@ -470,8 +470,9 @@ export const patientApi = {
   },
   getGameEligibility: async () => {
     const response = await withFallbackChain([
+      async () => (await http.get('/v1/game/eligibility')).data,
       async () => (await http.get('/game/eligibility')).data,
-      async () => (await http.get('/game/eligibility')).data,
+      async () => (await http.get('/v1/game/eligibility')).data,
     ]);
     const raw = unwrapPayload(response);
     // Timing info may be in 'timing' (new) or 'data' (legacy/unwrapped)
@@ -488,8 +489,9 @@ export const patientApi = {
   },
   playGame: async () => {
     const response = await withFallbackChain([
+      async () => (await http.post('/v1/game/play')).data,
       async () => (await http.post('/game/play')).data,
-      async () => (await http.post('/game/play')).data,
+      async () => (await http.post('/v1/game/play')).data,
     ]);
     const raw = unwrapPayload(response);
 
@@ -504,21 +506,26 @@ export const patientApi = {
   },
   getGameWinners: async (limit = 10) => {
     const response = await withFallbackChain([
+      async () => (await http.get('/v1/game/winners', { params: { limit } })).data,
       async () => (await http.get('/game/winners', { params: { limit } })).data,
-      async () => (await http.get('/game/winners', { params: { limit } })).data,
+      async () => (await http.get('/v1/game/winners', { params: { limit } })).data,
     ]);
     return unwrapPayload(response);
   },
   getWalletBalance: async () => {
     const response = await withFallbackChain([
+      async () => (await http.get('/v1/wallet/balance')).data,
       async () => (await http.get('/wallet/balance')).data,
-      async () => (await http.get('/wallet/balance')).data,
+      async () => (await http.get('/v1/wallet/balance')).data,
     ]);
     return unwrapPayload(response);
   },
   applyWalletCredits: async (payload: { referenceId?: string; referenceType?: string; bookingId?: string; amount: number }) => {
-    const response = await http.post('/wallet/apply', payload);
-    return unwrapPayload(response.data);
+    const response = await withFallbackChain([
+      async () => (await http.post('/v1/wallet/apply', payload)).data,
+      async () => (await http.post('/wallet/apply', payload)).data,
+    ]);
+    return unwrapPayload(response);
   },
   createSessionPayment: async (payload: { providerId: string; amountMinor: number; currency?: string }) => {
     const response = await http.post('/payments/sessions', payload);
@@ -583,22 +590,25 @@ export const patientApi = {
     ]),
   getPaymentMethod: async () =>
     withFallbackChain([
+      async () => (await http.get('/v1/payment-method')).data,
       async () => (await http.get('/payment-method')).data,
-      async () => (await http.get('/payment-method')).data,
+      async () => (await http.get('/v1/payment-method')).data,
       async () => (await http.get('/patient/payment-method')).data,
       async () => (await http.get('/patient/payment-method')).data,
     ]),
   updatePaymentMethod: async (payload: { cardLast4: string; cardBrand: string; expiryMonth: number; expiryYear: number }) =>
     withFallbackChain([
+      async () => (await http.put('/v1/payment-method', payload)).data,
       async () => (await http.put('/payment-method', payload)).data,
-      async () => (await http.put('/payment-method', payload)).data,
+      async () => (await http.put('/v1/payment-method', payload)).data,
       async () => (await http.put('/patient/payment-method', payload)).data,
       async () => (await http.put('/patient/payment-method', payload)).data,
     ]),
   getInvoices: async () =>
     withFallbackChain([
+      async () => (await http.get('/v1/invoices')).data,
       async () => (await http.get('/invoices')).data,
-      async () => (await http.get('/invoices')).data,
+      async () => (await http.get('/v1/invoices')).data,
       async () => (await http.get('/patient/invoices')).data,
       async () => (await http.get('/patient/invoices')).data,
     ]),

@@ -44,6 +44,41 @@ interface PaymentDetails {
   validUntil?: string;
 }
 
+const resolveMoney = (major: unknown, minor: unknown): number => {
+  const majorNum = Number(major);
+  if (Number.isFinite(majorNum)) return majorNum;
+
+  const minorNum = Number(minor);
+  if (Number.isFinite(minorNum)) return minorNum / 100;
+
+  return 0;
+};
+
+const normalizePaymentDetails = (raw: any, fallback: { type: string; planId: string | null; orderId: string | null }): PaymentDetails => {
+  const base = resolveMoney(raw?.baseAmount, raw?.baseAmountMinor);
+  const gst = resolveMoney(raw?.gstAmount, raw?.gstMinor);
+  const total = resolveMoney(raw?.amount ?? raw?.totalAmount ?? raw?.finalAmount, raw?.totalAmountMinor ?? raw?.finalAmountMinor);
+  const wallet = resolveMoney(raw?.walletUsed, raw?.walletUsedMinor);
+
+  return {
+    orderId: String(raw?.orderId || raw?.id || fallback.orderId || ''),
+    type: (String(raw?.type || fallback.type || 'patient').toLowerCase() === 'provider' ? 'provider' : 'patient'),
+    planId: String(raw?.planId || fallback.planId || ''),
+    planName: String(raw?.planName || raw?.planId || fallback.planId || 'Selected Plan'),
+    amount: total,
+    baseAmount: base,
+    gstAmount: gst,
+    walletUsed: wallet,
+    paidAmount: total,
+    paymentMethod: String(raw?.paymentMethod || 'PhonePe'),
+    transactionId: String(raw?.transactionId || raw?.phonepeTransactionId || raw?.id || fallback.orderId || ''),
+    status: (String(raw?.status || 'COMPLETED').toUpperCase() as PaymentDetails['status']),
+    timestamp: String(raw?.completedAt || raw?.updatedAt || raw?.createdAt || new Date().toISOString()),
+    features: Array.isArray(raw?.features) ? raw.features : undefined,
+    validUntil: raw?.validUntil ? String(raw.validUntil) : undefined,
+  };
+};
+
 export default function PaymentSuccessPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -77,7 +112,8 @@ export default function PaymentSuccessPage() {
         }
 
         const data = response.data;
-        setPayment(data?.data?.payment || data?.payment || data);
+        const rawPayment = data?.data?.payment || data?.payment || data;
+        setPayment(normalizePaymentDetails(rawPayment, { type, planId, orderId: transactionId }));
       } catch (err: any) {
         setError(err?.message || 'Failed to verify payment');
       } finally {
@@ -210,7 +246,7 @@ export default function PaymentSuccessPage() {
                   </div>
                   <div>
                     <p className="text-slate-600 text-sm mb-1">Plan ID</p>
-                    <p className="font-mono text-slate-900 text-sm">{planId}</p>
+                      <p className="font-mono text-slate-900 text-sm">{payment.planId}</p>
                   </div>
                   {payment.validUntil && (
                     <div>
@@ -233,7 +269,7 @@ export default function PaymentSuccessPage() {
                     <p className="text-slate-600 text-sm mb-1">Transaction ID</p>
                     <div className="flex items-center gap-2">
                       <p className="font-mono text-slate-900 text-sm font-semibold">
-                        {transactionId?.slice(0, 12)}...
+                        {(payment.transactionId || transactionId || '').slice(0, 12)}...
                       </p>
                       <button
                         onClick={copyTransactionId}

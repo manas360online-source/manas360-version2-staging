@@ -38,7 +38,7 @@ describe('patientApi security calls', () => {
     await patientApi.revokeAllSessions();
 
     expect(http.get).toHaveBeenCalledWith('/users/me/sessions');
-    expect(http.delete).toHaveBeenCalledWith('/users/me/sessions/session-uuid');
+    expect(http.delete).toHaveBeenCalledWith('/v1/users/me/sessions/session-uuid');
     expect(http.delete).toHaveBeenCalledWith('/users/me/sessions');
   });
 });
