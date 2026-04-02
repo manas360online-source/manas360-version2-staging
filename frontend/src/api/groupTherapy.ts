@@ -26,7 +26,7 @@ const unwrap = <T = any>(payload: any): T => {
 
 export const groupTherapyApi = {
   listPublicSessions: async (): Promise<{ items: GroupTherapySession[] }> => {
-    const res = await publicHttp.get('/group-therapy/public/sessions');
+    const res = await publicHttp.get('/v1/group-therapy/public/sessions');
     return unwrap<{ items: GroupTherapySession[] }>(res.data);
   },
 
