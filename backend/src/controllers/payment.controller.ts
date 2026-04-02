@@ -3,12 +3,22 @@ import { AppError } from '../middleware/error.middleware';
 import { sendSuccess } from '../utils/response';
 import { env } from '../config/env';
 import { prisma } from '../config/db';
+import { LEAD_MARKETPLACE_PRICES, PROVIDER_PLANS, type ProviderPlanKey } from '../config/providerPlans';
 import {
 	createSessionPayment,
 	processPhonePeWebhook,
 	releaseSessionEarnings,
 	reconcilePhonePePaymentStatus,
 } from '../services/payment.service';
+import { applyCreditsForPayment } from '../services/wallet.service';
+import { initiatePatientSubscriptionPayment } from '../services/patient-subscription-payment.service';
+import { reactivatePatientSubscription } from '../services/patient-v1.service';
+import { initiateProviderSubscriptionPayment } from '../services/provider-subscription-payment.service';
+import { initiateProviderPlatformPayment } from '../services/provider-subscription-payment.service';
+import { activateProviderSubscription } from '../services/provider-subscription.service';
+import { activatePlatformAccess } from '../services/platform-access.service';
+import { createPendingSubscriptionComponents } from '../services/provider-subscription.pending.service';
+import { getActivePlatformPlan } from '../services/pricing.service';
 import { 
 	verifyPhonePeWebhook, 
 	initiatePhonePeRefund, 
@@ -63,57 +73,16 @@ export const completeFinancialSessionController = async (req: Request, res: Resp
 };
 
 export const phonepeWebhookController = async (req: Request, res: Response): Promise<void> => {
-	const rawBody = req.rawBody ?? JSON.stringify(req.body ?? {});
-	const xVerify = String(req.headers['x-verify'] ?? '').trim();
 	const payload = req.body as any;
-	const hasBase64WebhookPayload = typeof payload?.response === 'string' && payload.response.trim().length > 0;
-	const hasStructuredWebhookPayload = Boolean(payload?.data?.merchantTransactionId || payload?.merchantTransactionId);
+	const hasProbePayload = Boolean(payload?.data?.merchantTransactionId || payload?.merchantTransactionId || payload?.response);
 
-	if (env.allowDevPhonePeWebhookProbeBypass && !hasBase64WebhookPayload && !hasStructuredWebhookPayload) {
-		logger.warn('[PhonePe] Webhook probe bypass is ENABLED. Returning 200 without strict validation.');
-		logger.info('[PhonePe] Probe request received', { headers: req.headers, body: payload });
-		return void res.status(200).json({ success: true, message: 'Webhook probe bypass enabled' });
+	if (env.allowDevPhonePeWebhookProbeBypass && !hasProbePayload) {
+		return void res.status(200).json({ success: true, message: 'PhonePe webhook endpoint reachable' });
 	}
 
-	// 1. IP Whitelisting
-	const clientIp = getClientIpFromRequest(req);
-	const shouldBypassPhonePeWebhookIp = env.nodeEnv !== 'production' && env.allowPhonePeWebhookIpBypass;
-	if (!shouldBypassPhonePeWebhookIp && !isPhonePeWebhookIP(clientIp)) {
-		throw new AppError('Unauthorized source IP for PhonePe webhook', 403);
-	}
-
-	// 2. Authorization Header
-	const authHeader = String(req.headers['authorization'] ?? '').trim();
-	const { PHONEPE_WEBHOOK_USERNAME, PHONEPE_WEBHOOK_PASSWORD } = process.env;
-	if (!verifyPhonePeWebhookAuth(authHeader, String(PHONEPE_WEBHOOK_USERNAME ?? ''), String(PHONEPE_WEBHOOK_PASSWORD ?? ''))) {
-		// PhonePe dashboard validation commonly sends a lightweight probe payload.
-		if (!hasBase64WebhookPayload) {
-			logger.info('[PhonePe] Webhook probe accepted without auth enforcement', { headers: req.headers, body: payload });
-			return void res.status(200).json({ success: true, message: 'PhonePe webhook endpoint reachable' });
-		}
-
-		throw new AppError('Invalid PhonePe webhook authorization', 401);
-	}
-
-	// 3. Signature Verification: strict in production, lenient in non-production for diagnostics.
-	if (xVerify && !verifyPhonePeWebhook(rawBody, xVerify)) {
-		if (env.nodeEnv === 'production') {
-			throw new AppError('Invalid PhonePe webhook signature', 401);
-		}
-
-		logger.warn('[PhonePe] Webhook signature verification failed; allowing in non-production for debugging.');
-		logger.debug('[PhonePe] Webhook rawBody', { rawBody });
-	}
-
-	let decoded: any = payload;
-
-	if (typeof payload?.response === 'string' && payload.response.trim().length > 0) {
-		try {
-			decoded = JSON.parse(Buffer.from(payload.response, 'base64').toString('utf8'));
-		} catch {
-			throw new AppError('Invalid PhonePe webhook payload', 422);
-		}
-	}
+	const decoded = typeof payload?.response === 'string' && payload.response.trim().length > 0
+		? JSON.parse(Buffer.from(payload.response, 'base64').toString('utf8'))
+		: payload;
 
 	const result = await processPhonePeWebhook(decoded);
 	res.status(200).json({ success: true, ...result });
@@ -121,135 +90,456 @@ export const phonepeWebhookController = async (req: Request, res: Response): Pro
 
 export const getPhonePeStatusController = async (req: Request, res: Response): Promise<void> => {
 	const transactionId = String(req.params.transactionId ?? '').trim();
-	if (!transactionId) {
-		throw new AppError('transactionId is required', 422);
-	}
+	if (!transactionId) throw new AppError('transactionId is required', 422);
 
-	logger.info('[Payment.StatusCheck] Status check initiated', { transactionId });
-
-	// Use polling/reconciliation for better UX (handles PENDING states)
 	const result = await reconcilePhonePePaymentStatus(transactionId, 5, 5000);
-
-	const state = String(result.state || '').toUpperCase();
-	const isSuccess = state === 'COMPLETED' || state === 'PAYMENT_SUCCESS';
-	const isFailed = state === 'FAILED' || state === 'DECLINED' || state === 'CANCELLED';
-	const isPending = state === 'PENDING';
-
-	// Fetch metadata from DB if it's a known payment
-	const payment = await prisma.financialPayment.findFirst({
-		where: { merchantTransactionId: transactionId },
-		select: { metadata: true }
-	});
-
-	logger.info('[Payment.StatusCheck] Final result', {
-		transactionId,
-		state,
-		isSuccess,
-		isFailed,
-		isPending,
-	});
-
-	res.status(200).json({
-		success: true,
-		data: {
-			transactionId,
-			state,
-			isSuccess,
-			isFailed,
-			isPending,
-			message: result.resultMessage,
-			metadata: payment?.metadata || {},
-		},
-	});
+	sendSuccess(res, result, 'Payment status retrieved', 200);
 };
 
 export const initiateRefundController = async (req: Request, res: Response): Promise<void> => {
 	const patientId = getAuthUserId(req);
-	const paymentId = String(req.body.paymentId ?? '').trim();
-	const reason = String(req.body.reason ?? 'Customer requested').trim();
+	const paymentId = String(req.body.paymentId ?? req.body.refundPaymentId ?? '').trim();
+	const amountMinor = Math.max(0, Math.round(Number(req.body.amountMinor ?? 0)));
 
-	if (!paymentId) {
-		throw new AppError('paymentId is required', 422);
-	}
+	if (!paymentId) throw new AppError('paymentId is required', 422);
+	if (!Number.isFinite(amountMinor) || amountMinor <= 0) throw new AppError('amountMinor must be > 0', 422);
 
-	// Verify payment exists and belongs to the patient
 	const payment = await prisma.financialPayment.findUnique({
 		where: { id: paymentId },
-		include: {
-			session: {
-				select: { patientId: true },
-			},
+		select: { id: true, patientId: true, merchantTransactionId: true, currency: true },
+	});
+
+	if (!payment) throw new AppError('Payment not found', 404);
+	if (String(payment.patientId || '') !== patientId) throw new AppError('Unauthorized to refund this payment', 403);
+
+	const merchantRefundId = `RF_${Date.now()}_${payment.id.slice(0, 8)}`;
+	const refundResult = await initiatePhonePeRefund({
+		merchantRefundId,
+		originalMerchantOrderId: payment.merchantTransactionId,
+		amountInPaise: amountMinor,
+	});
+
+	const refundRecord = await (prisma as any).financialRefund.create({
+		data: {
+			paymentId: payment.id,
+			merchantRefundId,
+			originalMerchantOrderId: payment.merchantTransactionId,
+			phonePeRefundId: refundResult.refundId || null,
+			amountMinor,
+			currency: payment.currency || 'INR',
+			status: refundResult.state === 'COMPLETED' ? 'COMPLETED' : 'PENDING',
+			requestData: { paymentId, amountMinor },
+			responseData: refundResult.responseData,
 		},
 	});
 
-	if (!payment) {
-		throw new AppError('Payment not found', 404);
-	}
-
-	if (payment.session?.patientId !== patientId) {
-		throw new AppError('Unauthorized to refund this payment', 403);
-	}
-
-	if (payment.status !== 'CAPTURED') {
-		throw new AppError('Only captured payments can be refunded', 422);
-	}
-
-	// Check if refund already exists
-	const existingRefund = await prisma.financialRefund.findFirst({
-		where: { paymentId },
-	});
-
-	if (existingRefund && existingRefund.status !== 'FAILED') {
-		throw new AppError('Refund already initiated for this payment', 422);
-	}
-
-	// Generate merchant refund ID
-	const merchantRefundId = `${paymentId}-${Date.now()}`;
-
-	try {
-		// Initiate PhonePe refund
-		const refundResult = await initiatePhonePeRefund({
-			merchantRefundId,
-			originalMerchantOrderId: payment.merchantTransactionId,
-			amountInPaise: Number(payment.amountMinor),
-		});
-
-		// Create or update refund record
-		const refund = await prisma.financialRefund.upsert({
-			where: { merchantRefundId },
-			create: {
-				paymentId,
-				merchantRefundId,
-				originalMerchantOrderId: payment.merchantTransactionId,
-				phonePeRefundId: refundResult.refundId,
-				status: 'PENDING',
-				amountMinor: payment.amountMinor,
-				currency: payment.currency,
-				reason,
-				responseData: refundResult.responseData,
-			},
-			update: {
-				phonePeRefundId: refundResult.refundId || undefined,
-				status: 'PENDING',
-				responseData: refundResult.responseData,
-				retryCount: 0,
-				updatedAt: new Date(),
-			},
-		});
-
-		sendSuccess(res, refund, 'Refund initiated successfully', 201);
-	} catch (error: any) {
-		if (error instanceof AppError) throw error;
-
-		// Log error and create failed refund record
-		logger.error('[Payment] Refund initiation failed', {
-			paymentId,
-			error: error?.message,
-		});
-
-		throw new AppError('Failed to initiate refund: ' + error?.message, 502);
-	}
+	sendSuccess(res, refundRecord, 'Refund initiated', 201);
 };
+
+const UNIVERSAL_PATIENT_PLAN_MAP: Record<string, 'free' | 'monthly' | 'quarterly' | 'premium_monthly'> = {
+	'patient-free': 'free',
+	'patient-1month': 'monthly',
+	'patient-3month': 'quarterly',
+	'patient-1year': 'premium_monthly',
+	free: 'free',
+	monthly: 'monthly',
+	quarterly: 'quarterly',
+	premium_monthly: 'premium_monthly',
+};
+
+const UNIVERSAL_PROVIDER_PLAN_MAP: Record<string, ProviderPlanKey> = {
+	'lead-free': 'free',
+	'lead-basic': 'basic',
+	'lead-standard': 'standard',
+	'lead-premium': 'premium',
+	free: 'free',
+	standard: 'standard',
+	premium: 'premium',
+};
+
+const resolvePatientPlanKey = (planId: string) => UNIVERSAL_PATIENT_PLAN_MAP[String(planId || '').trim().toLowerCase()] || null;
+const resolveProviderPlanKey = (planId: string) => UNIVERSAL_PROVIDER_PLAN_MAP[String(planId || '').trim().toLowerCase()] || null;
+const resolveProviderCycle = (raw: unknown): 'monthly' | 'quarterly' => String(raw || 'monthly').trim().toLowerCase() === 'quarterly' ? 'quarterly' : 'monthly';
+
+const buildUniversalSuccessUrl = (type: string, planId: string, transactionId: string): string =>
+	`${env.frontendUrl}/#/universal/payment-success?type=${encodeURIComponent(type)}&planId=${encodeURIComponent(planId)}&transactionId=${encodeURIComponent(transactionId)}`;
+
+const computeProviderCheckoutTotals = (input: {
+	leadPlanKey: ProviderPlanKey;
+	platformCycle: 'monthly' | 'quarterly';
+	hot: number;
+	warm: number;
+	cold: number;
+}) => {
+	const platformMinor = input.platformCycle === 'quarterly' ? 27900 : 9900;
+	const plan = PROVIDER_PLANS[input.leadPlanKey];
+	const leadPlanMinor = Math.round((input.platformCycle === 'quarterly' ? plan.quarterlyPrice : plan.price) * 100);
+	const addonsMinor = (Math.max(0, input.hot) * LEAD_MARKETPLACE_PRICES.hot + Math.max(0, input.warm) * LEAD_MARKETPLACE_PRICES.warm + Math.max(0, input.cold) * LEAD_MARKETPLACE_PRICES.cold) * 100;
+	const subtotalMinor = platformMinor + leadPlanMinor + addonsMinor;
+	const gstMinor = Math.round(subtotalMinor * 0.18);
+	const totalMinor = subtotalMinor + gstMinor;
+	return { platformMinor, leadPlanMinor, addonsMinor, subtotalMinor, gstMinor, totalMinor };
+};
+
+const activatePlanForType = async (params: {
+	type: string;
+	planId: string;
+	userId: string;
+	paymentId: string;
+	providerCycle?: 'monthly' | 'quarterly';
+	providerAddons?: { hot: number; warm: number; cold: number };
+	metadata?: Record<string, unknown>;
+}) => {
+	if (params.type === 'patient') {
+		const planKey = resolvePatientPlanKey(params.planId);
+		if (!planKey) throw new AppError('Invalid patient plan', 422);
+		return reactivatePatientSubscription(params.userId, params.paymentId, planKey);
+	}
+
+	if (params.type === 'provider') {
+		const providerPlanKey = resolveProviderPlanKey(params.planId);
+		if (!providerPlanKey) throw new AppError('Invalid provider plan', 422);
+		const cycle = resolveProviderCycle(params.providerCycle);
+		const providerSubscription = await activateProviderSubscription(params.userId, providerPlanKey, params.paymentId);
+		await activatePlatformAccess(params.userId, cycle, params.paymentId).catch(() => null);
+		if (params.providerAddons) {
+			await createPendingSubscriptionComponents({
+				providerId: params.userId,
+				leadPlanKey: providerPlanKey,
+				platformCycle: cycle,
+				addons: params.providerAddons,
+				merchantTransactionId: params.paymentId,
+				metadata: params.metadata || {},
+			}).catch(() => null);
+		}
+		return providerSubscription;
+	}
+
+	throw new AppError('Invalid type. Must be "provider" or "patient"', 422);
+};
+
+export const getUniversalInvoiceController = async (req: Request, res: Response): Promise<void> => {
+	const orderId = String(req.params.orderId ?? '').trim();
+	if (!orderId) throw new AppError('orderId is required', 422);
+
+	const payment = await prisma.universalCheckoutPayment.findUnique({ where: { id: orderId } });
+
+	const invoice = {
+		orderId: payment.id,
+		type: payment.type,
+		planId: payment.planId,
+		baseAmount: (payment.baseAmountMinor / 100).toFixed(2),
+		gst: (payment.gstMinor / 100).toFixed(2),
+		totalAmount: (payment.totalAmountMinor / 100).toFixed(2),
+		walletUsed: (payment.walletUsedMinor / 100).toFixed(2),
+		finalAmount: (payment.finalAmountMinor / 100).toFixed(2),
+		status: payment.status,
+		createdAt: payment.createdAt,
+		completedAt: payment.completedAt,
+	};
+
+	res.setHeader('Content-Type', 'application/json');
+	res.setHeader('Content-Disposition', `attachment; filename="invoice-${orderId}.json"`);
+	sendSuccess(res, invoice, 'Invoice retrieved', 200);
+};
+
+
+
+	export const initiateUniversalPaymentController = async (req: Request, res: Response): Promise<void> => {
+		const userId = getAuthUserId(req);
+		const type = String(req.body.type ?? '').trim().toLowerCase();
+		const planId = String(req.body.planId ?? '').trim();
+		const baseAmountMinor = Math.max(0, Math.round(Number(req.body.baseAmountMinor ?? 0)));
+		const gstMinor = Math.max(0, Math.round(Number(req.body.gstMinor ?? 0)));
+		const totalAmountMinor = Math.max(0, Math.round(Number(req.body.totalAmountMinor ?? 0)));
+		const walletUsedMinor = Math.max(0, Math.round(Number(req.body.walletUsedMinor ?? 0)));
+		const finalAmountMinor = Math.max(0, Math.round(Number(req.body.finalAmountMinor ?? 0)));
+		const idempotencyKey = String(req.body.idempotencyKey ?? '').trim();
+		const promoCode = String(req.body.promoCode ?? '').trim() || undefined;
+		const platformCycle = resolveProviderCycle(req.body.platformCycle);
+		const providerAddons = {
+			hot: Math.max(0, Math.round(Number(req.body.addons?.hot ?? 0))),
+			warm: Math.max(0, Math.round(Number(req.body.addons?.warm ?? 0))),
+			cold: Math.max(0, Math.round(Number(req.body.addons?.cold ?? 0))),
+		};
+
+		if (!['provider', 'patient'].includes(type)) {
+			throw new AppError('Invalid type. Must be "provider" or "patient"', 422);
+		}
+		if (!planId) throw new AppError('planId is required', 422);
+		if (!idempotencyKey) throw new AppError('idempotencyKey is required', 422);
+
+		const universalPayment = await prisma.universalCheckoutPayment.findUnique({ where: { idempotencyKey } });
+		if (universalPayment) {
+			logger.info('[UniversalPayment] Idempotent duplicate detected', { idempotencyKey });
+			return void sendSuccess(res, universalPayment, 'Duplicate payment detected', 200);
+		}
+
+		const paymentRecord = await prisma.universalCheckoutPayment.create({
+			data: {
+				type,
+				planId,
+				baseAmountMinor,
+				gstMinor,
+				totalAmountMinor,
+				walletUsedMinor,
+				finalAmountMinor,
+				idempotencyKey,
+				status: 'INITIATED',
+			},
+		});
+
+		const successRedirectUrl = buildUniversalSuccessUrl(type, planId, paymentRecord.id);
+
+		try {
+			if (type === 'patient') {
+				const patientPlanKey = resolvePatientPlanKey(planId);
+				if (!patientPlanKey) throw new AppError('Invalid patient plan', 422);
+
+				const plan = await getActivePlatformPlan(patientPlanKey);
+				if (!plan) throw new AppError('Invalid patient plan', 422);
+
+				const expectedGstMinor = Math.round(baseAmountMinor * 0.18);
+				const expectedTotalMinor = baseAmountMinor + expectedGstMinor;
+				if (Math.abs(gstMinor - expectedGstMinor) > 1) throw new AppError('GST mismatch. Please refresh checkout and retry.', 422);
+				if (totalAmountMinor > 0 && Math.abs(totalAmountMinor - expectedTotalMinor) > 1) throw new AppError('Invalid checkout total. Total must be subtotal plus GST.', 422);
+
+				const walletResult = await applyCreditsForPayment({
+					userId,
+					referenceId: idempotencyKey || `universal_patient_${Date.now()}`,
+					referenceType: 'patient_subscription',
+					amountMinor: expectedTotalMinor,
+				});
+
+				const effectiveFinalAmountMinor = Math.max(0, walletResult.finalAmount);
+				if (effectiveFinalAmountMinor <= 0 || Number(plan.price || 0) <= 0) {
+					const activated = await activatePlanForType({
+						type,
+						planId,
+						userId,
+						paymentId: paymentRecord.id,
+						metadata: { walletUsedMinor: walletResult.amountUsed, promoCode },
+					});
+
+					const completed = await prisma.universalCheckoutPayment.update({
+						where: { id: paymentRecord.id },
+						data: { status: 'COMPLETED', completedAt: new Date(), planDetails: activated as any },
+					});
+					return void sendSuccess(res, { ...completed, redirectUrl: successRedirectUrl }, 'Free plan activated', 201);
+				}
+
+				const payment = await initiatePatientSubscriptionPayment(userId, patientPlanKey, {
+					amountMinorOverride: effectiveFinalAmountMinor,
+					redirectUrlOverride: successRedirectUrl,
+					metadata: {
+						universalCheckoutPaymentId: paymentRecord.id,
+						promoCode,
+						walletUsedMinor: walletResult.amountUsed,
+						finalAmountMinor: effectiveFinalAmountMinor,
+					},
+				});
+
+				await prisma.universalCheckoutPayment.update({
+					where: { id: paymentRecord.id },
+					data: {
+						phonepeTransactionId: String(payment.transactionId || ''),
+						status: 'PENDING_PAYMENT',
+					},
+				});
+
+				return void sendSuccess(res, { ...paymentRecord, redirectUrl: payment.redirectUrl, merchantTransactionId: payment.transactionId }, 'Payment initiated. Redirecting to PhonePe...', 201);
+			}
+
+			const providerPlanKey = resolveProviderPlanKey(planId);
+			if (!providerPlanKey) throw new AppError('Invalid provider plan', 422);
+
+			const plan = PROVIDER_PLANS[providerPlanKey];
+			if (!plan) throw new AppError('Invalid provider plan', 422);
+
+			const totals = computeProviderCheckoutTotals({
+				leadPlanKey: providerPlanKey,
+				platformCycle,
+				hot: providerAddons.hot,
+				warm: providerAddons.warm,
+				cold: providerAddons.cold,
+			});
+
+			if (baseAmountMinor > 0 && Math.abs(baseAmountMinor - totals.subtotalMinor) > 1) {
+				throw new AppError('Subtotal mismatch. Please refresh checkout and retry.', 409);
+			}
+			if (gstMinor > 0 && Math.abs(gstMinor - totals.gstMinor) > 1) {
+				throw new AppError('GST mismatch. Please refresh checkout and retry.', 409);
+			}
+			if (totalAmountMinor > 0 && Math.abs(totalAmountMinor - totals.totalMinor) > 1) {
+				throw new AppError('Total mismatch. Please refresh checkout and retry.', 409);
+			}
+
+			const walletResult = await applyCreditsForPayment({
+				userId,
+				referenceId: idempotencyKey || `universal_provider_${Date.now()}`,
+				referenceType: 'provider_subscription',
+				amountMinor: totals.totalMinor,
+			});
+			const effectiveFinalAmountMinor = Math.max(0, walletResult.finalAmount);
+
+			if (effectiveFinalAmountMinor <= 0) {
+				const activated = await activatePlanForType({
+					type,
+					planId,
+					userId,
+					paymentId: paymentRecord.id,
+					providerCycle: platformCycle,
+					providerAddons,
+					metadata: { promoCode, walletUsedMinor: walletResult.amountUsed, platformCycle },
+				});
+
+				const completed = await prisma.universalCheckoutPayment.update({
+					where: { id: paymentRecord.id },
+					data: { status: 'COMPLETED', completedAt: new Date(), planDetails: activated as any },
+				});
+				return void sendSuccess(res, { ...completed, redirectUrl: successRedirectUrl }, 'Free plan activated', 201);
+			}
+
+			if (providerPlanKey === 'free') {
+				const platformPayment = await initiateProviderPlatformPayment(
+					userId,
+					platformCycle,
+					effectiveFinalAmountMinor,
+					{ redirectUrlOverride: successRedirectUrl, idempotencyKey, requireGateway: true }
+				);
+
+				await prisma.universalCheckoutPayment.update({
+					where: { id: paymentRecord.id },
+					data: {
+						phonepeTransactionId: String(platformPayment.transactionId || ''),
+						status: 'PENDING_PAYMENT',
+						metadata: {
+							platformCycle,
+							addons: providerAddons,
+							flow: 'universal_provider_platform_only',
+						},
+					},
+				});
+
+				return void sendSuccess(
+					res,
+					{ ...paymentRecord, redirectUrl: platformPayment.redirectUrl, merchantTransactionId: platformPayment.transactionId },
+					'Payment initiated. Redirecting to PhonePe...',
+					201,
+				);
+			}
+
+			const payment = await initiateProviderSubscriptionPayment(userId, providerPlanKey, {
+				amountMinorOverride: effectiveFinalAmountMinor,
+				idempotencyKey,
+				redirectUrlOverride: successRedirectUrl,
+				metadata: {
+					flow: 'universal_checkout',
+					platformCycle,
+					platformMinor: totals.platformMinor,
+					leadPlanMinor: totals.leadPlanMinor,
+					addons: providerAddons,
+					expectedSubtotalMinor: totals.subtotalMinor,
+					expectedGstMinor: totals.gstMinor,
+					expectedTotalMinor: totals.totalMinor,
+					promoCode,
+					universalCheckoutPaymentId: paymentRecord.id,
+					walletUsedMinor: walletResult.amountUsed,
+					finalAmountMinor: effectiveFinalAmountMinor,
+				},
+			});
+
+			await prisma.universalCheckoutPayment.update({
+				where: { id: paymentRecord.id },
+				data: {
+					phonepeTransactionId: String(payment.transactionId || ''),
+					status: 'PENDING_PAYMENT',
+				},
+			});
+
+			await createPendingSubscriptionComponents({
+				providerId: userId,
+				leadPlanKey: providerPlanKey,
+				platformCycle,
+				addons: providerAddons,
+				merchantTransactionId: String(payment.transactionId || ''),
+				metadata: {
+					flow: 'universal_checkout',
+					universalCheckoutPaymentId: paymentRecord.id,
+					promoCode,
+				},
+			}).catch(() => null);
+
+			return void sendSuccess(res, { ...paymentRecord, redirectUrl: payment.redirectUrl, merchantTransactionId: payment.transactionId }, 'Payment initiated. Redirecting to PhonePe...', 201);
+		} catch (error: any) {
+			if (error instanceof AppError) throw error;
+			logger.error('[UniversalPayment.Initiate] Error', { error: error?.message, type, planId });
+			await prisma.universalCheckoutPayment.delete({ where: { id: paymentRecord.id } }).catch(() => null);
+			throw new AppError('Failed to initiate universal payment: ' + error?.message, 502);
+		}
+		};
+
+		export const confirmUniversalPaymentController = async (req: Request, res: Response): Promise<void> => {
+			const paymentId = String(req.body.paymentId ?? '').trim();
+			if (!paymentId) throw new AppError('paymentId is required', 422);
+
+			const payment = await prisma.universalCheckoutPayment.findUnique({ where: { id: paymentId } });
+			if (!payment) throw new AppError('Payment not found', 404);
+
+			if (payment.status === 'COMPLETED') {
+				return void sendSuccess(res, payment, 'Payment already confirmed', 200);
+			}
+
+			const activated = await activatePlanForType({
+				type: payment.type,
+				planId: payment.planId,
+				userId: getAuthUserId(req),
+				paymentId: payment.id,
+			});
+
+			const updated = await prisma.universalCheckoutPayment.update({
+				where: { id: payment.id },
+				data: { status: 'COMPLETED', completedAt: new Date(), planDetails: activated as any },
+			});
+
+			sendSuccess(res, updated, 'Plan activated successfully', 200);
+		};
+
+		export const verifyUniversalPaymentController = async (req: Request, res: Response): Promise<void> => {
+			const orderId = String(req.query.orderId ?? req.query.transactionId ?? '').trim();
+			if (!orderId) throw new AppError('orderId is required', 422);
+
+			const payment = await prisma.universalCheckoutPayment.findUnique({ where: { id: orderId } });
+			if (!payment) throw new AppError('Payment not found', 404);
+
+			if (payment.status === 'COMPLETED') {
+				return void sendSuccess(res, { payment }, 'Payment status verified', 200);
+			}
+
+			if (payment.phonepeTransactionId) {
+				const phonepeStatus = await reconcilePhonePePaymentStatus(payment.phonepeTransactionId, 5, 5000);
+				const state = String(phonepeStatus.state || '').toUpperCase();
+				if (state === 'COMPLETED' || state === 'PAYMENT_SUCCESS') {
+					const activated = await activatePlanForType({
+						type: payment.type,
+						planId: payment.planId,
+						userId: getAuthUserId(req),
+						paymentId: payment.id,
+						providerCycle: String(payment.metadata?.platformCycle || '').toLowerCase() === 'quarterly' ? 'quarterly' : 'monthly',
+						providerAddons: payment.metadata?.addons as { hot: number; warm: number; cold: number } | undefined,
+						metadata: payment.metadata || {},
+					});
+
+					const updated = await prisma.universalCheckoutPayment.update({
+						where: { id: payment.id },
+						data: { status: 'COMPLETED', completedAt: new Date(), planDetails: activated as any },
+					});
+					return void sendSuccess(res, { payment: updated }, 'Payment completed', 200);
+				}
+			}
+
+			sendSuccess(res, { payment }, 'Payment status verified', 200);
+	};
 
 export const getRefundStatusController = async (req: Request, res: Response): Promise<void> => {
 	const refundId = String(req.params.refundId ?? '').trim();
@@ -318,3 +608,5 @@ export const getRefundStatusController = async (req: Request, res: Response): Pr
 		throw new AppError('Failed to fetch refund status: ' + error?.message, 502);
 	}
 };
+
+

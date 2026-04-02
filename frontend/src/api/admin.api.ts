@@ -154,6 +154,16 @@ export type AdminPricingPlatformFee = {
 	effectiveTo?: string | null;
 };
 
+export type AdminPricingPlanItem = {
+	id: string;
+	planKey: string;
+	planName: string;
+	price: number;
+	billingCycle: string;
+	description?: string | null;
+	active: boolean;
+};
+
 export type AdminPricingSessionItem = {
 	id: string;
 	providerType: string;
@@ -178,6 +188,7 @@ export type AdminPricingBundleItem = {
 
 export type AdminPricingConfig = {
 	platformFee: AdminPricingPlatformFee | null;
+	platformPlans: AdminPricingPlanItem[];
 	sessionPricing: AdminPricingSessionItem[];
 	premiumBundles: AdminPricingBundleItem[];
 	surchargePercent: number;
@@ -348,6 +359,14 @@ export const getAdminPricingConfig = async (): Promise<ApiEnvelope<AdminPricingC
 export const updateAdminPricingConfig = async (payload: {
 	platform_fee?: number;
 	preferred_time_surcharge?: number;
+	plans?: Array<{
+		planKey: string;
+		planName: string;
+		price: number;
+		billingCycle: string;
+		description?: string | null;
+		active?: boolean;
+	}>;
 	session_pricing?: Array<{
 		providerType: string;
 		durationMinutes: number;
@@ -453,6 +472,8 @@ export type AdminRevenueAnalytics = {
 	sessionCommissions: number;
 	total: number;
 	mrr: number;
+	platformShare?: number;
+	providerShare?: number;
 };
 
 export type AdminUserMetrics = {

@@ -544,9 +544,9 @@ export const patientApi = {
     idempotencyKey?: string;
   }) => {
     const response = await withFallbackChain([
+      async () => (await http.post('/v1/subscription/checkout', payload)).data,
       async () => (await http.post('/v1/patient/subscription/checkout', payload)).data,
       async () => (await http.post('/patient/subscription/checkout', payload)).data,
-      async () => (await http.post('/v1/subscription/checkout', payload)).data,
       async () => (await http.post('/subscription/checkout', payload)).data,
     ]);
     return unwrapPayload(response);

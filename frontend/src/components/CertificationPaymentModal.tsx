@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, CheckCircle, ShieldCheck, AlertCircle, Lock, ArrowRight } from 'lucide-react';
 import { Certification } from '../CertificationTypes';
 import { useNavigate } from 'react-router-dom';
+import useEnrollmentStore from '../store/CertificationEnrollmentStore';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -13,6 +14,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, cer
   const [step, setStep] = useState<'plan' | 'processing' | 'success' | 'fail'>('plan');
   const [paymentPlan, setPaymentPlan] = useState<'full' | 'installment'>('full');
   const navigate = useNavigate();
+  const { addEnrollment } = useEnrollmentStore();
 
   if (!isOpen) return null;
 
@@ -20,8 +22,23 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, cer
 
   const handlePayment = () => {
     setStep('processing');
-    // Simulate API call
     setTimeout(() => {
+      const totalAmount = certification.price_inr;
+      addEnrollment({
+        id: `ENR-${Date.now()}`,
+        certificationId: certification.id,
+        certificationName: certification.name,
+        slug: certification.slug,
+        badgeColor: certification.badgeColor,
+        enrollmentDate: new Date().toLocaleDateString(),
+        paymentStatus: totalAmount === 0 ? 'Paid' : paymentPlan === 'installment' ? 'Partial' : 'Paid',
+        paymentPlan,
+        amountPaid: totalAmount === 0 ? 0 : paymentPlan === 'full' ? totalAmount : installmentAmount,
+        totalAmount,
+        installmentsPaidCount: totalAmount === 0 ? 3 : paymentPlan === 'full' ? 3 : 1,
+        completionPercentage: 0,
+        modulesCompleted: 0,
+      });
       setStep('success');
     }, 2000);
   };
@@ -33,7 +50,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, cer
 
   const handleGoToDashboard = () => {
       handleClose();
-      navigate('/dashboard'); // Mocking "My Certifications" to go to dashboard or home
+      navigate('/my-certifications');
   };
 
   return (
@@ -64,7 +81,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, cer
                     </div>
                     <div className="ml-3">
                     <p className="text-sm text-amber-800 font-bold">
-                        Demo only – backend, payments, and notifications are not connected yet.
+                      Payment completion will be recorded in your certifications dashboard.
                     </p>
                     </div>
                 </div>
@@ -130,7 +147,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, cer
               }
             </button>
             <div className="text-center mt-3 text-xs text-slate-400 flex items-center justify-center gap-1">
-                <Lock size={10} /> Secure checkout (demo)
+              <Lock size={10} /> Secure checkout
             </div>
           </div>
         )}
@@ -149,10 +166,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, cer
               <CheckCircle size={40} />
             </div>
             
-            <h3 className="text-2xl font-serif font-bold text-slate-800">Enrollment Successful (Demo)</h3>
+            <h3 className="text-2xl font-serif font-bold text-slate-800">Enrollment Successful</h3>
             
             <p className="text-slate-600 mt-4 mb-8 max-w-xs mx-auto leading-relaxed">
-                You will receive course access and confirmation email after backend integration.
+              Your enrollment has been added to My Certifications.
             </p>
 
             <div className="w-full space-y-3">

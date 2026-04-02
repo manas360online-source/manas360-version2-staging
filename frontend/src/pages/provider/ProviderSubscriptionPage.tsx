@@ -11,8 +11,6 @@ import {
   type ProviderBillingCycle,
   type ProviderLeadPlanId,
 } from '../../lib/providerSubscriptionFlow';
-import { initiateProviderPlatformPayment } from '../../api/provider';
-import toast from 'react-hot-toast';
 
 export default function ProviderSubscriptionPage() {
   const navigate = useNavigate();
@@ -26,16 +24,14 @@ export default function ProviderSubscriptionPage() {
 
   const handlePlatformPayment = async () => {
     setLoading(true);
-    try {
-      const result = await initiateProviderPlatformPayment({ billingCycle: selectedPlatformCycle });
-      if (result?.redirectUrl) {
-        window.location.href = result.redirectUrl;
-      }
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to initiate payment');
-    } finally {
-      setLoading(false);
-    }
+    saveProviderCart({
+      leadPlanId: 'free',
+      platformCycle: selectedPlatformCycle,
+      addons: { ...DEFAULT_PROVIDER_ADDONS },
+      updatedAt: new Date().toISOString(),
+    });
+    navigate('/provider/checkout?type=provider&planId=lead-free');
+    setLoading(false);
   };
 
   const startFlow = (leadPlanId: ProviderLeadPlanId) => {

@@ -36,8 +36,12 @@ import legalRoutes from './legal.routes';
 
 
 const router = Router();
+import sharedRoutes from './shared.routes';
 // Defensive public pricing route for landing page
 router.get('/public/pricing/:category', getLivePricingController);
+
+// Mount shared routes for plans and other public data
+router.use('/v1/shared', sharedRoutes);
 
 router.get('/health', (_req, res) => {
 	res.status(200).json({
@@ -52,6 +56,8 @@ router.get('/health', (_req, res) => {
 
 router.use('/auth', authRoutes);
 router.use('/v1/auth', authRoutes);
+// Mount specific public group-therapy routes before broad /v1 routes.
+router.use('/v1/group-therapy', groupTherapyRoutes);
 router.use('/v1', patientV1Routes);
 router.use('/patient', patientSelfRoutes);
 router.use('/v1/patient', patientSelfRoutes);
@@ -93,7 +99,6 @@ router.use('/v1', riskAnalyticsRoutes);
 // Mount game and wallet routes for patient-facing game features and wallet APIs
 router.use('/v1/game', gameRoutes);
 router.use('/v1/wallet', walletRoutes);
-router.use('/v1/group-therapy', groupTherapyRoutes);
 router.use('/v1/legal', legalRoutes);
 
 export default router;

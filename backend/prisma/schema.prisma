@@ -1135,6 +1135,31 @@ model FinancialRefund {
   @@map("financial_refunds")
 }
 
+model UniversalCheckoutPayment {
+  id                    String                     @id @default(uuid())
+  type                  String                     @db.VarChar(50) // 'provider' | 'patient'
+  planId                String                     @db.VarChar(255)
+  baseAmountMinor       BigInt                     @default(0) // Amount in paise
+  gstMinor              BigInt                     @default(0)  // GST in paise
+  totalAmountMinor      BigInt                     @default(0)  // Total incl GST
+  walletUsedMinor       BigInt                     @default(0)  // Wallet deduction
+  finalAmountMinor      BigInt                     @default(0)  // Final amount to pay
+  status                UniversalCheckoutStatus   @default(INITIATED)
+  idempotencyKey        String                    @unique
+  phonepeTransactionId  String?                   @unique
+  planDetails           Json?                     // Activation details
+  createdAt             DateTime                  @default(now())
+  completedAt           DateTime?
+  failedAt              DateTime?
+  updatedAt             DateTime                  @updatedAt
+
+  @@index([type, planId])
+  @@index([status, createdAt])
+  @@index([phonepeTransactionId])
+  @@index([idempotencyKey])
+  @@map("universal_checkout_payments")
+}
+
 model ProviderWallet {
   providerId            String              @id
   pendingBalanceMinor   BigInt              @default(0)
@@ -2444,6 +2469,14 @@ enum FinancialPaymentType {
 enum FinancialRefundStatus {
   PENDING
   CONFIRMED
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum UniversalCheckoutStatus {
+  INITIATED
+  PENDING_PAYMENT
   COMPLETED
   FAILED
   CANCELLED

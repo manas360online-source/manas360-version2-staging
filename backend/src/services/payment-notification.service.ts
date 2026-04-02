@@ -33,6 +33,24 @@ export const notifyPaymentDeadLetterEvent = async (input: {
       timestamp: new Date().toISOString(),
     });
 
+    if (input.userId) {
+      await db.notification.create({
+        data: {
+          userId: input.userId,
+          type: 'PAYMENT_DEAD_LETTER',
+          title: 'Payment needs attention',
+          message: 'Your payment could not be completed. Please retry to keep access active.',
+          payload: {
+            paymentId: input.paymentId,
+            reason: input.reason,
+            channel: input.channel || null,
+            retryCount: input.retryCount ?? null,
+          },
+          sentAt: new Date(),
+        },
+      }).catch(() => null);
+    }
+
     // TODO: Integrate with:
     // - Email service: send "Payment failed, please retry" email
     // - Slack webhook: alert support team

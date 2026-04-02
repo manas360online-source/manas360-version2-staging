@@ -46,5 +46,5 @@ export const sendSubscriptionActivationEmail = async (input: SubscriptionActivat
 	}
 
 	// Fallback for local/dev environments where a real mail transport is not configured.
-	console.info('[email-placeholder]', JSON.stringify({ to: email, ...message }));
+	console.info('[email-delivery-fallback]', JSON.stringify({ to: email, ...message }));
 };

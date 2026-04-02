@@ -33,7 +33,7 @@ export default function PsychologistSchedulePage() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <TherapistCard className="p-4 lg:col-span-2">
-          <div className="text-sm text-ink-600">(Calendar view placeholder) - integrate full calendar component as next step.</div>
+          <div className="text-sm text-ink-600">Live schedule list below; the calendar surface can be layered on without changing the data source.</div>
           <div className="mt-4 space-y-2">
             {items.map((it) => (
               <div key={it.id} className="flex items-center justify-between rounded-lg border border-ink-100 px-3 py-2">

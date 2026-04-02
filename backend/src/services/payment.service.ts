@@ -73,8 +73,10 @@ const assertPaymentActors = async (tx: any, patientId: string, providerId: strin
 
 export const createSessionPayment = async (input: CreateFinancialSessionInput) => {
 	const amountMinor = asMinor(input.amountMinor);
-	if (!amountMinor) {
-		throw new AppError('amountMinor must be greater than zero', 422);
+	
+	// GUIDELINE COMPLIANCE: PhonePe requires minimum 100 paise (₹1.00)
+	if (!Number.isFinite(amountMinor) || amountMinor < 100) {
+		throw new AppError('amountMinor must be at least 100 paise (₹1.00) per PhonePe payment gateway requirements', 422);
 	}
 
 	const idempotencyKey = String(input.idempotencyKey || randomUUID()).trim();
@@ -97,8 +99,11 @@ export const createSessionPayment = async (input: CreateFinancialSessionInput) =
 	}
 
 	const transactionId = `SESS_${Date.now()}_${idempotencyKey.slice(0, 8)}`;
-	const shouldBypass = env.allowDevPaymentBypass && env.nodeEnv === 'development';
+	const hasPhonePeOAuth = Boolean(String(process.env.PHONEPE_CLIENT_ID || '').trim())
+		&& Boolean(String(process.env.PHONEPE_CLIENT_SECRET || '').trim());
+	const shouldBypass = env.allowDevPaymentBypass && env.nodeEnv === 'development' && !hasPhonePeOAuth;
 	const frontendBaseUrl = env.frontendUrl;
+	const paymentStatusBase = `${frontendBaseUrl}/#/payment/status`;
 	const callbackUrl = `${env.apiUrl}${env.apiPrefix}/v1/payments/phonepe/webhook`;
 
 	let redirectUrl: string;
@@ -108,14 +113,14 @@ export const createSessionPayment = async (input: CreateFinancialSessionInput) =
 			userId: input.patientId,
 			amountInPaise: amountMinor,
 			callbackUrl,
-			redirectUrl: `${frontendBaseUrl}/payment/status?id=${transactionId}`,
+			redirectUrl: `${paymentStatusBase}?transactionId=${transactionId}`,
 		});
 	} catch (error: any) {
 		if (!shouldBypass) {
 			throw new AppError(error?.message || 'Failed to initiate PhonePe payment', 500);
 		}
 
-		redirectUrl = `${frontendBaseUrl}/payment/status?id=${transactionId}`;
+		redirectUrl = `${paymentStatusBase}?transactionId=${transactionId}`;
 	}
 
 	const created = await db.$transaction(async (tx: any) => {
@@ -278,21 +283,36 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 				throw new AppError('Unable to resolve patient subscription userId from payment', 422);
 			}
 
-			const verify = await checkPhonePeStatus(merchantTransactionId);
+	const verify = await checkPhonePeStatus(merchantTransactionId);
 			const verifyCode = String(verify?.code || '').toUpperCase();
-			const verifyState = String(verify?.data?.state || '').toUpperCase();
+			// GUIDELINE COMPLIANCE: Rely ONLY on .state field for payment status determination
+			const verifyState = String(verify?.data?.state || '').toUpperCase().trim();
 			const isVerifiedByStatus = Boolean(verify) && (
 				verifyCode === 'PAYMENT_SUCCESS' || verifyState === 'COMPLETED'
 			);
 			const isExplicitFailure = verifyCode === 'PAYMENT_ERROR'
 				|| verifyState === 'FAILED'
-				|| verifyState === 'DECLINED';
-
-			if (isExplicitFailure) {
-				throw new AppError('Patient payment not verified', 400);
+				|| verifyState === 'DECLINED'
+				|| verifyState === 'CANCELLED';
+			
+			// GUIDELINE: Handle PENDING states with reconciliation
+			const isPendingState = verifyState === 'PENDING' || verifyState === '';
+			if (isPendingState && !isExplicitFailure) {
+				// GUIDELINE Option 2: Mark as pending in UI but reconcile backend until terminal
+				logger.warn('[PaymentService] Transaction in PENDING state; backend will continue reconciliation', {
+					merchantTransactionId,
+					verifyCode,
+					verifyState,
+				});
+				// Don't throw - allow webhook to mark as PENDING_CAPTURE, frontend will poll
+				// Or reconcile here if backend should drive the completion
 			}
 
-			if (!isVerifiedByStatus) {
+			if (isExplicitFailure) {
+				throw new AppError('Patient payment verification failed or declined', 400);
+			}
+
+			if (!isVerifiedByStatus && !isPendingState) {
 				logger.warn('[PaymentService] Status verification unavailable/non-completed; proceeding with webhook success', {
 					merchantTransactionId,
 					verifyCode,
@@ -701,7 +721,7 @@ export const reconcilePhonePePaymentStatus = async (
 	maxRetries: number = 5,
 	initialWaitMs: number = 5000
 ): Promise<{ state: string; transactionId: string; resultMessage: string }> => {
-	logger.info('[Payment.Reconcile] Starting status reconciliation', {
+	logger.info('[Payment.Reconcile] Starting status reconciliation (strict PhonePe guideline schedule)', {
 		transactionId,
 		maxRetries,
 		initialWaitMs,
@@ -710,20 +730,36 @@ export const reconcilePhonePePaymentStatus = async (
 	let currentState = 'PENDING';
 	let lastStatus: any = null;
 
-	for (let attempt = 1; attempt <= maxRetries; attempt++) {
-		// Calculate wait time based on PhonePe schedule
-		let waitMs = initialWaitMs;
-		if (attempt > 1) {
-			if (attempt <= 3) waitMs = 3000; // every 3s for attempts 2-3
-			else if (attempt <= 5) waitMs = 6000; // every 6s for attempts 4-5
-			else waitMs = 10000; // every 10s after
+	// GUIDELINE COMPLIANCE: Strict reconciliation schedule as per PhonePe guidelines
+	// First check: 20-25 seconds after transaction initiation
+	// Then: Every 3s for 30s, every 6s for 60s, every 10s for 60s, every 30s for 60s, every 1 minute until final
+	const getWaitTimeMs = (attempt: number): number => {
+		if (attempt === 1) {
+			return 20000; // First check: 20-25 seconds
 		}
+		if (attempt <= 11) {
+			return 3000; // Every 3s for next 10 attempts (30 seconds total)
+		}
+		if (attempt <= 21) {
+			return 6000; // Every 6s for next 10 attempts (60 seconds)
+		}
+		if (attempt <= 31) {
+			return 10000; // Every 10s for next 10 attempts (100 seconds)
+		}
+		if (attempt <= 35) {
+			return 30000; // Every 30s for next 4 attempts (120 seconds)
+		}
+		return 60000; // Every 1 minute thereafter
+	};
+
+	for (let attempt = 1; attempt <= maxRetries; attempt++) {
+		const waitMs = getWaitTimeMs(attempt);
 
 		if (attempt > 1) {
-			logger.info('[Payment.Reconcile] Waiting before retry', {
+			logger.info('[Payment.Reconcile] Waiting before retry (PhonePe guideline schedule)', {
 				transactionId,
 				attempt,
-				nextCheckInMs: waitMs,
+				nextCheckInSeconds: Math.round(waitMs / 1000),
 			});
 			await new Promise((resolve) => setTimeout(resolve, waitMs));
 		}
@@ -738,24 +774,32 @@ export const reconcilePhonePePaymentStatus = async (
 				continue;
 			}
 
-			currentState = String(lastStatus?.data?.state || lastStatus?.code || 'UNKNOWN').toUpperCase();
+			// GUIDELINE COMPLIANCE: Rely only on .state field for payment status determination
+			const state = String(lastStatus?.data?.state || '').toUpperCase().trim();
+			
 			logger.info('[Payment.Reconcile] Status check result', {
 				transactionId,
 				attempt,
-				state: currentState,
+				state,
 				code: lastStatus?.code,
+				rawData: lastStatus?.data,
 			});
 
-			// If state is final (not PENDING), stop polling
-			if (currentState !== 'PENDING') {
-				logger.info('[Payment.Reconcile] Final state reached', {
+			// Map state: COMPLETED or PAYMENT_SUCCESS = success
+			const isTerminalSuccess = state === 'COMPLETED' || state === 'PAYMENT_SUCCESS';
+			const isTerminalFailure = state === 'FAILED' || state === 'DECLINED' || state === 'CANCELLED';
+			const isStillPending = state === 'PENDING' || state === '';
+
+			if (isTerminalSuccess || isTerminalFailure) {
+				currentState = isTerminalSuccess ? 'COMPLETED' : state;
+				logger.info('[Payment.Reconcile] Terminal state reached', {
 					transactionId,
 					state: currentState,
 					attemptNumber: attempt,
 				});
 
-				// If success, trigger webhook processing to update DB
-				if (currentState === 'COMPLETED' && transactionId.startsWith('SUB_')) {
+				// If success, trigger webhook processing to update DB state
+				if (isTerminalSuccess && transactionId.startsWith('SUB_')) {
 					try {
 						await processPhonePeWebhook(lastStatus).catch((error) => {
 							logger.warn('[Payment.Reconcile] Inline webhook processing failed', {
@@ -772,26 +816,34 @@ export const reconcilePhonePePaymentStatus = async (
 					resultMessage: `Payment state is ${currentState}`,
 				};
 			}
+
+			if (!isStillPending) {
+				// Unknown state
+				logger.warn('[Payment.Reconcile] Unknown state received', {
+					transactionId,
+					state,
+				});
+			}
 		} catch (error: any) {
 			logger.warn('[Payment.Reconcile] Status check error', {
 				transactionId,
 				attempt,
 				error: error?.message,
 			});
-			// Continue to next retry
+			// Continue to next retry per guideline
 		}
 	}
 
 	// All retries exhausted but still PENDING
-	logger.warn('[Payment.Reconcile] Max retries exhausted, still PENDING', {
+	logger.warn('[Payment.Reconcile] Max retries exhausted (guideline schedule completed), still PENDING', {
 		transactionId,
 		maxRetries,
 		finalState: currentState,
 	});
 
 	return {
-		state: currentState,
+		state: 'PENDING',
 		transactionId,
-		resultMessage: `Payment status is still ${currentState}. Please check again in a moment or contact support.`,
+		resultMessage: `Payment status is still PENDING after all reconciliation attempts. Please try status check again later or contact support. (PhonePe guideline max schedule: ~${Math.round(maxRetries * 90 / 60)} min)`,
 	};
 }

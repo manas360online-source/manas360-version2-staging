@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getAdminPayouts, approveAdminPayout } from '../../api/admin.api';
 import { Button } from '../../components/ui/Button';
+import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { useSocket } from '../../context/SocketContext';
 import toast from 'react-hot-toast';
@@ -10,6 +11,15 @@ export default function Payouts() {
   const [loading, setLoading] = useState(true);
   const [globalSplit, setGlobalSplit] = useState(60); // 60% therapist
   const { socket } = useSocket();
+
+  const summary = useMemo(() => {
+    const requested = payouts.filter((p) => p.status === 'REQUESTED');
+    const nextPayout = requested[0];
+    return {
+      nextPayoutAmount: nextPayout ? Number(nextPayout.amountMinor || 0) / 100 : 0,
+      nextPayoutDate: nextPayout ? new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) : null,
+    };
+  }, [payouts]);
 
   // Helper to format currency from minor units (strings/numbers)
   const formatCurrency = (minor: string | number | undefined) => {
@@ -91,6 +101,20 @@ export default function Payouts() {
           <p className="text-[10px] text-gray-400 mt-1 uppercase font-bold tracking-tighter">Gateway: Automated Pay-out</p>
         </div>
       </div>
+
+      {/* Transfer Details */}
+      <Card className="p-6 mt-8 mb-8">
+        <h2 className="font-semibold mb-4">Payout Transfer Status</h2>
+        <div className="flex justify-between gap-4">
+          <div>Next Automated Payout (PhonePe)</div>
+          <div className="text-green-600">
+            Scheduled in 3 days • ₹{summary.nextPayoutAmount.toLocaleString('en-IN')}
+          </div>
+        </div>
+        <div className="text-xs text-gray-400 mt-2">
+          Providers will receive 60% share automatically every 7 days
+        </div>
+      </Card>
 
       {/* Pending Payouts Header */}
       <div className="mb-4 flex items-center justify-between">

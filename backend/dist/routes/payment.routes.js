@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const payment_controller_1 = require("../controllers/payment.controller");
+const payment_controller_2 = require("../controllers/payment.controller");
 const auth_middleware_1 = require("../middleware/auth.middleware");
 const rbac_middleware_1 = require("../middleware/rbac.middleware");
 const subscription_middleware_1 = require("../middleware/subscription.middleware");
@@ -21,4 +22,9 @@ router.get('/status/:transactionId', (0, validate_middleware_1.asyncHandler)(pay
 // Refund routes
 router.post('/refund', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('patient'), rateLimiter_middleware_1.paymentRateLimiter, (0, validate_middleware_1.asyncHandler)(payment_controller_1.initiateRefundController));
 router.get('/refund/:refundId/status', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('patient'), (0, validate_middleware_1.asyncHandler)(payment_controller_1.getRefundStatusController));
+// Universal payment routes (for all plan types)
+router.post('/universal/initiate', auth_middleware_1.requireAuth, rateLimiter_middleware_1.paymentRateLimiter, (0, validate_middleware_1.asyncHandler)(payment_controller_2.initiateUniversalPaymentController));
+router.post('/universal/confirm', auth_middleware_1.requireAuth, rateLimiter_middleware_1.paymentRateLimiter, (0, validate_middleware_1.asyncHandler)(payment_controller_2.confirmUniversalPaymentController));
+router.get('/universal/verify', auth_middleware_1.requireAuth, (0, validate_middleware_1.asyncHandler)(payment_controller_2.verifyUniversalPaymentController));
+router.get('/universal/invoice/:orderId', auth_middleware_1.requireAuth, (0, validate_middleware_1.asyncHandler)(payment_controller_2.getUniversalInvoiceController));
 exports.default = router;

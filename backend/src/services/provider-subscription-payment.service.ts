@@ -14,6 +14,7 @@ const toCompactToken = (value: string, maxLength: number): string =>
 interface ProviderSubscriptionPaymentOptions {
 	amountMinorOverride?: number;
 	idempotencyKey?: string;
+	redirectUrlOverride?: string;
 	metadata?: Record<string, unknown>;
 }
 
@@ -74,7 +75,6 @@ export const initiateProviderSubscriptionPayment = async (
 		if (!requestedIdempotencyKey) return true;
 		return String(row?.captureIdempotencyKey || row?.metadata?.idempotencyKey || '') === requestedIdempotencyKey;
 	});
-
 	const latestAttempt = matchingAttempts[0] as any;
 	if (latestAttempt) {
 		const ageMs = Date.now() - new Date(latestAttempt.createdAt).getTime();
@@ -87,7 +87,6 @@ export const initiateProviderSubscriptionPayment = async (
 				price: plan.price,
 			};
 		}
-
 		await prisma.financialPayment.deleteMany({
 			where: {
 				id: { in: matchingAttempts.map((item: any) => String(item.id)) },
@@ -97,9 +96,13 @@ export const initiateProviderSubscriptionPayment = async (
 
 	const providerToken = toCompactToken(providerId, 8) || 'provider';
 	const transactionId = `PROV_SUB_${providerToken}_${Date.now()}`;
-	const shouldBypass = env.allowDevPaymentBypass && env.nodeEnv !== 'production';
+	const hasPhonePeOAuth = Boolean(String(process.env.PHONEPE_CLIENT_ID || '').trim())
+		&& Boolean(String(process.env.PHONEPE_CLIENT_SECRET || '').trim());
+	const shouldBypass = env.allowDevPaymentBypass && env.nodeEnv !== 'production' && !hasPhonePeOAuth;
 	const canFallbackWithoutGateway = env.nodeEnv !== 'production';
 	const frontendBaseUrl = env.frontendUrl;
+	const paymentStatusBase = `${frontendBaseUrl}/#/payment/status`;
+	const redirectUrlTarget = String(options?.redirectUrlOverride || `${paymentStatusBase}?transactionId=${transactionId}&status=SUCCESS`).trim();
 	const callbackUrl = `${env.apiUrl}${env.apiPrefix}/v1/payments/phonepe/webhook`;
 	const cycleKey = new Date().toISOString().slice(0, 10);
 	const subscriptionIdempotencyKey = requestedIdempotencyKey || `prov_sub_init:${providerId}:${planKey}:${cycleKey}`;
@@ -119,7 +122,7 @@ export const initiateProviderSubscriptionPayment = async (
 			userId: providerId,
 			amountInPaise: amountMinor,
 			callbackUrl,
-			redirectUrl: `${frontendBaseUrl}/payment/status?id=${transactionId}&status=SUCCESS`,
+			redirectUrl: redirectUrlTarget,
 			metadata: { plan: planKey, ...(options?.metadata || {}) },
 		});
 	} catch (error: any) {
@@ -132,7 +135,7 @@ export const initiateProviderSubscriptionPayment = async (
 			nodeEnv: env.nodeEnv,
 			error: error?.message,
 		});
-		redirectUrl = `${frontendBaseUrl}/payment/status?id=${transactionId}&status=SUCCESS`;
+		redirectUrl = redirectUrlTarget;
 	}
 
 	// Mandatory: Create financialPayment record for reconciliation worker
@@ -204,12 +207,18 @@ export const initiateProviderPlatformPayment = async (
 	providerId: string,
 	billingCycle: 'monthly' | 'quarterly',
 	amountMinor: number,
+	options?: { redirectUrlOverride?: string; idempotencyKey?: string; requireGateway?: boolean },
 ) => {
 	const providerToken = toCompactToken(providerId, 8) || 'provider';
 	const transactionId = `PROV_PA_${providerToken}_${Date.now()}`;
-	const shouldBypass = env.allowDevPaymentBypass && env.nodeEnv !== 'production';
-	const canFallbackWithoutGateway = env.nodeEnv !== 'production';
+	const hasPhonePeOAuth = Boolean(String(process.env.PHONEPE_CLIENT_ID || '').trim())
+		&& Boolean(String(process.env.PHONEPE_CLIENT_SECRET || '').trim());
+	const requireGateway = Boolean(options?.requireGateway);
+	const shouldBypass = !requireGateway && env.allowDevPaymentBypass && env.nodeEnv !== 'production' && !hasPhonePeOAuth;
+	const canFallbackWithoutGateway = !requireGateway && env.nodeEnv !== 'production';
 	const frontendBaseUrl = env.frontendUrl;
+	const paymentStatusBase = `${frontendBaseUrl}/#/payment/status`;
+	const redirectUrlTarget = String(options?.redirectUrlOverride || `${paymentStatusBase}?transactionId=${transactionId}&status=SUCCESS`).trim();
 	const callbackUrl = `${env.apiUrl}${env.apiPrefix}/v1/payments/phonepe/webhook`;
 
 	let redirectUrl: string;
@@ -219,7 +228,7 @@ export const initiateProviderPlatformPayment = async (
 			userId: providerId,
 			amountInPaise: amountMinor,
 			callbackUrl,
-			redirectUrl: `${frontendBaseUrl}/payment/status?id=${transactionId}&status=SUCCESS`,
+			redirectUrl: redirectUrlTarget,
 			metadata: {
 				flow: 'provider_platform_access',
 				billingCycle,
@@ -234,7 +243,7 @@ export const initiateProviderPlatformPayment = async (
 			nodeEnv: env.nodeEnv,
 			error: error?.message,
 		});
-		redirectUrl = `${frontendBaseUrl}/payment/status?id=${transactionId}&status=SUCCESS`;
+		redirectUrl = redirectUrlTarget;
 	}
 
 	// Create financialPayment record
@@ -251,13 +260,14 @@ export const initiateProviderPlatformPayment = async (
 				providerId,
 				amountMinor,
 				currency: 'INR',
-				captureIdempotencyKey: `prov_pa:${providerId}:${billingCycle}:${new Date().toISOString().slice(0, 10)}`,
+				captureIdempotencyKey: String(options?.idempotencyKey || `prov_pa:${providerId}:${billingCycle}:${new Date().toISOString().slice(0, 10)}`),
 				status: shouldBypass ? 'CAPTURED' : 'INITIATED',
 				metadata: {
 					type: 'provider_platform_access',
 					flow: 'provider_platform_access',
 					billingCycle,
 					redirectUrl,
+					redirectUrlOverride: String(options?.redirectUrlOverride || '').trim() || undefined,
 				},
 			},
 		});

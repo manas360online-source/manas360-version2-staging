@@ -6,6 +6,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../config/db';
 import { requireAuth } from '../middleware/auth.middleware';
+import { requireProviderSubscription } from '../middleware/subscription.middleware';
 import { LEAD_ASSIGNMENT_STATUS } from '../config/plans';
 
 const router = Router();
@@ -15,7 +16,7 @@ const router = Router();
  * Mark that therapist has seen/responded to the lead
  * Sets respondedAt and responseTime for analytics
  */
-router.put('/leads/:leadId/respond', requireAuth, async (req: Request, res: Response) => {
+router.put('/leads/:leadId/respond', requireAuth, requireProviderSubscription, async (req: Request, res: Response) => {
   try {
     const leadId = Array.isArray(req.params.leadId) ? req.params.leadId[0] : req.params.leadId;
     const therapistId = (req as any).auth?.userId as string;
@@ -85,7 +86,7 @@ router.put('/leads/:leadId/respond', requireAuth, async (req: Request, res: Resp
  * Mark that patient has booked a PAID session (conversion confirmed)
  * This is triggered when a therapy session booking is completed with payment
  */
-router.put('/leads/:leadId/convert', requireAuth, async (req: Request, res: Response) => {
+router.put('/leads/:leadId/convert', requireAuth, requireProviderSubscription, async (req: Request, res: Response) => {
   try {
     const leadId = Array.isArray(req.params.leadId) ? req.params.leadId[0] : req.params.leadId;
     const therapistId = (req as any).auth?.userId as string;
@@ -153,7 +154,7 @@ router.put('/leads/:leadId/convert', requireAuth, async (req: Request, res: Resp
  * GET /api/leads/:leadId/assignments
  * Get all assignments for a lead (admin/analytics)
  */
-router.get('/leads/:leadId/assignments', requireAuth, async (req: Request, res: Response) => {
+router.get('/leads/:leadId/assignments', requireAuth, requireProviderSubscription, async (req: Request, res: Response) => {
   try {
     const leadId = Array.isArray(req.params.leadId) ? req.params.leadId[0] : req.params.leadId;
 
@@ -184,7 +185,7 @@ router.get('/leads/:leadId/assignments', requireAuth, async (req: Request, res: 
  * GET /api/leads/:leadId/status
  * Get lead distribution status (which tier it's in, how many responses, etc.)
  */
-router.get('/leads/:leadId/status', requireAuth, async (req: Request, res: Response) => {
+router.get('/leads/:leadId/status', requireAuth, requireProviderSubscription, async (req: Request, res: Response) => {
   try {
     const leadId = Array.isArray(req.params.leadId) ? req.params.leadId[0] : req.params.leadId;
 
