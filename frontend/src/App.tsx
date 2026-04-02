@@ -5,6 +5,7 @@ import { GlobalFallbackLoader } from './components/ui/FallbackLoader';
 import ScrollToTop from './components/common/ScrollToTop';
 import { GlobalAudioProvider } from './context/GlobalAudioContext';
 import GlobalAudioPlayerConsole from './components/audio/GlobalAudioPlayerConsole';
+import { isNativeApp } from './lib/runtimeEnv';
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 import { AuthProvider, getPostLoginRoute, useAuth } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
@@ -85,6 +86,7 @@ const UserApprovals = lazy(() => import('./pages/admin/UserApprovals'));
 const LiveSessions = lazy(() => import('./pages/admin/LiveSessions'));
 const Feedback = lazy(() => import('./pages/admin/Feedback'));
 const AllUsers = lazy(() => import('./pages/admin/AllUsers'));
+const QrCodeManager = lazy(() => import('./pages/admin/QrCodeManager'));
 const CertificationsPage = lazy(() => import('./pages/CertificationsPage'));
 const CertificationLandingPage = lazy(() => import('./pages/CertificationLandingPage'));
 const TermsOfService = lazy(() => import('./pages/legal/TermsOfService'));
@@ -185,6 +187,7 @@ function LegacyProviderLiveSessionRedirect() {
 function App() {
   const [assessmentData, setAssessmentData] = useState<AssessmentData | null>(null);
   const [userName, setUserName] = useState<string>('');
+  const appStartsAtLogin = isNativeApp();
 
   const handleAssessmentSubmit = (data: AssessmentData, isCritical: boolean) => {
     setAssessmentData(data);
@@ -226,7 +229,7 @@ function App() {
         <Suspense fallback={<GlobalFallbackLoader />}>
           <ScrollToTop />
           <Routes>
-            <Route path="/" element={<LandingPage />} />
+            <Route path="/" element={appStartsAtLogin ? <Navigate to="/auth/login" replace /> : <LandingPage />} />
             <Route path="/assessment" element={<Assessment onSubmit={handleAssessmentSubmit} />} />
 
             {/* ── Certification Sub-App ── */}
@@ -481,6 +484,7 @@ function App() {
                 <Route path="crisis-console" element={<CrisisConsole />} />
                 <Route path="audit-trail" element={<AuditTrail />} />
                 <Route path="groups" element={<GroupManagement />} />
+                <Route path="qr-codes" element={<QrCodeManager />} />
                 <Route path="roles" element={<RoleManagement />} />
                 <Route path="feedback" element={<AdminSectionPage title="Feedback" description="Collect and analyze user and provider feedback loops for product quality." bullets={['NPS and CSAT trends', 'Feedback themes', 'Feature request clusters', 'Escalation tagging']} />} />
                 <Route path="audit-logs" element={<AuditTrail />} />

@@ -65,15 +65,15 @@ export default function ProviderSubscriptionAddonsPage() {
           <div className="grid gap-3 sm:grid-cols-3">
             <label className="text-sm text-slate-700">
               Hot leads (INR 299 each)
-              <input type="number" min={0} value={addons.hot} onChange={(e) => setAddons((prev) => ({ ...prev, hot: Number(e.target.value || 0) }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" />
+              <input id="provider-addons-hot" name="providerAddonsHot" type="number" min={0} value={addons.hot} onChange={(e) => setAddons((prev) => ({ ...prev, hot: Number(e.target.value || 0) }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" />
             </label>
             <label className="text-sm text-slate-700">
               Warm leads (INR 199 each)
-              <input type="number" min={0} value={addons.warm} onChange={(e) => setAddons((prev) => ({ ...prev, warm: Number(e.target.value || 0) }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" />
+              <input id="provider-addons-warm" name="providerAddonsWarm" type="number" min={0} value={addons.warm} onChange={(e) => setAddons((prev) => ({ ...prev, warm: Number(e.target.value || 0) }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" />
             </label>
             <label className="text-sm text-slate-700">
               Cold leads (INR 99 each)
-              <input type="number" min={0} value={addons.cold} onChange={(e) => setAddons((prev) => ({ ...prev, cold: Number(e.target.value || 0) }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" />
+              <input id="provider-addons-cold" name="providerAddonsCold" type="number" min={0} value={addons.cold} onChange={(e) => setAddons((prev) => ({ ...prev, cold: Number(e.target.value || 0) }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" />
             </label>
           </div>
 

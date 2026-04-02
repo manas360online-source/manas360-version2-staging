@@ -93,6 +93,11 @@ import {
 	updateGroupCategoryController, 
 	deleteGroupCategoryController 
 } from '../controllers/admin-groups.controller';
+import {
+	createAdminQrCodeController,
+	listAdminQrCodesController,
+	updateAdminQrCodeController,
+} from '../controllers/admin-qr.controller';
 
 const router = Router();
 
@@ -409,6 +414,11 @@ router.put('/offers/:id', requireAuth, requireRole('admin'), requirePermission('
 router.delete('/offers/:id', requireAuth, requireRole('admin'), requirePermission('offers_edit'), deleteOfferController);
 router.post('/offers/reorder', requireAuth, requireRole('admin'), requirePermission('offers_edit'), reorderOffersController);
 router.post('/offers/publish', requireAuth, requireRole('admin'), requirePermission('offers_edit'), publishOffersController);
+
+// === QR CODE MANAGEMENT ===
+router.get('/qr-codes', requireAuth, requireRole(['admin', 'superadmin']), asyncHandler(listAdminQrCodesController));
+router.post('/qr-codes', requireAuth, requireRole(['admin', 'superadmin']), asyncHandler(createAdminQrCodeController));
+router.patch('/qr-codes/:code', requireAuth, requireRole(['admin', 'superadmin']), asyncHandler(updateAdminQrCodeController));
 
 router.get('/pricing/contracts', requireAuth, requireRole('admin'), getPricingContractsController);
 router.post('/pricing/contracts/draft', requireAuth, requireRole('admin'), requirePermission('pricing_edit'), createPricingDraftController);

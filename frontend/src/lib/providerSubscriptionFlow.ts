@@ -16,6 +16,8 @@ export interface ProviderSubscriptionCart {
 
 export const PROVIDER_CART_KEY = 'manas360.provider.subscription.cart.v1';
 
+let inMemoryProviderCart: ProviderSubscriptionCart | null = null;
+
 export const PROVIDER_LEAD_PLANS: Array<{
   id: ProviderLeadPlanId;
   name: string;
@@ -108,21 +110,32 @@ export const formatInr = (minor: number): string => {
 };
 
 export const saveProviderCart = (cart: ProviderSubscriptionCart): void => {
-  localStorage.setItem(PROVIDER_CART_KEY, JSON.stringify(cart));
+  inMemoryProviderCart = cart;
+  try {
+    localStorage.setItem(PROVIDER_CART_KEY, JSON.stringify(cart));
+  } catch {
+    // localStorage may be blocked in strict browser/privacy modes.
+  }
 };
 
 export const loadProviderCart = (): ProviderSubscriptionCart | null => {
   try {
     const raw = localStorage.getItem(PROVIDER_CART_KEY);
-    if (!raw) return null;
+    if (!raw) return inMemoryProviderCart;
     const parsed = JSON.parse(raw) as ProviderSubscriptionCart;
     if (!parsed || !parsed.leadPlanId || !parsed.platformCycle || !parsed.addons) return null;
+    inMemoryProviderCart = parsed;
     return parsed;
   } catch {
-    return null;
+    return inMemoryProviderCart;
   }
 };
 
 export const clearProviderCart = (): void => {
-  localStorage.removeItem(PROVIDER_CART_KEY);
+  inMemoryProviderCart = null;
+  try {
+    localStorage.removeItem(PROVIDER_CART_KEY);
+  } catch {
+    // Ignore storage cleanup errors in restricted browser/privacy modes.
+  }
 };

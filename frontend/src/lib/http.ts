@@ -1,9 +1,7 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
+import { getApiBaseUrl } from './runtimeEnv';
 
-const baseURL =
-	import.meta.env.VITE_API_BASE_URL?.trim() ||
-	import.meta.env.VITE_API_URL?.trim() ||
-	'/api';
+const baseURL = getApiBaseUrl();
 
 const getCookieValue = (cookieName: string): string | null => {
 	if (typeof document === 'undefined') {
