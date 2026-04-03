@@ -91,6 +91,22 @@ export default function LoginPage() {
 			await checkAuth({ force: true });
 			// Redirect patients without subscription to plans
 			if ((result.user as any)?.requiresSubscription) {
+				let hasActiveSubscription = false;
+				try {
+					const subscriptionResponse = await patientApi.getSubscription();
+					const subscriptionPayload = (subscriptionResponse as any)?.data ?? subscriptionResponse;
+					hasActiveSubscription = isSubscriptionActive(subscriptionPayload);
+				} catch {
+					hasActiveSubscription = false;
+				}
+
+				if (hasActiveSubscription) {
+					const candidate = from || afterLogin || next || null;
+					const postLoginRoute = await resolvePostLoginRouteWithSubscription(candidate, result.user?.role, result.user);
+					navigate(postLoginRoute, { replace: true });
+					return;
+				}
+
 				const candidate = from || afterLogin || next || null;
 				const returnTo = candidate || '/';
 				navigate(`/plans?returnTo=${encodeURIComponent(returnTo)}`, { replace: true });

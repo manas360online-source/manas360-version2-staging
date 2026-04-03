@@ -146,6 +146,10 @@ export default function UniversalCheckout() {
     ? (providerCart ? PROVIDER_PLAN_MAP[providerCart.leadPlanId] : typePlanId || '')
     : (patientCart ? PATIENT_PLAN_MAP[patientCart.planId] : typePlanId || '');
 
+  const providerBackRoute = mode === 'provider'
+    ? (providerCart?.leadPlanId === 'free' ? '/provider/subscription' : '/provider/plans/addons')
+    : '/plans/addons';
+
   const title = mode === 'provider' ? 'Provider Checkout' : 'Checkout';
   const subtitle = mode === 'provider'
     ? 'Platform access, lead plan, and marketplace add-ons.'
@@ -337,7 +341,7 @@ export default function UniversalCheckout() {
           </label>
 
           <div className="mt-4 flex flex-wrap gap-2">
-            <button type="button" onClick={() => navigate(mode === 'provider' ? '/provider/plans/addons' : '/plans/addons')} className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">
+            <button type="button" onClick={() => navigate(providerBackRoute)} className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">
               Back
             </button>
             <button type="button" onClick={confirmAndPay} disabled={submitting} className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">

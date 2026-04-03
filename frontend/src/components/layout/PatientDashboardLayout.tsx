@@ -37,7 +37,6 @@ const selfCareNavItems = [
 
 const progressNavItems = [
   { to: '/patient/progress', label: 'My Progress', icon: BarChart3 },
-  { to: '/patient/wallet', label: 'Wallet', icon: () => <span className="text-[16px] leading-none">💰</span> },
   { to: '/patient/reports', label: 'Clinical Records', icon: FileText },
 ];
 
@@ -86,11 +85,6 @@ export default function PatientDashboardLayout() {
   }, [user]);
 
   useEffect(() => { void fetchUnread(); }, [fetchUnread]);
-
-  useEffect(() => {
-    // keep header reactive to auth changes; useWallet handles fetching and caching
-    // ensure walletBalance is reset when user changes
-  }, [user]);
 
   const userName = [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim() || user?.email || 'Patient';
   const initials = userName
@@ -203,11 +197,6 @@ export default function PatientDashboardLayout() {
                   }`}
                 >
                   {item.badge}
-                </span>
-              )}
-              {item.label === 'Wallet' && walletBalance !== null && (
-                <span className="ml-auto rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
-                  {`\u20b9${walletBalance.toFixed(0)}`}
                 </span>
               )}
             </Link>

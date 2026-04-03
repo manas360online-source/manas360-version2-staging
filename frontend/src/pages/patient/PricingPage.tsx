@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { patientApi } from '../../api/patient';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
@@ -12,8 +12,58 @@ import {
 export default function PricingPage() {
   const navigate = useNavigate();
   const [subscribing, setSubscribing] = useState(false);
+  const [subscriptionLoading, setSubscriptionLoading] = useState(true);
+  const [subscription, setSubscription] = useState<any | null>(null);
+
+  useEffect(() => {
+    const loadSubscription = async () => {
+      setSubscriptionLoading(true);
+      try {
+        const current = await patientApi.getSubscription();
+        setSubscription(current || null);
+      } catch {
+        setSubscription(null);
+      } finally {
+        setSubscriptionLoading(false);
+      }
+    };
+
+    void loadSubscription();
+  }, []);
+
+  const isSubscriptionCurrentlyActive = useMemo(() => {
+    const status = String(subscription?.status || '').toLowerCase();
+    const renewal = subscription?.renewalDate ? new Date(subscription.renewalDate) : null;
+    const stillValid = renewal ? renewal.getTime() > Date.now() : false;
+    return ['active', 'trial', 'trialing', 'grace'].includes(status) && stillValid;
+  }, [subscription]);
+
+  const activePlanId = useMemo(() => {
+    const rawPlan = String(subscription?.planKey || subscription?.plan_name || subscription?.planName || '').toLowerCase();
+    const normalized = rawPlan.replace(/\s+/g, '_');
+    const match = PATIENT_PLANS.find(
+      (plan) => plan.gatewayPlanKey === normalized || plan.id === normalized,
+    );
+    return match?.id || null;
+  }, [subscription]);
+
+  const renewalLabel = useMemo(() => {
+    if (!subscription?.renewalDate) return '';
+    const renewal = new Date(subscription.renewalDate);
+    if (Number.isNaN(renewal.getTime())) return '';
+    return renewal.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  }, [subscription]);
 
   const onStartSubscription = async (planId: PatientPlanId) => {
+    if (isSubscriptionCurrentlyActive) {
+      toast.error(
+        renewalLabel
+          ? `You already have an active subscription until ${renewalLabel}.`
+          : 'You already have an active subscription. Upgrade/renew after expiry.',
+      );
+      return;
+    }
+
     const selectedPlan = PATIENT_PLANS.find((plan) => plan.id === planId);
     if (!selectedPlan) {
       toast.error('Selected plan is not available.');
@@ -84,15 +134,33 @@ export default function PricingPage() {
           Platform subscription gives access to assessments, therapist matching, streaming, and AI tools.
           Therapy sessions are separate and paid later via PhonePe.
         </p>
+        {!subscriptionLoading && isSubscriptionCurrentlyActive && (
+          <div className="mt-3 inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800">
+            Active plan: {subscription?.planName || 'Current Plan'}{renewalLabel ? ` · Valid until ${renewalLabel}` : ''}
+          </div>
+        )}
 
         <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {PATIENT_PLANS.map((plan) => (
+            (() => {
+              const isCurrentPlan = isSubscriptionCurrentlyActive && activePlanId === plan.id;
+              const disableSubscribe = subscribing || isSubscriptionCurrentlyActive;
+              return (
             <article
               key={plan.id}
               className={`relative rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md ${
-                plan.id === 'quarterly' ? 'border-[#2563eb] ring-1 ring-[#2563eb]/25' : 'border-slate-200'
+                isCurrentPlan
+                  ? 'border-emerald-400 ring-1 ring-emerald-200'
+                  : plan.id === 'quarterly'
+                    ? 'border-[#2563eb] ring-1 ring-[#2563eb]/25'
+                    : 'border-slate-200'
               }`}
             >
+              {isCurrentPlan && (
+                <span className="mb-2 inline-block rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-emerald-800">
+                  Current Plan
+                </span>
+              )}
               {plan.badge && (
                 <span className="mb-2 inline-block rounded-full bg-[#dbeafe] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[#1e40af]">
                   {plan.badge}
@@ -111,16 +179,26 @@ export default function PricingPage() {
               <button
                 type="button"
                 onClick={() => void onStartSubscription(plan.id)}
-                disabled={subscribing}
+                disabled={disableSubscribe}
                 className={`mt-6 w-full rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
-                  plan.id === 'quarterly' || plan.id === 'premium_monthly'
+                  isCurrentPlan
+                    ? 'bg-emerald-600 text-white'
+                    : plan.id === 'quarterly' || plan.id === 'premium_monthly'
                     ? 'bg-[#4a6741] text-white hover:bg-[#2d4128]'
                     : 'border border-[#4a6741] text-[#4a6741] hover:bg-[#e8f0e5]'
                 } disabled:opacity-50`}
               >
-                {subscribing ? 'Processing...' : plan.cta}
+                {isCurrentPlan
+                  ? 'Subscribed'
+                  : subscribing
+                    ? 'Processing...'
+                    : isSubscriptionCurrentlyActive
+                      ? 'Active Subscription'
+                      : plan.cta}
               </button>
             </article>
+              );
+            })()
           ))}
         </div>
 

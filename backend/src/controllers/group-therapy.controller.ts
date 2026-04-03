@@ -125,12 +125,23 @@ export const createGroupTherapyRequestController = async (req: Request, res: Res
 
 export const getMyGroupTherapyRequestsController = async (req: Request, res: Response): Promise<void> => {
   const userId = authUserId(req);
-  const rows = await db.groupTherapySession.findMany({
-    where: {
-      OR: [{ requestedById: userId }, { hostTherapistId: userId }],
-    },
-    orderBy: { createdAt: 'desc' },
-  });
+  let rows: any[] = [];
+
+  try {
+    rows = await db.groupTherapySession.findMany({
+      where: {
+        OR: [{ requestedById: userId }, { hostTherapistId: userId }],
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  } catch {
+    // Backward compatibility for environments where requestedById is unavailable.
+    rows = await db.groupTherapySession.findMany({
+      where: { hostTherapistId: userId },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   sendSuccess(res, { items: rows }, 'My group therapy requests fetched');
 };
 

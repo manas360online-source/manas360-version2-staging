@@ -42,7 +42,7 @@ services:
         condition: service_started
     ports:
       - "5000:5000"
-    command: ["sh", "-c", "npx prisma db push && node dist/server.js"]
+    command: ["sh", "-c", "npx prisma db push && node scripts/seed-env-admins.js && node dist/server.js"]
 
   ai_engine:
     build:

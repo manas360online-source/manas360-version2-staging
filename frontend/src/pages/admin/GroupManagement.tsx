@@ -5,7 +5,6 @@ import {
   updateGroupCategory, 
   type GroupCategory 
 } from '../../api/admin.api';
-import { groupTherapyApi } from '../../api/groupTherapy';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
@@ -15,15 +14,6 @@ export default function GroupManagement() {
   const [groups, setGroups] = useState<GroupCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
-  const [requestQueue, setRequestQueue] = useState<any[]>([]);
-  const [reviewDrafts, setReviewDrafts] = useState<Record<string, {
-    scheduledAt: string;
-    durationMinutes: number;
-    maxMembers: number;
-    priceMinor: number;
-    allowGuestJoin: boolean;
-    requiresPayment: boolean;
-  }>>({});
   const [newGroup, setNewGroup] = useState<Partial<GroupCategory>>({
     name: '',
     type: 'therapy_group',
@@ -45,83 +35,9 @@ export default function GroupManagement() {
     }
   }, []);
 
-  const fetchQueue = useCallback(async () => {
-    try {
-      const res = await groupTherapyApi.listAdminQueue();
-      const rows = Array.isArray(res.items) ? res.items : [];
-      setRequestQueue(rows);
-      const draftMap: Record<string, {
-        scheduledAt: string;
-        durationMinutes: number;
-        maxMembers: number;
-        priceMinor: number;
-        allowGuestJoin: boolean;
-        requiresPayment: boolean;
-      }> = {};
-      for (const row of rows) {
-        const scheduled = row?.scheduledAt ? new Date(row.scheduledAt) : null;
-        const valid = scheduled && !Number.isNaN(scheduled.getTime());
-        const toLocal = (d: Date) => {
-          const pad = (n: number) => String(n).padStart(2, '0');
-          return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-        };
-        draftMap[row.id] = {
-          scheduledAt: valid ? toLocal(scheduled as Date) : '',
-          durationMinutes: Number(row.durationMinutes || 60),
-          maxMembers: Number(row.maxMembers || 10),
-          priceMinor: Number(row.priceMinor || 0),
-          allowGuestJoin: row.allowGuestJoin !== false,
-          requiresPayment: row.requiresPayment !== false,
-        };
-      }
-      setReviewDrafts(draftMap);
-    } catch {
-      setRequestQueue([]);
-    }
-  }, []);
-
   useEffect(() => {
     fetchGroups();
-    void fetchQueue();
-  }, [fetchGroups, fetchQueue]);
-
-  const approveRequest = async (request: any) => {
-    try {
-      const draft = reviewDrafts[request.id] || {
-        scheduledAt: '',
-        durationMinutes: Number(request.durationMinutes || 60),
-        maxMembers: Number(request.maxMembers || 10),
-        priceMinor: Number(request.priceMinor || 0),
-        allowGuestJoin: request.allowGuestJoin !== false,
-        requiresPayment: request.requiresPayment !== false,
-      };
-      await groupTherapyApi.reviewRequest(request.id, {
-        decision: 'approve',
-        title: request.title,
-        topic: request.topic,
-        scheduledAt: draft.scheduledAt ? new Date(draft.scheduledAt).toISOString() : request.scheduledAt,
-        maxMembers: draft.maxMembers,
-        durationMinutes: draft.durationMinutes,
-        priceMinor: draft.priceMinor,
-        allowGuestJoin: draft.allowGuestJoin,
-        requiresPayment: draft.requiresPayment,
-      });
-      toast.success('Request approved with pricing and capacity governance');
-      void fetchQueue();
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Approval failed');
-    }
-  };
-
-  const publishRequest = async (id: string) => {
-    try {
-      await groupTherapyApi.publishRequest(id);
-      toast.success('Session published to landing and patient dashboards');
-      void fetchQueue();
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Publish failed');
-    }
-  };
+  }, [fetchGroups]);
 
   const handleCreateGroup = async () => {
     if (!newGroup.name || !newGroup.type) {
@@ -309,162 +225,6 @@ export default function GroupManagement() {
                   </tr>
                 ))
               )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-2xl shadow-soft-sm border border-gray-100 overflow-hidden mt-8">
-        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-gray-50/30">
-          <h3 className="font-bold text-gray-800 text-base uppercase tracking-wider">Therapist Group Therapy Approval Queue</h3>
-          <Badge variant="secondary" className="text-[10px] font-black">{requestQueue.length} Requests</Badge>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-gray-50/50 border-b border-gray-100 text-[11px] font-bold uppercase text-gray-400 tracking-wider">
-                <th className="px-6 py-4">Title / Topic</th>
-                <th className="px-6 py-4">Host</th>
-                <th className="px-6 py-4 text-center">Schedule</th>
-                <th className="px-6 py-4 text-center">Mode</th>
-                <th className="px-6 py-4 text-center">Status</th>
-                <th className="px-6 py-4 text-center">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50 text-sm">
-              {requestQueue.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-gray-400 italic">No pending requests.</td>
-                </tr>
-              ) : requestQueue.map((row) => (
-                <tr key={row.id} className="hover:bg-gray-50/30 transition-colors">
-                  <td className="px-6 py-4">
-                    <p className="font-bold text-gray-900">{row.title}</p>
-                    <p className="text-xs text-gray-500">{row.topic}</p>
-                  </td>
-                  <td className="px-6 py-4 text-xs text-gray-600">{row.hostTherapist?.firstName} {row.hostTherapist?.lastName}</td>
-                  <td className="px-6 py-4 text-center text-xs text-gray-600">
-                    {row.scheduledAt ? new Date(row.scheduledAt).toLocaleString() : '-'}
-                  </td>
-                  <td className="px-6 py-4 text-center text-xs font-bold">{row.sessionMode}</td>
-                  <td className="px-6 py-4 text-center text-xs font-bold">{row.status}</td>
-                  <td className="px-6 py-4 text-center">
-                    {row.status === 'PENDING_APPROVAL' ? (
-                      <div className="flex flex-col gap-2 items-end min-w-[320px]">
-                        <div className="grid grid-cols-2 gap-2 w-full">
-                          <label className="flex flex-col gap-1 text-left">
-                            <span className="text-[9px] font-bold uppercase tracking-wide text-gray-500">Schedule Date & Time</span>
-                            <input
-                              type="datetime-local"
-                              value={reviewDrafts[row.id]?.scheduledAt || ''}
-                              onChange={(e) => setReviewDrafts((prev) => ({
-                                ...prev,
-                                [row.id]: {
-                                  ...prev[row.id],
-                                  scheduledAt: e.target.value,
-                                },
-                              }))}
-                              className="h-8 border border-gray-200 rounded px-2 text-[10px]"
-                            />
-                          </label>
-
-                          <label className="flex flex-col gap-1 text-left">
-                            <span className="text-[9px] font-bold uppercase tracking-wide text-gray-500">Duration (Minutes)</span>
-                            <input
-                              type="number"
-                              min={15}
-                              value={reviewDrafts[row.id]?.durationMinutes ?? 60}
-                              onChange={(e) => setReviewDrafts((prev) => ({
-                                ...prev,
-                                [row.id]: {
-                                  ...prev[row.id],
-                                  durationMinutes: Number(e.target.value || 60),
-                                },
-                              }))}
-                              className="h-8 border border-gray-200 rounded px-2 text-[10px]"
-                              placeholder="e.g. 60"
-                            />
-                          </label>
-
-                          <label className="flex flex-col gap-1 text-left">
-                            <span className="text-[9px] font-bold uppercase tracking-wide text-gray-500">Capacity (Members)</span>
-                            <input
-                              type="number"
-                              min={2}
-                              value={reviewDrafts[row.id]?.maxMembers ?? 10}
-                              onChange={(e) => setReviewDrafts((prev) => ({
-                                ...prev,
-                                [row.id]: {
-                                  ...prev[row.id],
-                                  maxMembers: Number(e.target.value || 10),
-                                },
-                              }))}
-                              className="h-8 border border-gray-200 rounded px-2 text-[10px]"
-                              placeholder="e.g. 12"
-                            />
-                          </label>
-
-                          <label className="flex flex-col gap-1 text-left">
-                            <span className="text-[9px] font-bold uppercase tracking-wide text-gray-500">Session Fee (Minor/Paise)</span>
-                            <input
-                              type="number"
-                              min={0}
-                              value={reviewDrafts[row.id]?.priceMinor ?? 0}
-                              onChange={(e) => setReviewDrafts((prev) => ({
-                                ...prev,
-                                [row.id]: {
-                                  ...prev[row.id],
-                                  priceMinor: Number(e.target.value || 0),
-                                },
-                              }))}
-                              className="h-8 border border-gray-200 rounded px-2 text-[10px]"
-                              placeholder="e.g. 49900 (= INR 499)"
-                            />
-                          </label>
-                        </div>
-                        <div className="flex items-center gap-4 text-[10px] text-gray-600">
-                          <label className="inline-flex items-center gap-1">
-                            <input
-                              type="checkbox"
-                              checked={reviewDrafts[row.id]?.allowGuestJoin ?? true}
-                              onChange={(e) => setReviewDrafts((prev) => ({
-                                ...prev,
-                                [row.id]: {
-                                  ...prev[row.id],
-                                  allowGuestJoin: e.target.checked,
-                                },
-                              }))}
-                            />
-                            Allow Guest
-                          </label>
-                          <label className="inline-flex items-center gap-1">
-                            <input
-                              type="checkbox"
-                              checked={reviewDrafts[row.id]?.requiresPayment ?? true}
-                              onChange={(e) => setReviewDrafts((prev) => ({
-                                ...prev,
-                                [row.id]: {
-                                  ...prev[row.id],
-                                  requiresPayment: e.target.checked,
-                                },
-                              }))}
-                            />
-                            Requires Payment
-                          </label>
-                        </div>
-                        <Button size="sm" onClick={() => void approveRequest(row)} className="h-8 px-3 text-[10px]">
-                          Approve + Set Governance
-                        </Button>
-                      </div>
-                    ) : null}
-                    {row.status === 'APPROVED' ? (
-                      <Button size="sm" onClick={() => void publishRequest(row.id)} className="h-8 px-3 text-[10px] bg-emerald-600 hover:bg-emerald-700">
-                        Publish
-                      </Button>
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
             </tbody>
           </table>
         </div>
