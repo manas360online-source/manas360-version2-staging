@@ -11,17 +11,8 @@ interface PricingTableProps {
 
 export const PricingTable: React.FC<PricingTableProps> = ({
   selectedFeatures,
-  currentTier,
   currentBilling,
-  pricing,
 }) => {
-  // Use API pricing data if available, otherwise calculate locally
-  const tierPrices = {
-    solo: FEATURES.map((f) => f.solo),
-    small: FEATURES.map((f) => f.small),
-    large: FEATURES.map((f) => f.large),
-  };
-
   // Calculate totals
   let total_solo = 0,
     total_small = 0,

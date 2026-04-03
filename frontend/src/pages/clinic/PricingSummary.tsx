@@ -1,5 +1,5 @@
 import React from 'react';
-import { TIER_OPTIONS, FEATURES } from './data';
+import { TIER_OPTIONS } from './data';
 import { PricingResponse } from './api';
 
 interface PricingSummaryProps {

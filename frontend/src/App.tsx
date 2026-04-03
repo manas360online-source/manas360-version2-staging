@@ -109,6 +109,7 @@ const CorporateHelpPage = lazy(() => import('./pages/corporate/CorporateHelpPage
 const SSOSettingsPage = lazy(() => import('./pages/corporate/SSOSettingsPage'));
 const CorporateDashboardPage = lazy(() => import('./pages/corporate/CorporateDashboardPage'));
 const CorporateOnboardingPage = lazy(() => import('./pages/corporate/CorporateOnboardingPage'));
+const MyDigitalClinicPage = lazy(() => import('./pages/clinic/MyDigitalClinicPage'));
 const ProviderCalendarPage = lazy(() => import('./pages/provider/Calendar'));
 const ProviderInboxPage = lazy(() => import('./pages/provider/Messages'));
 const ProviderEarningsPage = lazy(() => import('./pages/provider/Earnings'));
@@ -116,6 +117,7 @@ const ProviderSettingsPage = lazy(() => import('./pages/provider/Settings'));
 const ProviderDashboard = lazy(() => import('./pages/provider/Dashboard/ProviderDashboard'));
 const ProviderSubscriptionPage = lazy(() => import('./pages/provider/ProviderSubscriptionPage'));
 const ProviderSubscriptionAddonsPage = lazy(() => import('./pages/provider/ProviderSubscriptionAddonsPage'));
+const ProviderPortalPage = lazy(() => import('./pages/provider/ProviderPortalPage'));
 const AppointmentRequestsPage = lazy(() => import('./pages/provider/AppointmentRequests'));
 const ProviderOnboardingPage = lazy(() => import('./pages/provider/ProviderOnboardingPage'));
 const ProviderVerificationPendingPage = lazy(() => import('./pages/provider/ProviderVerificationPendingPage'));
@@ -257,6 +259,8 @@ function App() {
 
             <Route path="/results" element={<ResultsPage data={assessmentData} />} />
             <Route path="/crisis" element={<CrisisPage />} />
+            <Route path="/my-digital-clinic" element={<MyDigitalClinicPage />} />
+            <Route path="/clinic" element={<Navigate to="/my-digital-clinic" replace />} />
             <Route path="/onboarding/name" element={<OnboardingName onNext={handleOnboardingName} />} />
             <Route path="/onboarding/email" element={<OnboardingEmail userName={userName} />} />
             
