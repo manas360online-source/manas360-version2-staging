@@ -19,6 +19,7 @@ const admin_metrics_controller_1 = require("../controllers/admin-metrics.control
 const admin_crisis_controller_1 = require("../controllers/admin-crisis.controller");
 const admin_audit_controller_1 = require("../controllers/admin-audit.controller");
 const admin_groups_controller_1 = require("../controllers/admin-groups.controller");
+const admin_qr_controller_1 = require("../controllers/admin-qr.controller");
 const router = (0, express_1.Router)();
 /**
  * GET /api/v1/admin/users
@@ -241,6 +242,10 @@ router.put('/offers/:id', auth_middleware_1.requireAuth, (0, rbac_middleware_1.r
 router.delete('/offers/:id', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('offers_edit'), admin_offer_controller_1.deleteOfferController);
 router.post('/offers/reorder', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('offers_edit'), admin_offer_controller_1.reorderOffersController);
 router.post('/offers/publish', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('offers_edit'), admin_offer_controller_1.publishOffersController);
+// === QR CODE MANAGEMENT ===
+router.get('/qr-codes', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin']), (0, validate_middleware_1.asyncHandler)(admin_qr_controller_1.listAdminQrCodesController));
+router.post('/qr-codes', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin']), (0, validate_middleware_1.asyncHandler)(admin_qr_controller_1.createAdminQrCodeController));
+router.patch('/qr-codes/:code', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin']), (0, validate_middleware_1.asyncHandler)(admin_qr_controller_1.updateAdminQrCodeController));
 router.get('/pricing/contracts', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), admin_pricing_controller_1.getPricingContractsController);
 router.post('/pricing/contracts/draft', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('pricing_edit'), admin_pricing_controller_1.createPricingDraftController);
 router.post('/pricing/contracts/:id/approve', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requirePermission)('pricing_edit'), admin_pricing_controller_1.approvePricingContractController);
