@@ -30,7 +30,7 @@ export default function ProviderSubscriptionPage() {
       addons: { ...DEFAULT_PROVIDER_ADDONS },
       updatedAt: new Date().toISOString(),
     });
-    navigate('/provider/checkout?type=provider&planId=lead-free');
+    navigate('/universal/checkout?type=provider&planId=lead-free');
     setLoading(false);
   };
 
@@ -46,7 +46,7 @@ export default function ProviderSubscriptionPage() {
       updatedAt: new Date().toISOString(),
     });
     if (leadPlanId === 'free') {
-        navigate('/provider/checkout?type=provider&planId=lead-free');
+        navigate('/universal/checkout?type=provider&planId=lead-free');
       return;
     }
     navigate('/provider/plans/addons');

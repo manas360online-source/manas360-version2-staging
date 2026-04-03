@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
 
 type NavItem = { to: string; label: string; section: string; shortLabel: string };
+type AdminPersona = 'superadmin' | 'financemanager' | 'clinicaldirector' | 'complianceofficer' | 'admin';
 
 const navItems: NavItem[] = [
 	// OVERVIEW
@@ -59,13 +60,36 @@ const mobileBottomNav = [
 	{ to: '/admin/settings', label: 'Settings' },
 ];
 
+const dedupeNavByPath = (items: NavItem[]): NavItem[] => {
+	const seen = new Set<string>();
+	return items.filter((item) => {
+		if (seen.has(item.to)) return false;
+		seen.add(item.to);
+		return true;
+	});
+};
+
+const normalizeRoleValue = (value: unknown): string =>
+	String(value || '')
+		.toLowerCase()
+		.replace(/[^a-z0-9]/g, '');
+
+const resolveAdminPersona = (user: any): AdminPersona => {
+	const normalizedRole = normalizeRoleValue(user?.role);
+	if (normalizedRole === 'superadmin') return 'superadmin';
+	if (normalizedRole === 'financemanager') return 'financemanager';
+	if (normalizedRole === 'clinicaldirector') return 'clinicaldirector';
+	if (normalizedRole === 'complianceofficer') return 'complianceofficer';
+	return 'admin';
+};
+
 export default function AdminShellLayout() {
 	const location = useLocation();
 	const navigate = useNavigate();
 	const { user, logout } = useAuth();
 
 	const userName = [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim() || user?.email || 'Admin';
-	const userRole = String(user?.role || '').toLowerCase().replace(/_/g, '');
+	const userRole: AdminPersona = resolveAdminPersona(user);
 
 	const complianceMenuItems: NavItem[] = useMemo(() => [
 		{ to: '/admin/compliance', label: 'Dashboard', shortLabel: 'Dash', section: 'COMPLIANCE' },
@@ -75,15 +99,6 @@ export default function AdminShellLayout() {
 		{ to: '/admin/compliance-documents', label: 'Legal Documents', shortLabel: 'LD', section: 'COMPLIANCE' },
 		{ to: '/admin/compliance-status', label: 'Compliance Status', shortLabel: 'CS', section: 'COMPLIANCE' },
 	], []);
-
-	const complianceAllowedPaths = useMemo(() => new Set([
-		'/admin/compliance',
-		'/admin/audit-trail',
-		'/admin/company-reports',
-		'/admin/feedback',
-		'/admin/compliance-documents',
-		'/admin/compliance-status',
-	]), []);
 
 	const roleLabel = useMemo(() => {
 		switch (userRole) {
@@ -149,14 +164,13 @@ export default function AdminShellLayout() {
 			return [['COMPLIANCE', complianceMenuItems]] as Array<[string, NavItem[]]>;
 		}
 
+		const uniqueNavItems = dedupeNavByPath(navItems);
 		const grouped = new Map<string, NavItem[]>();
 
-		for (const item of navItems) {
-			const showItem = userRole === 'complianceofficer'
-				? complianceAllowedPaths.has(item.to)
-				: sectionAllowlist
-					? sectionAllowlist.has(item.section)
-					: true;
+		for (const item of uniqueNavItems) {
+			const showItem = sectionAllowlist
+				? sectionAllowlist.has(item.section)
+				: true;
 
 			if (showItem) {
 				if (!grouped.has(item.section)) grouped.set(item.section, []);
@@ -164,7 +178,7 @@ export default function AdminShellLayout() {
 			}
 		}
 		return Array.from(grouped.entries());
-	}, [sectionAllowlist, userRole, complianceAllowedPaths, complianceMenuItems]);
+	}, [sectionAllowlist, userRole, complianceMenuItems]);
 
 
 

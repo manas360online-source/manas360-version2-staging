@@ -1237,13 +1237,100 @@ export const updatePatientPaymentMethod = async (
 
 export const getPatientInvoices = async (userId: string) => {
 	const invoices = await db.patientInvoice.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }).catch(() => []);
-	return invoices;
+
+	const subscriptionPayments = await db.financialPayment.findMany({
+		where: {
+			patientId: userId,
+			metadata: {
+				path: ['type'],
+				equals: 'patient_subscription',
+			},
+		},
+		orderBy: { createdAt: 'desc' },
+	}).catch(() => []);
+
+	const mappedPayments = subscriptionPayments.map((payment: any) => {
+		const amountMinor = Number(payment?.amountMinor || 0);
+		const universalCheckoutPaymentId = String(payment?.metadata?.universalCheckoutPaymentId || '').trim();
+		const planKey = String(payment?.metadata?.plan || '').trim();
+
+		return {
+			id: String(payment.id),
+			userId,
+			amountMinor,
+			amount: Math.round(amountMinor / 100),
+			status: String(payment.status || 'INITIATED'),
+			planKey,
+			planName: planKey ? planKey.toUpperCase().replace(/_/g, ' ') : 'Subscription Plan',
+			invoiceUrl: universalCheckoutPaymentId
+				? `/api/v1/payments/universal/invoice/${encodeURIComponent(universalCheckoutPaymentId)}`
+				: null,
+			merchantTransactionId: String(payment?.merchantTransactionId || ''),
+			createdAt: payment.createdAt,
+			source: 'FINANCIAL_PAYMENT',
+		};
+	});
+
+	const combined = [...invoices, ...mappedPayments].sort((a: any, b: any) => {
+		const aTs = new Date(a?.createdAt || 0).getTime();
+		const bTs = new Date(b?.createdAt || 0).getTime();
+		return bTs - aTs;
+	});
+
+	const seen = new Set<string>();
+	const deduped = combined.filter((entry: any) => {
+		const invoiceUrl = String(entry?.invoiceUrl || '').trim();
+		const merchantTransactionId = String(entry?.merchantTransactionId || '').trim();
+		const key = invoiceUrl
+			? `invoiceUrl:${invoiceUrl}`
+			: merchantTransactionId
+				? `merchant:${merchantTransactionId}`
+				: `id:${String(entry?.id || '')}`;
+
+		if (seen.has(key)) return false;
+		seen.add(key);
+		return true;
+	});
+
+	return deduped;
 };
 
 export const getPatientInvoiceById = async (userId: string, invoiceId: string) => {
 	const invoice = await db.patientInvoice.findFirst({ where: { id: invoiceId, userId } }).catch(() => null);
-	if (!invoice) throw new AppError('Invoice not found', 404);
-	return invoice;
+	if (invoice) return invoice;
+
+	const paymentInvoice = await db.financialPayment.findFirst({
+		where: {
+			patientId: userId,
+			OR: [
+				{ id: invoiceId },
+				{ merchantTransactionId: invoiceId },
+			],
+			metadata: {
+				path: ['type'],
+				equals: 'patient_subscription',
+			},
+		},
+	}).catch(() => null);
+
+	if (!paymentInvoice) throw new AppError('Invoice not found', 404);
+
+	const amountMinor = Number(paymentInvoice?.amountMinor || 0);
+	const universalCheckoutPaymentId = String(paymentInvoice?.metadata?.universalCheckoutPaymentId || '').trim();
+
+	return {
+		id: String(paymentInvoice.id),
+		userId,
+		amountMinor,
+		amount: Math.round(amountMinor / 100),
+		status: String(paymentInvoice.status || 'INITIATED'),
+		invoiceUrl: universalCheckoutPaymentId
+			? `/api/v1/payments/universal/invoice/${encodeURIComponent(universalCheckoutPaymentId)}`
+			: null,
+		merchantTransactionId: String(paymentInvoice?.merchantTransactionId || ''),
+		createdAt: paymentInvoice.createdAt,
+		source: 'FINANCIAL_PAYMENT',
+	};
 };
 
 export const getPatientExercises = async (userId: string) => {
