@@ -658,13 +658,14 @@ async function seed() {
     }
   }
 
-  // Seed Group Therapy Sessions
-  const groupTherapySessions = [
+ 
+/* ❌ DISABLED: Group Therapy Seed  
+    const groupTherapySessions = [
     {
       title: 'Anxiety Circle - Morning Session',
-      topic: 'Anxiety Management',
+   //   topic: 'Anxiety Management',
       description: 'Learn evidence-based techniques to manage anxiety symptoms including breathing exercises, cognitive restructuring, and exposure therapy.',
-      mode: 'PUBLIC',
+     / mode: 'PUBLIC',
       status: 'PUBLISHED',
       offset: 0, // Today
       durationMinutes: 60,
@@ -803,7 +804,7 @@ async function seed() {
         },
       }).catch(() => null);
     }
-  }
+  }*/
 
   for (const patient of patientUsers) {
     const profile = profileByUserId.get(patient.id);
