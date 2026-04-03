@@ -10,7 +10,7 @@ export const Hero: React.FC = () => {
     const image = new Image();
     image.onload = () => setIsHeroImageLoaded(true);
     image.onerror = () => setIsHeroImageLoaded(false);
-    image.src = 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1600&auto=format&fit=crop';
+    image.src = '/You%20renot%20alone-Beach.jpeg';
   }, []);
 
   const handleStartAssessment = () => {
@@ -37,8 +37,7 @@ export const Hero: React.FC = () => {
           isHeroImageLoaded ? 'opacity-100' : 'opacity-0'
         }`}
         style={{
-          backgroundImage:
-            "url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1600&auto=format&fit=crop')",
+          backgroundImage: "url('/You%20renot%20alone-Beach.jpeg')",
         }}
       />
       <div aria-hidden="true" className="absolute inset-0 bg-charcoal/18" />
