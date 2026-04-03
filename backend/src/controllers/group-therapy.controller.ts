@@ -255,19 +255,6 @@ export const listPublicPublishedGroupTherapySessionsController = async (_req: Re
           },
         },
         take: 30,
-      });
-
-  const items = rows.map((row: any) => ({
-    ...row,
-    joinedCount: row.enrollments.length,
-  }));
-
-  sendSuccess(res, { items }, 'Public group therapy sessions fetched');
-};
-
-const createPhonePeRedirect = async (transactionId: string, userIdentity: string, amountMinor: number): Promise<string> => {
-  const callbackUrl = `${env.apiUrl}${env.apiPrefix}/v1/payments/phonepe/webhook`;
-  const redirectUrl = `${env.frontendUrl}/#/payment/status?transactionId=${encodeURIComponent(transactionId)}`;
 
   return initiatePhonePePayment({
     transactionId,
