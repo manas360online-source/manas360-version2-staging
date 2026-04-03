@@ -35,6 +35,7 @@ services:
       DATABASE_URL: postgresql://manas360:manas360@db:5432/manas360
       REDIS_URL: redis://redis:6379
       PORT: 5000
+      ADMIN_SEED_ENABLED: "true"
     depends_on:
       db:
         condition: service_healthy
@@ -42,7 +43,12 @@ services:
         condition: service_started
     ports:
       - "5000:5000"
-    command: ["sh", "-c", "npx prisma db push && node scripts/seed-env-admins.js && node dist/server.js"]
+    command: >
+       sh -c "
+       npx prisma db push &&
+       npx prisma db seed &&
+       node dist/server.js
+       "
 
   ai_engine:
     build:

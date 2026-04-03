@@ -234,22 +234,24 @@ export const publishGroupTherapySessionController = async (req: Request, res: Re
 
 export const listPublicPublishedGroupTherapySessionsController = async (_req: Request, res: Response): Promise<void> => {
   const now = new Date();
-  const rows = await db.groupTherapySession.findMany({
-    where: {
-      status: { in: ['PUBLISHED', 'LIVE'] },
-      scheduledAt: { gte: new Date(now.getTime() - 2 * 60 * 60 * 1000) },
-      sessionMode: 'PUBLIC',
-    },
-    orderBy: { scheduledAt: 'asc' },
-    include: {
-      hostTherapist: { select: { id: true, firstName: true, lastName: true } },
-      enrollments: {
-        where: { status: { in: ['PAID', 'JOINED'] } },
-        select: { id: true },
-      },
-    },
-    take: 30,
-  });
+  const rows = db.groupTherapySession
+    ? await db.groupTherapySession.findMany({
+        where: {
+          status: { in: ['PUBLISHED', 'LIVE'] },
+          scheduledAt: { gte: new Date(now.getTime() - 2 * 60 * 60 * 1000) },
+          sessionMode: 'PUBLIC',
+        },
+        orderBy: { scheduledAt: 'asc' },
+        include: {
+          hostTherapist: { select: { id: true, firstName: true, lastName: true } },
+          enrollments: {
+            where: { status: { in: ['PAID', 'JOINED'] } },
+            select: { id: true },
+          },
+        },
+        take: 30,
+      })
+    : [];
 
   const items = rows.map((row: any) => ({
     ...row,
