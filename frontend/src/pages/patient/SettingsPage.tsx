@@ -825,7 +825,32 @@ export default function SettingsPage() {
     const formatInvoicePlanName = (entry: any) =>
       String(entry?.plan?.name || entry?.planName || entry?.plan?.key || entry?.planKey || entry?.description || '—');
 
+    const resolveInvoiceAmountMajor = (entry: any): number => {
+      const amountMinor = Number(entry?.amountMinor);
+      if (Number.isFinite(amountMinor) && amountMinor > 0) {
+        return amountMinor / 100;
+      }
+      const amount = Number(entry?.amount || entry?.total || 0);
+      return Number.isFinite(amount) ? amount : 0;
+    };
+
     const isRetryable = (statusValue: string) => /(failed|declined|error|cancel)/.test(statusValue);
+
+    const downloadInvoice = async (invoiceId: string) => {
+      try {
+        const blob = await patientApi.downloadInvoice(invoiceId);
+        const fileUrl = window.URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = fileUrl;
+        anchor.download = `invoice-${invoiceId}.txt`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        window.URL.revokeObjectURL(fileUrl);
+      } catch (error: any) {
+        setBillingError(error?.response?.data?.message || 'Failed to download invoice.');
+      }
+    };
 
     return (
       <div className="space-y-4">
@@ -909,7 +934,7 @@ export default function SettingsPage() {
                           : '—';
                         const statusText = String(invoice.status || 'unknown').toUpperCase();
                         const retryable = isRetryable(String(invoice.status || ''));
-                        const amountValue = Number(invoice.amount || invoice.total || invoice.amountMinor || 0);
+                        const amountValue = resolveInvoiceAmountMajor(invoice);
 
                         return (
                           <tr key={`invoice-${invoice.id || index}`} className="border-b border-slate-100">
@@ -929,6 +954,14 @@ export default function SettingsPage() {
                                 >
                                   Retry
                                 </Link>
+                              ) : invoice?.id ? (
+                                <button
+                                  type="button"
+                                  onClick={() => void downloadInvoice(String(invoice.id))}
+                                  className="rounded-full border border-calm-sage/30 bg-calm-sage/10 px-3 py-1 text-xs font-semibold text-calm-sage transition hover:bg-calm-sage/20"
+                                >
+                                  Download
+                                </button>
                               ) : (
                                 <span className="text-xs text-charcoal/60">—</span>
                               )}
