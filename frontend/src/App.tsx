@@ -108,6 +108,7 @@ const SSOSettingsPage = lazy(() => import('./pages/corporate/SSOSettingsPage'));
 const CorporateDashboardPage = lazy(() => import('./pages/corporate/CorporateDashboardPage'));
 const CorporateOnboardingPage = lazy(() => import('./pages/corporate/CorporateOnboardingPage'));
 const MyDigitalClinicPage = lazy(() => import('./pages/clinic/MyDigitalClinicPage'));
+const HowItWorksPage = lazy(() => import('./pages/how-it-works/HowItWorksPage'));
 const ProviderCalendarPage = lazy(() => import('./pages/provider/Calendar'));
 const ProviderInboxPage = lazy(() => import('./pages/provider/Messages'));
 const ProviderEarningsPage = lazy(() => import('./pages/provider/Earnings'));
@@ -256,6 +257,7 @@ function App() {
 
             <Route path="/results" element={<ResultsPage data={assessmentData} />} />
             <Route path="/crisis" element={<CrisisPage />} />
+            <Route path="/how-it-works" element={<HowItWorksPage />} />
             <Route path="/my-digital-clinic" element={<MyDigitalClinicPage />} />
             <Route path="/clinic" element={<Navigate to="/my-digital-clinic" replace />} />
             <Route path="/onboarding/name" element={<OnboardingName onNext={handleOnboardingName} />} />
