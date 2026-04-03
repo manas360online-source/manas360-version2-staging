@@ -265,14 +265,18 @@ export const patientApi = {
     (await http.post('/patient-journey/clinical-assessment', payload)).data,
   startStructuredAssessment: async (payload: { templateKey: string }): Promise<StructuredAssessmentStartResponse> => {
     try {
-      const response = await http.post('/free-screening/start/me', payload);
+      const response = await http.post('/v1/free-screening/start/me', payload);
       return response.data?.data ?? response.data;
     } catch (err: any) {
       const status = Number(err?.response?.status || 0);
       if (status === 401) {
         // Not authenticated — fall back to public free-screening start endpoint
-        const publicResp = await http.post('/free-screening/start', payload);
+        const publicResp = await http.post('/v1/free-screening/start', payload);
         return publicResp.data?.data ?? publicResp.data;
+      }
+      if (status === 404) {
+        const legacyResp = await http.post('/free-screening/start/me', payload);
+        return legacyResp.data?.data ?? legacyResp.data;
       }
       throw err;
     }

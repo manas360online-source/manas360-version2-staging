@@ -1277,7 +1277,22 @@ export const getPatientInvoices = async (userId: string) => {
 		return bTs - aTs;
 	});
 
-	return combined;
+	const seen = new Set<string>();
+	const deduped = combined.filter((entry: any) => {
+		const invoiceUrl = String(entry?.invoiceUrl || '').trim();
+		const merchantTransactionId = String(entry?.merchantTransactionId || '').trim();
+		const key = invoiceUrl
+			? `invoiceUrl:${invoiceUrl}`
+			: merchantTransactionId
+				? `merchant:${merchantTransactionId}`
+				: `id:${String(entry?.id || '')}`;
+
+		if (seen.has(key)) return false;
+		seen.add(key);
+		return true;
+	});
+
+	return deduped;
 };
 
 export const getPatientInvoiceById = async (userId: string, invoiceId: string) => {

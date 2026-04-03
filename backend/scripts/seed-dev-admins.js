@@ -3,7 +3,7 @@ const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
-async function upsertAdmin(email, phone, firstName, lastName, password) {
+async function upsertAdmin(email, phone, firstName, lastName, password, role) {
   const passwordHash = await bcrypt.hash(password, 12);
 
   return prisma.user.upsert({
@@ -12,7 +12,7 @@ async function upsertAdmin(email, phone, firstName, lastName, password) {
       email,
       phone,
       passwordHash,
-      role: 'ADMIN',
+      role,
       provider: 'LOCAL',
       emailVerified: true,
       phoneVerified: true,
@@ -27,7 +27,7 @@ async function upsertAdmin(email, phone, firstName, lastName, password) {
       email,
       phone,
       passwordHash,
-      role: 'ADMIN',
+      role,
       provider: 'LOCAL',
       emailVerified: true,
       phoneVerified: true,
@@ -45,16 +45,16 @@ async function run() {
   const password = process.env.DEV_ADMIN_PASSWORD || 'Admin@123';
 
   const admins = [
-    { email: 'superadmin@manas360.com', phone: 'superadmin@manas360.com', firstName: 'Super', lastName: 'Admin' },
-    { email: 'finance@manas360.com', phone: 'finance@manas360.com', firstName: 'Finance', lastName: 'Manager' },
-    { email: 'clinical@manas360.com', phone: 'clinical@manas360.com', firstName: 'Clinical', lastName: 'Director' },
-    { email: 'compliance@manas360.com', phone: 'compliance@manas360.com', firstName: 'Compliance', lastName: 'Officer' },
+    { email: 'superadmin@manas360.com', phone: 'superadmin@manas360.com', firstName: 'Super', lastName: 'Admin', role: 'SUPER_ADMIN' },
+    { email: 'finance@manas360.com', phone: 'finance@manas360.com', firstName: 'Finance', lastName: 'Manager', role: 'FINANCE_MANAGER' },
+    { email: 'clinical@manas360.com', phone: 'clinical@manas360.com', firstName: 'Clinical', lastName: 'Director', role: 'CLINICAL_DIRECTOR' },
+    { email: 'compliance@manas360.com', phone: 'compliance@manas360.com', firstName: 'Compliance', lastName: 'Officer', role: 'COMPLIANCE_OFFICER' },
   ];
 
   const results = [];
   for (const a of admins) {
     // try upsert by email; also ensure phone is present
-    const res = await upsertAdmin(a.email, a.phone, a.firstName, a.lastName, password);
+    const res = await upsertAdmin(a.email, a.phone, a.firstName, a.lastName, password, a.role);
     results.push(res);
   }
 
