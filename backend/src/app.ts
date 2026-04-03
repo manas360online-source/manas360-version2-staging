@@ -65,7 +65,7 @@ app.use(requestLogger);
 
 // Health check endpoint
 app.get('/health', (_req, res) => {
-	res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    res.status(200).json({ status: 'OK' });
 });
 
 app.use(env.apiPrefix, apiRoutes);
