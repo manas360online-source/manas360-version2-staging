@@ -410,6 +410,62 @@ model ScreeningTemplate {
   @@map("screening_templates")
 }
 
+model GroupTherapySession {
+  id                 String   @id @default(cuid())
+  title              String
+  topic              String?
+  description        String
+  sessionMode        String
+  status             String
+
+  requestedById      String?
+  hostTherapistId    String?
+  approvedById       String?
+  groupCategoryId    String?
+
+  scheduledAt        DateTime
+  durationMinutes    Int
+  maxMembers         Int
+
+  priceMinor         BigInt
+  allowGuestJoin     Boolean  @default(false)
+  requiresPayment    Boolean  @default(false)
+  requiresAdminGate  Boolean  @default(false)
+
+  jitsiRoomName      String?
+  rejectionReason    String?
+
+  publishAt          DateTime?
+  publishedAt        DateTime?
+  approvedAt         DateTime?
+
+  enrollments        GroupTherapyEnrollment[]
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model GroupTherapyEnrollment {
+  id                String   @id @default(cuid())
+
+  sessionId         String
+  session           GroupTherapySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  userId            String?
+  guestEmail        String?
+  guestName         String?
+
+  enrolledByAdminId String?
+  status            String
+  amountMinor       BigInt?
+  paymentId         String?
+  merchantTransaction String?
+  paidAt            DateTime?
+
+  createdAt         DateTime @default(now())
+
+  @@unique([sessionId, userId, guestEmail])
+}
+
 model ScreeningQuestion {
   id                                 String                    @id @default(uuid())
   templateId                         String

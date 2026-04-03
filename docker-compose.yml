@@ -45,7 +45,7 @@ services:
       - "5000:5000"
     command: >
        sh -c "
-       npx prisma db push --force-reset &&
+       npx prisma db push &&
        npx prisma db seed &&
        node dist/server.js
        "
