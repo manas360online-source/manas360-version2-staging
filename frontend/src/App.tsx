@@ -90,7 +90,8 @@ const CertificationsPage = lazy(() => import('./pages/CertificationsPage'));
 const CertificationLandingPage = lazy(() => import('./pages/CertificationLandingPage'));
 const TermsOfService = lazy(() => import('./pages/legal/TermsOfService'));
 const PrivacyPolicy = lazy(() => import('./pages/legal/PrivacyPolicy'));
-const AcceptableUsePolicy = lazy(() => import('./pages/legal/AcceptableUsePolicy'));
+// AcceptableUsePolicy lazy import removed (not used in routing)
+// const AcceptableUsePolicy = lazy(() => import('./pages/legal/AcceptableUsePolicy'));
 const RefundAndCancellationPolicy = lazy(() => import('./pages/legal/RefundAndCancellationPolicy'));
 const TherapistICAgr = lazy(() => import('./pages/legal/TherapistICAgr'));
 const TherapistNDA = lazy(() => import('./pages/legal/TherapistNDA'));

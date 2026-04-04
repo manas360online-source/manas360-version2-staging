@@ -11,9 +11,9 @@ interface PricingTableProps {
 
 export const PricingTable: React.FC<PricingTableProps> = ({
   selectedFeatures,
-  currentTier,
-  currentBilling,
-  pricing,
+    currentTier,
+    currentBilling,
+    pricing,
 }) => {
   // Use API pricing data if available, otherwise calculate locally
   const tierPrices = {
@@ -21,6 +21,11 @@ export const PricingTable: React.FC<PricingTableProps> = ({
     small: FEATURES.map((f) => f.small),
     large: FEATURES.map((f) => f.large),
   };
+
+  // prevent unused variable TypeScript errors when props or computed values are optional
+  void currentTier;
+  void pricing;
+  void tierPrices;
 
   // Calculate totals
   let total_solo = 0,
