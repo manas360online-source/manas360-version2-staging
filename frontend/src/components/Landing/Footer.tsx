@@ -2,6 +2,14 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, Phone } from 'lucide-react';
 import { companyInfo } from '../../config/companyInfo';
+import dpdpaActPdf from '../../pages/legal/DPDPA Act 2023.pdf';
+
+interface FooterLinkItem {
+  label: string;
+  to?: string;
+  href?: string;
+  newTab?: boolean;
+}
 
 export const Footer: React.FC = () => {
   const navigate = useNavigate();
@@ -11,7 +19,7 @@ export const Footer: React.FC = () => {
     navigate('/assessment');
   };
 
-  const footerLinks = {
+  const footerLinks: Record<string, FooterLinkItem[]> = {
     Platform: [
       { label: 'How It Works', to: '/#how' },
       { label: 'Find a Therapist', to: '/therapists' },
@@ -25,6 +33,7 @@ export const Footer: React.FC = () => {
       { label: 'Contact', to: '/contact' },
     ],
     Legal: [
+      { label: 'DPDPA Act-2023', href: dpdpaActPdf },
       { label: 'Privacy Policy', to: '/privacy' },
       { label: 'Terms of Service', to: '/terms' },
       { label: 'Cancellation & Refund Policy', to: '/refunds' },
@@ -98,13 +107,24 @@ export const Footer: React.FC = () => {
                 </h3>
                 <ul className="space-y-2">
                   {links.map((link) => (
-                    <li key={link.to}>
-                      <Link
-                        to={link.to}
-                        className="text-sm text-charcoal/65 transition-colors duration-200 hover:text-charcoal"
-                      >
-                        {link.label}
-                      </Link>
+                    <li key={`${heading}-${link.label}`}>
+                      {link.href ? (
+                        <a
+                          href={link.href}
+                          target={link.newTab ? '_blank' : undefined}
+                          rel={link.newTab ? 'noreferrer' : undefined}
+                          className="text-sm text-charcoal/65 transition-colors duration-200 hover:text-charcoal"
+                        >
+                          {link.label}
+                        </a>
+                      ) : (
+                        <Link
+                          to={link.to || '/'}
+                          className="text-sm text-charcoal/65 transition-colors duration-200 hover:text-charcoal"
+                        >
+                          {link.label}
+                        </Link>
+                      )}
                     </li>
                   ))}
                 </ul>

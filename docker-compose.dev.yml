@@ -1,0 +1,76 @@
+services:
+  db:
+    image: postgres:15
+    container_name: manas360-dev-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: manas360
+      POSTGRES_PASSWORD: manas360
+      POSTGRES_DB: manas360
+    ports:
+      - "5432:5432"
+    volumes:
+      - manas360_dev_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U manas360"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7
+    container_name: manas360-dev-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - manas360_dev_redis_data:/data
+
+  backend:
+    image: node:20
+    container_name: manas360-dev-backend
+    restart: unless-stopped
+    working_dir: /app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    env_file:
+      - ./backend/.env
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DATABASE_URL: postgresql://manas360:manas360@db:5432/manas360
+      REDIS_URL: redis://redis:6379
+      CORS_ORIGIN: http://localhost:5173
+      API_URL: http://localhost:3000
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./backend:/app
+    command: sh -c "npm install && npm run prisma:generate && npm run dev"
+
+  frontend:
+    image: node:20
+    container_name: manas360-dev-frontend
+    restart: unless-stopped
+    working_dir: /app
+    depends_on:
+      backend:
+        condition: service_started
+    environment:
+      VITE_API_BASE_URL: http://localhost:3000/api
+      VITE_API_URL: http://localhost:3000/api
+      VITE_CSRF_COOKIE_NAME: csrf_token
+      CHOKIDAR_USEPOLLING: "true"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+
+volumes:
+  manas360_dev_postgres_data:
+  manas360_dev_redis_data:
