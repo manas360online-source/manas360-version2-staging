@@ -79,8 +79,6 @@ jobs:
       EC2_USER: ${{ secrets.EC2_USER }}
       EC2_KEY: ${{ secrets.EC2_KEY }}
       STAGING_APP_DIR: ${{ vars.STAGING_APP_DIR }}
-      RUN_STAGING_SEED: ${{ vars.RUN_STAGING_SEED }}
-      STAGING_SEED_COMMAND: ${{ vars.STAGING_SEED_COMMAND }}
 
     steps:
       - name: Checkout
@@ -163,14 +161,6 @@ jobs:
               exit 1
             fi
 
-            if [ "${RUN_STAGING_SEED:-false}" = "true" ]; then
-              SEED_CMD="${STAGING_SEED_COMMAND:-npm run seed:templates}"
-              echo "Running staging seed command: ${SEED_CMD}"
-              docker exec "${BACKEND_ID}" sh -lc "${SEED_CMD}"
-            else
-              echo "Staging seed skipped (RUN_STAGING_SEED != true)"
-            fi
-
             echo "Waiting for backend health..."
             until curl -f http://localhost:5000/health > /dev/null 2>&1; do
               echo "  Waiting for backend..."
@@ -181,16 +171,3 @@ jobs:
             curl -f http://localhost:5000/api/v1/group-therapy/public/sessions > /dev/null
 
             echo "✅ Deployment complete"
-
-      # Optional: Seed staging database if needed
-      # Uncomment and configure if you want automated seeding
-      # - name: Seed staging database
-      #   if: ${{ vars.RUN_STAGING_SEED == 'true' }}
-      #   uses: appleboy/ssh-action@v1.0.3
-      #   with:
-      #     host: ${{ env.EC2_HOST }}
-      #     username: ${{ env.EC2_USER }}
-      #     key: ${{ env.EC2_KEY }}
-      #     script: |
-      #       cd ~/manas360-version2-staging
-      #       npm run seed
