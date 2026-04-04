@@ -28,6 +28,8 @@ import {
 import { createTokenPair, verifyRefreshToken } from '../utils/jwt';
 import { logger } from '../utils/logger';
 import { sendPlatformAdminPasswordResetEmail } from './email.service';
+import { sendWhatsAppMessage } from './whatsapp.service';
+import type { WhatsAppUserType } from './whatsapp.service';
 import type {
 	GoogleLoginInput,
 	LoginInput,
@@ -55,6 +57,15 @@ const toPrismaUserRole = (role: PublicUserRole): 'PATIENT' | 'THERAPIST' | 'PSYC
 	if (role === 'psychiatrist') return 'PSYCHIATRIST';
 	if (role === 'psychologist') return 'PSYCHOLOGIST';
 	return 'COACH';
+};
+
+const toWhatsAppUserType = (role: PublicUserRole): WhatsAppUserType => {
+	if (role === 'patient') return 'patient';
+	if (role === 'therapist') return 'therapist';
+	if (role === 'psychiatrist') return 'psychiatrist';
+	if (role === 'psychologist') return 'psychologist';
+	if (role === 'coach') return 'coach';
+	return 'user';
 };
 
 let supportedUserRolesCache: Set<string> | null = null;
@@ -261,7 +272,7 @@ const toProviderDisplayName = (displayName: string): string => {
 export const registerProviderProfile = async (userId: string, input: ProviderRegisterInput) => {
 	const normalizedRegistrationNum = input.registrationNum.trim().toUpperCase();
 
-	return db.$transaction(async (tx: any) => {
+	const profile = await db.$transaction(async (tx: any) => {
 		const user = await tx.user.findUnique({
 			where: { id: userId },
 			select: {
@@ -270,6 +281,7 @@ export const registerProviderProfile = async (userId: string, input: ProviderReg
 				firstName: true,
 				lastName: true,
 				name: true,
+				phone: true,
 			},
 		});
 
@@ -363,8 +375,22 @@ export const registerProviderProfile = async (userId: string, input: ProviderReg
 			},
 		});
 
-		return profile;
+		return { profile, phone: user.phone, role: userRole };
 	});
+
+	// Send WhatsApp provider welcome message (non-blocking)
+	const userRole = String(profile.role || '').toLowerCase() as PublicUserRole;
+	sendWhatsAppMessage({
+		phoneNumber: profile.phone,
+		templateType: 'provider_welcome',
+		userType: toWhatsAppUserType(userRole),
+		templateVariables: { displayName: profile.profile.displayName },
+		language: 'en',
+	}).catch((err) => {
+		console.error('[Auth] Failed to send WhatsApp provider welcome message:', err.message);
+	});
+
+	return profile.profile;
 };
 
 export const registerWithPhone = async (input: RegisterPhoneInput) => {
@@ -417,6 +443,17 @@ export const registerWithPhone = async (input: RegisterPhoneInput) => {
 					phone: true,
 				},
 		  });
+
+	// Send WhatsApp OTP message (non-blocking)
+	sendWhatsAppMessage({
+		phoneNumber: user.phone,
+		templateType: 'user_otp_login',
+		userType: 'user',
+		templateVariables: { otp },
+		language: 'en',
+	}).catch((err) => {
+		console.error('[Auth] Failed to send WhatsApp OTP:', err.message);
+	});
 
 	return {
 		userId: String(user.id),
@@ -519,6 +556,18 @@ export const verifyPhoneOtp = async (input: VerifyPhoneOtpInput, meta: RequestMe
 		if (toCreate.length > 0) {
 			await db.consent.createMany({ data: toCreate });
 		}
+
+		// Send WhatsApp welcome message for first-time users (non-blocking)
+		const userRole = String(user.role || '').toLowerCase() as PublicUserRole;
+		sendWhatsAppMessage({
+			phoneNumber: user.phone,
+			templateType: 'user_welcome',
+			userType: toWhatsAppUserType(userRole),
+			templateVariables: { name: user.email?.split('@')[0] || 'User' },
+			language: 'en',
+		}).catch((err) => {
+			console.error('[Auth] Failed to send WhatsApp welcome message:', err.message);
+		});
 	}
 
 	const tokenPair = await issueSessionTokens(String(user.id), meta);
