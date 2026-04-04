@@ -324,8 +324,15 @@ export default function UniversalCheckout() {
                 setTermsScrolled(false);
               }}
             />
-            <button type="button" onClick={() => { setShowTermsModal(true); setTermsScrolled(false); }} className="text-left underline text-emerald-700">
-              I agree to the Terms of Service, Privacy Policy, and Refund &amp; Cancellation Policy.
+            <button
+              type="button"
+              onClick={() => {
+                setShowTermsModal(true);
+                setTermsScrolled(false);
+              }}
+              className="text-left underline text-emerald-700"
+            >
+              I agree to the Refund &amp; Cancellation Policy.
             </button>
           </label>
 
@@ -344,7 +351,7 @@ export default function UniversalCheckout() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-2xl rounded-2xl bg-white p-5 shadow-xl">
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-slate-900">Terms & Conditions</h2>
+              <h2 className="text-lg font-semibold text-slate-900">Refund &amp; Cancellation Policy</h2>
               <button type="button" onClick={() => setShowTermsModal(false)} className="rounded-md border border-slate-300 px-2 py-1 text-xs">Close</button>
             </div>
             <p className="mb-2 text-xs text-slate-500">Read fully and scroll to the bottom to enable agreement.</p>
@@ -352,11 +359,55 @@ export default function UniversalCheckout() {
               onScroll={handleTermsScroll}
               className="max-h-80 overflow-y-auto rounded-lg border border-slate-200 p-4 text-sm leading-6 text-slate-700"
             >
-              <p className="mb-3">1. Billing, refunds, and cancellations follow the published policy for the selected service type.</p>
-              <p className="mb-3">2. Provider access, patient access, and marketplace usage are subject to role and compliance checks.</p>
-              <p className="mb-3">3. Your transaction record may be used for reconciliation, audit, and subscription activation.</p>
-              <p className="mb-3">4. You confirm the payment amount and plan selection before submitting the order.</p>
-              <p>5. By agreeing, you acknowledge the service-specific terms shown on this checkout.</p>
+              <h3 className="mb-2 text-base font-semibold text-slate-900">1. PURPOSE AND SCOPE</h3>
+              <p className="mb-3">
+                1.1 This Refund and Cancellation Policy governs all payments made by Users while accessing or using
+                the MANAS360 Platform, including therapy sessions, subscriptions, assessments, digital programs, and
+                other paid services.
+              </p>
+              <p className="mb-4">
+                1.2 By booking a session, purchasing a subscription, or making any payment on the Platform, the User
+                agrees to this Policy.
+              </p>
+
+              <h3 className="mb-2 text-base font-semibold text-slate-900">2. SESSION CANCELLATIONS</h3>
+              <p className="mb-2">2.1 <strong>By Patient - More than 24 hours before session:</strong> Full refund to original payment method within 5-7 business days.</p>
+              <p className="mb-2">2.2 <strong>By Patient - 12 to 24 hours before session:</strong> 50% refund. Remaining 50% credited as MANAS360 wallet balance.</p>
+              <p className="mb-2">2.3 <strong>By Patient - Less than 12 hours before session:</strong> No refund. Full amount credited as MANAS360 wallet balance valid for 90 days.</p>
+              <p className="mb-2">2.4 <strong>By Patient - No-show (no cancellation):</strong> No refund. Provider receives full session fee.</p>
+              <p className="mb-2">2.5 <strong>By Provider:</strong> Full refund to patient's original payment method. Provider's reliability score may be affected.</p>
+              <p className="mb-4">2.6 <strong>Technical failure (MANAS360 side):</strong> Full refund or complimentary rescheduled session at patient's choice.</p>
+
+              <h3 className="mb-2 text-base font-semibold text-slate-900">3. SUBSCRIPTION CANCELLATIONS</h3>
+              <p className="mb-2">3.1 Subscriptions may be cancelled at any time from Settings &gt; Subscription &gt; Cancel.</p>
+              <p className="mb-2">3.2 Upon cancellation, the subscription remains active until the end of the current billing period. No prorated refund for unused days.</p>
+              <p className="mb-4">3.3 Annual subscribers who cancel within the first 14 days receive a full refund minus the cost of any sessions attended.</p>
+
+              <h3 className="mb-2 text-base font-semibold text-slate-900">4. REFUND PROCESSING</h3>
+              <p className="mb-2">4.1 Refunds are processed via the original payment method (UPI, card, net banking).</p>
+              <p className="mb-2">4.2 Standard processing time: 5-7 business days for bank refunds, instant for wallet credits.</p>
+              <p className="mb-4">4.3 PhonePe transaction fees are non-refundable.</p>
+
+              <h3 className="mb-2 text-base font-semibold text-slate-900">5. WALLET CREDITS</h3>
+              <p className="mb-2">5.1 Wallet credits may be used for any MANAS360 service (sessions, subscriptions, premium content).</p>
+              <p className="mb-2">5.2 Wallet credits are non-transferable and expire 90 days from issuance.</p>
+              <p className="mb-4">5.3 Wallet credits cannot be redeemed for cash.</p>
+
+              <h3 className="mb-2 text-base font-semibold text-slate-900">6. FRAUD PREVENTION</h3>
+              <p className="mb-2">6.1 MANAS360 reserves the right to withhold refunds where:</p>
+              <p className="mb-1">(a) Fraudulent activity is suspected;</p>
+              <p className="mb-4">(b) Repeated refund abuse is detected.</p>
+
+              <h3 className="mb-2 text-base font-semibold text-slate-900">7. DISPUTES</h3>
+              <p className="mb-2">7.1 Refund disputes may be raised within 30 days of the transaction by contacting support@manas360.com.</p>
+              <p className="mb-4">7.2 MANAS360's decision on refund disputes shall be final, subject to the dispute resolution mechanisms in applicable platform policies.</p>
+
+              <h3 className="mb-2 text-base font-semibold text-slate-900">8. CHANGES TO THIS POLICY</h3>
+              <p>
+                8.1 We may update this Policy periodically to reflect legal, technical, or operational changes.
+                Material changes will be notified via email and in-app notification. Continued accessing or using the
+                Platform after notification constitutes acceptance of the revised Policy.
+              </p>
             </div>
             <div className="mt-4 flex justify-end gap-2">
               <button type="button" onClick={() => setShowTermsModal(false)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">Cancel</button>
