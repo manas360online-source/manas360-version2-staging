@@ -6,27 +6,28 @@ async function ensureAuthorized(req: Request, sessionId: string, requireDecrypte
   const authUserId = req.auth?.userId;
   if (!authUserId) throw new Error('Authentication required');
 
-  const session = await prisma.patientSession.findUnique({
+  const session = await prisma.therapySession.findUnique({
     where: { id: sessionId },
-    include: { template: { select: { therapistId: true } }, patient: { select: { id: true } } },
+    include: { patientProfile: { select: { userId: true } } },
   });
   if (!session) throw new Error('Session not found');
 
-  // Allow patient who owns the session, the therapist who created the template, or admin users
-  if (session.patient.id === authUserId) {
+  // Allow patient who owns the session, the therapist who owns the session, or admin users
+  if (session.patientProfile?.userId === authUserId) {
     // Patients may not be allowed decrypted notes access
     if (requireDecryptedAccess) throw new Error('Forbidden');
     return;
   }
 
-  if (session.template.therapistId === authUserId) {
+  if (session.therapistProfileId === authUserId) {
     // Therapist (owner) allowed; OK for decrypted if requested
     return;
   }
 
   // Check admin role as fallback
   const user = await prisma.user.findUnique({ where: { id: authUserId }, select: { role: true } });
-  if (user?.role === 'ADMIN') return;
+  const role = String(user?.role || '').toUpperCase();
+  if (role === 'ADMIN' || role === 'SUPERADMIN' || role === 'CLINICALDIRECTOR') return;
 
   throw new Error('Forbidden');
 }

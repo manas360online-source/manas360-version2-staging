@@ -3,6 +3,8 @@ import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import cors from 'cors';
 import { env } from './config/env';
+import { requireAuth } from './middleware/auth.middleware';
+import { requireRole } from './middleware/rbac.middleware';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware';
 import { requestLogger } from './middleware/logger.middleware';
 import apiRoutes from './routes';
@@ -73,7 +75,7 @@ app.use(env.apiPrefix, apiRoutes);
 // Prometheus metrics endpoint
 const collectDefaultMetrics = client.collectDefaultMetrics;
 collectDefaultMetrics({ timeout: 5000 } as any);
-app.get('/metrics', async (_req, res) => {
+app.get('/metrics', requireAuth, requireRole(['admin', 'superadmin']), async (_req, res) => {
 	try {
 		const metrics = await client.register.metrics();
 		res.set('Content-Type', client.register.contentType);

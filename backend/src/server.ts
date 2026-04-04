@@ -37,7 +37,21 @@ const startServer = async (): Promise<void> => {
 				console.error('SSO tenant seed failed', err);
 			}
 		})
-		.catch((err) => console.error('SSO table init failed', err));
+		.catch((err) => {
+			const code = String((err as any)?.code || '');
+			const message = String((err as any)?.message || '').toLowerCase();
+			const transientSocketClose = code === 'UND_ERR_SOCKET' || message.includes('other side closed');
+			if (transientSocketClose) {
+				console.warn('SSO table init transient socket closure; scheduling retry');
+				setTimeout(() => {
+					void ensureSsoTables().catch((retryErr) => {
+						console.error('SSO table retry failed', retryErr);
+					});
+				}, 5000);
+				return;
+			}
+			console.error('SSO table init failed', err);
+		});
 
 	const server = app.listen(env.port, () => {
 		console.log(`Server running on port ${env.port}`);

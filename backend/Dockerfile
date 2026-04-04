@@ -20,7 +20,7 @@ RUN rm -f .env
 
 ENV DATABASE_URL=postgresql://manas360:manas360@db:5432/manas360
 
-RUN npm run build && npx prisma generate
+RUN npm run build && PRISMA_CLIENT_ENGINE_TYPE=binary npx prisma generate
 
 # REMOVE build dependencies (IMPORTANT)
 RUN apk del .build-deps
@@ -37,8 +37,9 @@ RUN apk add --no-cache openssl
 COPY --from=build /app .
 
 ENV NODE_ENV=production
+ENV PRISMA_CLIENT_ENGINE_TYPE=binary
 
 EXPOSE 5000
 
-# TEMP FIX: remove migrate from startup
-CMD ["node", "dist/server.js"]
+# Deployment-safe startup: apply migrations before serving traffic.
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]

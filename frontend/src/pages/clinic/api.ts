@@ -1,7 +1,7 @@
 import axios, { AxiosError } from 'axios';
+import { getApiBaseUrl } from '../../lib/runtimeEnv';
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_BASE_URL = getApiBaseUrl();
 
 export interface CalculatePricePayload {
   clinic_tier: 'solo' | 'small' | 'large';

@@ -6,7 +6,7 @@ After=network.target
 Type=simple
 User=ubuntu
 WorkingDirectory=/opt/manas360/backend
-ExecStart=/usr/bin/node dist/index.js
+ExecStart=/bin/sh -c '/usr/bin/npx prisma migrate deploy && /usr/bin/node dist/server.js'
 Restart=always
 Environment=NODE_ENV=production
 EnvironmentFile=/opt/manas360/backend/.env

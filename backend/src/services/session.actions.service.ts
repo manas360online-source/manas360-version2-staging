@@ -7,10 +7,9 @@ import cuid from 'cuid';
 
 export class SessionActionsService {
   async ensureOwnership(therapistId: string, sessionId: string) {
-    const session = await prisma.patientSession.findUnique({
-      where: { id: sessionId },
+    const session = await prisma.therapySession.findFirst({
+      where: { id: sessionId, therapistProfileId: therapistId },
       include: {
-        template: true,
         patientProfile: {
           select: {
             id: true,
@@ -29,18 +28,17 @@ export class SessionActionsService {
       },
     });
     if (!session) throw new AppError('Session not found', 404);
-    if (!session.template || String(session.template.therapistId) !== String(therapistId)) throw new AppError('Forbidden', 403);
     return session;
   }
 
   async rescheduleSession(therapistId: string, sessionId: string, newStartAt: string, options: { requestorId?: string } = {}) {
     const session = await this.ensureOwnership(therapistId, sessionId);
 
-    const before = { startAt: session.startedAt, status: session.status } as any;
+    const before = { startAt: session.dateTime, status: session.status } as any;
 
-    const updated = await prisma.patientSession.update({ where: { id: sessionId }, data: { startedAt: new Date(newStartAt) } });
+    const updated = await prisma.therapySession.update({ where: { id: sessionId }, data: { dateTime: new Date(newStartAt) } });
 
-    await prisma.sessionAuditLog.create({ data: { sessionId, userId: options.requestorId || therapistId, action: 'RESCHEDULE', entityType: 'PATIENT_SESSION', entityId: sessionId, changes: { before, after: { startAt: updated.startedAt } } } as any });
+    await prisma.sessionAuditLog.create({ data: { sessionId, userId: options.requestorId || therapistId, action: 'RESCHEDULE', entityType: 'THERAPY_SESSION', entityId: sessionId, changes: { before, after: { startAt: updated.dateTime } } } as any });
 
     return updated;
   }
@@ -50,9 +48,9 @@ export class SessionActionsService {
 
     const before = { status: session.status, cancelledAt: session.cancelledAt } as any;
 
-    const updated = await prisma.patientSession.update({ where: { id: sessionId }, data: { status: 'CANCELLED', cancelledAt: new Date() } });
+    const updated = await prisma.therapySession.update({ where: { id: sessionId }, data: { status: 'CANCELLED', cancelledAt: new Date() } });
 
-    await prisma.sessionAuditLog.create({ data: { sessionId, userId: options.requestorId || therapistId, action: 'CANCEL', entityType: 'PATIENT_SESSION', entityId: sessionId, changes: { reason, before, after: { status: updated.status, cancelledAt: updated.cancelledAt } } } as any });
+    await prisma.sessionAuditLog.create({ data: { sessionId, userId: options.requestorId || therapistId, action: 'CANCEL', entityType: 'THERAPY_SESSION', entityId: sessionId, changes: { reason, before, after: { status: updated.status, cancelledAt: updated.cancelledAt } } } as any });
 
     return updated;
   }
@@ -65,14 +63,16 @@ export class SessionActionsService {
         || `${String(session.patientProfile?.user?.firstName || '').trim()} ${String(session.patientProfile?.user?.lastName || '').trim()}`.trim()
         || 'Patient',
     );
+    const therapist = await prisma.user.findUnique({ where: { id: therapistId }, select: { firstName: true, lastName: true, name: true } });
     const therapistName = String(
-      `${String((session as any)?.template?.therapist?.firstName || '').trim()} ${String((session as any)?.template?.therapist?.lastName || '').trim()}`.trim() ||
-      'Your therapist',
+      therapist?.name
+      || `${String(therapist?.firstName || '').trim()} ${String(therapist?.lastName || '').trim()}`.trim()
+      || 'Your therapist',
     );
 
     const ev = await publishPlaceholderNotificationEvent({
       eventType: 'REMINDER',
-      entityType: 'PATIENT_SESSION',
+      entityType: 'THERAPY_SESSION',
       entityId: sessionId,
       userId: patientUserId,
       title: 'Session reminder',
@@ -80,7 +80,7 @@ export class SessionActionsService {
       payload: { via, templateId, patientName, therapistName },
     });
 
-    await prisma.sessionAuditLog.create({ data: { sessionId, userId: options.requestorId || therapistId, action: 'REMIND', entityType: 'PATIENT_SESSION', entityId: sessionId, changes: { queued: true, event: ev } } } as any);
+    await prisma.sessionAuditLog.create({ data: { sessionId, userId: options.requestorId || therapistId, action: 'REMIND', entityType: 'THERAPY_SESSION', entityId: sessionId, changes: { queued: true, event: ev } } } as any);
 
     return { queued: true };
   }
@@ -93,7 +93,7 @@ export class SessionActionsService {
     const token = jwt.sign({ sessionId, therapistId, roomId, mode }, env.jwtAccessSecret, { expiresIn });
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
-    await prisma.sessionAuditLog.create({ data: { sessionId, userId: options.requestorId || therapistId, action: 'START_LIVE', entityType: 'PATIENT_SESSION', entityId: sessionId, changes: { roomId, mode, expiresAt } } } as any);
+    await prisma.sessionAuditLog.create({ data: { sessionId, userId: options.requestorId || therapistId, action: 'START_LIVE', entityType: 'THERAPY_SESSION', entityId: sessionId, changes: { roomId, mode, expiresAt } } } as any);
 
     return { room: { roomId, token, expiresAt } };
   }

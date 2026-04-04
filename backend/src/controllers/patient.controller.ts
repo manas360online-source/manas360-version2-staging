@@ -200,7 +200,7 @@ export const getMyTherapyPlanController = async (req: Request, res: Response): P
 		  };
 
 	try {
-		const [goalActivities, cbtSessions, therapistNotes, careTeamAssignment] = await Promise.all([
+		const [goalActivities, therapistNotes] = await Promise.all([
 		prisma.therapyPlanActivity.findMany({
 			where: {
 				plan: {
@@ -224,15 +224,6 @@ export const getMyTherapyPlanController = async (req: Request, res: Response): P
 					dayNumber: true,
 			},
 		}).catch(() => []),
-		// patientSession model was removed from schema; skip to avoid runtime TypeError
-		Promise.resolve([] as Array<{
-			id: string;
-			status: string | null;
-			createdAt: Date;
-			completedAt: Date | null;
-			sessionNotes: string | null;
-			template: { title: string; category: string | null } | null;
-		}>),
 		prisma.therapistSessionNote.findMany({
 			where: {
 				patientId: patientProfile.id,
@@ -257,26 +248,8 @@ export const getMyTherapyPlanController = async (req: Request, res: Response): P
 				},
 			},
 		}).catch(() => []),
-		prisma.careTeamAssignment.findFirst({
-			where: {
-				patientId: userId,
-				status: 'ACTIVE',
-			},
-			orderBy: { assignedAt: 'desc' },
-			select: {
-				provider: {
-					select: {
-						firstName: true,
-						lastName: true,
-						name: true,
-					},
-				},
-			},
-		}).catch(() => null),
 	]);
 
-	const fallbackProviderName = getProviderDisplayName(careTeamAssignment?.provider);
-	const fallbackProviderInitials = getProviderInitials(fallbackProviderName);
 	const providerAssignedGoals = goalActivities.filter((activity) => !isExerciseActivityType(String(activity.activityType)));
 	const providerAssignedExercises = goalActivities.filter((activity) => isExerciseActivityType(String(activity.activityType)));
 
@@ -318,16 +291,6 @@ export const getMyTherapyPlanController = async (req: Request, res: Response): P
 				};
 			})
 			.filter((entry): entry is NonNullable<typeof entry> => Boolean(entry)),
-		...cbtSessions
-			.filter((session) => String(session.status || '').toUpperCase() === 'COMPLETED' && cleanFeedbackText(session.sessionNotes))
-			.map((session) => ({
-				id: `cbt-${session.id}`,
-				feedback: cleanFeedbackText(session.sessionNotes),
-				providerName: fallbackProviderName,
-				providerInitials: fallbackProviderInitials,
-				source: 'cbt-review' as const,
-				createdAt: (session.completedAt || session.createdAt).toISOString(),
-			})),
 	]
 		.sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
 		.slice(0, 3);

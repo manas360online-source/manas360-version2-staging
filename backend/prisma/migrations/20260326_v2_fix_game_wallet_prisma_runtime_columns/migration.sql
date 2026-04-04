@@ -1,6 +1,22 @@
 -- Align game/wallet DB columns with current Prisma models
 -- Non-destructive: keeps legacy snake_case columns for backward compatibility.
 
+-- Legacy compatibility:
+-- Earlier migration created user_wallet (singular) with snake_case user_id.
+-- Later Prisma model expects user_wallets with camelCase userId.
+DO $$ BEGIN
+  IF to_regclass('public.user_wallets') IS NULL AND to_regclass('public.user_wallet') IS NOT NULL THEN
+    EXECUTE 'ALTER TABLE user_wallet RENAME TO user_wallets';
+  END IF;
+END $$;
+
+ALTER TABLE user_wallets
+  ADD COLUMN IF NOT EXISTS "userId" TEXT;
+
+UPDATE user_wallets
+SET "userId" = COALESCE("userId", user_id)
+WHERE "userId" IS NULL;
+
 DO $$ BEGIN
   CREATE TYPE "WalletTransactionType" AS ENUM ('CREDIT', 'DEBIT');
 EXCEPTION

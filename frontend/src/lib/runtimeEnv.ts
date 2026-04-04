@@ -1,5 +1,30 @@
 const APP_API_BASE_URL = 'https://www.manas360.com/api';
 
+const getWindowOrigin = (): string => {
+  if (typeof window === 'undefined') {
+    return 'https://www.manas360.com';
+  }
+
+  return window.location.origin;
+};
+
+const stripTrailingApiSegment = (value: string): string => value.replace(/\/api\/?$/i, '');
+
+const getDefaultWebsocketUrl = (): string => {
+  const origin = getWindowOrigin();
+  return origin.replace(/^https:/i, 'wss:').replace(/^http:/i, 'ws:');
+};
+
+const toWebsocketOrigin = (value: string): string => value.replace(/^https:/i, 'wss:').replace(/^http:/i, 'ws:');
+
+export const API_BASE = '/api';
+
+export const FRONTEND_URL = import.meta.env.VITE_FRONTEND_URL?.trim() || getWindowOrigin();
+
+export const WS_BASE = import.meta.env.VITE_WS_URL?.trim() || getDefaultWebsocketUrl();
+
+export const AI_ENGINE_WS_URL = import.meta.env.VITE_AI_ENGINE_WS_URL?.trim() || `${toWebsocketOrigin(stripTrailingApiSegment(FRONTEND_URL))}/ai-engine`;
+
 const getWindowCapacitor = (): any => {
   if (typeof window === 'undefined') {
     return null;

@@ -154,10 +154,10 @@ jobs:
             echo "Starting fresh containers..."
             ${DC} -p manas360-version2-staging up -d --build --no-cache
 
-            echo "Applying database schema (migrate deploy, fallback to db push for baseline DBs)..."
+            echo "Applying database schema (migrate deploy only)..."
             BACKEND_ID="$(${DC} -p manas360-version2-staging ps -q backend)"
             if [ -n "${BACKEND_ID}" ]; then
-              docker exec "${BACKEND_ID}" sh -lc 'npx prisma migrate deploy || npx prisma db push --accept-data-loss'
+              docker exec "${BACKEND_ID}" sh -lc 'npx prisma migrate deploy'
             else
               echo "Backend container not found; cannot apply schema"
               exit 1
@@ -176,6 +176,9 @@ jobs:
               echo "  Waiting for backend..."
               sleep 2
             done
+
+            echo "Running post-deploy endpoint smoke checks..."
+            curl -f http://localhost:5000/api/v1/group-therapy/public/sessions > /dev/null
 
             echo "✅ Deployment complete"
 

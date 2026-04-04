@@ -25,6 +25,6 @@ export const getLandingMetricsErrorMessage = (error: unknown, fallback = 'Unable
 };
 
 export const getLandingMetrics = async (): Promise<LandingMetricsResponse> => {
-	const response = await http.get<ApiEnvelope<LandingMetricsResponse>>('/landing/metrics');
+	const response = await http.get<ApiEnvelope<LandingMetricsResponse>>('/v1/landing/metrics');
 	return response.data.data;
 };

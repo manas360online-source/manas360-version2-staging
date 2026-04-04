@@ -44,6 +44,11 @@
             "date": 1775155247950,
             "name": "/Users/chandu/Project/github/MANAS360_version2/backend/logs/error-2026-04-03.log",
             "hash": "8fd0373ae4c7c573d8e3122faca84a8cf22732d554f230269dd1688147353136"
+        },
+        {
+            "date": 1775265304489,
+            "name": "/Users/chandu/Project/github/MANAS360_version2/backend/logs/error-2026-04-04.log",
+            "hash": "160c1f4212440986200d362ab76d911c52b283fdb1a3536c77fa3c80d5db6b77"
         }
     ],
     "hashType": "sha256"
