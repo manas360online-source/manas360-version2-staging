@@ -22,6 +22,21 @@ EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
 
+CREATE TABLE IF NOT EXISTS "group_categories" (
+  "id" TEXT NOT NULL,
+  "name" TEXT NOT NULL,
+  "type" TEXT NOT NULL DEFAULT 'GENERAL',
+  "description" TEXT,
+  "max_capacity" INTEGER NOT NULL DEFAULT 15,
+  "session_price" DOUBLE PRECISION NOT NULL DEFAULT 0,
+  "is_active" BOOLEAN NOT NULL DEFAULT true,
+  "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "group_categories_pkey" PRIMARY KEY ("id")
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "group_categories_name_key" ON "group_categories"("name");
+
 CREATE TABLE IF NOT EXISTS "group_therapy_sessions" (
   "id" TEXT NOT NULL,
   "title" TEXT NOT NULL,

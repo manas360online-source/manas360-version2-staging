@@ -226,23 +226,23 @@ export type MoodHistoryResponse = {
 
 export const therapistApi = {
 	getDashboard: async (): Promise<TherapistDashboardResponse> => {
-		const res = await http.get('/therapists/me/dashboard');
+		const res = await http.get('/v1/therapists/me/dashboard');
 		return unwrap<TherapistDashboardResponse>(res.data);
 	},
 	getPatients: async (params?: { status?: string; search?: string }): Promise<{ items: TherapistPatientItem[] }> => {
-		const res = await http.get('/therapists/me/patients', { params });
+		const res = await http.get('/v1/therapists/me/patients', { params });
 		return unwrap<{ items: TherapistPatientItem[] }>(res.data);
 	},
 	getSessions: async (params?: { page?: number; limit?: number; status?: string; patient?: string }): Promise<any> => {
-		const res = await http.get('/therapists/me/sessions', { params });
+		const res = await http.get('/v1/therapists/me/sessions', { params });
 		return unwrap<any>(res.data);
 	},
 	getSessionNotes: async (): Promise<{ items: TherapistSessionNoteItem[] }> => {
-		const res = await http.get('/therapists/me/notes');
+		const res = await http.get('/v1/therapists/me/notes');
 		return unwrap<{ items: TherapistSessionNoteItem[] }>(res.data);
 	},
 	getStructuredSessionNotes: async (): Promise<{ items: TherapistSessionNoteItem[] }> => {
-		const res = await http.get('/therapists/me/session-notes');
+		const res = await http.get('/v1/therapists/me/session-notes');
 		return unwrap<{ items: TherapistSessionNoteItem[] }>(res.data);
 	},
 	upsertStructuredSessionNote: async (sessionId: string, payload: Record<string, any>): Promise<any> => {
@@ -254,11 +254,11 @@ export const therapistApi = {
 		return unwrap<AiClinicalSummary>(res.data);
 	},
 	getExercises: async (): Promise<{ items: TherapistExerciseItem[] }> => {
-		const res = await http.get('/therapists/me/exercises');
+		const res = await http.get('/v1/therapists/me/exercises');
 		return unwrap<{ items: TherapistExerciseItem[] }>(res.data);
 	},
 	createExercise: async (payload: Partial<TherapistExerciseItem>): Promise<any> => {
-		const res = await http.post('/therapists/me/exercises', payload);
+		const res = await http.post('/v1/therapists/me/exercises', payload);
 		return unwrap<any>(res.data);
 	},
 	updateExercise: async (id: string, payload: Partial<TherapistExerciseItem>): Promise<any> => {
@@ -274,11 +274,11 @@ export const therapistApi = {
 		return unwrap<any>(res.data);
 	},
 	getCbtModules: async (): Promise<{ items: TherapistCbtModuleItem[] }> => {
-		const res = await http.get('/therapists/me/cbt-modules');
+		const res = await http.get('/v1/therapists/me/cbt-modules');
 		return unwrap<{ items: TherapistCbtModuleItem[] }>(res.data);
 	},
 	createCbtModule: async (payload: Partial<TherapistCbtModuleItem>): Promise<any> => {
-		const res = await http.post('/therapists/me/cbt-modules', payload);
+		const res = await http.post('/v1/therapists/me/cbt-modules', payload);
 		return unwrap<any>(res.data);
 	},
 	deleteCbtModule: async (id: string): Promise<any> => {
@@ -286,19 +286,19 @@ export const therapistApi = {
 		return unwrap<any>(res.data);
 	},
 	getAssessments: async (): Promise<{ items: TherapistAssessmentItem[] }> => {
-		const res = await http.get('/therapists/me/assessments');
+		const res = await http.get('/v1/therapists/me/assessments');
 		return unwrap<{ items: TherapistAssessmentItem[] }>(res.data);
 	},
 	createAssessment: async (payload: Partial<TherapistAssessmentItem>): Promise<any> => {
-		const res = await http.post('/therapists/me/assessments', payload);
+		const res = await http.post('/v1/therapists/me/assessments', payload);
 		return unwrap<any>(res.data);
 	},
 	getResources: async (): Promise<{ items: TherapistResourceItem[] }> => {
-		const res = await http.get('/therapists/me/resources');
+		const res = await http.get('/v1/therapists/me/resources');
 		return unwrap<{ items: TherapistResourceItem[] }>(res.data);
 	},
 	createResource: async (payload: Partial<TherapistResourceItem>): Promise<any> => {
-		const res = await http.post('/therapists/me/resources', payload);
+		const res = await http.post('/v1/therapists/me/resources', payload);
 		return unwrap<any>(res.data);
 	},
 	trackResourceView: async (id: string): Promise<any> => {
@@ -310,11 +310,11 @@ export const therapistApi = {
 		return unwrap<any>(res.data);
 	},
 	getCareTeam: async (params?: { patientId?: string }): Promise<{ items: TherapistCareTeamMemberItem[] }> => {
-		const res = await http.get('/therapists/me/care-team', { params });
+		const res = await http.get('/v1/therapists/me/care-team', { params });
 		return unwrap<{ items: TherapistCareTeamMemberItem[] }>(res.data);
 	},
 	createCareTeamMember: async (payload: Partial<TherapistCareTeamMemberItem>): Promise<any> => {
-		const res = await http.post('/therapists/me/care-team', payload);
+		const res = await http.post('/v1/therapists/me/care-team', payload);
 		return unwrap<any>(res.data);
 	},
 	updateCareTeamMember: async (id: string, payload: Partial<TherapistCareTeamMemberItem>): Promise<any> => {
@@ -326,19 +326,19 @@ export const therapistApi = {
 		return unwrap<any>(res.data);
 	},
 	getEarnings: async (): Promise<TherapistEarningsResponse> => {
-		const res = await http.get('/therapists/me/earnings');
+		const res = await http.get('/v1/therapists/me/earnings');
 		return unwrap<TherapistEarningsResponse>(res.data);
 	},
 	getMessages: async (): Promise<{ items: TherapistMessageItem[]; unreadCount: number }> => {
-		const res = await http.get('/therapists/me/messages');
+		const res = await http.get('/v1/therapists/me/messages');
 		return unwrap<{ items: TherapistMessageItem[]; unreadCount: number }>(res.data);
 	},
 	getPayoutHistory: async (): Promise<{ items: TherapistPayoutItem[] }> => {
-		const res = await http.get('/therapists/me/payout-history');
+		const res = await http.get('/v1/therapists/me/payout-history');
 		return unwrap<{ items: TherapistPayoutItem[] }>(res.data);
 	},
 	getAnalyticsSummary: async (): Promise<TherapistAnalyticsSummary> => {
-		const res = await http.get('/therapists/me/analytics/summary');
+		const res = await http.get('/v1/therapists/me/analytics/summary');
 		return unwrap<TherapistAnalyticsSummary>(res.data);
 	},
 	getPatientMoodPrediction: async (userId: string): Promise<MoodPredictionResponse> => {

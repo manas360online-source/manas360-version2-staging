@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, Clock, Loader2 } from 'lucide-react';
 import { patientApi } from '../../api/patient';
+import { FRONTEND_URL } from '../../lib/runtimeEnv';
 
 interface CalendarSelectionProps {
   onDateTimeSelect: (date: Date, time: string) => void;
@@ -234,7 +235,7 @@ export default function CalendarSelection({ onDateTimeSelect, onCancel }: Calend
                     className="rounded-lg bg-teal-600 px-4 py-2 text-white font-semibold mt-2 hover:bg-teal-700 transition-colors"
                     onClick={() => {
                       const returnTo = window.location.pathname + window.location.search + window.location.hash;
-                      window.location.href = `http://localhost:5173/payment/status?id=SUB_653d1e79_1774602028060&status=SUCCESS#/plans?returnTo=${encodeURIComponent(returnTo)}`;
+                      window.location.href = `${FRONTEND_URL}/payment/status?id=SUB_653d1e79_1774602028060&status=SUCCESS#/plans?returnTo=${encodeURIComponent(returnTo)}`;
                     }}
                   >
                     Subscribe to Platform Fee

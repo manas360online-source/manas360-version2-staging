@@ -28,8 +28,32 @@ export type SsoTenant = {
 
 const db = prisma as any;
 
+const isTransientPrismaSocketError = (error: unknown): boolean => {
+    const code = String((error as any)?.code || '');
+    const message = String((error as any)?.message || '').toLowerCase();
+    return code === 'UND_ERR_SOCKET' || message.includes('other side closed');
+};
+
+const executeRawWithRetry = async (sql: string, attempts = 2): Promise<void> => {
+    let lastError: unknown;
+    for (let index = 0; index < attempts; index += 1) {
+        try {
+            await db.$executeRawUnsafe(sql);
+            return;
+        } catch (error) {
+            lastError = error;
+            if (!isTransientPrismaSocketError(error) || index === attempts - 1) {
+                throw error;
+            }
+            await prisma.$disconnect().catch(() => undefined);
+            await prisma.$connect();
+        }
+    }
+    throw lastError;
+};
+
 export const ensureSsoTables = async (): Promise<void> => {
-    await db.$executeRawUnsafe(`
+    await executeRawWithRetry(`
         CREATE TABLE IF NOT EXISTS sso_tenants (
             id serial PRIMARY KEY,
             key text UNIQUE NOT NULL,
@@ -47,7 +71,7 @@ export const ensureSsoTables = async (): Promise<void> => {
         );
     `);
 
-    await db.$executeRawUnsafe(`
+    await executeRawWithRetry(`
         CREATE TABLE IF NOT EXISTS sso_identities (
             id serial PRIMARY KEY,
             user_id text NOT NULL,
@@ -62,11 +86,11 @@ export const ensureSsoTables = async (): Promise<void> => {
     `);
 
     // Add owner_company_key to sso_tenants if missing
-    await db.$executeRawUnsafe(`ALTER TABLE sso_tenants ADD COLUMN IF NOT EXISTS owner_company_key text;`);
+    await executeRawWithRetry(`ALTER TABLE sso_tenants ADD COLUMN IF NOT EXISTS owner_company_key text;`);
 
     // Ensure user table has company_key and is_company_admin
-    await db.$executeRawUnsafe(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS company_key text;`);
-    await db.$executeRawUnsafe(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS is_company_admin boolean DEFAULT false;`);
+    await executeRawWithRetry(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS company_key text;`);
+    await executeRawWithRetry(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS is_company_admin boolean DEFAULT false;`);
 };
 
 export const createTenant = async (input: Partial<SsoTenant>): Promise<SsoTenant> => {

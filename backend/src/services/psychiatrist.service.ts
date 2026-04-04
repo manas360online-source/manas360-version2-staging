@@ -1,14 +1,18 @@
 import { randomUUID } from 'crypto';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/error.middleware';
 
-const db = prisma as any;
+// Use the Prisma client type for DB operations. Some Prisma versions do not
+// export `TransactionClient` as a top-level type; use `typeof prisma` to
+// remain compatible across environments.
+type DbClient = typeof prisma;
 let initialized = false;
 
 const ensurePsychiatristTables = async (): Promise<void> => {
   if (initialized) return;
 
-  await db.$executeRawUnsafe(`
+  await prisma.$executeRaw`
     CREATE TABLE IF NOT EXISTS psychiatric_assessments (
       id TEXT PRIMARY KEY,
       psychiatrist_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -24,9 +28,9 @@ const ensurePsychiatristTables = async (): Promise<void> => {
       created_at TIMESTAMP NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMP NOT NULL DEFAULT NOW()
     );
-  `);
+  `;
 
-  await db.$executeRawUnsafe(`
+  await prisma.$executeRaw`
     CREATE TABLE IF NOT EXISTS prescriptions (
       id TEXT PRIMARY KEY,
       provider_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -39,9 +43,9 @@ const ensurePsychiatristTables = async (): Promise<void> => {
       created_at TIMESTAMP NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMP NOT NULL DEFAULT NOW()
     );
-  `);
+  `;
 
-  await db.$executeRawUnsafe(`
+  await prisma.$executeRaw`
     CREATE TABLE IF NOT EXISTS drug_interactions (
       id TEXT PRIMARY KEY,
       "psychiatristId" TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -56,9 +60,9 @@ const ensurePsychiatristTables = async (): Promise<void> => {
       override_justification TEXT,
       created_at TIMESTAMP NOT NULL DEFAULT NOW()
     );
-  `);
+  `;
 
-  await db.$executeRawUnsafe(`
+  await prisma.$executeRaw`
     CREATE TABLE IF NOT EXISTS medication_history (
       id TEXT PRIMARY KEY,
       "psychiatristId" TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -71,9 +75,9 @@ const ensurePsychiatristTables = async (): Promise<void> => {
       changed_at TIMESTAMP NOT NULL DEFAULT NOW(),
       created_at TIMESTAMP NOT NULL DEFAULT NOW()
     );
-  `);
+  `;
 
-  await db.$executeRawUnsafe(`
+  await prisma.$executeRaw`
     CREATE TABLE IF NOT EXISTS patient_vitals (
       id TEXT PRIMARY KEY,
       "patientId" TEXT NOT NULL REFERENCES patient_profiles(id) ON DELETE CASCADE,
@@ -87,9 +91,9 @@ const ensurePsychiatristTables = async (): Promise<void> => {
       recorded_at TIMESTAMP NOT NULL DEFAULT NOW(),
       created_at TIMESTAMP NOT NULL DEFAULT NOW()
     );
-  `);
+  `;
 
-  await db.$executeRawUnsafe(`
+  await prisma.$executeRaw`
     CREATE TABLE IF NOT EXISTS psychologist_wellness_plans (
       id TEXT PRIMARY KEY,
       "patientId" TEXT NOT NULL REFERENCES patient_profiles(id) ON DELETE CASCADE,
@@ -101,9 +105,9 @@ const ensurePsychiatristTables = async (): Promise<void> => {
       created_at TIMESTAMP NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMP NOT NULL DEFAULT NOW()
     );
-  `);
+  `;
 
-  await db.$executeRawUnsafe(`
+  await prisma.$executeRaw`
     CREATE TABLE IF NOT EXISTS psychiatrist_medication_library (
       id TEXT PRIMARY KEY,
       "psychiatristId" TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -115,9 +119,9 @@ const ensurePsychiatristTables = async (): Promise<void> => {
       created_at TIMESTAMP NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMP NOT NULL DEFAULT NOW()
     );
-  `);
+  `;
 
-  await db.$executeRawUnsafe(`
+  await prisma.$executeRaw`
     CREATE TABLE IF NOT EXISTS psychiatrist_assessment_templates (
       id TEXT PRIMARY KEY,
       "psychiatristId" TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -129,9 +133,9 @@ const ensurePsychiatristTables = async (): Promise<void> => {
       created_at TIMESTAMP NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMP NOT NULL DEFAULT NOW()
     );
-  `);
+  `;
 
-  await db.$executeRawUnsafe(`
+  await prisma.$executeRaw`
     CREATE TABLE IF NOT EXISTS psychiatrist_assessment_drafts (
       id TEXT PRIMARY KEY,
       "psychiatristId" TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -141,9 +145,9 @@ const ensurePsychiatristTables = async (): Promise<void> => {
       updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
       UNIQUE("psychiatristId", "patientId")
     );
-  `);
+  `;
 
-  await db.$executeRawUnsafe(`
+  await prisma.$executeRaw`
     CREATE TABLE IF NOT EXISTS psychiatrist_settings (
       id TEXT PRIMARY KEY,
       "psychiatristId" TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -152,101 +156,101 @@ const ensurePsychiatristTables = async (): Promise<void> => {
       updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
       UNIQUE("psychiatristId")
     );
-  `);
+  `;
 
   try {
-    await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS psychiatric_assessments_psychiatrist_idx ON psychiatric_assessments("psychiatristId", "createdAt" DESC);');
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS psychiatric_assessments_psychiatrist_idx ON psychiatric_assessments("psychiatristId", "createdAt" DESC);`;
   } catch (e) {
     try {
-      await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS psychiatric_assessments_psychiatrist_idx ON psychiatric_assessments(psychiatrist_id, created_at DESC);');
+      await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS psychiatric_assessments_psychiatrist_idx ON psychiatric_assessments(psychiatrist_id, created_at DESC);`;
     } catch {}
   }
 
   try {
-    await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS psychiatric_assessments_patient_idx ON psychiatric_assessments("patientId", "createdAt" DESC);');
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS psychiatric_assessments_patient_idx ON psychiatric_assessments("patientId", "createdAt" DESC);`;
   } catch (e) {
     try {
-      await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS psychiatric_assessments_patient_idx ON psychiatric_assessments(patient_id, created_at DESC);');
+      await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS psychiatric_assessments_patient_idx ON psychiatric_assessments(patient_id, created_at DESC);`;
     } catch {}
   }
 
   try {
-    await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS prescriptions_psychiatrist_idx ON prescriptions(provider_id, created_at DESC);');
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS prescriptions_psychiatrist_idx ON prescriptions(provider_id, created_at DESC);`;
   } catch (e) {
     try {
-      await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS prescriptions_psychiatrist_idx ON prescriptions(psychiatrist_id, created_at DESC);');
+      await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS prescriptions_psychiatrist_idx ON prescriptions(psychiatrist_id, created_at DESC);`;
     } catch {}
   }
 
   try {
-    await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS prescriptions_patient_idx ON prescriptions(patient_id, created_at DESC);');
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS prescriptions_patient_idx ON prescriptions(patient_id, created_at DESC);`;
   } catch (e) {
     try {
-      await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS prescriptions_patient_idx ON prescriptions("patientId", "createdAt" DESC);');
+      await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS prescriptions_patient_idx ON prescriptions("patientId", "createdAt" DESC);`;
     } catch {}
   }
 
   try {
-    await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS medication_history_patient_idx ON medication_history("patientId", "changedAt" DESC);');
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS medication_history_patient_idx ON medication_history("patientId", "changedAt" DESC);`;
   } catch (e) {
     try {
-      await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS medication_history_patient_idx ON medication_history(patient_id, changed_at DESC);');
+      await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS medication_history_patient_idx ON medication_history(patient_id, changed_at DESC);`;
     } catch {}
   }
 
   try {
-    await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS patient_vitals_patient_idx ON patient_vitals("patientId", "recordedAt" DESC);');
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS patient_vitals_patient_idx ON patient_vitals("patientId", "recordedAt" DESC);`;
   } catch (e) {
     try {
-      await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS patient_vitals_patient_idx ON patient_vitals(patient_id, recorded_at DESC);');
+      await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS patient_vitals_patient_idx ON patient_vitals(patient_id, recorded_at DESC);`;
     } catch {}
   }
 
   try {
-    await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS psychologist_wellness_plans_patient_idx ON psychologist_wellness_plans("patientId", "createdAt" DESC);');
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS psychologist_wellness_plans_patient_idx ON psychologist_wellness_plans("patientId", "createdAt" DESC);`;
   } catch (e) {
     try {
-      await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS psychologist_wellness_plans_patient_idx ON psychologist_wellness_plans(patient_id, created_at DESC);');
+      await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS psychologist_wellness_plans_patient_idx ON psychologist_wellness_plans(patient_id, created_at DESC);`;
     } catch {}
   }
 
   try {
-    await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS psychiatrist_medication_library_idx ON psychiatrist_medication_library("psychiatristId", "updatedAt" DESC);');
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS psychiatrist_medication_library_idx ON psychiatrist_medication_library("psychiatristId", "updatedAt" DESC);`;
   } catch (e) {
     try {
-      await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS psychiatrist_medication_library_idx ON psychiatrist_medication_library(psychiatrist_id, updated_at DESC);');
+      await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS psychiatrist_medication_library_idx ON psychiatrist_medication_library(psychiatrist_id, updated_at DESC);`;
     } catch {}
   }
 
   try {
-    await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS psychiatrist_assessment_templates_idx ON psychiatrist_assessment_templates("psychiatristId", "updatedAt" DESC);');
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS psychiatrist_assessment_templates_idx ON psychiatrist_assessment_templates("psychiatristId", "updatedAt" DESC);`;
   } catch (e) {
     try {
-      await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS psychiatrist_assessment_templates_idx ON psychiatrist_assessment_templates(psychiatrist_id, updated_at DESC);');
+      await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS psychiatrist_assessment_templates_idx ON psychiatrist_assessment_templates(psychiatrist_id, updated_at DESC);`;
     } catch {}
   }
 
   try {
-    await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS psychiatrist_assessment_drafts_idx ON psychiatrist_assessment_drafts("psychiatristId", "patientId", "updatedAt" DESC);');
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS psychiatrist_assessment_drafts_idx ON psychiatrist_assessment_drafts("psychiatristId", "patientId", "updatedAt" DESC);`;
   } catch (e) {
     try {
-      await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS psychiatrist_assessment_drafts_idx ON psychiatrist_assessment_drafts(psychiatrist_id, patient_id, updated_at DESC);');
+      await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS psychiatrist_assessment_drafts_idx ON psychiatrist_assessment_drafts(psychiatrist_id, patient_id, updated_at DESC);`;
     } catch {}
   }
 
   try {
-    await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS psychiatrist_settings_idx ON psychiatrist_settings("psychiatristId", "updatedAt" DESC);');
+    await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS psychiatrist_settings_idx ON psychiatrist_settings("psychiatristId", "updatedAt" DESC);`;
   } catch (e) {
     try {
-      await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS psychiatrist_settings_idx ON psychiatrist_settings(psychiatrist_id, updated_at DESC);');
+      await prisma.$executeRaw`CREATE INDEX IF NOT EXISTS psychiatrist_settings_idx ON psychiatrist_settings(psychiatrist_id, updated_at DESC);`;
     } catch {}
   }
 
   initialized = true;
 };
 
-const assertPsychiatrist = async (userId: string): Promise<void> => {
-  const user = await db.user.findUnique({
+const assertPsychiatrist = async (userId: string, db: DbClient = prisma): Promise<void> => {
+  const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { id: true, role: true, isDeleted: true },
   });
@@ -255,8 +259,8 @@ const assertPsychiatrist = async (userId: string): Promise<void> => {
   if (String(user.role) !== 'PSYCHIATRIST') throw new AppError('Psychiatrist role required', 403);
 };
 
-const getPatientBasics = async (patientId: string) => {
-  const patient = await db.patientProfile.findUnique({
+const getPatientBasics = async (patientId: string, db: DbClient = prisma) => {
+  const patient = await prisma.patientProfile.findUnique({
     where: { id: patientId },
     select: {
       id: true,
@@ -331,7 +335,7 @@ export const listPsychiatristPatients = async (userId: string) => {
   await ensurePsychiatristTables();
   await assertPsychiatrist(userId);
 
-  const sessions = await db.therapySession.findMany({
+  const sessions = await prisma.therapySession.findMany({
     where: { therapistProfileId: userId },
     orderBy: { dateTime: 'desc' },
     select: {
@@ -376,7 +380,7 @@ export const listPsychiatristPatients = async (userId: string) => {
 
   // Fallback pool for psychiatrists with no prior sessions yet.
   if (items.length === 0) {
-    const profiles = await db.patientProfile.findMany({
+    const profiles = await prisma.patientProfile.findMany({
       take: 25,
       orderBy: { createdAt: 'desc' },
       select: {
@@ -420,40 +424,27 @@ export const getPsychiatristDashboard = async (userId: string, patientId?: strin
     const dayEnd = new Date(now);
     dayEnd.setHours(23, 59, 59, 999);
 
-    const psychiatristSessions = await db.therapySession.findMany({
+    const psychiatristSessions = await prisma.therapySession.findMany({
       where: { therapistProfileId: userId },
       select: { patientProfileId: true },
     });
     const patientIds = Array.from(new Set((psychiatristSessions as any[]).map((s) => String(s.patientProfileId))));
 
     const [todayConsultationsCount, medicationReviews, interactionAlerts, worseningSymptoms] = await Promise.all([
-      db.therapySession.count({
+      prisma.therapySession.count({
         where: {
           therapistProfileId: userId,
           dateTime: { gte: dayStart, lte: dayEnd },
         },
       }),
-      db.$queryRawUnsafe(
-        `SELECT COUNT(*)::int AS value FROM prescriptions WHERE "psychiatristId" = $1 AND is_active = true AND review_due_at IS NOT NULL AND review_due_at <= NOW()`,
-        userId,
-      ),
-      db.$queryRawUnsafe(
-        `SELECT COUNT(*)::int AS value FROM drug_interactions WHERE "psychiatristId" = $1 AND severity IN ('CRITICAL', 'CAUTION')`,
-        userId,
-      ),
-      db.$queryRawUnsafe(
-        `SELECT COUNT(*)::int AS value FROM psychiatric_assessments pa WHERE pa."psychiatristId" = $1 AND LOWER(COALESCE(pa.severity, '')) IN ('severe','moderately severe')`,
-        userId,
-      ),
+      prisma.$queryRaw<Array<{ value: number }>>`SELECT COUNT(*)::int AS value FROM prescriptions WHERE "psychiatristId" = ${userId} AND is_active = true AND review_due_at IS NOT NULL AND review_due_at <= NOW()`,
+      prisma.$queryRaw<Array<{ value: number }>>`SELECT COUNT(*)::int AS value FROM drug_interactions WHERE "psychiatristId" = ${userId} AND severity IN ('CRITICAL', 'CAUTION')`,
+      prisma.$queryRaw<Array<{ value: number }>>`SELECT COUNT(*)::int AS value FROM psychiatric_assessments pa WHERE pa."psychiatristId" = ${userId} AND LOWER(COALESCE(pa.severity, '')) IN ('severe','moderately severe')`,
     ]);
 
     let nonAdherenceCount = 0;
     if (patientIds.length > 0) {
-      const placeholders = patientIds.map((_, i) => `$${i + 1}`).join(',');
-      const rows = await db.$queryRawUnsafe(
-        `SELECT COUNT(*)::int AS value FROM psychologist_wellness_plans WHERE is_active = true AND adherence_score < 60 AND "patientId" IN (${placeholders})`,
-        ...patientIds,
-      );
+      const rows = await prisma.$queryRaw<Array<{ value: number }>>`SELECT COUNT(*)::int AS value FROM psychologist_wellness_plans WHERE is_active = true AND adherence_score < 60 AND "patientId" IN (${Prisma.join(patientIds)})`;
       nonAdherenceCount = Number((rows as any[])[0]?.value || 0);
     }
 
@@ -471,48 +462,34 @@ export const getPsychiatristDashboard = async (userId: string, patientId?: strin
   const patient = await getPatientBasics(patientId);
 
   const [lastSession, nextSession, diagnosisRows, medicationsRows, wellnessRows] = await Promise.all([
-    db.therapySession.findFirst({
+    prisma.therapySession.findFirst({
       where: { therapistProfileId: userId, patientProfileId: patientId, dateTime: { lte: new Date() } },
       orderBy: { dateTime: 'desc' },
       select: { dateTime: true },
     }),
-    db.therapySession.findFirst({
+    prisma.therapySession.findFirst({
       where: { therapistProfileId: userId, patientProfileId: patientId, dateTime: { gt: new Date() } },
       orderBy: { dateTime: 'asc' },
       select: { dateTime: true },
     }),
-    db.$queryRawUnsafe(
-      `SELECT clinical_impression, severity, created_at FROM psychiatric_assessments WHERE "psychiatristId" = $1 AND "patientId" = $2 ORDER BY created_at DESC LIMIT 1`,
-      userId,
-      patientId,
-    ),
-    db.$queryRawUnsafe(
-      `SELECT drug_name, starting_dose, frequency, duration, instructions FROM prescriptions WHERE "psychiatristId" = $1 AND "patientId" = $2 AND is_active = true ORDER BY created_at DESC`,
-      userId,
-      patientId,
-    ),
-    db.$queryRawUnsafe(
-      `SELECT plan_items, notes, adherence_score, created_at FROM psychologist_wellness_plans WHERE "patientId" = $1 AND is_active = true ORDER BY created_at DESC LIMIT 1`,
-      patientId,
-    ),
+    prisma.$queryRaw<Array<{ clinical_impression: string | null; severity: string | null; created_at: Date }>>`SELECT clinical_impression, severity, created_at FROM psychiatric_assessments WHERE "psychiatristId" = ${userId} AND "patientId" = ${patientId} ORDER BY created_at DESC LIMIT 1`,
+    prisma.$queryRaw<Array<{ drug_name: string; starting_dose: string | null; frequency: string | null; duration: string | null; instructions: string | null }>>`SELECT drug_name, starting_dose, frequency, duration, instructions FROM prescriptions WHERE "psychiatristId" = ${userId} AND "patientId" = ${patientId} AND is_active = true ORDER BY created_at DESC`,
+    prisma.$queryRaw<Array<{ plan_items: unknown[]; notes: string | null; adherence_score: number; created_at: Date }>>`SELECT plan_items, notes, adherence_score, created_at FROM psychologist_wellness_plans WHERE "patientId" = ${patientId} AND is_active = true ORDER BY created_at DESC LIMIT 1`,
   ]);
 
   // Some environments may not have legacy therapist_exercises table. Use patient_exercises safely.
   let exercisesRows: any[] = [];
   try {
-    exercisesRows = await db.$queryRawUnsafe(
-      `SELECT "title" AS name,
+    exercisesRows = await prisma.$queryRaw<Array<{ name: string; completion_rate: number }>>`SELECT "title" AS name,
               CASE
                 WHEN UPPER(COALESCE("status", '')) = 'COMPLETED' THEN 100
                 WHEN UPPER(COALESCE("status", '')) IN ('IN_PROGRESS', 'IN PROGRESS') THEN 60
                 ELSE 30
               END AS completion_rate
          FROM "patient_exercises"
-         WHERE "patientId" = $1
+         WHERE "patientId" = ${patientId}
          ORDER BY "updatedAt" DESC
-         LIMIT 8`,
-      patientId,
-    );
+         LIMIT 8`;
   } catch {
     exercisesRows = [];
   }
@@ -560,35 +537,33 @@ export const getPsychiatristDashboard = async (userId: string, patientId?: strin
 
 export const createPsychiatricAssessment = async (userId: string, payload: any) => {
   await ensurePsychiatristTables();
-  await assertPsychiatrist(userId);
 
   const patientId = String(payload.patientId || '').trim();
   if (!patientId) throw new AppError('patientId is required', 400);
-  const patient = await getPatientBasics(patientId);
-  const patientUserId = patient.patientUserId;
 
-  const id = randomUUID();
-  await db.$executeRawUnsafe(
-    `
+  return prisma.$transaction(async (tx) => {
+    await assertPsychiatrist(userId, tx);
+    await getPatientBasics(patientId, tx);
+
+    const id = randomUUID();
+    await tx.$executeRaw`
     INSERT INTO psychiatric_assessments (
       id, "psychiatristId", "patientId", chief_complaint, symptoms, duration_weeks,
       medical_history, lab_results, clinical_impression, severity, status, created_at, updated_at
-    ) VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7::jsonb,$8::jsonb,$9,$10,$11,NOW(),NOW())
-    `,
-    id,
-    userId,
-    patientId,
-    String(payload.chiefComplaint || '').trim(),
-    JSON.stringify(Array.isArray(payload.symptoms) ? payload.symptoms : []),
-    payload.durationWeeks == null ? null : Number(payload.durationWeeks),
-    JSON.stringify(payload.medicalHistory || {}),
-    JSON.stringify(payload.labResults || {}),
-    payload.clinicalImpression ? String(payload.clinicalImpression) : null,
-    payload.severity ? String(payload.severity) : null,
-    String(payload.status || 'draft'),
-  );
+    ) VALUES (
+      ${id},${userId},${patientId},${String(payload.chiefComplaint || '').trim()},
+      ${JSON.stringify(Array.isArray(payload.symptoms) ? payload.symptoms : [])}::jsonb,
+      ${payload.durationWeeks == null ? null : Number(payload.durationWeeks)},
+      ${JSON.stringify(payload.medicalHistory || {})}::jsonb,
+      ${JSON.stringify(payload.labResults || {})}::jsonb,
+      ${payload.clinicalImpression ? String(payload.clinicalImpression) : null},
+      ${payload.severity ? String(payload.severity) : null},
+      ${String(payload.status || 'draft')},
+      NOW(),NOW()
+    )`;
 
-  return { id };
+    return { id };
+  });
 };
 
 export const listPsychiatricAssessments = async (userId: string, patientId?: string) => {
@@ -596,52 +571,37 @@ export const listPsychiatricAssessments = async (userId: string, patientId?: str
   await assertPsychiatrist(userId);
 
   const rows = patientId
-    ? await db.$queryRawUnsafe(
-        `SELECT * FROM psychiatric_assessments WHERE "psychiatristId" = $1 AND "patientId" = $2 ORDER BY created_at DESC LIMIT 100`,
-        userId,
-        patientId,
-      )
-    : await db.$queryRawUnsafe(
-        `SELECT * FROM psychiatric_assessments WHERE "psychiatristId" = $1 ORDER BY created_at DESC LIMIT 100`,
-        userId,
-      );
+    ? await prisma.$queryRaw`SELECT * FROM psychiatric_assessments WHERE "psychiatristId" = ${userId} AND "patientId" = ${patientId} ORDER BY created_at DESC LIMIT 100`
+    : await prisma.$queryRaw`SELECT * FROM psychiatric_assessments WHERE "psychiatristId" = ${userId} ORDER BY created_at DESC LIMIT 100`;
 
   return { items: rows };
 };
 
 export const createPrescription = async (userId: string, payload: any) => {
   await ensurePsychiatristTables();
-  await assertPsychiatrist(userId);
 
   const patientId = String(payload.patientId || '').trim();
   if (!patientId) throw new AppError('patientId is required', 400);
-  const patient = await getPatientBasics(patientId);
-  const patientUserId = patient.patientUserId;
-
-  const id = randomUUID();
   const instructions = buildMedicationInstruction(payload);
-
   const dosage = payload.dosage ? String(payload.dosage) : payload.startingDose ? String(payload.startingDose) : null;
   const status = String(payload.status || 'active');
   const instructionsText = instructions;
 
-  await db.$executeRawUnsafe(
-    `
+  return prisma.$transaction(async (tx) => {
+    await assertPsychiatrist(userId, tx);
+    const patient = await getPatientBasics(patientId, tx);
+    const id = randomUUID();
+
+    await tx.$executeRaw`
     INSERT INTO prescriptions (
       id, patient_id, provider_id, drug_name, dosage, instructions, prescribed_date, status, created_at, updated_at
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW(),NOW())
-    `,
-    id,
-    patientUserId,
-    userId,
-    String(payload.drugName || '').trim(),
-    dosage,
-    instructionsText,
-    payload.prescribedDate ? new Date(payload.prescribedDate) : new Date(),
-    status,
-  );
+    ) VALUES (
+      ${id},${patient.patientUserId},${userId},${String(payload.drugName || '').trim()},${dosage},${instructionsText},
+      ${payload.prescribedDate ? new Date(payload.prescribedDate) : new Date()},${status},NOW(),NOW()
+    )`;
 
-  return { id, instructions };
+    return { id, instructions };
+  });
 };
 
 export const listPrescriptions = async (userId: string, patientId?: string) => {
@@ -649,19 +609,14 @@ export const listPrescriptions = async (userId: string, patientId?: string) => {
   await assertPsychiatrist(userId);
 
   const rows = patientId
-    ? await db.$queryRawUnsafe(
-        `SELECT * FROM prescriptions WHERE "psychiatristId" = $1 AND "patientId" = $2 ORDER BY created_at DESC`,
-        userId,
-        patientId,
-      )
-    : await db.$queryRawUnsafe(`SELECT * FROM prescriptions WHERE "psychiatristId" = $1 ORDER BY created_at DESC`, userId);
+    ? await prisma.$queryRaw`SELECT * FROM prescriptions WHERE "psychiatristId" = ${userId} AND "patientId" = ${patientId} ORDER BY created_at DESC`
+    : await prisma.$queryRaw`SELECT * FROM prescriptions WHERE "psychiatristId" = ${userId} ORDER BY created_at DESC`;
 
   return { items: rows };
 };
 
 export const checkDrugInteractions = async (userId: string, payload: any) => {
   await ensurePsychiatristTables();
-  await assertPsychiatrist(userId);
 
   const patientId = payload.patientId ? String(payload.patientId) : null;
   const medications = Array.isArray(payload.medications) ? payload.medications : [];
@@ -674,25 +629,22 @@ export const checkDrugInteractions = async (userId: string, payload: any) => {
     ...herbals.map((v: unknown) => String(v)),
   ]);
 
-  for (const w of warnings) {
-    await db.$executeRawUnsafe(
-      `
+  await prisma.$transaction(async (tx) => {
+    await assertPsychiatrist(userId, tx);
+
+    for (const w of warnings) {
+      await tx.$executeRaw`
       INSERT INTO drug_interactions (
         id, "psychiatristId", "patientId", primary_substance, interacting_substance, severity, risk, recommendation, resolution, override_justification, created_at
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW())
-      `,
-      randomUUID(),
-      userId,
-      patientId,
-      String(w.primarySubstance),
-      String(w.interactingSubstance),
-      String(w.severity),
-      String(w.risk || ''),
-      String(w.recommendation || ''),
-      payload.resolution ? String(payload.resolution) : null,
-      payload.overrideJustification ? String(payload.overrideJustification) : null,
-    );
-  }
+      ) VALUES (
+        ${randomUUID()},${userId},${patientId},${String(w.primarySubstance)},${String(w.interactingSubstance)},${String(w.severity)},
+        ${String(w.risk || '')},${String(w.recommendation || '')},
+        ${payload.resolution ? String(payload.resolution) : null},
+        ${payload.overrideJustification ? String(payload.overrideJustification) : null},
+        NOW()
+      )`;
+    }
+  });
 
   return {
     level: warnings.some((w) => String(w.severity) === 'CRITICAL')
@@ -708,28 +660,23 @@ export const checkDrugInteractions = async (userId: string, payload: any) => {
 
 export const recordMedicationAdjustment = async (userId: string, payload: any) => {
   await ensurePsychiatristTables();
-  await assertPsychiatrist(userId);
 
   const patientId = String(payload.patientId || '').trim();
   if (!patientId) throw new AppError('patientId is required', 400);
 
   const id = randomUUID();
-  await db.$executeRawUnsafe(
-    `
+  await prisma.$transaction(async (tx) => {
+    await assertPsychiatrist(userId, tx);
+    await tx.$executeRaw`
     INSERT INTO medication_history (
       id, "psychiatristId", "patientId", medication, old_dose, new_dose, reason, outcome, changed_at, created_at
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW())
-    `,
-    id,
-    userId,
-    patientId,
-    String(payload.medication || '').trim(),
-    payload.oldDose ? String(payload.oldDose) : null,
-    payload.newDose ? String(payload.newDose) : null,
-    payload.reason ? String(payload.reason) : null,
-    payload.outcome ? String(payload.outcome) : null,
-    payload.changedAt ? new Date(payload.changedAt) : new Date(),
-  );
+    ) VALUES (
+      ${id},${userId},${patientId},${String(payload.medication || '').trim()},
+      ${payload.oldDose ? String(payload.oldDose) : null},${payload.newDose ? String(payload.newDose) : null},
+      ${payload.reason ? String(payload.reason) : null},${payload.outcome ? String(payload.outcome) : null},
+      ${payload.changedAt ? new Date(payload.changedAt) : new Date()},NOW()
+    )`;
+  });
 
   return { id };
 };
@@ -739,12 +686,8 @@ export const listMedicationHistory = async (userId: string, patientId?: string) 
   await assertPsychiatrist(userId);
 
   const rows = patientId
-    ? await db.$queryRawUnsafe(
-        `SELECT * FROM medication_history WHERE "psychiatristId" = $1 AND "patientId" = $2 ORDER BY changed_at DESC`,
-        userId,
-        patientId,
-      )
-    : await db.$queryRawUnsafe(`SELECT * FROM medication_history WHERE "psychiatristId" = $1 ORDER BY changed_at DESC`, userId);
+    ? await prisma.$queryRaw`SELECT * FROM medication_history WHERE "psychiatristId" = ${userId} AND "patientId" = ${patientId} ORDER BY changed_at DESC`
+    : await prisma.$queryRaw`SELECT * FROM medication_history WHERE "psychiatristId" = ${userId} ORDER BY changed_at DESC`;
 
   return { items: rows };
 };
@@ -756,18 +699,9 @@ export const getParameterTracking = async (userId: string, patientId: string) =>
   const patient = await getPatientBasics(patientId);
 
   const [phqRows, gadRows, vitalsRows] = await Promise.all([
-    db.$queryRawUnsafe(
-      `SELECT assessed_at, total_score FROM phq9_assessments WHERE user_id = $1 ORDER BY assessed_at ASC LIMIT 24`,
-      patient.patientUserId,
-    ),
-    db.$queryRawUnsafe(
-      `SELECT assessed_at, total_score FROM gad7_assessments WHERE user_id = $1 ORDER BY assessed_at ASC LIMIT 24`,
-      patient.patientUserId,
-    ),
-    db.$queryRawUnsafe(
-      `SELECT recorded_at, adherence_percent, side_effects, systolic, diastolic, pulse, weight FROM patient_vitals WHERE "patientId" = $1 ORDER BY recorded_at ASC LIMIT 24`,
-      patientId,
-    ),
+    prisma.$queryRaw<Array<{ assessed_at: Date; total_score: number }>>`SELECT assessed_at, total_score FROM phq9_assessments WHERE user_id = ${patient.patientUserId} ORDER BY assessed_at ASC LIMIT 24`,
+    prisma.$queryRaw<Array<{ assessed_at: Date; total_score: number }>>`SELECT assessed_at, total_score FROM gad7_assessments WHERE user_id = ${patient.patientUserId} ORDER BY assessed_at ASC LIMIT 24`,
+    prisma.$queryRaw<Array<{ recorded_at: Date; adherence_percent: number; side_effects: unknown[]; systolic: number | null; diastolic: number | null; pulse: number | null; weight: number | null }>>`SELECT recorded_at, adherence_percent, side_effects, systolic, diastolic, pulse, weight FROM patient_vitals WHERE "patientId" = ${patientId} ORDER BY recorded_at ASC LIMIT 24`,
   ]);
 
   return {
@@ -796,7 +730,6 @@ export const getParameterTracking = async (userId: string, patientId: string) =>
 
 export const scheduleFollowUp = async (userId: string, payload: any) => {
   await ensurePsychiatristTables();
-  await assertPsychiatrist(userId);
 
   const patientId = String(payload.patientId || '').trim();
   if (!patientId) throw new AppError('patientId is required', 400);
@@ -811,18 +744,23 @@ export const scheduleFollowUp = async (userId: string, payload: any) => {
     ? 60
     : 30;
 
-  const session = await db.therapySession.create({
-    data: {
-      bookingReferenceId,
-      patientProfileId: patientId,
-      therapistProfileId: userId,
-      dateTime: new Date(payload.dateTime || Date.now() + 3 * 24 * 60 * 60 * 1000),
-      durationMinutes,
-      sessionFeeMinor: BigInt(0),
-      paymentStatus: 'UNPAID',
-      status: 'CONFIRMED',
-    },
-    select: { id: true, bookingReferenceId: true, dateTime: true, durationMinutes: true },
+  const session = await prisma.$transaction(async (tx) => {
+    await assertPsychiatrist(userId, tx);
+    await getPatientBasics(patientId, tx);
+
+    return tx.therapySession.create({
+      data: {
+        bookingReferenceId,
+        patientProfileId: patientId,
+        therapistProfileId: userId,
+        dateTime: new Date(payload.dateTime || Date.now() + 3 * 24 * 60 * 60 * 1000),
+        durationMinutes,
+        sessionFeeMinor: BigInt(0),
+        paymentStatus: 'UNPAID',
+        status: 'CONFIRMED',
+      },
+      select: { id: true, bookingReferenceId: true, dateTime: true, durationMinutes: true },
+    });
   });
 
   return {
@@ -842,35 +780,27 @@ export const getSelfModeDashboard = async (userId: string) => {
   weekStart.setHours(0, 0, 0, 0);
 
   const [sessions, fallbackPatientCount, activePrescriptions, consultationsThisWeek, incomeAgg, ratingAgg, prescriptionTrendRows, assessmentTrendRows, revenueRows, reviewsDueRows] = await Promise.all([
-    db.therapySession.findMany({
+    prisma.therapySession.findMany({
       where: { therapistProfileId: userId },
       select: { patientProfileId: true },
     }),
-    db.patientProfile.count(),
-    db.$queryRawUnsafe(
-      `SELECT COUNT(*)::int AS value FROM prescriptions WHERE "psychiatristId" = $1 AND is_active = true`,
-      userId,
-    ),
-    db.therapySession.count({ where: { therapistProfileId: userId, dateTime: { gte: weekStart } } }),
-    db.therapySession.aggregate({
+    prisma.patientProfile.count(),
+    prisma.$queryRaw<Array<{ value: number }>>`SELECT COUNT(*)::int AS value FROM prescriptions WHERE "psychiatristId" = ${userId} AND is_active = true`,
+    prisma.therapySession.count({ where: { therapistProfileId: userId, dateTime: { gte: weekStart } } }),
+    prisma.therapySession.aggregate({
       _sum: { sessionFeeMinor: true },
       where: { therapistProfileId: userId },
     }),
-    db.$queryRawUnsafe(
-      `SELECT ROUND(AVG(COALESCE(rating, 0))::numeric, 1) AS value FROM therapist_reviews WHERE therapist_id = $1`,
-      userId,
-    ).catch(() => [{ value: null }]),
-    db.$queryRawUnsafe(
-      `SELECT TO_CHAR(created_at, 'Mon YY') AS label, COUNT(*)::int AS value
+    prisma.$queryRaw<Array<{ value: number | null }>>`SELECT ROUND(AVG(COALESCE(rating, 0))::numeric, 1) AS value FROM therapist_reviews WHERE therapist_id = ${userId}`.catch(() => [{ value: null }]),
+    prisma.$queryRaw<Array<{ label: string; value: number }>>`
+      SELECT TO_CHAR(created_at, 'Mon YY') AS label, COUNT(*)::int AS value
       FROM prescriptions
-      WHERE "psychiatristId" = $1
+      WHERE "psychiatristId" = ${userId}
        GROUP BY TO_CHAR(created_at, 'Mon YY'), DATE_TRUNC('month', created_at)
        ORDER BY DATE_TRUNC('month', created_at) DESC
        LIMIT 6`,
-      userId,
-    ),
-    db.$queryRawUnsafe(
-      `SELECT TO_CHAR(created_at, 'Mon YY') AS label,
+    prisma.$queryRaw<Array<{ label: string; value: number }>>`
+      SELECT TO_CHAR(created_at, 'Mon YY') AS label,
               ROUND(AVG(
                 CASE LOWER(COALESCE(severity, ''))
                   WHEN 'severe' THEN 35
@@ -881,30 +811,24 @@ export const getSelfModeDashboard = async (userId: string) => {
                 END
               )::numeric, 1) AS value
       FROM psychiatric_assessments
-      WHERE "psychiatristId" = $1
+      WHERE "psychiatristId" = ${userId}
        GROUP BY TO_CHAR(created_at, 'Mon YY'), DATE_TRUNC('month', created_at)
        ORDER BY DATE_TRUNC('month', created_at) DESC
        LIMIT 6`,
-      userId,
-    ),
-    db.$queryRawUnsafe(
-      `SELECT TO_CHAR(date_time, 'Mon YY') AS label, COALESCE(SUM(session_fee_minor), 0)::bigint AS value
+    prisma.$queryRaw<Array<{ label: string; value: bigint }>>`
+      SELECT TO_CHAR(date_time, 'Mon YY') AS label, COALESCE(SUM(session_fee_minor), 0)::bigint AS value
       FROM therapy_sessions
-      WHERE therapist_profile_id = $1
+      WHERE therapist_profile_id = ${userId}
        GROUP BY TO_CHAR(date_time, 'Mon YY'), DATE_TRUNC('month', date_time)
        ORDER BY DATE_TRUNC('month', date_time) DESC
-       LIMIT 6`,
-      userId,
-    ).catch(() => []),
-    db.$queryRawUnsafe(
-      `SELECT COUNT(*)::int AS value
+       LIMIT 6`.catch(() => []),
+    prisma.$queryRaw<Array<{ value: number }>>`
+      SELECT COUNT(*)::int AS value
        FROM prescriptions
-       WHERE "psychiatristId" = $1
+       WHERE "psychiatristId" = ${userId}
          AND is_active = true
          AND review_due_at IS NOT NULL
          AND review_due_at <= NOW()`,
-      userId,
-    ),
   ]);
 
   const sessionPatientCount = new Set((sessions as any[]).map((s) => String(s.patientProfileId))).size;
@@ -938,13 +862,11 @@ export const listPsychiatristMedicationLibrary = async (userId: string) => {
   await ensurePsychiatristTables();
   await assertPsychiatrist(userId);
 
-  const rows = await db.$queryRawUnsafe(
-    `SELECT id, drug_name, starting_dose, max_dose, side_effects, notes, created_at, updated_at
+  const rows = await prisma.$queryRaw<Array<{ id: string; drug_name: string | null; starting_dose: string | null; max_dose: string | null; side_effects: string | null; notes: string | null; created_at: Date; updated_at: Date }>>`
+    SELECT id, drug_name, starting_dose, max_dose, side_effects, notes, created_at, updated_at
      FROM psychiatrist_medication_library
-     WHERE "psychiatristId" = $1
-     ORDER BY updated_at DESC`,
-    userId,
-  );
+     WHERE "psychiatristId" = ${userId}
+     ORDER BY updated_at DESC`;
 
   return {
     items: (rows as any[]).map((row) => ({
@@ -962,24 +884,17 @@ export const listPsychiatristMedicationLibrary = async (userId: string) => {
 
 export const createPsychiatristMedicationLibraryItem = async (userId: string, payload: any) => {
   await ensurePsychiatristTables();
-  await assertPsychiatrist(userId);
 
   const drugName = String(payload.drugName || '').trim();
   if (!drugName) throw new AppError('drugName is required', 400);
 
   const id = randomUUID();
-  await db.$executeRawUnsafe(
-    `INSERT INTO psychiatrist_medication_library (
+  await prisma.$transaction(async (tx) => {
+    await assertPsychiatrist(userId, tx);
+    await tx.$executeRaw`INSERT INTO psychiatrist_medication_library (
       id, "psychiatristId", drug_name, starting_dose, max_dose, side_effects, notes, created_at, updated_at
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,NOW(),NOW())`,
-    id,
-    userId,
-    drugName,
-    payload.startingDose ? String(payload.startingDose) : null,
-    payload.maxDose ? String(payload.maxDose) : null,
-    payload.sideEffects ? String(payload.sideEffects) : null,
-    payload.notes ? String(payload.notes) : null,
-  );
+    ) VALUES (${id},${userId},${drugName},${payload.startingDose ? String(payload.startingDose) : null},${payload.maxDose ? String(payload.maxDose) : null},${payload.sideEffects ? String(payload.sideEffects) : null},${payload.notes ? String(payload.notes) : null},NOW(),NOW())`;
+  });
 
   return { id };
 };
@@ -988,13 +903,11 @@ export const listPsychiatristAssessmentTemplates = async (userId: string) => {
   await ensurePsychiatristTables();
   await assertPsychiatrist(userId);
 
-  const rows = await db.$queryRawUnsafe(
-    `SELECT id, name, checklist, severity_scale, duration_field, notes, created_at, updated_at
+  const rows = await prisma.$queryRaw<Array<{ id: string; name: string | null; checklist: string | null; severity_scale: string | null; duration_field: string | null; notes: string | null; created_at: Date; updated_at: Date }>>`
+    SELECT id, name, checklist, severity_scale, duration_field, notes, created_at, updated_at
      FROM psychiatrist_assessment_templates
-     WHERE "psychiatristId" = $1
-     ORDER BY updated_at DESC`,
-    userId,
-  );
+     WHERE "psychiatristId" = ${userId}
+     ORDER BY updated_at DESC`;
 
   return {
     items: (rows as any[]).map((row) => ({
@@ -1012,24 +925,17 @@ export const listPsychiatristAssessmentTemplates = async (userId: string) => {
 
 export const createPsychiatristAssessmentTemplate = async (userId: string, payload: any) => {
   await ensurePsychiatristTables();
-  await assertPsychiatrist(userId);
 
   const name = String(payload.name || '').trim();
   if (!name) throw new AppError('name is required', 400);
 
   const id = randomUUID();
-  await db.$executeRawUnsafe(
-    `INSERT INTO psychiatrist_assessment_templates (
+  await prisma.$transaction(async (tx) => {
+    await assertPsychiatrist(userId, tx);
+    await tx.$executeRaw`INSERT INTO psychiatrist_assessment_templates (
       id, "psychiatristId", name, checklist, severity_scale, duration_field, notes, created_at, updated_at
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,NOW(),NOW())`,
-    id,
-    userId,
-    name,
-    payload.checklist ? String(payload.checklist) : null,
-    payload.severityScale ? String(payload.severityScale) : null,
-    payload.durationField ? String(payload.durationField) : null,
-    payload.notes ? String(payload.notes) : null,
-  );
+    ) VALUES (${id},${userId},${name},${payload.checklist ? String(payload.checklist) : null},${payload.severityScale ? String(payload.severityScale) : null},${payload.durationField ? String(payload.durationField) : null},${payload.notes ? String(payload.notes) : null},NOW(),NOW())`;
+  });
 
   return { id };
 };
@@ -1042,14 +948,11 @@ export const getPsychiatristAssessmentDraft = async (userId: string, patientId: 
   if (!normalizedPatientId) throw new AppError('patientId is required', 400);
   await getPatientBasics(normalizedPatientId);
 
-    const rows = await db.$queryRawUnsafe(
-    `SELECT payload, updated_at
+  const rows = await prisma.$queryRaw<Array<{ payload: unknown; updated_at: Date }>>`
+    SELECT payload, updated_at
      FROM psychiatrist_assessment_drafts
-     WHERE "psychiatristId" = $1 AND "patientId" = $2
-     LIMIT 1`,
-    userId,
-    normalizedPatientId,
-  );
+     WHERE "psychiatristId" = ${userId} AND "patientId" = ${normalizedPatientId}
+     LIMIT 1`;
 
   const row = (rows as any[])[0];
   return {
@@ -1061,38 +964,32 @@ export const getPsychiatristAssessmentDraft = async (userId: string, patientId: 
 
 export const upsertPsychiatristAssessmentDraft = async (userId: string, patientId: string, payload: any) => {
   await ensurePsychiatristTables();
-  await assertPsychiatrist(userId);
 
   const normalizedPatientId = String(patientId || '').trim();
   if (!normalizedPatientId) throw new AppError('patientId is required', 400);
-  await getPatientBasics(normalizedPatientId);
+  await prisma.$transaction(async (tx) => {
+    await assertPsychiatrist(userId, tx);
+    await getPatientBasics(normalizedPatientId, tx);
 
-  await db.$executeRawUnsafe(
-    `INSERT INTO psychiatrist_assessment_drafts (id, "psychiatristId", "patientId", payload, created_at, updated_at)
-     VALUES ($1,$2,$3,$4::jsonb,NOW(),NOW())
+    await tx.$executeRaw`INSERT INTO psychiatrist_assessment_drafts (id, "psychiatristId", "patientId", payload, created_at, updated_at)
+     VALUES (${randomUUID()},${userId},${normalizedPatientId},${JSON.stringify(payload || {})}::jsonb,NOW(),NOW())
      ON CONFLICT ("psychiatristId", "patientId")
-     DO UPDATE SET payload = EXCLUDED.payload, updated_at = NOW()`,
-    randomUUID(),
-    userId,
-    normalizedPatientId,
-    JSON.stringify(payload || {}),
-  );
+     DO UPDATE SET payload = EXCLUDED.payload, updated_at = NOW()`;
+  });
 
   return { patientId: normalizedPatientId };
 };
 
 export const clearPsychiatristAssessmentDraft = async (userId: string, patientId: string) => {
   await ensurePsychiatristTables();
-  await assertPsychiatrist(userId);
 
   const normalizedPatientId = String(patientId || '').trim();
   if (!normalizedPatientId) throw new AppError('patientId is required', 400);
 
-  await db.$executeRawUnsafe(
-    `DELETE FROM psychiatrist_assessment_drafts WHERE "psychiatristId" = $1 AND "patientId" = $2`,
-    userId,
-    normalizedPatientId,
-  );
+  await prisma.$transaction(async (tx) => {
+    await assertPsychiatrist(userId, tx);
+    await tx.$executeRaw`DELETE FROM psychiatrist_assessment_drafts WHERE "psychiatristId" = ${userId} AND "patientId" = ${normalizedPatientId}`;
+  });
 
   return { patientId: normalizedPatientId };
 };
@@ -1101,13 +998,11 @@ export const getPsychiatristSettings = async (userId: string) => {
   await ensurePsychiatristTables();
   await assertPsychiatrist(userId);
 
-  const rows = await db.$queryRawUnsafe(
-    `SELECT payload, updated_at
+  const rows = await prisma.$queryRaw<Array<{ payload: unknown; updated_at: Date }>>`
+    SELECT payload, updated_at
      FROM psychiatrist_settings
-     WHERE "psychiatristId" = $1
-     LIMIT 1`,
-    userId,
-  );
+     WHERE "psychiatristId" = ${userId}
+     LIMIT 1`;
 
   const row = (rows as any[])[0];
   return {
@@ -1118,17 +1013,13 @@ export const getPsychiatristSettings = async (userId: string) => {
 
 export const upsertPsychiatristSettings = async (userId: string, payload: any) => {
   await ensurePsychiatristTables();
-  await assertPsychiatrist(userId);
-
-  await db.$executeRawUnsafe(
-    `INSERT INTO psychiatrist_settings (id, "psychiatristId", payload, created_at, updated_at)
-     VALUES ($1,$2,$3::jsonb,NOW(),NOW())
+  await prisma.$transaction(async (tx) => {
+    await assertPsychiatrist(userId, tx);
+    await tx.$executeRaw`INSERT INTO psychiatrist_settings (id, "psychiatristId", payload, created_at, updated_at)
+     VALUES (${randomUUID()},${userId},${JSON.stringify(payload || {})}::jsonb,NOW(),NOW())
      ON CONFLICT ("psychiatristId")
-     DO UPDATE SET payload = EXCLUDED.payload, updated_at = NOW()`,
-    randomUUID(),
-    userId,
-    JSON.stringify(payload || {}),
-  );
+     DO UPDATE SET payload = EXCLUDED.payload, updated_at = NOW()`;
+  });
 
   return { ok: true };
 };

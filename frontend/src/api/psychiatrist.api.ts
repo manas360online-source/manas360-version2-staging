@@ -102,35 +102,35 @@ export type PsychiatristSettingsPayload = Record<string, unknown>;
 
 export const psychiatristApi = {
   getDashboard: async (patientId?: string): Promise<PsychiatristDashboard> => {
-    const res = await http.get('/psychiatrist/me/dashboard', { params: patientId ? { patientId } : undefined });
+    const res = await http.get('/v1/psychiatrist/me/dashboard', { params: patientId ? { patientId } : undefined });
     return unwrap<PsychiatristDashboard>(res.data);
   },
   getSelfMode: async (): Promise<PsychiatristSelfMode> => {
-    const res = await http.get('/psychiatrist/me/self-mode');
+    const res = await http.get('/v1/psychiatrist/me/self-mode');
     return unwrap<PsychiatristSelfMode>(res.data);
   },
   getPatients: async (): Promise<{ items: PsychiatristPatient[] }> => {
-    const res = await http.get('/psychiatrist/me/patients');
+    const res = await http.get('/v1/psychiatrist/me/patients');
     return unwrap<{ items: PsychiatristPatient[] }>(res.data);
   },
   createAssessment: async (payload: Record<string, unknown>): Promise<{ id: string }> => {
-    const res = await http.post('/psychiatrist/me/assessments', payload);
+    const res = await http.post('/v1/psychiatrist/me/assessments', payload);
     return unwrap<{ id: string }>(res.data);
   },
   listAssessments: async (patientId?: string): Promise<{ items: any[] }> => {
-    const res = await http.get('/psychiatrist/me/assessments', { params: patientId ? { patientId } : undefined });
+    const res = await http.get('/v1/psychiatrist/me/assessments', { params: patientId ? { patientId } : undefined });
     return unwrap<{ items: any[] }>(res.data);
   },
   createPrescription: async (payload: Record<string, unknown>): Promise<{ id: string; instructions: string }> => {
-    const res = await http.post('/psychiatrist/me/prescriptions', payload);
+    const res = await http.post('/v1/psychiatrist/me/prescriptions', payload);
     return unwrap<{ id: string; instructions: string }>(res.data);
   },
   listPrescriptions: async (patientId?: string): Promise<{ items: any[] }> => {
-    const res = await http.get('/psychiatrist/me/prescriptions', { params: patientId ? { patientId } : undefined });
+    const res = await http.get('/v1/psychiatrist/me/prescriptions', { params: patientId ? { patientId } : undefined });
     return unwrap<{ items: any[] }>(res.data);
   },
   checkInteractions: async (payload: Record<string, unknown>): Promise<{ level: string; warnings: any[] }> => {
-    const res = await http.post('/psychiatrist/me/drug-interactions/check', payload);
+    const res = await http.post('/v1/psychiatrist/me/drug-interactions/check', payload);
     return unwrap<{ level: string; warnings: any[] }>(res.data);
   },
   getParameterTracking: async (patientId: string): Promise<any> => {
@@ -138,31 +138,31 @@ export const psychiatristApi = {
     return unwrap<any>(res.data);
   },
   createMedicationHistory: async (payload: Record<string, unknown>): Promise<{ id: string }> => {
-    const res = await http.post('/psychiatrist/me/medication-history', payload);
+    const res = await http.post('/v1/psychiatrist/me/medication-history', payload);
     return unwrap<{ id: string }>(res.data);
   },
   listMedicationHistory: async (patientId?: string): Promise<{ items: any[] }> => {
-    const res = await http.get('/psychiatrist/me/medication-history', { params: patientId ? { patientId } : undefined });
+    const res = await http.get('/v1/psychiatrist/me/medication-history', { params: patientId ? { patientId } : undefined });
     return unwrap<{ items: any[] }>(res.data);
   },
   createFollowUp: async (payload: Record<string, unknown>): Promise<any> => {
-    const res = await http.post('/psychiatrist/me/follow-ups', payload);
+    const res = await http.post('/v1/psychiatrist/me/follow-ups', payload);
     return unwrap<any>(res.data);
   },
   listMedicationLibrary: async (): Promise<{ items: PsychiatristMedicationLibraryItem[] }> => {
-    const res = await http.get('/psychiatrist/me/medication-library');
+    const res = await http.get('/v1/psychiatrist/me/medication-library');
     return unwrap<{ items: PsychiatristMedicationLibraryItem[] }>(res.data);
   },
   createMedicationLibraryItem: async (payload: Record<string, unknown>): Promise<{ id: string }> => {
-    const res = await http.post('/psychiatrist/me/medication-library', payload);
+    const res = await http.post('/v1/psychiatrist/me/medication-library', payload);
     return unwrap<{ id: string }>(res.data);
   },
   listAssessmentTemplates: async (): Promise<{ items: PsychiatristAssessmentTemplateItem[] }> => {
-    const res = await http.get('/psychiatrist/me/assessment-templates');
+    const res = await http.get('/v1/psychiatrist/me/assessment-templates');
     return unwrap<{ items: PsychiatristAssessmentTemplateItem[] }>(res.data);
   },
   createAssessmentTemplate: async (payload: Record<string, unknown>): Promise<{ id: string }> => {
-    const res = await http.post('/psychiatrist/me/assessment-templates', payload);
+    const res = await http.post('/v1/psychiatrist/me/assessment-templates', payload);
     return unwrap<{ id: string }>(res.data);
   },
   getAssessmentDraft: async (patientId: string): Promise<{ patientId: string; payload: PsychiatristAssessmentDraftPayload | null; updatedAt: string | null }> => {
@@ -178,11 +178,11 @@ export const psychiatristApi = {
     return unwrap<{ patientId: string }>(res.data);
   },
   getSettings: async (): Promise<{ payload: PsychiatristSettingsPayload; updatedAt: string | null }> => {
-    const res = await http.get('/psychiatrist/me/settings');
+    const res = await http.get('/v1/psychiatrist/me/settings');
     return unwrap<{ payload: PsychiatristSettingsPayload; updatedAt: string | null }>(res.data);
   },
   saveSettings: async (payload: PsychiatristSettingsPayload): Promise<{ ok: boolean }> => {
-    const res = await http.put('/psychiatrist/me/settings', payload);
+    const res = await http.put('/v1/psychiatrist/me/settings', payload);
     return unwrap<{ ok: boolean }>(res.data);
   },
 };

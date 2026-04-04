@@ -17,12 +17,12 @@ import { StatusLight, type ConnectionStatus } from '../../components/shared/Stat
 import GPSDashboard from '../../components/therapist/GPSDashboard';
 import useAuthToken from '../../hooks/useAuthToken';
 import { http } from '../../lib/http';
+import { AI_ENGINE_WS_URL } from '../../lib/runtimeEnv';
 import { useAuth } from '../../context/AuthContext';
 import { useVideoSession } from '../../context/VideoSessionContext';
 
 const providerRoles = new Set(['therapist', 'psychiatrist', 'psychologist', 'coach']);
 const MIN_AUDIO_CAPTURE_SECONDS = 15;
-const AI_ENGINE_WS_URL = import.meta.env.VITE_AI_ENGINE_WS_URL || 'ws://localhost:8765';
 type WorkspaceTab = 'patient-info' | 'clinical-notes' | 'ai-insights';
 
 

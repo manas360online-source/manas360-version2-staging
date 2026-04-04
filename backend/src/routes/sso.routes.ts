@@ -1,13 +1,14 @@
 import { Router } from 'express';
 import ssoController from '../controllers/sso.controller';
 import { requireAuth } from '../middleware/auth.middleware';
+import { requireRole } from '../middleware/rbac.middleware';
 import { requireTenantAdmin } from '../middleware/tenantAdmin.middleware';
 const router = Router();
 
 // Tenant management (admin)
-router.get('/tenants', ssoController.listTenantsController);
+router.get('/tenants', requireAuth, requireRole(['admin', 'superadmin']), ssoController.listTenantsController);
 router.get('/tenant/me', requireAuth, ssoController.getMyTenantController);
-router.post('/tenants', ssoController.createTenantController);
+router.post('/tenants', requireAuth, requireRole(['admin', 'superadmin']), ssoController.createTenantController);
 router.post('/tenants/template/azure', requireAuth, requireTenantAdmin(), ssoController.createAzureTemplateTenantController);
 router.post('/tenants/template/google', requireAuth, requireTenantAdmin(), ssoController.createGoogleTemplateTenantController);
 router.post('/tenants/template/okta', requireAuth, requireTenantAdmin(), ssoController.createOktaTemplateTenantController);

@@ -53,11 +53,11 @@ export const getCertificationsErrorMessage = (error: unknown, fallback = 'Reques
 };
 
 export const getCertifications = async (): Promise<{ items: Certification[]; total: number }> => {
-	const response = await http.get<ApiEnvelope<{ items: Certification[]; total: number }>>('/certifications');
+	const response = await http.get<ApiEnvelope<{ items: Certification[]; total: number }>>('/v1/certifications');
 	return response.data.data;
 };
 
 export const getCertificationById = async (id: string): Promise<Certification> => {
-	const response = await http.get<ApiEnvelope<Certification>>(`/certifications/${encodeURIComponent(id)}`);
+	const response = await http.get<ApiEnvelope<Certification>>(`/v1/certifications/${encodeURIComponent(id)}`);
 	return response.data.data;
 };

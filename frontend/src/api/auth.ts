@@ -65,6 +65,9 @@ export interface ProviderRegisterPayload {
 export interface SignupConsentPayload {
 	acceptedTerms: boolean;
 	acceptedDocuments?: string[];
+	nri_declared?: boolean;
+	nri_tos_accepted?: boolean;
+	nri_tos_accepted_at?: string;
 }
 
 export const getApiErrorMessage = (error: unknown, fallback = 'Request failed'): string => {
@@ -87,7 +90,7 @@ const normalizePhoneForAuth = (value: string): string => {
 };
 
 export const login = async (payload: LoginPayload): Promise<AuthUser> => {
-	const response = await http.post<ApiEnvelope<{ user: AuthUser; sessionId: string }>>('/auth/login', payload);
+	const response = await http.post<ApiEnvelope<{ user: AuthUser; sessionId: string }>>('/v1/auth/login', payload);
 	const loggedInUser = response.data.data.user;
 
 	if (!loggedInUser?.role) {
@@ -102,11 +105,11 @@ export const login = async (payload: LoginPayload): Promise<AuthUser> => {
 };
 
 export const providerRegister = async (payload: ProviderRegisterPayload): Promise<void> => {
-	await http.post<ApiEnvelope<unknown>>('/provider/onboarding', payload);
+	await http.post<ApiEnvelope<unknown>>('/v1/provider/onboarding', payload);
 };
 
 export const googleLogin = async (idToken: string): Promise<AuthUser> => {
-	const response = await http.post<ApiEnvelope<{ user: AuthUser; sessionId: string }>>('/auth/login/google', { idToken });
+	const response = await http.post<ApiEnvelope<{ user: AuthUser; sessionId: string }>>('/v1/auth/login/google', { idToken });
 	return response.data.data.user;
 };
 
@@ -115,7 +118,7 @@ export const signupWithPhone = async (
 	profile?: { name?: string; role?: 'patient' | 'therapist' | 'psychiatrist' | 'psychologist' | 'coach' },
 ): Promise<{ userId: string; phone: string; message: string; devOtp?: string }> => {
 	const normalizedPhone = normalizePhoneForAuth(phone);
-	const response = await http.post<ApiEnvelope<{ userId: string; phone: string; message: string; devOtp?: string }>>('/auth/signup/phone', {
+	const response = await http.post<ApiEnvelope<{ userId: string; phone: string; message: string; devOtp?: string }>>('/v1/auth/signup/phone', {
 		phone: normalizedPhone,
 		...(profile || {}),
 	});
@@ -128,7 +131,7 @@ export const verifyPhoneSignupOtp = async (
 	consent?: SignupConsentPayload,
 ): Promise<{ user: AuthUser; sessionId: string }> => {
 	const normalizedPhone = normalizePhoneForAuth(phone);
-	const response = await http.post<ApiEnvelope<{ user: AuthUser; sessionId: string }>>('/auth/verify/phone-otp', {
+	const response = await http.post<ApiEnvelope<{ user: AuthUser; sessionId: string }>>('/v1/auth/verify/phone-otp', {
 		phone: normalizedPhone,
 		otp,
 		...(consent || {}),
@@ -137,7 +140,7 @@ export const verifyPhoneSignupOtp = async (
 };
 
 export const me = async (): Promise<AuthUser> => {
-	const response = await http.get<ApiEnvelope<AuthUser>>('/auth/me');
+	const response = await http.get<ApiEnvelope<AuthUser>>('/v1/auth/me');
 	return response.data.data;
 };
 
@@ -151,7 +154,7 @@ export const logout = async (): Promise<void> => {
 	const csrfCookieName = import.meta.env.VITE_CSRF_COOKIE_NAME || 'csrf_token';
 	const csrfToken = getCookieValue(csrfCookieName);
 
-	await http.post('/auth/logout', {}, {
+	await http.post('/v1/auth/logout', {}, {
 		headers: csrfToken ? { 'x-csrf-token': csrfToken } : undefined,
 	});
 };

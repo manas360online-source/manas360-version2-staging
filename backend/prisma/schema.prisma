@@ -1,7 +1,8 @@
 generator client {
   provider      = "prisma-client-js"
-  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "linux-musl-arm64-openssl-3.0.x"]
 }
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -101,6 +102,11 @@ model User {
   therapistResources            TherapistResource[]
   therapistSessionNotesAuthored TherapistSessionNote[]      @relation("TherapistSessionNoteAuthor")
   therapyBookings               TherapySession[]
+  groupTherapyRequests          GroupTherapySession[]       @relation("GroupTherapyRequestedBy")
+  groupTherapyHostedSessions    GroupTherapySession[]       @relation("GroupTherapyHost")
+  groupTherapyApprovedSessions  GroupTherapySession[]       @relation("GroupTherapyApprovedBy")
+  groupTherapyInvitesSent       GroupTherapyInvite[]        @relation("GroupTherapyInviteBy")
+  groupTherapyInvitesReceived   GroupTherapyInvite[]        @relation("GroupTherapyInvitePatient")
   grantedCapabilities           UserCapability[]            @relation("UserCapabilitiesGrantor")
   userCapabilities              UserCapability[]            @relation("UserCapabilitiesOwner")
 
@@ -111,6 +117,7 @@ model User {
   @@index([companyId])
   @@index([status])
   @@index([companyId, status])
+  @@index([role, status])
   @@index([isDeleted])
   @@map("users")
 }
@@ -147,20 +154,20 @@ model Role {
 }
 
 model QrCode {
-  code        String   @id
-  redirectUrl String   @map("redirect_url")
-  templateId  String   @default("classic-black") @map("template_id")
-  stylePreset String   @default("rounded") @map("style_preset")
-  foregroundColor String @default("#0F172A") @map("foreground_color")
-  backgroundColor String @default("#FFFFFF") @map("background_color")
-  logoUrl     String?  @map("logo_url")
-  isActive    Boolean  @default(true) @map("is_active")
-  scanCount   Int      @default(0) @map("scan_count")
-  connectedCount Int   @default(0) @map("connected_count")
-  createdById String?  @map("created_by_id")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-  createdBy   User?    @relation("QrCodeCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  code            String   @id
+  redirectUrl     String   @map("redirect_url")
+  templateId      String   @default("classic-black") @map("template_id")
+  stylePreset     String   @default("rounded") @map("style_preset")
+  foregroundColor String   @default("#0F172A") @map("foreground_color")
+  backgroundColor String   @default("#FFFFFF") @map("background_color")
+  logoUrl         String?  @map("logo_url")
+  isActive        Boolean  @default(true) @map("is_active")
+  scanCount       Int      @default(0) @map("scan_count")
+  connectedCount  Int      @default(0) @map("connected_count")
+  createdById     String?  @map("created_by_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  createdBy       User?    @relation("QrCodeCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([createdById])
   @@index([createdAt])
@@ -387,7 +394,7 @@ model PatientAssessment {
   updatedAt     DateTime       @updatedAt
   patient       PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
-  @@index([patientId, createdAt])
+  @@index([patientId, createdAt(sort: Desc)])
   @@map("patient_assessments")
 }
 
@@ -411,59 +418,94 @@ model ScreeningTemplate {
 }
 
 model GroupTherapySession {
-  id                 String   @id @default(cuid())
-  title              String
-  topic              String?
-  description        String
-  sessionMode        String
-  status             String
+  id          String  @id @default(cuid())
+  title       String
+  topic       String
+  description String?
+  sessionMode String  @map("session_mode")
+  status      String
 
-  requestedById      String?
-  hostTherapistId    String?
-  approvedById       String?
-  groupCategoryId    String?
+  requestedById   String  @map("requested_by_id")
+  hostTherapistId String  @map("host_therapist_id")
+  approvedById    String? @map("approved_by_id")
+  groupCategoryId String? @map("group_category_id")
 
-  scheduledAt        DateTime
-  durationMinutes    Int
-  maxMembers         Int
+  scheduledAt     DateTime @map("scheduled_at")
+  durationMinutes Int      @map("duration_minutes")
+  maxMembers      Int      @map("max_members")
 
-  priceMinor         BigInt
-  allowGuestJoin     Boolean  @default(false)
-  requiresPayment    Boolean  @default(false)
-  requiresAdminGate  Boolean  @default(false)
+  priceMinor        BigInt  @map("price_minor")
+  allowGuestJoin    Boolean @default(false) @map("allow_guest_join")
+  requiresPayment   Boolean @default(false) @map("requires_payment")
+  requiresAdminGate Boolean @default(false) @map("requires_admin_gate")
 
-  jitsiRoomName      String?
-  rejectionReason    String?
+  jitsiRoomName   String? @map("jitsi_room_name")
+  rejectionReason String? @map("rejection_reason")
 
-  publishAt          DateTime?
-  publishedAt        DateTime?
-  approvedAt         DateTime?
+  publishAt   DateTime? @map("publish_at")
+  publishedAt DateTime? @map("published_at")
+  approvedAt  DateTime? @map("approved_at")
 
-  enrollments        GroupTherapyEnrollment[]
+  requestedBy   User?                    @relation("GroupTherapyRequestedBy", fields: [requestedById], references: [id])
+  hostTherapist User?                    @relation("GroupTherapyHost", fields: [hostTherapistId], references: [id])
+  approvedBy    User?                    @relation("GroupTherapyApprovedBy", fields: [approvedById], references: [id])
+  groupCategory GroupCategory?           @relation(fields: [groupCategoryId], references: [id])
+  invites       GroupTherapyInvite[]
+  enrollments   GroupTherapyEnrollment[]
 
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("group_therapy_sessions")
 }
 
 model GroupTherapyEnrollment {
-  id                String   @id @default(cuid())
+  id String @id @default(cuid())
 
-  sessionId         String
-  session           GroupTherapySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  userId            String?
-  guestEmail        String?
-  guestName         String?
+  sessionId  String              @map("session_id")
+  session    GroupTherapySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  userId     String?             @map("user_id")
+  guestEmail String?             @map("guest_email")
+  guestName  String?             @map("guest_name")
 
-  enrolledByAdminId String?
-  status            String
-  amountMinor       BigInt?
-  paymentId         String?
-  merchantTransaction String?
-  paidAt            DateTime?
+  enrolledByAdminId   String?   @map("enrolled_by_admin_id")
+  status              String
+  amountMinor         BigInt?   @map("amount_minor")
+  paymentId           String?   @map("payment_id")
+  merchantTransaction String?   @map("merchant_transaction")
+  paidAt              DateTime? @map("paid_at")
+  joinedAt            DateTime? @map("joined_at")
 
-  createdAt         DateTime @default(now())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@unique([sessionId, userId, guestEmail])
+  @@map("group_therapy_enrollments")
+}
+
+model GroupTherapyInvite {
+  id              String              @id @default(cuid())
+  sessionId       String              @map("session_id")
+  patientUserId   String              @map("patient_user_id")
+  invitedById     String              @map("invited_by_id")
+  status          String
+  amountMinor     BigInt              @map("amount_minor")
+  message         String?
+  paymentDeadline DateTime?           @map("payment_deadline")
+  acceptedAt      DateTime?           @map("accepted_at")
+  paidAt          DateTime?           @map("paid_at")
+  joinedAt        DateTime?           @map("joined_at")
+  paymentId       String?             @map("payment_id")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+  session         GroupTherapySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  patient         User                @relation("GroupTherapyInvitePatient", fields: [patientUserId], references: [id], onDelete: Cascade)
+  invitedBy       User                @relation("GroupTherapyInviteBy", fields: [invitedById], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, patientUserId])
+  @@index([patientUserId, status])
+  @@index([sessionId, status])
+  @@map("group_therapy_invites")
 }
 
 model ScreeningQuestion {
@@ -545,7 +587,7 @@ model ScreeningAttempt {
   template            ScreeningTemplate            @relation(fields: [templateId], references: [id])
 
   @@index([templateId, status])
-  @@index([patientId, createdAt])
+  @@index([patientId, createdAt(sort: Desc)])
   @@map("screening_attempts")
 }
 
@@ -670,8 +712,11 @@ model TherapySession {
   patientProfile           PatientProfile        @relation(fields: [patientProfileId], references: [id], onDelete: Cascade)
   therapistProfile         User                  @relation(fields: [therapistProfileId], references: [id], onDelete: Cascade)
 
-  @@index([therapistProfileId, dateTime])
-  @@index([patientProfileId, dateTime])
+  @@index([therapistProfileId, dateTime(sort: Desc)])
+  @@index([patientProfileId, dateTime(sort: Desc)])
+  @@index([therapistProfileId, status, dateTime(sort: Desc)])
+  @@index([patientProfileId, status, dateTime(sort: Desc)])
+  @@index([paymentStatus, createdAt(sort: Desc)])
   @@map("therapy_sessions")
 }
 
@@ -1098,7 +1143,10 @@ model FinancialSession {
 
   @@index([patientId, status])
   @@index([providerId, status])
-  @@index([createdAt])
+  @@index([patientId, createdAt(sort: Desc)])
+  @@index([providerId, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([providerId])  
   @@map("financial_sessions")
 }
 
@@ -1214,22 +1262,22 @@ model FinancialRefund {
 }
 
 model UniversalCheckoutPayment {
-  id                    String                     @id @default(uuid())
-  type                  String                     @db.VarChar(50) // 'provider' | 'patient'
-  planId                String                     @db.VarChar(255)
-  baseAmountMinor       BigInt                     @default(0) // Amount in paise
-  gstMinor              BigInt                     @default(0)  // GST in paise
-  totalAmountMinor      BigInt                     @default(0)  // Total incl GST
-  walletUsedMinor       BigInt                     @default(0)  // Wallet deduction
-  finalAmountMinor      BigInt                     @default(0)  // Final amount to pay
-  status                UniversalCheckoutStatus   @default(INITIATED)
-  idempotencyKey        String                    @unique
-  phonepeTransactionId  String?                   @unique
-  planDetails           Json?                     // Activation details
-  createdAt             DateTime                  @default(now())
-  completedAt           DateTime?
-  failedAt              DateTime?
-  updatedAt             DateTime                  @updatedAt
+  id                   String                  @id @default(uuid())
+  type                 String                  @db.VarChar(50) // 'provider' | 'patient'
+  planId               String                  @db.VarChar(255)
+  baseAmountMinor      BigInt                  @default(0) // Amount in paise
+  gstMinor             BigInt                  @default(0) // GST in paise
+  totalAmountMinor     BigInt                  @default(0) // Total incl GST
+  walletUsedMinor      BigInt                  @default(0) // Wallet deduction
+  finalAmountMinor     BigInt                  @default(0) // Final amount to pay
+  status               UniversalCheckoutStatus @default(INITIATED)
+  idempotencyKey       String                  @unique
+  phonepeTransactionId String?                 @unique
+  planDetails          Json? // Activation details
+  createdAt            DateTime                @default(now())
+  completedAt          DateTime?
+  failedAt             DateTime?
+  updatedAt            DateTime                @updatedAt
 
   @@index([type, planId])
   @@index([status, createdAt])
@@ -1669,6 +1717,9 @@ model Prescription {
 
   @@index([patientId, status])
   @@index([providerId, status])
+  @@index([providerId, createdAt(sort: Desc)])
+  @@index([patientId, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
   @@map("prescriptions")
 }
 
@@ -1942,6 +1993,7 @@ model CorporateOtpRequest {
   updatedAt   DateTime @updatedAt
 
   @@index([phone, status])
+  @@index([phone, status, createdAt(sort: Desc)])
   @@index([status, expiresAt])
   @@map("corporate_otp_requests")
 }
@@ -2143,15 +2195,16 @@ model CrisisAlert {
 }
 
 model GroupCategory {
-  id           String   @id @default(uuid())
-  name         String   @unique
+  id           String                @id @default(uuid())
+  name         String                @unique
   type         String
   description  String?
-  maxCapacity  Int      @default(15) @map("max_capacity")
-  sessionPrice Float    @map("session_price")
-  isActive     Boolean  @default(true) @map("is_active")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  maxCapacity  Int                   @default(15) @map("max_capacity")
+  sessionPrice Float                 @map("session_price")
+  isActive     Boolean               @default(true) @map("is_active")
+  createdAt    DateTime              @default(now()) @map("created_at")
+  updatedAt    DateTime              @updatedAt @map("updated_at")
+  sessions     GroupTherapySession[]
 
   @@map("group_categories")
 }
@@ -2180,6 +2233,8 @@ model companies {
   corporate_programs          corporate_programs[]
   corporate_reports           corporate_reports[]
   corporate_workshops         corporate_workshops[]
+
+  @@index([createdAt])
 }
 
 model company_departments {
@@ -2194,6 +2249,7 @@ model company_departments {
   company_session_allocations company_session_allocations[]
 
   @@unique([companyId, name])
+  @@index([companyId, createdAt])
 }
 
 model company_employees {
@@ -2218,6 +2274,11 @@ model company_employees {
   company_departments company_departments? @relation(fields: [departmentId], references: [id], onUpdate: NoAction)
 
   @@unique([companyId, email])
+  @@index([companyId, createdAt])
+  @@index([companyId, departmentId])
+  @@index([departmentId])
+  @@index([companyId, riskBand])
+  @@index([companyId, preferredService])
 }
 
 model company_session_allocations {
@@ -2232,6 +2293,7 @@ model company_session_allocations {
   company_departments company_departments @relation(fields: [departmentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([companyId, departmentId])
+  @@index([companyId, updatedAt])
 }
 
 model corporate_campaigns {
@@ -2247,6 +2309,9 @@ model corporate_campaigns {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @default(now())
   companies      companies @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([companyId, startDate])
+  @@index([companyId, status, startDate])
 }
 
 model corporate_demo_requests {
@@ -2282,6 +2347,8 @@ model corporate_invoices {
   companies     companies @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([companyId, invoiceCode])
+  @@index([companyId, status, dueDate])
+  @@index([companyId, createdAt(sort: Desc)])
 }
 
 model corporate_monthly_metrics {
@@ -2298,6 +2365,7 @@ model corporate_monthly_metrics {
   companies         companies @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([companyId, monthLabel])
+  @@index([companyId, createdAt])
 }
 
 model corporate_payment_methods {
@@ -2311,6 +2379,10 @@ model corporate_payment_methods {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @default(now())
   companies  companies @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([companyId, updatedAt(sort: Desc)])
+  @@index([companyId, isPrimary, updatedAt(sort: Desc)])
+  @@index([companyId, methodType, updatedAt(sort: Desc)])
 }
 
 model corporate_programs {
@@ -2324,6 +2396,9 @@ model corporate_programs {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @default(now())
   companies         companies @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([companyId, createdAt(sort: Desc)])
+  @@index([companyId, status, createdAt(sort: Desc)])
 }
 
 model corporate_reports {
@@ -2336,6 +2411,9 @@ model corporate_reports {
   generatedAt DateTime  @default(now())
   createdAt   DateTime  @default(now())
   companies   companies @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([companyId, generatedAt(sort: Desc)])
+  @@index([companyId, reportType, generatedAt(sort: Desc)])
 }
 
 model corporate_workshops {
@@ -2350,6 +2428,9 @@ model corporate_workshops {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @default(now())
   companies    companies @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([companyId, workshopDate])
+  @@index([companyId, status, workshopDate])
 }
 
 model patient_pathway_state {

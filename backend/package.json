@@ -20,18 +20,7 @@
 		"test": "jest --runInBand",
 		"test:chat": "jest --runInBand chat.integration.test.ts chat-route.integration.test.ts",
 		"backfill:versions": "ts-node ./scripts/backfill_versions.ts",
-		"seed:templates": "ts-node ./scripts/seed_default_templates.ts",
-		"seed:login-users": "node ./scripts/seed-login-users.js",
-		"seed:dev-admins": "node ./scripts/seed-dev-admins.js",
-		"seed:demo:saas": "node ./scripts/seed-demo-saas.js",
-		"seed:test": "node ./scripts/seed-demo-saas.js",
-		"seed:realistic": "ts-node-dev --transpile-only ./prisma/seed-realistic.ts",
-		"seed": "node ./prisma/seed.js",
-		"seed:users:mock": "ts-node ./scripts/seed_mock_users.ts",
-		"seed:analytics:mock": "ts-node ./scripts/seed_admin_analytics_mock_data.ts",
-		"seed:patient:mock-dashboard": "node ./scripts/seed_mock_patient_dashboard.js",
-		"seed:staging": "node ./scripts/seed-stage-users.js",
-		"seed:all:mock": "npm run seed:users:mock && npm run seed:analytics:mock",
+		"health:predeploy": "bash ./scripts/predeploy-health-check.sh",
 		"smoke:patient:saas": "bash ./scripts/run-patient-saas-smoke.sh",
 		"guard:single-admin": "node ./scripts/check-single-platform-admin.js",
 		"test:watch": "jest --watch"
@@ -93,9 +82,6 @@
 		"ts-jest": "^29.2.5",
 		"ts-node-dev": "^2.0.0",
 		"typescript": "^5.8.2"
-	},
-	"prisma": {
-		"seed": "node prisma/seed.js"
 	},
 	"overrides": {
 		"tar": "7.5.8"

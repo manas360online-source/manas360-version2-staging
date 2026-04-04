@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/error.middleware';
 import { hashPassword, generateNumericOtp, hashOtp, verifyOtp } from '../utils/hash';
@@ -102,10 +103,8 @@ type CorporateAccountCreateInput = {
 };
 
 const DEFAULT_COMPANY_KEY = 'techcorp-india';
-
-const queryRaw = async <T>(sql: string, ...params: unknown[]): Promise<T> => (
-  prisma.$queryRawUnsafe(sql, ...params) as Promise<T>
-);
+// See note in psychiatrist.service.ts — use typeof prisma for compatibility
+type DbClient = typeof prisma;
 
 const toInt = (value: unknown, fallback = 0): number => {
   const n = Number(value);
@@ -125,13 +124,10 @@ const sanitizeKeyPart = (value: string): string =>
     .replace(/^-+|-+$/g, '')
     .slice(0, 40);
 
-const resolveUniqueCompanyKey = async (companyName: string): Promise<string> => {
+const resolveUniqueCompanyKey = async (companyName: string, db: DbClient = prisma): Promise<string> => {
   const base = sanitizeKeyPart(companyName) || `company-${randomUUID().slice(0, 8)}`;
 
-  const existing = await queryRaw<Array<{ companyKey: string }>>(
-    `SELECT "companyKey" FROM "companies" WHERE "companyKey" LIKE $1`,
-    `${base}%`,
-  );
+  const existing = await db.$queryRaw<Array<{ companyKey: string }>>`SELECT "companyKey" FROM "companies" WHERE "companyKey" LIKE ${`${base}%`}`;
 
   const existingSet = new Set(existing.map((row) => String(row.companyKey)));
   if (!existingSet.has(base)) {
@@ -162,10 +158,10 @@ const normalizeRisk = (value: string | null | undefined): 'HIGH' | 'MEDIUM' | 'L
 };
 
 export const ensureCorporateTables = async (): Promise<void> => {
-  await prisma.$executeRawUnsafe(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS company_key text;`);
-  await prisma.$executeRawUnsafe(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS is_company_admin boolean DEFAULT false;`);
+  await prisma.$executeRaw`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS company_key text;`;
+  await prisma.$executeRaw`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS is_company_admin boolean DEFAULT false;`;
 
-  await prisma.$executeRawUnsafe(`
+  await prisma.$executeRaw`
     CREATE TABLE IF NOT EXISTS "companies" (
       "id" TEXT PRIMARY KEY,
       "companyKey" TEXT NOT NULL UNIQUE,
@@ -180,25 +176,25 @@ export const ensureCorporateTables = async (): Promise<void> => {
       "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
-  `);
+  `;
 
-  await prisma.$executeRawUnsafe(`
+  await prisma.$executeRaw`
     ALTER TABLE "companies" ADD COLUMN IF NOT EXISTS "domain" TEXT;
-  `);
+  `;
 
-  await prisma.$executeRawUnsafe(`
+  await prisma.$executeRaw`
     ALTER TABLE "companies" ADD COLUMN IF NOT EXISTS "supportEmail" TEXT NOT NULL DEFAULT 'enterprise-support@manas360.com';
-  `);
+  `;
 
-  await prisma.$executeRawUnsafe(`
+  await prisma.$executeRaw`
     ALTER TABLE "companies" ADD COLUMN IF NOT EXISTS "supportPhone" TEXT NOT NULL DEFAULT '+91-80-4000-3600';
-  `);
+  `;
 
-  await prisma.$executeRawUnsafe(`
+  await prisma.$executeRaw`
     ALTER TABLE "companies" ADD COLUMN IF NOT EXISTS "supportSla" TEXT NOT NULL DEFAULT 'Priority support within 4 business hours.';
-  `);
+  `;
 
-  await prisma.$executeRawUnsafe(`
+  await prisma.$executeRaw`
     CREATE TABLE IF NOT EXISTS "company_departments" (
       "id" TEXT PRIMARY KEY,
       "companyId" TEXT NOT NULL,
@@ -209,9 +205,9 @@ export const ensureCorporateTables = async (): Promise<void> => {
       CONSTRAINT "company_departments_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "companies"("id") ON DELETE CASCADE,
       CONSTRAINT "company_departments_companyId_name_key" UNIQUE ("companyId", "name")
     );
-  `);
+  `;
 
-  await prisma.$executeRawUnsafe(`
+  await prisma.$executeRaw`
     CREATE TABLE IF NOT EXISTS "company_employees" (
       "id" TEXT PRIMARY KEY,
       "companyId" TEXT NOT NULL,
@@ -234,9 +230,9 @@ export const ensureCorporateTables = async (): Promise<void> => {
       CONSTRAINT "company_employees_departmentId_fkey" FOREIGN KEY ("departmentId") REFERENCES "company_departments"("id") ON DELETE SET NULL,
       CONSTRAINT "company_employees_companyId_email_key" UNIQUE ("companyId", "email")
     );
-  `);
+  `;
 
-  await prisma.$executeRawUnsafe(`
+  await prisma.$executeRaw`
     CREATE TABLE IF NOT EXISTS "company_session_allocations" (
       "id" TEXT PRIMARY KEY,
       "companyId" TEXT NOT NULL,
@@ -249,9 +245,9 @@ export const ensureCorporateTables = async (): Promise<void> => {
       CONSTRAINT "company_session_allocations_departmentId_fkey" FOREIGN KEY ("departmentId") REFERENCES "company_departments"("id") ON DELETE CASCADE,
       CONSTRAINT "company_session_allocations_companyId_departmentId_key" UNIQUE ("companyId", "departmentId")
     );
-  `);
+  `;
 
-  await prisma.$executeRawUnsafe(`
+  await prisma.$executeRaw`
     CREATE TABLE IF NOT EXISTS "corporate_programs" (
       "id" TEXT PRIMARY KEY,
       "companyId" TEXT NOT NULL,
@@ -264,9 +260,9 @@ export const ensureCorporateTables = async (): Promise<void> => {
       "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       CONSTRAINT "corporate_programs_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "companies"("id") ON DELETE CASCADE
     );
-  `);
+  `;
 
-  await prisma.$executeRawUnsafe(`
+  await prisma.$executeRaw`
     CREATE TABLE IF NOT EXISTS "corporate_workshops" (
       "id" TEXT PRIMARY KEY,
       "companyId" TEXT NOT NULL,
@@ -280,9 +276,9 @@ export const ensureCorporateTables = async (): Promise<void> => {
       "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       CONSTRAINT "corporate_workshops_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "companies"("id") ON DELETE CASCADE
     );
-  `);
+  `;
 
-  await prisma.$executeRawUnsafe(`
+  await prisma.$executeRaw`
     CREATE TABLE IF NOT EXISTS "corporate_campaigns" (
       "id" TEXT PRIMARY KEY,
       "companyId" TEXT NOT NULL,
@@ -297,9 +293,9 @@ export const ensureCorporateTables = async (): Promise<void> => {
       "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       CONSTRAINT "corporate_campaigns_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "companies"("id") ON DELETE CASCADE
     );
-  `);
+  `;
 
-  await prisma.$executeRawUnsafe(`
+  await prisma.$executeRaw`
     CREATE TABLE IF NOT EXISTS "corporate_reports" (
       "id" TEXT PRIMARY KEY,
       "companyId" TEXT NOT NULL,
@@ -311,9 +307,9 @@ export const ensureCorporateTables = async (): Promise<void> => {
       "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       CONSTRAINT "corporate_reports_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "companies"("id") ON DELETE CASCADE
     );
-  `);
+  `;
 
-  await prisma.$executeRawUnsafe(`
+  await prisma.$executeRaw`
     CREATE TABLE IF NOT EXISTS "corporate_monthly_metrics" (
       "id" TEXT PRIMARY KEY,
       "companyId" TEXT NOT NULL,
@@ -328,9 +324,9 @@ export const ensureCorporateTables = async (): Promise<void> => {
       CONSTRAINT "corporate_monthly_metrics_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "companies"("id") ON DELETE CASCADE,
       CONSTRAINT "corporate_monthly_metrics_companyId_monthLabel_key" UNIQUE ("companyId", "monthLabel")
     );
-  `);
+  `;
 
-  await prisma.$executeRawUnsafe(`
+  await prisma.$executeRaw`
     CREATE TABLE IF NOT EXISTS "corporate_payment_methods" (
       "id" TEXT PRIMARY KEY,
       "companyId" TEXT NOT NULL,
@@ -343,9 +339,9 @@ export const ensureCorporateTables = async (): Promise<void> => {
       "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       CONSTRAINT "corporate_payment_methods_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "companies"("id") ON DELETE CASCADE
     );
-  `);
+  `;
 
-  await prisma.$executeRawUnsafe(`
+  await prisma.$executeRaw`
     CREATE TABLE IF NOT EXISTS "corporate_invoices" (
       "id" TEXT PRIMARY KEY,
       "companyId" TEXT NOT NULL,
@@ -362,9 +358,9 @@ export const ensureCorporateTables = async (): Promise<void> => {
       CONSTRAINT "corporate_invoices_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "companies"("id") ON DELETE CASCADE,
       CONSTRAINT "corporate_invoices_companyId_invoiceCode_key" UNIQUE ("companyId", "invoiceCode")
     );
-  `);
+  `;
 
-  await prisma.$executeRawUnsafe(`
+  await prisma.$executeRaw`
     CREATE TABLE IF NOT EXISTS "corporate_demo_requests" (
       "id" TEXT PRIMARY KEY,
       "companyName" TEXT NOT NULL,
@@ -379,375 +375,22 @@ export const ensureCorporateTables = async (): Promise<void> => {
       "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
-  `);
+  `;
 
-  await prisma.$executeRawUnsafe(`
+  await prisma.$executeRaw`
     CREATE INDEX IF NOT EXISTS "corporate_demo_requests_workEmail_idx" ON "corporate_demo_requests"("workEmail");
-  `);
+  `;
 };
 
-const getCompanyByKey = async (companyKey = DEFAULT_COMPANY_KEY): Promise<{ id: string; name: string } | null> => {
-  const rows = await queryRaw<Array<{ id: string; name: string }>>(
-    `SELECT "id", "name" FROM "companies" WHERE "companyKey" = $1 LIMIT 1`,
-    companyKey,
-  );
+const getCompanyByKey = async (companyKey = DEFAULT_COMPANY_KEY, db: DbClient = prisma): Promise<{ id: string; name: string } | null> => {
+  const rows = await db.$queryRaw<Array<{ id: string; name: string }>>`SELECT "id", "name" FROM "companies" WHERE "companyKey" = ${companyKey} LIMIT 1`;
   return rows[0] || null;
 };
 
-const seedCorporateDemoData = async (companyKey = DEFAULT_COMPANY_KEY): Promise<{ companyId: string; companyName: string }> => {
-  await ensureCorporateTables();
-
-  const existing = await getCompanyByKey(companyKey);
-  let companyId = existing?.id || randomUUID();
-
-  const defaultDomain = companyKey === 'techcorp-india'
-    ? 'techcorp.com'
-    : companyKey === 'global-fintech-labs'
-      ? 'globalfintech.com'
-      : companyKey === 'zen-retail-group'
-        ? 'zenretail.com'
-        : `${companyKey.replace(/-+/g, '')}.com`;
-
-  await prisma.$executeRawUnsafe(
-    `INSERT INTO "companies" (
-      "id","companyKey","domain","name","employeeLimit","sessionQuota","ssoProvider","privacyPolicy","supportEmail","supportPhone","supportSla","createdAt","updatedAt"
-    )
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW(),NOW())
-     ON CONFLICT ("companyKey") DO UPDATE SET
-      "domain"=EXCLUDED."domain",
-      "name"=EXCLUDED."name",
-      "employeeLimit"=EXCLUDED."employeeLimit",
-      "sessionQuota"=EXCLUDED."sessionQuota",
-      "ssoProvider"=EXCLUDED."ssoProvider",
-      "privacyPolicy"=EXCLUDED."privacyPolicy",
-      "supportEmail"=EXCLUDED."supportEmail",
-      "supportPhone"=EXCLUDED."supportPhone",
-      "supportSla"=EXCLUDED."supportSla",
-      "updatedAt"=NOW();`,
-    companyId,
-    companyKey,
-    defaultDomain,
-    'TechCorp India',
-    300,
-    200,
-    'Google Workspace',
-    'Only aggregate analytics are visible to HR. Individual therapy notes, diagnosis, medications, and provider details are never shown.',
-    'enterprise-support@manas360.com',
-    '+91-80-4000-3600',
-    'Priority support within 4 business hours.',
-  );
-
-  const company = await getCompanyByKey(companyKey);
-  companyId = company?.id || companyId;
-
-  const departments = [
-    { name: 'Engineering', risk: 'HIGH', enrolled: 82, used: 48, allocated: 80 },
-    { name: 'Operations', risk: 'MODERATE', enrolled: 56, used: 38, allocated: 50 },
-    { name: 'Sales & Marketing', risk: 'MODERATE', enrolled: 44, used: 24, allocated: 40 },
-    { name: 'Customer Support', risk: 'MODERATE', enrolled: 38, used: 19, allocated: 20 },
-    { name: 'HR & Admin', risk: 'LOW', enrolled: 28, used: 13, allocated: 10 },
-  ];
-
-  for (const department of departments) {
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO "company_departments" ("id","companyId","name","riskIndicator","createdAt","updatedAt")
-       VALUES ($1,$2,$3,$4,NOW(),NOW())
-       ON CONFLICT ("companyId","name") DO UPDATE SET
-        "riskIndicator"=EXCLUDED."riskIndicator",
-        "updatedAt"=NOW();`,
-      randomUUID(),
-      companyId,
-      department.name,
-      department.risk,
-    );
-  }
-
-  const countRows = await queryRaw<Array<{ count: bigint }>>(
-    `SELECT COUNT(*)::bigint as count FROM "company_employees" WHERE "companyId" = $1`,
-    companyId,
-  );
-
-  if (toInt(countRows[0]?.count || 0) === 0) {
-    const serviceBuckets = ['Stress therapy', 'Relationship counselling', 'Burnout recovery', 'Career coaching'];
-    let employeeSeq = 1;
-    for (const department of departments) {
-      const deptRows = await queryRaw<Array<{ id: string }>>(
-        `SELECT "id" FROM "company_departments" WHERE "companyId" = $1 AND "name" = $2 LIMIT 1`,
-        companyId,
-        department.name,
-      );
-      const departmentId = deptRows[0]?.id;
-      if (!departmentId) continue;
-
-      for (let i = 0; i < department.enrolled; i += 1) {
-        const index = employeeSeq;
-        const riskBand = department.risk === 'HIGH'
-          ? (i % 3 === 0 ? 'HIGH' : i % 2 === 0 ? 'MEDIUM' : 'LOW')
-          : department.risk === 'LOW'
-            ? (i % 4 === 0 ? 'MEDIUM' : 'LOW')
-            : (i % 5 === 0 ? 'HIGH' : i % 2 === 0 ? 'MEDIUM' : 'LOW');
-
-        const sessionsUsed = index <= 166 ? (1 + (index % 4)) : 0;
-        const engagementScore = index <= 166 ? 55 + (index % 40) : 20 + (index % 20);
-
-        await prisma.$executeRawUnsafe(
-          `INSERT INTO "company_employees" (
-             "id","companyId","departmentId","employeeCode","name","email","location","managerName",
-             "riskBand","phq9Score","gad7Score","sessionsUsed","engagementScore","preferredService","isActive","createdAt","updatedAt"
-           ) VALUES (
-             $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,true,NOW(),NOW()
-           ) ON CONFLICT ("companyId","email") DO NOTHING;`,
-          randomUUID(),
-          companyId,
-          departmentId,
-          `EMP${String(index).padStart(4, '0')}`,
-          `Employee ${index}`,
-          `employee${index}@techcorp.com`,
-          index % 2 === 0 ? 'Bengaluru' : 'Hyderabad',
-          `Manager ${1 + (index % 12)}`,
-          riskBand,
-          riskBand === 'HIGH' ? 15 : riskBand === 'MEDIUM' ? 10 : 5,
-          riskBand === 'HIGH' ? 14 : riskBand === 'MEDIUM' ? 9 : 4,
-          sessionsUsed,
-          engagementScore,
-          serviceBuckets[index % serviceBuckets.length],
-        );
-
-        employeeSeq += 1;
-      }
-    }
-  }
-
-  for (const department of departments) {
-    const deptRows = await queryRaw<Array<{ id: string }>>(
-      `SELECT "id" FROM "company_departments" WHERE "companyId" = $1 AND "name" = $2 LIMIT 1`,
-      companyId,
-      department.name,
-    );
-    const departmentId = deptRows[0]?.id;
-    if (!departmentId) continue;
-
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO "company_session_allocations" ("id","companyId","departmentId","allocatedSessions","usedSessions","createdAt","updatedAt")
-       VALUES ($1,$2,$3,$4,$5,NOW(),NOW())
-       ON CONFLICT ("companyId","departmentId") DO UPDATE SET
-        "allocatedSessions"=EXCLUDED."allocatedSessions",
-        "usedSessions"=EXCLUDED."usedSessions",
-        "updatedAt"=NOW();`,
-      randomUUID(),
-      companyId,
-      departmentId,
-      department.allocated,
-      department.used,
-    );
-  }
-
-  const monthly = [
-    { month: 'Oct', used: 88, allocated: 160, active: 120, stress: 72, utilization: 55 },
-    { month: 'Nov', used: 102, allocated: 160, active: 128, stress: 73, utilization: 64 },
-    { month: 'Dec', used: 118, allocated: 180, active: 140, stress: 74, utilization: 66 },
-    { month: 'Jan', used: 126, allocated: 180, active: 148, stress: 72, utilization: 70 },
-    { month: 'Feb', used: 132, allocated: 200, active: 156, stress: 75, utilization: 66 },
-    { month: 'Mar', used: 142, allocated: 200, active: 166, stress: 78, utilization: 71 },
-  ];
-
-  for (const row of monthly) {
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO "corporate_monthly_metrics" (
-        "id","companyId","monthLabel","sessionsUsed","sessionsAllocated","activeUsers","stressScore","utilizationRate","createdAt","updatedAt"
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW(),NOW())
-      ON CONFLICT ("companyId","monthLabel") DO UPDATE SET
-        "sessionsUsed"=EXCLUDED."sessionsUsed",
-        "sessionsAllocated"=EXCLUDED."sessionsAllocated",
-        "activeUsers"=EXCLUDED."activeUsers",
-        "stressScore"=EXCLUDED."stressScore",
-        "utilizationRate"=EXCLUDED."utilizationRate",
-        "updatedAt"=NOW();`,
-      randomUUID(),
-      companyId,
-      row.month,
-      row.used,
-      row.allocated,
-      row.active,
-      row.stress,
-      row.utilization,
-    );
-  }
-
-  const programs = [
-    { title: 'Stress Management Program', duration: 6, enrolled: 132, completion: 76, status: 'ACTIVE' },
-    { title: 'Digital Detox Week', duration: 2, enrolled: 88, completion: 62, status: 'ACTIVE' },
-    { title: 'Sleep Improvement Program', duration: 4, enrolled: 74, completion: 68, status: 'ACTIVE' },
-    { title: 'Burnout Recovery Program', duration: 8, enrolled: 43, completion: 54, status: 'ACTIVE' },
-  ];
-
-  for (const program of programs) {
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO "corporate_programs" ("id","companyId","title","durationWeeks","employeesEnrolled","completionRate","status","createdAt","updatedAt")
-       VALUES ($1,$2,$3,$4,$5,$6,$7,NOW(),NOW())
-       ON CONFLICT DO NOTHING;`,
-      randomUUID(),
-      companyId,
-      program.title,
-      program.duration,
-      program.enrolled,
-      program.completion,
-      program.status,
-    );
-  }
-
-  const workshops = [
-    { title: 'Mindfulness Workshop', provider: 'Dr. Naina Rao', department: 'Engineering', date: '2026-03-16', attendees: 62 },
-    { title: 'Leadership Stress Training', provider: 'Dr. Rajeev Sinha', department: 'Operations', date: '2026-03-19', attendees: 36 },
-    { title: 'Burnout Awareness', provider: 'Anytime Buddy AI', department: 'Sales & Marketing', date: '2026-03-22', attendees: 29 },
-    { title: 'Emotional Intelligence', provider: 'Dr. Kavya Iyer', department: 'Customer Support', date: '2026-03-27', attendees: 24 },
-  ];
-
-  for (const workshop of workshops) {
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO "corporate_workshops" ("id","companyId","title","provider","department","workshopDate","attendees","status","createdAt","updatedAt")
-       VALUES ($1,$2,$3,$4,$5,$6::date,$7,'SCHEDULED',NOW(),NOW())
-       ON CONFLICT DO NOTHING;`,
-      randomUUID(),
-      companyId,
-      workshop.title,
-      workshop.provider,
-      workshop.department,
-      workshop.date,
-      workshop.attendees,
-    );
-  }
-
-  const campaigns = [
-    { title: 'Q1 Burnout Awareness Drive', audience: 'All Employees', startDate: '2026-01-08', endDate: '2026-02-15', reachCount: 214, engagementRate: 68 },
-    { title: 'Sleep Better March', audience: 'Engineering + Support', startDate: '2026-03-01', endDate: '2026-03-31', reachCount: 124, engagementRate: 61 },
-    { title: 'Manager Mental Fitness Toolkit', audience: 'People Managers', startDate: '2026-02-05', endDate: '2026-03-20', reachCount: 56, engagementRate: 72 },
-  ];
-
-  for (const campaign of campaigns) {
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO "corporate_campaigns" ("id","companyId","title","audience","startDate","endDate","reachCount","engagementRate","status","createdAt","updatedAt")
-       VALUES ($1,$2,$3,$4,$5::date,$6::date,$7,$8,'ACTIVE',NOW(),NOW())
-       ON CONFLICT DO NOTHING;`,
-      randomUUID(),
-      companyId,
-      campaign.title,
-      campaign.audience,
-      campaign.startDate,
-      campaign.endDate,
-      campaign.reachCount,
-      campaign.engagementRate,
-    );
-  }
-
-  const reports = [
-    { reportType: 'Wellness report', quarter: 'Q1-2026', format: 'PDF' },
-    { reportType: 'Usage report', quarter: 'Q1-2026', format: 'XLSX' },
-    { reportType: 'ROI report', quarter: 'Q1-2026', format: 'PDF' },
-  ];
-
-  for (const report of reports) {
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO "corporate_reports" ("id","companyId","reportType","quarter","format","downloadUrl","generatedAt","createdAt")
-       VALUES ($1,$2,$3,$4,$5,$6,NOW(),NOW())
-       ON CONFLICT DO NOTHING;`,
-      randomUUID(),
-      companyId,
-      report.reportType,
-      report.quarter,
-      report.format,
-      `https://cdn.manas360.local/corporate-reports/${companyKey}/${report.reportType.toLowerCase().replace(/\s+/g, '-')}.${report.format.toLowerCase()}`,
-    );
-  }
-
-  const paymentMethods = [
-    { methodType: 'UPI', label: 'UPI - Primary', details: 'corp.payments@okbank', isPrimary: true },
-    { methodType: 'CARD', label: 'Visa Corporate Card', details: 'Visa •••• 4242', isPrimary: false },
-  ];
-
-  const paymentMethodCountRows = await queryRaw<Array<{ count: bigint }>>(
-    `SELECT COUNT(*)::bigint as count FROM "corporate_payment_methods" WHERE "companyId" = $1`,
-    companyId,
-  );
-
-  if (toInt(paymentMethodCountRows[0]?.count || 0) === 0) {
-    for (const method of paymentMethods) {
-      await prisma.$executeRawUnsafe(
-        `INSERT INTO "corporate_payment_methods" (
-          "id","companyId","methodType","label","details","isPrimary","isActive","createdAt","updatedAt"
-        ) VALUES ($1,$2,$3,$4,$5,$6,true,NOW(),NOW())`,
-        randomUUID(),
-        companyId,
-        method.methodType,
-        method.label,
-        method.details,
-        method.isPrimary,
-      );
-    }
-  }
-
-  const invoices = [
-    {
-      invoiceCode: 'INV-2026-003',
-      title: 'March 2026 — Enterprise Plan',
-      billingPeriod: '2026-03',
-      amountPaise: 5223400,
-      status: 'DUE',
-      dueDate: '2026-03-15',
-      paidDate: null,
-    },
-    {
-      invoiceCode: 'INV-2026-002',
-      title: 'February 2026 — Enterprise Plan',
-      billingPeriod: '2026-02',
-      amountPaise: 4984200,
-      status: 'PAID',
-      dueDate: '2026-02-15',
-      paidDate: '2026-02-12',
-    },
-    {
-      invoiceCode: 'INV-2026-001',
-      title: 'January 2026 — Enterprise Plan',
-      billingPeriod: '2026-01',
-      amountPaise: 4745000,
-      status: 'PAID',
-      dueDate: '2026-01-15',
-      paidDate: '2026-01-13',
-    },
-  ];
-
-  for (const invoice of invoices) {
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO "corporate_invoices" (
-        "id","companyId","invoiceCode","title","billingPeriod","amountPaise","currency","status","dueDate","paidDate","createdAt","updatedAt"
-      ) VALUES ($1,$2,$3,$4,$5,$6,'INR',$7,$8,$9,NOW(),NOW())
-      ON CONFLICT ("companyId","invoiceCode") DO UPDATE SET
-        "title" = EXCLUDED."title",
-        "billingPeriod" = EXCLUDED."billingPeriod",
-        "amountPaise" = EXCLUDED."amountPaise",
-        "status" = EXCLUDED."status",
-        "dueDate" = EXCLUDED."dueDate",
-        "paidDate" = EXCLUDED."paidDate",
-        "updatedAt" = NOW();`,
-      randomUUID(),
-      companyId,
-      invoice.invoiceCode,
-      invoice.title,
-      invoice.billingPeriod,
-      invoice.amountPaise,
-      invoice.status,
-      new Date(invoice.dueDate),
-      invoice.paidDate ? new Date(invoice.paidDate) : null,
-    );
-  }
-
-  return { companyId, companyName: company?.name || 'TechCorp India' };
-};
-
-const resolveCompany = async (companyKey?: string): Promise<{ companyId: string; companyName: string; companyKey: string }> => {
+const resolveCompany = async (companyKey?: string, db: DbClient = prisma): Promise<{ companyId: string; companyName: string; companyKey: string }> => {
   const key = String(companyKey || DEFAULT_COMPANY_KEY).trim() || DEFAULT_COMPANY_KEY;
-  const seeded = await seedCorporateDemoData(key);
-  return { ...seeded, companyKey: key };
+  const company = await getCompanyByKey(key, db);
+  return { companyId: company?.id || '', companyName: company?.name || 'TechCorp India', companyKey: key };
 };
 
 export const getCorporateDashboard = async (companyKey?: string) => {
@@ -768,32 +411,16 @@ export const getCorporateDashboard = async (companyKey?: string) => {
     campaignRows,
     reportRows,
   ] = await Promise.all([
-    queryRaw<Array<{ employeeLimit: number; sessionQuota: number; ssoProvider: string; privacyPolicy: string }>>(
-      `SELECT "employeeLimit", "sessionQuota", "ssoProvider", "privacyPolicy" FROM "companies" WHERE "id" = $1 LIMIT 1`,
-      companyId,
-    ),
-    queryRaw<Array<{ total: bigint }>>(
-      `SELECT COUNT(*)::bigint as total FROM "company_employees" WHERE "companyId" = $1`,
-      companyId,
-    ),
-    queryRaw<Array<{ active: bigint }>>(
-      `SELECT COUNT(*)::bigint as active FROM "company_employees" WHERE "companyId" = $1 AND "sessionsUsed" > 0`,
-      companyId,
-    ),
-    queryRaw<Array<{ allocated: bigint; used: bigint }>>(
-      `SELECT COALESCE(SUM("allocatedSessions"),0)::bigint as allocated, COALESCE(SUM("usedSessions"),0)::bigint as used FROM "company_session_allocations" WHERE "companyId" = $1`,
-      companyId,
-    ),
-    queryRaw<Array<{ department: string; allocated: number; used: number }>>(
-      `SELECT d."name" as department, a."allocatedSessions" as allocated, a."usedSessions" as used
+    prisma.$queryRaw<Array<{ employeeLimit: number; sessionQuota: number; ssoProvider: string; privacyPolicy: string }>>`SELECT "employeeLimit", "sessionQuota", "ssoProvider", "privacyPolicy" FROM "companies" WHERE "id" = ${companyId} LIMIT 1`,
+    prisma.$queryRaw<Array<{ total: bigint }>>`SELECT COUNT(*)::bigint as total FROM "company_employees" WHERE "companyId" = ${companyId}`,
+    prisma.$queryRaw<Array<{ active: bigint }>>`SELECT COUNT(*)::bigint as active FROM "company_employees" WHERE "companyId" = ${companyId} AND "sessionsUsed" > 0`,
+    prisma.$queryRaw<Array<{ allocated: bigint; used: bigint }>>`SELECT COALESCE(SUM("allocatedSessions"),0)::bigint as allocated, COALESCE(SUM("usedSessions"),0)::bigint as used FROM "company_session_allocations" WHERE "companyId" = ${companyId}`,
+    prisma.$queryRaw<Array<{ department: string; allocated: number; used: number }>>`SELECT d."name" as department, a."allocatedSessions" as allocated, a."usedSessions" as used
        FROM "company_session_allocations" a
        INNER JOIN "company_departments" d ON d."id" = a."departmentId"
-       WHERE a."companyId" = $1
+       WHERE a."companyId" = ${companyId}
        ORDER BY d."name" ASC`,
-      companyId,
-    ),
-    queryRaw<Array<{ department: string; enrolled: bigint; active: bigint; utilization: number; sessionsUsed: bigint; riskIndicator: string }>>(
-      `SELECT
+    prisma.$queryRaw<Array<{ department: string; enrolled: bigint; active: bigint; utilization: number; sessionsUsed: bigint; riskIndicator: string }>>`SELECT
          d."name" as department,
          COUNT(e."id")::bigint as enrolled,
          COUNT(CASE WHEN e."sessionsUsed" > 0 THEN 1 END)::bigint as active,
@@ -802,58 +429,35 @@ export const getCorporateDashboard = async (companyKey?: string) => {
          d."riskIndicator" as "riskIndicator"
        FROM "company_departments" d
        LEFT JOIN "company_employees" e ON e."departmentId" = d."id"
-       WHERE d."companyId" = $1
+       WHERE d."companyId" = ${companyId}
        GROUP BY d."name", d."riskIndicator"
        ORDER BY enrolled DESC`,
-      companyId,
-    ),
-    queryRaw<Array<{ riskBand: string; total: bigint }>>(
-      `SELECT "riskBand", COUNT(*)::bigint as total FROM "company_employees" WHERE "companyId" = $1 GROUP BY "riskBand"`,
-      companyId,
-    ),
-    queryRaw<Array<{ service: string; total: bigint }>>(
-      `SELECT "preferredService" as service, COUNT(*)::bigint as total
+    prisma.$queryRaw<Array<{ riskBand: string; total: bigint }>>`SELECT "riskBand", COUNT(*)::bigint as total FROM "company_employees" WHERE "companyId" = ${companyId} GROUP BY "riskBand"`,
+    prisma.$queryRaw<Array<{ service: string; total: bigint }>>`SELECT "preferredService" as service, COUNT(*)::bigint as total
        FROM "company_employees"
-       WHERE "companyId" = $1
+       WHERE "companyId" = ${companyId}
        GROUP BY "preferredService"
        ORDER BY total DESC`,
-      companyId,
-    ),
-    queryRaw<Array<{ month: string; used: number; allocated: number; activeUsers: number; stressScore: number; utilizationRate: number }>>(
-      `SELECT "monthLabel" as month, "sessionsUsed" as used, "sessionsAllocated" as allocated, "activeUsers", "stressScore", "utilizationRate"
+    prisma.$queryRaw<Array<{ month: string; used: number; allocated: number; activeUsers: number; stressScore: number; utilizationRate: number }>>`SELECT "monthLabel" as month, "sessionsUsed" as used, "sessionsAllocated" as allocated, "activeUsers", "stressScore", "utilizationRate"
        FROM "corporate_monthly_metrics"
-       WHERE "companyId" = $1
+       WHERE "companyId" = ${companyId}
        ORDER BY "createdAt" ASC`,
-      companyId,
-    ),
-    queryRaw<Array<{ id: string; title: string; durationWeeks: number; employeesEnrolled: number; completionRate: number; status: string }>>(
-      `SELECT "id", "title", "durationWeeks", "employeesEnrolled", "completionRate", "status"
+    prisma.$queryRaw<Array<{ id: string; title: string; durationWeeks: number; employeesEnrolled: number; completionRate: number; status: string }>>`SELECT "id", "title", "durationWeeks", "employeesEnrolled", "completionRate", "status"
        FROM "corporate_programs"
-       WHERE "companyId" = $1
+       WHERE "companyId" = ${companyId}
        ORDER BY "createdAt" DESC`,
-      companyId,
-    ),
-    queryRaw<Array<{ id: string; title: string; provider: string; department: string; workshopDate: Date; attendees: number; status: string }>>(
-      `SELECT "id", "title", "provider", "department", "workshopDate", "attendees", "status"
+    prisma.$queryRaw<Array<{ id: string; title: string; provider: string; department: string; workshopDate: Date; attendees: number; status: string }>>`SELECT "id", "title", "provider", "department", "workshopDate", "attendees", "status"
        FROM "corporate_workshops"
-       WHERE "companyId" = $1
+       WHERE "companyId" = ${companyId}
        ORDER BY "workshopDate" ASC`,
-      companyId,
-    ),
-    queryRaw<Array<{ id: string; title: string; audience: string; startDate: Date; endDate: Date; reachCount: number; engagementRate: number; status: string }>>(
-      `SELECT "id", "title", "audience", "startDate", "endDate", "reachCount", "engagementRate", "status"
+    prisma.$queryRaw<Array<{ id: string; title: string; audience: string; startDate: Date; endDate: Date; reachCount: number; engagementRate: number; status: string }>>`SELECT "id", "title", "audience", "startDate", "endDate", "reachCount", "engagementRate", "status"
        FROM "corporate_campaigns"
-       WHERE "companyId" = $1
+       WHERE "companyId" = ${companyId}
        ORDER BY "startDate" DESC`,
-      companyId,
-    ),
-    queryRaw<Array<{ id: string; reportType: string; quarter: string; format: string; downloadUrl: string; generatedAt: Date }>>(
-      `SELECT "id", "reportType", "quarter", "format", "downloadUrl", "generatedAt"
+    prisma.$queryRaw<Array<{ id: string; reportType: string; quarter: string; format: string; downloadUrl: string; generatedAt: Date }>>`SELECT "id", "reportType", "quarter", "format", "downloadUrl", "generatedAt"
        FROM "corporate_reports"
-       WHERE "companyId" = $1
+       WHERE "companyId" = ${companyId}
        ORDER BY "generatedAt" DESC`,
-      companyId,
-    ),
   ]);
 
   const settings = companyRows[0] || { employeeLimit: 300, sessionQuota: 200, ssoProvider: 'Google Workspace', privacyPolicy: '' };
@@ -1031,22 +635,16 @@ export const getCorporateDashboard = async (companyKey?: string) => {
 };
 
 export const getCorporateCompanies = async () => {
-  await seedCorporateDemoData('techcorp-india');
-  await seedCorporateDemoData('global-fintech-labs');
-  await seedCorporateDemoData('zen-retail-group');
-
-  const rows = await queryRaw<Array<{ id: string; companyKey: string; name: string }>>(
-    `SELECT "id", "companyKey", "name"
+  const rows = await prisma.$queryRaw<Array<{ id: string; companyKey: string; name: string }>>`SELECT "id", "companyKey", "name"
      FROM "companies"
-     ORDER BY "name" ASC`,
-  );
+     ORDER BY "name" ASC`;
 
   return rows;
 };
 
 export const getCorporateSettings = async (companyKey?: string) => {
   const { companyId, companyName, companyKey: resolvedCompanyKey } = await resolveCompany(companyKey);
-  const rows = await queryRaw<Array<{
+  const rows = await prisma.$queryRaw<Array<{
     employeeLimit: number;
     sessionQuota: number;
     ssoProvider: string;
@@ -1054,13 +652,10 @@ export const getCorporateSettings = async (companyKey?: string) => {
     supportEmail: string;
     supportPhone: string;
     supportSla: string;
-  }>>(
-    `SELECT "employeeLimit", "sessionQuota", "ssoProvider", "privacyPolicy", "supportEmail", "supportPhone", "supportSla"
+  }>>`SELECT "employeeLimit", "sessionQuota", "ssoProvider", "privacyPolicy", "supportEmail", "supportPhone", "supportSla"
      FROM "companies"
-     WHERE "id" = $1
-     LIMIT 1`,
-    companyId,
-  );
+     WHERE "id" = ${companyId}
+     LIMIT 1`;
 
   const row = rows[0] || {
     employeeLimit: 300,
@@ -1100,57 +695,33 @@ export const updateCorporateSettings = async (payload: CorporateSettingsUpdate, 
     supportSla: String(payload.supportSla || current.supportSla).trim() || current.supportSla,
   };
 
-  await prisma.$executeRawUnsafe(
-    `UPDATE "companies"
-     SET "name" = $2,
-         "employeeLimit" = $3,
-         "sessionQuota" = $4,
-         "ssoProvider" = $5,
-         "privacyPolicy" = $6,
-         "supportEmail" = $7,
-         "supportPhone" = $8,
-         "supportSla" = $9,
+  await prisma.$executeRaw`UPDATE "companies"
+     SET "name" = ${next.companyName},
+         "employeeLimit" = ${next.employeeLimit},
+         "sessionQuota" = ${next.sessionQuota},
+         "ssoProvider" = ${next.ssoProvider},
+         "privacyPolicy" = ${next.privacyPolicy},
+         "supportEmail" = ${next.supportEmail},
+         "supportPhone" = ${next.supportPhone},
+         "supportSla" = ${next.supportSla},
          "updatedAt" = NOW()
-     WHERE "id" = $1`,
-    companyId,
-    next.companyName,
-    next.employeeLimit,
-    next.sessionQuota,
-    next.ssoProvider,
-    next.privacyPolicy,
-    next.supportEmail,
-    next.supportPhone,
-    next.supportSla,
-  );
+     WHERE "id" = ${companyId}`;
 
   return getCorporateSettings(companyKey);
 };
 
-const resolveDepartmentId = async (companyId: string, departmentName: string): Promise<string> => {
+const resolveDepartmentId = async (companyId: string, departmentName: string, db: DbClient = prisma): Promise<string> => {
   const normalizedName = departmentName.trim();
-  const rows = await queryRaw<Array<{ id: string }>>(
-    `SELECT "id" FROM "company_departments" WHERE "companyId" = $1 AND "name" = $2 LIMIT 1`,
-    companyId,
-    normalizedName,
-  );
+  const rows = await db.$queryRaw<Array<{ id: string }>>`SELECT "id" FROM "company_departments" WHERE "companyId" = ${companyId} AND "name" = ${normalizedName} LIMIT 1`;
 
   if (rows[0]?.id) return rows[0].id;
 
   const id = randomUUID();
-  await prisma.$executeRawUnsafe(
-    `INSERT INTO "company_departments" ("id","companyId","name","riskIndicator","createdAt","updatedAt")
-     VALUES ($1,$2,$3,'MODERATE',NOW(),NOW())
-     ON CONFLICT ("companyId","name") DO NOTHING;`,
-    id,
-    companyId,
-    normalizedName,
-  );
+    await db.$executeRaw`INSERT INTO "company_departments" ("id","companyId","name","riskIndicator","createdAt","updatedAt")
+     VALUES (${id},${companyId},${normalizedName},'MODERATE',NOW(),NOW())
+     ON CONFLICT ("companyId","name") DO NOTHING;`;
 
-  const after = await queryRaw<Array<{ id: string }>>(
-    `SELECT "id" FROM "company_departments" WHERE "companyId" = $1 AND "name" = $2 LIMIT 1`,
-    companyId,
-    normalizedName,
-  );
+    const after = await db.$queryRaw<Array<{ id: string }>>`SELECT "id" FROM "company_departments" WHERE "companyId" = ${companyId} AND "name" = ${normalizedName} LIMIT 1`;
 
   return after[0]?.id || id;
 };
@@ -1162,31 +733,27 @@ export const bulkUploadCorporateEmployees = async (rows: BulkEmployeeRow[], comp
   let updated = 0;
   const errors: Array<{ index: number; reason: string }> = [];
 
-  for (let i = 0; i < rows.length; i += 1) {
-    const row = rows[i];
-    const name = String(row.name || '').trim();
-    const email = String(row.email || '').trim().toLowerCase();
-    const department = String(row.department || 'General').trim();
+  await prisma.$transaction(async (tx) => {
+    for (let i = 0; i < rows.length; i += 1) {
+      const row = rows[i];
+      const name = String(row.name || '').trim();
+      const email = String(row.email || '').trim().toLowerCase();
+      const department = String(row.department || 'General').trim();
 
-    if (!name || !email || !email.includes('@')) {
-      errors.push({ index: i, reason: 'Invalid name or email' });
-      continue;
-    }
+      if (!name || !email || !email.includes('@')) {
+        errors.push({ index: i, reason: 'Invalid name or email' });
+        continue;
+      }
 
-    const departmentId = await resolveDepartmentId(companyId, department);
-    const existing = await queryRaw<Array<{ id: string }>>(
-      `SELECT "id" FROM "company_employees" WHERE "companyId" = $1 AND "email" = $2 LIMIT 1`,
-      companyId,
-      email,
-    );
+      const departmentId = await resolveDepartmentId(companyId, department, tx);
+      const existing = await tx.$queryRaw<Array<{ id: string }>>`SELECT "id" FROM "company_employees" WHERE "companyId" = ${companyId} AND "email" = ${email} LIMIT 1`;
 
-    const id = existing[0]?.id || randomUUID();
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO "company_employees" (
+      const id = existing[0]?.id || randomUUID();
+      await tx.$executeRaw`INSERT INTO "company_employees" (
           "id","companyId","departmentId","employeeCode","name","email","location","managerName",
           "riskBand","phq9Score","gad7Score","sessionsUsed","engagementScore","preferredService","isActive","createdAt","updatedAt"
        ) VALUES (
-          $1,$2,$3,$4,$5,$6,$7,$8,'LOW',4,4,0,45,'Stress therapy',true,NOW(),NOW()
+          ${id},${companyId},${departmentId},${String(row.employeeId || '')},${name},${email},${String(row.location || 'Bengaluru')},${String(row.manager || 'Unassigned')},'LOW',4,4,0,45,'Stress therapy',true,NOW(),NOW()
        )
        ON CONFLICT ("companyId","email") DO UPDATE SET
           "departmentId"=EXCLUDED."departmentId",
@@ -1194,23 +761,15 @@ export const bulkUploadCorporateEmployees = async (rows: BulkEmployeeRow[], comp
           "name"=EXCLUDED."name",
           "location"=EXCLUDED."location",
           "managerName"=EXCLUDED."managerName",
-          "updatedAt"=NOW();`,
-      id,
-      companyId,
-      departmentId,
-      String(row.employeeId || ''),
-      name,
-      email,
-      String(row.location || 'Bengaluru'),
-      String(row.manager || 'Unassigned'),
-    );
+          "updatedAt"=NOW();`;
 
-    if (existing[0]?.id) {
-      updated += 1;
-    } else {
-      created += 1;
+      if (existing[0]?.id) {
+        updated += 1;
+      } else {
+        created += 1;
+      }
     }
-  }
+  });
 
   return {
     requested: rows.length,
@@ -1224,13 +783,10 @@ export const bulkUploadCorporateEmployees = async (rows: BulkEmployeeRow[], comp
 
 export const getCorporateReports = async (companyKey?: string) => {
   const { companyId } = await resolveCompany(companyKey);
-  const rows = await queryRaw<Array<{ id: string; reportType: string; quarter: string; format: string; downloadUrl: string; generatedAt: Date }>>(
-    `SELECT "id", "reportType", "quarter", "format", "downloadUrl", "generatedAt"
+  const rows = await prisma.$queryRaw<Array<{ id: string; reportType: string; quarter: string; format: string; downloadUrl: string; generatedAt: Date }>>`SELECT "id", "reportType", "quarter", "format", "downloadUrl", "generatedAt"
      FROM "corporate_reports"
-     WHERE "companyId" = $1
-     ORDER BY "generatedAt" DESC`,
-    companyId,
-  );
+     WHERE "companyId" = ${companyId}
+     ORDER BY "generatedAt" DESC`;
 
   return rows.map((row) => ({
     id: row.id,
@@ -1244,26 +800,20 @@ export const getCorporateReports = async (companyKey?: string) => {
 
 export const getCorporatePrograms = async (companyKey?: string) => {
   const { companyId } = await resolveCompany(companyKey);
-  const rows = await queryRaw<Array<{ id: string; title: string; durationWeeks: number; employeesEnrolled: number; completionRate: number; status: string }>>(
-    `SELECT "id", "title", "durationWeeks", "employeesEnrolled", "completionRate", "status"
+  const rows = await prisma.$queryRaw<Array<{ id: string; title: string; durationWeeks: number; employeesEnrolled: number; completionRate: number; status: string }>>`SELECT "id", "title", "durationWeeks", "employeesEnrolled", "completionRate", "status"
      FROM "corporate_programs"
-     WHERE "companyId" = $1
-     ORDER BY "createdAt" DESC`,
-    companyId,
-  );
+     WHERE "companyId" = ${companyId}
+     ORDER BY "createdAt" DESC`;
 
   return rows;
 };
 
 export const getCorporateWorkshops = async (companyKey?: string) => {
   const { companyId } = await resolveCompany(companyKey);
-  const rows = await queryRaw<Array<{ id: string; title: string; provider: string; department: string; workshopDate: Date; attendees: number; status: string }>>(
-    `SELECT "id", "title", "provider", "department", "workshopDate", "attendees", "status"
+  const rows = await prisma.$queryRaw<Array<{ id: string; title: string; provider: string; department: string; workshopDate: Date; attendees: number; status: string }>>`SELECT "id", "title", "provider", "department", "workshopDate", "attendees", "status"
      FROM "corporate_workshops"
-     WHERE "companyId" = $1
-     ORDER BY "workshopDate" ASC`,
-    companyId,
-  );
+     WHERE "companyId" = ${companyId}
+     ORDER BY "workshopDate" ASC`;
 
   return rows.map((row) => ({
     ...row,
@@ -1273,13 +823,10 @@ export const getCorporateWorkshops = async (companyKey?: string) => {
 
 export const getCorporateCampaigns = async (companyKey?: string) => {
   const { companyId } = await resolveCompany(companyKey);
-  const rows = await queryRaw<Array<{ id: string; title: string; audience: string; startDate: Date; endDate: Date; reachCount: number; engagementRate: number; status: string }>>(
-    `SELECT "id", "title", "audience", "startDate", "endDate", "reachCount", "engagementRate", "status"
+  const rows = await prisma.$queryRaw<Array<{ id: string; title: string; audience: string; startDate: Date; endDate: Date; reachCount: number; engagementRate: number; status: string }>>`SELECT "id", "title", "audience", "startDate", "endDate", "reachCount", "engagementRate", "status"
      FROM "corporate_campaigns"
-     WHERE "companyId" = $1
-     ORDER BY "startDate" DESC`,
-    companyId,
-  );
+     WHERE "companyId" = ${companyId}
+     ORDER BY "startDate" DESC`;
 
   return rows;
 };
@@ -1294,7 +841,7 @@ export const getCorporateEmployees = async (
   const query = String(filters?.query || '').trim();
   const department = String(filters?.department || '').trim();
 
-  const rows = await queryRaw<Array<{
+  const rows = await prisma.$queryRaw<Array<{
     id: string;
     employeeCode: string | null;
     name: string;
@@ -1309,8 +856,7 @@ export const getCorporateEmployees = async (
     engagementScore: number;
     preferredService: string;
     isActive: boolean;
-  }>>(
-    `SELECT
+  }>>`SELECT
        e."id",
        e."employeeCode",
        e."name",
@@ -1327,29 +873,18 @@ export const getCorporateEmployees = async (
        e."isActive"
      FROM "company_employees" e
      LEFT JOIN "company_departments" d ON d."id" = e."departmentId"
-     WHERE e."companyId" = $1
-       AND ($2::text = '' OR LOWER(e."name") LIKE LOWER($2) OR LOWER(e."email") LIKE LOWER($2) OR LOWER(COALESCE(e."employeeCode", '')) LIKE LOWER($2))
-       AND ($3::text = '' OR d."name" = $3)
+     WHERE e."companyId" = ${companyId}
+       AND (${query ? `%${query}%` : ''}::text = '' OR LOWER(e."name") LIKE LOWER(${query ? `%${query}%` : ''}) OR LOWER(e."email") LIKE LOWER(${query ? `%${query}%` : ''}) OR LOWER(COALESCE(e."employeeCode", '')) LIKE LOWER(${query ? `%${query}%` : ''}))
+       AND (${department}::text = '' OR d."name" = ${department})
      ORDER BY e."name" ASC
-     LIMIT $4 OFFSET $5`,
-    companyId,
-    query ? `%${query}%` : '',
-    department,
-    limit,
-    offset,
-  );
+     LIMIT ${limit} OFFSET ${offset}`;
 
-  const totalRows = await queryRaw<Array<{ total: bigint }>>(
-    `SELECT COUNT(*)::bigint as total
+  const totalRows = await prisma.$queryRaw<Array<{ total: bigint }>>`SELECT COUNT(*)::bigint as total
      FROM "company_employees" e
      LEFT JOIN "company_departments" d ON d."id" = e."departmentId"
-     WHERE e."companyId" = $1
-       AND ($2::text = '' OR LOWER(e."name") LIKE LOWER($2) OR LOWER(e."email") LIKE LOWER($2) OR LOWER(COALESCE(e."employeeCode", '')) LIKE LOWER($2))
-       AND ($3::text = '' OR d."name" = $3)`,
-    companyId,
-    query ? `%${query}%` : '',
-    department,
-  );
+     WHERE e."companyId" = ${companyId}
+       AND (${query ? `%${query}%` : ''}::text = '' OR LOWER(e."name") LIKE LOWER(${query ? `%${query}%` : ''}) OR LOWER(e."email") LIKE LOWER(${query ? `%${query}%` : ''}) OR LOWER(COALESCE(e."employeeCode", '')) LIKE LOWER(${query ? `%${query}%` : ''}))
+       AND (${department}::text = '' OR d."name" = ${department})`;
 
   return {
     total: toInt(totalRows[0]?.total, 0),
@@ -1361,14 +896,11 @@ export const getCorporateEmployees = async (
 
 export const getCorporateSessionAllocations = async (companyKey?: string) => {
   const { companyId } = await resolveCompany(companyKey);
-  const rows = await queryRaw<Array<{ department: string; allocatedSessions: number; usedSessions: number }>>(
-    `SELECT d."name" as department, a."allocatedSessions", a."usedSessions"
+  const rows = await prisma.$queryRaw<Array<{ department: string; allocatedSessions: number; usedSessions: number }>>`SELECT d."name" as department, a."allocatedSessions", a."usedSessions"
      FROM "company_session_allocations" a
      INNER JOIN "company_departments" d ON d."id" = a."departmentId"
-     WHERE a."companyId" = $1
-     ORDER BY d."name" ASC`,
-    companyId,
-  );
+     WHERE a."companyId" = ${companyId}
+     ORDER BY d."name" ASC`;
 
   const totals = rows.reduce(
     (acc, row) => {
@@ -1389,26 +921,22 @@ export const getCorporateSessionAllocations = async (companyKey?: string) => {
 export const updateCorporateSessionAllocations = async (allocations: SessionAllocationUpdate[], companyKey?: string) => {
   const { companyId } = await resolveCompany(companyKey);
 
-  for (const item of allocations) {
-    const department = String(item.department || '').trim();
-    if (!department) continue;
-    const departmentId = await resolveDepartmentId(companyId, department);
-    const allocatedSessions = Math.max(0, toInt(item.allocatedSessions, 0));
+  await prisma.$transaction(async (tx) => {
+    for (const item of allocations) {
+      const department = String(item.department || '').trim();
+      if (!department) continue;
+      const departmentId = await resolveDepartmentId(companyId, department, tx);
+      const allocatedSessions = Math.max(0, toInt(item.allocatedSessions, 0));
 
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO "company_session_allocations" (
+      await tx.$executeRaw`INSERT INTO "company_session_allocations" (
         "id", "companyId", "departmentId", "allocatedSessions", "usedSessions", "createdAt", "updatedAt"
       ) VALUES (
-        $1, $2, $3, $4, COALESCE((SELECT "usedSessions" FROM "company_session_allocations" WHERE "companyId" = $2 AND "departmentId" = $3), 0), NOW(), NOW()
+        ${randomUUID()}, ${companyId}, ${departmentId}, ${allocatedSessions}, COALESCE((SELECT "usedSessions" FROM "company_session_allocations" WHERE "companyId" = ${companyId} AND "departmentId" = ${departmentId}), 0), NOW(), NOW()
       ) ON CONFLICT ("companyId","departmentId") DO UPDATE SET
         "allocatedSessions" = EXCLUDED."allocatedSessions",
-        "updatedAt" = NOW();`,
-      randomUUID(),
-      companyId,
-      departmentId,
-      allocatedSessions,
-    );
-  }
+        "updatedAt" = NOW();`;
+    }
+  });
 
   return getCorporateSessionAllocations(companyKey);
 };
@@ -1420,17 +948,8 @@ export const createCorporateProgram = async (payload: ProgramCreateInput, compan
     throw new Error('Program title is required');
   }
 
-  await prisma.$executeRawUnsafe(
-    `INSERT INTO "corporate_programs" ("id","companyId","title","durationWeeks","employeesEnrolled","completionRate","status","createdAt","updatedAt")
-     VALUES ($1,$2,$3,$4,$5,$6,$7,NOW(),NOW())`,
-    randomUUID(),
-    companyId,
-    title,
-    Math.max(1, toInt(payload.durationWeeks, 4)),
-    Math.max(0, toInt(payload.employeesEnrolled, 0)),
-    Math.max(0, Math.min(100, toInt(payload.completionRate, 0))),
-    String(payload.status || 'ACTIVE').trim().toUpperCase() || 'ACTIVE',
-  );
+  await prisma.$executeRaw`INSERT INTO "corporate_programs" ("id","companyId","title","durationWeeks","employeesEnrolled","completionRate","status","createdAt","updatedAt")
+     VALUES (${randomUUID()},${companyId},${title},${Math.max(1, toInt(payload.durationWeeks, 4))},${Math.max(0, toInt(payload.employeesEnrolled, 0))},${Math.max(0, Math.min(100, toInt(payload.completionRate, 0)))},${String(payload.status || 'ACTIVE').trim().toUpperCase() || 'ACTIVE'},NOW(),NOW())`;
 
   return getCorporatePrograms(companyKey);
 };
@@ -1442,18 +961,8 @@ export const createCorporateWorkshop = async (payload: WorkshopCreateInput, comp
     throw new Error('Workshop title is required');
   }
 
-  await prisma.$executeRawUnsafe(
-    `INSERT INTO "corporate_workshops" ("id","companyId","title","provider","department","workshopDate","attendees","status","createdAt","updatedAt")
-     VALUES ($1,$2,$3,$4,$5,$6::date,$7,$8,NOW(),NOW())`,
-    randomUUID(),
-    companyId,
-    title,
-    String(payload.provider || 'Internal Wellness Team').trim(),
-    String(payload.department || 'General').trim(),
-    String(payload.date || new Date().toISOString().slice(0, 10)),
-    Math.max(0, toInt(payload.attendees, 0)),
-    String(payload.status || 'SCHEDULED').trim().toUpperCase() || 'SCHEDULED',
-  );
+  await prisma.$executeRaw`INSERT INTO "corporate_workshops" ("id","companyId","title","provider","department","workshopDate","attendees","status","createdAt","updatedAt")
+     VALUES (${randomUUID()},${companyId},${title},${String(payload.provider || 'Internal Wellness Team').trim()},${String(payload.department || 'General').trim()},${String(payload.date || new Date().toISOString().slice(0, 10))}::date,${Math.max(0, toInt(payload.attendees, 0))},${String(payload.status || 'SCHEDULED').trim().toUpperCase() || 'SCHEDULED'},NOW(),NOW())`;
 
   return getCorporateWorkshops(companyKey);
 };
@@ -1465,19 +974,8 @@ export const createCorporateCampaign = async (payload: CampaignCreateInput, comp
     throw new Error('Campaign title is required');
   }
 
-  await prisma.$executeRawUnsafe(
-    `INSERT INTO "corporate_campaigns" ("id","companyId","title","audience","startDate","endDate","reachCount","engagementRate","status","createdAt","updatedAt")
-     VALUES ($1,$2,$3,$4,$5::date,$6::date,$7,$8,$9,NOW(),NOW())`,
-    randomUUID(),
-    companyId,
-    title,
-    String(payload.audience || 'All Employees').trim(),
-    String(payload.startDate || new Date().toISOString().slice(0, 10)),
-    String(payload.endDate || new Date().toISOString().slice(0, 10)),
-    Math.max(0, toInt(payload.reachCount, 0)),
-    Math.max(0, Math.min(100, toInt(payload.engagementRate, 0))),
-    String(payload.status || 'ACTIVE').trim().toUpperCase() || 'ACTIVE',
-  );
+  await prisma.$executeRaw`INSERT INTO "corporate_campaigns" ("id","companyId","title","audience","startDate","endDate","reachCount","engagementRate","status","createdAt","updatedAt")
+     VALUES (${randomUUID()},${companyId},${title},${String(payload.audience || 'All Employees').trim()},${String(payload.startDate || new Date().toISOString().slice(0, 10))}::date,${String(payload.endDate || new Date().toISOString().slice(0, 10))}::date,${Math.max(0, toInt(payload.reachCount, 0))},${Math.max(0, Math.min(100, toInt(payload.engagementRate, 0)))},${String(payload.status || 'ACTIVE').trim().toUpperCase() || 'ACTIVE'},NOW(),NOW())`;
 
   return getCorporateCampaigns(companyKey);
 };
@@ -1500,7 +998,7 @@ export const getCorporateRoi = async (companyKey?: string) => {
 
 export const getCorporateInvoices = async (companyKey?: string) => {
   const { companyId } = await resolveCompany(companyKey);
-  const rows = await queryRaw<Array<{
+  const rows = await prisma.$queryRaw<Array<{
     id: string;
     invoiceCode: string;
     title: string;
@@ -1510,13 +1008,10 @@ export const getCorporateInvoices = async (companyKey?: string) => {
     status: string;
     dueDate: Date | null;
     paidDate: Date | null;
-  }>>(
-    `SELECT "id", "invoiceCode", "title", "billingPeriod", "amountPaise", "currency", "status", "dueDate", "paidDate"
+  }>>`SELECT "id", "invoiceCode", "title", "billingPeriod", "amountPaise", "currency", "status", "dueDate", "paidDate"
      FROM "corporate_invoices"
-     WHERE "companyId" = $1
-     ORDER BY "dueDate" DESC NULLS LAST, "createdAt" DESC`,
-    companyId,
-  );
+     WHERE "companyId" = ${companyId}
+     ORDER BY "dueDate" DESC NULLS LAST, "createdAt" DESC`;
 
   const summary = rows.reduce(
     (acc, row) => {
@@ -1541,7 +1036,7 @@ export const getCorporateInvoices = async (companyKey?: string) => {
 
 export const getCorporatePaymentMethods = async (companyKey?: string) => {
   const { companyId } = await resolveCompany(companyKey);
-  const rows = await queryRaw<Array<{
+  const rows = await prisma.$queryRaw<Array<{
     id: string;
     methodType: string;
     label: string;
@@ -1549,14 +1044,11 @@ export const getCorporatePaymentMethods = async (companyKey?: string) => {
     isPrimary: boolean;
     isActive: boolean;
     updatedAt: Date;
-  }>>(
-    `SELECT DISTINCT ON ("methodType", "details")
+  }>>`SELECT DISTINCT ON ("methodType", "details")
        "id", "methodType", "label", "details", "isPrimary", "isActive", "updatedAt"
      FROM "corporate_payment_methods"
-     WHERE "companyId" = $1
-     ORDER BY "methodType", "details", "updatedAt" DESC`,
-    companyId,
-  );
+     WHERE "companyId" = ${companyId}
+     ORDER BY "methodType", "details", "updatedAt" DESC`;
 
   return {
     rows: rows.sort((a, b) => {
@@ -1579,26 +1071,17 @@ export const createCorporatePaymentMethod = async (payload: PaymentMethodCreateI
     throw new Error('label and details are required');
   }
 
-  if (isPrimary) {
-    await prisma.$executeRawUnsafe(
-      `UPDATE "corporate_payment_methods"
+  await prisma.$transaction(async (tx) => {
+    if (isPrimary) {
+      await tx.$executeRaw`UPDATE "corporate_payment_methods"
        SET "isPrimary" = false, "updatedAt" = NOW()
-       WHERE "companyId" = $1`,
-      companyId,
-    );
-  }
+       WHERE "companyId" = ${companyId}`;
+    }
 
-  await prisma.$executeRawUnsafe(
-    `INSERT INTO "corporate_payment_methods" (
+    await tx.$executeRaw`INSERT INTO "corporate_payment_methods" (
       "id","companyId","methodType","label","details","isPrimary","isActive","createdAt","updatedAt"
-    ) VALUES ($1,$2,$3,$4,$5,$6,true,NOW(),NOW())`,
-    randomUUID(),
-    companyId,
-    methodType,
-    label,
-    details,
-    isPrimary,
-  );
+    ) VALUES (${randomUUID()},${companyId},${methodType},${label},${details},${isPrimary},true,NOW(),NOW())`;
+  });
 
   return getCorporatePaymentMethods(companyKey);
 };
@@ -1614,45 +1097,32 @@ export const updateCorporatePaymentMethod = async (
     throw new Error('paymentMethodId is required');
   }
 
-  const rows = await queryRaw<Array<{ id: string; label: string; details: string; isPrimary: boolean; isActive: boolean }>>(
-    `SELECT "id", "label", "details", "isPrimary", "isActive"
-     FROM "corporate_payment_methods"
-     WHERE "id" = $1 AND "companyId" = $2
-     LIMIT 1`,
-    methodId,
-    companyId,
-  );
+  await prisma.$transaction(async (tx) => {
+    const rows = await tx.$queryRaw<Array<{ id: string; label: string; details: string; isPrimary: boolean; isActive: boolean }>>`SELECT "id", "label", "details", "isPrimary", "isActive"
+       FROM "corporate_payment_methods"
+       WHERE "id" = ${methodId} AND "companyId" = ${companyId}
+       LIMIT 1`;
 
-  const current = rows[0];
-  if (!current) {
-    throw new Error('Payment method not found');
-  }
+    const current = rows[0];
+    if (!current) {
+      throw new Error('Payment method not found');
+    }
 
-  const isPrimary = payload.isPrimary === undefined ? current.isPrimary : Boolean(payload.isPrimary);
-  if (isPrimary) {
-    await prisma.$executeRawUnsafe(
-      `UPDATE "corporate_payment_methods"
+    const isPrimary = payload.isPrimary === undefined ? current.isPrimary : Boolean(payload.isPrimary);
+    if (isPrimary) {
+      await tx.$executeRaw`UPDATE "corporate_payment_methods"
        SET "isPrimary" = false, "updatedAt" = NOW()
-       WHERE "companyId" = $1`,
-      companyId,
-    );
-  }
+       WHERE "companyId" = ${companyId}`;
+    }
 
-  await prisma.$executeRawUnsafe(
-    `UPDATE "corporate_payment_methods"
-     SET "label" = $3,
-         "details" = $4,
-         "isPrimary" = $5,
-         "isActive" = $6,
+    await tx.$executeRaw`UPDATE "corporate_payment_methods"
+     SET "label" = ${String(payload.label ?? current.label).trim() || current.label},
+         "details" = ${String(payload.details ?? current.details).trim() || current.details},
+         "isPrimary" = ${isPrimary},
+         "isActive" = ${payload.isActive === undefined ? current.isActive : Boolean(payload.isActive)},
          "updatedAt" = NOW()
-     WHERE "id" = $1 AND "companyId" = $2`,
-    methodId,
-    companyId,
-    String(payload.label ?? current.label).trim() || current.label,
-    String(payload.details ?? current.details).trim() || current.details,
-    isPrimary,
-    payload.isActive === undefined ? current.isActive : Boolean(payload.isActive),
-  );
+     WHERE "id" = ${methodId} AND "companyId" = ${companyId}`;
+  });
 
   return getCorporatePaymentMethods(companyKey);
 };
@@ -1675,20 +1145,9 @@ export const submitCorporateDemoRequest = async (payload: CorporateDemoRequestIn
   const companyKey = sanitizeKeyPart(companyName);
   const requestId = randomUUID();
 
-  await prisma.$executeRawUnsafe(
-    `INSERT INTO "corporate_demo_requests" (
+  await prisma.$executeRaw`INSERT INTO "corporate_demo_requests" (
       "id","companyName","companyKey","workEmail","companySize","industry","country","contactName","phone","status","createdAt","updatedAt"
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'NEW',NOW(),NOW())`,
-    requestId,
-    companyName,
-    companyKey || null,
-    email,
-    String(payload.companySize || '').trim() || null,
-    String(payload.industry || '').trim() || null,
-    String(payload.country || '').trim() || null,
-    String(payload.contactName || '').trim() || null,
-    phone,
-  );
+    ) VALUES (${requestId},${companyName},${companyKey || null},${email},${String(payload.companySize || '').trim() || null},${String(payload.industry || '').trim() || null},${String(payload.country || '').trim() || null},${String(payload.contactName || '').trim() || null},${phone},'NEW',NOW(),NOW())`;
 
   return {
     requestId,
@@ -1721,21 +1180,9 @@ export const requestCorporateOtp = async (payload: CorporateOtpRequestInput) => 
   const expiresAt = new Date(Date.now() + env.otpTtlMinutes * 60 * 1000);
 
   // Store corporate OTP request
-  await prisma.$executeRawUnsafe(
-    `INSERT INTO "corporate_otp_requests" (
+  await prisma.$executeRaw`INSERT INTO "corporate_otp_requests" (
       "id","phone","otpHash","companyName","companySize","industry","country","contactName","email","status","expiresAt","createdAt","updatedAt"
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'PENDING',$10,NOW(),NOW())`,
-    otpRecordId,
-    phone,
-    otpHash,
-    companyName,
-    String(payload.companySize || '').trim() || null,
-    String(payload.industry || '').trim() || null,
-    String(payload.country || '').trim() || null,
-    String(payload.contactName || '').trim() || null,
-    String(payload.email || '').trim().toLowerCase() || null,
-    expiresAt,
-  );
+    ) VALUES (${otpRecordId},${phone},${otpHash},${companyName},${String(payload.companySize || '').trim() || null},${String(payload.industry || '').trim() || null},${String(payload.country || '').trim() || null},${String(payload.contactName || '').trim() || null},${String(payload.email || '').trim().toLowerCase() || null},'PENDING',${expiresAt},NOW(),NOW())`;
 
   return {
     otpRecordId,
@@ -1766,110 +1213,98 @@ export const createCorporateAccount = async (payload: CorporateAccountCreateInpu
     throw new AppError('OTP is required', 400);
   }
 
-  // Verify OTP
-  const otpRecord = (await prisma.$queryRawUnsafe(
-    `SELECT "otpHash", "expiresAt" FROM "corporate_otp_requests" 
-     WHERE phone = $1 AND status = 'PENDING' ORDER BY "createdAt" DESC LIMIT 1`,
-    phone,
-  )) as Array<{ otpHash: string; expiresAt: Date }>;
+  const accountCreation = await prisma.$transaction(async (tx) => {
+    // Verify OTP
+    const otpRecord = (await tx.$queryRaw`SELECT "otpHash", "expiresAt" FROM "corporate_otp_requests" 
+     WHERE phone = ${phone} AND status = 'PENDING' ORDER BY "createdAt" DESC LIMIT 1`) as Array<{ otpHash: string; expiresAt: Date }>;
 
-  if (!otpRecord || !otpRecord[0]) {
-    throw new AppError('Invalid or expired OTP request', 400);
-  }
+    if (!otpRecord || !otpRecord[0]) {
+      throw new AppError('Invalid or expired OTP request', 400);
+    }
 
-  if (otpRecord[0].expiresAt < new Date()) {
-    throw new AppError('OTP expired', 400);
-  }
+    if (otpRecord[0].expiresAt < new Date()) {
+      throw new AppError('OTP expired', 400);
+    }
 
-  const validOtp = await verifyOtp(otp, otpRecord[0].otpHash);
-  if (!validOtp) {
-    throw new AppError('Invalid OTP', 400);
-  }
+    const validOtp = await verifyOtp(otp, otpRecord[0].otpHash);
+    if (!validOtp) {
+      throw new AppError('Invalid OTP', 400);
+    }
 
-  // Mark OTP as used
-  await prisma.$executeRawUnsafe(
-    `UPDATE "corporate_otp_requests" SET status = 'USED' WHERE phone = $1`,
-    phone,
-  );
+    // Mark OTP as used
+    await tx.$executeRaw`UPDATE "corporate_otp_requests" SET status = 'USED' WHERE phone = ${phone}`;
 
-  // Check if phone already registered
-  const existingUser = await prisma.user.findFirst({ where: { phone } });
-  if (existingUser && !existingUser.isDeleted) {
-    throw new AppError('Phone number is already registered', 409);
-  }
+    // Check if phone already registered
+    const existingUser = await tx.user.findFirst({ where: { phone } });
+    if (existingUser && !existingUser.isDeleted) {
+      throw new AppError('Phone number is already registered', 409);
+    }
 
-  const companyKey = await resolveUniqueCompanyKey(companyName);
-  const companyDomain = email ? getDomainFromEmail(email) : null;
-  const companyId = randomUUID();
-  const defaultEmployeeLimit = Math.max(50, toInt(payload.companySize, 300));
-  const defaultSessionQuota = Math.max(25, Math.round(defaultEmployeeLimit * 0.65));
+    const companyKey = await resolveUniqueCompanyKey(companyName, tx);
+    const companyDomain = email ? getDomainFromEmail(email) : null;
+    const companyId = randomUUID();
+    const defaultEmployeeLimit = Math.max(50, toInt(payload.companySize, 300));
+    const defaultSessionQuota = Math.max(25, Math.round(defaultEmployeeLimit * 0.65));
 
-  await prisma.$executeRawUnsafe(
-    `INSERT INTO "companies" (
+    await tx.$executeRaw`INSERT INTO "companies" (
       "id","companyKey","domain","name","employeeLimit","sessionQuota","ssoProvider","privacyPolicy","supportEmail","supportPhone","supportSla","createdAt","updatedAt"
-    ) VALUES ($1,$2,$3,$4,$5,$6,'Google Workspace',$7,$8,$9,$10,NOW(),NOW())`,
-    companyId,
-    companyKey,
-    companyDomain,
-    companyName,
-    defaultEmployeeLimit,
-    defaultSessionQuota,
-    'Only aggregate analytics are visible to HR. Individual therapy notes, diagnosis, medications, and provider details are never shown.',
-    'enterprise-support@manas360.com',
-    '+91-80-4000-3600',
-    'Priority support within 4 business hours.',
-  );
+    ) VALUES (${companyId},${companyKey},${companyDomain},${companyName},${defaultEmployeeLimit},${defaultSessionQuota},'Google Workspace',${'Only aggregate analytics are visible to HR. Individual therapy notes, diagnosis, medications, and provider details are never shown.'},${'enterprise-support@manas360.com'},${'+91-80-4000-3600'},${'Priority support within 4 business hours.'},NOW(),NOW())`;
 
-  const nameParts = contactName ? contactName.split(/\s+/).filter(Boolean) : [];
-  const firstName = nameParts[0] || companyName;
-  const lastName = nameParts.slice(1).join(' ');
+    const nameParts = contactName ? contactName.split(/\s+/).filter(Boolean) : [];
+    const firstName = nameParts[0] || companyName;
+    const lastName = nameParts.slice(1).join(' ');
 
-  const corporateMember = await prisma.user.create({
-    data: {
-      email: email || undefined,
-      phone,
-      provider: 'PHONE',
-      role: 'PATIENT',
-      firstName,
-      lastName,
-      name: contactName || companyName,
-      phoneVerified: true,
-      emailVerified: Boolean(email),
-    },
-    select: {
-      id: true,
-      email: true,
-      phone: true,
-      firstName: true,
-      lastName: true,
-    },
+    const corporateMember = await tx.user.create({
+      data: {
+        email: email || undefined,
+        phone,
+        provider: 'PHONE',
+        role: 'PATIENT',
+        firstName,
+        lastName,
+        name: contactName || companyName,
+        phoneVerified: true,
+        emailVerified: Boolean(email),
+      },
+      select: {
+        id: true,
+        email: true,
+        phone: true,
+        firstName: true,
+        lastName: true,
+      },
+    });
+
+    await tx.$executeRaw`UPDATE "users"
+       SET company_key = ${companyKey},
+           is_company_admin = false,
+           "updatedAt" = NOW()
+       WHERE id = ${corporateMember.id}`;
+
+    return {
+      companyId,
+      companyKey,
+      defaultEmployeeLimit,
+      defaultSessionQuota,
+      corporateMember,
+    };
   });
 
-  await prisma.$executeRawUnsafe(
-    `UPDATE "users"
-     SET company_key = $2,
-         is_company_admin = false,
-         "updatedAt" = NOW()
-     WHERE id = $1`,
-    corporateMember.id,
-    companyKey,
-  );
-
   const corporateMemberPayload = {
-    id: corporateMember.id,
-    email: corporateMember.email,
-    firstName: corporateMember.firstName,
-    lastName: corporateMember.lastName,
+    id: accountCreation.corporateMember.id,
+    email: accountCreation.corporateMember.email,
+    firstName: accountCreation.corporateMember.firstName,
+    lastName: accountCreation.corporateMember.lastName,
     isCompanyAdmin: false,
   };
 
   return {
     company: {
-      id: companyId,
-      companyKey,
+      id: accountCreation.companyId,
+      companyKey: accountCreation.companyKey,
       name: companyName,
-      employeeLimit: defaultEmployeeLimit,
-      sessionQuota: defaultSessionQuota,
+      employeeLimit: accountCreation.defaultEmployeeLimit,
+      sessionQuota: accountCreation.defaultSessionQuota,
       industry: String(payload.industry || '').trim() || null,
       country: String(payload.country || '').trim() || null,
     },

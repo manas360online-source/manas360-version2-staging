@@ -243,7 +243,7 @@ export const listPublicPublishedGroupTherapySessionsController = async (_req: Re
     orderBy: { scheduledAt: 'asc' },
     include: {
       hostTherapist: {
-        select: { id: true, firstName: true, lastName: true },
+        select: { id: true, firstName: true, lastName: true, email: true },
       },
       enrollments: {
         where: { status: { in: ['PAID', 'JOINED'] } },

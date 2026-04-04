@@ -4,7 +4,7 @@ const unwrap = (payload: any) => (payload && payload.data ? payload.data : paylo
 
 export const ssoApi = {
   getTenantForCompany: async () => {
-    const resp = await http.get('/sso/tenant/me');
+    const resp = await http.get('/v1/sso/tenant/me');
     return unwrap(resp.data);
   },
   updateTenant: async (tenantKey: string, payload: Record<string, any>) => {
