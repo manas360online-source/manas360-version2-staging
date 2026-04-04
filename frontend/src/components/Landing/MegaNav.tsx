@@ -71,7 +71,6 @@ const tabs: TabConfig[] = [
       { icon: '📚', title: 'Psychoeducation', description: 'Learn practical wellbeing skills', route: '/learn' },
       { icon: '🏞️', title: 'Wellness Retreats', description: 'Restorative retreat experiences', route: '/retreats' },
       { icon: '🛍️', title: 'Wellness Shop', description: 'Tools and resources for wellbeing', route: '/shop' },
-      { icon: '📖', title: 'How It Works', description: 'Start your care journey in minutes', route: '/how-it-works' },
     ],
   },
 ];
@@ -173,10 +172,10 @@ export const MegaNav: React.FC<MegaNavProps> = ({ tone = 'dark' }) => {
   return (
     <div ref={rootRef} className="relative" onMouseLeave={handleDesktopLeave}>
       <nav
-        className={`mx-auto mt-2 hidden w-full max-w-7xl items-center justify-between gap-0.5 border-t px-3 pt-1.5 md:flex ${isLight ? 'border-calm-sage/12' : 'border-cream/10'}`}
+        className={`mx-auto mt-2 hidden w-full max-w-7xl flex-nowrap items-center gap-0.5 border-t px-3 pt-1.5 md:flex ${isLight ? 'border-calm-sage/12' : 'border-cream/10'}`}
         aria-label="Mega navigation tabs"
       >
-        <div className="flex flex-1 items-center gap-0.5">
+        <div className="flex min-w-0 flex-1 items-center gap-0.5">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.label;
 
@@ -203,18 +202,27 @@ export const MegaNav: React.FC<MegaNavProps> = ({ tone = 'dark' }) => {
               </button>
             );
           })}
+          <Link
+            to="/my-digital-clinic"
+            className={`min-h-[36px] flex-1 whitespace-nowrap border-b-2 border-transparent px-2.5 py-1.5 text-center text-[13px] font-medium tracking-wide transition-all duration-300 ease-out ${
+              isLight
+                ? 'text-charcoal/70 hover:border-b-gentle-blue/70 hover:text-charcoal'
+                : 'text-cream/80 hover:border-b-gentle-blue/80 hover:text-cream'
+            }`}
+          >
+            MyDigitalClinic
+          </Link>
+          <Link
+            to="/how-it-works"
+            className={`min-h-[36px] flex-1 whitespace-nowrap border-b-2 border-transparent px-2.5 py-1.5 text-center text-[13px] font-medium tracking-wide transition-all duration-300 ease-out ${
+              isLight
+                ? 'text-charcoal/70 hover:border-b-gentle-blue/70 hover:text-charcoal'
+                : 'text-cream/80 hover:border-b-gentle-blue/80 hover:text-cream'
+            }`}
+          >
+            How It Works
+          </Link>
         </div>
-
-        <Link
-          to="/my-digital-clinic"
-          className={`whitespace-nowrap rounded-full px-4 py-2 text-[13px] font-medium tracking-wide transition-all duration-300 ${
-            isLight
-              ? 'text-charcoal/70 hover:text-charcoal'
-              : 'text-cream/75 hover:text-cream'
-          }`}
-        >
-          MyDigitalClinic
-        </Link>
       </nav>
 
       <div

@@ -1,0 +1,1702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MANS360 Interactive Demo — Explore All Journeys</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --primary: #7C3AED;
+  --primary-dark: #5B21B6;
+  --accent: #D4A017;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --danger: #EF4444;
+  --slate: #1E293B;
+  --slate-light: #64748B;
+  --gray: #F1F5F9;
+  --white: #FFFFFF;
+  --cream: #FDF6E3;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Outfit', sans-serif;
+  background: linear-gradient(135deg, #F5F0FF 0%, #EDE9FE 40%, #FFFFFF 100%);
+  color: var(--slate);
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+.header {
+  background: var(--white);
+  border-bottom: 1px solid #E2E8F0;
+  padding: 20px 0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.header-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.logo {
+  font-family: 'Playfair Display', serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.logo em {
+  font-style: normal;
+  color: var(--accent);
+}
+
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.breadcrumb {
+  font-size: 12px;
+  color: var(--slate-light);
+}
+
+.breadcrumb a {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.breadcrumb a:hover {
+  color: var(--primary-dark);
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 20px;
+}
+
+.hero {
+  text-align: center;
+  margin-bottom: 60px;
+}
+
+.hero h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: 48px;
+  font-weight: 900;
+  margin-bottom: 16px;
+  color: var(--slate);
+  line-height: 1.2;
+}
+
+.hero h1 .accent {
+  color: var(--primary);
+}
+
+.hero p {
+  font-size: 18px;
+  color: var(--slate-light);
+  max-width: 600px;
+  margin: 0 auto 16px;
+  line-height: 1.8;
+}
+
+.hero-sub {
+  font-size: 14px;
+  color: var(--warning);
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.role-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 24px;
+  margin-bottom: 60px;
+}
+
+.role-card {
+  background: var(--white);
+  border-radius: 12px;
+  padding: 32px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.role-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--primary);
+  box-shadow: 0 12px 32px rgba(124,58,237,0.15);
+}
+
+.role-icon {
+  font-size: 56px;
+  margin-bottom: 16px;
+  display: block;
+}
+
+.role-card h3 {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  color: var(--slate);
+}
+
+.role-card p {
+  font-size: 14px;
+  color: var(--slate-light);
+  margin-bottom: 20px;
+}
+
+.role-card .cta {
+  display: inline-block;
+  padding: 10px 24px;
+  background: var(--primary);
+  color: var(--white);
+  border-radius: 8px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+  font-size: 14px;
+}
+
+.role-card .cta:hover {
+  background: var(--primary-dark);
+  transform: scale(1.05);
+}
+
+.journey-section {
+  display: none;
+  animation: fadeIn 0.4s ease;
+}
+
+.journey-section.active {
+  display: block;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.journey-header {
+  background: var(--white);
+  border-radius: 12px;
+  padding: 32px;
+  margin-bottom: 32px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.journey-header h2 {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--slate);
+  margin-bottom: 12px;
+}
+
+.journey-header p {
+  font-size: 16px;
+  color: var(--slate-light);
+  margin-bottom: 20px;
+}
+
+.journey-stats {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.stat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stat-icon {
+  font-size: 24px;
+}
+
+.stat-text {
+  font-size: 14px;
+  color: var(--slate-light);
+}
+
+.stat-value {
+  font-weight: 700;
+  color: var(--slate);
+}
+
+.journey-flow {
+  background: var(--white);
+  border-radius: 12px;
+  padding: 32px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  margin-bottom: 32px;
+}
+
+.flow-step {
+  margin-bottom: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #E2E8F0;
+  position: relative;
+  padding-left: 40px;
+}
+
+.flow-step:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.step-number {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 32px;
+  height: 32px;
+  background: var(--primary);
+  color: var(--white);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.step-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--slate);
+  margin-bottom: 8px;
+}
+
+.step-description {
+  font-size: 14px;
+  color: var(--slate-light);
+  margin-bottom: 12px;
+  line-height: 1.6;
+}
+
+.step-action {
+  display: inline-block;
+  padding: 8px 16px;
+  background: #F3F4F6;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--slate);
+  font-weight: 600;
+  border: 1px solid #E5E7EB;
+}
+
+.nav-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 40px;
+  flex-wrap: wrap;
+}
+
+.btn {
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+  font-size: 14px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: var(--white);
+}
+
+.btn-primary:hover {
+  background: var(--primary-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(124,58,237,0.3);
+}
+
+.btn-secondary {
+  background: var(--gray);
+  color: var(--slate);
+  border: 1px solid #E2E8F0;
+}
+
+.btn-secondary:hover {
+  background: #E2E8F0;
+  transform: translateY(-2px);
+}
+
+.btn-outline {
+  background: transparent;
+  color: var(--primary);
+  border: 2px solid var(--primary);
+}
+
+.btn-outline:hover {
+  background: #F3F0FF;
+}
+
+.role-swap {
+  background: var(--cream);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 32px 0;
+  border-left: 4px solid var(--warning);
+}
+
+.role-swap h4 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--slate);
+  margin-bottom: 12px;
+}
+
+.role-swap p {
+  font-size: 14px;
+  color: var(--slate-light);
+  margin-bottom: 16px;
+}
+
+.role-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.role-btn {
+  padding: 8px 16px;
+  background: var(--white);
+  border: 2px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: all 0.2s;
+}
+
+.role-btn.active {
+  background: var(--primary);
+  color: var(--white);
+  border-color: var(--primary);
+}
+
+.role-btn:hover {
+  border-color: var(--primary);
+}
+
+.tips-box {
+  background: #DBEAFE;
+  border-left: 4px solid var(--primary);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 20px 0;
+}
+
+.tips-box h4 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--primary);
+  margin-bottom: 8px;
+}
+
+.tips-box p {
+  font-size: 13px;
+  color: #0C4A6E;
+  line-height: 1.6;
+}
+
+.footer {
+  background: var(--slate);
+  color: var(--white);
+  padding: 40px 20px;
+  margin-top: 80px;
+  text-align: center;
+}
+
+.footer p {
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.footer-links {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+.footer-links a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .hero h1 {
+    font-size: 32px;
+  }
+  .role-grid {
+    grid-template-columns: 1fr;
+  }
+  .nav-buttons {
+    flex-direction: column;
+  }
+  .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.journey-section {
+  animation: slideInUp 0.5s ease;
+}
+
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="logo">MANS<em>360</em></div>
+    <div class="nav-right">
+      <div class="breadcrumb">
+        <span id="breadcrumb-text">Home</span>
+        <span id="breadcrumb-arrow" style="display:none;"> / <span id="current-role"></span></span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- HOME SECTION -->
+  <section id="home-section" class="journey-section active">
+    <div class="hero">
+      <span class="hero-sub">Interactive Demo</span>
+      <h1>Explore MANS360<br><span class="accent">All User Journeys</span></h1>
+      <p>No login required. Click any journey below to experience the complete user pathway. Navigate freely, swap roles anytime, and discover how MANS360 works from different perspectives.</p>
+      <p style="font-size: 14px; color: #94A3B8; margin-top: 20px;">💡 Tip: Each journey takes 3-5 minutes to explore. Discover your perfect entry point.</p>
+    </div>
+
+    <div class="role-grid">
+      <!-- 1. Not Sure-Discover Myself Journey -->
+      <div class="role-card" onclick="showJourney('discover')">
+        <span class="role-icon">🔍</span>
+        <h3>Not Sure-Discover Myself</h3>
+        <p>Free screening, AnytimeBUDDY, digital pet, sound therapy, Dr. Meera chat. Try free. No commitment.</p>
+        <button class="cta">Start Journey</button>
+      </div>
+
+      <!-- 2. Group Therapies-My Topic-Pay Less -->
+      <div class="role-card" onclick="showJourney('group')">
+        <span class="role-icon">👥</span>
+        <h3>Group Therapies-My Topic-Pay Less</h3>
+        <p>Join group therapy sessions with 4-8 people. Same clinical depth, fraction of the cost.</p>
+        <button class="cta">Start Journey</button>
+      </div>
+
+      <!-- 3. Mental Wellness Seeker Journey -->
+      <div class="role-card" onclick="showJourney('patient')">
+        <span class="role-icon">🌟</span>
+        <h3>Mental Wellness Seeker</h3>
+        <p>Experience MANS360 as someone seeking transformational mental health support. From discovery to lasting change.</p>
+        <button class="cta">Start Journey</button>
+      </div>
+
+      <!-- 4. Provider Journey -->
+      <div class="role-card" onclick="showJourney('provider')">
+        <span class="role-icon">👨‍⚕️</span>
+        <h3>Provider Journey</h3>
+        <p>See how therapists onboard, manage clients, and grow their practice on MANS360.</p>
+        <button class="cta">Start Journey</button>
+      </div>
+
+      <!-- 5. Corp HR Head/Corp CSR/Hospital Admin/College Admin -->
+      <div class="role-card" onclick="showJourney('corporate')">
+        <span class="role-icon">💼</span>
+        <h3>IT HR Head / Corp CSR / Hospital Admin / College Admin Mental Wellness Journey</h3>
+        <p>Implement team/institutional wellness, measure outcomes, and support mental health at scale.</p>
+        <button class="cta">Start Journey</button>
+      </div>
+
+      <!-- 6. Detox-Slow-Tranquility Retreat -->
+      <div class="role-card" onclick="showJourney('retreat')">
+        <span class="role-icon">🌿</span>
+        <h3>Detox-Slow-Tranquility-Find a Spark Again Retreats</h3>
+        <p>7-14 day intensive retreat. Digital detox. Nature. Therapy + naturo-therapy. Rediscover joy.</p>
+        <button class="cta">Start Journey</button>
+      </div>
+
+      <!-- 7. Certify-Earn More Journey -->
+      <div class="role-card" onclick="showJourney('training')">
+        <span class="role-icon">💰</span>
+        <h3>Certify-Earn More Journey</h3>
+        <p>Get trained, earn certification, unlock income. Build a sustainable livelihood through MANS360.</p>
+        <button class="cta">Start Journey</button>
+      </div>
+
+      <!-- 8. Admin & Operations -->
+      <div class="role-card" onclick="showJourney('admin')">
+        <span class="role-icon">⚙️</span>
+        <h3>MANAS360-Admin</h3>
+        <p>Manage therapists, track outcomes, handle incidents, and keep the platform running smoothly.</p>
+        <button class="cta">Start Journey</button>
+      </div>
+
+      <!-- 9. Anyone Onboarding-Jiffy -->
+      <div class="role-card" onclick="showJourney('onboarding')">
+        <span class="role-icon">⚡</span>
+        <h3>Anyone Onboarding-Jiffy</h3>
+        <p>Quick, seamless onboarding for everyone. Registration to first interaction in minutes.</p>
+        <button class="cta">Start Journey</button>
+      </div>
+
+      <!-- 10. Executive Journey -->
+      <div class="role-card" onclick="showJourney('executive')">
+        <span class="role-icon">🎯</span>
+        <h3>Executive-One on One Focused Goals-Manifest</h3>
+        <p>High-touch therapy for busy leaders. 1-on-1 sessions focused on performance, clarity, purpose.</p>
+        <button class="cta">Start Journey</button>
+      </div>
+
+      <!-- 11. NRI Journey -->
+      <div class="role-card" onclick="showJourney('nri')">
+        <span class="role-icon">🌏</span>
+        <h3>NRI-Find a Janmabhoomi Connection-Heal</h3>
+        <p>For Indians abroad. Therapy + cultural reconnection. Find your roots, heal your heart.</p>
+        <button class="cta">Start Journey</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- DISCOVER MYSELF JOURNEY -->
+  <section id="discover-section" class="journey-section">
+    <div class="journey-header">
+      <h2>🔍 Not Sure-Discover Myself: The Free Explorer</h2>
+      <p>No commitment. No risk. Just explore MANS360 with free tools. Perfect for people curious but not ready to book.</p>
+      <div class="journey-stats">
+        <div class="stat">
+          <span class="stat-icon">💰</span>
+          <span class="stat-text"><span class="stat-value">100% Free</span> to start</span>
+        </div>
+        <div class="stat">
+          <span class="stat-icon">⏱️</span>
+          <span class="stat-text">15-30 min</span> to experience</span>
+        </div>
+        <div class="stat">
+          <span class="stat-icon">📱</span>
+          <span class="stat-text">All features on mobile</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="journey-flow">
+      <div class="flow-step">
+        <div class="step-number">1</div>
+        <div class="step-title">Free Screening: "Am I okay?"</div>
+        <div class="step-description">Take a free 2-minute mental health screening. PHQ-9 or GAD-7 assessment. Instant results (no email required).</div>
+        <span class="step-action">✓ Take free screening</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">2</div>
+        <div class="step-title">AnytimeBUDDY Meet Chintu: "Your free companion"</div>
+        <div class="step-description">Meet Chintu, your dopamine buddy. Tap for encouragement, get motivational messages, celebrate small wins. No login needed.</div>
+        <span class="step-action">✓ Play with Chintu</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">3</div>
+        <div class="step-title">Digital Pet: "Your healing buddy"</div>
+        <div class="step-description">Adopt a free digital pet. Care for it, watch it grow. Gamified wellness: feeding = hydration, playing = movement.</div>
+        <span class="step-action">✓ Adopt your pet</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">4</div>
+        <div class="step-title">Sound Therapy: "Calm your mind"</div>
+        <div class="step-description">Access 10 free soundscapes: forest rain, ocean waves, meditation bells. 5-30 minutes each. Pure relaxation.</div>
+        <span class="step-action">✓ Browse soundtracks</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">5</div>
+        <div class="step-title">Dr. Meera Chat: "2 min with a doctor"</div>
+        <div class="step-description">Text or audio chat with Dr. Meera (AI companion). 2 minutes free per day. Ask about symptoms, get gentle guidance.</div>
+        <span class="step-action">✓ Chat with Dr. Meera</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">6</div>
+        <div class="step-title">Free Certification Module: "Learn basics"</div>
+        <div class="step-description">Access Module 1 free: "Understanding Mental Health Basics." Video + quiz. See what full training includes.</div>
+        <span class="step-action">✓ Start module 1</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">7</div>
+        <div class="step-title">Gentle Upgrade Path: "Ready for more?"</div>
+        <div class="step-description">Based on screening results, see personalized recommendations: Group therapy (₹500/session), 1-on-1 (₹1000/session), Retreat (₹25K+). All optional.</div>
+        <span class="step-action">✓ View recommendations</span>
+      </div>
+    </div>
+
+    <div class="role-swap">
+      <h4>🔄 Want a different experience?</h4>
+      <div class="role-buttons">
+        <button class="role-btn" onclick="showJourney('group')">Group Therapies</button>
+        <button class="role-btn" onclick="showJourney('patient')">Mental Wellness Seeker</button>
+        <button class="role-btn active" onclick="showJourney('discover')">← Back to Free</button>
+      </div>
+    </div>
+
+    <div class="tips-box">
+      <h4>💡 Why Free Tools?</h4>
+      <p><strong>MANS360 believes exploration should be free.</strong> These tools help you understand where you stand, introduce our approach, and build trust. No gates. No pressure. Just genuine tools that work.</p>
+    </div>
+
+    <div class="nav-buttons">
+      <button class="btn btn-secondary" onclick="showJourney('home')">← Back to Home</button>
+      <button class="btn btn-outline" onclick="showJourney('group')">See Group Therapy Journey →</button>
+    </div>
+  </section>
+
+  <!-- GROUP THERAPIES JOURNEY -->
+  <section id="group-section" class="journey-section">
+    <div class="journey-header">
+      <h2>👥 Group Therapies-My Topic-Pay Less: Heal Together</h2>
+      <p>Same clinical depth as 1-on-1, but in a group of 4-8 people on YOUR topic. Build community. Share stories. Pay less. Heal more.</p>
+      <div class="journey-stats">
+        <div class="stat">
+          <span class="stat-icon">💵</span>
+          <span class="stat-text">₹500-2K per session</span>
+        </div>
+        <div class="stat">
+          <span class="stat-icon">👥</span>
+          <span class="stat-text">Groups of 4-8 people</span>
+        </div>
+        <div class="stat">
+          <span class="stat-icon">🎯</span>
+          <span class="stat-text">Weekly or bi-weekly</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="journey-flow">
+      <div class="flow-step">
+        <div class="step-number">1</div>
+        <div class="step-title">Browse Group Options: "Find your fit"</div>
+        <div class="step-description">See available groups by topic: Anxiety Circle, Burnout Recovery, Life Transitions, Relationship Healing, Grief & Loss, Career Clarity, Parenting Stress, Identity Questions. Each has therapist profile, schedule, cost.</div>
+        <span class="step-action">✓ Browse group options</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">2</div>
+        <div class="step-title">Group Interview: "Meet the therapist & group"</div>
+        <div class="step-description">Attend a free 15-min group intro call. Meet the therapist. Hear what others are working on. Ask questions. Make sure it's right for you.</div>
+        <span class="step-action">✓ Schedule group intro</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">3</div>
+        <div class="step-title">First Group Session: "You belong here"</div>
+        <div class="step-description">Join your first 60-90 min session. Therapist creates safe space. People share their stories. You realize: You're not alone. Others get it.</div>
+        <span class="step-action">✓ Join first session</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">4</div>
+        <div class="step-title">Weekly Participation: "The work"</div>
+        <div class="step-description">Commit to 8-week or 12-week group. Show up weekly. Share. Listen. Learn. Your story becomes part of someone else's healing.</div>
+        <span class="step-action">✓ Commit to 8-week cycle</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">5</div>
+        <div class="step-title">Community Bonds: "Find your people"</div>
+        <div class="step-description">Exchange WhatsApp contacts (optional). Support each other between sessions. Text a group member when you're struggling. Real friendships form.</div>
+        <span class="step-action">✓ Join WhatsApp circle</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">6</div>
+        <div class="step-title">Cycle Completion: "You've grown"</div>
+        <div class="step-description">After 8-12 weeks, reflect on what changed. Measure progress (PHQ-9 before/after). Decide: Continue with group, try 1-on-1, take a break, graduate.</div>
+        <span class="step-action">✓ Take completion survey</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">7</div>
+        <div class="step-title">Alumni Community: "Forever connected"</div>
+        <div class="step-description">Join MANS360 alumni community. Monthly meetups (virtual or in-person). Guest speakers. Wellness workshops. Your group becomes lifelong connection.</div>
+        <span class="step-action">✓ Join alumni circle</span>
+      </div>
+    </div>
+
+    <div class="role-swap">
+      <h4>🔄 Compare other pathways</h4>
+      <div class="role-buttons">
+        <button class="role-btn" onclick="showJourney('discover')">Free Explorer</button>
+        <button class="role-btn" onclick="showJourney('patient')">Mental Wellness Seeker</button>
+        <button class="role-btn active" onclick="showJourney('group')">← Back to Groups</button>
+      </div>
+    </div>
+
+    <div class="tips-box">
+      <h4>💡 Why Groups?</h4>
+      <p><strong>Healing is social.</strong> Group therapy is 40% cheaper than 1-on-1, but research shows equal or better outcomes. Why? Because hearing others' stories normalizes yours. Because helping someone else heal, heals you. Because you make friends who truly get it.</p>
+    </div>
+
+    <div class="nav-buttons">
+      <button class="btn btn-secondary" onclick="showJourney('home')">← Back to Home</button>
+      <button class="btn btn-outline" onclick="showJourney('patient')">See Mental Wellness Seeker →</button>
+    </div>
+  </section>
+
+  <!-- MENTAL WELLNESS SEEKER JOURNEY -->
+  <section id="patient-section" class="journey-section">
+    <div class="journey-header">
+      <h2>🌟 Mental Wellness Seeker: From Struggle to Transformation</h2>
+      <p>Experience MANS360 as someone seeking transformational mental health support. This journey shows how someone discovers, books, and participates in a retreat.</p>
+      <div class="journey-stats">
+        <div class="stat">
+          <span class="stat-icon">⏱️</span>
+          <span class="stat-text"><span class="stat-value">5 min</span> to explore</span>
+        </div>
+        <div class="stat">
+          <span class="stat-icon">🎯</span>
+          <span class="stat-text">Key Flows: Discovery → Qualification → Booking → Retreat</span>
+        </div>
+        <div class="stat">
+          <span class="stat-icon">📱</span>
+          <span class="stat-text">Mobile-optimized</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="journey-flow">
+      <div class="flow-step">
+        <div class="step-number">1</div>
+        <div class="step-title">Discovery: "I'm struggling"</div>
+        <div class="step-description">You land on MANS360 via LinkedIn or search. See relatable messaging about burnout, anxiety, or depression. No login required to browse.</div>
+        <span class="step-action">✓ Click to explore landing page</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">2</div>
+        <div class="step-title">Exploration: "What is this?"</div>
+        <div class="step-description">Explore the "HOW IT WORKS" section. See retreat options (Solo Detox, Couple's Healing, Corporate), pricing, and therapist profiles. Watch 2-min video explaining the model.</div>
+        <span class="step-action">✓ Browse retreat options</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">3</div>
+        <div class="step-title">Qualification: "Is this right for me?"</div>
+        <div class="step-description">Book a free 15-min consultation call. Quick health screening confirms you're safe for group retreat. Discuss preferences (location, language, dates).</div>
+        <span class="step-action">✓ Schedule consultation</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">4</div>
+        <div class="step-title">Booking: "Let's do this"</div>
+        <div class="step-description">Select retreat date/location, make payment via PhonePe. Receive confirmation email with onboarding sequence.</div>
+        <span class="step-action">✓ Complete booking</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">5</div>
+        <div class="step-title">Pre-Retreat: "Getting ready"</div>
+        <div class="step-description">Receive daily emails: Day 1 = Welcome + therapist bio, Day 3 = Retreat schedule, Day 5 = Packing list + travel logistics, Day 7 = Final check-in call.</div>
+        <span class="step-action">✓ Download pre-retreat materials</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">6</div>
+        <div class="step-title">Retreat: "The transformation"</div>
+        <div class="step-description">7-day intensive: therapy + naturo-therapy + nature. Use AnytimeBUDDY app for dopamine hits between sessions. Connect with other participants.</div>
+        <span class="step-action">✓ Explore retreat schedule</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">7</div>
+        <div class="step-title">Post-Retreat: "Sustaining the change"</div>
+        <div class="step-description">Attend 4 virtual follow-up sessions (bi-weekly). Take PHQ-9 assessment (measure improvement). Join alumni community. Receive herbal protocols for home.</div>
+        <span class="step-action">✓ View 6-month support plan</span>
+      </div>
+    </div>
+
+    <div class="role-swap">
+      <h4>🔄 Want to see a different perspective?</h4>
+      <p>Try exploring the journey from a therapist's or HR manager's view. See how the same events look from different roles.</p>
+      <div class="role-buttons">
+        <button class="role-btn" onclick="showJourney('provider')">Provider View</button>
+        <button class="role-btn" onclick="showJourney('corporate')">Corporate View</button>
+        <button class="role-btn active" onclick="showJourney('patient')">← Back to Wellness Seeker</button>
+      </div>
+    </div>
+
+    <div class="tips-box">
+      <h4>💡 Key Insights</h4>
+      <p>MANS360 is designed for people like you. The entire flow minimizes friction: no login until you're ready, free consultation removes commitment anxiety, and post-retreat support ensures transformation lasts.</p>
+    </div>
+
+    <div class="nav-buttons">
+      <button class="btn btn-secondary" onclick="showJourney('home')">← Back to Home</button>
+      <button class="btn btn-outline" onclick="showJourney('provider')">See Provider View →</button>
+    </div>
+  </section>
+
+  <!-- PROVIDER JOURNEY -->
+  <section id="provider-section" class="journey-section">
+    <div class="journey-header">
+      <h2>👨‍⚕️ Provider Journey: Build Your Practice</h2>
+      <p>Experience MANS360 as a therapist or mental health professional. See how providers register, manage clients, and grow their practice.</p>
+      <div class="journey-stats">
+        <div class="stat">
+          <span class="stat-icon">⏱️</span>
+          <span class="stat-text"><span class="stat-value">5-7 min</span> to explore</span>
+        </div>
+        <div class="stat">
+          <span class="stat-icon">🎯</span>
+          <span class="stat-text">Key Flows: Registration → Onboarding → Client Management → Retreats</span>
+        </div>
+        <div class="stat">
+          <span class="stat-icon">📊</span>
+          <span class="stat-text">Real-time analytics & earnings</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="journey-flow">
+      <div class="flow-step">
+        <div class="step-number">1</div>
+        <div class="step-title">Registration: "Join our network"</div>
+        <div class="step-description">Therapist creates account with email, NMC/RCI credentials uploaded. No approval delay — credentials verified within 48 hours in background.</div>
+        <span class="step-action">✓ Start registration</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">2</div>
+        <div class="step-title">Profile Setup: "Tell your story"</div>
+        <div class="step-description">Complete profile: bio, specializations, languages offered, availability, hourly rate. Photo & verified badge displayed. Profile visible to patients immediately.</div>
+        <span class="step-action">✓ Build provider profile</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">3</div>
+        <div class="step-title">Onboarding Training: "Get trained"</div>
+        <div class="step-description">4-week onboarding: MANS360 clinical protocols, naturo-therapy basics, crisis management, patient matching algorithm. Weekly sync with Clinical Lead (Dr. Sindhuja).</div>
+        <span class="step-action">✓ Explore onboarding modules</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">4</div>
+        <div class="step-title">Client Onboarding: "First patient"</div>
+        <div class="step-description">Receive patient match from platform. Initial consultation (free 15-min) scheduled. Build therapeutic alliance, assess fit.</div>
+        <span class="step-action">✓ View client intake form</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">5</div>
+        <div class="step-title">Therapy Sessions: "The work"</div>
+        <div class="step-description">Conduct video or in-person sessions. Use MANS360 patient dashboard to track progress, assign homework, monitor PHQ-9 scores.</div>
+        <span class="step-action">✓ Access session templates</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">6</div>
+        <div class="step-title">Retreat Leadership: "Go deep"</div>
+        <div class="step-description">Lead 7-14 day intensive retreat. Facilitate group therapy, individual check-ins, integrate naturo-therapy. Support crisis situations if they arise.</div>
+        <span class="step-action">✓ Review retreat protocols</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">7</div>
+        <div class="step-title">Earnings & Growth: "Scale your impact"</div>
+        <div class="step-description">Earn 60% of session fees, 60% of retreat revenue. Real-time earnings dashboard. Referral bonuses for patient acquisition. Access to supervision/training for growth.</div>
+        <span class="step-action">✓ View earnings model</span>
+      </div>
+    </div>
+
+    <div class="role-swap">
+      <h4>🔄 How does this compare to other platforms?</h4>
+      <p>See how patients experience this same provider's work — understand the full ecosystem from both sides.</p>
+      <div class="role-buttons">
+        <button class="role-btn" onclick="showJourney('patient')">Mental Wellness Seeker View</button>
+        <button class="role-btn" onclick="showJourney('training')">Certify-Earn More View</button>
+        <button class="role-btn active" onclick="showJourney('provider')">← Back to Provider</button>
+      </div>
+    </div>
+
+    <div class="tips-box">
+      <h4>💡 Key Insights for Providers</h4>
+      <p>MANS360 is built FOR therapists. You keep 60% of revenue, get trained in specialized protocols, access a built-in patient base, and have real-time support from a Clinical Advisory Board.</p>
+    </div>
+
+    <div class="nav-buttons">
+      <button class="btn btn-secondary" onclick="showJourney('home')">← Back to Home</button>
+      <button class="btn btn-outline" onclick="showJourney('corporate')">See Corporate View →</button>
+    </div>
+  </section>
+
+  <!-- CORPORATE HR JOURNEY -->
+  <section id="corporate-section" class="journey-section">
+    <div class="journey-header">
+      <h2>💼 IT HR Head / Corp CSR / Hospital Admin / College Admin Mental Wellness Journey</h2>
+      <p>Experience MANS360 as an HR leader, CSR manager, Hospital administrator, or College wellness coordinator. See how institutions implement team wellness and measure impact.</p>
+      <div class="journey-stats">
+        <div class="stat">
+          <span class="stat-icon">👥</span>
+          <span class="stat-text">25-1000 person groups</span>
+        </div>
+        <div class="stat">
+          <span class="stat-icon">📊</span>
+          <span class="stat-text">ROI: -40% burnout, +12% retention</span>
+        </div>
+        <div class="stat">
+          <span class="stat-icon">💰</span>
+          <span class="stat-text">₹35-60K per person</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="journey-flow">
+      <div class="flow-step">
+        <div class="step-number">1</div>
+        <div class="step-title">Discovery: "We need a solution"</div>
+        <div class="step-description">HR leader sees MANS360 LinkedIn post about wellness solutions. Recognizes burnout in team. Books 20-min discovery call with MANS360 corporate specialist.</div>
+        <span class="step-action">✓ Schedule discovery call</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">2</div>
+        <div class="step-title">Proposal & Budget: "Business case"</div>
+        <div class="step-description">MANS360 sends proposal: 40-person team, 5-7 day retreat, 2 groups. Cost: ₹16L total (₹40K per person). ROI: 12% retention improvement = ₹40L+ savings. Budget approved.</div>
+        <span class="step-action">✓ View sample proposal</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">3</div>
+        <div class="step-title">Baseline Assessment: "Measure before"</div>
+        <div class="step-description">HR sends anonymous survey to team: PHQ-9, GAD-7, Team Dynamics Assessment, engagement. Baseline metrics captured. Data completely anonymized.</div>
+        <span class="step-action">✓ View baseline questionnaire</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">4</div>
+        <div class="step-title">Team Registration: "Enrollment"</div>
+        <div class="step-description">HR shares enrollment link with team. Employees select retreat dates. Confidential health screening completed by MANS360 clinician.</div>
+        <span class="step-action">✓ Enroll team members</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">5</div>
+        <div class="step-title">Retreat Delivery: "Transformation week"</div>
+        <div class="step-description">5-7 day intensive at resort. Group therapy + trust-building activities + individual check-ins + nature immersion. MANS360 therapists run groups, managers trust the process.</div>
+        <span class="step-action">✓ Explore daily itinerary</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">6</div>
+        <div class="step-title">Post-Retreat: "Sustain the gains"</div>
+        <div class="step-description">Monthly virtual group sessions (6 months). Quarterly micro-retreats. HR dashboard shows real-time engagement metrics. Employee wellness scores tracked.</div>
+        <span class="step-action">✓ View 6-month support plan</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">7</div>
+        <div class="step-title">Impact Measurement: "Prove the ROI"</div>
+        <div class="step-description">6-month post-retreat: Repeat baseline assessment. Results: 40% avg burnout drop, 12% retention improvement, 35% team trust increase. Case study published with permission.</div>
+        <span class="step-action">✓ View impact report</span>
+      </div>
+    </div>
+
+    <div class="role-swap">
+      <h4>🔄 Understand the team experience</h4>
+      <p>Your team members will go through the Mental Wellness Seeker journey. See what they experience during and after the retreat.</p>
+      <div class="role-buttons">
+        <button class="role-btn" onclick="showJourney('patient')">Employee/Seeker View</button>
+        <button class="role-btn" onclick="showJourney('admin')">Operations View</button>
+        <button class="role-btn active" onclick="showJourney('corporate')">← Back to Corp HR</button>
+      </div>
+    </div>
+
+    <div class="tips-box">
+      <h4>💡 Key Insights for Corporate Leaders</h4>
+      <p>This isn't a team offsite disguised as wellness. It's a measured intervention with real clinical depth, ongoing support, and proven ROI. Your best talent will feel valued and empowered to lead.</p>
+    </div>
+
+    <div class="nav-buttons">
+      <button class="btn btn-secondary" onclick="showJourney('home')">← Back to Home</button>
+      <button class="btn btn-outline" onclick="showJourney('retreat')">See Retreat Journey →</button>
+    </div>
+  </section>
+
+  <!-- RETREAT JOURNEY -->
+  <section id="retreat-section" class="journey-section">
+    <div class="journey-header">
+      <h2>🌿 Detox-Slow-Tranquility-Find a Spark Again Retreats</h2>
+      <p>7-14 day intensive retreat. Leave burnout behind. Rediscover joy, purpose, yourself. Digital detox. Nature immersion. Real transformation.</p>
+      <div class="journey-stats">
+        <div class="stat">
+          <span class="stat-icon">📍</span>
+          <span class="stat-text">Goa, Kerala, Himalayas, Coorg</span>
+        </div>
+        <div class="stat">
+          <span class="stat-icon">💵</span>
+          <span class="stat-text">₹25K-75K</span>
+        </div>
+        <div class="stat">
+          <span class="stat-icon">🌍</span>
+          <span class="stat-text">6-month post-retreat support</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="journey-flow">
+      <div class="flow-step">
+        <div class="step-number">1</div>
+        <div class="step-title">Discovery: "I need to get away"</div>
+        <div class="step-description">You land on MANS360. See retreat options: Solo Detox (₹25-75K), Couple's Healing (₹80K), Corporate Group (₹35-60K/person). Each promises transformation.</div>
+        <span class="step-action">✓ Explore retreat options</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">2</div>
+        <div class="step-title">Pre-Retreat Preparation: "Getting ready"</div>
+        <div class="step-description">Email sequence: Day 1 = Welcome + therapist bio, Day 3 = Retreat schedule, Day 5 = Packing list + travel info, Day 7 = Final check-in call with therapist.</div>
+        <span class="step-action">✓ Download pre-retreat kit</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">3</div>
+        <div class="step-title">Arrival: "You're here. Finally."</div>
+        <div class="step-description">Land at resort. Leave your phone (digital detox protocol). Room key, retreat schedule, welcome dinner. Meet your group. Nerves + hope.</div>
+        <span class="step-action">✓ Check in</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">4</div>
+        <div class="step-title">Daily Rhythm: "The transformation"</div>
+        <div class="step-description">6:30 AM Yoga → 8:30 AM Therapy group → 1:30 PM Naturo-therapy (Shirodhara/Abhyanga) → 5 PM Activity (forest bath, gardening) → 7 PM Circle (sharing). Repeat 7-14 days.</div>
+        <span class="step-action">✓ View daily schedule</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">5</div>
+        <div class="step-title">Breakthroughs: "Things shift"</div>
+        <div class="step-description">Around day 3-4, something clicks. Walls come down. You cry. You laugh. You realize what you've been carrying. Therapist is there. Your group holds you.</div>
+        <span class="step-action">✓ Read breakthrough stories</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">6</div>
+        <div class="step-title">Closure & Commitment: "The last night"</div>
+        <div class="step-description">Final circle. People share transformations. Therapist gives you "home protocols" (herbal remedies, daily practices). You get video testimonial (optional).</div>
+        <span class="step-action">✓ Plan home practices</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">7</div>
+        <div class="step-title">Post-Retreat: "Sustaining the change"</div>
+        <div class="step-description">4 virtual follow-up sessions (bi-weekly, 6 months). PHQ-9 re-assessment. Join alumni community. Some join ongoing group therapy or continue 1-on-1. The transformation sticks.</div>
+        <span class="step-action">✓ View 6-month support</span>
+      </div>
+    </div>
+
+    <div class="role-swap">
+      <h4>🔄 Different retreat pathways</h4>
+      <div class="role-buttons">
+        <button class="role-btn" onclick="showJourney('group')">Group Therapy (cheaper start)</button>
+        <button class="role-btn" onclick="showJourney('executive')">Executive 1-on-1</button>
+        <button class="role-btn active" onclick="showJourney('retreat')">← Back to Retreat</button>
+      </div>
+    </div>
+
+    <div class="tips-box">
+      <h4>💡 Why Intensive?</h4>
+      <p><strong>Transformation requires depth.</strong> 1 hour/week of therapy takes 2 years to process what you can process in 7 days of immersion. Therapy + nature + community + naturo-therapy = exponential healing. Your nervous system resets. Your perspective shifts. You come home different.</p>
+    </div>
+
+    <div class="nav-buttons">
+      <button class="btn btn-secondary" onclick="showJourney('home')">← Back to Home</button>
+      <button class="btn btn-outline" onclick="showJourney('training')">See Certify-Earn More →</button>
+    </div>
+  </section>
+
+  <!-- CERTIFY-EARN MORE JOURNEY -->
+  <section id="training-section" class="journey-section">
+    <div class="journey-header">
+      <h2>💰 Certify-Earn More Journey: Build Your Income</h2>
+      <p>Experience how community health workers get trained, certified, and unlock a sustainable income stream through MANS360 referrals and session fees.</p>
+      <div class="journey-stats">
+        <div class="stat">
+          <span class="stat-icon">⏱️</span>
+          <span class="stat-text"><span class="stat-value">6-8 weeks</span> to certification</span>
+        </div>
+        <div class="stat">
+          <span class="stat-icon">💵</span>
+          <span class="stat-text">Earn <span class="stat-value">₹5-15K/month</span> post-certification</span>
+        </div>
+        <div class="stat">
+          <span class="stat-icon">📍</span>
+          <span class="stat-text">On-site + online hybrid training</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="journey-flow">
+      <div class="flow-step">
+        <div class="step-number">1</div>
+        <div class="step-title">Recruitment: "Join the mission"</div>
+        <div class="step-description">ASHA/CHW in a village hears about MANS360 mental health training. Minimal qualifications: class 8+ education, interest in mental health, willingness to learn.</div>
+        <span class="step-action">✓ View recruitment flyer</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">2</div>
+        <div class="step-title">Induction: "Welcome aboard"</div>
+        <div class="step-description">1-day workshop in nearby district center. Introduction to MANS360 model, mobile app demo, community health context. Receive training kit (manual, flashcards, certificate template).</div>
+        <span class="step-action">✓ Explore training materials</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">3</div>
+        <div class="step-title">Module Learning: "The 5Why + ECI Framework"</div>
+        <div class="step-description">Weeks 1-4: Learn 5 core modules via blended approach (videos + group sessions + WhatsApp support). Topics: NLP fundamentals, empathy, 5Why framework, crisis identification.</div>
+        <span class="step-action">✓ Access module 1: NLP Basics</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">4</div>
+        <div class="step-title">Practical Sessions: "Learn by doing"</div>
+        <div class="step-description">Weeks 5-6: Role-play exercises with facilitators. Practice IVR conversations, PHQ-9 screening, community outreach. Video recorded for feedback.</div>
+        <span class="step-action">✓ Practice role-plays</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">5</div>
+        <div class="step-title">Certification Exam: "Prove mastery"</div>
+        <div class="step-description">Weeks 7: Written + practical exam. 60% pass threshold. Covers NLP concepts, crisis protocols, IVR system, ethical guidelines.</div>
+        <span class="step-action">✓ Take practice exam</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">6</div>
+        <div class="step-title">Deployment: "Go to your village"</div>
+        <div class="step-description">Certified CHW returns to village with MANS360 app + IVR system. Starts identifying people in mental health crisis via community conversations. Routes them to platform for professional help.</div>
+        <span class="step-action">✓ View deployment checklist</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">7</div>
+        <div class="step-title">Ongoing Support & Growth: "Build your income"</div>
+        <div class="step-description">Monthly group video calls with trainer. WhatsApp support channel. Quarterly refresher modules. Escalation path for complex cases. Incentive payments for successful referrals (₹500-2K per referral). Participate in group therapy sessions for additional income. Some CHWs earn ₹8-15K/month with consistent effort.</div>
+        <span class="step-action">✓ View income opportunity details</span>
+      </div>
+    </div>
+
+    <div class="role-swap">
+      <h4>🔄 How does this income fit into the ecosystem?</h4>
+      <p>CHWs are the backbone of MANS360's rural reach. See how your referrals create patients for therapists, and therapists' outcomes create more referrals for you.</p>
+      <div class="role-buttons">
+        <button class="role-btn" onclick="showJourney('patient')">Mental Wellness Seeker View</button>
+        <button class="role-btn" onclick="showJourney('provider')">Provider View</button>
+        <button class="role-btn active" onclick="showJourney('training')">← Back to Certify-Earn</button>
+      </div>
+    </div>
+
+    <div class="tips-box">
+      <h4>💡 Key Insights for CHWs</h4>
+      <p><strong>This isn't just training. It's an income opportunity.</strong> Get certified in 6-8 weeks, start earning ₹5-15K/month through referrals, session support, and retreat participation. Build a sustainable livelihood while helping your community access mental health support.</p>
+    </div>
+
+    <div class="nav-buttons">
+      <button class="btn btn-secondary" onclick="showJourney('home')">← Back to Home</button>
+      <button class="btn btn-outline" onclick="showJourney('admin')">See Admin View →</button>
+    </div>
+  </section>
+
+  <!-- ADMIN JOURNEY -->
+  <section id="admin-section" class="journey-section">
+    <div class="journey-header">
+      <h2>⚙️ MANAS360-Admin: Keeping the Platform Running</h2>
+      <p>Experience MANS360 from the operations perspective. See how admins manage therapists, track outcomes, and ensure safety.</p>
+      <div class="journey-stats">
+        <div class="stat">
+          <span class="stat-icon">📊</span>
+          <span class="stat-text">Real-time dashboards & alerts</span>
+        </div>
+        <div class="stat">
+          <span class="stat-icon">🔍</span>
+          <span class="stat-text">Therapist management & compliance</span>
+        </div>
+        <div class="stat">
+          <span class="stat-icon">🚨</span>
+          <span class="stat-text">Incident & crisis tracking</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="journey-flow">
+      <div class="flow-step">
+        <div class="step-number">1</div>
+        <div class="step-title">Daily Dashboard: "The pulse"</div>
+        <div class="step-description">Every morning, Admin checks platform health: active users, therapist workload, incident log, revenue metrics. Automated alerts flag issues (therapist overload, safety concerns).</div>
+        <span class="step-action">✓ View admin dashboard</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">2</div>
+        <div class="step-title">Therapist Onboarding: "Add to network"</div>
+        <div class="step-description">New therapist applies. Admin verifies NMC/RCI credentials, reviews background check, confirms training completion. Profile goes live with "Verified" badge.</div>
+        <span class="step-action">✓ Process therapist application</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">3</div>
+        <div class="step-title">Quality Monitoring: "Ensure excellence"</div>
+        <div class="step-description">Weekly spot-checks: review 2-3 therapy session recordings (consent obtained). Patient NPS scores monitored. If issues detected, coaching conversation with therapist + supervisor.</div>
+        <span class="step-action">✓ View QA checklist</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">4</div>
+        <div class="step-title">Incident Management: "Safety first"</div>
+        <div class="step-description">Incident reported (e.g., suicidal ideation, crisis). Admin logs it, triggers escalation to Clinical Lead. Follow-up protocol initiated. Data tracked for patterns & improvement.</div>
+        <span class="step-action">✓ Review incident protocols</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">5</div>
+        <div class="step-title">Retreat Operations: "Execute flawlessly"</div>
+        <div class="step-description">Month before retreat: venue booked, therapists assigned, naturo-doctors confirmed, transportation arranged. Daily check-ins during retreat. Post-retreat debrief & learnings documented.</div>
+        <span class="step-action">✓ View retreat checklist</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">6</div>
+        <div class="step-title">Outcomes Tracking: "Measure impact"</div>
+        <div class="step-description">All participants take PHQ-9/GAD-7 pre/post/3-month/6-month. Admin tracks aggregated metrics: avg improvement %, retention rate, case study opportunities.</div>
+        <span class="step-action">✓ View outcomes dashboard</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">7</div>
+        <div class="step-title">Business Intelligence: "Make decisions"</div>
+        <div class="step-description">Monthly reports: revenue by pathway, therapist performance ranking, patient lifetime value, churn risk analysis. Data informs hiring, location expansion, pricing adjustments.</div>
+        <span class="step-action">✓ View BI reports</span>
+      </div>
+    </div>
+
+    <div class="role-swap">
+      <h4>🔄 The full ecosystem</h4>
+      <p>Admin's job is to ensure excellence across all user journeys. See how therapist and patient experiences are interconnected.</p>
+      <div class="role-buttons">
+        <button class="role-btn" onclick="showJourney('patient')">Mental Wellness Seeker View</button>
+        <button class="role-btn" onclick="showJourney('provider')">Provider View</button>
+        <button class="role-btn active" onclick="showJourney('admin')">← Back to Admin</button>
+      </div>
+    </div>
+
+    <div class="tips-box">
+      <h4>💡 Key Insights for Operations</h4>
+      <p>This dashboard gives you complete visibility into platform health: clinical quality, business metrics, and safety all in one place. Data-driven decisions = sustainable growth.</p>
+    </div>
+
+    <div class="nav-buttons">
+      <button class="btn btn-secondary" onclick="showJourney('home')">← Back to Home</button>
+      <button class="btn btn-outline" onclick="showJourney('onboarding')">See Onboarding Journey →</button>
+    </div>
+  </section>
+
+  <!-- ONBOARDING JOURNEY -->
+  <section id="onboarding-section" class="journey-section">
+    <div class="journey-header">
+      <h2>⚡ Anyone Onboarding-Jiffy: Registration to Access in Minutes</h2>
+      <p>Quick, seamless onboarding for everyone. From signup to first interaction in minutes. No forms friction. No waiting. Just access.</p>
+      <div class="journey-stats">
+        <div class="stat">
+          <span class="stat-icon">🚀</span>
+          <span class="stat-text">Minutes</span> from signup to access</span>
+        </div>
+        <div class="stat">
+          <span class="stat-icon">✅</span>
+          <span class="stat-text">All roles supported</span>
+        </div>
+        <div class="stat">
+          <span class="stat-icon">📱</span>
+          <span class="stat-text">Mobile-first design</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="journey-flow">
+      <div class="flow-step">
+        <div class="step-number">1</div>
+        <div class="step-title">Quick Registration: "Just email & password"</div>
+        <div class="step-description">Enter email, create password. Choose role (Patient, Therapist, CHW, Corporate, Admin). No 20-page forms. No verification delays.</div>
+        <span class="step-action">✓ Start registration</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">2</div>
+        <div class="step-title">Profile Completion: "Tell us just enough"</div>
+        <div class="step-description">Name, location, phone (optional). For therapists: NMC/RCI credential upload (optional now, required before accepting patients). Minimal friction.</div>
+        <span class="step-action">✓ Complete profile</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">3</div>
+        <div class="step-title">Email Verification: "Instant"</div>
+        <div class="step-description">Click verification link in email (2 seconds). Account activated. Ready to explore.</div>
+        <span class="step-action">✓ Verify email</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">4</div>
+        <div class="step-title">Access Granted: "You're in"</div>
+        <div class="step-description">Immediate access to role-specific dashboard. Patients see retreat options. Therapists see patient queue. CHWs see IVR system. Corporate see enrollment tools.</div>
+        <span class="step-action">✓ View dashboard</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">5</div>
+        <div class="step-title">First Action: "Start immediately"</div>
+        <div class="step-description">Patient: Browse & book. Therapist: View first patient. CHW: Download app. Corporate: Enroll team. No "welcome email delays" or "pending approval" messages.</div>
+        <span class="step-action">✓ Take first action</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">6</div>
+        <div class="step-title">Optional Enrichment: "As you go"</div>
+        <div class="step-description">Complete additional details as needed: Therapist can add bio/specializations later. Corporate can upload team roster later. Patient can add health history later. Nothing blocks access.</div>
+        <span class="step-action">✓ Add details</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">7</div>
+        <div class="step-title">Ongoing Support: "We're here"</div>
+        <div class="step-description">In-app help, chat support, email. But most people don't need it — the experience is intuitive. Less onboarding friction = higher adoption.</div>
+        <span class="step-action">✓ Get support</span>
+      </div>
+    </div>
+
+    <div class="role-swap">
+      <h4>🔄 See role-specific experiences</h4>
+      <p>After Jiffy onboarding, each role has their own journey. Explore what they do next.</p>
+      <div class="role-buttons">
+        <button class="role-btn" onclick="showJourney('patient')">Mental Wellness Seeker Next</button>
+        <button class="role-btn" onclick="showJourney('provider')">Provider Next</button>
+        <button class="role-btn active" onclick="showJourney('onboarding')">← Back to Jiffy</button>
+      </div>
+    </div>
+
+    <div class="tips-box">
+      <h4>💡 Why Jiffy?</h4>
+      <p><strong>Friction kills adoption.</strong> Every extra field, every "pending approval" message, every delay — reduces who actually tries MANS360. Jiffy onboarding means more people actually get in and experience the platform. And experience is what converts.</p>
+    </div>
+
+    <div class="nav-buttons">
+      <button class="btn btn-secondary" onclick="showJourney('home')">← Back to Home</button>
+      <button class="btn btn-outline" onclick="showJourney('executive')">See Executive Journey →</button>
+    </div>
+  </section>
+
+  <!-- EXECUTIVE JOURNEY -->
+  <section id="executive-section" class="journey-section">
+    <div class="journey-header">
+      <h2>🎯 Executive-One on One Focused Goals-Manifest</h2>
+      <p>For busy leaders. High-touch 1-on-1 therapy focused on performance, clarity, and purpose. Confidential. Results-driven. Executive-level discretion.</p>
+      <div class="journey-stats">
+        <div class="stat">
+          <span class="stat-icon">⏱️</span>
+          <span class="stat-text">Flexible scheduling (early mornings, weekends)</span>
+        </div>
+        <div class="stat">
+          <span class="stat-icon">💵</span>
+          <span class="stat-text">₹2000-5000 per session</span>
+        </div>
+        <div class="stat">
+          <span class="stat-icon">📱</span>
+          <span class="stat-text">Video or in-person</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="journey-flow">
+      <div class="flow-step">
+        <div class="step-number">1</div>
+        <div class="step-title">Initial Consultation: "Let's understand you"</div>
+        <div class="step-description">60-min deep dive with senior therapist. What are you struggling with? Performance anxiety? Imposter syndrome? Decision fatigue? Leadership isolation? Set clear goals for therapy.</div>
+        <span class="step-action">✓ Schedule consultation</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">2</div>
+        <div class="step-title">Therapist Match: "Your dedicated therapist"</div>
+        <div class="step-description">Assigned a senior therapist experienced with C-suite executives. They understand pressure, stakes, confidentiality. You're not just a case number. You're their focus.</div>
+        <span class="step-action">✓ Meet your therapist</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">3</div>
+        <div class="step-title">Weekly Sessions: "The work"</div>
+        <div class="step-description">60-90 min weekly sessions. Flexible timing (7 AM, 6 PM, weekends). Focus on: decision-making clarity, stress management, relationship challenges, purpose/legacy questions.</div>
+        <span class="step-action">✓ Schedule recurring sessions</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">4</div>
+        <div class="step-title">Performance Coaching: "Clarity in action"</div>
+        <div class="step-description">Therapy + executive coaching hybrid. Between sessions, your therapist tracks your progress on stated goals. Practical strategies tailored to your role.</div>
+        <span class="step-action">✓ Track progress</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">5</div>
+        <div class="step-title">Leadership Resilience: "You're stronger"</div>
+        <div class="step-description">After 12 weeks: Clearer decisions, better boundaries, less imposter syndrome. Better presence with team. More authentic leadership. People notice you're different.</div>
+        <span class="step-action">✓ Measure progress</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">6</div>
+        <div class="step-title">Ongoing Optimization: "Continue or graduate"</div>
+        <div class="step-description">After initial goals achieved: Continue monthly check-ins, pause during slower seasons, or graduate. Therapist remains available for future crises or transitions.</div>
+        <span class="step-action">✓ Plan next phase</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">7</div>
+        <div class="step-title">Executive Alumni Network: "Peer community"</div>
+        <div class="step-description">Join exclusive alumni circle of other executives who've done deep work. Quarterly confidential mastermind sessions. Support network of peers who understand.</div>
+        <span class="step-action">✓ Join mastermind</span>
+      </div>
+    </div>
+
+    <div class="role-swap">
+      <h4>🔄 How does this compare?</h4>
+      <div class="role-buttons">
+        <button class="role-btn" onclick="showJourney('retreat')">Retreat (intensive immersion)</button>
+        <button class="role-btn" onclick="showJourney('group')">Group (community healing)</button>
+        <button class="role-btn active" onclick="showJourney('executive')">← Back to 1-on-1</button>
+      </div>
+    </div>
+
+    <div class="tips-box">
+      <h4>💡 Why Executives Choose This</h4>
+      <p><strong>Because you need privacy + expertise.</strong> You can't take 7 days off. You need flexible scheduling. You need a therapist who understands your world. You need clarity, not just validation. This is therapy designed for the C-suite.</p>
+    </div>
+
+    <div class="nav-buttons">
+      <button class="btn btn-secondary" onclick="showJourney('home')">← Back to Home</button>
+      <button class="btn btn-outline" onclick="showJourney('nri')">See NRI Journey →</button>
+    </div>
+  </section>
+
+  <!-- NRI JOURNEY -->
+  <section id="nri-section" class="journey-section">
+    <div class="journey-header">
+      <h2>🌏 NRI-Find a Janmabhoomi Connection-Heal</h2>
+      <p>For Indians abroad missing home, seeking roots, homesick but can't go back. Therapy + cultural reconnection. Find your Janmabhoomi, heal your displacement.</p>
+      <div class="journey-stats">
+        <div class="stat">
+          <span class="stat-icon">🌍</span>
+          <span class="stat-text">Global time zones (match any timezone)</span>
+        </div>
+        <div class="stat">
+          <span class="stat-icon">💵</span>
+          <span class="stat-text">₹1500-4000 per session</span>
+        </div>
+        <div class="stat">
+          <span class="stat-icon">🗣️</span>
+          <span class="stat-text">Hindi, English, regional languages</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="journey-flow">
+      <div class="flow-step">
+        <div class="step-number">1</div>
+        <div class="step-title">Recognition: "I'm homesick but can't go home"</div>
+        <div class="step-description">You're in London, US, Singapore, Australia. Successful career. Good life. But something's missing. The sounds. The smells. The people who 'get you' without explaining.</div>
+        <span class="step-action">✓ Share your story</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">2</div>
+        <div class="step-title">Therapist Match: "Someone who knows Janmabhoomi"</div>
+        <div class="step-description">Matched with therapist (Indian-origin, based in India or abroad) who specializes in NRI displacement. They understand the unique pain: success far from home, cultural dissonance, identity questions.</div>
+        <span class="step-action">✓ Connect with therapist</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">3</div>
+        <div class="step-title">Emotional Excavation: "What you're really grieving"</div>
+        <div class="step-description">Weekly sessions (scheduled for your timezone) exploring: What does 'home' mean to you? Who do you miss most? What would reconnecting look like? Permission to feel the loss.</div>
+        <span class="step-action">✓ Begin therapy journey</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">4</div>
+        <div class="step-title">Cultural Reconnection Sessions: "Heal through roots"</div>
+        <div class="step-description">Specialized sessions combining therapy + cultural work: listening to grandmother's stories (recorded sessions), exploring regional poetry/songs, connecting with diaspora community online.</div>
+        <span class="step-action">✓ Explore cultural practices</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">5</div>
+        <div class="step-title">Integration: "You can be both"</div>
+        <div class="step-description">Realization: You don't have to choose. You can be successful abroad AND have roots. You can miss India AND love your new home. You can honor both identities.</div>
+        <span class="step-action">✓ Integration work</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">6</div>
+        <div class="step-title">Action Plan: "Bridge the distance"</div>
+        <div class="step-description">With therapist: Plan reconnection (visit timing, call family more, learn regional language, join diaspora community, start projects that honor your roots).</div>
+        <span class="step-action">✓ Create action plan</span>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">7</div>
+        <div class="step-title">Ongoing Connection: "The threads hold"</div>
+        <div class="step-description">Monthly sessions (ongoing). Join MANS360 NRI community (WhatsApp, Slack). Share stories with others doing the same work. Longing transforms into belonging.</div>
+        <span class="step-action">✓ Join NRI community</span>
+      </div>
+    </div>
+
+    <div class="role-swap">
+      <h4>🔄 Other journeys for you</h4>
+      <div class="role-buttons">
+        <button class="role-btn" onclick="showJourney('executive')">Executive 1-on-1 (high-touch)</button>
+        <button class="role-btn" onclick="showJourney('discover')">Free Explorer (try first)</button>
+        <button class="role-btn active" onclick="showJourney('nri')">← Back to NRI</button>
+      </div>
+    </div>
+
+    <div class="tips-box">
+      <h4>💡 Why NRI-Specific?</h4>
+      <p><strong>Homesickness is real grief.</strong> It's not weakness. It's displacement. You've sacrificed proximity to home for opportunity. That's a real loss. This therapy honors that loss while helping you build new roots without abandoning old ones. You're not broken. You're just healing displacement.</p>
+    </div>
+
+    <div class="nav-buttons">
+      <button class="btn btn-secondary" onclick="showJourney('home')">← Back to Home</button>
+      <button class="btn btn-outline" onclick="showJourney('discover')">Start Your Journey →</button>
+    </div>
+  </section>
+
+</div>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <p><strong>MANS360 Interactive Demo Platform</strong></p>
+  <p>No login required. 9+ journeys to explore. Find your perfect entry point.</p>
+  <div class="footer-links">
+    <a href="#" onclick="showJourney('home'); return false;">Back to Home</a>
+    <span>|</span>
+    <a href="https://mans360.com" target="_blank">Visit MANS360</a>
+    <span>|</span>
+    <a href="https://mans360.com/contact" target="_blank">Contact Us</a>
+  </div>
+  <p style="margin-top: 20px; font-size: 12px; opacity: 0.8;">© 2026 MANS360. From Episodic to Transformational.</p>
+</footer>
+
+<script>
+function showJourney(journeyId) {
+  const sections = document.querySelectorAll('.journey-section');
+  sections.forEach(section => section.classList.remove('active'));
+  
+  const selectedSection = document.getElementById(journeyId + '-section');
+  if (selectedSection) {
+    selectedSection.classList.add('active');
+    window.scrollTo(0, 0);
+  }
+  
+  updateBreadcrumb(journeyId);
+}
+
+function updateBreadcrumb(journeyId) {
+  const breadcrumbArrow = document.getElementById('breadcrumb-arrow');
+  const currentRole = document.getElementById('current-role');
+  
+  const labels = {
+    'home': 'Home',
+    'discover': 'Not Sure-Discover Myself',
+    'group': 'Group Therapies-My Topic-Pay Less',
+    'patient': 'Mental Wellness Seeker',
+    'provider': 'Provider Journey',
+    'corporate': 'IT HR Head / Corp CSR / Hospital Admin / College Admin',
+    'retreat': 'Detox-Slow-Tranquility-Find a Spark Again',
+    'training': 'Certify-Earn More Journey',
+    'admin': 'MANAS360-Admin',
+    'onboarding': 'Anyone Onboarding-Jiffy',
+    'executive': 'Executive-One on One Goals-Manifest',
+    'nri': 'NRI-Janmabhoomi Connection-Heal'
+  };
+  
+  if (journeyId === 'home') {
+    breadcrumbArrow.style.display = 'none';
+  } else {
+    breadcrumbArrow.style.display = 'inline';
+    currentRole.textContent = labels[journeyId] || 'Demo';
+  }
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  showJourney('home');
+});
+</script>
+
+</body>
+</html>
