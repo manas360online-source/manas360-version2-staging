@@ -5,7 +5,6 @@ import { GlobalFallbackLoader } from './components/ui/FallbackLoader';
 import ScrollToTop from './components/common/ScrollToTop';
 import { GlobalAudioProvider } from './context/GlobalAudioContext';
 import GlobalAudioPlayerConsole from './components/audio/GlobalAudioPlayerConsole';
-import { isNativeApp } from './lib/runtimeEnv';
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 import { AuthProvider, getPostLoginRoute, useAuth } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
@@ -86,7 +85,6 @@ const UserApprovals = lazy(() => import('./pages/admin/UserApprovals'));
 const LiveSessions = lazy(() => import('./pages/admin/LiveSessions'));
 const Feedback = lazy(() => import('./pages/admin/Feedback'));
 const AllUsers = lazy(() => import('./pages/admin/AllUsers'));
-const QrCodeManager = lazy(() => import('./pages/admin/QrCodeManager'));
 const CertificationsPage = lazy(() => import('./pages/CertificationsPage'));
 const CertificationLandingPage = lazy(() => import('./pages/CertificationLandingPage'));
 const TermsOfService = lazy(() => import('./pages/legal/TermsOfService'));
@@ -110,14 +108,15 @@ const SSOSettingsPage = lazy(() => import('./pages/corporate/SSOSettingsPage'));
 const CorporateDashboardPage = lazy(() => import('./pages/corporate/CorporateDashboardPage'));
 const CorporateOnboardingPage = lazy(() => import('./pages/corporate/CorporateOnboardingPage'));
 const MyDigitalClinicPage = lazy(() => import('./pages/clinic/MyDigitalClinicPage'));
+const HowItWorksPage = lazy(() => import('./pages/how-it-works/HowItWorksPage'));
 const ProviderCalendarPage = lazy(() => import('./pages/provider/Calendar'));
 const ProviderInboxPage = lazy(() => import('./pages/provider/Messages'));
 const ProviderEarningsPage = lazy(() => import('./pages/provider/Earnings'));
 const ProviderSettingsPage = lazy(() => import('./pages/provider/Settings'));
 const ProviderDashboard = lazy(() => import('./pages/provider/Dashboard/ProviderDashboard'));
+const ProviderPortalPage = lazy(() => import('./pages/provider/ProviderPortalPage'));
 const ProviderSubscriptionPage = lazy(() => import('./pages/provider/ProviderSubscriptionPage'));
 const ProviderSubscriptionAddonsPage = lazy(() => import('./pages/provider/ProviderSubscriptionAddonsPage'));
-const ProviderPortalPage = lazy(() => import('./pages/provider/ProviderPortalPage'));
 const AppointmentRequestsPage = lazy(() => import('./pages/provider/AppointmentRequests'));
 const ProviderOnboardingPage = lazy(() => import('./pages/provider/ProviderOnboardingPage'));
 const ProviderVerificationPendingPage = lazy(() => import('./pages/provider/ProviderVerificationPendingPage'));
@@ -145,7 +144,6 @@ const EnrollmentRegistrationPage = lazy(() => import('./pages/EnrollmentRegistra
 const PaymentSuccessPage = lazy(() => import('./pages/PaymentSuccessPage'));
 const PaymentFailedPage = lazy(() => import('./pages/PaymentFailedPage'));
 const JourneyWireframePage = lazy(() => import('./pages/JourneyWireframePage'));
-const HowItWorksPage = lazy(() => import('./pages/how-it-works/HowItWorksPage'));
 const EnrollmentConfirmedPage = lazy(() => import('./pages/EnrollmentConfirmedPage'));
 const CertificationDetailsPage = lazy(() => import('./pages/CertificationDetailsPage').then(m => ({ default: m.CertificationDetailsPage })));
 const CertificationModulesPage = lazy(() => import('./pages/CertificationModulesPage').then(m => ({ default: m.CertificationModulesPage })));
@@ -189,7 +187,6 @@ function LegacyProviderLiveSessionRedirect() {
 function App() {
   const [assessmentData, setAssessmentData] = useState<AssessmentData | null>(null);
   const [userName, setUserName] = useState<string>('');
-  const appStartsAtLogin = isNativeApp();
 
   const handleAssessmentSubmit = (data: AssessmentData, isCritical: boolean) => {
     setAssessmentData(data);
@@ -231,7 +228,7 @@ function App() {
         <Suspense fallback={<GlobalFallbackLoader />}>
           <ScrollToTop />
           <Routes>
-            <Route path="/" element={appStartsAtLogin ? <Navigate to="/auth/login" replace /> : <LandingPage />} />
+            <Route path="/" element={<LandingPage />} />
             <Route path="/assessment" element={<Assessment onSubmit={handleAssessmentSubmit} />} />
 
             {/* ── Certification Sub-App ── */}
@@ -260,6 +257,7 @@ function App() {
 
             <Route path="/results" element={<ResultsPage data={assessmentData} />} />
             <Route path="/crisis" element={<CrisisPage />} />
+            <Route path="/how-it-works" element={<HowItWorksPage />} />
             <Route path="/my-digital-clinic" element={<MyDigitalClinicPage />} />
             <Route path="/clinic" element={<Navigate to="/my-digital-clinic" replace />} />
             <Route path="/onboarding/name" element={<OnboardingName onNext={handleOnboardingName} />} />
@@ -488,7 +486,6 @@ function App() {
                 <Route path="crisis-console" element={<CrisisConsole />} />
                 <Route path="audit-trail" element={<AuditTrail />} />
                 <Route path="groups" element={<GroupManagement />} />
-                <Route path="qr-codes" element={<QrCodeManager />} />
                 <Route path="roles" element={<RoleManagement />} />
                 <Route path="feedback" element={<AdminSectionPage title="Feedback" description="Collect and analyze user and provider feedback loops for product quality." bullets={['NPS and CSAT trends', 'Feedback themes', 'Feature request clusters', 'Escalation tagging']} />} />
                 <Route path="audit-logs" element={<AuditTrail />} />
@@ -593,7 +590,6 @@ function App() {
             <Route path="/legal/therapist-data-processing" element={<TherapistDataProcessingAgr />} />
             {/* Certificate verification — standalone, no layout, accessible via QR scan */}
             <Route path="/verify/:certId" element={<CertificateVerificationPage />} />
-            <Route path="/how-it-works" element={<HowItWorksPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>

@@ -1,10 +1,472 @@
-.how-it-works-page {
-  padding-top: 48px;
-  padding-bottom: 48px;
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&display=swap');
+
+.how-it-works-page,
+.how-it-works-page * {
+  box-sizing: border-box;
 }
 
-/* Scoped small adjustments for page layout */
+.how-it-works-page {
+  --primary: #7c3aed;
+  --primary-dark: #5b21b6;
+  --accent: #d4a017;
+  --warning: #f59e0b;
+  --slate: #1e293b;
+  --slate-light: #64748b;
+  --gray: #f1f5f9;
+  --white: #ffffff;
+  --cream: #fdf6e3;
+
+  font-family: 'Outfit', sans-serif;
+  background: linear-gradient(135deg, #f5f0ff 0%, #ede9fe 40%, #ffffff 100%);
+  color: var(--slate);
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+.how-it-works-page .header {
+  background: var(--white);
+  border-bottom: 1px solid #e2e8f0;
+  padding: 20px 0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.how-it-works-page .header-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.how-it-works-page .logo {
+  font-family: 'Playfair Display', serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.how-it-works-page .logo em {
+  font-style: normal;
+  color: var(--accent);
+}
+
+.how-it-works-page .nav-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.how-it-works-page .breadcrumb {
+  font-size: 12px;
+  color: var(--slate-light);
+}
+
+.how-it-works-page .container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 20px;
+}
+
+.how-it-works-page .hero {
+  text-align: center;
+  margin-bottom: 60px;
+}
+
+.how-it-works-page .hero h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: 48px;
+  font-weight: 900;
+  margin-bottom: 16px;
+  color: var(--slate);
+  line-height: 1.2;
+}
+
+.how-it-works-page .hero h1 .accent {
+  color: var(--primary);
+}
+
+.how-it-works-page .hero p {
+  font-size: 18px;
+  color: var(--slate-light);
+  max-width: 600px;
+  margin: 0 auto 16px;
+  line-height: 1.8;
+}
+
+.how-it-works-page .hero-sub {
+  font-size: 14px;
+  color: var(--warning);
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.how-it-works-page .hero-tip {
+  font-size: 14px;
+  color: #94a3b8;
+  margin-top: 20px;
+}
+
+.how-it-works-page .role-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 24px;
+  margin-bottom: 60px;
+}
+
+.how-it-works-page .role-card {
+  background: var(--white);
+  border-radius: 12px;
+  padding: 32px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.how-it-works-page .role-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--primary);
+  box-shadow: 0 12px 32px rgba(124, 58, 237, 0.15);
+}
+
+.how-it-works-page .role-icon {
+  font-size: 56px;
+  margin-bottom: 16px;
+  display: block;
+}
+
+.how-it-works-page .role-card h3 {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  color: var(--slate);
+}
+
+.how-it-works-page .role-card p {
+  font-size: 14px;
+  color: var(--slate-light);
+  margin-bottom: 20px;
+}
+
+.how-it-works-page .role-card .cta {
+  display: inline-block;
+  padding: 10px 24px;
+  background: var(--primary);
+  color: var(--white);
+  border-radius: 8px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+  font-size: 14px;
+}
+
+.how-it-works-page .role-card .cta:hover {
+  background: var(--primary-dark);
+  transform: scale(1.05);
+}
+
 .how-it-works-page .journey-section {
-  padding-left: 1rem;
-  padding-right: 1rem;
+  animation: slideInUp 0.5s ease;
+}
+
+.how-it-works-page .journey-header {
+  background: var(--white);
+  border-radius: 12px;
+  padding: 32px;
+  margin-bottom: 32px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.how-it-works-page .journey-header h2 {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--slate);
+  margin-bottom: 12px;
+}
+
+.how-it-works-page .journey-header p {
+  font-size: 16px;
+  color: var(--slate-light);
+  margin-bottom: 20px;
+}
+
+.how-it-works-page .journey-stats {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.how-it-works-page .stat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.how-it-works-page .stat-icon {
+  font-size: 24px;
+}
+
+.how-it-works-page .stat-text {
+  font-size: 14px;
+  color: var(--slate-light);
+}
+
+.how-it-works-page .journey-flow {
+  background: var(--white);
+  border-radius: 12px;
+  padding: 32px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  margin-bottom: 32px;
+}
+
+.how-it-works-page .flow-step {
+  margin-bottom: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #e2e8f0;
+  position: relative;
+  padding-left: 40px;
+}
+
+.how-it-works-page .flow-step:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.how-it-works-page .step-number {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 32px;
+  height: 32px;
+  background: var(--primary);
+  color: var(--white);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.how-it-works-page .step-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--slate);
+  margin-bottom: 8px;
+}
+
+.how-it-works-page .step-description {
+  font-size: 14px;
+  color: var(--slate-light);
+  margin-bottom: 12px;
+  line-height: 1.6;
+}
+
+.how-it-works-page .step-action {
+  display: inline-block;
+  padding: 8px 16px;
+  background: #f3f4f6;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--slate);
+  font-weight: 600;
+  border: 1px solid #e5e7eb;
+}
+
+.how-it-works-page .nav-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 40px;
+  flex-wrap: wrap;
+}
+
+.how-it-works-page .btn {
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+  font-size: 14px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.how-it-works-page .btn-primary {
+  background: var(--primary);
+  color: var(--white);
+}
+
+.how-it-works-page .btn-primary:hover {
+  background: var(--primary-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(124, 58, 237, 0.3);
+}
+
+.how-it-works-page .btn-secondary {
+  background: var(--gray);
+  color: var(--slate);
+  border: 1px solid #e2e8f0;
+}
+
+.how-it-works-page .btn-secondary:hover {
+  background: #e2e8f0;
+  transform: translateY(-2px);
+}
+
+.how-it-works-page .btn-outline {
+  background: transparent;
+  color: var(--primary);
+  border: 2px solid var(--primary);
+}
+
+.how-it-works-page .btn-outline:hover {
+  background: #f3f0ff;
+}
+
+.how-it-works-page .role-swap {
+  background: var(--cream);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 32px 0;
+  border-left: 4px solid var(--warning);
+}
+
+.how-it-works-page .role-swap h4 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--slate);
+  margin-bottom: 12px;
+}
+
+.how-it-works-page .role-swap p {
+  font-size: 14px;
+  color: var(--slate-light);
+  margin-bottom: 16px;
+}
+
+.how-it-works-page .role-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.how-it-works-page .role-btn {
+  padding: 8px 16px;
+  background: var(--white);
+  border: 2px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: all 0.2s;
+}
+
+.how-it-works-page .role-btn.active {
+  background: var(--primary);
+  color: var(--white);
+  border-color: var(--primary);
+}
+
+.how-it-works-page .role-btn:hover {
+  border-color: var(--primary);
+}
+
+.how-it-works-page .tips-box {
+  background: #dbeafe;
+  border-left: 4px solid var(--primary);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 20px 0;
+}
+
+.how-it-works-page .tips-box h4 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--primary);
+  margin-bottom: 8px;
+}
+
+.how-it-works-page .tips-box p {
+  font-size: 13px;
+  color: #0c4a6e;
+  line-height: 1.6;
+}
+
+.how-it-works-page .footer {
+  background: var(--slate);
+  color: var(--white);
+  padding: 40px 20px;
+  margin-top: 80px;
+  text-align: center;
+}
+
+.how-it-works-page .footer p {
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.how-it-works-page .footer-links {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+.how-it-works-page .footer-links a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.how-it-works-page .footer-copy {
+  margin-top: 20px;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+@media (max-width: 768px) {
+  .how-it-works-page .hero h1 {
+    font-size: 32px;
+  }
+
+  .how-it-works-page .role-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .how-it-works-page .nav-buttons {
+    flex-direction: column;
+  }
+
+  .how-it-works-page .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
