@@ -27,6 +27,7 @@ import {
 } from '../utils/hash';
 import { createTokenPair, verifyRefreshToken } from '../utils/jwt';
 import { logger } from '../utils/logger';
+import { sendPlatformAdminPasswordResetEmail } from './email.service';
 import type {
 	GoogleLoginInput,
 	LoginInput,
@@ -812,6 +813,14 @@ export const requestPasswordReset = async (input: PasswordResetRequestInput, met
 	const user = await resolveUserByIdentifier(input.identifier);
 
 	if (user) {
+		// Only platform/admin accounts may perform password reset via email/password flow.
+		const isAdmin = await isPlatformAdminAccount({ id: String(user.id), role: String(user.role || '') });
+		if (!isAdmin) {
+			// Do not generate password-reset OTPs for non-admins (they use phone OTPs).
+			await audit('PASSWORD_RESET_REQUEST_IGNORED_NON_ADMIN', 'failure', meta, { userId: user.id, phone: user.phone });
+			return { message: 'If the account exists, reset instructions were sent.' };
+		}
+
 		const otp = generateNumericOtp();
 		await db.user.update({
 			where: { id: user.id },
@@ -822,6 +831,17 @@ export const requestPasswordReset = async (input: PasswordResetRequestInput, met
 		});
 
 		await audit('PASSWORD_RESET_REQUESTED', 'success', meta, { userId: user.id, phone: user.phone });
+
+		// Send admin password reset via configured email/Zoho flow if email exists
+		try {
+			const adminLoginUrl = String(process.env.ADMIN_INVITE_LOGIN_URL || `${String(env.frontendUrl || '').replace(/\/$/, '')}/admin-portal/login`).trim();
+			if (user.email) {
+				// Fire-and-forget
+				void sendPlatformAdminPasswordResetEmail({ to: String(user.email), name: String(user.email), loginUrl: adminLoginUrl, otp });
+			}
+		} catch (err) {
+			logger.warn('[Auth] Failed sending admin password reset email', { error: String(err?.message || err) });
+		}
 
 		return {
 			message: 'Password reset OTP sent.',
@@ -836,6 +856,11 @@ export const resetPassword = async (input: PasswordResetInput, meta: RequestMeta
 	const user = await resolveUserByIdentifier(input.identifier);
 	if (!user || !user.passwordResetOtpHash || !user.passwordResetOtpExpiresAt) {
 		throw new AppError('Invalid reset request', 400);
+	}
+
+	// Ensure password reset flow only applies to platform/admin accounts
+	if (!(await isPlatformAdminAccount({ id: String(user.id), role: String(user.role || '') }))) {
+		throw new AppError('Password reset is only available for platform admin accounts', 403);
 	}
 
 	if (user.passwordResetOtpExpiresAt < new Date()) {
