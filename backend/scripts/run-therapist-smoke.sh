@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -eu
-BASE_URL="http://localhost:3000"
-THERAPIST_PHONE="${THERAPIST_PHONE:-+917000200002}"
+BASE_URL="${BASE_URL:-http://localhost:5001}"
+THERAPIST_PHONE="${THERAPIST_PHONE:-+917000299999}"
 COOKIE_FILE="/tmp/manas_therapist_smoke.cookies"
 OUT_DIR="/tmp/therapist-smoke"
 mkdir -p "$OUT_DIR"
 
 echo "Logging in as therapist via phone OTP..."
 curl -sS -c "$COOKIE_FILE" -H 'Content-Type: application/json' \
-  -d "{\"phone\":\"$THERAPIST_PHONE\"}" \
+  -d "{\"phone\":\"$THERAPIST_PHONE\",\"role\":\"therapist\",\"name\":\"Therapist Smoke\"}" \
   "$BASE_URL/api/v1/auth/signup/phone" -o "$OUT_DIR/otp_request.json" -w '\nHTTP:%{http_code}\n'
 
 OTP_CODE=$(node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('$OUT_DIR/otp_request.json','utf8'));process.stdout.write(String(p?.data?.devOtp||''));")
@@ -18,7 +18,7 @@ if [ -z "$OTP_CODE" ]; then
 fi
 
 curl -sS -c "$COOKIE_FILE" -H 'Content-Type: application/json' \
-  -d "{\"phone\":\"$THERAPIST_PHONE\",\"otp\":\"$OTP_CODE\"}" \
+  -d "{\"phone\":\"$THERAPIST_PHONE\",\"otp\":\"$OTP_CODE\",\"acceptedTerms\":true}" \
   "$BASE_URL/api/v1/auth/verify/phone-otp" -o "$OUT_DIR/login.json" -w '\nHTTP:%{http_code}\n'
 
 echo "Creating exercise..."

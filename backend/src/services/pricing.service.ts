@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { prisma } from '../config/db';
+import { PATIENT_PLANS } from '../config/patientPlans';
 
 const db = prisma as any;
 let initialized = false;
@@ -307,8 +308,17 @@ export const getActivePlatformPlan = async (planKey?: string) => {
 	const resolvedPlanKey = String(planKey || 'monthly');
 	const row = (await db.$queryRawUnsafe(`SELECT * FROM platform_subscription WHERE plan_key = $1 AND active = TRUE`, resolvedPlanKey)) as any[];
 	if (!row?.[0]) {
-		// Keep legacy fallback only for default lookups; explicit keys should fail validation upstream.
-		if (planKey) return null;
+		if (planKey) {
+			const fallback = (PATIENT_PLANS as Record<string, { price: number }>)[resolvedPlanKey];
+			if (fallback) {
+				return {
+					key: resolvedPlanKey,
+					name: resolvedPlanKey.replace(/_/g, ' '),
+					price: Number(fallback.price || 0),
+				};
+			}
+			return null;
+		}
 		return { key: 'free', name: 'Free Tier', price: 0 };
 	}
 	return { key: row[0].plan_key, name: row[0].plan_name, price: row[0].price };

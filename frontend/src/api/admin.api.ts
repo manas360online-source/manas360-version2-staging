@@ -38,6 +38,7 @@ export type RangeParams = {
 };
 
 export type AdminUserRole = 'patient' | 'therapist' | 'psychiatrist' | 'coach' | 'admin' | 'complianceofficer';
+export type PlatformAdminRole = 'admin' | 'clinicaldirector' | 'financemanager' | 'complianceofficer';
 
 export type AdminSubscriptionPlanType = 'basic' | 'premium' | 'pro';
 export type AdminSubscriptionStatus = 'active' | 'expired' | 'cancelled' | 'paused';
@@ -1023,6 +1024,27 @@ export interface Role {
 	description?: string;
 }
 
+export interface CreatePlatformAdminPayload {
+	email: string;
+	role: PlatformAdminRole;
+	firstName?: string;
+	lastName?: string;
+	password?: string;
+	name?: string;
+}
+
+export interface CreatePlatformAdminResponse {
+	user: {
+		id: string;
+		email: string | null;
+		role: string;
+		firstName: string;
+		lastName: string;
+	};
+	temporaryPassword: string;
+	isNewAccount: boolean;
+}
+
 export const getRoles = async (): Promise<ApiEnvelope<Role[]>> => {
 	const response = await client.get<ApiEnvelope<Role[]>>('/v1/admin/roles');
 	return response.data;
@@ -1030,6 +1052,11 @@ export const getRoles = async (): Promise<ApiEnvelope<Role[]>> => {
 
 export const updateRolePermissions = async (role: string, permissions: string[]): Promise<ApiEnvelope<Role>> => {
 	const response = await client.patch<ApiEnvelope<Role>>(`/v1/admin/roles/${role}`, { permissions });
+	return response.data;
+};
+
+export const createPlatformAdminAccount = async (payload: CreatePlatformAdminPayload): Promise<ApiEnvelope<CreatePlatformAdminResponse>> => {
+	const response = await client.post<ApiEnvelope<CreatePlatformAdminResponse>>('/v1/admin/rbac/platform-admins', payload);
 	return response.data;
 };
 

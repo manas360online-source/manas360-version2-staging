@@ -59,18 +59,28 @@ const toPrismaUserRole = (role: PublicUserRole): 'PATIENT' | 'THERAPIST' | 'PSYC
 let supportedUserRolesCache: Set<string> | null = null;
 
 const getCompanyAdminMeta = async (userId: string) => {
-	const rows = (await db.$queryRawUnsafe(
-		'SELECT company_key, is_company_admin FROM users WHERE id = $1 LIMIT 1',
-		userId,
-	)) as Array<{ company_key: string | null; is_company_admin: boolean | null }>;
+	try {
+		const rows = (await db.$queryRawUnsafe(
+			'SELECT company_key, is_company_admin FROM users WHERE id = $1 LIMIT 1',
+			userId,
+		)) as Array<{ company_key: string | null; is_company_admin: boolean | null }>;
 
-	const row = rows?.[0] ?? { company_key: null, is_company_admin: false };
-	return {
-		companyKey: row.company_key,
-		company_key: row.company_key,
-		isCompanyAdmin: Boolean(row.is_company_admin),
-		is_company_admin: Boolean(row.is_company_admin),
-	};
+		const row = rows?.[0] ?? { company_key: null, is_company_admin: false };
+		return {
+			companyKey: row.company_key,
+			company_key: row.company_key,
+			isCompanyAdmin: Boolean(row.is_company_admin),
+			is_company_admin: Boolean(row.is_company_admin),
+		};
+	} catch {
+		// Legacy databases may not yet have company columns; auth should continue gracefully.
+		return {
+			companyKey: null,
+			company_key: null,
+			isCompanyAdmin: false,
+			is_company_admin: false,
+		};
+	}
 };
 
 const isPlatformAdminAccount = async (user: { id: string; role?: string | null }): Promise<boolean> => {

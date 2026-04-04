@@ -114,7 +114,7 @@ const response = calculateSubscriptionPriceMock({
 
 ```
 .env.local
-REACT_APP_API_URL=http://localhost:3000/api
+REACT_APP_API_URL=http://localhost:5001/api
 REACT_APP_USE_MOCK_API=true
 ```
 
@@ -126,7 +126,7 @@ REACT_APP_USE_MOCK_API=true
 
 ```
 .env.local
-REACT_APP_API_URL=http://localhost:3000/api
+REACT_APP_API_URL=http://localhost:5001/api
 REACT_APP_USE_MOCK_API=false
 ```
 

@@ -19,7 +19,7 @@ if [ -z "$OTP_CODE" ]; then
 fi
 
 curl -sS -c "$COOKIE_FILE" -H 'Content-Type: application/json' \
-  -d "{\"phone\":\"$PATIENT_PHONE\",\"otp\":\"$OTP_CODE\"}" \
+  -d "{\"phone\":\"$PATIENT_PHONE\",\"otp\":\"$OTP_CODE\",\"acceptedTerms\":true}" \
   "$BASE_URL/api/v1/auth/verify/phone-otp" -o "$OUT_DIR/login.json" -w '\nHTTP:%{http_code}\n'
 
 echo "[2/5] Fetch journey recommendation..."

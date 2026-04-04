@@ -460,7 +460,7 @@ export const getJourneyRecommendationController = async (req: Request, res: Resp
 };
 
 export const getMyTreatmentPlanController = async (req: Request, res: Response): Promise<void> => {
-	const dayRaw = req.query.day;
+	const dayRaw = req.query.day ?? req.query.week;
 	const day = dayRaw !== undefined ? Number(dayRaw) : undefined;
 	if (dayRaw !== undefined && (!Number.isInteger(day) || Number(day) <= 0)) {
 		throw new AppError('day must be a positive integer', 422);

@@ -1,9 +1,136 @@
+import { randomBytes } from 'crypto';
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/error.middleware';
+import { roleHierarchy } from '../middleware/rbac.middleware';
 import { buildPaginationMeta, normalizePagination } from '../utils/pagination';
 import type { PaginationMeta } from '../utils/pagination';
+import { hashPassword } from '../utils/hash';
+import { sendPlatformAdminInviteEmail } from './email.service';
+import { env } from '../config/env';
 
 const db = prisma as any;
+
+type PlatformAdminRole = 'admin' | 'superadmin' | 'clinicaldirector' | 'financemanager' | 'complianceofficer';
+
+const PLATFORM_ADMIN_ROLES: PlatformAdminRole[] = [
+	'admin',
+	'superadmin',
+	'clinicaldirector',
+	'financemanager',
+	'complianceofficer',
+];
+
+const INVITABLE_PLATFORM_ADMIN_ROLES: Exclude<PlatformAdminRole, 'superadmin'>[] = [
+	'admin',
+	'clinicaldirector',
+	'financemanager',
+	'complianceofficer',
+];
+
+const PLATFORM_ADMIN_ROLE_PERMISSIONS: Record<PlatformAdminRole, string[]> = {
+	admin: ['dashboard', 'users_read', 'users_write', 'view_analytics', 'manage_users', 'manage_therapists', 'view_feedback', 'view_audit'],
+	superadmin: ['dashboard', 'users_read', 'users_write', 'view_analytics', 'manage_users', 'manage_therapists', 'view_feedback', 'view_audit', 'pricing_edit', 'payouts_approve', 'manage_compliance'],
+	clinicaldirector: ['dashboard', 'users_read', 'manage_therapists', 'view_analytics', 'view_feedback', 'view_audit'],
+	financemanager: ['dashboard', 'view_analytics', 'pricing_edit', 'payouts_approve', 'revenue'],
+	complianceofficer: ['dashboard', 'view_analytics', 'view_feedback', 'view_audit', 'manage_compliance', 'read_reports'],
+};
+
+const toPrismaUserRole = (role: PlatformAdminRole): 'ADMIN' | 'SUPER_ADMIN' | 'CLINICAL_DIRECTOR' | 'FINANCE_MANAGER' | 'COMPLIANCE_OFFICER' => {
+	if (role === 'admin') return 'ADMIN';
+	if (role === 'superadmin') return 'SUPER_ADMIN';
+	if (role === 'clinicaldirector') return 'CLINICAL_DIRECTOR';
+	if (role === 'financemanager') return 'FINANCE_MANAGER';
+	return 'COMPLIANCE_OFFICER';
+};
+
+const ensurePlatformRoleStore = async (): Promise<void> => {
+	await db.$executeRaw`
+		CREATE TABLE IF NOT EXISTS roles (
+			id TEXT PRIMARY KEY,
+			name TEXT NOT NULL UNIQUE,
+			description TEXT,
+			permissions TEXT[] NOT NULL DEFAULT '{}'::text[],
+			created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+			updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+		);
+	`;
+};
+
+const seedPlatformRoleRecords = async (): Promise<void> => {
+	await ensurePlatformRoleStore();
+
+	for (const role of PLATFORM_ADMIN_ROLES) {
+		await db.role.upsert({
+			where: { name: role },
+			update: { permissions: PLATFORM_ADMIN_ROLE_PERMISSIONS[role] },
+			create: {
+				id: randomBytes(16).toString('hex'),
+				name: role,
+				description:
+					role === 'superadmin'
+						? 'Platform owner with full access'
+						: role === 'admin'
+							? 'Platform admin with management access'
+							: role === 'clinicaldirector'
+								? 'Clinical operations admin'
+								: role === 'financemanager'
+									? 'Finance admin'
+									: 'Compliance admin',
+				permissions: PLATFORM_ADMIN_ROLE_PERMISSIONS[role],
+			},
+		});
+	}
+};
+
+const normalizePlatformAdminRole = (role: string): PlatformAdminRole => {
+	const normalized = role.toLowerCase().replace(/[-_\s]/g, '');
+	if (normalized === 'admin') return 'admin';
+	if (normalized === 'superadmin' || normalized === 'super_admin') return 'superadmin';
+	if (normalized === 'clinicaldirector' || normalized === 'clinical_director') return 'clinicaldirector';
+	if (normalized === 'financemanager' || normalized === 'finance_manager') return 'financemanager';
+	if (normalized === 'complianceofficer' || normalized === 'compliance_officer') return 'complianceofficer';
+	throw new AppError('Invalid platform admin role', 400);
+};
+
+const ensureRoleRecord = async (role: PlatformAdminRole): Promise<void> => {
+	await seedPlatformRoleRecords();
+	await db.role.upsert({
+		where: { name: role },
+		update: { permissions: PLATFORM_ADMIN_ROLE_PERMISSIONS[role] },
+		create: {
+			id: randomBytes(16).toString('hex'),
+			name: role,
+			description:
+				role === 'superadmin'
+					? 'Platform owner with full access'
+					: role === 'admin'
+						? 'Platform admin with management access'
+						: role === 'clinicaldirector'
+							? 'Clinical operations admin'
+							: role === 'financemanager'
+								? 'Finance admin'
+								: 'Compliance admin',
+				permissions: PLATFORM_ADMIN_ROLE_PERMISSIONS[role],
+		},
+	});
+};
+
+export interface PlatformAdminRoleInventoryItem {
+	role: PlatformAdminRole;
+	existsInRbac: boolean;
+	hasRoleRecord: boolean;
+	userCount: number;
+	permissions: string[];
+}
+
+export interface CreatePlatformAdminInput {
+	email: string;
+	role: string;
+	firstName?: string;
+	lastName?: string;
+	password?: string;
+	name?: string;
+}
 
 const mapRoleFilterToEnum = (role?: string): 'PATIENT' | 'THERAPIST' | 'PSYCHIATRIST' | 'COACH' | 'ADMIN' | 'COMPLIANCE_OFFICER' | undefined => {
 	if (!role) return undefined;
@@ -780,18 +907,164 @@ export const updateUserStatus = async (userId: string, status: string): Promise<
  * Get all roles and permissions
  */
 export const getRoles = async (): Promise<any[]> => {
+	await seedPlatformRoleRecords();
+	try {
 	return await db.role.findMany({
 		orderBy: { name: 'asc' },
 	});
+	} catch {
+		return PLATFORM_ADMIN_ROLES.map((role) => ({
+			id: role,
+			name: role,
+			description: PLATFORM_ADMIN_ROLE_PERMISSIONS[role].join(', '),
+			permissions: PLATFORM_ADMIN_ROLE_PERMISSIONS[role],
+			createdAt: new Date(0),
+			updatedAt: new Date(0),
+		}));
+	}
 };
 
 /**
  * Update permissions for a specific role
  */
 export const updateRolePermissions = async (roleName: string, permissions: string[]): Promise<any> => {
+	await seedPlatformRoleRecords();
 	const role = await db.role.update({
 		where: { name: roleName },
 		data: { permissions },
 	});
 	return role;
+};
+
+export const getPlatformAdminRoleInventory = async (): Promise<PlatformAdminRoleInventoryItem[]> => {
+	await seedPlatformRoleRecords();
+	const items: PlatformAdminRoleInventoryItem[] = [];
+
+	for (const role of PLATFORM_ADMIN_ROLES) {
+		let userCount = 0;
+		let hasRoleRecord = false;
+
+		try {
+			userCount = await db.user.count({ where: { role: toPrismaUserRole(role) } });
+		} catch {
+			userCount = 0;
+		}
+
+		try {
+			hasRoleRecord = Boolean(await db.role.findUnique({ where: { name: role }, select: { id: true } }));
+		} catch {
+			hasRoleRecord = false;
+		}
+
+		items.push({
+			role,
+			existsInRbac: roleHierarchy[role] !== undefined,
+			hasRoleRecord,
+			userCount,
+			permissions: PLATFORM_ADMIN_ROLE_PERMISSIONS[role],
+		});
+	}
+
+	return items;
+};
+
+export const createPlatformAdminAccount = async (
+	createdByUserId: string,
+	input: CreatePlatformAdminInput,
+): Promise<{
+	user: {
+		id: string;
+		email: string | null;
+		role: string;
+		firstName: string;
+		lastName: string;
+	};
+	temporaryPassword: string;
+	isNewAccount: boolean;
+}> => {
+	const actor = await db.user.findUnique({ where: { id: createdByUserId }, select: { role: true } });
+	if (!actor || normalizePlatformAdminRole(String(actor.role || '')) !== 'superadmin') {
+		throw new AppError('Superadmin required', 403);
+	}
+
+	const email = String(input.email || '').trim().toLowerCase();
+	if (!email || !email.includes('@')) {
+		throw new AppError('Valid email is required', 400);
+	}
+
+	const role = normalizePlatformAdminRole(String(input.role || ''));
+	if (!INVITABLE_PLATFORM_ADMIN_ROLES.includes(role as Exclude<PlatformAdminRole, 'superadmin'>)) {
+		throw new AppError('Only admin, clinicaldirector, financemanager, or complianceofficer can be created from this endpoint', 400);
+	}
+
+	const temporaryPassword = String(input.password || '').trim() || `Admin-${randomBytes(6).toString('hex')}`;
+	const passwordHash = await hashPassword(temporaryPassword);
+	const firstName = String(input.firstName || '').trim();
+	const lastName = String(input.lastName || '').trim();
+	const displayName = String(input.name || `${firstName} ${lastName}`.trim() || email.split('@')[0]).trim();
+
+	await seedPlatformRoleRecords();
+	await ensureRoleRecord(role);
+
+	const existing = await db.user.findUnique({ where: { email }, select: { id: true, isDeleted: true } });
+	if (existing?.isDeleted) {
+		throw new AppError('Deleted account cannot be promoted. Restore it first.', 409);
+	}
+
+	const baseData = {
+		email,
+		firstName: firstName || displayName,
+		lastName,
+		name: displayName,
+		role: toPrismaUserRole(role),
+		passwordHash,
+		emailVerified: true,
+		phoneVerified: false,
+		provider: 'LOCAL',
+		isDeleted: false,
+		deletedAt: null,
+		status: 'ACTIVE',
+		onboardingStatus: 'COMPLETED',
+		companyId: null,
+		companyKey: null,
+		isCompanyAdmin: false,
+		permissions: {},
+		failedLoginAttempts: 0,
+		lockUntil: null,
+		mfaEnabled: false,
+		mfaSecret: null,
+		phone: null,
+	};
+
+	const user = existing
+		? await db.user.update({
+			where: { id: existing.id },
+			data: baseData,
+			select: { id: true, email: true, role: true, firstName: true, lastName: true },
+		})
+		: await db.user.create({
+			data: baseData,
+			select: { id: true, email: true, role: true, firstName: true, lastName: true },
+		});
+
+	const inviteLoginUrl = String(process.env.ADMIN_INVITE_LOGIN_URL || `${String(env.frontendUrl || '').replace(/\/$/, '')}/admin-portal/login`).trim();
+	await sendPlatformAdminInviteEmail({
+		to: email,
+		name: displayName,
+		role,
+		loginUrl: inviteLoginUrl,
+		temporaryPassword,
+	});
+
+	return {
+		user: {
+			id: user.id,
+			email: user.email,
+			role: String(user.role).toLowerCase(),
+			firstName: user.firstName,
+			lastName: user.lastName,
+		},
+		temporaryPassword,
+		isNewAccount: !existing,
+	};
 };
