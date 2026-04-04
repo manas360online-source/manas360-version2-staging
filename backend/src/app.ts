@@ -25,8 +25,17 @@ Sentry.setupExpressErrorHandler(app);
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
 app.use(helmet());
+
+const localDevOrigins = [
+	'http://localhost:5173',
+	'http://127.0.0.1:5173',
+	'http://localhost:3000',
+	'http://127.0.0.1:3000',
+];
+
 const allowedCorsOrigins = Array.from(new Set([
 	...env.corsOrigins,
+	...localDevOrigins,
 	'https://www.manas360.com',
 	'https://manas360.com',
 	'http://www.manas360.com',

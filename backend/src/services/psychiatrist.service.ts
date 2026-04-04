@@ -430,17 +430,41 @@ export const getPsychiatristDashboard = async (userId: string, patientId?: strin
     });
     const patientIds = Array.from(new Set((psychiatristSessions as any[]).map((s) => String(s.patientProfileId))));
 
-    const [todayConsultationsCount, medicationReviews, interactionAlerts, worseningSymptoms] = await Promise.all([
-      prisma.therapySession.count({
-        where: {
-          therapistProfileId: userId,
-          dateTime: { gte: dayStart, lte: dayEnd },
-        },
-      }),
-      prisma.$queryRaw<Array<{ value: number }>>`SELECT COUNT(*)::int AS value FROM prescriptions WHERE "psychiatristId" = ${userId} AND is_active = true AND review_due_at IS NOT NULL AND review_due_at <= NOW()`,
-      prisma.$queryRaw<Array<{ value: number }>>`SELECT COUNT(*)::int AS value FROM drug_interactions WHERE "psychiatristId" = ${userId} AND severity IN ('CRITICAL', 'CAUTION')`,
-      prisma.$queryRaw<Array<{ value: number }>>`SELECT COUNT(*)::int AS value FROM psychiatric_assessments pa WHERE pa."psychiatristId" = ${userId} AND LOWER(COALESCE(pa.severity, '')) IN ('severe','moderately severe')`,
-    ]);
+    const todayConsultationsCount = await prisma.therapySession.count({
+      where: {
+        therapistProfileId: userId,
+        dateTime: { gte: dayStart, lte: dayEnd },
+      },
+    });
+
+    let medicationReviews: Array<{ value: number }> = [{ value: 0 }];
+    try {
+      medicationReviews = await prisma.$queryRaw<Array<{ value: number }>>`SELECT COUNT(*)::int AS value FROM prescriptions WHERE "psychiatristId" = ${userId} AND is_active = true AND review_due_at IS NOT NULL AND review_due_at <= NOW()`;
+    } catch {
+      try {
+        medicationReviews = await prisma.$queryRaw<Array<{ value: number }>>`SELECT COUNT(*)::int AS value FROM prescriptions WHERE provider_id = ${userId} AND review_due_at IS NOT NULL AND review_due_at <= NOW()`;
+      } catch {
+        medicationReviews = [{ value: 0 }];
+      }
+    }
+
+    let interactionAlerts: Array<{ value: number }> = [{ value: 0 }];
+    try {
+      interactionAlerts = await prisma.$queryRaw<Array<{ value: number }>>`SELECT COUNT(*)::int AS value FROM drug_interactions WHERE "psychiatristId" = ${userId} AND severity IN ('CRITICAL', 'CAUTION')`;
+    } catch {
+      interactionAlerts = [{ value: 0 }];
+    }
+
+    let worseningSymptoms: Array<{ value: number }> = [{ value: 0 }];
+    try {
+      worseningSymptoms = await prisma.$queryRaw<Array<{ value: number }>>`SELECT COUNT(*)::int AS value FROM psychiatric_assessments pa WHERE pa."psychiatristId" = ${userId} AND LOWER(COALESCE(pa.severity, '')) IN ('severe','moderately severe')`;
+    } catch {
+      try {
+        worseningSymptoms = await prisma.$queryRaw<Array<{ value: number }>>`SELECT COUNT(*)::int AS value FROM psychiatric_assessments pa WHERE pa.psychiatrist_id = ${userId} AND LOWER(COALESCE(pa.severity, '')) IN ('severe','moderately severe')`;
+      } catch {
+        worseningSymptoms = [{ value: 0 }];
+      }
+    }
 
     let nonAdherenceCount = 0;
     if (patientIds.length > 0) {
@@ -461,7 +485,7 @@ export const getPsychiatristDashboard = async (userId: string, patientId?: strin
 
   const patient = await getPatientBasics(patientId);
 
-  const [lastSession, nextSession, diagnosisRows, medicationsRows, wellnessRows] = await Promise.all([
+  const [lastSession, nextSession, wellnessRows] = await Promise.all([
     prisma.therapySession.findFirst({
       where: { therapistProfileId: userId, patientProfileId: patientId, dateTime: { lte: new Date() } },
       orderBy: { dateTime: 'desc' },
@@ -472,10 +496,30 @@ export const getPsychiatristDashboard = async (userId: string, patientId?: strin
       orderBy: { dateTime: 'asc' },
       select: { dateTime: true },
     }),
-    prisma.$queryRaw<Array<{ clinical_impression: string | null; severity: string | null; created_at: Date }>>`SELECT clinical_impression, severity, created_at FROM psychiatric_assessments WHERE "psychiatristId" = ${userId} AND "patientId" = ${patientId} ORDER BY created_at DESC LIMIT 1`,
-    prisma.$queryRaw<Array<{ drug_name: string; starting_dose: string | null; frequency: string | null; duration: string | null; instructions: string | null }>>`SELECT drug_name, starting_dose, frequency, duration, instructions FROM prescriptions WHERE "psychiatristId" = ${userId} AND "patientId" = ${patientId} AND is_active = true ORDER BY created_at DESC`,
     prisma.$queryRaw<Array<{ plan_items: unknown[]; notes: string | null; adherence_score: number; created_at: Date }>>`SELECT plan_items, notes, adherence_score, created_at FROM psychologist_wellness_plans WHERE "patientId" = ${patientId} AND is_active = true ORDER BY created_at DESC LIMIT 1`,
   ]);
+
+  let diagnosisRows: Array<{ clinical_impression: string | null; severity: string | null; created_at: Date }> = [];
+  try {
+    diagnosisRows = await prisma.$queryRaw<Array<{ clinical_impression: string | null; severity: string | null; created_at: Date }>>`SELECT clinical_impression, severity, created_at FROM psychiatric_assessments WHERE "psychiatristId" = ${userId} AND "patientId" = ${patientId} ORDER BY created_at DESC LIMIT 1`;
+  } catch {
+    try {
+      diagnosisRows = await prisma.$queryRaw<Array<{ clinical_impression: string | null; severity: string | null; created_at: Date }>>`SELECT clinical_impression, severity, created_at FROM psychiatric_assessments WHERE psychiatrist_id = ${userId} AND patient_id = ${patientId} ORDER BY created_at DESC LIMIT 1`;
+    } catch {
+      diagnosisRows = [];
+    }
+  }
+
+  let medicationsRows: Array<{ drug_name: string; starting_dose: string | null; frequency: string | null; duration: string | null; instructions: string | null }> = [];
+  try {
+    medicationsRows = await prisma.$queryRaw<Array<{ drug_name: string; starting_dose: string | null; frequency: string | null; duration: string | null; instructions: string | null }>>`SELECT drug_name, starting_dose, frequency, duration, instructions FROM prescriptions WHERE "psychiatristId" = ${userId} AND "patientId" = ${patientId} AND is_active = true ORDER BY created_at DESC`;
+  } catch {
+    try {
+      medicationsRows = await prisma.$queryRaw<Array<{ drug_name: string; starting_dose: string | null; frequency: string | null; duration: string | null; instructions: string | null }>>`SELECT drug_name, dosage AS starting_dose, frequency, duration, instructions FROM prescriptions WHERE provider_id = ${userId} AND patient_id = ${patient.patientUserId} ORDER BY created_at DESC`;
+    } catch {
+      medicationsRows = [];
+    }
+  }
 
   // Some environments may not have legacy therapist_exercises table. Use patient_exercises safely.
   let exercisesRows: any[] = [];
@@ -608,9 +652,19 @@ export const listPrescriptions = async (userId: string, patientId?: string) => {
   await ensurePsychiatristTables();
   await assertPsychiatrist(userId);
 
-  const rows = patientId
-    ? await prisma.$queryRaw`SELECT * FROM prescriptions WHERE "psychiatristId" = ${userId} AND "patientId" = ${patientId} ORDER BY created_at DESC`
-    : await prisma.$queryRaw`SELECT * FROM prescriptions WHERE "psychiatristId" = ${userId} ORDER BY created_at DESC`;
+  let rows: any[] = [];
+  try {
+    rows = patientId
+      ? await prisma.$queryRaw`SELECT * FROM prescriptions WHERE "psychiatristId" = ${userId} AND "patientId" = ${patientId} ORDER BY created_at DESC`
+      : await prisma.$queryRaw`SELECT * FROM prescriptions WHERE "psychiatristId" = ${userId} ORDER BY created_at DESC`;
+  } catch {
+    if (patientId) {
+      const patient = await getPatientBasics(patientId);
+      rows = await prisma.$queryRaw`SELECT * FROM prescriptions WHERE provider_id = ${userId} AND patient_id = ${patient.patientUserId} ORDER BY created_at DESC`;
+    } else {
+      rows = await prisma.$queryRaw`SELECT * FROM prescriptions WHERE provider_id = ${userId} ORDER BY created_at DESC`;
+    }
+  }
 
   return { items: rows };
 };

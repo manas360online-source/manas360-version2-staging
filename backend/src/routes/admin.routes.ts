@@ -8,7 +8,7 @@ import {
 	validateAdminListSubscriptionsQuery,
 	asyncHandler,
 } from '../middleware/validate.middleware';
-import { listUsersController, getUserController, verifyProviderController, verifyTherapistController, approveProviderController, getMetricsController, listSubscriptionsController, getAdminUserApprovalsController, updateAdminUserApprovalController, getAdminLiveSessionsController, getAdminFeedbackController, resolveAdminFeedbackController, updateAdminUserStatusController, getRolesController, updateRolePermissionsController, getUserAcceptancesController, getComplianceStatusController, getLegalDocumentsController, downloadLegalDocumentController } from '../controllers/admin.controller';
+import { listUsersController, getUserController, verifyProviderController, verifyTherapistController, approveProviderController, getMetricsController, listSubscriptionsController, getAdminUserApprovalsController, updateAdminUserApprovalController, getAdminLiveSessionsController, getAdminFeedbackController, resolveAdminFeedbackController, updateAdminUserStatusController, getRolesController, updateRolePermissionsController, getUserAcceptancesController, getComplianceStatusController, getLegalDocumentsController, downloadLegalDocumentController, getPlatformAdminRoleInventoryController, createPlatformAdminAccountController } from '../controllers/admin.controller';
 import {
 	getAdminAnalyticsSummaryController,
 	getAdminMostUsedTemplatesController,
@@ -457,5 +457,7 @@ router.delete('/groups/:id', requireAuth, requireRole('admin'), deleteGroupCateg
 // === DYNAMIC ROLE MANAGEMENT ===
 router.get('/roles', requireAuth, requireRole('superadmin'), asyncHandler(getRolesController));
 router.patch('/roles/:role', requireAuth, requireRole('superadmin'), asyncHandler(updateRolePermissionsController));
+router.get('/rbac/platform-admins', requireAuth, requireRole('superadmin'), asyncHandler(getPlatformAdminRoleInventoryController));
+router.post('/rbac/platform-admins', requireAuth, requireRole('superadmin'), asyncHandler(createPlatformAdminAccountController));
 
 export default router;
