@@ -42,7 +42,7 @@ services:
       REDIS_URL: redis://redis:6379
       PRISMA_CLIENT_ENGINE_TYPE: binary
       PORT: 5000
-      API_URL: http://localhost:${BACKEND_HOST_PORT:-5001}
+      API_URL: http://localhost:${BACKEND_HOST_PORT:-5000}
       FRONTEND_URL: http://localhost:${FRONTEND_HOST_PORT:-3000}
       CORS_ORIGIN: http://localhost:${FRONTEND_HOST_PORT:-3000}
       ADMIN_SEED_ENABLED: "false"
@@ -59,7 +59,7 @@ services:
       timeout: 5s
       retries: 5
     ports:
-      - "${BACKEND_HOST_PORT:-5001}:5000"
+      - "${BACKEND_HOST_PORT:-5000}:5000"
     command: sh -c "npx prisma migrate deploy && node dist/server.js"
 
   ai_engine:
