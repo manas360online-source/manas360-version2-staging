@@ -3,7 +3,10 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/error.middleware';
 
-type DbClient = Prisma.TransactionClient | typeof prisma;
+// Use the Prisma client type for DB operations. Some Prisma versions do not
+// export `TransactionClient` as a top-level type; use `typeof prisma` to
+// remain compatible across environments.
+type DbClient = typeof prisma;
 let initialized = false;
 
 const ensurePsychiatristTables = async (): Promise<void> => {

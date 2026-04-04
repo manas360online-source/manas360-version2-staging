@@ -103,7 +103,8 @@ type CorporateAccountCreateInput = {
 };
 
 const DEFAULT_COMPANY_KEY = 'techcorp-india';
-type DbClient = Prisma.TransactionClient | typeof prisma;
+// See note in psychiatrist.service.ts — use typeof prisma for compatibility
+type DbClient = typeof prisma;
 
 const toInt = (value: unknown, fallback = 0): number => {
   const n = Number(value);
