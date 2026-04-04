@@ -71,6 +71,7 @@ const tabs: TabConfig[] = [
       { icon: '📚', title: 'Psychoeducation', description: 'Learn practical wellbeing skills', route: '/learn' },
       { icon: '🏞️', title: 'Wellness Retreats', description: 'Restorative retreat experiences', route: '/retreats' },
       { icon: '🛍️', title: 'Wellness Shop', description: 'Tools and resources for wellbeing', route: '/shop' },
+      { icon: '📖', title: 'How It Works', description: 'Start your care journey in minutes', route: '/how-it-works' },
     ],
   },
 ];
