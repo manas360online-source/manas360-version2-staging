@@ -1,0 +1,10 @@
+.how-it-works-page {
+  padding-top: 48px;
+  padding-bottom: 48px;
+}
+
+/* Scoped small adjustments for page layout */
+.how-it-works-page .journey-section {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
