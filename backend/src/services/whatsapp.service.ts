@@ -19,7 +19,12 @@ export type WhatsAppTemplateType =
 	| 'subscription_renewed' // Subscription renewed
 	| 'refund_processed' // Refund issued
 	| 'clinical_results_ready' // Assessment results available
-	| 'treatment_plan_updated'; // Treatment plan updated
+	| 'treatment_plan_updated' // Treatment plan updated
+	| 'report_uploaded' // Report/assessment shared with patient
+	| 'prescription_issued' // Prescription issued by therapist/psychiatrist
+	| 'therapist_note_shared' // Therapist shared notes/documents
+	| 'therapist_message' // Direct message/communication from therapist
+	| 'clinical_notes_updated'; // Clinical notes updated/modified
 
 export type WhatsAppUserType = 'patient' | 'therapist' | 'psychiatrist' | 'psychologist' | 'coach' | 'user';
 
@@ -169,6 +174,46 @@ const whatsappTemplates: Record<WhatsAppTemplateType, Record<WhatsAppUserType, {
 		psychologist: { templateName: 'treatment_plan_updated', description: 'Treatment plan updated' },
 		coach: { templateName: 'treatment_plan_updated', description: 'Treatment plan updated' },
 		user: { templateName: 'treatment_plan_updated', description: 'Treatment plan updated' },
+	},
+	report_uploaded: {
+		patient: { templateName: 'report_uploaded_patient', description: 'Report/assessment shared with you' },
+		therapist: { templateName: 'report_uploaded_shared', description: 'Report uploaded for sharing' },
+		psychiatrist: { templateName: 'report_uploaded_shared', description: 'Report uploaded for sharing' },
+		psychologist: { templateName: 'report_uploaded_shared', description: 'Report uploaded for sharing' },
+		coach: { templateName: 'report_uploaded_shared', description: 'Report uploaded for sharing' },
+		user: { templateName: 'report_uploaded_generic', description: 'Report uploaded' },
+	},
+	prescription_issued: {
+		patient: { templateName: 'prescription_issued_patient', description: 'Prescription issued for you' },
+		therapist: { templateName: 'prescription_issued_provider', description: 'Prescription issued' },
+		psychiatrist: { templateName: 'prescription_issued_provider', description: 'Prescription issued' },
+		psychologist: { templateName: 'prescription_issued_provider', description: 'Prescription issued' },
+		coach: { templateName: 'prescription_issued_provider', description: 'Prescription issued' },
+		user: { templateName: 'prescription_issued_generic', description: 'Prescription issued' },
+	},
+	therapist_note_shared: {
+		patient: { templateName: 'therapist_note_shared_patient', description: 'Therapist shared notes/documents' },
+		therapist: { templateName: 'therapist_note_shared_provider', description: 'Notes shared with patient' },
+		psychiatrist: { templateName: 'therapist_note_shared_provider', description: 'Notes shared with patient' },
+		psychologist: { templateName: 'therapist_note_shared_provider', description: 'Notes shared with patient' },
+		coach: { templateName: 'therapist_note_shared_provider', description: 'Notes shared with patient' },
+		user: { templateName: 'therapist_note_shared_generic', description: 'Notes shared' },
+	},
+	therapist_message: {
+		patient: { templateName: 'therapist_message_patient', description: 'Direct message from therapist' },
+		therapist: { templateName: 'therapist_message_provider', description: 'Message sent to patient' },
+		psychiatrist: { templateName: 'therapist_message_provider', description: 'Message sent to patient' },
+		psychologist: { templateName: 'therapist_message_provider', description: 'Message sent to patient' },
+		coach: { templateName: 'therapist_message_provider', description: 'Message sent to patient' },
+		user: { templateName: 'therapist_message_generic', description: 'Message received' },
+	},
+	clinical_notes_updated: {
+		patient: { templateName: 'clinical_notes_updated_patient', description: 'Clinical notes updated' },
+		therapist: { templateName: 'clinical_notes_updated_provider', description: 'Clinical notes updated' },
+		psychiatrist: { templateName: 'clinical_notes_updated_provider', description: 'Clinical notes updated' },
+		psychologist: { templateName: 'clinical_notes_updated_provider', description: 'Clinical notes updated' },
+		coach: { templateName: 'clinical_notes_updated_provider', description: 'Clinical notes updated' },
+		user: { templateName: 'clinical_notes_updated_generic', description: 'Clinical notes updated' },
 	},
 };
 
