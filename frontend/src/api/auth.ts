@@ -65,6 +65,9 @@ export interface ProviderRegisterPayload {
 export interface SignupConsentPayload {
 	acceptedTerms: boolean;
 	acceptedDocuments?: string[];
+	nri_declared?: boolean;
+	nri_tos_accepted?: boolean;
+	nri_tos_accepted_at?: string;
 }
 
 export const getApiErrorMessage = (error: unknown, fallback = 'Request failed'): string => {

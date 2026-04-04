@@ -1,18 +1,15 @@
+# Logs
+backend/logs/
+
+# Node
 node_modules/
-*.log
-.DS_Store
-backend/node_modules/
-backend/dist/
-backend/.venv/
-frontend/node_modules/
-frontend/dist/
-load-tests/**/node_modules/
-# Environment files
-*.env
-*.env.*
-!*.env.example
-!backend/.env.example
-!frontend/.env.example
-/public/*.mp4
+
+# Env
 .env
-**/.env
+
+# Database
+backend/.pgdata/
+
+# Build
+dist/
+build/

@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { GlobalFallbackLoader } from './components/ui/FallbackLoader';
 import ScrollToTop from './components/common/ScrollToTop';
+import CookieConsentBanner from './components/common/CookieConsentBanner';
 import { GlobalAudioProvider } from './context/GlobalAudioContext';
 import GlobalAudioPlayerConsole from './components/audio/GlobalAudioPlayerConsole';
 const LandingPage = lazy(() => import('./pages/LandingPage'));
@@ -89,6 +90,7 @@ const CertificationsPage = lazy(() => import('./pages/CertificationsPage'));
 const CertificationLandingPage = lazy(() => import('./pages/CertificationLandingPage'));
 const TermsOfService = lazy(() => import('./pages/legal/TermsOfService'));
 const PrivacyPolicy = lazy(() => import('./pages/legal/PrivacyPolicy'));
+const AcceptableUsePolicy = lazy(() => import('./pages/legal/AcceptableUsePolicy'));
 const RefundAndCancellationPolicy = lazy(() => import('./pages/legal/RefundAndCancellationPolicy'));
 const TherapistICAgr = lazy(() => import('./pages/legal/TherapistICAgr'));
 const TherapistNDA = lazy(() => import('./pages/legal/TherapistNDA'));
@@ -593,6 +595,7 @@ function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
+        <CookieConsentBanner />
         <GlobalAudioPlayerConsole />
       </GlobalAudioProvider>
     </SocketProvider>

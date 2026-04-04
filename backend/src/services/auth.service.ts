@@ -357,7 +357,14 @@ export const registerProviderProfile = async (userId: string, input: ProviderReg
 };
 
 export const registerWithPhone = async (input: RegisterPhoneInput) => {
-	const existing = await db.user.findFirst({ where: { phone: input.phone } });
+	const existing = await db.user.findFirst({
+		where: { phone: input.phone },
+		select: {
+			id: true,
+			isDeleted: true,
+			role: true,
+		},
+	});
 	if (existing?.isDeleted) {
 		throw new AppError('Account is deleted. Contact support to restore access.', 410);
 	}
@@ -376,6 +383,10 @@ export const registerWithPhone = async (input: RegisterPhoneInput) => {
 					phoneVerificationOtpHash: otpHash,
 					phoneVerificationOtpExpiresAt: nowPlusMinutes(env.otpTtlMinutes),
 				},
+				select: {
+					id: true,
+					phone: true,
+				},
 		  })
 		: await db.user.create({
 				data: {
@@ -390,6 +401,10 @@ export const registerWithPhone = async (input: RegisterPhoneInput) => {
 					firstName: trimmedName || '',
 					lastName: '',
 				},
+				select: {
+					id: true,
+					phone: true,
+				},
 		  });
 
 	return {
@@ -401,7 +416,22 @@ export const registerWithPhone = async (input: RegisterPhoneInput) => {
 };
 
 export const verifyPhoneOtp = async (input: VerifyPhoneOtpInput, meta: RequestMeta) => {
-	const user = await db.user.findFirst({ where: { phone: input.phone } });
+	const user = await db.user.findFirst({
+		where: { phone: input.phone },
+		select: {
+			id: true,
+			email: true,
+			phone: true,
+			role: true,
+			emailVerified: true,
+			phoneVerified: true,
+			mfaEnabled: true,
+			isTherapistVerified: true,
+			therapistVerifiedAt: true,
+			phoneVerificationOtpHash: true,
+			phoneVerificationOtpExpiresAt: true,
+		},
+	});
 	if (!user || !user.phoneVerificationOtpHash || !user.phoneVerificationOtpExpiresAt) {
 		throw new AppError('Invalid verification request', 400);
 	}
@@ -430,6 +460,7 @@ export const verifyPhoneOtp = async (input: VerifyPhoneOtpInput, meta: RequestMe
 			phoneVerificationOtpHash: null,
 			phoneVerificationOtpExpiresAt: null,
 		},
+		select: { id: true },
 	});
 
 	if (isFirstPhoneVerification && input.acceptedTerms) {

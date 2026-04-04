@@ -1,0 +1,6 @@
+[Sentry] SENTRY_DSN is not defined. Sentry error tracking is disabled.
+2026-03-18 23:00:21:021 [32minfo[39m: [32m[CRON] Provider lead CRON jobs initialized.[39m \n\t[META] {"service":"manas360-backend"}
+Socket server initialized
+Port 3000 is already in use.
+On macOS this is often ControlCenter (AirPlay Receiver) on port 5000.
+Disable AirPlay Receiver in System Settings > General > AirDrop & Handoff, then restart backend.
