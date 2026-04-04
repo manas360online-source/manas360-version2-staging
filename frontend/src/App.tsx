@@ -145,6 +145,7 @@ const EnrollmentRegistrationPage = lazy(() => import('./pages/EnrollmentRegistra
 const PaymentSuccessPage = lazy(() => import('./pages/PaymentSuccessPage'));
 const PaymentFailedPage = lazy(() => import('./pages/PaymentFailedPage'));
 const JourneyWireframePage = lazy(() => import('./pages/JourneyWireframePage'));
+const HowItWorksPage = lazy(() => import('./pages/how-it-works/HowItWorksPage'));
 const EnrollmentConfirmedPage = lazy(() => import('./pages/EnrollmentConfirmedPage'));
 const CertificationDetailsPage = lazy(() => import('./pages/CertificationDetailsPage').then(m => ({ default: m.CertificationDetailsPage })));
 const CertificationModulesPage = lazy(() => import('./pages/CertificationModulesPage').then(m => ({ default: m.CertificationModulesPage })));
@@ -592,6 +593,7 @@ function App() {
             <Route path="/legal/therapist-data-processing" element={<TherapistDataProcessingAgr />} />
             {/* Certificate verification — standalone, no layout, accessible via QR scan */}
             <Route path="/verify/:certId" element={<CertificateVerificationPage />} />
+            <Route path="/how-it-works" element={<HowItWorksPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
