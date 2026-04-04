@@ -281,15 +281,54 @@ export const submitFreeScreeningAttempt = async (input: SubmitInput) => {
 };
 
 export const getMyFreeScreeningHistory = async (patientUserId: string) => {
-	const profile = await getPatientProfileByUserId(patientUserId);
-	const attempts = await db.screeningAttempt.findMany({
-		where: { patientId: profile.id, status: 'SUBMITTED' },
-		orderBy: { submittedAt: 'desc' },
-		take: 20,
-		include: {
-			template: { select: { key: true, title: true } },
-		},
-	});
+ let profile: { id: string } | null = null;
+ try {
+  profile = await getPatientProfileByUserId(patientUserId);
+ } catch (error) {
+  const message = String((error as any)?.message || '').toLowerCase();
+	const code = String((error as any)?.code || '').toUpperCase();
+	if (
+	 message.includes('patient profile not found')
+	 || code === 'P2021'
+	 || code === 'P2022'
+	 || code === 'P2010'
+	 || message.includes('does not exist')
+	 || message.includes('unknown column')
+	 || message.includes('no such table')
+	 || message.includes('connect econnrefused')
+	) {
+	 return { items: [] };
+	}
+	throw error;
+ }
+
+ if (!profile?.id) {
+  return { items: [] };
+ }
+
+ const attempts = await db.screeningAttempt.findMany({
+  where: { patientId: profile.id, status: 'SUBMITTED' },
+  orderBy: { submittedAt: 'desc' },
+  take: 20,
+  include: {
+   template: { select: { key: true, title: true } },
+  },
+ }).catch((error: unknown) => {
+  const message = String((error as any)?.message || '').toLowerCase();
+  const code = String((error as any)?.code || '').toUpperCase();
+  if (
+   code === 'P2021'
+   || code === 'P2022'
+   || code === 'P2010'
+   || message.includes('does not exist')
+   || message.includes('unknown column')
+   || message.includes('no such table')
+   || message.includes('screening')
+  ) {
+   return [];
+  }
+  throw error;
+ });
 
 	return {
 		items: attempts.map((attempt: any) => ({

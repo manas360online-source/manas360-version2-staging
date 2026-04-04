@@ -233,32 +233,40 @@ export const publishGroupTherapySessionController = async (req: Request, res: Re
 };
 
 export const listPublicPublishedGroupTherapySessionsController = async (_req: Request, res: Response): Promise<void> => {
-  const now = new Date();
-  const rows = await db.groupTherapySession.findMany({
-    where: {
-      status: { in: ['PUBLISHED', 'LIVE'] },
-      scheduledAt: { gte: new Date(now.getTime() - 2 * 60 * 60 * 1000) },
-      sessionMode: 'PUBLIC',
-    },
-    orderBy: { scheduledAt: 'asc' },
-    include: {
-      hostTherapist: {
-        select: { id: true, firstName: true, lastName: true, email: true },
+  try {
+    const rows = await db.groupTherapySession.findMany({
+      where: { status: 'PUBLISHED' },
+      orderBy: { scheduledAt: 'asc' },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        topic: true,
+        sessionMode: true,
+        status: true,
+        scheduledAt: true,
+        durationMinutes: true,
+        maxMembers: true,
+        priceMinor: true,
+        allowGuestJoin: true,
+        requiresPayment: true,
+        createdAt: true,
+        updatedAt: true,
       },
-      enrollments: {
-        where: { status: { in: ['PAID', 'JOINED'] } },
-        select: { id: true },
-      },
-    },
-    take: 30,
-  });
+    });
 
-  const items = rows.map((row: any) => ({
-    ...row,
-    joinedCount: row.enrollments.length,
-  }));
+    const sessions = rows.map((session) => ({
+      ...session,
+      priceMinor: session.priceMinor.toString(),
+    }));
 
-  sendSuccess(res, { items }, 'Public group therapy sessions fetched');
+    res.status(200).json({
+      success: true,
+      data: sessions,
+    });
+  } catch (error) {
+    throw new AppError('Failed to fetch public group therapy sessions', 500);
+  }
 };
 
 const createPhonePeRedirect = async (transactionId: string, userIdentity: string, amountMinor: number): Promise<string> => {

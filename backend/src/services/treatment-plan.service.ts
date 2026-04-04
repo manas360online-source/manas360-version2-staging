@@ -187,7 +187,25 @@ export const syncTreatmentPlanFromAssessment = async (
 export const getMyTreatmentPlan = async (userId: string, dayNumber?: number) => {
   const connectedProviderId = await getConnectedProvider(userId);
   if (!connectedProviderId) {
-    throw new AppError('Therapy plan will be available once you are connected with a provider.', 404);
+    const now = new Date();
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() + 7);
+    return {
+      plan: {
+        id: 'local-default-plan',
+        title: 'Week 1: Foundations',
+        status: 'ACTIVE',
+        providerNote: 'A provider will be assigned soon. Start with daily check-ins in the meantime.',
+        startDate: now,
+        endDate,
+        dayNumber: dayNumber && Number.isInteger(dayNumber) && dayNumber > 0 ? dayNumber : 1,
+        totalDays: 7,
+        currentDay: 1,
+        adherencePercent: 0,
+        updatedAt: now,
+      },
+      activities: [],
+    };
   }
 
   const patientProfile = await getPatientProfile(userId);

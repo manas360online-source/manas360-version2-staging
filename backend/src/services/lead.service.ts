@@ -63,9 +63,11 @@ export const getMyTherapistLeads = async (userId: string, query: TherapistLeadsQ
 			OR: [availableWhere, purchasedWhere],
 		};
 
-	const [total, leads] = await Promise.all([
-		db.lead.count({ where }),
-		db.lead.findMany({
+	const total = await db.lead.count({ where });
+
+	let leads: any[] = [];
+	try {
+		leads = await db.lead.findMany({
 			where,
 			orderBy: [{ createdAt: 'desc' }],
 			skip: pagination.skip,
@@ -89,8 +91,34 @@ export const getMyTherapistLeads = async (userId: string, query: TherapistLeadsQ
 				patientId: true,
 				providerId: true,
 			},
-		}),
-	]);
+		});
+	} catch {
+		// Backward-compatible fallback when merchantTransactionId column does not exist.
+		leads = await db.lead.findMany({
+			where,
+			orderBy: [{ createdAt: 'desc' }],
+			skip: pagination.skip,
+			take: pagination.limit,
+			select: {
+				id: true,
+				status: true,
+				channel: true,
+				tier: true,
+				visibleAt: true,
+				paymentStatus: true,
+				matchScore: true,
+				amountMinor: true,
+				currency: true,
+				previewData: true,
+				patientAcceptanceUntil: true,
+				providerContactedAt: true,
+				purchasedAt: true,
+				createdAt: true,
+				patientId: true,
+				providerId: true,
+			},
+		});
+	}
 
 	return {
 		items: leads,

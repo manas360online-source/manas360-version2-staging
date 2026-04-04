@@ -276,4 +276,6 @@ router.delete('/groups/:id', auth_middleware_1.requireAuth, (0, rbac_middleware_
 // === DYNAMIC ROLE MANAGEMENT ===
 router.get('/roles', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('superadmin'), (0, validate_middleware_1.asyncHandler)(admin_controller_1.getRolesController));
 router.patch('/roles/:role', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('superadmin'), (0, validate_middleware_1.asyncHandler)(admin_controller_1.updateRolePermissionsController));
+router.get('/rbac/platform-admins', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('superadmin'), (0, validate_middleware_1.asyncHandler)(admin_controller_1.getPlatformAdminRoleInventoryController));
+router.post('/rbac/platform-admins', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('superadmin'), (0, validate_middleware_1.asyncHandler)(admin_controller_1.createPlatformAdminAccountController));
 exports.default = router;

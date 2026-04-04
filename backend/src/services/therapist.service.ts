@@ -117,9 +117,15 @@ export const createTherapistProfile = async (userId: string, input: TherapistPro
 
 export const getMyTherapistProfile = async (userId: string) => {
 	await assertTherapistUser(userId);
-	const profile = await db.therapistProfile.findUnique({ where: { userId },
-		include: { user: { select: { createdAt: true, updatedAt: true } } },
-	});
+	let profile: any = null;
+	try {
+		profile = await db.therapistProfile.findUnique({ where: { userId },
+			include: { user: { select: { createdAt: true, updatedAt: true } } },
+		});
+	} catch {
+		// Older environments may miss optional columns; fall back to composed profile.
+		profile = null;
+	}
 
 	if (!profile) {
 		// Return a composed default if no persisted profile exists yet

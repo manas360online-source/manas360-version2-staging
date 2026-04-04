@@ -75,9 +75,35 @@ export const completeFinancialSessionController = async (req: Request, res: Resp
 export const phonepeWebhookController = async (req: Request, res: Response): Promise<void> => {
 	const payload = req.body as any;
 	const hasProbePayload = Boolean(payload?.data?.merchantTransactionId || payload?.merchantTransactionId || payload?.response);
+	const isHostedEnv = env.nodeEnv === 'production' || env.nodeEnv === 'staging';
 
 	if (env.allowDevPhonePeWebhookProbeBypass && !hasProbePayload) {
 		return void res.status(200).json({ success: true, message: 'PhonePe webhook endpoint reachable' });
+	}
+
+	const clientIp = getClientIpFromRequest(req);
+	if (isHostedEnv && !env.allowPhonePeWebhookIpBypass && !isPhonePeWebhookIP(clientIp)) {
+		logger.warn('[PhonePe] Webhook rejected due to IP allowlist', { clientIp });
+		throw new AppError('Unauthorized webhook source', 401);
+	}
+
+	if (isHostedEnv) {
+		const username = String(env.phonePeWebhookUsername || '').trim();
+		const password = String(env.phonePeWebhookPassword || '').trim();
+		if (!username || !password) {
+			throw new AppError('PhonePe webhook auth credentials are not configured', 500);
+		}
+
+		const authHeader = String(req.headers.authorization || '').trim();
+		if (!verifyPhonePeWebhookAuth(authHeader, username, password)) {
+			throw new AppError('Unauthorized webhook request', 401);
+		}
+
+		const xVerifyHeader = String(req.headers['x-verify'] || req.headers['x_verify'] || '').trim();
+		const rawBody = String(req.rawBody || '').trim() || JSON.stringify(payload || {});
+		if (!xVerifyHeader || !verifyPhonePeWebhook(rawBody, xVerifyHeader)) {
+			throw new AppError('Invalid webhook signature', 401);
+		}
 	}
 
 	const decoded = typeof payload?.response === 'string' && payload.response.trim().length > 0

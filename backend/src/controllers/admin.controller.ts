@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { AppError } from '../middleware/error.middleware';
-import { listUsers, getUserById, verifyTherapist, verifyProvider, approveProvider, getMetrics, listSubscriptions, getUserApprovals, updateUserApprovalStatus, listLiveSessions, getFeedback, resolveFeedback, updateUserStatus, getRoles, updateRolePermissions } from '../services/admin.service';
+import { listUsers, getUserById, verifyTherapist, verifyProvider, approveProvider, getMetrics, listSubscriptions, getUserApprovals, updateUserApprovalStatus, listLiveSessions, getFeedback, resolveFeedback, updateUserStatus, getRoles, updateRolePermissions, getPlatformAdminRoleInventory, createPlatformAdminAccount } from '../services/admin.service';
 import { prisma } from '../config/db';
 import { sendSuccess } from '../utils/response';
 
@@ -24,11 +24,6 @@ export const listUsersController = async (req: Request, res: Response): Promise<
 	sendSuccess(res, result, 'Users fetched successfully');
 };
 
-/**
- * GET /api/v1/admin/users/:id
- * Get a single user by ID
- * Admin role required
- */
 export const getUserController = async (req: Request, res: Response): Promise<void> => {
 	const userId = req.validatedUserId;
 
@@ -39,6 +34,29 @@ export const getUserController = async (req: Request, res: Response): Promise<vo
 	const user = await getUserById(userId);
 
 	sendSuccess(res, user, 'User fetched successfully');
+};
+
+export const getPlatformAdminRoleInventoryController = async (_req: Request, res: Response): Promise<void> => {
+	const items = await getPlatformAdminRoleInventory();
+	sendSuccess(res, { items }, 'Platform admin RBAC inventory fetched successfully');
+};
+
+export const createPlatformAdminAccountController = async (req: Request, res: Response): Promise<void> => {
+	const adminUserId = req.auth?.userId;
+	if (!adminUserId) {
+		throw new AppError('Authentication required', 401);
+	}
+
+	const result = await createPlatformAdminAccount(adminUserId, {
+		email: String(req.body?.email || '').trim(),
+		role: String(req.body?.role || '').trim(),
+		firstName: typeof req.body?.firstName === 'string' ? req.body.firstName : undefined,
+		lastName: typeof req.body?.lastName === 'string' ? req.body.lastName : undefined,
+		password: typeof req.body?.password === 'string' ? req.body.password : undefined,
+		name: typeof req.body?.name === 'string' ? req.body.name : undefined,
+	});
+
+	sendSuccess(res, result, 'Platform admin account created successfully', 201);
 };
 
 /**

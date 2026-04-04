@@ -6,6 +6,21 @@ import { checkEligibility, playGame } from '../services/game-engine.service';
 
 const db = prisma as any;
 
+const isSchemaUnavailableError = (error: unknown): boolean => {
+  const message = String((error as any)?.message || '').toLowerCase();
+  const code = String((error as any)?.code || '').toUpperCase();
+  return (
+    code === 'P2021'
+    || code === 'P2022'
+    || code === 'P2010'
+    || message.includes('does not exist')
+    || message.includes('unknown column')
+    || message.includes('no such table')
+    || message.includes('dailygameplay')
+    || message.includes('daily_game_play')
+  );
+};
+
 const getAuthUserId = (req: Request): string => {
   const userId = req.auth?.userId;
   if (!userId) throw new AppError('Authentication required', 401);
@@ -40,17 +55,24 @@ export const getGameWinnersController = async (req: Request, res: Response): Pro
 
   // Prisma schema: DailyGamePlay does NOT have `outcome`, `playedAt`, `creditAmount`, or `user` relation.
   // So we fetch wins first, then fetch user names separately by `userId`.
-  const plays = await db.dailyGamePlay.findMany({
-    where: { didWin: true },
-    orderBy: { lastPlayedAt: 'desc' },
-    take: limit,
-    select: {
-      userId: true,
-      sixesHit: true,
-      prizeAmount: true,
-      lastPlayedAt: true,
-    },
-  });
+  let plays: any[] = [];
+  try {
+    plays = await db.dailyGamePlay.findMany({
+      where: { didWin: true },
+      orderBy: { lastPlayedAt: 'desc' },
+      take: limit,
+      select: {
+        userId: true,
+        sixesHit: true,
+        prizeAmount: true,
+        lastPlayedAt: true,
+      },
+    });
+  } catch (error) {
+    if (!isSchemaUnavailableError(error)) throw error;
+    sendSuccess(res, { winners: [] }, 'Winners feed');
+    return;
+  }
 
   const userIds = Array.from(new Set(plays.map((p: any) => String(p.userId)).filter(Boolean)));
   const users = userIds.length

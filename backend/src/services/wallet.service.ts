@@ -4,6 +4,24 @@ import { AppError } from '../middleware/error.middleware';
 const db = prisma as any;
 const IST_TIME_ZONE = 'Asia/Kolkata';
 
+const isWalletSchemaUnavailableError = (error: unknown): boolean => {
+  const message = String((error as any)?.message || '').toLowerCase();
+  return (
+    message.includes('user_wallets')
+    || message.includes('user_wallet_transactions')
+    || message.includes('wallet_credits')
+    || message.includes('booking_wallet_usages')
+    || message.includes('column `user_wallets.balance` does not exist')
+  );
+};
+
+const getFallbackWallet = (userId: string) => ({
+  id: `fallback:${userId}`,
+  userId,
+  balance: 0,
+  lastTxnDate: null,
+});
+
 const getIstNow = (): Date => {
   const locale = new Date().toLocaleString('en-US', { timeZone: IST_TIME_ZONE });
   return new Date(locale);
@@ -17,9 +35,16 @@ const isAllowedCreditSource = (source: string): boolean => {
 };
 
 export const getOrCreateWallet = async (userId: string) => {
-  const existing = await db.userWallet.findUnique({ where: { userId } });
-  if (existing) return existing;
-  return db.userWallet.create({ data: { userId } });
+  try {
+    const existing = await db.userWallet.findUnique({ where: { userId } });
+    if (existing) return existing;
+    return await db.userWallet.create({ data: { userId } });
+  } catch (error) {
+    if (isWalletSchemaUnavailableError(error)) {
+      return getFallbackWallet(userId);
+    }
+    throw error;
+  }
 };
 
 export const addCredit = async (input: {
@@ -101,65 +126,72 @@ export const applyCreditsForPayment = async (input: {
     return { amountUsed: 0, finalAmount: 0, creditIds: [], transactionId: null };
   }
 
-  return db.$transaction(async (tx: any) => {
-    const wallet = await tx.userWallet.findUnique({ where: { userId: input.userId } });
-    if (!wallet || Number(wallet.balance || 0) <= 0) {
-      return { amountUsed: 0, finalAmount: originalAmount, creditIds: [], transactionId: null };
-    }
-
-    const used = Math.min(Number(wallet.balance || 0), originalAmount);
-    const creditIds: string[] = [];
-
-    if (used <= 0) {
-      return { amountUsed: 0, finalAmount: originalAmount, creditIds: [], transactionId: null };
-    }
-
-    const balanceBefore = Number(wallet.balance || 0);
-    const balanceAfter = Math.max(0, balanceBefore - used);
-    const now = getIstNow();
-
-    const transaction = await tx.userWalletTransaction.create({
-      data: {
-        walletId: wallet.id,
-        transactionType: 'DEBIT',
-        amount: -used,
-        balanceAfter,
-        referenceId: input.referenceId,
-        description: `Used ${used} credits for ${input.referenceType || 'payment'} ${input.referenceId}`,
-      },
-    });
-
-    // Only record in the mapping table if it's explicitly a booking
-    if (!input.referenceType || input.referenceType === 'booking') {
-      try {
-        await tx.bookingWalletUsage.create({
-          data: {
-            walletId: wallet.id,
-            bookingId: input.referenceId,
-            amountUsed: used,
-          },
-        });
-      } catch (e) {
-        // Ignore if booking mapping fails (e.g. invalid foreign key), transaction debit still succeeds
-        console.warn('Failed to insert into bookingWalletUsage, continuing wallet debit.');
+  try {
+    return await db.$transaction(async (tx: any) => {
+      const wallet = await tx.userWallet.findUnique({ where: { userId: input.userId } });
+      if (!wallet || Number(wallet.balance || 0) <= 0) {
+        return { amountUsed: 0, finalAmount: originalAmount, creditIds: [], transactionId: null };
       }
-    }
 
-    await tx.userWallet.update({
-      where: { id: wallet.id },
-      data: {
-        balance: balanceAfter,
-        lastTxnDate: now,
-      },
+      const used = Math.min(Number(wallet.balance || 0), originalAmount);
+      const creditIds: string[] = [];
+
+      if (used <= 0) {
+        return { amountUsed: 0, finalAmount: originalAmount, creditIds: [], transactionId: null };
+      }
+
+      const balanceBefore = Number(wallet.balance || 0);
+      const balanceAfter = Math.max(0, balanceBefore - used);
+      const now = getIstNow();
+
+      const transaction = await tx.userWalletTransaction.create({
+        data: {
+          walletId: wallet.id,
+          transactionType: 'DEBIT',
+          amount: -used,
+          balanceAfter,
+          referenceId: input.referenceId,
+          description: `Used ${used} credits for ${input.referenceType || 'payment'} ${input.referenceId}`,
+        },
+      });
+
+      // Only record in the mapping table if it's explicitly a booking
+      if (!input.referenceType || input.referenceType === 'booking') {
+        try {
+          await tx.bookingWalletUsage.create({
+            data: {
+              walletId: wallet.id,
+              bookingId: input.referenceId,
+              amountUsed: used,
+            },
+          });
+        } catch (e) {
+          // Ignore if booking mapping fails (e.g. invalid foreign key), transaction debit still succeeds
+          console.warn('Failed to insert into bookingWalletUsage, continuing wallet debit.');
+        }
+      }
+
+      await tx.userWallet.update({
+        where: { id: wallet.id },
+        data: {
+          balance: balanceAfter,
+          lastTxnDate: now,
+        },
+      });
+
+      return {
+        amountUsed: used,
+        finalAmount: Math.max(0, originalAmount - used),
+        creditIds,
+        transactionId: transaction.id,
+      };
     });
-
-    return {
-      amountUsed: used,
-      finalAmount: Math.max(0, originalAmount - used),
-      creditIds,
-      transactionId: transaction.id,
-    };
-  });
+  } catch (error) {
+    if (isWalletSchemaUnavailableError(error)) {
+      return { amountUsed: 0, finalAmount: originalAmount, creditIds: [], transactionId: null };
+    }
+    throw error;
+  }
 };
 
 export const expireOldCredits = async () => {

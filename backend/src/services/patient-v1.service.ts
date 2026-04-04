@@ -22,6 +22,19 @@ import { calculateGraceEndDate } from './subscription.helper';
 const db = prisma as any;
 const SUBSCRIPTION_LOCK_TIMEOUT_MS = 5 * 60 * 1000;
 
+const isSchemaUnavailableError = (error: unknown): boolean => {
+	const message = String((error as any)?.message || '').toLowerCase();
+	const code = String((error as any)?.code || '').toUpperCase();
+	return (
+		code === 'P2021'
+		|| code === 'P2022'
+		|| code === 'P2010'
+		|| message.includes('does not exist')
+		|| message.includes('unknown column')
+		|| message.includes('no such table')
+	);
+};
+
 const recordPatientSubscriptionHistory = async (input: {
 	userId: string;
 	subscriptionRefId?: string;
@@ -1829,66 +1842,86 @@ export const patientConfirmProposedAppointmentSlot = async (
 };
 
 export const getUpcomingSessions = async (userId: string) => {
-	const patientProfile = await getPatientProfile(userId);
-	const now = new Date();
-	const sessions = await db.therapySession.findMany({
-		where: { patientProfileId: patientProfile.id, dateTime: { gte: now }, status: { in: ['PENDING', 'CONFIRMED'] } },
-		orderBy: { dateTime: 'asc' },
-		select: {
-			id: true,
-			bookingReferenceId: true,
-			dateTime: true,
-			status: true,
-			isLocked: true,
-			durationMinutes: true,
-			sessionFeeMinor: true,
-			agoraChannel: true,
-			agoraToken: true,
-			therapistProfile: { select: { id: true, firstName: true, lastName: true, name: true } },
-		},
-	});
-	return sessions.map((s: any) => ({
-		id: s.id,
-		booking_reference: s.bookingReferenceId,
-		scheduled_at: s.dateTime,
-		status: String(s.status).toLowerCase(),
-		is_locked: Boolean(s.isLocked),
-		duration_minutes: s.durationMinutes,
-		session_fee: Number(s.sessionFeeMinor),
-		agora_channel: s.agoraChannel,
-		agora_token: s.agoraToken,
-		provider: { id: s.therapistProfile.id, name: String(s.therapistProfile.name || `${s.therapistProfile.firstName || ''} ${s.therapistProfile.lastName || ''}`.trim()) },
-	}));
+	try {
+		const patientProfile = await getPatientProfile(userId);
+		const now = new Date();
+		const sessions = await db.therapySession.findMany({
+			where: { patientProfileId: patientProfile.id, dateTime: { gte: now }, status: { in: ['PENDING', 'CONFIRMED'] } },
+			orderBy: { dateTime: 'asc' },
+			select: {
+				id: true,
+				bookingReferenceId: true,
+				dateTime: true,
+				status: true,
+				isLocked: true,
+				durationMinutes: true,
+				sessionFeeMinor: true,
+				agoraChannel: true,
+				agoraToken: true,
+				therapistProfile: { select: { id: true, firstName: true, lastName: true, name: true } },
+			},
+		}).catch((error: unknown) => {
+			if (isSchemaUnavailableError(error)) return [];
+			throw error;
+		});
+		return sessions.map((s: any) => ({
+			id: s.id,
+			booking_reference: s.bookingReferenceId,
+			scheduled_at: s.dateTime,
+			status: String(s.status).toLowerCase(),
+			is_locked: Boolean(s.isLocked),
+			duration_minutes: s.durationMinutes,
+			session_fee: Number(s.sessionFeeMinor),
+			agora_channel: s.agoraChannel,
+			agora_token: s.agoraToken,
+			provider: {
+				id: s.therapistProfile?.id || null,
+				name: String(s.therapistProfile?.name || `${s.therapistProfile?.firstName || ''} ${s.therapistProfile?.lastName || ''}`.trim() || 'Therapist'),
+			},
+		}));
+	} catch {
+		return [];
+	}
 };
 
 export const getSessionHistory = async (userId: string) => {
-	const patientProfile = await getPatientProfile(userId);
-	const sessions = await db.therapySession.findMany({
-		where: { patientProfileId: patientProfile.id },
-		orderBy: { dateTime: 'desc' },
-		select: {
-			id: true,
-			bookingReferenceId: true,
-			dateTime: true,
-			status: true,
-			isLocked: true,
-			durationMinutes: true,
-			sessionFeeMinor: true,
-			paymentStatus: true,
-			therapistProfile: { select: { id: true, firstName: true, lastName: true, name: true } },
-		},
-	});
-	return sessions.map((s: any) => ({
-		id: s.id,
-		booking_reference: s.bookingReferenceId,
-		scheduled_at: s.dateTime,
-		status: String(s.status).toLowerCase(),
-		is_locked: Boolean(s.isLocked),
-		duration_minutes: s.durationMinutes,
-		session_fee: Number(s.sessionFeeMinor),
-		payment_status: s.paymentStatus,
-		provider: { id: s.therapistProfile.id, name: String(s.therapistProfile.name || `${s.therapistProfile.firstName || ''} ${s.therapistProfile.lastName || ''}`.trim()) },
-	}));
+	try {
+		const patientProfile = await getPatientProfile(userId);
+		const sessions = await db.therapySession.findMany({
+			where: { patientProfileId: patientProfile.id },
+			orderBy: { dateTime: 'desc' },
+			select: {
+				id: true,
+				bookingReferenceId: true,
+				dateTime: true,
+				status: true,
+				isLocked: true,
+				durationMinutes: true,
+				sessionFeeMinor: true,
+				paymentStatus: true,
+				therapistProfile: { select: { id: true, firstName: true, lastName: true, name: true } },
+			},
+		}).catch((error: unknown) => {
+			if (isSchemaUnavailableError(error)) return [];
+			throw error;
+		});
+		return sessions.map((s: any) => ({
+			id: s.id,
+			booking_reference: s.bookingReferenceId,
+			scheduled_at: s.dateTime,
+			status: String(s.status).toLowerCase(),
+			is_locked: Boolean(s.isLocked),
+			duration_minutes: s.durationMinutes,
+			session_fee: Number(s.sessionFeeMinor),
+			payment_status: s.paymentStatus,
+			provider: {
+				id: s.therapistProfile?.id || null,
+				name: String(s.therapistProfile?.name || `${s.therapistProfile?.firstName || ''} ${s.therapistProfile?.lastName || ''}`.trim() || 'Therapist'),
+			},
+		}));
+	} catch {
+		return [];
+	}
 };
 
 export const getSessionDetail = async (userId: string, sessionId: string) => {
@@ -2230,45 +2263,49 @@ export const createMoodLog = async (userId: string, input: { mood: number; note?
 };
 
 export const getMoodHistory = async (userId: string) => {
-	const patientProfile = await getPatientProfile(userId);
-	const [patientMoodRows, moodLogRows, dailyCheckIns] = await Promise.all([
-		db.patientMoodEntry.findMany({
-			where: { patientId: patientProfile.id },
-			orderBy: { date: 'desc' },
-			take: 60,
-		}).catch(() => []),
-		db.moodLog.findMany({
-			where: { userId },
-			orderBy: { loggedAt: 'desc' },
-			take: 60,
-		}).catch(() => []),
-		db.dailyCheckIn.findMany({
-			where: { patientId: userId },
-			orderBy: { date: 'desc' },
-			take: 60,
-		}).catch(() => []),
-	]);
+	try {
+		const patientProfile = await getPatientProfile(userId);
+		const [patientMoodRows, moodLogRows, dailyCheckIns] = await Promise.all([
+			db.patientMoodEntry.findMany({
+				where: { patientId: patientProfile.id },
+				orderBy: { date: 'desc' },
+				take: 60,
+			}).catch(() => []),
+			db.moodLog.findMany({
+				where: { userId },
+				orderBy: { loggedAt: 'desc' },
+				take: 60,
+			}).catch(() => []),
+			db.dailyCheckIn.findMany({
+				where: { patientId: userId },
+				orderBy: { date: 'desc' },
+				take: 60,
+			}).catch(() => []),
+		]);
 
-	const unified: any[] = [
-		...patientMoodRows.map((r: any) => mapMoodRow({ id: r.id, mood: r.moodScore, note: r.note, created_at: r.createdAt || r.date })),
-		...moodLogRows.map((r: any) => mapMoodRow({ id: r.id, mood: Number(r.moodValue || 0), note: r.note, created_at: r.createdAt || r.loggedAt })),
-		...dailyCheckIns.map((r: any) => mapMoodRow({
-			id: r.id,
-			mood: Number(r.mood || 0),
-			note: r.reflectionGood || r.intention || '',
-			created_at: r.createdAt || r.date,
-			metadata: {
-				tags: r.context || [],
-				energy: r.energy ? (['low', 'medium', 'high'][r.energy - 1] || 'medium') : undefined,
-				sleepHours: r.sleep ? String(r.sleep) : undefined,
-				stressLevel: r.stressLevel || undefined,
-			},
-		})),
-	];
+		const unified: any[] = [
+			...patientMoodRows.map((r: any) => mapMoodRow({ id: r.id, mood: r.moodScore, note: r.note, created_at: r.createdAt || r.date })),
+			...moodLogRows.map((r: any) => mapMoodRow({ id: r.id, mood: Number(r.moodValue || 0), note: r.note, created_at: r.createdAt || r.loggedAt })),
+			...dailyCheckIns.map((r: any) => mapMoodRow({
+				id: r.id,
+				mood: Number(r.mood || 0),
+				note: r.reflectionGood || r.intention || '',
+				created_at: r.createdAt || r.date,
+				metadata: {
+					tags: r.context || [],
+					energy: r.energy ? (['low', 'medium', 'high'][r.energy - 1] || 'medium') : undefined,
+					sleepHours: r.sleep ? String(r.sleep) : undefined,
+					stressLevel: r.stressLevel || undefined,
+				},
+			})),
+		];
 
-	return unified
-		.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-		.slice(0, 60);
+		return unified
+			.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+			.slice(0, 60);
+	} catch {
+		return [];
+	}
 };
 
 export const getMoodToday = async (userId: string) => {
@@ -2532,7 +2569,7 @@ export const getPatientReports = async (userId: string) => {
 			orderBy: { createdAt: 'desc' },
 			take: 12,
 			select: { id: true, type: true, totalScore: true, severityLevel: true, createdAt: true },
-		}),
+		}).catch(() => []),
 		db.pHQ9Assessment.findMany({
 			where: { userId: patientProfile.userId },
 			orderBy: { createdAt: 'desc' },
@@ -2554,7 +2591,7 @@ export const getPatientReports = async (userId: string) => {
 				dateTime: true,
 				therapistProfile: { select: { firstName: true, lastName: true, name: true, role: true } },
 			},
-		}),
+		}).catch(() => []),
 	]);
 
 	const assessments = [
@@ -2736,69 +2773,79 @@ export const getCompleteHealthSummaryData = async (userId: string) => {
 };
 
 export const getMyCareTeamProviders = async (userId: string) => {
-	const patientProfile = await getPatientProfile(userId);
-	const lastPhq9 = await db.pHQ9Assessment.findFirst({
-		where: { userId },   // userId is the User.id FK — use it directly, not patientProfile.userId (undefined)
-		orderBy: { assessedAt: 'desc' },
-		select: { severity: true, totalScore: true, assessedAt: true }
-	}).catch(() => null);
-	const sessions = await db.therapySession.findMany({
-		where: { patientProfileId: patientProfile.id },
-		orderBy: { dateTime: 'desc' },
-		select: {
-			id: true,
-			dateTime: true,
-			status: true,
-			therapistProfileId: true,
-			therapistProfile: { select: { id: true, firstName: true, lastName: true, name: true, role: true } },
-		},
-		take: 60,
-	});
+	try {
+		const patientProfile = await getPatientProfile(userId);
+		const lastPhq9 = await db.pHQ9Assessment.findFirst({
+			where: { userId },
+			orderBy: { assessedAt: 'desc' },
+			select: { severity: true, totalScore: true, assessedAt: true }
+		}).catch(() => null);
+		const sessions = await db.therapySession.findMany({
+			where: { patientProfileId: patientProfile.id },
+			orderBy: { dateTime: 'desc' },
+			select: {
+				id: true,
+				dateTime: true,
+				status: true,
+				therapistProfileId: true,
+				therapistProfile: { select: { id: true, firstName: true, lastName: true, name: true, role: true } },
+			},
+			take: 60,
+		}).catch((error: unknown) => {
+			if (isSchemaUnavailableError(error)) return [];
+			throw error;
+		});
 
-	const now = new Date();
-	const providerIds = Array.from(new Set<string>(sessions.map((s: any) => String(s.therapistProfileId || '')).filter(Boolean)));
-	if (!providerIds.length) return [];
+		const now = new Date();
+		const providerIds = Array.from(new Set<string>(sessions.map((s: any) => String(s.therapistProfileId || '')).filter(Boolean)));
+		if (!providerIds.length) return [];
 
-	const providerUsers = await db.user.findMany({
-		where: { id: { in: providerIds } },
-		select: { id: true, firstName: true, lastName: true, name: true, role: true },
-	});
-	const providerMeta = new Map<string, any>();
-	for (const user of providerUsers) {
-		providerMeta.set(String(user.id), await toProviderListItem(user));
-	}
-
-	return providerIds.map((therapistProfileId: string) => {
-		const providerSessions = sessions
-			.filter((s: any) => String(s.therapistProfileId) === therapistProfileId)
-			.sort((a: any, b: any) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
-		const nextSession = providerSessions.find((s: any) => new Date(s.dateTime) >= now);
-		const latest = providerSessions[providerSessions.length - 1];
-		const userId = therapistProfileId;
-		const meta = userId ? providerMeta.get(String(userId)) : null;
-
-		const providerName = String(latest?.therapistProfile?.name || `${latest?.therapistProfile?.firstName || ''} ${latest?.therapistProfile?.lastName || ''}`.trim() || 'Provider');
-		let latestPhq9Assessment: string | null = null;
-		if (lastPhq9) {
-			const formattedDate = new Date(lastPhq9.assessedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-			latestPhq9Assessment = `> 📊 PHQ-9 Score: ${lastPhq9.severity} (${lastPhq9.totalScore}/27) — Shared with ${providerName} on ${formattedDate}`;
+		const providerUsers = await db.user.findMany({
+			where: { id: { in: providerIds } },
+			select: { id: true, firstName: true, lastName: true, name: true, role: true },
+		}).catch((error: unknown) => {
+			if (isSchemaUnavailableError(error)) return [];
+			throw error;
+		});
+		const providerMeta = new Map<string, any>();
+		for (const user of providerUsers) {
+			providerMeta.set(String(user.id), await toProviderListItem(user));
 		}
 
-		return {
-			id: userId,
-			name: providerName,
-			role: roleLabel(latest?.therapistProfile?.role || meta?.role),
-			nextSession: nextSession
-				? {
-					date: new Date(nextSession.dateTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-					time: new Date(nextSession.dateTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-				}
-				: undefined,
-			latestPhq9Assessment,
-			specialization: Array.isArray(meta?.specializations) && meta.specializations.length ? meta.specializations : [meta?.specialization || 'General Wellness'],
-			canMessage: true,
-		};
-	});
+		return providerIds.map((therapistProfileId: string) => {
+			const providerSessions = sessions
+				.filter((s: any) => String(s.therapistProfileId) === therapistProfileId)
+				.sort((a: any, b: any) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
+			const nextSession = providerSessions.find((s: any) => new Date(s.dateTime) >= now);
+			const latest = providerSessions[providerSessions.length - 1];
+			const mappedUserId = therapistProfileId;
+			const meta = mappedUserId ? providerMeta.get(String(mappedUserId)) : null;
+
+			const providerName = String(latest?.therapistProfile?.name || `${latest?.therapistProfile?.firstName || ''} ${latest?.therapistProfile?.lastName || ''}`.trim() || 'Provider');
+			let latestPhq9Assessment: string | null = null;
+			if (lastPhq9) {
+				const formattedDate = new Date(lastPhq9.assessedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+				latestPhq9Assessment = `> 📊 PHQ-9 Score: ${lastPhq9.severity} (${lastPhq9.totalScore}/27) — Shared with ${providerName} on ${formattedDate}`;
+			}
+
+			return {
+				id: mappedUserId,
+				name: providerName,
+				role: roleLabel(latest?.therapistProfile?.role || meta?.role),
+				nextSession: nextSession
+					? {
+						date: new Date(nextSession.dateTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+						time: new Date(nextSession.dateTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+					}
+					: undefined,
+				latestPhq9Assessment,
+				specialization: Array.isArray(meta?.specializations) && meta.specializations.length ? meta.specializations : [meta?.specialization || 'General Wellness'],
+				canMessage: true,
+			};
+		});
+	} catch {
+		return [];
+	}
 };
 
 export const listAvailableProvidersForPatient = async (
