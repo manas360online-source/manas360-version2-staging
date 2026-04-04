@@ -13,6 +13,13 @@ type PlatformAdminInviteEmailInput = {
 	temporaryPassword: string;
 };
 
+type PlatformAdminPasswordResetEmailInput = {
+	to: string;
+	name?: string | null;
+	loginUrl: string;
+	otp: string;
+};
+
 const buildSubscriptionActivationMessage = (input: SubscriptionActivationEmailInput) => {
 	const subject = 'Welcome to MANAS360';
 	const greetingName = input.name?.trim() ? input.name.trim() : 'there';
@@ -123,6 +130,76 @@ export const sendPlatformAdminInviteEmail = async (input: PlatformAdminInviteEma
 				subject: message.subject,
 				text: message.text,
 				template: 'platform-admin-invite',
+			}),
+		}).catch(() => null);
+		return;
+	}
+
+	console.info('[email-delivery-fallback]', JSON.stringify({ to: email, from: fromAddress || null, fromName, replyTo: replyTo || null, ...message }));
+};
+
+const buildPlatformAdminPasswordResetMessage = (input: PlatformAdminPasswordResetEmailInput) => {
+	const subject = String(process.env.ADMIN_PASSWORD_RESET_EMAIL_SUBJECT || 'MANAS360 admin password reset').trim();
+	const greetingName = input.name?.trim() ? input.name.trim() : 'there';
+	const text = [
+		`Hi ${greetingName},`,
+		'',
+		'We received a request to reset your admin portal password.',
+		'',
+		`OTP / Code: ${input.otp}`,
+		`Login URL: ${input.loginUrl}`,
+		'',
+		'If you did not request this, contact support immediately.',
+	].join('\n');
+
+	return { subject, text };
+};
+
+export const sendPlatformAdminPasswordResetEmail = async (input: PlatformAdminPasswordResetEmailInput): Promise<void> => {
+	const email = String(input.to || '').trim();
+	if (!email) return;
+
+	const message = buildPlatformAdminPasswordResetMessage(input);
+	const emailProvider = String(process.env.EMAIL_PROVIDER || '').trim().toLowerCase();
+	const zohoFlowWebhookUrl = String(process.env.ZOHO_FLOW_WEBHOOK_URL || '').trim();
+	const webhookUrl = process.env.EMAIL_WEBHOOK_URL;
+	const fromName = String(process.env.EMAIL_FROM_NAME || 'MANAS360').trim();
+	const fromAddress = String(process.env.EMAIL_FROM_ADDRESS || '').trim();
+	const replyTo = String(process.env.EMAIL_REPLY_TO || fromAddress).trim();
+
+	if ((emailProvider === 'zoho' || (!webhookUrl && !!zohoFlowWebhookUrl)) && zohoFlowWebhookUrl) {
+		await fetch(zohoFlowWebhookUrl, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				event: 'platform_admin_password_reset_email',
+				timestamp: new Date().toISOString(),
+				data: {
+					to: email,
+					from: fromAddress || undefined,
+					fromName,
+					replyTo: replyTo || undefined,
+					subject: message.subject,
+					text: message.text,
+					template: 'platform-admin-password-reset',
+				},
+			}),
+		}).catch(() => null);
+		return;
+	}
+
+	if (webhookUrl) {
+		await fetch(webhookUrl, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				to: email,
+				from: fromAddress || undefined,
+				fromName,
+				replyTo: replyTo || undefined,
+				subject: message.subject,
+				text: message.text,
+				template: 'platform-admin-password-reset',
 			}),
 		}).catch(() => null);
 		return;
