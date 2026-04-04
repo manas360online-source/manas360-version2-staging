@@ -19,8 +19,16 @@ services:
   redis:
     image: redis:7
     command: redis-server --appendonly yes
-    ports:
-      - "${REDIS_HOST_PORT:-6380}:6379"
+    # Do not publish Redis host port by default; expose internally to the Docker
+    # network so the backend can connect to `redis:6379` while allowing a local
+    # Redis instance to continue running on the host.
+    expose:
+      - "6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     volumes:
       - redis_data:/data
 
@@ -43,6 +51,13 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+    healthcheck:
+      # Backend exposes port 5000 in the container; use a node one-liner to
+      # query the /health endpoint without adding curl/wget to the image.
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://127.0.0.1:5000/health', res => { process.exit(res.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     ports:
       - "${BACKEND_HOST_PORT:-5001}:5000"
     command: sh -c "npx prisma migrate deploy && node dist/server.js"

@@ -22,8 +22,15 @@ services:
     container_name: manas360-dev-redis
     restart: unless-stopped
     command: redis-server --appendonly yes
-    ports:
-      - "6379:6379"
+    # Do not publish Redis port to the host to avoid conflicts with local Redis.
+    # Expose the port only to the Docker network so backend can reach it by service name.
+    expose:
+      - "6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     volumes:
       - manas360_dev_redis_data:/data
 
@@ -51,6 +58,11 @@ services:
     volumes:
       - ./backend:/app
     command: sh -c "npm install && npm run prisma:generate && npm run dev"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://127.0.0.1:3000/health', res => { process.exit(res.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   frontend:
     image: node:20

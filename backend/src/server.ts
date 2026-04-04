@@ -11,7 +11,6 @@ import { initSubscriptionCron } from './jobs/subscriptionCron';
 import { initProviderLeadCron } from './cron/providerLeadCron';
 import { startPatientSharedReportCleanupJob } from './jobs/patientSharedReportCleanup.job';
 import { ensureSsoTables } from './services/sso.service';
-import { createOrEnsureTenant, azureTemplate, googleTemplate, oktaTemplate } from './services/sso.service';
 import { setSocketIO } from './routes/gps.routes';
 import { reconcilePendingPayments } from './cron/paymentReconciliation';
 import { initLeadDistributionCrons } from './cron/lead-distribution.cron';
@@ -26,18 +25,7 @@ const startServer = async (): Promise<void> => {
 	await initializePhonePeTokenRefresh();
 
 	// ensure SSO tables exist
-	void ensureSsoTables()
-		.then(async () => {
-			try {
-				// create example tenants for quick testing (no secrets included)
-				await createOrEnsureTenant(googleTemplate({ key: 'sso-google-demo', name: 'Google Workspace (demo)', domain: 'techcorp-india.com' }));
-				await createOrEnsureTenant(azureTemplate({ tenantId: 'common', key: 'sso-azure-demo', name: 'Azure AD (demo)', domain: 'techcorp-india.com' }));
-				await createOrEnsureTenant(oktaTemplate({ key: 'sso-okta-demo', name: 'Okta (demo)', issuer: 'https://example.okta.com/oauth2/default', domain: 'techcorp-india.com' }));
-			} catch (err) {
-				console.error('SSO tenant seed failed', err);
-			}
-		})
-		.catch((err) => {
+	void ensureSsoTables().catch((err) => {
 			const code = String((err as any)?.code || '');
 			const message = String((err as any)?.message || '').toLowerCase();
 			const transientSocketClose = code === 'UND_ERR_SOCKET' || message.includes('other side closed');

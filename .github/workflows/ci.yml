@@ -69,13 +69,9 @@ jobs:
         working-directory: backend
         run: npm run prisma:migrate:deploy
 
-      - name: Verify reset-safe migrations and full seed
+      - name: Verify reset-safe migrations
         working-directory: backend
         run: npx prisma migrate reset --force
-
-      - name: Seed baseline login users
-        working-directory: backend
-        run: npm run seed:login-users
 
       - name: Enforce single platform admin
         working-directory: backend
