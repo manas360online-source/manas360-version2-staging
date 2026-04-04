@@ -22,8 +22,10 @@ services:
     container_name: manas360-dev-redis
     restart: unless-stopped
     command: redis-server --appendonly yes
-    ports:
-      - "6379:6379"
+    # Do not publish Redis port to the host to avoid conflicts with local Redis.
+    # Expose the port only to the Docker network so backend can reach it by service name.
+    expose:
+      - "6379"
     volumes:
       - manas360_dev_redis_data:/data
 
