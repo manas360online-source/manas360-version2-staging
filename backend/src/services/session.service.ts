@@ -2,6 +2,8 @@ import { randomBytes } from 'crypto';
 import { AppError } from '../middleware/error.middleware';
 import { prisma } from '../config/db';
 import { publishPlaceholderNotificationEvent } from './notification.service';
+import { sendWhatsAppMessage } from './whatsapp.service';
+import type { WhatsAppUserType } from './whatsapp.service';
 import { buildPaginationMeta, normalizePagination } from '../utils/pagination';
 import { decryptSessionNote, encryptSessionNote } from '../utils/encryption';
 import { analyticsService } from './analytics.service';
@@ -222,6 +224,46 @@ export const bookPatientSession = async (userId: string, input: BookSessionInput
 			status: 'pending',
 		},
 	});
+
+	// Send WhatsApp booking confirmed notification (non-blocking)
+	const patientUser = await db.user.findFirst({
+		where: { id: String(patientProfile.userId) },
+		select: { phone: true },
+	});
+	if (patientUser?.phone) {
+		sendWhatsAppMessage({
+			phoneNumber: patientUser.phone,
+			templateType: 'booking_confirmed',
+			userType: 'patient',
+			templateVariables: {
+				therapistName: String(therapist.name || therapist.firstName || 'Your Therapist'),
+				appointmentDate: input.dateTime.toLocaleDateString('en-IN'),
+				appointmentTime: input.dateTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+				sessionLink: `https://manas360.com/session/${String(session.id)}`,
+				appUrl: 'https://manas360.com',
+			},
+		}).catch((err) => console.error('[Session] Failed to send booking_confirmed WhatsApp:', err.message));
+	}
+
+	// Send WhatsApp booking confirmed to therapist (non-blocking)
+	const therapistUser = await db.user.findUnique({
+		where: { id: String(therapist.id) },
+		select: { phone: true },
+	});
+	if (therapistUser?.phone) {
+		sendWhatsAppMessage({
+			phoneNumber: therapistUser.phone,
+			templateType: 'booking_confirmed',
+			userType: String(therapist.role).toLowerCase() as WhatsAppUserType,
+			templateVariables: {
+				patientName: String(patientProfile.name || patientProfile.user?.name || 'Patient'),
+				appointmentDate: input.dateTime.toLocaleDateString('en-IN'),
+				appointmentTime: input.dateTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+				sessionLink: `https://manas360.com/session/${String(session.id)}`,
+				dashboardLink: 'https://manas360.com/therapist-dashboard',
+			},
+		}).catch((err) => console.error('[Session] Failed to send booking_confirmed WhatsApp to therapist:', err.message));
+	}
 
 	return {
 		sessionId: String(session.id),
@@ -689,6 +731,31 @@ export const updateMyTherapistSessionStatus = async (
 
 	if (payload.status === 'completed') {
 		void triggerSessionTranscription(String(updated.id), payload.recordingUrl);
+
+		// Send WhatsApp session followup to patient (non-blocking)
+		const sessionData = await db.therapySession.findUnique({
+			where: { id: String(updated.id) },
+			select: {
+				patientProfile: { select: { id: true, userId: true, user: { select: { phone: true, name: true } } } },
+				therapistProfile: { select: { id: true, userId: true, displayName: true } },
+				dateTime: true,
+			},
+		});
+
+		if (sessionData?.patientProfile?.user?.phone) {
+			sendWhatsAppMessage({
+				phoneNumber: sessionData.patientProfile.user.phone,
+				templateType: 'session_followup',
+				userType: 'patient',
+				templateVariables: {
+					name: sessionData.patientProfile.user.name || 'User',
+					therapistName: sessionData.therapistProfile?.displayName || 'Your Therapist',
+					sessionDate: sessionData.dateTime.toLocaleDateString('en-IN'),
+					feedbackUrl: `https://manas360.com/session/${String(updated.id)}/feedback`,
+					nextSessionDate: 'Coming soon',
+				},
+			}).catch((err) => console.error('[Session] Failed to send session_followup WhatsApp:', err.message));
+		}
 	}
 
 	return {

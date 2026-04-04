@@ -9,6 +9,7 @@ import { reactivatePatientSubscription } from './patient-v1.service';
 import { activateProviderSubscription } from './provider-subscription.service';
 import { activateAllPendingComponents, expirePendingComponents } from './provider-subscription.pending.service';
 import { extractDeclineReasonFromPhonePe, formatDeclineMessage } from './phonepe-decline-reasons.service';
+import { sendWhatsAppMessage } from './whatsapp.service';
 import { logger } from '../utils/logger';
 
 const redis = createClient({
@@ -262,6 +263,25 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 					retryCount: Number(capturedPayment.retryCount || 0),
 					channel: 'session',
 				});
+
+				// Send WhatsApp payment success notification (non-blocking)
+				const patientUser = await db.user.findUnique({
+					where: { id: String(capturedPayment.patientId) },
+					select: { phone: true, name: true },
+				});
+				if (patientUser?.phone) {
+					sendWhatsAppMessage({
+						phoneNumber: patientUser.phone,
+						templateType: 'payment_success',
+						userType: 'patient',
+						templateVariables: {
+							name: patientUser.name || 'User',
+							amount: `₹${(capturedAmountMinor / 100).toFixed(2)}`,
+							planName: 'Session Payment',
+							expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-IN'),
+						},
+					}).catch((err) => console.error('[Payment] Failed to send payment_success WhatsApp:', err.message));
+				}
 			}
 
 			logger.info(`[PaymentService] Session payment processed and capture recorded`, { merchantTransactionId });
@@ -359,6 +379,25 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 					retryCount: Number(payment.retryCount || 0),
 					channel: 'patient_subscription',
 				});
+
+				// Send WhatsApp payment success for subscription (non-blocking)
+				const patientUser = await db.user.findUnique({
+					where: { id: userId },
+					select: { phone: true, name: true },
+				});
+				if (patientUser?.phone) {
+					sendWhatsAppMessage({
+						phoneNumber: patientUser.phone,
+						templateType: 'payment_success',
+						userType: 'patient',
+						templateVariables: {
+							name: patientUser.name || 'User',
+							amount: `₹${(Number(payment.amountMinor || 0) / 100).toFixed(2)}`,
+							planName: String(planKey || 'Subscription Plan'),
+							expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-IN'),
+						},
+					}).catch((err) => console.error('[Payment] Failed to send subscription payment_success WhatsApp:', err.message));
+				}
 			}
 			
 			logger.info(`[PaymentService] Patient subscription activated successfully`, { merchantTransactionId, userId, planKey });
@@ -511,6 +550,25 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 					retryCount: Number(payment.retryCount || 0),
 					channel: 'provider_subscription',
 				});
+
+				// Send WhatsApp payment success for provider subscription (non-blocking)
+				const providerUser = await db.user.findUnique({
+					where: { id: providerId },
+					select: { phone: true, name: true },
+				});
+				if (providerUser?.phone) {
+					sendWhatsAppMessage({
+						phoneNumber: providerUser.phone,
+						templateType: 'payment_success',
+						userType: 'therapist',
+						templateVariables: {
+							name: providerUser.name || 'Provider',
+							amount: `₹${(Number(payment.amountMinor || 0) / 100).toFixed(2)}`,
+							planName: String(planKey || 'Subscription Plan'),
+							expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-IN'),
+						},
+					}).catch((err) => console.error('[Payment] Failed to send provider subscription payment_success WhatsApp:', err.message));
+				}
 			}
 
 			logger.info(`[PaymentService] Provider subscription activated successfully (Phase 2)`, {
