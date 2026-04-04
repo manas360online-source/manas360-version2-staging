@@ -19,8 +19,11 @@ services:
   redis:
     image: redis:7
     command: redis-server --appendonly yes
-    ports:
-      - "${REDIS_HOST_PORT:-6380}:6379"
+    # Do not publish Redis host port by default; expose internally to the Docker
+    # network so the backend can connect to `redis:6379` while allowing a local
+    # Redis instance to continue running on the host.
+    expose:
+      - "6379"
     volumes:
       - redis_data:/data
 
