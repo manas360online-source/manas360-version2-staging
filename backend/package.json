@@ -27,6 +27,7 @@
 		"seed:test": "node ./scripts/seed-demo-saas.js",
 		"seed:realistic": "ts-node-dev --transpile-only ./prisma/seed-realistic.ts",
 		"seed": "node ./prisma/seed.js",
+		"health:predeploy": "bash ./scripts/predeploy-health-check.sh",
 		"seed:users:mock": "ts-node ./scripts/seed_mock_users.ts",
 		"seed:analytics:mock": "ts-node ./scripts/seed_admin_analytics_mock_data.ts",
 		"seed:patient:mock-dashboard": "node ./scripts/seed_mock_patient_dashboard.js",

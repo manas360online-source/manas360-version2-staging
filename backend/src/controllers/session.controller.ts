@@ -17,7 +17,6 @@ import {
   updateResponseNote,
   deleteResponseNote,
 } from '../services/session.service';
-import { sessionExportService } from '../services/session-export.service';
 import { prisma } from '../config/db';
 import { exportQueue } from '../jobs/export.worker';
 
@@ -162,13 +161,6 @@ export const exportMyTherapistSessionController = async (req: Request, res: Resp
 
 		// Enqueue background export job
 		const job = await exportQueue.add('export', { sessionId, format, requestorId: userId, uploadToS3: true }, { removeOnComplete: { age: 3600 }, removeOnFail: { age: 86400 } });
-
-		// create a pending session export record mapped to the jobId (best-effort)
-		try {
-			await prisma.sessionExport.create({ data: { sessionId, jobId: String(job.id), format: format.toUpperCase(), fileName: '', filePath: '', status: 'PENDING' } });
-		} catch (e) {
-			console.warn('Failed to create sessionExport record for job', job.id, e);
-		}
 
 		res.status(202).json({ success: true, jobId: job.id, status: 'queued' });
 	} catch (err) {

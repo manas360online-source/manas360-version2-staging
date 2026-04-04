@@ -69,6 +69,10 @@ jobs:
         working-directory: backend
         run: npm run prisma:migrate:deploy
 
+      - name: Verify reset-safe migrations and full seed
+        working-directory: backend
+        run: npx prisma migrate reset --force
+
       - name: Seed baseline login users
         working-directory: backend
         run: npm run seed:login-users

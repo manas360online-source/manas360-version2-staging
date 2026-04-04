@@ -554,16 +554,31 @@ export const getMyTherapistSessionDetail = async (userId: string, sessionId: str
 			null
 		: 'Anonymous Patient';
 
-	const responses = await prisma.patientSessionResponse.findMany({
+	const note = await prisma.therapistSessionNote.findUnique({
 		where: { sessionId: String(session.id) },
-		orderBy: { answeredAt: 'asc' },
 		select: {
 			id: true,
-			questionId: true,
-			responseData: true,
-			answeredAt: true,
+			subjective: true,
+			objective: true,
+			assessment: true,
+			plan: true,
+			updatedAt: true,
 		},
 	});
+
+	const responses = note
+		? [{
+			id: `note-${note.id}`,
+			questionId: 'clinical-note',
+			responseData: {
+				subjective: note.subjective,
+				objective: note.objective,
+				assessment: note.assessment,
+				plan: note.plan,
+			},
+			answeredAt: note.updatedAt,
+		}]
+		: [];
 
 	const branching = { nodes: {}, path: [] as string[] };
 

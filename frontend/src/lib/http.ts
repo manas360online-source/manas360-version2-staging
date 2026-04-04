@@ -3,6 +3,26 @@ import { getApiBaseUrl } from './runtimeEnv';
 
 const baseURL = getApiBaseUrl();
 
+const normalizeApiUrl = (url: string): string => {
+	if (!url || /^https?:\/\//i.test(url) || url.startsWith('/api/')) {
+		return url;
+	}
+
+	if (url === '/health' || url === '/metrics' || url.startsWith('/chat/') || url.startsWith('/webhooks/')) {
+		return url;
+	}
+
+	if (url.startsWith('/v1/')) {
+		return url;
+	}
+
+	if (url.startsWith('/')) {
+		return `/v1${url}`;
+	}
+
+	return `/v1/${url}`;
+};
+
 const getCookieValue = (cookieName: string): string | null => {
 	if (typeof document === 'undefined') {
 		return null;
@@ -68,6 +88,16 @@ if (axios && typeof (axios as any).create === 'function') {
 
 export const http = httpInstance as AxiosInstance;
 
+if (http && http.interceptors && http.interceptors.request && typeof http.interceptors.request.use === 'function') {
+	http.interceptors.request.use((config: any) => {
+		if (typeof config?.url === 'string') {
+			config.url = normalizeApiUrl(config.url);
+		}
+
+		return config;
+	});
+}
+
 const isExpectedAuthFailure = (status: number | undefined, url: string): boolean => {
 	if (!status) return false;
 	if (status === 401 && url.includes('/auth/me')) return true;
@@ -81,7 +111,7 @@ if (http && http.interceptors && http.interceptors.response && typeof http.inter
 		async (error: any) => {
 			const status: number | undefined = error?.response?.status;
 			const baseUrl = error?.config?.baseURL || '';
-			const relativeUrl = error?.config?.url || '';
+			const relativeUrl = normalizeApiUrl(error?.config?.url || '');
 			const fullUrl = `${baseUrl}${relativeUrl}`;
 
 			(error as any).isExpectedAuthFailure = isExpectedAuthFailure(status, fullUrl);

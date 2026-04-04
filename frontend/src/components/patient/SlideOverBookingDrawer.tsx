@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Calendar as CalendarIcon, Clock, CreditCard, CheckCircle2 } from 'lucide-react';
 import { patientApi } from '../../api/patient';
 import { useWallet } from '../../hooks/useWallet';
+import { FRONTEND_URL } from '../../lib/runtimeEnv';
 
 interface Provider {
   id: string;
@@ -258,7 +259,7 @@ export default function SlideOverBookingDrawer({
                 onClick={() => {
                   const returnTo = window.location.pathname + window.location.search + window.location.hash;
                   // Use the provided subscription plan link or fallback to /plans
-                  window.location.href = `http://localhost:5173/payment/status?id=SUB_653d1e79_1774602028060&status=SUCCESS#/plans?returnTo=${encodeURIComponent(returnTo)}`;
+                  window.location.href = `${FRONTEND_URL}/payment/status?id=SUB_653d1e79_1774602028060&status=SUCCESS#/plans?returnTo=${encodeURIComponent(returnTo)}`;
                 }}
               >
                 Subscribe to Platform Fee

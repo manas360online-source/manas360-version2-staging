@@ -18,9 +18,9 @@ import GPSDashboard from '../../components/therapist/GPSDashboard';
 import { JitsiSessionManager } from '../../lib/jitsi/JitsiSessionManager';
 import useAuthToken from '../../hooks/useAuthToken';
 import { http } from '../../lib/http';
+import { AI_ENGINE_WS_URL } from '../../lib/runtimeEnv';
 
 const JITSI_DOMAIN = import.meta.env.VITE_JITSI_DOMAIN || 'meet.jit.si';
-const AI_ENGINE_WS_URL = import.meta.env.VITE_AI_ENGINE_WS_URL || 'ws://localhost:8765';
 
 function loadJitsiScript(domain: string): Promise<void> {
   return new Promise((resolve, reject) => {

@@ -51,7 +51,6 @@ export async function initSocket(server: http.Server) {
   const redisUp = new client.Gauge({ name: 'socket_redis_up', help: 'Redis availability (1 up, 0 down)' });
   const streamProcessed = new client.Counter({ name: 'socket_stream_processed_total', help: 'Total stream entries processed' });
   const streamErrors = new client.Counter({ name: 'socket_stream_errors_total', help: 'Stream processing errors' });
-  const pendingDbGauge = new client.Gauge({ name: 'socket_pending_db_rows', help: 'Number of DB pending delivery rows' });
   const rateLimitRejected = new client.Counter({ name: 'socket_rate_limit_rejected_total', help: 'Rate limit rejections' });
   const messageLatency = new client.Histogram({
     name: 'app_message_latency_seconds',
@@ -260,19 +259,10 @@ export async function initSocket(server: http.Server) {
       socket.emit('left', { sessionId });
     });
 
-    // example: patient submits answer -> server persists and notifies therapist
-    // socket.on('answer_submitted', async (data: { sessionId: string; questionId: string; answer: any; messageId?: string }) => {
-    //   // Commented out - references missing patientSessionResponse table
-    // });
-
     socket.on('typing', (data: { sessionId: string; isTyping: boolean }) => {
       if (!(socket as any).consume(0.2)) return;
       socket.to(data.sessionId).emit('typing', { userId: user.id, isTyping: data.isTyping });
     });
-
-    // socket.on('sync_state', async (data: { sessionId: string }) => {
-    //   // Commented out - references missing patientSessionResponse table
-    // });
 
     // ── Direct Messaging Events ─────────────────────────────────────────────
     // Patients join their personal inbox room on connect so they receive
@@ -508,37 +498,6 @@ export async function initSocket(server: http.Server) {
       }
     }
   }
-
-  // Periodic background job: find DB rows with _pendingDelivery and push to stream
-  async function drainPendingResponses() {
-    while (!shuttingDown) {
-      try {
-        if (!redisAvailable) {
-          await new Promise((r) => setTimeout(r, 5000));
-          continue;
-        }
-        const pending = await prisma.patientSessionResponse.findMany({ where: { deliveredToStream: false }, take: 50 });
-        pendingDbGauge.set(pending.length);
-        for (const row of pending) {
-          try {
-            const messageId = row.messageId || randomUUID();
-            const payload = { messageId, from: row.patientId, questionId: row.questionId, answer: row.responseData, at: Date.now(), sessionId: row.sessionId };
-            await pubClient.sendCommand(['XADD', STREAM_KEY, '*', 'messageId', messageId, 'payload', JSON.stringify(payload)]);
-            // mark deliveredToStream
-            await prisma.patientSessionResponse.update({ where: { id: row.id }, data: { deliveredToStream: true } as any });
-          } catch (e) {
-            console.warn('Failed to requeue pending response', e);
-          }
-        }
-        await new Promise((r) => setTimeout(r, 2000));
-      } catch (e) {
-        console.error('drainPendingResponses error', e);
-        await new Promise((r) => setTimeout(r, 5000));
-      }
-    }
-  }
-
-  // void drainPendingResponses(); // Commented out - references missing patientSessionResponse table
 
   // Presence cleanup: check zset entries older than TTL and mark offline in DB
   const PRESENCE_TTL_MS = 60 * 1000; // 60s

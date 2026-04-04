@@ -234,28 +234,24 @@ export const publishGroupTherapySessionController = async (req: Request, res: Re
 
 export const listPublicPublishedGroupTherapySessionsController = async (_req: Request, res: Response): Promise<void> => {
   const now = new Date();
-  const sessionModel = db.groupTherapySession || db.groupTherapySessions;
-  if (!sessionModel?.findMany) {
-    sendSuccess(res, { items: [] }, 'Public group therapy sessions fetched');
-    return;
-  }
-
-  const rows = await sessionModel.findMany({
-        where: {
-          status: { in: ['PUBLISHED', 'LIVE'] },
-          scheduledAt: { gte: new Date(now.getTime() - 2 * 60 * 60 * 1000) },
-          sessionMode: 'PUBLIC',
-        },
-        orderBy: { scheduledAt: 'asc' },
-        include: {
-          hostTherapist: { select: { id: true, firstName: true, lastName: true } },
-          enrollments: {
-            where: { status: { in: ['PAID', 'JOINED'] } },
-            select: { id: true },
-          },
-        },
-        take: 30,
-      });
+  const rows = await db.groupTherapySession.findMany({
+    where: {
+      status: { in: ['PUBLISHED', 'LIVE'] },
+      scheduledAt: { gte: new Date(now.getTime() - 2 * 60 * 60 * 1000) },
+      sessionMode: 'PUBLIC',
+    },
+    orderBy: { scheduledAt: 'asc' },
+    include: {
+      hostTherapist: {
+        select: { id: true, firstName: true, lastName: true, email: true },
+      },
+      enrollments: {
+        where: { status: { in: ['PAID', 'JOINED'] } },
+        select: { id: true },
+      },
+    },
+    take: 30,
+  });
 
   const items = rows.map((row: any) => ({
     ...row,

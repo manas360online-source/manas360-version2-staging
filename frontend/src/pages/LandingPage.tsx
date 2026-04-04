@@ -126,7 +126,7 @@ export const LandingPage: React.FC = () => {
           })}
         </script>
         {/* Preload hero image for better LCP */}
-        <link rel="preload" as="image" href="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1600&auto=format&fit=crop" />
+        <link rel="preload" as="image" href="/You%20renot%20alone-Beach.jpeg" />
       </Helmet>
 
       {/* Main Page Structure */}

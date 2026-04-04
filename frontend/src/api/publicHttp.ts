@@ -9,6 +9,26 @@ import { getApiBaseUrl } from '../lib/runtimeEnv';
 
 const baseURL = getApiBaseUrl();
 
+const normalizeApiUrl = (url: string): string => {
+  if (!url || /^https?:\/\//i.test(url) || url.startsWith('/api/')) {
+    return url;
+  }
+
+  if (url === '/health' || url === '/metrics' || url.startsWith('/chat/') || url.startsWith('/webhooks/')) {
+    return url;
+  }
+
+  if (url.startsWith('/v1/')) {
+    return url;
+  }
+
+  if (url.startsWith('/')) {
+    return `/v1${url}`;
+  }
+
+  return `/v1/${url}`;
+};
+
 const publicHttpInstance: AxiosInstance = axios.create({
   baseURL,
   withCredentials: false, // Do NOT send cookies/auth
@@ -22,6 +42,10 @@ const publicHttpInstance: AxiosInstance = axios.create({
 
 // Add interceptor to ensure no auth headers are sent
 publicHttpInstance.interceptors.request.use((config: any) => {
+  if (typeof config?.url === 'string') {
+    config.url = normalizeApiUrl(config.url);
+  }
+
   // Remove any Authorization header that might have been added
   delete config.headers.Authorization;
   delete config.headers['x-csrf-token'];

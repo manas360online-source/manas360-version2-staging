@@ -168,16 +168,31 @@ export async function getTherapistSessionDetail(therapistUserId: string, session
 
   if (!session) throw new Error('Session not found');
 
-  const responses = await prisma.patientSessionResponse.findMany({
+  const note = await prisma.therapistSessionNote.findUnique({
     where: { sessionId: String(session.id) },
-    orderBy: { answeredAt: 'asc' },
     select: {
       id: true,
-      questionId: true,
-      responseData: true,
-      answeredAt: true,
+      subjective: true,
+      objective: true,
+      assessment: true,
+      plan: true,
+      updatedAt: true,
     },
   });
+
+  const responses = note
+    ? [{
+        id: `note-${note.id}`,
+        questionId: 'clinical-note',
+        responseData: {
+          subjective: note.subjective,
+          objective: note.objective,
+          assessment: note.assessment,
+          plan: note.plan,
+        },
+        answeredAt: note.updatedAt,
+      }]
+    : [];
 
   // presence
   let presence = { patientOnline: false, sessionActive: false };
