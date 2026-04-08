@@ -380,6 +380,36 @@ export const ensureCorporateTables = async (): Promise<void> => {
   await prisma.$executeRaw`
     CREATE INDEX IF NOT EXISTS "corporate_demo_requests_workEmail_idx" ON "corporate_demo_requests"("workEmail");
   `;
+
+  await prisma.$executeRaw`
+    CREATE TABLE IF NOT EXISTS "corporate_otp_requests" (
+      "id" TEXT PRIMARY KEY,
+      "phone" TEXT NOT NULL,
+      "otpHash" TEXT NOT NULL,
+      "companyName" TEXT NOT NULL,
+      "companySize" TEXT,
+      "industry" TEXT,
+      "country" TEXT,
+      "contactName" TEXT,
+      "email" TEXT,
+      "status" TEXT NOT NULL DEFAULT 'PENDING',
+      "expiresAt" TIMESTAMP(3) NOT NULL,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `;
+
+  await prisma.$executeRaw`
+    CREATE INDEX IF NOT EXISTS "corporate_otp_requests_phone_status_idx" ON "corporate_otp_requests"("phone", "status");
+  `;
+
+  await prisma.$executeRaw`
+    CREATE INDEX IF NOT EXISTS "corporate_otp_requests_phone_status_created_idx" ON "corporate_otp_requests"("phone", "status", "createdAt" DESC);
+  `;
+
+  await prisma.$executeRaw`
+    CREATE INDEX IF NOT EXISTS "corporate_otp_requests_status_expiresAt_idx" ON "corporate_otp_requests"("status", "expiresAt");
+  `;
 };
 
 const getCompanyByKey = async (companyKey = DEFAULT_COMPANY_KEY, db: DbClient = prisma): Promise<{ id: string; name: string } | null> => {

@@ -1,7 +1,8 @@
 import axios, { AxiosError } from 'axios';
+import { API_BASE } from '../../lib/runtimeEnv';
+import { getAuthHeaders } from '../../utils/authToken';
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+const API_BASE_URL = `${API_BASE}/subscriptions`;
 
 export interface CalculatePricePayload {
   clinic_tier: 'solo' | 'small' | 'large';
@@ -37,11 +38,15 @@ export const calculateSubscriptionPrice = async (
   payload: CalculatePricePayload
 ): Promise<PricingResponse> => {
   try {
+    const authHeaders = getAuthHeaders();
     const response = await axios.post<PricingResponse>(
-      `${API_BASE_URL}/subscriptions/calculate-price`,
+      `${API_BASE_URL}/calculate-price`,
       payload,
       {
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders,
+        },
         timeout: 10000,
       }
     );

@@ -35,6 +35,33 @@ const resolveCompanyKey = (req: Request): string | undefined => {
   return normalized || undefined;
 };
 
+type CorporateDemoRequestBody = {
+  companyName?: string;
+  email?: string;
+  companySize?: string;
+  industry?: string;
+  country?: string;
+  contactName?: string;
+  phone?: string;
+  company_name?: string;
+  work_email?: string;
+  company_size?: string;
+  contact_name?: string;
+  phone_number?: string;
+};
+
+const normalizeCorporateDemoRequestBody = (body: CorporateDemoRequestBody) => {
+  return {
+    companyName: body.companyName ?? body.company_name,
+    email: body.email ?? body.work_email,
+    companySize: body.companySize ?? body.company_size,
+    industry: body.industry,
+    country: body.country,
+    contactName: body.contactName ?? body.contact_name,
+    phone: body.phone ?? body.phone_number,
+  };
+};
+
 export const getCorporateDashboardController = async (req: Request, res: Response): Promise<void> => {
   const companyKey = resolveCompanyKey(req);
   const data = await getCorporateDashboard(companyKey);
@@ -231,9 +258,41 @@ export const updateCorporateSettingsController = async (req: Request, res: Respo
   sendSuccess(res, data, 'Corporate settings updated successfully');
 };
 
-export const submitCorporateDemoRequestController = async (req: Request, res: Response): Promise<void> => {
-  const data = await submitCorporateDemoRequest(req.body || {});
-  sendSuccess(res, data, 'Corporate demo request submitted successfully', 201);
+export const submitCorporateDemoRequestController = async (req: Request, res: Response): Promise<Response> => {
+  try {
+    const payload = normalizeCorporateDemoRequestBody((req.body || {}) as CorporateDemoRequestBody);
+
+    // Validate required fields before service call.
+    const companyName = String(payload.companyName || '').trim();
+    const phone = String(payload.phone || '').trim();
+
+    if (!companyName || !phone) {
+      console.error('Corporate demo request validation failed', {
+        companyNameProvided: Boolean(companyName),
+        phoneProvided: Boolean(phone),
+        body: req.body,
+      });
+      return res.status(500).json({
+        success: false,
+        message: 'Unable to process corporate onboarding request',
+      });
+    }
+
+    // Service handles persistence into corporate_demo_requests table.
+    await submitCorporateDemoRequest(payload);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Demo request submitted successfully',
+    });
+  } catch (err) {
+    console.error(err);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to process corporate onboarding request',
+    });
+  }
 };
 
 export const requestCorporateOtpController = async (req: Request, res: Response): Promise<void> => {

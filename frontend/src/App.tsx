@@ -108,9 +108,10 @@ const CorporatePaymentMethodsPage = lazy(() => import('./pages/corporate/Corpora
 const CorporatePlanPage = lazy(() => import('./pages/corporate/CorporatePlanPage'));
 const CorporateHelpPage = lazy(() => import('./pages/corporate/CorporateHelpPage'));
 const SSOSettingsPage = lazy(() => import('./pages/corporate/SSOSettingsPage'));
-const CorporateDashboardPage = lazy(() => import('./pages/corporate/CorporateDashboardPage'));
+const CorporateDashboardPage = lazy(() => import('./pages/corporate/CorporateDashboard'));
 const CorporateOnboardingPage = lazy(() => import('./pages/corporate/CorporateOnboardingPage'));
-const MyDigitalClinicPage = lazy(() => import('./pages/clinic/MyDigitalClinicPage'));
+const MyDigitalClinicPricingPage = lazy(() => import('./pages/clinic/PricingPage'));
+const MyDigitalClinicDashboard = lazy(() => import('./pages/clinic/ClinicDashboard'));
 const HowItWorksPage = lazy(() => import('./pages/how-it-works/HowItWorksPage'));
 const ProviderCalendarPage = lazy(() => import('./pages/provider/Calendar'));
 const ProviderInboxPage = lazy(() => import('./pages/provider/Messages'));
@@ -261,7 +262,8 @@ function App() {
             <Route path="/results" element={<ResultsPage data={assessmentData} />} />
             <Route path="/crisis" element={<CrisisPage />} />
             <Route path="/how-it-works" element={<HowItWorksPage />} />
-            <Route path="/my-digital-clinic" element={<MyDigitalClinicPage />} />
+            <Route path="/my-digital-clinic" element={<MyDigitalClinicPricingPage />} />
+            <Route path="/my-digital-clinic/dashboard" element={<MyDigitalClinicDashboard />} />
             <Route path="/clinic" element={<Navigate to="/my-digital-clinic" replace />} />
             <Route path="/onboarding/name" element={<OnboardingName onNext={handleOnboardingName} />} />
             <Route path="/onboarding/email" element={<OnboardingEmail userName={userName} />} />

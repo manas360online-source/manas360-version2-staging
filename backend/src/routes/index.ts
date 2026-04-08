@@ -1,5 +1,7 @@
 import { getLivePricingController } from '../controllers/pricing.controller';
+import { submitCorporateDemoRequestController } from '../controllers/corporate.controller';
 import { Router } from 'express';
+import { asyncHandler } from '../middleware/validate.middleware';
 import authRoutes from './auth.routes';
 import patientRoutes from './patient.routes';
 import therapistRoutes from './therapist.routes';
@@ -40,6 +42,7 @@ const router = Router();
 import sharedRoutes from './shared.routes';
 // Defensive public pricing route for landing page
 router.get('/public/pricing/:category', getLivePricingController);
+router.post('/corporate/demo-request', asyncHandler(submitCorporateDemoRequestController));
 
 // Mount shared routes for plans and other public data
 router.use('/v1/shared', sharedRoutes);
