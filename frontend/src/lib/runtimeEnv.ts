@@ -19,6 +19,8 @@ const toWebsocketOrigin = (value: string): string => value.replace(/^https:/i, '
 
 export const API_BASE = '/api';
 
+export const API_MDC_BASE = '/api/mdc';
+
 export const FRONTEND_URL = import.meta.env.VITE_FRONTEND_URL?.trim() || getWindowOrigin();
 
 export const WS_BASE = import.meta.env.VITE_WS_URL?.trim() || getDefaultWebsocketUrl();

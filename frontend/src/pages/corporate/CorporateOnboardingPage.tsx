@@ -109,14 +109,18 @@ export default function CorporateOnboardingPage() {
     setLoading(true);
     try {
       if (mode === 'demo') {
+        const demoPayload = {
+          companyName: companyName.trim(),
+          email: workEmail.trim(),
+          companySize: companySize.trim(),
+          industry: industry.trim(),
+          country: country.trim(),
+          contactName: contactName.trim(),
+          phone: phone.trim(),
+        };
+
         await corporateApi.requestDemo({
-          companyName,
-          companySize,
-          industry,
-          country,
-          contactName,
-          phone,
-          email: workEmail || undefined,
+          ...demoPayload,
         });
         setSuccess('Demo request submitted. Our enterprise team will contact you shortly.');
         return;
@@ -192,6 +196,15 @@ export default function CorporateOnboardingPage() {
 
             <h2 className="mt-4 font-display text-2xl font-bold text-[#193D3A]">{modeCopy[mode].title}</h2>
             <p className="mt-1 text-sm text-[#446662]">{modeCopy[mode].subtitle}</p>
+            <div className="mt-3 flex items-center gap-2">
+              <span className="text-xs text-[#5A7873]">Already onboarded?</span>
+              <Link
+                to="/corporate/dashboard"
+                className="inline-flex items-center justify-center rounded-lg border border-[#C7DDD8] bg-[#F3F8F6] px-3 py-1.5 text-xs font-semibold text-[#1E6C61] transition hover:bg-[#E8F2EE] hover:text-[#18574F]"
+              >
+                Go to Dashboard
+              </Link>
+            </div>
 
             <form className="mt-5 space-y-3" onSubmit={mode === 'demo' ? onSubmit : (createStep === 'details' ? requestOtp : verifyOtpAndCreate)}>
               {mode === 'create' && createStep === 'otp' ? (
