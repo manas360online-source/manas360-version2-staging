@@ -106,6 +106,14 @@ export const FEATURES: Feature[] = [
     small: 399,
     large: 599,
   },
+  {
+    name: "Live Session",
+    description: "Video conferencing",
+    slug: "jitsi-session",
+    solo: 199,
+    small: 249,
+    large: 349,
+  },
 ];
 
 // ✅ ADD THIS (IMPORTANT)
