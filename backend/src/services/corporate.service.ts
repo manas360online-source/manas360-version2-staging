@@ -412,12 +412,27 @@ export const ensureCorporateTables = async (): Promise<void> => {
   `;
 };
 
+let corporateSchemaInitPromise: Promise<void> | null = null;
+
+const ensureCorporateSchemaReady = async (): Promise<void> => {
+  if (!corporateSchemaInitPromise) {
+    corporateSchemaInitPromise = ensureCorporateTables().catch((error) => {
+      corporateSchemaInitPromise = null;
+      throw error;
+    });
+  }
+
+  await corporateSchemaInitPromise;
+};
+
 const getCompanyByKey = async (companyKey = DEFAULT_COMPANY_KEY, db: DbClient = prisma): Promise<{ id: string; name: string } | null> => {
   const rows = await db.$queryRaw<Array<{ id: string; name: string }>>`SELECT "id", "name" FROM "companies" WHERE "companyKey" = ${companyKey} LIMIT 1`;
   return rows[0] || null;
 };
 
 const resolveCompany = async (companyKey?: string, db: DbClient = prisma): Promise<{ companyId: string; companyName: string; companyKey: string }> => {
+  await ensureCorporateSchemaReady();
+
   const key = String(companyKey || DEFAULT_COMPANY_KEY).trim() || DEFAULT_COMPANY_KEY;
   const company = await getCompanyByKey(key, db);
   return { companyId: company?.id || '', companyName: company?.name || 'TechCorp India', companyKey: key };

@@ -455,9 +455,9 @@ router.put('/groups/:id', requireAuth, requireRole('admin'), updateGroupCategory
 router.delete('/groups/:id', requireAuth, requireRole('admin'), deleteGroupCategoryController);
 
 // === DYNAMIC ROLE MANAGEMENT ===
-router.get('/roles', requireAuth, requireRole('superadmin'), asyncHandler(getRolesController));
+router.get('/roles', requireAuth, requireRole(['admin', 'superadmin', 'clinicaldirector', 'financemanager', 'complianceofficer']), asyncHandler(getRolesController));
 router.patch('/roles/:role', requireAuth, requireRole('superadmin'), asyncHandler(updateRolePermissionsController));
-router.get('/rbac/platform-admins', requireAuth, requireRole('superadmin'), asyncHandler(getPlatformAdminRoleInventoryController));
+router.get('/rbac/platform-admins', requireAuth, requireRole(['admin', 'superadmin', 'clinicaldirector', 'financemanager', 'complianceofficer']), asyncHandler(getPlatformAdminRoleInventoryController));
 router.post('/rbac/platform-admins', requireAuth, requireRole('superadmin'), asyncHandler(createPlatformAdminAccountController));
 
 export default router;

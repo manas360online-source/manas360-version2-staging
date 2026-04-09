@@ -202,6 +202,19 @@ export default function LoginPage() {
 						</Link>
 					</p>
 
+					<div className="mt-3 text-center">
+						<button
+							type="button"
+							className="text-calm-sage underline underline-offset-2 hover:text-wellness-text text-sm"
+							onClick={() => {
+								// Navigate to a corporate-specific hash for corporate login flows
+								window.location.hash = '/corporate';
+							}}
+						>
+							Corporate login
+						</button>
+					</div>
+
 					<div className="mt-10 pt-6 border-t border-gray-100">
 						<p className="text-[10px] uppercase font-bold text-gray-400 mb-4 text-center tracking-widest">
 							Developer Sandbox — Quick Admin Login
