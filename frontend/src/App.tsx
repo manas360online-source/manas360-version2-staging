@@ -48,6 +48,11 @@ const DailyCheckInPage = lazy(() => import('./pages/patient/DailyCheckInPage'));
 const HitASixerGamePage = lazy(() => import('./pages/patient/HitASixerGamePage'));
 const WalletPage = lazy(() => import('./pages/patient/WalletPage'));
 const GroupTherapySessionsPage = lazy(() => import('./pages/patient/GroupTherapySessionsPage'));
+const DigitalPetPage = lazy(() => import('./pages/patient/DigitalPetPage'));
+const TemboPage = lazy(() => import('./pages/patient/TemboPage'));
+const ChintuPage = lazy(() => import('./pages/ChintuPage'));
+const DinoPage = lazy(() => import('./pages/DinoPage'));
+const GoldenPupPage = lazy(() => import('./pages/GoldenPupPage'));
 const VideoSessionPage = lazy(() => import('./pages/shared/VideoSessionPage'));
 const AdminPortalLoginPage = lazy(() => import('./pages/admin/AdminPortalLoginPage'));
 const AdminDashboardPage = lazy(() => import('./pages/admin/Dashboard'));
@@ -263,6 +268,11 @@ function App() {
             <Route path="/how-it-works" element={<HowItWorksPage />} />
             <Route path="/my-digital-clinic" element={<MyDigitalClinicPage />} />
             <Route path="/clinic" element={<Navigate to="/my-digital-clinic" replace />} />
+            <Route path="/pet" element={<DigitalPetPage />} />
+            <Route path="/chintu" element={<ChintuPage />} />
+            <Route path="/dino" element={<DinoPage />} />
+            <Route path="/elephant" element={<TemboPage />} />
+            <Route path="/goldenPup" element={<GoldenPupPage />} />
             <Route path="/onboarding/name" element={<OnboardingName onNext={handleOnboardingName} />} />
             <Route path="/onboarding/email" element={<OnboardingEmail userName={userName} />} />
             
@@ -552,6 +562,9 @@ function App() {
               <Route path="wellness-library" element={<WellnessLibraryPage />} />
               <Route path="sleep-therapy" element={<SleepTherapyPage />} />
               <Route path="sound-therapy" element={<SoundTherapyPage />} />
+              <Route path="pet" element={<DigitalPetPage />} />
+              <Route path="chintu" element={<ChintuPage />} />
+              <Route path="dino" element={<DinoPage />} />
               <Route path="buddy/:mode" element={<BuddyChatPage />} />
               <Route path="provider-messages" element={<ProviderMessagesPage />} />
               <Route path="provider-messages/:providerId" element={<ProviderMessagesPage />} />
