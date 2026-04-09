@@ -21,6 +21,8 @@ export type UserRole =
 	| 'financemanager'
 	| 'complianceofficer';
 
+const normalizeRoleName = (value: unknown): UserRole => String(value || '').toLowerCase().replace(/[_\s-]/g, '') as UserRole;
+
 /**
  * Role hierarchy for logical grouping
  * Useful for future permission inheritance
@@ -78,10 +80,11 @@ const getRolePermissions = async (roleName: UserRole): Promise<string[]> => {
 		return cached.permissions;
 	}
 
-	const roleData = await db.role.findUnique({
-		where: { name: roleName },
-		select: { permissions: true },
-	});
+	const roleDataRows = (await db.$queryRawUnsafe(
+		'SELECT permissions FROM roles WHERE LOWER(name) = LOWER($1) LIMIT 1',
+		roleName,
+	)) as Array<{ permissions: string[] | null }>;
+	const roleData = roleDataRows[0] ?? null;
 
 	const permissions = roleData?.permissions || [];
 	
@@ -126,7 +129,7 @@ const getUserRole = async (userId: string): Promise<{ role: UserRole; isDeleted:
 	}
 
 	// Cache the result (map super_admin to superadmin for generic convention)
-	const cleanRole = String(user.role).toLowerCase().replace('_', '') as UserRole;
+	const cleanRole = normalizeRoleName(user.role);
 	roleCache.set(userId, {
 		role: cleanRole,
 		timestamp: Date.now(),
@@ -201,7 +204,8 @@ export const requireRole = (
 			}
 
 			// Check if user's role is in allowed roles (NO hierarchy escalation for single-role checks)
-			const isAllowedByExplicitRole = roles.includes(userDetails.role);
+			const isSuperAdminAccessingAdminRoute = userDetails.role === 'superadmin' && roles.includes('admin');
+			const isAllowedByExplicitRole = roles.includes(userDetails.role) || isSuperAdminAccessingAdminRoute;
 			if (!isAllowedByExplicitRole) {
 				// Log unauthorized attempt for security audit
 				console.warn(
@@ -299,7 +303,8 @@ export const requireCorporateMemberAccess = async (
 		}
 
 		const role = String(user.role).toLowerCase() as UserRole;
-		if (role === 'admin') {
+		const isPlatformAdmin = ['admin', 'superadmin', 'clinicaldirector', 'financemanager', 'complianceofficer'].includes(role);
+		if (isPlatformAdmin) {
 			if (!req.auth) {
 				req.auth = { userId: '', sessionId: '', jti: '' };
 			}

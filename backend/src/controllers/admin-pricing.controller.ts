@@ -4,6 +4,43 @@ import { io } from '../socket';
 import { randomUUID } from 'crypto';
 import { logger } from '../utils/logger';
 
+let pricingContractsSchemaInitPromise: Promise<void> | null = null;
+
+const ensurePricingContractsTable = async (): Promise<void> => {
+  if (!pricingContractsSchemaInitPromise) {
+    pricingContractsSchemaInitPromise = db.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "pricing_versions" (
+        "id" TEXT PRIMARY KEY,
+        "version" INTEGER NOT NULL DEFAULT 1,
+        "category" TEXT NOT NULL,
+        "pricing_data" JSONB NOT NULL,
+        "status" TEXT NOT NULL DEFAULT 'draft',
+        "description" TEXT,
+        "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "approved_by" TEXT,
+        "effective_from" TIMESTAMP(3),
+        "archived_at" TIMESTAMP(3)
+      );
+    `.then(async () => {
+      await db.$executeRaw`
+        CREATE INDEX IF NOT EXISTS "pricing_versions_category_status_idx"
+        ON "pricing_versions" ("category", "status");
+      `;
+
+      await db.$executeRaw`
+        CREATE INDEX IF NOT EXISTS "pricing_versions_created_at_idx"
+        ON "pricing_versions" ("created_at" DESC);
+      `;
+    }).catch((error) => {
+      pricingContractsSchemaInitPromise = null;
+      throw error;
+    });
+  }
+
+  await pricingContractsSchemaInitPromise;
+};
+
 /**
  * POST /api/v1/admin/pricing/free-toggle
  * Toggle global free sign-up period for new users.
@@ -152,6 +189,8 @@ export const waiveSubscriptionController = async (req: Request | any, res: Respo
  */
 export const getPricingContractsController = async (req: Request, res: Response) => {
   try {
+    await ensurePricingContractsTable();
+
     const contracts = await db.pricingVersion.findMany({
       orderBy: { createdAt: 'desc' }
     });
@@ -168,6 +207,8 @@ export const getPricingContractsController = async (req: Request, res: Response)
 export const createPricingDraftController = async (req: Request, res: Response) => {
   const { category, description, pricingData } = req.body;
   try {
+    await ensurePricingContractsTable();
+
     const lastVersion = await db.pricingVersion.findFirst({
       where: { category },
       orderBy: { version: 'desc' }
@@ -196,6 +237,8 @@ export const approvePricingContractController = async (req: Request | any, res: 
   const { id } = req.params;
   const adminId = req.auth?.userId || 'admin';
   try {
+    await ensurePricingContractsTable();
+
     const draft = await db.pricingVersion.findUnique({ where: { id } });
     if (!draft) return res.status(404).json({ success: false, message: 'Contract not found' });
     if (draft.status !== 'draft') return res.status(400).json({ success: false, message: 'Only drafts can be approved' });

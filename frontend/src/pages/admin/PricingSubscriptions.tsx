@@ -50,6 +50,7 @@ export default function PricingSubscriptions() {
   const [contracts, setContracts] = useState<PricingContract[]>([]);
   const [providerMetrics, setProviderMetrics] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  const [metricsLoading, setMetricsLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [selectedContract, setSelectedContract] = useState<PricingContract | null>(null);
 
@@ -61,11 +62,23 @@ export default function PricingSubscriptions() {
 
   const load = async () => {
     setLoading(true);
+    setMetricsLoading(true);
+
+    const providerMetricsPromise = getAdminProviderMetrics()
+      .then((result) => {
+        setProviderMetrics(result?.data || null);
+      })
+      .catch(() => {
+        setProviderMetrics(null);
+      })
+      .finally(() => {
+        setMetricsLoading(false);
+      });
+
     try {
-      const [pricingRes, contractsRes, providerRes] = await Promise.allSettled([
+      const [pricingRes, contractsRes] = await Promise.allSettled([
         getAdminPricingConfig(),
         getPricingContracts(),
-        getAdminProviderMetrics(),
       ]);
 
       if (pricingRes.status === 'fulfilled') {
@@ -101,15 +114,13 @@ export default function PricingSubscriptions() {
       if (contractsRes.status === 'fulfilled') {
         setContracts(contractsRes.value.data || []);
       }
-
-      if (providerRes.status === 'fulfilled') {
-        setProviderMetrics(providerRes.value.data || null);
-      }
     } catch (error) {
       toast.error('Failed to load pricing data');
     } finally {
       setLoading(false);
     }
+
+    await providerMetricsPromise;
   };
 
   useEffect(() => {
@@ -274,12 +285,12 @@ export default function PricingSubscriptions() {
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Card className="p-5">
           <p className="text-xs font-semibold uppercase tracking-wider text-ink-500">Provider Subscriptions</p>
-          <p className="mt-2 text-3xl font-bold text-ink-900">{activeProviders}</p>
+          <p className="mt-2 text-3xl font-bold text-ink-900">{metricsLoading ? '...' : activeProviders}</p>
           <p className="mt-1 text-xs text-ink-500">Active paid subscriptions</p>
         </Card>
         <Card className="p-5">
           <p className="text-xs font-semibold uppercase tracking-wider text-ink-500">Premium Providers</p>
-          <p className="mt-2 text-3xl font-bold text-ink-900">{premiumProviders}</p>
+          <p className="mt-2 text-3xl font-bold text-ink-900">{metricsLoading ? '...' : premiumProviders}</p>
           <p className="mt-1 text-xs text-ink-500">Providers on premium plans</p>
         </Card>
         <Card className="p-5">

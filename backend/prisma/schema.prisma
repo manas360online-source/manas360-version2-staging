@@ -79,6 +79,7 @@ model User {
   moodPredictions               MoodPrediction[]            @relation("UserMoodPredictions")
   notifications                 Notification[]
   patientInvoices               PatientInvoice[]
+  invoices                      Invoice[]                   @relation("UserInvoices")
   patient_pathway_state         patient_pathway_state?
   patientPaymentMethod          PatientPaymentMethod?
   patientProfile                PatientProfile?
@@ -1222,6 +1223,7 @@ model FinancialPayment {
   refunds               FinancialRefund[]      @relation("PaymentRefunds")
   revenueLedger         RevenueLedger[]        @relation("PaymentRevenueLedger")
   walletTransactions    WalletTransaction[]    @relation("PaymentWalletTransactions")
+  invoice               Invoice?               @relation("PaymentInvoice")
 
   @@index([sessionId, status])
   @@index([providerId, status])
@@ -1501,6 +1503,61 @@ model PatientInvoice {
 
   @@index([userId, createdAt])
   @@map("patient_invoices")
+}
+
+model InvoiceSequence {
+  year         Int      @id
+  lastSequence Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("invoice_sequences")
+}
+
+model Invoice {
+  id                   String            @id @default(uuid())
+  paymentId            String            @unique
+  paymentTransactionId  String            @unique
+  userId               String
+  invoiceNumber        String            @unique
+  invoiceYear          Int
+  sequenceNumber       Int
+  companyName          String            @default("MANAS360")
+  companyGstin         String?
+  companyAddress       Json?
+  customerName         String
+  customerEmail        String?
+  customerPhone        String?
+  customerGstin        String?
+  billingAddress       Json?
+  currency             String            @default("INR")
+  items                Json
+  subtotalMinor        BigInt
+  gstRate              Int               @default(18)
+  cgstMinor            BigInt
+  sgstMinor            BigInt
+  gstAmountMinor       BigInt
+  totalMinor           BigInt
+  status               String            @default("GENERATED")
+  retryCount           Int               @default(0)
+  pdfPath              String?
+  htmlPath             String?
+  emailedTo            String?
+  emailedAt            DateTime?
+  sentAt               DateTime?
+  failedAt             DateTime?
+  deliveryError        String?
+  metadata             Json?
+  issuedAt             DateTime          @default(now())
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  payment              FinancialPayment   @relation("PaymentInvoice", fields: [paymentId], references: [id], onDelete: Cascade)
+  customer             User              @relation("UserInvoices", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([paymentTransactionId])
+  @@index([status, createdAt])
+  @@map("invoices")
 }
 
 model PatientExercise {

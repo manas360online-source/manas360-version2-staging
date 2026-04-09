@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { getApiErrorMessage, signupWithPhone, verifyPhoneSignupOtp, login } from '../../api/auth';
+import { getApiErrorMessage, signupWithPhone, verifyPhoneSignupOtp } from '../../api/auth';
 import { patientApi } from '../../api/patient';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
@@ -29,9 +29,6 @@ export default function LoginPage() {
 	const [otpSent, setOtpSent] = useState(false);
 	const [devOtp, setDevOtp] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
-	const [loginMode, setLoginMode] = useState<'phone' | 'platform'>('phone');
-	const [identifier, setIdentifier] = useState('');
-	const [password, setPassword] = useState('');
 	const [error, setError] = useState<string | null>(null);
 	const adminPortalLogin = '/admin-portal/login';
 
@@ -136,22 +133,6 @@ export default function LoginPage() {
 		}
 	};
 
-	const platformLogin = async () => {
-		setError(null);
-		setLoading(true);
-		try {
-			await login({ identifier: identifier.trim(), password: password.trim() });
-			await checkAuth({ force: true });
-			const candidate = from || afterLogin || next || null;
-			const postLoginRoute = await resolvePostLoginRouteWithSubscription(candidate, undefined);
-			navigate(postLoginRoute, { replace: true });
-		} catch (err) {
-			setError(getApiErrorMessage(err, 'Login failed'));
-		} finally {
-			setLoading(false);
-		}
-	};
-
 	return (
 		<div className="responsive-page">
 			<div className="responsive-container py-6 sm:py-10">
@@ -164,50 +145,7 @@ export default function LoginPage() {
 					<h1 className="text-2xl font-semibold text-wellness-text sm:text-3xl">Welcome back</h1>
 					<p className="mt-2 text-sm text-wellness-muted sm:text-base">Login with your phone number and OTP.</p>
 
-					<div className="mt-4">
-						<div className="flex items-center gap-2">
-							<button
-								className={`px-3 py-1 rounded-full ${loginMode === 'phone' ? 'bg-calm-sage text-white' : 'bg-transparent text-wellness-text border border-transparent'}`}
-								onClick={() => setLoginMode('phone')}
-							>
-								Phone (Corporate)
-							</button>
-							<button
-								className={`px-3 py-1 rounded-full ${loginMode === 'platform' ? 'bg-calm-sage text-white' : 'bg-transparent text-wellness-text border border-transparent'}`}
-								onClick={() => setLoginMode('platform')}
-							>
-								Platform Admin
-							</button>
-						</div>
-					</div>
-
 					<div className="mt-6 space-y-4">
-						{loginMode === 'platform' ? (
-							<>
-								<Input
-									id="login-email"
-									label="Email"
-									type="email"
-									placeholder="admin@manas360.local"
-									value={identifier}
-									onChange={(e) => setIdentifier(e.target.value)}
-									required
-								/>
-								<Input
-									id="login-password"
-									label="Password"
-									type="password"
-									placeholder="Password"
-									value={password}
-									onChange={(e) => setPassword(e.target.value)}
-									required
-								/>
-
-								<Button type="button" fullWidth loading={loading} className="min-h-[48px]" onClick={platformLogin}>
-									{loading ? 'Logging in...' : 'Login as Platform Admin'}
-								</Button>
-							</>
-						) : (
 						<Input
 							id="login-phone"
 							label="Phone Number"
@@ -234,16 +172,15 @@ export default function LoginPage() {
 							/>
 						) : null}
 
-								{!otpSent ? (
-									<Button type="button" fullWidth loading={loading} className="min-h-[48px]" onClick={requestOtp}>
-										{loading ? 'Sending OTP...' : 'Send OTP'}
-									</Button>
-								) : (
-									<Button type="button" fullWidth loading={loading} className="min-h-[48px]" onClick={verifyOtp}>
-										{loading ? 'Verifying OTP...' : 'Verify OTP and Login'}
-									</Button>
-								)}
-							)
+						{!otpSent ? (
+							<Button type="button" fullWidth loading={loading} className="min-h-[48px]" onClick={requestOtp}>
+								{loading ? 'Sending OTP...' : 'Send OTP'}
+							</Button>
+						) : (
+							<Button type="button" fullWidth loading={loading} className="min-h-[48px]" onClick={verifyOtp}>
+								{loading ? 'Verifying OTP...' : 'Verify OTP and Login'}
+							</Button>
+						)}
 					</div>
 
 					{devOtp ? (
@@ -264,6 +201,19 @@ export default function LoginPage() {
 							Register here
 						</Link>
 					</p>
+
+					<div className="mt-3 text-center">
+						<button
+							type="button"
+							className="text-calm-sage underline underline-offset-2 hover:text-wellness-text text-sm"
+							onClick={() => {
+								// Navigate to a corporate-specific hash for corporate login flows
+								window.location.hash = '/corporate';
+							}}
+						>
+							Corporate login
+						</button>
+					</div>
 
 					<div className="mt-10 pt-6 border-t border-gray-100">
 						<p className="text-[10px] uppercase font-bold text-gray-400 mb-4 text-center tracking-widest">

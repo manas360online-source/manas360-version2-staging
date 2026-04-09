@@ -78,6 +78,7 @@ const PricingSubscriptionsPage = lazy(() => import('./pages/admin/PricingSubscri
 const CrisisConsole = lazy(() => import('./pages/admin/CrisisConsole'));
 const AuditTrail = lazy(() => import('./pages/admin/AuditTrail'));
 const GroupManagement = lazy(() => import('./pages/admin/GroupManagement'));
+const QrCodeManager = lazy(() => import('./pages/admin/QrCodeManager'));
 const TherapistPerformance = lazy(() => import('./pages/admin/TherapistPerformance'));
 const SessionAnalytics = lazy(() => import('./pages/admin/SessionAnalytics'));
 const UserGrowthAnalytics = lazy(() => import('./pages/admin/UserGrowthAnalytics'));
@@ -491,6 +492,7 @@ function App() {
                 <Route path="crisis-console" element={<CrisisConsole />} />
                 <Route path="audit-trail" element={<AuditTrail />} />
                 <Route path="groups" element={<GroupManagement />} />
+                <Route path="qr-codes" element={<QrCodeManager />} />
                 <Route path="roles" element={<RoleManagement />} />
                 <Route path="feedback" element={<AdminSectionPage title="Feedback" description="Collect and analyze user and provider feedback loops for product quality." bullets={['NPS and CSAT trends', 'Feedback themes', 'Feature request clusters', 'Escalation tagging']} />} />
                 <Route path="audit-logs" element={<AuditTrail />} />

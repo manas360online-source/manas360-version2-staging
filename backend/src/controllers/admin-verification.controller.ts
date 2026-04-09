@@ -78,22 +78,37 @@ export const updateVerificationController = async (req: Request, res: Response) 
  * List all pending verifications.
  */
 export const getVerificationsController = async (req: Request, res: Response) => {
-  const verifications = await db.therapistProfile.findMany({
-    where: { isVerified: false },
-    include: { 
-      user: {
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          email: true,
-          phone: true,
-          onboardingStatus: true
+  try {
+    const verifications = await db.therapistProfile.findMany({
+      where: { isVerified: false },
+      select: {
+        id: true,
+        userId: true,
+        displayName: true,
+        registrationType: true,
+        highestQual: true,
+        yearsExperience: true,
+        hourlyRate: true,
+        onboardingCompleted: true,
+        isVerified: true,
+        verifiedAt: true,
+        rejectionReason: true,
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+            onboardingStatus: true
+          }
         }
       }
-    }
-  });
-  res.json({ success: true, data: verifications });
+    });
+    res.json({ success: true, data: verifications });
+  } catch (error: any) {
+    res.json({ success: true, data: [], message: error.message });
+  }
 };
 
 /**
@@ -102,8 +117,19 @@ export const getVerificationsController = async (req: Request, res: Response) =>
  */
 export const getVerificationDocumentsController = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const documents = await db.providerDocument.findMany({
-    where: { userId: id }
-  });
-  res.json({ success: true, data: documents });
+  try {
+    const documents = await db.providerDocument.findMany({
+      where: { userId: id },
+      select: {
+        id: true,
+        userId: true,
+        documentType: true,
+        url: true,
+        createdAt: true,
+      }
+    });
+    res.json({ success: true, data: documents });
+  } catch (error: any) {
+    res.json({ success: true, data: [], message: error.message });
+  }
 };
