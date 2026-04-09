@@ -236,10 +236,15 @@ export const triggerZohoFlow = async (event: string, payload: any) => {
   }
   
   try {
+    // Flatten payload keys at top-level for easier Zoho Decision mapping,
+    // while preserving the nested data object for backward compatibility.
+    const safePayload = payload && typeof payload === 'object' && !Array.isArray(payload) ? payload : { value: payload };
     await axios.post(ZOHO_FLOW_WEBHOOK_URL, {
       event,
-      data: payload,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      source: 'MANAS360',
+      ...safePayload,
+      data: safePayload,
     });
     logger.info(`[ZohoFlow] Event triggered: ${event}`);
   } catch (err: any) {

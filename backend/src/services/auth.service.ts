@@ -386,6 +386,15 @@ export const registerProviderProfile = async (userId: string, input: ProviderReg
 		userType: toWhatsAppUserType(userRole),
 		templateVariables: { displayName: profile.profile.displayName },
 		language: 'en',
+		flowEvent: 'USER_REGISTERED',
+		flowRole: String(profile.role || '').toUpperCase(),
+		flowData: {
+			userId: String(profile.profile.userId || ''),
+			name: String(profile.profile.displayName || ''),
+			specialization: Array.isArray((profile.profile as any).specializations)
+				? String((profile.profile as any).specializations[0] || '')
+				: '',
+		},
 	}).catch((err) => {
 		console.error('[Auth] Failed to send WhatsApp provider welcome message:', err.message);
 	});
@@ -451,6 +460,12 @@ export const registerWithPhone = async (input: RegisterPhoneInput) => {
 		userType: 'user',
 		templateVariables: { otp },
 		language: 'en',
+		flowEvent: 'USER_REGISTERED',
+		flowRole: String(role || 'PATIENT').toUpperCase(),
+		flowData: {
+			userId: String(user.id),
+			name: trimmedName || 'User',
+		},
 	}).catch((err) => {
 		console.error('[Auth] Failed to send WhatsApp OTP:', err.message);
 	});
@@ -565,6 +580,13 @@ export const verifyPhoneOtp = async (input: VerifyPhoneOtpInput, meta: RequestMe
 			userType: toWhatsAppUserType(userRole),
 			templateVariables: { name: user.email?.split('@')[0] || 'User' },
 			language: 'en',
+			flowEvent: 'USER_REGISTERED',
+			flowRole: String(user.role || '').toUpperCase(),
+			flowData: {
+				userId: String(user.id),
+				name: String(user.email?.split('@')[0] || 'User'),
+				email: String(user.email || ''),
+			},
 		}).catch((err) => {
 			console.error('[Auth] Failed to send WhatsApp welcome message:', err.message);
 		});
@@ -632,12 +654,14 @@ export const loginWithPassword = async (input: LoginInput, meta: RequestMeta) =>
 	}
 
 	const isPlatformAdmin = await isPlatformAdminAccount({ id: String(user.id), role: String(user.role || '') });
-	if (!isPlatformAdmin) {
+	const companyMeta = await getCompanyAdminMeta(String(user.id));
+	const hasCorporateAccess = Boolean(companyMeta.company_key) || Boolean(companyMeta.is_company_admin);
+	if (!isPlatformAdmin && !hasCorporateAccess) {
 		await audit('LOGIN_BLOCKED_NON_ADMIN_PASSWORD', 'failure', meta, { userId: user.id, phone: user.phone, email: user.email });
 		throw new AppError('Use phone OTP login for this account', 403);
 	}
 	if (!input.identifier.includes('@')) {
-		throw new AppError('Platform admin login requires email identifier', 400);
+		throw new AppError('Email identifier is required for admin/corporate login', 400);
 	}
 
 	if (user.isDeleted) {

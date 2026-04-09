@@ -200,17 +200,13 @@ export const requireRole = (
 				return;
 			}
 
-			// Check if user's role is in allowed roles OR satisfies hierarchy
-			const userRank = roleHierarchy[userDetails.role] || 0;
+			// Check if user's role is in allowed roles (NO hierarchy escalation for single-role checks)
 			const isAllowedByExplicitRole = roles.includes(userDetails.role);
-			const isAllowedByHierarchy = roles.some(role => userRank >= (roleHierarchy[role] || 0));
-
-			if (!isAllowedByExplicitRole && !isAllowedByHierarchy) {
+			if (!isAllowedByExplicitRole) {
 				// Log unauthorized attempt for security audit
 				console.warn(
-					`[RBAC] Access denied - userId: ${userId}, userRole: ${userDetails.role}, requiredRoles: ${roles.join(',')}, rank: ${userRank}`,
+					`[RBAC] Access denied - userId: ${userId}, userRole: ${userDetails.role}, requiredRoles: ${roles.join(',')}`,
 				);
-
 				next(
 					new AppError(
 						`Access denied. Required role(s): ${roles.join(' or ')}. Your role: ${userDetails.role}`,

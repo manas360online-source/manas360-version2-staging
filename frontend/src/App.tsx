@@ -466,7 +466,7 @@ function App() {
                 <Route path="therapist-verification" element={<TherapistVerification />} />
                 <Route path="pending-providers" element={<AdminPendingProvidersPage />} />
                 <Route path="users" element={<AdminUsersPage />} />
-                <Route path="roles" element={<AdminRolesPage />} />
+                {/* Removed duplicate legacy AdminRolesPage route. Only RoleManagement is active. */}
                 <Route path="companies" element={<AdminCompaniesPage />} />
                 <Route path="company-subscriptions" element={<AdminCompanySubscriptionsPage />} />
                 <Route path="company-reports" element={<AdminReportsPage />} />

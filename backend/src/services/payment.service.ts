@@ -280,6 +280,13 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 							planName: 'Session Payment',
 							expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-IN'),
 						},
+						flowEvent: 'PAYMENT_SUCCESS',
+						flowRole: 'PATIENT',
+						flowData: {
+							userId: String(capturedPayment.patientId || ''),
+							name: String(patientUser.name || 'User'),
+							amount: `₹${(capturedAmountMinor / 100).toFixed(2)}`,
+						},
 					}).catch((err) => console.error('[Payment] Failed to send payment_success WhatsApp:', err.message));
 				}
 			}
@@ -395,6 +402,13 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 							amount: `₹${(Number(payment.amountMinor || 0) / 100).toFixed(2)}`,
 							planName: String(planKey || 'Subscription Plan'),
 							expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-IN'),
+						},
+						flowEvent: 'PAYMENT_SUCCESS',
+						flowRole: 'PATIENT',
+						flowData: {
+							userId,
+							name: String(patientUser.name || 'User'),
+							amount: `₹${(Number(payment.amountMinor || 0) / 100).toFixed(2)}`,
 						},
 					}).catch((err) => console.error('[Payment] Failed to send subscription payment_success WhatsApp:', err.message));
 				}
@@ -566,6 +580,13 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 							amount: `₹${(Number(payment.amountMinor || 0) / 100).toFixed(2)}`,
 							planName: String(planKey || 'Subscription Plan'),
 							expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-IN'),
+						},
+						flowEvent: 'PAYMENT_SUCCESS',
+						flowRole: 'THERAPIST',
+						flowData: {
+							userId: providerId,
+							name: String(providerUser.name || 'Provider'),
+							amount: `₹${(Number(payment.amountMinor || 0) / 100).toFixed(2)}`,
 						},
 					}).catch((err) => console.error('[Payment] Failed to send provider subscription payment_success WhatsApp:', err.message));
 				}

@@ -242,6 +242,17 @@ export const bookPatientSession = async (userId: string, input: BookSessionInput
 				sessionLink: `https://manas360.com/session/${String(session.id)}`,
 				appUrl: 'https://manas360.com',
 			},
+			flowEvent: 'SESSION_BOOKED',
+			flowRole: 'PATIENT',
+			flowData: {
+				userId: String(userId),
+				name: String(patientProfile.name || 'Patient'),
+				therapistName: String(therapist.name || therapist.firstName || 'Your Therapist'),
+				date: input.dateTime.toLocaleDateString('en-IN'),
+				time: input.dateTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+				meetingLink: `https://manas360.com/session/${String(session.id)}`,
+				detailsLink: 'https://manas360.com',
+			},
 		}).catch((err) => console.error('[Session] Failed to send booking_confirmed WhatsApp:', err.message));
 	}
 
@@ -261,6 +272,16 @@ export const bookPatientSession = async (userId: string, input: BookSessionInput
 				appointmentTime: input.dateTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
 				sessionLink: `https://manas360.com/session/${String(session.id)}`,
 				dashboardLink: 'https://manas360.com/therapist-dashboard',
+			},
+			flowEvent: 'SESSION_BOOKED',
+			flowRole: String(therapist.role || 'THERAPIST').toUpperCase(),
+			flowData: {
+				userId: String(therapist.id),
+				name: String(therapist.name || therapist.firstName || 'Therapist'),
+				date: input.dateTime.toLocaleDateString('en-IN'),
+				time: input.dateTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+				meetingLink: `https://manas360.com/session/${String(session.id)}`,
+				detailsLink: 'https://manas360.com/therapist-dashboard',
 			},
 		}).catch((err) => console.error('[Session] Failed to send booking_confirmed WhatsApp to therapist:', err.message));
 	}
@@ -753,6 +774,15 @@ export const updateMyTherapistSessionStatus = async (
 					sessionDate: sessionData.dateTime.toLocaleDateString('en-IN'),
 					feedbackUrl: `https://manas360.com/session/${String(updated.id)}/feedback`,
 					nextSessionDate: 'Coming soon',
+				},
+				flowEvent: 'SESSION_FOLLOWUP',
+				flowRole: 'PATIENT',
+				flowData: {
+					userId: String(sessionData.patientProfile.userId || ''),
+					name: String(sessionData.patientProfile.user.name || 'User'),
+					therapistName: String(sessionData.therapistProfile?.displayName || 'Your Therapist'),
+					date: sessionData.dateTime.toLocaleDateString('en-IN'),
+					detailsLink: `https://manas360.com/session/${String(updated.id)}/feedback`,
 				},
 			}).catch((err) => console.error('[Session] Failed to send session_followup WhatsApp:', err.message));
 		}
