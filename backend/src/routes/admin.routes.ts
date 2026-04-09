@@ -228,7 +228,7 @@ router.get('/screening/provider-questions', requireAuth, requireRole('admin'), a
 router.get('/modules/:module/summary', requireAuth, requireRole('admin'), asyncHandler(getAdminModuleSummaryController));
 
 // ==================== DASHBOARD & CORE ====================
-router.get('/analytics/health', requireAuth, requireRole('admin'), asyncHandler(getAdminSystemHealthController));
+// Removed duplicate analytics/health route. Only permission-guarded version remains below.
 router.get('/company-reports', requireAuth, requireRole(['admin', 'superadmin']), asyncHandler(getAdminCompanyReportsController));
 router.get('/analytics/bi-summary', requireAuth, requireRole(['admin', 'superadmin']), asyncHandler(getAdminBICorporateSummaryController));
 router.get('/analytics/therapist-performance', requireAuth, requireRole(['admin', 'superadmin']), asyncHandler(getAdminTherapistPerformanceController));

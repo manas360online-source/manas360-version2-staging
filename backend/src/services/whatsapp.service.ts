@@ -29,19 +29,49 @@ export type WhatsAppTemplateType =
 export type WhatsAppUserType = 'patient' | 'therapist' | 'psychiatrist' | 'psychologist' | 'coach' | 'user';
 
 interface WhatsAppMessageInput {
-	phoneNumber: string; // E.164 format: +919876543210
+	phoneNumber: string; // Normalized for WATI: 919876543210
 	templateType: WhatsAppTemplateType;
 	userType: WhatsAppUserType;
 	templateVariables?: Record<string, string>; // Variables to substitute in template
 	language?: string; // Language code, default 'en'
+	flowEvent?: string;
+	flowRole?: string;
+	flowData?: {
+		userId?: string;
+		name?: string;
+		email?: string;
+		therapistName?: string;
+		date?: string;
+		time?: string;
+		meetingLink?: string;
+		detailsLink?: string;
+		amount?: string;
+		certificateName?: string;
+		specialization?: string;
+		clinicalType?: string;
+	};
 }
 
 interface WhatsAppZohoFlowPayload {
 	event: string;
+	role: string;
 	timestamp: string;
 	source: string;
 	data: {
+		userId?: string;
+		phone: string;
 		phoneNumber: string;
+		name?: string;
+		email?: string;
+		therapistName?: string;
+		date?: string;
+		time?: string;
+		meetingLink?: string;
+		detailsLink?: string;
+		amount?: string;
+		certificateName?: string;
+		specialization?: string;
+		clinicalType?: string;
 		templateName: string;
 		templateType: string;
 		userType: string;
@@ -49,6 +79,95 @@ interface WhatsAppZohoFlowPayload {
 		language: string;
 	};
 }
+
+const normalizeWatiPhoneNumber = (phoneNumber: string) => {
+	const digits = String(phoneNumber || '').replace(/\D/g, '');
+	if (!digits) return '';
+	if (digits.startsWith('91') && digits.length >= 12) return digits;
+	if (digits.length === 10) return `91${digits}`;
+	if (digits.startsWith('91')) return digits;
+	return digits;
+};
+
+const getFirstNonEmpty = (...values: Array<string | undefined>) =>
+	values.map((value) => String(value || '').trim()).find((value) => Boolean(value)) || '';
+
+const resolveFlowEvent = (templateType: WhatsAppTemplateType): string => {
+	switch (templateType) {
+		case 'user_welcome':
+		case 'provider_welcome':
+		case 'user_otp_login':
+			return 'USER_REGISTERED';
+		case 'booking_confirmed':
+		case 'booking_reminder_24h':
+		case 'booking_reminder_2h':
+			return 'SESSION_BOOKED';
+		case 'session_followup':
+			return 'SESSION_FOLLOWUP';
+		case 'payment_success':
+			return 'PAYMENT_SUCCESS';
+		case 'payment_failed':
+			return 'PAYMENT_FAILED';
+		case 'subscription_expiry_7d':
+		case 'subscription_expiry_1d':
+		case 'subscription_renewed':
+			return 'SUBSCRIPTION_EVENT';
+		case 'refund_processed':
+			return 'REFUND_PROCESSED';
+		case 'clinical_results_ready':
+			return 'CLINICAL_EVENT';
+		case 'treatment_plan_updated':
+			return 'TREATMENT_PLAN_UPDATED';
+		case 'report_uploaded':
+			return 'REPORT_UPLOADED';
+		case 'prescription_issued':
+			return 'PRESCRIPTION_ISSUED';
+		case 'therapist_note_shared':
+			return 'THERAPIST_NOTE_SHARED';
+		case 'therapist_message':
+			return 'THERAPIST_MESSAGE';
+		case 'clinical_notes_updated':
+			return 'CLINICAL_NOTES_UPDATED';
+		default:
+			return 'WHATSAPP_MESSAGE_SENT';
+	}
+};
+
+const buildFlowData = (input: WhatsAppMessageInput, templateName: string, normalizedPhone: string) => {
+	const variables = input.templateVariables || {};
+	const explicit = input.flowData || {};
+	const name = getFirstNonEmpty(
+		explicit.name,
+		variables.name,
+		variables.displayName,
+		variables.patientName,
+		variables.userName,
+		variables.recipientName,
+		'User',
+	);
+
+	return {
+		userId: getFirstNonEmpty(explicit.userId, variables.userId),
+		phone: normalizedPhone,
+		phoneNumber: normalizedPhone,
+		name,
+		email: getFirstNonEmpty(explicit.email, variables.email),
+		therapistName: getFirstNonEmpty(explicit.therapistName, variables.therapistName),
+		date: getFirstNonEmpty(explicit.date, variables.date, variables.appointmentDate, variables.sessionDate),
+		time: getFirstNonEmpty(explicit.time, variables.time, variables.appointmentTime),
+		meetingLink: getFirstNonEmpty(explicit.meetingLink, variables.meetingLink, variables.sessionLink),
+		detailsLink: getFirstNonEmpty(explicit.detailsLink, variables.detailsLink, variables.appUrl, variables.dashboardLink, variables.feedbackUrl),
+		amount: getFirstNonEmpty(explicit.amount, variables.amount),
+		certificateName: getFirstNonEmpty(explicit.certificateName, variables.certificateName),
+		specialization: getFirstNonEmpty(explicit.specialization, variables.specialization),
+		clinicalType: getFirstNonEmpty(explicit.clinicalType, variables.clinicalType),
+		templateName,
+		templateType: input.templateType,
+		userType: input.userType,
+		variables,
+		language: input.language || 'en',
+	};
+};
 
 /**
  * WhatsApp template definitions for each user type.
@@ -225,9 +344,9 @@ export const sendWhatsAppMessage = async (input: WhatsAppMessageInput): Promise<
 	}
 
 	// Validate phone number
-	const phone = String(input.phoneNumber || '').trim();
-	if (!phone.startsWith('+')) {
-		console.warn('[WhatsApp] Invalid phone number format (must be E.164 +country code):', phone);
+	const phone = normalizeWatiPhoneNumber(input.phoneNumber);
+	if (!phone) {
+		console.warn('[WhatsApp] Invalid phone number format:', input.phoneNumber);
 		return;
 	}
 
@@ -239,17 +358,15 @@ export const sendWhatsAppMessage = async (input: WhatsAppMessageInput): Promise<
 	}
 
 	// Build Zoho Flow payload
+	const flowEvent = String(input.flowEvent || '').trim() || resolveFlowEvent(input.templateType);
 	const payload: WhatsAppZohoFlowPayload = {
-		event: 'whatsapp_message_send',
+		event: flowEvent,
+		role: String(input.flowRole || '').trim() || input.userType.toUpperCase(),
 		timestamp: new Date().toISOString(),
 		source: 'MANAS360',
 		data: {
-			phoneNumber: phone,
+			...buildFlowData(input, templateDef.templateName, phone),
 			templateName: templateDef.templateName,
-			templateType: input.templateType,
-			userType: input.userType,
-			variables: input.templateVariables || {},
-			language: input.language || 'en',
 		},
 	};
 
