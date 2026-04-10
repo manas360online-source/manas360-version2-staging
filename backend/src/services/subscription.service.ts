@@ -3,6 +3,7 @@ import { createClient } from 'redis';
 import { env } from '../config/env';
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/error.middleware';
+import { sendWhatsAppMessage } from './whatsapp.service';
 
 const db = prisma as any;
 const redis = createClient({
@@ -177,6 +178,39 @@ export const processSubscriptionWebhook = async (
 					subscriptionId: sub.id,
 				},
 			});
+
+			// Emit WhatsApp subscription renewal event
+			try {
+				const user = await tx.user.findUnique({
+					where: { id: sub.userId },
+					select: { phone: true, name: true },
+				});
+
+				if (user?.phone) {
+					const planDisplay = sub.plan.charAt(0) + sub.plan.slice(1).toLowerCase();
+					const amountDisplay = (payment.amountMinor / 100).toFixed(2);
+
+					await sendWhatsAppMessage({
+						phoneNumber: user.phone,
+						templateType: 'subscription_renewed',
+						userType: 'user',
+						templateVariables: {
+							plan_name: planDisplay,
+							amount: amountDisplay,
+							currency: payment.currency,
+							next_billing_date: nextBillingDate.toLocaleDateString('en-US', {
+								year: 'numeric',
+								month: 'long',
+								day: 'numeric',
+							}),
+							user_name: user.name || 'User'
+						},
+					});
+				}
+			} catch (error) {
+				console.error('[subscription.service] Failed to emit WhatsApp subscription renewal event:', error);
+				// Don't fail the payment if WhatsApp emission fails
+			}
 		} else if (
 			transactionStatus === 'FAILED' ||
 			transactionStatus === 'DECLINED' ||
@@ -193,6 +227,35 @@ export const processSubscriptionWebhook = async (
 					},
 				},
 			});
+
+			// Emit WhatsApp subscription payment failure event
+			try {
+				const user = await tx.user.findUnique({
+					where: { id: sub.userId },
+					select: { phone: true, name: true },
+				});
+
+				if (user?.phone) {
+					const failureReason =
+						event?.data?.failureReason ||
+						(transactionStatus === 'DECLINED' ? 'Card declined' : 'Payment processing failed');
+
+					await sendWhatsAppMessage({
+						phoneNumber: user.phone,
+						templateType: 'payment_failed',
+						userType: 'user',
+						templateVariables: {
+							plan_name: sub.plan.charAt(0) + sub.plan.slice(1).toLowerCase(),
+							failure_reason: failureReason,
+							user_name: user.name || 'User',
+							action_link: `${process.env.APP_URL || 'https://manas360.io'}/subscription/retry?id=${sub.id}`
+						},
+					});
+				}
+			} catch (error) {
+				console.error('[subscription.service] Failed to emit WhatsApp payment failure event:', error);
+				// Don't fail the update if WhatsApp emission fails
+			}
 		} else if (transactionStatus === 'PENDING') {
 			// Keep subscription in PENDING state for authorization
 			await tx.marketplaceSubscription.update({

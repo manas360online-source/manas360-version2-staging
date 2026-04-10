@@ -373,60 +373,112 @@ export class AdminAnalyticsService {
 	}
 
 	async getSystemHealthMetrics() {
-		try {
-			const [activeSessions, activeSubscriptions, totalTherapists, failedLeadPayments, failedSessionPayments, pendingPayments, expiredSubscriptions] = await Promise.all([
-				prisma.therapySession.count({ where: { status: 'CONFIRMED' } }),
-				prisma.patientSubscription.count({ where: { status: 'active' } }),
-				prisma.user.count({ where: { role: { in: ['THERAPIST', 'PSYCHOLOGIST', 'PSYCHIATRIST', 'COACH'] as any }, isDeleted: false } }),
-				prisma.leadPurchase.count({ where: { status: 'failed' } }),
-				prisma.financialPayment.count({ where: { status: 'FAILED' } }),
-				prisma.financialPayment.count({ where: { status: 'PENDING_CAPTURE' } }),
-				prisma.providerSubscription.count({
-					where: { status: 'active', expiryDate: { lt: new Date() } }
-				}),
-			]);
+		const startedAt = Date.now();
+		const warnings: string[] = [];
 
-			return {
-				overall: 'Healthy',
-				latencyMs: Math.floor(Math.random() * 40) + 10,
-				uptimePercent: 99.98,
-				activeSessions,
-				activeSubscriptions,
-				totalTherapists,
-				failedPayments: failedLeadPayments + failedSessionPayments,
-				pendingPayments,
-				expiredSubscriptions,
-				services: {
-					backend: 'Healthy',
-					database: 'Healthy',
-					redis: 'Healthy',
-					zohoDesk: 'Healthy',
-					phonePe: 'Healthy',
-				},
-				lastChecked: new Date().toISOString(),
-			};
+		const dbProbeStartedAt = Date.now();
+		let dbProbeMs: number | null = null;
+		let dbHealthy = true;
+		try {
+			await prisma.$queryRawUnsafe('SELECT 1');
+			dbProbeMs = Date.now() - dbProbeStartedAt;
 		} catch {
-			// Return a minimal health object so the dashboard doesn't crash
-			return {
-				overall: 'Healthy',
-				latencyMs: 15,
-				uptimePercent: 99.98,
-				activeSessions: 0,
-				activeSubscriptions: 0,
-				totalTherapists: 0,
-				failedPayments: 0,
-				pendingPayments: 0,
-				expiredSubscriptions: 0,
-				services: {
-					backend: 'Healthy',
-					database: 'Healthy',
-					redis: 'Healthy',
-					zohoDesk: 'Unknown',
-					phonePe: 'Unknown',
-				},
-				lastChecked: new Date().toISOString(),
-			};
+			dbHealthy = false;
+			warnings.push('Database probe failed');
 		}
+
+		const metricResults = await Promise.allSettled([
+			prisma.therapySession.count({ where: { status: 'CONFIRMED' } }),
+			prisma.patientSubscription.count({ where: { status: 'active' } }),
+			prisma.user.count({ where: { role: { in: ['THERAPIST', 'PSYCHOLOGIST', 'PSYCHIATRIST', 'COACH'] as any }, isDeleted: false } }),
+			prisma.leadPurchase.count({ where: { status: 'failed' } }),
+			prisma.financialPayment.count({ where: { status: 'FAILED' } }),
+			prisma.financialPayment.count({ where: { status: 'PENDING_CAPTURE' } }),
+			prisma.providerSubscription.count({
+				where: { status: 'active', expiryDate: { lt: new Date() } },
+			}),
+		]);
+
+		const readMetric = (index: number, metricName: string): number => {
+			const result = metricResults[index];
+			if (result.status === 'fulfilled') {
+				return Number(result.value || 0);
+			}
+			warnings.push(`${metricName} unavailable`);
+			return 0;
+		};
+
+		const activeSessions = readMetric(0, 'Active sessions');
+		const activeSubscriptions = readMetric(1, 'Active subscriptions');
+		const totalTherapists = readMetric(2, 'Total therapists');
+		const failedLeadPayments = readMetric(3, 'Lead payment failures');
+		const failedSessionPayments = readMetric(4, 'Session payment failures');
+		const pendingPayments = readMetric(5, 'Pending payments');
+		const expiredSubscriptions = readMetric(6, 'Expired subscriptions');
+
+		let queuedExports = 0;
+		let failedExports24h = 0;
+		try {
+			queuedExports = await prisma.$queryRawUnsafe(
+				`SELECT COUNT(*)::int AS count
+				 FROM analytics.report_export_job
+				 WHERE status IN ('queued', 'processing')`,
+			).then((rows: any) => Number(rows?.[0]?.count || 0));
+
+			failedExports24h = await prisma.$queryRawUnsafe(
+				`SELECT COUNT(*)::int AS count
+				 FROM analytics.report_export_job
+				 WHERE status = 'failed'
+				   AND created_at >= NOW() - INTERVAL '24 hours'`,
+			).then((rows: any) => Number(rows?.[0]?.count || 0));
+		} catch {
+			queuedExports = -1;
+			failedExports24h = -1;
+			warnings.push('Analytics export queue metrics unavailable');
+		}
+
+		const latencyMs = Date.now() - startedAt;
+		const backendStatus = latencyMs <= 250 ? 'Healthy' : latencyMs <= 500 ? 'Degraded' : 'Unhealthy';
+		const databaseStatus = dbHealthy && (dbProbeMs ?? 9999) <= 200 ? 'Healthy' : dbHealthy ? 'Degraded' : 'Unhealthy';
+		const queueStatus = queuedExports < 0
+			? 'Unknown'
+			: queuedExports > 100 || failedExports24h > 20
+				? 'Degraded'
+				: 'Healthy';
+
+		const serviceStatuses = [backendStatus, databaseStatus, queueStatus];
+		const overall = serviceStatuses.includes('Unhealthy')
+			? 'Critical'
+			: serviceStatuses.includes('Degraded') || serviceStatuses.includes('Unknown')
+				? 'Degraded'
+				: 'Healthy';
+
+		return {
+			overall,
+			latencyMs,
+			uptimePercent: 0,
+			activeSessions,
+			activeSubscriptions,
+			totalTherapists,
+			failedPayments: failedLeadPayments + failedSessionPayments,
+			pendingPayments,
+			expiredSubscriptions,
+			services: {
+				backend: backendStatus,
+				database: databaseStatus,
+				queue: queueStatus,
+				redis: 'Unknown',
+				zohoDesk: 'Unknown',
+				phonePe: 'Unknown',
+			},
+			lastChecked: new Date().toISOString(),
+			diagnostics: {
+				dbProbeMs,
+				queuedExports,
+				failedExports24h,
+				warnings,
+			},
+		};
 	}
 
 	async getPaymentReliabilityMetrics(days = 30) {
@@ -482,7 +534,7 @@ export class AdminAnalyticsService {
 			successRate: totals.total > 0 ? Number(((totals.success / totals.total) * 100).toFixed(2)) : 0,
 			retrySuccessRate: totals.retryAttempts > 0 ? Number(((totals.retrySuccess / totals.retryAttempts) * 100).toFixed(2)) : 0,
 			revenueMinor: totals.revenueMinor,
-			revenueInr: Number((totals.revenueInr / 100).toFixed(2)),
+			revenueInr: Number((totals.revenueMinor / 100).toFixed(2)),
 			failureReasons: (failureReasonRows || []).map((row: any) => ({
 				reason: String(row.failureReason || 'UNKNOWN'),
 				count: Number(row._count?._all || 0),

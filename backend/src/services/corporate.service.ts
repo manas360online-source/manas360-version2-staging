@@ -380,6 +380,49 @@ export const ensureCorporateTables = async (): Promise<void> => {
   await prisma.$executeRaw`
     CREATE INDEX IF NOT EXISTS "corporate_demo_requests_workEmail_idx" ON "corporate_demo_requests"("workEmail");
   `;
+
+  await prisma.$executeRaw`
+    CREATE TABLE IF NOT EXISTS "corporate_otp_requests" (
+      "id" TEXT PRIMARY KEY,
+      "phone" TEXT NOT NULL,
+      "otpHash" TEXT NOT NULL,
+      "companyName" TEXT NOT NULL,
+      "companySize" TEXT,
+      "industry" TEXT,
+      "country" TEXT,
+      "contactName" TEXT,
+      "email" TEXT,
+      "status" TEXT NOT NULL DEFAULT 'PENDING',
+      "expiresAt" TIMESTAMP(3) NOT NULL,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `;
+
+  await prisma.$executeRaw`
+    CREATE INDEX IF NOT EXISTS "corporate_otp_requests_phone_status_idx" ON "corporate_otp_requests"("phone", "status");
+  `;
+
+  await prisma.$executeRaw`
+    CREATE INDEX IF NOT EXISTS "corporate_otp_requests_phone_status_created_idx" ON "corporate_otp_requests"("phone", "status", "createdAt" DESC);
+  `;
+
+  await prisma.$executeRaw`
+    CREATE INDEX IF NOT EXISTS "corporate_otp_requests_status_expiresAt_idx" ON "corporate_otp_requests"("status", "expiresAt");
+  `;
+};
+
+let corporateSchemaInitPromise: Promise<void> | null = null;
+
+const ensureCorporateSchemaReady = async (): Promise<void> => {
+  if (!corporateSchemaInitPromise) {
+    corporateSchemaInitPromise = ensureCorporateTables().catch((error) => {
+      corporateSchemaInitPromise = null;
+      throw error;
+    });
+  }
+
+  await corporateSchemaInitPromise;
 };
 
 const getCompanyByKey = async (companyKey = DEFAULT_COMPANY_KEY, db: DbClient = prisma): Promise<{ id: string; name: string } | null> => {
@@ -388,6 +431,8 @@ const getCompanyByKey = async (companyKey = DEFAULT_COMPANY_KEY, db: DbClient = 
 };
 
 const resolveCompany = async (companyKey?: string, db: DbClient = prisma): Promise<{ companyId: string; companyName: string; companyKey: string }> => {
+  await ensureCorporateSchemaReady();
+
   const key = String(companyKey || DEFAULT_COMPANY_KEY).trim() || DEFAULT_COMPANY_KEY;
   const company = await getCompanyByKey(key, db);
   return { companyId: company?.id || '', companyName: company?.name || 'TechCorp India', companyKey: key };

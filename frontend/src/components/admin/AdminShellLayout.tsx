@@ -1,73 +1,107 @@
 import { AlertCircle, Bell, ChevronDown, LogOut, Menu, Search, Settings, User } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { searchAdminEntities, type AdminGlobalSearchResult } from '../../api/admin.api';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
 
-type NavItem = { to: string; label: string; section: string; shortLabel: string };
+type NavItem = { to: string; label: string; shortLabel: string };
+type AdminDomain = {
+	key: 'control' | 'identity' | 'tenants' | 'operations' | 'intelligence' | 'governance' | 'support' | 'system';
+	label: string;
+	items: NavItem[];
+};
 type AdminPersona = 'superadmin' | 'financemanager' | 'clinicaldirector' | 'complianceofficer' | 'admin';
 
-const navItems: NavItem[] = [
-	// OVERVIEW
-	{ to: '/admin/dashboard', label: 'Dashboard', shortLabel: 'Dash', section: 'OVERVIEW' },
-	{ to: '/admin/platform-health', label: 'Platform Health', shortLabel: 'PH', section: 'OVERVIEW' },
-	// USER MANAGEMENT
-	{ to: '/admin/users', label: 'One View', shortLabel: 'U', section: 'USER MANAGEMENT' },
-	{ to: '/admin/user-approvals', label: 'User Approvals', shortLabel: 'UA', section: 'USER MANAGEMENT' },
-	{ to: '/admin/therapist-verification', label: 'Therapist Verification', shortLabel: 'TV', section: 'USER MANAGEMENT' },
-	{ to: '/admin/roles', label: 'Role Management', shortLabel: 'RB', section: 'USER MANAGEMENT' },
-	// CORPORATE
-	{ to: '/admin/companies', label: 'Companies', shortLabel: 'Co', section: 'CORPORATE' },
-	{ to: '/admin/company-subscriptions', label: 'Subscriptions', shortLabel: 'Sub', section: 'CORPORATE' },
-	{ to: '/admin/company-reports', label: 'Reports', shortLabel: 'Rep', section: 'CORPORATE' },
-	// OPERATIONS
-	{ to: '/admin/live-sessions', label: 'Sessions', shortLabel: 'Ses', section: 'OPERATIONS' },
-	{ to: '/admin/templates', label: 'Screening Framework Modification', shortLabel: 'Tpl', section: 'OPERATIONS' },
-	{ to: '/admin/groups', label: 'Group Therapy Management', shortLabel: 'Grp', section: 'OPERATIONS' },
-	{ to: '/admin/qr-codes', label: 'QR Codes', shortLabel: 'QR', section: 'OPERATIONS' },
-	{ to: '/admin/crisis-console', label: 'Crisis Console', shortLabel: 'CRC', section: 'OPERATIONS' },
-	// FINANCE
-	{ to: '/admin/revenue', label: 'Revenue', shortLabel: 'Rev', section: 'FINANCE' },
-	{ to: '/admin/pricing-subscriptions', label: 'Pricing & Subscriptions', shortLabel: 'PS', section: 'FINANCE' },
-	{ to: '/admin/offer-marquee', label: 'Offer Marquee', shortLabel: 'OM', section: 'FINANCE' },
-	{ to: '/admin/payouts', label: 'Payouts', shortLabel: 'Pyt', section: 'FINANCE' },
-	{ to: '/admin/invoices', label: 'Invoices', shortLabel: 'Inv', section: 'FINANCE' },
-	{ to: '/admin/payment-reliability', label: 'Payment Reliability', shortLabel: 'PR', section: 'FINANCE' },
-	// ANALYTICS
-	{ to: '/admin/platform-analytics', label: 'Platform Analytics', shortLabel: 'PA', section: 'ANALYTICS' },
-	{ to: '/admin/user-growth', label: 'User Growth', shortLabel: 'UG', section: 'ANALYTICS' },
-	{ to: '/admin/session-analytics', label: 'Session Analytics', shortLabel: 'SA', section: 'ANALYTICS' },
-	{ to: '/admin/therapist-performance', label: 'Providers Performance', shortLabel: 'TP', section: 'ANALYTICS' },
-	// SUPPORT
-	{ to: '/admin/zoho-desk', label: 'Tickets', shortLabel: 'Tkt', section: 'SUPPORT' },
-	{ to: '/admin/feedback', label: 'Feedback', shortLabel: 'Fb', section: 'SUPPORT' },
-	// SECURITY
-	{ to: '/admin/audit-trail', label: 'Audit Trail', shortLabel: 'AT', section: 'SECURITY' },
-	{ to: '/admin/audit-logs', label: 'System Logs', shortLabel: 'AL', section: 'SECURITY' },
-	{ to: '/admin/data-requests', label: 'Data Requests', shortLabel: 'DR', section: 'SECURITY' },
-	{ to: '/admin/data-privacy-hub', label: 'Data Privacy Hub', shortLabel: 'DP', section: 'SECURITY' },
-	{ to: '/admin/legal-documents', label: 'Legal Documents', shortLabel: 'LD', section: 'SECURITY' },
-	{ to: '/admin/ai-monitoring', label: 'AI Monitoring', shortLabel: 'AI', section: 'SECURITY' },
-	// SYSTEM
-	{ to: '/admin/settings', label: 'Settings', shortLabel: 'Set', section: 'SYSTEM' },
+const ADMIN_DOMAINS: AdminDomain[] = [
+	{
+		key: 'control',
+		label: 'Control Center',
+		items: [
+			{ to: '/admin/control/dashboard', label: 'Dashboard', shortLabel: 'Dash' },
+			{ to: '/admin/control/platform-health', label: 'Platform Health', shortLabel: 'PH' },
+		],
+	},
+	{
+		key: 'identity',
+		label: 'Identity & Access',
+		items: [
+			{ to: '/admin/identity/users', label: 'Users', shortLabel: 'U' },
+			{ to: '/admin/identity/approvals', label: 'Approvals', shortLabel: 'Ap' },
+			{ to: '/admin/identity/therapists', label: 'Therapists', shortLabel: 'Th' },
+			{ to: '/admin/identity/roles', label: 'Roles', shortLabel: 'Rl' },
+		],
+	},
+	{
+		key: 'tenants',
+		label: 'Tenants & Billing',
+		items: [
+			{ to: '/admin/billing/companies', label: 'Companies', shortLabel: 'Co' },
+			{ to: '/admin/billing/company-subscriptions', label: 'Subscriptions', shortLabel: 'Sub' },
+			{ to: '/admin/billing/company-reports', label: 'Company Reports', shortLabel: 'Rep' },
+			{ to: '/admin/billing/revenue', label: 'Revenue', shortLabel: 'Rev' },
+			{ to: '/admin/billing/pricing', label: 'Pricing', shortLabel: 'Prc' },
+			{ to: '/admin/billing/offers', label: 'Offer Marquee', shortLabel: 'Off' },
+			{ to: '/admin/billing/payouts', label: 'Payouts', shortLabel: 'Pay' },
+		],
+	},
+	{
+		key: 'operations',
+		label: 'Operations',
+		items: [
+			{ to: '/admin/operations/sessions', label: 'Sessions', shortLabel: 'Ses' },
+			{ to: '/admin/operations/templates', label: 'Screening Framework', shortLabel: 'Tpl' },
+			{ to: '/admin/operations/groups', label: 'Group Therapy', shortLabel: 'Grp' },
+			{ to: '/admin/operations/qr', label: 'QR Codes', shortLabel: 'QR' },
+			{ to: '/admin/operations/crisis', label: 'Crisis Console', shortLabel: 'Crs' },
+		],
+	},
+	{
+		key: 'intelligence',
+		label: 'Intelligence',
+		items: [
+			{ to: '/admin/intelligence/platform-analytics', label: 'Platform Analytics', shortLabel: 'PA' },
+			{ to: '/admin/intelligence/user-growth', label: 'User Growth', shortLabel: 'UG' },
+			{ to: '/admin/intelligence/session-analytics', label: 'Session Analytics', shortLabel: 'SA' },
+			{ to: '/admin/intelligence/provider-performance', label: 'Provider Performance', shortLabel: 'PP' },
+		],
+	},
+	{
+		key: 'governance',
+		label: 'Governance',
+		items: [
+			{ to: '/admin/governance/center', label: 'Governance Center', shortLabel: 'Gov' },
+			{ to: '/admin/governance/audit', label: 'Audit Trail', shortLabel: 'Aud' },
+			{ to: '/admin/governance/privacy', label: 'Data Privacy Hub', shortLabel: 'Dph' },
+			{ to: '/admin/governance/legal', label: 'Legal Documents', shortLabel: 'Leg' },
+			{ to: '/admin/governance/compliance', label: 'Compliance', shortLabel: 'Cmp' },
+		],
+	},
+	{
+		key: 'support',
+		label: 'Support',
+		items: [
+			{ to: '/admin/support/tickets', label: 'Tickets', shortLabel: 'Tkt' },
+			{ to: '/admin/support/feedback', label: 'Feedback', shortLabel: 'Fb' },
+		],
+	},
+	{
+		key: 'system',
+		label: 'System',
+		items: [
+			{ to: '/admin/system/settings', label: 'Settings', shortLabel: 'Set' },
+			{ to: '/admin/system/platform-config', label: 'Platform Config', shortLabel: 'Cfg' },
+		],
+	},
 ];
 
 const mobileBottomNav = [
-	{ to: '/admin/dashboard', label: 'Dashboard' },
-	{ to: '/admin/users', label: 'One View' },
-	{ to: '/admin/session-analytics', label: 'Analytics' },
-	{ to: '/admin/zoho-desk', label: 'Tickets' },
-	{ to: '/admin/settings', label: 'Settings' },
+	{ to: '/admin/control/dashboard', label: 'Dashboard' },
+	{ to: '/admin/identity/users', label: 'Users' },
+	{ to: '/admin/intelligence/session-analytics', label: 'Analytics' },
+	{ to: '/admin/support/tickets', label: 'Tickets' },
+	{ to: '/admin/system/settings', label: 'Settings' },
 ];
-
-const dedupeNavByPath = (items: NavItem[]): NavItem[] => {
-	const seen = new Set<string>();
-	return items.filter((item) => {
-		if (seen.has(item.to)) return false;
-		seen.add(item.to);
-		return true;
-	});
-};
 
 const normalizeRoleValue = (value: unknown): string =>
 	String(value || '')
@@ -91,15 +125,6 @@ export default function AdminShellLayout() {
 	const userName = [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim() || user?.email || 'Admin';
 	const userRole: AdminPersona = resolveAdminPersona(user);
 
-	const complianceMenuItems: NavItem[] = useMemo(() => [
-		{ to: '/admin/compliance', label: 'Dashboard', shortLabel: 'Dash', section: 'COMPLIANCE' },
-		{ to: '/admin/audit-trail', label: 'Audit Trail', shortLabel: 'AT', section: 'COMPLIANCE' },
-		{ to: '/admin/company-reports', label: 'Reports', shortLabel: 'Rep', section: 'COMPLIANCE' },
-		{ to: '/admin/feedback', label: 'Feedback', shortLabel: 'Fb', section: 'COMPLIANCE' },
-		{ to: '/admin/compliance-documents', label: 'Legal Documents', shortLabel: 'LD', section: 'COMPLIANCE' },
-		{ to: '/admin/compliance-status', label: 'Compliance Status', shortLabel: 'CS', section: 'COMPLIANCE' },
-	], []);
-
 	const roleLabel = useMemo(() => {
 		switch (userRole) {
 			case 'superadmin':
@@ -115,17 +140,17 @@ export default function AdminShellLayout() {
 		}
 	}, [userRole]);
 
-	const sectionAllowlist = useMemo(() => {
+	const domainAllowlist = useMemo(() => {
 		if (userRole === 'financemanager') {
-			return new Set(['OVERVIEW', 'FINANCE', 'ANALYTICS']);
+			return new Set(['control', 'tenants', 'intelligence']);
 		}
 
 		if (userRole === 'clinicaldirector') {
-			return new Set(['OVERVIEW', 'USER MANAGEMENT', 'OPERATIONS', 'SUPPORT', 'ANALYTICS']);
+			return new Set(['control', 'identity', 'operations', 'intelligence', 'support']);
 		}
 
 		if (userRole === 'complianceofficer') {
-			return new Set(['OVERVIEW', 'SUPPORT', 'SECURITY']);
+			return new Set(['control', 'governance', 'support']);
 		}
 
 		return null;
@@ -141,6 +166,10 @@ export default function AdminShellLayout() {
 	const [mobileOpen, setMobileOpen] = useState(false);
 	const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 	const [activeCrisis, setActiveCrisis] = useState<any>(null);
+	const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+	const [commandQuery, setCommandQuery] = useState('');
+	const [searchResults, setSearchResults] = useState<AdminGlobalSearchResult>({ users: [], payments: [], sessions: [] });
+	const [searchLoading, setSearchLoading] = useState(false);
 	const profileMenuRef = useRef<HTMLDivElement | null>(null);
 
 	useEffect(() => {
@@ -160,38 +189,25 @@ export default function AdminShellLayout() {
 	}, []);
 
 	const sections = useMemo(() => {
-		if (userRole === 'complianceofficer') {
-			return [['COMPLIANCE', complianceMenuItems]] as Array<[string, NavItem[]]>;
-		}
-
-		const uniqueNavItems = dedupeNavByPath(navItems);
-		const grouped = new Map<string, NavItem[]>();
-
-		for (const item of uniqueNavItems) {
-			const showItem = sectionAllowlist
-				? sectionAllowlist.has(item.section)
-				: true;
-
-			if (showItem) {
-				if (!grouped.has(item.section)) grouped.set(item.section, []);
-				grouped.get(item.section)?.push(item);
-			}
-		}
-		return Array.from(grouped.entries());
-	}, [sectionAllowlist, userRole, complianceMenuItems]);
+		return ADMIN_DOMAINS
+			.filter((domain) => (domainAllowlist ? domainAllowlist.has(domain.key) : true))
+			.map((domain) => [domain.label, domain.items] as [string, NavItem[]]);
+	}, [domainAllowlist]);
 
 
+
+	const allNavItems = useMemo(() => ADMIN_DOMAINS.flatMap((domain) => domain.items), []);
 
 	const activeNavItem = useMemo(() => {
-		const exactMatch = navItems.find((item) => item.to === location.pathname);
+		const exactMatch = allNavItems.find((item) => item.to === location.pathname);
 		if (exactMatch) return exactMatch;
 
 		// Match nested routes like /admin/users/123 to the closest configured nav item.
-		const nestedMatch = navItems.find((item) => location.pathname.startsWith(`${item.to}/`));
+		const nestedMatch = allNavItems.find((item) => location.pathname.startsWith(`${item.to}/`));
 		if (nestedMatch) return nestedMatch;
 
 		return null;
-	}, [location.pathname]);
+	}, [allNavItems, location.pathname]);
 
 	const headerTitle = useMemo(() => {
 		if (activeNavItem) return activeNavItem.label;
@@ -210,8 +226,14 @@ export default function AdminShellLayout() {
 		return 'Admin Dashboard';
 	}, [activeNavItem, location.pathname]);
 
+	const activeSectionLabel = useMemo(() => {
+		if (!activeNavItem) return null;
+		const match = ADMIN_DOMAINS.find((domain) => domain.items.some((item) => item.to === activeNavItem.to));
+		return match?.label ?? null;
+	}, [activeNavItem]);
+
 	const headerSubtitle = activeNavItem
-		? `${activeNavItem.section} · Platform command center`
+		? `${activeSectionLabel ?? 'Admin'} · Platform command center`
 		: 'Platform command center · All systems normal';
 
 	const onLogout = async () => {
@@ -264,16 +286,55 @@ export default function AdminShellLayout() {
 		};
 	}, [profileMenuOpen]);
 
+	useEffect(() => {
+		const onKeyDown = (event: KeyboardEvent) => {
+			if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+				event.preventDefault();
+				setIsCommandPaletteOpen((prev) => !prev);
+			}
+		};
+
+		document.addEventListener('keydown', onKeyDown);
+		return () => document.removeEventListener('keydown', onKeyDown);
+	}, []);
+
+	useEffect(() => {
+		if (!isCommandPaletteOpen || commandQuery.trim().length < 2) {
+			setSearchResults({ users: [], payments: [], sessions: [] });
+			return;
+		}
+
+		let mounted = true;
+		setSearchLoading(true);
+		const timer = window.setTimeout(() => {
+			void searchAdminEntities(commandQuery, 6)
+				.then((response) => {
+					if (mounted) setSearchResults(response.data);
+				})
+				.catch(() => {
+					if (mounted) setSearchResults({ users: [], payments: [], sessions: [] });
+				})
+				.finally(() => {
+					if (mounted) setSearchLoading(false);
+				});
+		}, 250);
+
+		return () => {
+			mounted = false;
+			window.clearTimeout(timer);
+		};
+	}, [commandQuery, isCommandPaletteOpen]);
+
 	const filteredMobileNav = useMemo(() => {
 		return mobileBottomNav.filter((item) => {
 			if (userRole === 'financemanager') {
 				return ['Dashboard', 'Analytics'].includes(item.label);
 			}
 			if (userRole === 'clinicaldirector') {
-				return ['Dashboard', 'One View', 'Analytics', 'Tickets'].includes(item.label);
+				return ['Dashboard', 'Users', 'Analytics', 'Tickets'].includes(item.label);
 			}
 			if (userRole === 'complianceofficer') {
-				return ['Dashboard'].includes(item.label);
+				return ['Dashboard', 'Tickets'].includes(item.label);
 			}
 			return true;
 		});
@@ -309,7 +370,7 @@ export default function AdminShellLayout() {
 							</div>
 							<div className="flex items-center gap-2">
 								<button 
-									onClick={() => navigate(`/admin/crisis-alerts`)}
+									onClick={() => navigate('/admin/operations/crisis')}
 									className="px-3 py-1 bg-white text-rose-600 rounded text-xs font-bold hover:bg-rose-50"
 								>
 									Take Action
@@ -336,7 +397,11 @@ export default function AdminShellLayout() {
 							<div className="ml-auto flex items-center gap-2 sm:gap-4">
 								<div className="hidden items-center gap-2 rounded-lg bg-ink-50 px-3 py-2 md:flex">
 									<Search className="h-4 w-4 text-ink-400" />
-									<input placeholder="Search users, tickets..." className="w-44 bg-transparent text-sm outline-none placeholder:text-ink-400" />
+									<input
+										placeholder="Search users, tickets... (Ctrl+K)"
+										className="w-44 bg-transparent text-sm outline-none placeholder:text-ink-400"
+										onFocus={() => setIsCommandPaletteOpen(true)}
+									/>
 								</div>
 								<button className="relative rounded-lg p-2 hover:bg-ink-50">
 									<Bell className="h-5 w-5 text-ink-500" />
@@ -360,7 +425,7 @@ export default function AdminShellLayout() {
 												<p className="text-[11px] text-ink-500">Platform Admin</p>
 											</div>
 											<NavLink
-												to="/admin/dashboard"
+												to="/admin/control/dashboard"
 												onClick={() => setProfileMenuOpen(false)}
 												className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-ink-700 hover:bg-ink-50"
 											>
@@ -368,7 +433,7 @@ export default function AdminShellLayout() {
 												My Dashboard
 											</NavLink>
 											<NavLink
-												to="/admin/settings"
+												to="/admin/system/settings"
 												onClick={() => setProfileMenuOpen(false)}
 												className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-ink-700 hover:bg-ink-50"
 											>
@@ -403,6 +468,88 @@ export default function AdminShellLayout() {
 							))}
 						</div>
 					</nav>
+
+					{isCommandPaletteOpen ? (
+						<div className="fixed inset-0 z-[70] flex items-start justify-center bg-black/30 p-4 pt-20" onClick={() => setIsCommandPaletteOpen(false)}>
+							<div className="w-full max-w-2xl rounded-xl border border-ink-100 bg-white p-3 shadow-soft-lg" onClick={(event) => event.stopPropagation()}>
+								<div className="flex items-center gap-2 rounded-lg bg-ink-50 px-3 py-2">
+									<Search className="h-4 w-4 text-ink-400" />
+									<input
+										autoFocus
+										value={commandQuery}
+										onChange={(event) => setCommandQuery(event.target.value)}
+										placeholder="Search pages and actions"
+										className="w-full bg-transparent text-sm outline-none placeholder:text-ink-400"
+									/>
+								</div>
+								<div className="mt-3 space-y-1">
+									{[
+										{ label: 'Go to Users', to: '/admin/identity/users' },
+										{ label: 'Go to Pricing', to: '/admin/billing/pricing' },
+										{ label: 'Go to QR Codes', to: '/admin/operations/qr' },
+										{ label: 'Go to Audit', to: '/admin/governance/audit' },
+										{ label: 'Action: Suspend selected users', to: '/admin/identity/users' },
+										{ label: 'Action: Create pricing plan', to: '/admin/billing/pricing' },
+										{ label: 'Action: Generate QR', to: '/admin/operations/qr' },
+									]
+										.filter((item) => item.label.toLowerCase().includes(commandQuery.toLowerCase()))
+										.map((item) => (
+											<button
+												key={item.to}
+												onClick={() => {
+													navigate(item.to);
+													setIsCommandPaletteOpen(false);
+												}}
+												className="block w-full rounded-lg px-3 py-2 text-left text-sm text-ink-700 hover:bg-ink-50"
+											>
+												{item.label}
+											</button>
+										))}
+
+									{searchLoading ? <p className="px-3 py-2 text-xs text-ink-500">Searching...</p> : null}
+
+									{searchResults.users.map((user) => (
+										<button
+											key={`user-${user.id}`}
+											onClick={() => {
+												navigate(`/admin/identity/users/${user.id}`);
+												setIsCommandPaletteOpen(false);
+											}}
+											className="block w-full rounded-lg px-3 py-2 text-left text-sm text-ink-700 hover:bg-ink-50"
+										>
+											User: {user.name} ({user.email})
+										</button>
+									))}
+
+									{searchResults.payments.map((payment) => (
+										<button
+											key={`payment-${payment.id}`}
+											onClick={() => {
+												navigate('/admin/billing/payment-reliability');
+												setIsCommandPaletteOpen(false);
+											}}
+											className="block w-full rounded-lg px-3 py-2 text-left text-sm text-ink-700 hover:bg-ink-50"
+										>
+											Payment: {payment.id.slice(0, 8)}... ({payment.status})
+										</button>
+									))}
+
+									{searchResults.sessions.map((session) => (
+										<button
+											key={`session-${session.id}`}
+											onClick={() => {
+												navigate('/admin/operations/sessions');
+												setIsCommandPaletteOpen(false);
+											}}
+											className="block w-full rounded-lg px-3 py-2 text-left text-sm text-ink-700 hover:bg-ink-50"
+										>
+											Session: {session.id.slice(0, 8)}... ({session.status})
+										</button>
+									))}
+								</div>
+							</div>
+						</div>
+					) : null}
 				</div>
 			</div>
 		</div>
@@ -423,6 +570,24 @@ function AdminNav({ sections, compact, initials, userName, userRole }: { section
 			</div>
 
 			<nav className="flex-1 overflow-y-auto px-2 py-4">
+				{!compact ? (
+					<div className="mb-4 rounded-lg border border-white/10 bg-white/5 p-3">
+						<p className="text-[10px] uppercase tracking-[0.14em] text-white/45">Context</p>
+						<p className="mt-1 text-xs text-white/85">Workspace: MANAS360</p>
+						<p className="text-xs text-white/85">Tenant: All</p>
+						<p className="text-xs text-white/85">Role: {userRole || 'Admin'}</p>
+					</div>
+				) : null}
+
+				{!compact ? (
+					<div className="mb-4 space-y-1">
+						<p className="px-2 text-[10px] uppercase tracking-[0.14em] text-white/45">Quick Actions</p>
+						<NavLink to="/admin/identity/approvals" className="block rounded-lg bg-sage-600 px-3 py-2 text-xs font-semibold text-white hover:bg-sage-500">+ Create User</NavLink>
+						<NavLink to="/admin/billing/pricing" className="block rounded-lg bg-sage-700 px-3 py-2 text-xs font-semibold text-white hover:bg-sage-600">+ Create Pricing Plan</NavLink>
+						<NavLink to="/admin/operations/qr" className="block rounded-lg bg-sage-800 px-3 py-2 text-xs font-semibold text-white hover:bg-sage-700">+ Generate QR</NavLink>
+					</div>
+				) : null}
+
 				{sections.map(([section, items]) => (
 					<div key={section} className="mb-4">
 						{!compact ? <p className="mb-2 px-3 text-[10px] font-semibold tracking-[0.15em] text-ink-400">{section}</p> : null}

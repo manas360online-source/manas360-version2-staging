@@ -4,7 +4,7 @@ import { getApiErrorMessage, signupWithPhone, verifyPhoneSignupOtp } from '../..
 import { patientApi } from '../../api/patient';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
-import { getPostLoginRoute, useAuth } from '../../context/AuthContext';
+import { getPostLoginRoute, hasCorporateAccess, useAuth } from '../../context/AuthContext';
 
 const isSubscriptionActive = (subscription: any): boolean => {
 	if (!subscription) return false;
@@ -33,8 +33,14 @@ export default function LoginPage() {
 	const adminPortalLogin = '/admin-portal/login';
 
 	const resolvePostLoginRouteWithSubscription = async (candidate: string | null, role: string | undefined, userOverride?: any) => {
+		const effectiveUser = userOverride || user;
+
+		if (hasCorporateAccess(effectiveUser)) {
+			return '/corporate/dashboard';
+		}
+
 		if (!candidate || candidate.startsWith('/auth/')) {
-			return getPostLoginRoute(userOverride || user);
+			return getPostLoginRoute(effectiveUser);
 		}
 
 		const normalizedRole = String(role || '').toLowerCase();
@@ -195,6 +201,19 @@ export default function LoginPage() {
 							Register here
 						</Link>
 					</p>
+
+					<div className="mt-3 text-center">
+						<button
+							type="button"
+							className="text-calm-sage underline underline-offset-2 hover:text-wellness-text text-sm"
+							onClick={() => {
+								// Navigate to a corporate-specific hash for corporate login flows
+								window.location.hash = '/corporate';
+							}}
+						>
+							Corporate login
+						</button>
+					</div>
 
 					<div className="mt-10 pt-6 border-t border-gray-100">
 						<p className="text-[10px] uppercase font-bold text-gray-400 mb-4 text-center tracking-widest">

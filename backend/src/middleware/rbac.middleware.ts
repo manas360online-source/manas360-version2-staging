@@ -21,6 +21,52 @@ export type UserRole =
 	| 'financemanager'
 	| 'complianceofficer';
 
+export const POLICY_VERSION = 1;
+
+export const ADMIN_POLICIES: Record<string, string[]> = {
+	users: ['manage_users'],
+	'users.view': ['manage_users'],
+	'users.moderate': ['manage_users'],
+	providers: ['manage_therapists'],
+	'providers.verify': ['manage_therapists'],
+	payments: ['manage_payments'],
+	'payments.view': ['view_analytics'],
+	'payments.retry': ['manage_payments'],
+	invoices: ['manage_payments'],
+	'invoices.view': ['manage_payments'],
+	'invoices.manage': ['manage_payments'],
+	'invoices.refund': ['manage_payments'],
+	pricing: ['pricing_edit'],
+	'pricing.manage': ['pricing_edit'],
+	payouts: ['payouts_approve'],
+	'payouts.manage': ['payouts_approve'],
+	'payouts.view': ['payouts_approve'],
+	offers: ['offers_edit'],
+	'offers.manage': ['offers_edit'],
+	qr: ['offers_edit'],
+	'qr.manage': ['offers_edit'],
+	screening: ['manage_therapists'],
+	'screening.manage': ['manage_therapists'],
+	audit: ['view_audit'],
+	'audit.view': ['view_audit'],
+	'audit.export': ['view_audit'],
+	analytics: ['view_analytics'],
+	'analytics.view': ['view_analytics'],
+	feedback: ['view_feedback'],
+	'feedback.manage': ['view_feedback'],
+	config: ['view_analytics'],
+	'config.view': ['view_analytics'],
+	'config.manage': ['manage_compliance'],
+	tickets: ['view_feedback'],
+	'tickets.manage': ['view_feedback'],
+	groups: ['manage_users'],
+	'groups.manage': ['manage_users'],
+	compliance: ['manage_compliance'],
+	'compliance.manage': ['manage_compliance'],
+};
+
+const normalizeRoleName = (value: unknown): UserRole => String(value || '').toLowerCase().replace(/[_\s-]/g, '') as UserRole;
+
 /**
  * Role hierarchy for logical grouping
  * Useful for future permission inheritance
@@ -78,10 +124,11 @@ const getRolePermissions = async (roleName: UserRole): Promise<string[]> => {
 		return cached.permissions;
 	}
 
-	const roleData = await db.role.findUnique({
-		where: { name: roleName },
-		select: { permissions: true },
-	});
+	const roleDataRows = (await db.$queryRawUnsafe(
+		'SELECT permissions FROM roles WHERE LOWER(name) = LOWER($1) LIMIT 1',
+		roleName,
+	)) as Array<{ permissions: string[] | null }>;
+	const roleData = roleDataRows[0] ?? null;
 
 	const permissions = roleData?.permissions || [];
 	
@@ -91,6 +138,21 @@ const getRolePermissions = async (roleName: UserRole): Promise<string[]> => {
 	});
 
 	return permissions;
+};
+
+export const getRolePermissionsForRole = async (roleName: UserRole): Promise<string[]> => getRolePermissions(roleName);
+
+export const requireAdminPolicy = (
+	policyKey: keyof typeof ADMIN_POLICIES,
+): ((req: Request, _res: Response, next: NextFunction) => Promise<void>) => {
+	const required = ADMIN_POLICIES[policyKey];
+	if (!required || required.length === 0) {
+		throw new Error(`Unknown admin policy key: ${String(policyKey)}`);
+	}
+	return requirePermission(required, {
+		policyKey: String(policyKey),
+		policyVersion: POLICY_VERSION,
+	});
 };
 
 /**
@@ -126,7 +188,7 @@ const getUserRole = async (userId: string): Promise<{ role: UserRole; isDeleted:
 	}
 
 	// Cache the result (map super_admin to superadmin for generic convention)
-	const cleanRole = String(user.role).toLowerCase().replace('_', '') as UserRole;
+	const cleanRole = normalizeRoleName(user.role);
 	roleCache.set(userId, {
 		role: cleanRole,
 		timestamp: Date.now(),
@@ -200,17 +262,14 @@ export const requireRole = (
 				return;
 			}
 
-			// Check if user's role is in allowed roles OR satisfies hierarchy
-			const userRank = roleHierarchy[userDetails.role] || 0;
-			const isAllowedByExplicitRole = roles.includes(userDetails.role);
-			const isAllowedByHierarchy = roles.some(role => userRank >= (roleHierarchy[role] || 0));
-
-			if (!isAllowedByExplicitRole && !isAllowedByHierarchy) {
+			// Check if user's role is in allowed roles (NO hierarchy escalation for single-role checks)
+			const isSuperAdminAccessingAdminRoute = userDetails.role === 'superadmin' && roles.includes('admin');
+			const isAllowedByExplicitRole = roles.includes(userDetails.role) || isSuperAdminAccessingAdminRoute;
+			if (!isAllowedByExplicitRole) {
 				// Log unauthorized attempt for security audit
 				console.warn(
-					`[RBAC] Access denied - userId: ${userId}, userRole: ${userDetails.role}, requiredRoles: ${roles.join(',')}, rank: ${userRank}`,
+					`[RBAC] Access denied - userId: ${userId}, userRole: ${userDetails.role}, requiredRoles: ${roles.join(',')}`,
 				);
-
 				next(
 					new AppError(
 						`Access denied. Required role(s): ${roles.join(' or ')}. Your role: ${userDetails.role}`,
@@ -303,7 +362,8 @@ export const requireCorporateMemberAccess = async (
 		}
 
 		const role = String(user.role).toLowerCase() as UserRole;
-		if (role === 'admin') {
+		const isPlatformAdmin = ['admin', 'superadmin', 'clinicaldirector', 'financemanager', 'complianceofficer'].includes(role);
+		if (isPlatformAdmin) {
 			if (!req.auth) {
 				req.auth = { userId: '', sessionId: '', jti: '' };
 			}
@@ -344,6 +404,7 @@ export const requireCorporateMemberAccess = async (
  */
 export const requirePermission = (
 	requiredPermissions: string | string[],
+    options?: { policyKey?: string; policyVersion?: number },
 ): ((req: Request, _res: Response, next: NextFunction) => Promise<void>) => {
 	const permissions = Array.isArray(requiredPermissions) ? requiredPermissions : [requiredPermissions];
 
@@ -391,6 +452,26 @@ export const requirePermission = (
 		const hasPermission = permissions.some(perm => userPermissions.includes(perm));
 
 		if (!hasPermission) {
+			try {
+				await db.auditLog.create({
+					data: {
+						userId,
+						action: 'ACCESS_DENIED',
+						resource: 'System',
+						details: {
+							policy: options?.policyKey || null,
+							policyVersion: options?.policyVersion || POLICY_VERSION,
+							requiredPermissions: permissions,
+							actorRole: userDetails.role,
+							route: req.originalUrl,
+							method: req.method,
+						},
+					},
+				});
+			} catch {
+				// Do not block primary auth flow if denial audit fails.
+			}
+
 			console.warn(
 				`[RBAC] Permission denied - userId: ${userId}, userRole: ${userDetails.role}, requiredPermissions: ${permissions.join(',')}`,
 			);

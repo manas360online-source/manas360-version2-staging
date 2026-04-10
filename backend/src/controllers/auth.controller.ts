@@ -18,6 +18,7 @@ import {
 	verifyPhoneOtp,
 } from '../services/auth.service';
 import { sendSuccess } from '../utils/response';
+import { ADMIN_POLICIES, POLICY_VERSION, getRolePermissionsForRole, type UserRole } from '../middleware/rbac.middleware';
 import {
 	validateOtp,
 	validatePassword,
@@ -25,6 +26,11 @@ import {
 	validatePublicSignupRole,
 } from '../validators/auth.validator';
 import { AppError } from '../middleware/error.middleware';
+import {
+	getActiveLegalDocuments,
+	getPendingLegalDocumentsForUser,
+	recordUserAcceptances,
+} from '../services/legal-compliance.service';
 
 const getRequestMeta = (req: Request) => ({
 	ipAddress: req.ip,
@@ -206,6 +212,9 @@ export const meController = async (req: Request, res: Response): Promise<void> =
 		throw new AppError('User not found', 404);
 	}
 
+	const normalizedRole = String(user.role || '').toLowerCase().replace(/[_\s-]/g, '') as UserRole;
+	const rolePermissions = await getRolePermissionsForRole(normalizedRole).catch(() => [] as string[]);
+
 	const companyRows = (await prisma.$queryRawUnsafe(
 		'SELECT company_key, is_company_admin FROM users WHERE id = $1 LIMIT 1',
 		user.id,
@@ -258,6 +267,8 @@ export const meController = async (req: Request, res: Response): Promise<void> =
 		console.error('[ME] Error computing requiresSubscription:', err);
 	}
 
+	const legalStatus = await getPendingLegalDocumentsForUser(String(user.id));
+
 	sendSuccess(
 		res,
 		{
@@ -284,8 +295,92 @@ export const meController = async (req: Request, res: Response): Promise<void> =
 			company_key: companyMeta.company_key,
 			isCompanyAdmin: Boolean(companyMeta.is_company_admin),
 			is_company_admin: Boolean(companyMeta.is_company_admin),
+			permissions: rolePermissions,
+			adminPolicies: ADMIN_POLICIES,
+			adminPolicyVersion: POLICY_VERSION,
+			legalAcceptanceRequired: legalStatus.pendingCount > 0,
+			pendingLegalDocuments: legalStatus.pending.map((doc: any) => ({
+				id: doc.id,
+				type: doc.type,
+				version: doc.version,
+				title: doc.title,
+				publishedAt: doc.publishedAt,
+			})),
 		},
 		'Authenticated user fetched',
+	);
+};
+
+export const getRequiredLegalDocumentsController = async (req: Request, res: Response): Promise<void> => {
+	if (!req.auth?.userId) {
+		throw new AppError('Authentication required', 401);
+	}
+
+	const [activeDocuments, pendingStatus] = await Promise.all([
+		getActiveLegalDocuments(),
+		getPendingLegalDocumentsForUser(req.auth.userId),
+	]);
+
+	sendSuccess(
+		res,
+		{
+			activeDocuments: activeDocuments.map((doc: any) => ({
+				id: doc.id,
+				type: doc.type,
+				version: doc.version,
+				title: doc.title,
+				content: doc.content,
+				publishedAt: doc.publishedAt,
+			})),
+			pendingDocuments: pendingStatus.pending.map((doc: any) => ({
+				id: doc.id,
+				type: doc.type,
+				version: doc.version,
+				title: doc.title,
+				content: doc.content,
+				publishedAt: doc.publishedAt,
+			})),
+			legalAcceptanceRequired: pendingStatus.pendingCount > 0,
+		},
+		'Required legal documents fetched',
+	);
+};
+
+export const acceptLegalDocumentsController = async (req: Request, res: Response): Promise<void> => {
+	if (!req.auth?.userId) {
+		throw new AppError('Authentication required', 401);
+	}
+
+	const documentIds = Array.isArray(req.body?.documentIds)
+		? req.body.documentIds.filter((value: unknown): value is string => typeof value === 'string' && value.trim().length > 0)
+		: [];
+
+	if (documentIds.length === 0) {
+		throw new AppError('documentIds must be a non-empty array', 400);
+	}
+
+	await recordUserAcceptances({
+		userId: req.auth.userId,
+		documentIds,
+		ipAddress: req.ip,
+		userAgent: req.get('user-agent') || undefined,
+		source: 'auth_legal_accept',
+	});
+
+	const pendingStatus = await getPendingLegalDocumentsForUser(req.auth.userId);
+
+	sendSuccess(
+		res,
+		{
+			legalAcceptanceRequired: pendingStatus.pendingCount > 0,
+			pendingDocuments: pendingStatus.pending.map((doc: any) => ({
+				id: doc.id,
+				type: doc.type,
+				version: doc.version,
+				title: doc.title,
+			})),
+		},
+		'Legal documents accepted',
 	);
 };
 

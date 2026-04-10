@@ -9,7 +9,10 @@ import { reactivatePatientSubscription } from './patient-v1.service';
 import { activateProviderSubscription } from './provider-subscription.service';
 import { activateAllPendingComponents, expirePendingComponents } from './provider-subscription.pending.service';
 import { extractDeclineReasonFromPhonePe, formatDeclineMessage } from './phonepe-decline-reasons.service';
+import { sendWhatsAppMessage } from './whatsapp.service';
+import { invoiceService } from './invoice.service';
 import { logger } from '../utils/logger';
+import { getPlatformConfig } from './platform-config.service';
 
 const redis = createClient({
   url: env.redisUrl,
@@ -35,12 +38,34 @@ const asMinor = (value: number): number => Math.max(0, Math.round(value));
 
 const sha256 = (input: string): string => crypto.createHash('sha256').update(input).digest('hex');
 
-const providerShareRatio = env.paymentProviderSharePercent / 100;
-const platformShareRatio = env.paymentPlatformSharePercent / 100;
+const DEFAULT_COMMISSION = {
+	providerPercent: env.paymentProviderSharePercent,
+	platformPercent: env.paymentPlatformSharePercent,
+};
 
-if (Math.round((providerShareRatio + platformShareRatio) * 100) !== 100) {
-	throw new Error('PAYMENT_PROVIDER_SHARE_PERCENT + PAYMENT_PLATFORM_SHARE_PERCENT must equal 100');
-}
+const normalizeCommission = (input: any) => {
+	const providerPercent = Number(input?.providerPercent ?? input?.provider ?? input?.provider_share ?? DEFAULT_COMMISSION.providerPercent);
+	const platformPercent = Number(input?.platformPercent ?? input?.platform ?? input?.platform_share ?? DEFAULT_COMMISSION.platformPercent);
+	if (!Number.isFinite(providerPercent) || !Number.isFinite(platformPercent)) {
+		return DEFAULT_COMMISSION;
+	}
+	if (Math.round(providerPercent + platformPercent) !== 100) {
+		return DEFAULT_COMMISSION;
+	}
+	return { providerPercent, platformPercent };
+};
+
+const resolveCommissionSplit = async (providerId?: string | null) => {
+	const config = await getPlatformConfig('commission', { allowMissing: true });
+	if (!config?.value || typeof config.value !== 'object') {
+		return normalizeCommission(DEFAULT_COMMISSION);
+	}
+	const value = config.value as any;
+	const overrides = value.providers || value.overrides || {};
+	const providerOverride = providerId ? overrides[providerId] : null;
+	const base = value.default || value.base || value;
+	return normalizeCommission(providerOverride || base);
+};
 
 export interface CreateFinancialSessionInput {
 	patientId: string;
@@ -158,6 +183,10 @@ export const createSessionPayment = async (input: CreateFinancialSessionInput) =
 		return { session, payment };
 	});
 
+	const commission = await resolveCommissionSplit(input.providerId);
+	const platformShareRatio = commission.platformPercent / 100;
+	const providerShareRatio = commission.providerPercent / 100;
+
 	return {
 		sessionId: created.session.id,
 		paymentId: created.payment.id,
@@ -212,6 +241,8 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 					throw new AppError('Invalid amount in PhonePe webhook', 422);
 				}
 
+				const commission = await resolveCommissionSplit(payment.providerId ?? null);
+				const providerShareRatio = commission.providerPercent / 100;
 				const therapistShareMinor = Math.floor(payloadAmountMinor * providerShareRatio);
 				const platformShareMinor = payloadAmountMinor - therapistShareMinor;
 
@@ -262,6 +293,45 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 					retryCount: Number(capturedPayment.retryCount || 0),
 					channel: 'session',
 				});
+
+				// Send WhatsApp payment success notification (non-blocking)
+				const patientUser = await db.user.findUnique({
+					where: { id: String(capturedPayment.patientId) },
+					select: { phone: true, name: true },
+				});
+				if (patientUser?.phone) {
+					sendWhatsAppMessage({
+						phoneNumber: patientUser.phone,
+						templateType: 'payment_success',
+						userType: 'patient',
+						templateVariables: {
+							name: patientUser.name || 'User',
+							amount: `₹${(capturedAmountMinor / 100).toFixed(2)}`,
+							planName: 'Session Payment',
+							expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-IN'),
+						},
+						flowEvent: 'PAYMENT_SUCCESS',
+						flowRole: 'PATIENT',
+						flowData: {
+							userId: String(capturedPayment.patientId || ''),
+							name: String(patientUser.name || 'User'),
+							amount: `₹${(capturedAmountMinor / 100).toFixed(2)}`,
+						},
+					}).catch((err) => console.error('[Payment] Failed to send payment_success WhatsApp:', err.message));
+				}
+
+					void invoiceService.ensureInvoiceForPayment(String(capturedPayment.id))
+						.then(() => invoiceService.transitionInvoiceLifecycleByPaymentId({
+							paymentId: String(capturedPayment.id),
+							nextStatus: 'PAID',
+							eventType: 'PAYMENT_CONFIRMED',
+						}))
+						.catch((err) => {
+						logger.error('[PaymentService] Session invoice generation failed', {
+							paymentId: String(capturedPayment.id),
+							error: err?.message || err,
+						});
+						});
 			}
 
 			logger.info(`[PaymentService] Session payment processed and capture recorded`, { merchantTransactionId });
@@ -327,7 +397,16 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 				return { handled: true, message: 'Patient subscription already processed' };
 			}
 
-			const activated = await reactivatePatientSubscription(userId, merchantTransactionId, String(planKey || ''));
+			const lockedMinor = Number(payment?.metadata?.priceLockedMinor ?? payment?.amountMinor ?? 0);
+			const planVersion = Number(payment?.metadata?.planVersion || 1);
+			const planName = String(payment?.metadata?.planName || '').trim() || undefined;
+
+			const activated = await reactivatePatientSubscription(userId, merchantTransactionId, String(planKey || ''), {
+				priceLockedMinor: lockedMinor,
+				planVersion,
+				planName,
+				priceLocked: lockedMinor > 0,
+			});
 
 			if (payment?.id) {
 				await db.financialPayment.update({
@@ -344,6 +423,9 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 							...(payment.metadata || {}),
 							type: 'patient_subscription',
 							plan: planKey,
+							planName: planName || payment?.metadata?.planName,
+							planVersion,
+							priceLockedMinor: lockedMinor,
 							subscriptionId: String(activated?.id || ''),
 							paymentVerifiedAt: new Date().toISOString(),
 						},
@@ -359,6 +441,45 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 					retryCount: Number(payment.retryCount || 0),
 					channel: 'patient_subscription',
 				});
+
+				// Send WhatsApp payment success for subscription (non-blocking)
+				const patientUser = await db.user.findUnique({
+					where: { id: userId },
+					select: { phone: true, name: true },
+				});
+				if (patientUser?.phone) {
+					sendWhatsAppMessage({
+						phoneNumber: patientUser.phone,
+						templateType: 'payment_success',
+						userType: 'patient',
+						templateVariables: {
+							name: patientUser.name || 'User',
+							amount: `₹${(Number(payment.amountMinor || 0) / 100).toFixed(2)}`,
+							planName: String(planKey || 'Subscription Plan'),
+							expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-IN'),
+						},
+						flowEvent: 'PAYMENT_SUCCESS',
+						flowRole: 'PATIENT',
+						flowData: {
+							userId,
+							name: String(patientUser.name || 'User'),
+							amount: `₹${(Number(payment.amountMinor || 0) / 100).toFixed(2)}`,
+						},
+					}).catch((err) => console.error('[Payment] Failed to send subscription payment_success WhatsApp:', err.message));
+				}
+
+				void invoiceService.ensureInvoiceForPayment(String(payment.id))
+					.then(() => invoiceService.transitionInvoiceLifecycleByPaymentId({
+						paymentId: String(payment.id),
+						nextStatus: 'PAID',
+						eventType: 'PAYMENT_CONFIRMED',
+					}))
+					.catch((err) => {
+					logger.error('[PaymentService] Subscription invoice generation failed', {
+						paymentId: String(payment.id),
+						error: err?.message || err,
+					});
+					});
 			}
 			
 			logger.info(`[PaymentService] Patient subscription activated successfully`, { merchantTransactionId, userId, planKey });
@@ -476,7 +597,14 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 				};
 			});
 
-			const activated = await activateProviderSubscription(providerId, planKey as any, merchantTransactionId);
+			const providerPlanVersion = Number(payment?.metadata?.planVersion || 1);
+			const providerLockedMinor = Number(payment?.metadata?.priceLockedMinor ?? payment?.amountMinor ?? 0);
+			const providerPriceInr = Number(payment?.metadata?.planPriceInr || 0) || (providerLockedMinor > 0 ? Math.round(providerLockedMinor / 100) : undefined);
+			const activated = await activateProviderSubscription(providerId, planKey as any, merchantTransactionId, {
+				priceOverride: providerPriceInr,
+				planVersion: providerPlanVersion,
+				priceLocked: providerLockedMinor > 0,
+			});
 
 			if (payment?.id) {
 				await db.financialPayment.update({
@@ -493,6 +621,8 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 							...(payment.metadata || {}),
 							type: 'provider_subscription',
 							plan: planKey,
+							planVersion: providerPlanVersion,
+							priceLockedMinor: providerLockedMinor,
 							subscriptionId: String(activated?.id || ''),
 							paymentVerifiedAt: new Date().toISOString(),
 							// Store Phase 2 activation details
@@ -511,6 +641,45 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 					retryCount: Number(payment.retryCount || 0),
 					channel: 'provider_subscription',
 				});
+
+				// Send WhatsApp payment success for provider subscription (non-blocking)
+				const providerUser = await db.user.findUnique({
+					where: { id: providerId },
+					select: { phone: true, name: true },
+				});
+				if (providerUser?.phone) {
+					sendWhatsAppMessage({
+						phoneNumber: providerUser.phone,
+						templateType: 'payment_success',
+						userType: 'therapist',
+						templateVariables: {
+							name: providerUser.name || 'Provider',
+							amount: `₹${(Number(payment.amountMinor || 0) / 100).toFixed(2)}`,
+							planName: String(planKey || 'Subscription Plan'),
+							expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-IN'),
+						},
+						flowEvent: 'PAYMENT_SUCCESS',
+						flowRole: 'THERAPIST',
+						flowData: {
+							userId: providerId,
+							name: String(providerUser.name || 'Provider'),
+							amount: `₹${(Number(payment.amountMinor || 0) / 100).toFixed(2)}`,
+						},
+					}).catch((err) => console.error('[Payment] Failed to send provider subscription payment_success WhatsApp:', err.message));
+				}
+
+				void invoiceService.ensureInvoiceForPayment(String(payment.id))
+					.then(() => invoiceService.transitionInvoiceLifecycleByPaymentId({
+						paymentId: String(payment.id),
+						nextStatus: 'PAID',
+						eventType: 'PAYMENT_CONFIRMED',
+					}))
+					.catch((err) => {
+					logger.error('[PaymentService] Provider subscription invoice generation failed', {
+						paymentId: String(payment.id),
+						error: err?.message || err,
+					});
+					});
 			}
 
 			logger.info(`[PaymentService] Provider subscription activated successfully (Phase 2)`, {

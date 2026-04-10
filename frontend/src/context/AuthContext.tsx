@@ -136,6 +136,7 @@ export const getPostLoginRoute = (user: AuthUser | null | undefined): string => 
 type AuthContextValue = {
   user: AuthUser | null;
   loading: boolean;
+  isReady: boolean;
   isAuthenticated: boolean;
   login: (identifier: string, password: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
@@ -257,6 +258,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     () => ({
       user,
       loading,
+      isReady: !loading,
       isAuthenticated: !!user,
       login,
       logout,

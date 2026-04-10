@@ -24,14 +24,23 @@ import {
   Sparkles
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { usePermission } from '../../hooks/usePermission';
 
 export default function OfferMarqueeEditor() {
+  const { isReady, canPolicy } = usePermission();
+  const canManageOffers = canPolicy('offers.manage');
   const [offers, setOffers] = useState<MarqueeOffer[]>([]);
   const [loading, setLoading] = useState(true);
   const [isPublishing, setIsPublishing] = useState(false);
 
   // Fetch all offers
   const fetchOffers = useCallback(async () => {
+    if (!isReady || !canManageOffers) {
+      setOffers([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       const res = await getAdminOffers();
       // Ensure offers are sorted by sortOrder
@@ -43,11 +52,20 @@ export default function OfferMarqueeEditor() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isReady, canManageOffers]);
 
   useEffect(() => {
+    if (!isReady || !canManageOffers) {
+      return;
+    }
     fetchOffers();
-  }, [fetchOffers]);
+  }, [isReady, canManageOffers, fetchOffers]);
+
+  if (!isReady) return null;
+
+  if (!canManageOffers) {
+    return <div className="p-12 text-center text-sm text-red-600">You do not have permission to manage offers.</div>;
+  }
 
   // Create a new offer with default values
   const handleCreate = async () => {

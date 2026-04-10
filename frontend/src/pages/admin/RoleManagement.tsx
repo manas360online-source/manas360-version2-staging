@@ -58,6 +58,7 @@ export default function RoleManagement() {
 
 	const normalizedRole = String(user?.role || '').toLowerCase().replace(/_/g, '');
 	const isSuperAdmin = normalizedRole === 'superadmin';
+	const canEditRoles = isSuperAdmin;
 
 	// Local state to track modified permissions before saving
 	const [editedRoles, setEditedRoles] = useState<Record<string, string[]>>({});
@@ -343,7 +344,7 @@ export default function RoleManagement() {
 											)}
 											<Button
 												onClick={() => handleSave(role.name)}
-												disabled={!isDirty || isSaving || role.name === 'superadmin'}
+												disabled={!canEditRoles || !isDirty || isSaving || role.name === 'superadmin'}
 												className="min-w-[100px]"
 												variant={isDirty ? 'primary' : 'secondary'}
 											>
@@ -367,7 +368,7 @@ export default function RoleManagement() {
 													<Switch
 														id={`${role.name}-${permission}`}
 														checked={hasPerm}
-														disabled={role.name === 'superadmin' || isSaving}
+														disabled={!canEditRoles || role.name === 'superadmin' || isSaving}
 														onCheckedChange={() => handlePermissionToggle(role.name, permission)}
 													/>
 													<label

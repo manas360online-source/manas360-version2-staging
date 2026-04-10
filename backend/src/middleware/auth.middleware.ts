@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { env } from '../config/env';
 import { AppError } from './error.middleware';
 import { verifyAccessToken } from '../utils/jwt';
+import { hasPendingLegalAcceptance } from '../services/legal-compliance.service';
 
 const getBearerToken = (authorizationHeader?: string): string | null => {
 	if (!authorizationHeader || !authorizationHeader.startsWith('Bearer ')) {
@@ -11,7 +12,21 @@ const getBearerToken = (authorizationHeader?: string): string | null => {
 	return authorizationHeader.slice(7);
 };
 
-export const requireAuth = (req: Request, _res: Response, next: NextFunction): void => {
+const isLegalAcceptanceBypassRoute = (path: string): boolean => {
+	const normalized = String(path || '').toLowerCase();
+	if (!normalized) return false;
+
+	return (
+		normalized.includes('/v1/auth/me')
+		|| normalized.includes('/v1/auth/refresh')
+		|| normalized.includes('/v1/auth/logout')
+		|| normalized.includes('/v1/auth/sessions')
+		|| normalized.includes('/v1/auth/legal/required')
+		|| normalized.includes('/v1/auth/legal/accept')
+	);
+};
+
+export const requireAuth = async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
 	const bearerToken = getBearerToken(req.headers.authorization);
 	const cookieToken = (req as Request & { cookies?: Record<string, string> }).cookies?.access_token;
 	const accessToken = bearerToken ?? cookieToken;
@@ -35,6 +50,17 @@ export const requireAuth = (req: Request, _res: Response, next: NextFunction): v
 			sessionId: payload.sessionId,
 			jti: payload.jti,
 		};
+
+		if (!isLegalAcceptanceBypassRoute(req.originalUrl)) {
+			const pendingLegalAcceptance = await hasPendingLegalAcceptance(payload.sub);
+			if (pendingLegalAcceptance) {
+				next(new AppError('Legal re-acceptance required', 428, {
+					code: 'LEGAL_REACCEPTANCE_REQUIRED',
+					message: 'Accept the latest legal documents to continue.',
+				}));
+				return;
+			}
+		}
 
 		next();
 	} catch (error) {

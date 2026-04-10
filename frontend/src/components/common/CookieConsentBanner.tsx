@@ -6,14 +6,25 @@ export default function CookieConsentBanner() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    const stored = window.localStorage.getItem(COOKIE_CONSENT_KEY);
-    if (!stored) {
+    try {
+      const ls = window && (window as any).localStorage;
+      const stored = ls && typeof ls.getItem === 'function' ? ls.getItem(COOKIE_CONSENT_KEY) : null;
+      if (!stored) {
+        setVisible(true);
+      }
+    } catch (e) {
+      // In some test environments window.localStorage may be undefined or mocked incorrectly.
       setVisible(true);
     }
   }, []);
 
   const setConsent = (value: 'accepted' | 'rejected') => {
-    window.localStorage.setItem(COOKIE_CONSENT_KEY, value);
+    try {
+      const ls = window && (window as any).localStorage;
+      if (ls && typeof ls.setItem === 'function') ls.setItem(COOKIE_CONSENT_KEY, value);
+    } catch (e) {
+      // ignore
+    }
     setVisible(false);
   };
 

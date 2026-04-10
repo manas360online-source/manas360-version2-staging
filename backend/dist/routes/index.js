@@ -4,7 +4,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const pricing_controller_1 = require("../controllers/pricing.controller");
+const corporate_controller_1 = require("../controllers/corporate.controller");
 const express_1 = require("express");
+const validate_middleware_1 = require("../middleware/validate.middleware");
 const auth_routes_1 = __importDefault(require("./auth.routes"));
 const patient_routes_1 = __importDefault(require("./patient.routes"));
 const therapist_routes_1 = __importDefault(require("./therapist.routes"));
@@ -39,10 +41,12 @@ const wallet_routes_1 = __importDefault(require("./wallet.routes"));
 const group_therapy_routes_1 = __importDefault(require("./group-therapy.routes"));
 const legal_routes_1 = __importDefault(require("./legal.routes"));
 const qr_routes_1 = __importDefault(require("./qr.routes"));
+const invoice_routes_1 = __importDefault(require("./invoice.routes"));
 const router = (0, express_1.Router)();
 const shared_routes_1 = __importDefault(require("./shared.routes"));
 // Defensive public pricing route for landing page
 router.get('/public/pricing/:category', pricing_controller_1.getLivePricingController);
+router.post('/corporate/demo-request', (0, validate_middleware_1.asyncHandler)(corporate_controller_1.submitCorporateDemoRequestController));
 // Mount shared routes for plans and other public data
 router.use('/v1/shared', shared_routes_1.default);
 router.get('/health', (_req, res) => {
@@ -101,4 +105,5 @@ router.use('/v1/game', game_routes_1.default);
 router.use('/v1/wallet', wallet_routes_1.default);
 router.use('/v1/legal', legal_routes_1.default);
 router.use('/v1/qr', qr_routes_1.default);
+router.use('/v1/invoices', invoice_routes_1.default);
 exports.default = router;

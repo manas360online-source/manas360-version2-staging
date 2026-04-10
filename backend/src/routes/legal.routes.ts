@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.middleware';
-import { requireRole } from '../middleware/rbac.middleware';
+import { requireAdminPolicy, requireRole } from '../middleware/rbac.middleware';
 import { asyncHandler } from '../middleware/validate.middleware';
 import { downloadLegalDocumentController } from '../controllers/admin.controller';
 
@@ -11,6 +11,7 @@ router.get(
   '/documents/:id',
   requireAuth,
   requireRole(['admin', 'complianceofficer']),
+  requireAdminPolicy('compliance.manage'),
   asyncHandler(downloadLegalDocumentController)
 );
 
