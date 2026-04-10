@@ -117,6 +117,8 @@ interface TherapistEarningsQuery {
 interface AdminListUsersQuery {
 	role?: string;
 	status?: string;
+	sortBy?: 'createdAt' | 'email' | 'role';
+	sortOrder?: 'asc' | 'desc';
 	page: number;
 	limit: number;
 }

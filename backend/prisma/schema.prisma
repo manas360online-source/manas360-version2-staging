@@ -72,6 +72,8 @@ model User {
   labOrdersAsPatient            LabOrder[]                  @relation("LabOrderPatient")
   labOrdersAsProvider           LabOrder[]                  @relation("LabOrderProvider")
   leadAssignments               LeadAssignment[]
+  legalAcceptances              UserAcceptance[]
+  legalDocumentsUpdated         LegalDocument[]             @relation("LegalDocumentUpdatedBy")
   patientLeads                  Lead[]                      @relation("LeadPatient")
   providerLeads                 Lead[]                      @relation("LeadProvider")
   subscriptions                 MarketplaceSubscription[]   @relation("UserSubscriptions")
@@ -80,12 +82,15 @@ model User {
   notifications                 Notification[]
   patientInvoices               PatientInvoice[]
   invoices                      Invoice[]                   @relation("UserInvoices")
+  invoiceEventsAsActor          InvoiceEvent[]              @relation("InvoiceEventsActor")
+  payouts                       Payout[]                    @relation("PayoutProvider")
   patient_pathway_state         patient_pathway_state?
   patientPaymentMethod          PatientPaymentMethod?
   patientProfile                PatientProfile?
   patientSubscription           PatientSubscription?
   phq9Assessments               PHQ9Assessment[]            @relation("UserPHQ9Assessments")
   platformAccess                PlatformAccess?
+  platformConfigsUpdated        PlatformConfig[]           @relation("PlatformConfigUpdatedBy")
   prescriptionsAsPatient        Prescription[]              @relation("PrescriptionPatient")
   prescriptionsAsProvider       Prescription[]              @relation("PrescriptionProvider")
   providerExtraQuestionsCreated ProviderExtraQuestion[]
@@ -217,6 +222,45 @@ model Consent {
   @@map("consents")
 }
 
+model LegalDocument {
+  id          String   @id @default(uuid())
+  type        String
+  version     Int
+  title       String
+  content     String
+  isActive    Boolean  @default(false)
+  publishedAt DateTime @default(now())
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  updatedBy   User?    @relation("LegalDocumentUpdatedBy", fields: [updatedById], references: [id])
+  acceptances UserAcceptance[]
+
+  @@unique([type, version])
+  @@index([type, isActive])
+  @@index([publishedAt])
+  @@map("legal_documents")
+}
+
+model UserAcceptance {
+  id          String   @id @default(uuid())
+  userId      String
+  documentId  String
+  documentVer Int
+  acceptedAt  DateTime @default(now())
+  ipAddress   String?
+  userAgent   String?
+  source      String   @default("web")
+  createdAt   DateTime @default(now())
+  document    LegalDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, documentId])
+  @@index([userId, acceptedAt])
+  @@index([documentId, acceptedAt])
+  @@map("user_acceptances")
+}
+
 model AuditEvent {
   id         String   @id @default(uuid())
   actorId    String?
@@ -255,6 +299,20 @@ model TenantPolicy {
 
   @@index([effectiveFrom])
   @@map("tenant_policies")
+}
+
+model PlatformConfig {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       Json
+  version     Int      @default(1)
+  updatedById String?  @map("updated_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  updatedBy   User?    @relation("PlatformConfigUpdatedBy", fields: [updatedById], references: [id])
+
+  @@index([key])
+  @@map("platform_configs")
 }
 
 model AuthSession {
@@ -1147,7 +1205,7 @@ model FinancialSession {
   @@index([patientId, createdAt(sort: Desc)])
   @@index([providerId, createdAt(sort: Desc)])
   @@index([status, createdAt(sort: Desc)])
-  @@index([providerId])  
+  @@index([providerId])
   @@map("financial_sessions")
 }
 
@@ -1344,7 +1402,7 @@ model PayoutRequest {
   providerId             String
   amountMinor            BigInt
   currency               String              @default("INR")
-  status                 PayoutStatus        @default(REQUESTED)
+  status                 PayoutRequestStatus @default(REQUESTED)
   minWithdrawalRuleMinor BigInt              @default(10000)
   requestedAt            DateTime            @default(now())
   approvedAt             DateTime?
@@ -1419,6 +1477,8 @@ model PatientSubscription {
   id                  String    @id @default(uuid())
   userId              String    @unique
   price               Int
+  planVersion         Int       @default(1)
+  priceLocked         Boolean   @default(false)
   status              String
   autoRenew           Boolean   @default(true)
   createdAt           DateTime  @default(now())
@@ -1516,10 +1576,12 @@ model InvoiceSequence {
 
 model Invoice {
   id                   String            @id @default(uuid())
-  paymentId            String            @unique
-  paymentTransactionId  String            @unique
+  tenantId             String?           @map("tenant_id")
+  paymentId            String?           @unique
+  paymentTransactionId String            @unique
   userId               String
   invoiceNumber        String            @unique
+  amountMinor          BigInt?           @map("amount_minor")
   invoiceYear          Int
   sequenceNumber       Int
   companyName          String            @default("MANAS360")
@@ -1539,25 +1601,122 @@ model Invoice {
   gstAmountMinor       BigInt
   totalMinor           BigInt
   status               String            @default("GENERATED")
+  lifecycleStatus      InvoiceStatus     @default(DRAFT) @map("lifecycle_status")
+  invoiceMethod        InvoiceMethod     @default(PDF) @map("invoice_method")
   retryCount           Int               @default(0)
   pdfPath              String?
+  pdfUrl               String?           @map("pdf_url")
   htmlPath             String?
   emailedTo            String?
   emailedAt            DateTime?
   sentAt               DateTime?
+  paidAt               DateTime?         @map("paid_at")
+  refundedAt           DateTime?         @map("refunded_at")
   failedAt             DateTime?
   deliveryError        String?
-  metadata             Json?
+  metadata             Json              @default("{}")
+  version              Int               @default(1)
   issuedAt             DateTime          @default(now())
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
-  payment              FinancialPayment   @relation("PaymentInvoice", fields: [paymentId], references: [id], onDelete: Cascade)
+  isPaidOut            Boolean           @default(false)
+  payment              FinancialPayment? @relation("PaymentInvoice", fields: [paymentId], references: [id], onDelete: SetNull)
   customer             User              @relation("UserInvoices", fields: [userId], references: [id], onDelete: Cascade)
+  payoutItem           PayoutItem?       @relation("InvoicePayoutItem")
+  events               InvoiceEvent[]
 
+  @@unique([id, version])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([tenantId, createdAt(sort: Desc)])
   @@index([userId, createdAt(sort: Desc)])
+  @@index([paymentId])
   @@index([paymentTransactionId])
-  @@index([status, createdAt])
+  @@index([isPaidOut])
   @@map("invoices")
+}
+
+model InvoiceEvent {
+  id             String   @id @default(uuid())
+  invoiceId      String   @map("invoice_id")
+  eventType      String   @map("event_type")
+  invoiceMethod  InvoiceMethod? @map("invoice_method")
+  beforeState    Json?    @map("before_state")
+  afterState     Json?    @map("after_state")
+  actorUserId    String?  @map("actor_user_id")
+  idempotencyKey String?  @map("idempotency_key")
+  createdAt      DateTime @default(now()) @map("created_at")
+  actor          User?    @relation("InvoiceEventsActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  invoice        Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@index([idempotencyKey])
+  @@map("invoice_events")
+}
+
+model Payout {
+  id            String       @id @default(uuid())
+  providerId    String
+  amountMinor   BigInt
+  currency      String       @default("INR")
+  status        PayoutStatus @default(PENDING)
+  method        PayoutMethod @default(BANK)
+  referenceId   String?
+  failureReason String?
+  createdAt     DateTime     @default(now())
+  processedAt   DateTime?
+  version       BigInt       @default(1)
+  provider      User         @relation("PayoutProvider", fields: [providerId], references: [id], onDelete: Cascade)
+  items         PayoutItem[] @relation("PayoutItems")
+
+  @@index([providerId, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@map("payouts")
+}
+
+model PayoutItem {
+  id          String  @id @default(uuid())
+  payoutId    String
+  invoiceId   String  @unique
+  amountMinor BigInt
+  payout      Payout  @relation("PayoutItems", fields: [payoutId], references: [id], onDelete: Cascade)
+  invoice     Invoice @relation("InvoicePayoutItem", fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([payoutId])
+  @@map("payout_items")
+}
+
+model IdempotencyKey {
+  id        String   @id
+  endpoint  String
+  actorId   String   @map("actor_id")
+  requestHash String   @map("request_hash")
+  response  Json
+  createdAt DateTime @default(now()) @map("created_at")
+  expiresAt DateTime @map("expires_at") // TTL: default 7 days
+
+  @@unique([id, endpoint, actorId])
+  @@unique([endpoint, actorId, requestHash])
+  @@index([endpoint, actorId])
+  @@index([expiresAt]) // For cleanup queries
+  @@map("idempotency_keys")
+}
+
+model SwipeItemMapping {
+  id             String   @id @default(uuid())
+  serviceId      String   @unique @map("service_id")
+  serviceName    String   @map("service_name")
+  swipeItemId    String   @map("swipe_item_id")
+  baseRateMinor  BigInt   @map("base_rate_minor")
+  sacCode        String?  @map("sac_code")
+  category       String   @map("category")
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([serviceId])
+  @@index([swipeItemId])
+  @@index([isActive])
+  @@map("swipe_item_mappings")
 }
 
 model PatientExercise {
@@ -1905,6 +2064,8 @@ model ProviderSubscription {
   providerId          String                    @unique
   plan                ProviderPlan
   price               Int
+  planVersion         Int                       @default(1)
+  priceLocked         Boolean                   @default(false)
   leadsPerWeek        Int
   startDate           DateTime                  @default(now())
   expiryDate          DateTime
@@ -2725,7 +2886,7 @@ enum WalletTxnStatus {
   VOIDED
 }
 
-enum PayoutStatus {
+enum PayoutRequestStatus {
   REQUESTED
   APPROVED
   PAID
@@ -2838,4 +2999,29 @@ enum WalletCreditStatus {
   AVAILABLE
   USED
   EXPIRED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum InvoiceMethod {
+  PDF
+  SWIPE
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum PayoutMethod {
+  BANK
+  UPI
 }

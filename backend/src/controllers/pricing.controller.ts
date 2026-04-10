@@ -10,6 +10,7 @@ import type { Request, Response } from 'express';
 import { AppError } from '../middleware/error.middleware';
 import { sendSuccess } from '../utils/response';
 import { getPricingConfig, getAdminPricingConfigWithImpact, updatePricingConfig } from '../services/pricing.service';
+import { recordAdminAuditEvent } from '../services/admin-audit.service';
 
 export const getPricingConfigController = async (_req: Request, res: Response): Promise<void> => {
 	const data = await getPricingConfig();
@@ -27,7 +28,34 @@ export const updateAdminPricingConfigController = async (req: Request, res: Resp
 	if (!hasBody) {
 		throw new AppError('Pricing update payload is required', 422);
 	}
+	const actorId = (req as Request & { auth?: { userId?: string } }).auth?.userId ?? null;
+	const beforeConfig = await getAdminPricingConfigWithImpact();
+	const data = await updatePricingConfig(body, actorId);
 
-	const data = await updatePricingConfig(body);
+	if (actorId) {
+		await recordAdminAuditEvent({
+			userId: actorId,
+			action: 'PRICING_UPDATED',
+			resource: 'PricingConfig',
+			details: {
+				changedKeys: Object.keys(body),
+				before: {
+					platformFee: beforeConfig.platformFee?.monthlyFee ?? null,
+					surchargePercent: beforeConfig.surchargePercent,
+					sessionPricingCount: beforeConfig.sessionPricing.length,
+					platformPlansCount: beforeConfig.platformPlans.length,
+					premiumBundlesCount: beforeConfig.premiumBundles.length,
+				},
+				after: {
+					platformFee: data.platformFee?.monthlyFee ?? null,
+					surchargePercent: data.surchargePercent,
+					sessionPricingCount: data.sessionPricing.length,
+					platformPlansCount: data.plans.length,
+					premiumBundlesCount: data.premiumBundles.length,
+				},
+			},
+		});
+	}
+
 	sendSuccess(res, data, 'Pricing configuration updated');
 };

@@ -41,6 +41,7 @@ const wallet_routes_1 = __importDefault(require("./wallet.routes"));
 const group_therapy_routes_1 = __importDefault(require("./group-therapy.routes"));
 const legal_routes_1 = __importDefault(require("./legal.routes"));
 const qr_routes_1 = __importDefault(require("./qr.routes"));
+const invoice_routes_1 = __importDefault(require("./invoice.routes"));
 const router = (0, express_1.Router)();
 const shared_routes_1 = __importDefault(require("./shared.routes"));
 // Defensive public pricing route for landing page
@@ -104,4 +105,5 @@ router.use('/v1/game', game_routes_1.default);
 router.use('/v1/wallet', wallet_routes_1.default);
 router.use('/v1/legal', legal_routes_1.default);
 router.use('/v1/qr', qr_routes_1.default);
+router.use('/v1/invoices', invoice_routes_1.default);
 exports.default = router;

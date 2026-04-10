@@ -113,6 +113,11 @@ export const initiateProviderSubscriptionPayment = async (
 				: Number(plan.price || 0) * 100,
 		),
 	);
+	const planVersion = 1;
+	const lockedMinor = Number.isFinite(Number(options?.metadata?.leadPlanMinor))
+		? Number(options?.metadata?.leadPlanMinor)
+		: amountMinor;
+	const planPriceInr = Math.round(lockedMinor / 100);
 
 	let redirectUrl: string;
 	try {
@@ -156,6 +161,9 @@ export const initiateProviderSubscriptionPayment = async (
 				metadata: {
 					type: 'provider_subscription',
 					plan: planKey,
+					planVersion,
+					priceLockedMinor: lockedMinor,
+					planPriceInr,
 					redirectUrl,
 					idempotencyKey: subscriptionIdempotencyKey,
 					...(options?.metadata || {}),
@@ -187,7 +195,11 @@ export const initiateProviderSubscriptionPayment = async (
 
 	if (shouldBypass) {
 		const { activateProviderSubscription } = await import('./provider-subscription.service');
-		await activateProviderSubscription(providerId, planKey);
+		await activateProviderSubscription(providerId, planKey, undefined, {
+			priceOverride: Number(plan.price || 0),
+			planVersion: 1,
+			priceLocked: Number(plan.price || 0) > 0,
+		});
 	}
 
 	return {

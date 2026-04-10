@@ -1,7 +1,7 @@
 import { randomBytes } from 'crypto';
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/error.middleware';
-import { roleHierarchy } from '../middleware/rbac.middleware';
+import { ADMIN_POLICIES, POLICY_VERSION, getRolePermissionsForRole, roleHierarchy } from '../middleware/rbac.middleware';
 import { buildPaginationMeta, normalizePagination } from '../utils/pagination';
 import type { PaginationMeta } from '../utils/pagination';
 import { hashPassword } from '../utils/hash';
@@ -195,9 +195,13 @@ export const listUsers = async (
 	{
 		role,
 		status,
+		sortBy,
+		sortOrder,
 	}: {
 		role?: string;
 		status?: string;
+		sortBy?: 'createdAt' | 'email' | 'role';
+		sortOrder?: 'asc' | 'desc';
 	} = {},
 ): Promise<AdminListUsersResponse> => {
 	if (status && !['active', 'deleted'].includes(status.toLowerCase())) {
@@ -216,6 +220,8 @@ export const listUsers = async (
 	}
 
 	const roleFilter = mapRoleFilterToEnum(role);
+	const resolvedSortBy = sortBy ?? 'createdAt';
+	const resolvedSortOrder = sortOrder ?? 'desc';
 
 	const normalized = normalizePagination(
 		{ page, limit },
@@ -225,7 +231,7 @@ export const listUsers = async (
 	const [users, totalItems] = await Promise.all([
 		db.user.findMany({
 			where: roleFilter ? { role: roleFilter } : undefined,
-			orderBy: { createdAt: 'desc' },
+			orderBy: { [resolvedSortBy]: resolvedSortOrder },
 			skip: normalized.skip,
 			take: normalized.limit,
 			select: {
@@ -886,7 +892,7 @@ export const resolveFeedback = async (feedbackId: string): Promise<void> => {
 /**
  * Update user status (Active/Suspended/etc)
  */
-export const updateUserStatus = async (userId: string, status: string): Promise<void> => {
+export const updateUserStatus = async (userId: string, status: string, _reason?: string): Promise<void> => {
 	const normalizedStatus = status.toUpperCase();
 	if (!['ACTIVE', 'SUSPENDED', 'DISABLED'].includes(normalizedStatus)) {
 		throw new AppError('Invalid status. Must be ACTIVE, SUSPENDED, or DISABLED', 400);
@@ -901,6 +907,90 @@ export const updateUserStatus = async (userId: string, status: string): Promise<
 		where: { id: userId },
 		data: { status: normalizedStatus as any },
 	});
+};
+
+export const updateUsersBulkStatus = async (
+	userIds: string[],
+	status: string,
+	adminUserId: string,
+	actorRole?: string,
+	reason?: string,
+): Promise<{
+	requestedCount: number;
+	successCount: number;
+	failedCount: number;
+	failedIds: string[];
+	status: string;
+	reason?: string;
+}> => {
+	if (!Array.isArray(userIds) || userIds.length === 0) {
+		throw new AppError('userIds must be a non-empty array', 400);
+	}
+
+	const dedupedUserIds = Array.from(new Set(userIds));
+	if (dedupedUserIds.length > 100) {
+		throw new AppError('Bulk limit exceeded. Maximum 100 users per request.', 400);
+	}
+
+	const normalizedStatus = status.toUpperCase();
+	if (!['ACTIVE', 'SUSPENDED', 'DISABLED'].includes(normalizedStatus)) {
+		throw new AppError('Invalid status. Must be ACTIVE, SUSPENDED, or DISABLED', 400);
+	}
+
+	const existingUsers = await db.user.findMany({
+		where: { id: { in: dedupedUserIds } },
+		select: { id: true },
+	});
+
+	const existingIds = new Set(existingUsers.map((user: { id: string }) => user.id));
+	const failedIds = dedupedUserIds.filter((id) => !existingIds.has(id));
+	const targetIds = dedupedUserIds.filter((id) => existingIds.has(id));
+
+	let successCount = 0;
+	if (targetIds.length > 0) {
+		const updateResult = await db.user.updateMany({
+			where: { id: { in: targetIds } },
+			data: {
+				status: normalizedStatus as any,
+			},
+		});
+		successCount = Number(updateResult.count || 0);
+	}
+
+	try {
+		if (db.auditLog && adminUserId) {
+			await db.auditLog.create({
+				data: {
+					userId: adminUserId,
+					action: 'BULK_USER_STATUS_UPDATE',
+					resource: 'User',
+					details: {
+						policy: 'users.moderate',
+						policyVersion: POLICY_VERSION,
+						actorRole: actorRole || null,
+						status: normalizedStatus,
+						reason: reason || null,
+						requestedCount: dedupedUserIds.length,
+						successCount,
+						failedCount: failedIds.length,
+						affectedIds: targetIds,
+						failedIds,
+					},
+				},
+			});
+		}
+	} catch {
+		// keep bulk operation successful even if audit write fails
+	}
+
+	return {
+		requestedCount: dedupedUserIds.length,
+		successCount,
+		failedCount: failedIds.length,
+		failedIds,
+		status: normalizedStatus,
+		reason,
+	};
 };
 
 /**
@@ -966,6 +1056,64 @@ export const getPlatformAdminRoleInventory = async (): Promise<PlatformAdminRole
 	}
 
 	return items;
+};
+
+const toRbacRoleName = (value: unknown):
+	| 'admin'
+	| 'superadmin'
+	| 'clinicaldirector'
+	| 'financemanager'
+	| 'complianceofficer'
+	| null => {
+	const normalized = String(value || '').toLowerCase().replace(/[_\s-]/g, '');
+	if (normalized === 'admin') return 'admin';
+	if (normalized === 'superadmin') return 'superadmin';
+	if (normalized === 'clinicaldirector') return 'clinicaldirector';
+	if (normalized === 'financemanager') return 'financemanager';
+	if (normalized === 'complianceofficer') return 'complianceofficer';
+	return null;
+};
+
+export const getEffectiveAdminPolicies = async (userId: string): Promise<{
+	userId: string;
+	role: string;
+	permissions: string[];
+	policyVersion: number;
+	allowedPolicies: string[];
+	deniedPolicies: string[];
+}> => {
+	const user = await db.user.findUnique({
+		where: { id: userId },
+		select: { id: true, role: true, isDeleted: true },
+	});
+
+	if (!user || user.isDeleted) {
+		throw new AppError('Admin user not found', 404);
+	}
+
+	const role = toRbacRoleName(user.role);
+	if (!role) {
+		throw new AppError('User is not a platform admin', 403);
+	}
+
+	const permissions = await getRolePermissionsForRole(role);
+	const allowedPolicies = Object.entries(ADMIN_POLICIES)
+		.filter(([, requiredPermissions]) => requiredPermissions.some((perm) => permissions.includes(perm)))
+		.map(([policyKey]) => policyKey)
+		.sort((a, b) => a.localeCompare(b));
+
+	const deniedPolicies = Object.keys(ADMIN_POLICIES)
+		.filter((policyKey) => !allowedPolicies.includes(policyKey))
+		.sort((a, b) => a.localeCompare(b));
+
+	return {
+		userId,
+		role,
+		permissions: [...permissions].sort((a, b) => a.localeCompare(b)),
+		policyVersion: POLICY_VERSION,
+		allowedPolicies,
+		deniedPolicies,
+	};
 };
 
 export const createPlatformAdminAccount = async (
@@ -1066,5 +1214,84 @@ export const createPlatformAdminAccount = async (
 		},
 		temporaryPassword,
 		isNewAccount: !existing,
+	};
+};
+
+export const searchAdminEntities = async (
+	q: string,
+	limit = 8,
+): Promise<{
+	users: Array<{ id: string; name: string; email: string; role: string }>;
+	payments: Array<{ id: string; status: string; amountMinor: number; currency: string }>;
+	sessions: Array<{ id: string; status: string; scheduledAt: string | null }>;
+}> => {
+	const query = String(q || '').trim();
+	if (query.length < 2) {
+		return { users: [], payments: [], sessions: [] };
+	}
+
+	const safeLimit = Math.max(1, Math.min(limit, 20));
+
+	const [users, payments, sessions] = await Promise.all([
+		db.user
+			.findMany({
+				where: {
+					OR: [
+						{ email: { contains: query, mode: 'insensitive' } },
+						{ firstName: { contains: query, mode: 'insensitive' } },
+						{ lastName: { contains: query, mode: 'insensitive' } },
+					],
+				},
+				select: { id: true, firstName: true, lastName: true, email: true, role: true },
+				take: safeLimit,
+				orderBy: { createdAt: 'desc' },
+			})
+			.catch(() => []),
+		db.financialPayment
+			.findMany({
+				where: {
+					OR: [
+						{ id: { contains: query, mode: 'insensitive' } },
+						{ merchantTransactionId: { contains: query, mode: 'insensitive' } },
+					],
+				},
+				select: { id: true, status: true, amountMinor: true, currency: true },
+				take: safeLimit,
+				orderBy: { createdAt: 'desc' },
+			})
+			.catch(() => []),
+		db.therapySession
+			.findMany({
+				where: {
+					OR: [
+						{ id: { contains: query, mode: 'insensitive' } },
+						{ status: { contains: query, mode: 'insensitive' } },
+					],
+				},
+				select: { id: true, status: true, dateTime: true },
+				take: safeLimit,
+				orderBy: { dateTime: 'desc' },
+			})
+			.catch(() => []),
+	]);
+
+	return {
+		users: users.map((user: any) => ({
+			id: user.id,
+			name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unnamed User',
+			email: user.email,
+			role: String(user.role || '').toLowerCase(),
+		})),
+		payments: payments.map((payment: any) => ({
+			id: payment.id,
+			status: String(payment.status || 'UNKNOWN'),
+			amountMinor: Number(payment.amountMinor || 0),
+			currency: String(payment.currency || 'INR'),
+		})),
+		sessions: sessions.map((session: any) => ({
+			id: session.id,
+			status: String(session.status || 'UNKNOWN'),
+			scheduledAt: session.dateTime ? new Date(session.dateTime).toISOString() : null,
+		})),
 	};
 };

@@ -1,6 +1,6 @@
 import { AppError } from '../middleware/error.middleware';
 import { prisma } from '../config/db';
-import { getActivePlatformPlan } from './pricing.service';
+import { getActivePlatformPlan, getPricingConfigVersion } from './pricing.service';
 import { initiatePhonePePayment } from './phonepe.service';
 import { env } from '../config/env';
 import { logger } from '../utils/logger';
@@ -25,6 +25,7 @@ export const initiatePatientSubscriptionPayment = async (
 ) => {
 	const plan = await getActivePlatformPlan(planKey);
 	if (!plan) throw new AppError('Invalid subscription plan', 422);
+	const planVersion = await getPricingConfigVersion();
 
 	const existingSubscription = await prisma.patientSubscription.findUnique({ where: { userId } }).catch(() => null);
 	const isAnyActiveSubscription = Boolean(
@@ -91,6 +92,7 @@ export const initiatePatientSubscriptionPayment = async (
 				: Number(plan.price || 0) * 100,
 		),
 	);
+	const planPriceInr = Math.round(amountMinor / 100);
 	const frontendBaseUrl = env.frontendUrl;
 	const paymentStatusBase = `${frontendBaseUrl}/#/payment/status`;
 	const redirectUrlTarget = String(options?.redirectUrlOverride || `${paymentStatusBase}?transactionId=${transactionId}&status=SUCCESS`).trim();
@@ -138,6 +140,10 @@ export const initiatePatientSubscriptionPayment = async (
 				metadata: {
 					type: 'patient_subscription',
 					plan: planKey,
+					planName: plan.name,
+					planVersion,
+					priceLockedMinor: amountMinor,
+					planPriceInr,
 					redirectUrl,
 					idempotencyKey: subscriptionIdempotencyKey,
 					redirectUrlOverride: String(options?.redirectUrlOverride || '').trim() || undefined,
@@ -174,7 +180,9 @@ export const initiatePatientSubscriptionPayment = async (
 			where: { userId },
 			update: {
 				planName: plan.name,
-				price: Number(plan.price || 0),
+				price: Number(planPriceInr || plan.price || 0),
+				planVersion,
+				priceLocked: true,
 				status: 'active',
 				renewalDate: nextRenewalDate,
 				autoRenew: true,
@@ -184,7 +192,9 @@ export const initiatePatientSubscriptionPayment = async (
 			create: {
 				userId,
 				planName: plan.name,
-				price: Number(plan.price || 0),
+				price: Number(planPriceInr || plan.price || 0),
+				planVersion,
+				priceLocked: true,
 				status: 'active',
 				renewalDate: nextRenewalDate,
 				billingCycle: 'monthly',

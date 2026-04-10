@@ -17,9 +17,12 @@ import { initLeadDistributionCrons } from './cron/lead-distribution.cron';
 import { initializePhonePeTokenRefresh, cleanupPhonePeTokenRefresh } from './services/phonepe.service';
 import { calculateLiveMetrics } from './controllers/admin-metrics.controller';
 import { io as socketIO } from './socket';
+import { cleanupIdempotencyKeys } from './services/idempotency.service';
+import { ensureSuperadminFromEnv } from './services/superadmin-bootstrap.service';
 
 const startServer = async (): Promise<void> => {
 	await connectDatabase();
+	await ensureSuperadminFromEnv();
 
 	// Initialize PhonePe OAuth token refresh (proactive background refresh)
 	await initializePhonePeTokenRefresh();
@@ -85,6 +88,13 @@ const startServer = async (): Promise<void> => {
 			console.error('[CRON] Metrics push failed', err);
 		}
 	}, 30000);
+
+	// Financial idempotency retention cleanup (every 6h, retain 7 days).
+	setInterval(() => {
+		cleanupIdempotencyKeys(7).catch((err) => {
+			console.error('[CRON] Idempotency cleanup failed', err);
+		});
+	}, 6 * 60 * 60 * 1000);
 
 	const shutdown = async (signal: string): Promise<void> => {
 		console.log(`${signal} received. Shutting down gracefully...`);

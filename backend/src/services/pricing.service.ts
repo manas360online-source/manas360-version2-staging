@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import { prisma } from '../config/db';
 import { PATIENT_PLANS } from '../config/patientPlans';
+import { getPlatformConfig, upsertPlatformConfig } from './platform-config.service';
 
 const db = prisma as any;
 let initialized = false;
@@ -41,6 +42,11 @@ type UpdatePricingInput = {
 	premium_bundles?: PremiumBundleInput[];
 	preferredTimeSurcharge?: number;
 	preferred_time_surcharge?: number;
+};
+
+type CommissionSplit = {
+	providerPercent: number;
+	platformPercent: number;
 };
 
 const toIso = (value: any): string | null => {
@@ -109,13 +115,68 @@ const ensurePricingTables = async (): Promise<void> => {
 	initialized = true;
 };
 
-export const getPricingConfig = async () => {
+const normalizePricingPayload = (value: any) => {
+	const platformPlans = Array.isArray(value?.platformPlans)
+		? value.platformPlans
+		: Array.isArray(value?.plans)
+			? value.plans
+			: [];
+	const sessionPricing = Array.isArray(value?.sessionPricing) ? value.sessionPricing : [];
+	const premiumBundles = Array.isArray(value?.premiumBundles) ? value.premiumBundles : [];
+	const surchargePercent = Number(value?.surchargePercent ?? 0);
+
+	return {
+		platformFee: value?.platformFee ?? null,
+		plans: platformPlans.map((plan: any) => ({
+			id: plan.id ?? null,
+			key: plan.planKey ?? plan.key ?? plan.plan_key ?? '',
+			name: plan.planName ?? plan.name ?? plan.plan_name ?? '',
+			price: Number(plan.price ?? 0),
+			billingCycle: plan.billingCycle ?? plan.billing_cycle ?? 'monthly',
+			active: plan.active !== false,
+			description: plan.description ?? null,
+		})),
+		sessions: sessionPricing.map((session: any) => ({
+			providerType: session.providerType ?? session.provider_type ?? 'therapist',
+			duration: Number(session.durationMinutes ?? session.duration ?? 0),
+			price: Number(session.price ?? 0),
+		})),
+		sessionPricing: sessionPricing.map((session: any) => ({
+			id: session.id ?? null,
+			providerType: session.providerType ?? session.provider_type ?? 'therapist',
+			durationMinutes: Number(session.durationMinutes ?? session.duration ?? 0),
+			price: Number(session.price ?? 0),
+			providerShare: Number(session.providerShare ?? 0),
+			platformShare: Number(session.platformShare ?? 0),
+			active: session.active !== false,
+			effectiveFrom: session.effectiveFrom ?? null,
+			effectiveTo: session.effectiveTo ?? null,
+		})),
+		addons: premiumBundles.map((bundle: any) => ({
+			key: bundle.bundleKey ?? bundle.bundle_key ?? bundle.bundleName ?? bundle.bundle_name ?? '',
+			name: bundle.bundleName ?? bundle.bundle_name ?? '',
+			price: Number(bundle.price ?? 0),
+		})),
+		premiumBundles: premiumBundles.map((bundle: any) => ({
+			id: bundle.id ?? null,
+			bundleName: bundle.bundleName ?? bundle.bundle_name ?? '',
+			minutes: Number(bundle.minutes ?? 0),
+			price: Number(bundle.price ?? 0),
+			active: bundle.active !== false,
+			effectiveFrom: bundle.effectiveFrom ?? null,
+			effectiveTo: bundle.effectiveTo ?? null,
+		})),
+		surchargePercent: Number.isFinite(surchargePercent) ? surchargePercent : 0,
+	};
+};
+
+const getPricingConfigFromTables = async () => {
 	await ensurePricingTables();
 	const plans = await db.$queryRawUnsafe(`SELECT * FROM platform_subscription WHERE active = TRUE`);
 	const sessions = await db.$queryRawUnsafe(`SELECT * FROM session_pricing WHERE active = TRUE`);
 	const addons = await db.$queryRawUnsafe(`SELECT * FROM product_addons WHERE active = TRUE`);
 	const settings = await db.$queryRawUnsafe(`SELECT * FROM system_settings WHERE key = 'preferred_time_surcharge'`);
-	
+
 	const surchargePercent = Number(settings?.[0]?.value || 20);
 
 	return {
@@ -142,7 +203,7 @@ export const getPricingConfig = async () => {
 		sessions: sessions.map((s: any) => ({
 			providerType: s.provider_type,
 			duration: s.duration_minutes,
-			price: s.price
+			price: s.price,
 		})),
 		sessionPricing: sessions.map((s: any) => ({
 			id: s.id,
@@ -158,7 +219,7 @@ export const getPricingConfig = async () => {
 		addons: addons.map((a: any) => ({
 			key: a.addon_key,
 			name: a.addon_name,
-			price: a.price
+			price: a.price,
 		})),
 		premiumBundles: addons.map((a: any) => ({
 			id: a.id,
@@ -169,8 +230,59 @@ export const getPricingConfig = async () => {
 			effectiveFrom: toIso(a.created_at),
 			effectiveTo: null,
 		})),
-		surchargePercent
+		surchargePercent,
 	};
+};
+
+const buildPlatformPricingPayload = (value: any) => ({
+	platformFee: value.platformFee ?? null,
+	platformPlans: (value.plans || []).map((plan: any) => ({
+		planKey: plan.key ?? plan.planKey ?? '',
+		planName: plan.name ?? plan.planName ?? '',
+		price: Number(plan.price ?? 0),
+		billingCycle: plan.billingCycle ?? 'monthly',
+		description: plan.description ?? null,
+		active: plan.active !== false,
+	})),
+	sessionPricing: value.sessionPricing ?? [],
+	premiumBundles: value.premiumBundles ?? [],
+	surchargePercent: Number(value.surchargePercent ?? 0),
+});
+
+const normalizeCommissionSplit = (input: any): CommissionSplit | null => {
+	const providerPercent = Number(input?.providerPercent ?? input?.provider ?? input?.provider_share);
+	const platformPercent = Number(input?.platformPercent ?? input?.platform ?? input?.platform_share);
+
+	if (!Number.isFinite(providerPercent) || !Number.isFinite(platformPercent)) {
+		return null;
+	}
+	if (providerPercent < 0 || providerPercent > 100 || platformPercent < 0 || platformPercent > 100) {
+		return null;
+	}
+	if (Math.round(providerPercent + platformPercent) !== 100) {
+		return null;
+	}
+
+	return { providerPercent, platformPercent };
+};
+
+const getDefaultCommissionSplit = async (): Promise<CommissionSplit | null> => {
+	const config = await getPlatformConfig('commission', { allowMissing: true });
+	if (!config?.value || typeof config.value !== 'object') {
+		return null;
+	}
+
+	const value = config.value as any;
+	return normalizeCommissionSplit(value.default || value.base || value);
+};
+
+export const getPricingConfig = async () => {
+	const platformConfig = await getPlatformConfig('pricing', { allowMissing: true });
+	if (platformConfig?.value && typeof platformConfig.value === 'object') {
+		return normalizePricingPayload(platformConfig.value as any);
+	}
+
+	return getPricingConfigFromTables();
 };
 
 const toAddonKey = (bundleName: string): string => {
@@ -182,8 +294,9 @@ const toAddonKey = (bundleName: string): string => {
 		.slice(0, 50);
 };
 
-export const updatePricingConfig = async (input: any) => {
+export const updatePricingConfig = async (input: any, updatedById?: string | null) => {
 	await ensurePricingTables();
+	const defaultCommissionSplit = await getDefaultCommissionSplit();
 
 	const normalizedInput: UpdatePricingInput = {
 		platformFee: input.platformFee ?? input.platform_fee,
@@ -196,8 +309,13 @@ export const updatePricingConfig = async (input: any) => {
 	if (normalizedInput.preferredTimeSurcharge !== undefined) {
         const val = normalizedInput.preferredTimeSurcharge;
 		await db.$executeRawUnsafe(
-			`UPDATE system_settings SET value = $1 WHERE key = 'preferred_time_surcharge'`,
-			String(val)
+			`INSERT INTO system_settings (id, key, value)
+			 VALUES ($1, 'preferred_time_surcharge', $2)
+			 ON CONFLICT (key) DO UPDATE SET
+			   value = EXCLUDED.value,
+			   updated_at = NOW()`,
+			randomUUID(),
+			String(val),
 		);
 	}
 
@@ -229,22 +347,64 @@ export const updatePricingConfig = async (input: any) => {
 		);
 	}
 
-    if (normalizedInput.sessionPricing && Array.isArray(normalizedInput.sessionPricing)) {
-        for (const session of normalizedInput.sessionPricing) {
-            const duration = Number((session as any).durationMinutes ?? (session as any).duration);
-            if (!session.providerType || !Number.isFinite(duration)) continue;
-            
-            const price = Number(session.price);
-            if (Number.isNaN(price)) continue;
+	if (normalizedInput.sessionPricing && Array.isArray(normalizedInput.sessionPricing)) {
+		for (const session of normalizedInput.sessionPricing) {
+			const duration = Number((session as any).durationMinutes ?? (session as any).duration);
+			if (!session.providerType || !Number.isFinite(duration)) continue;
 
-            const providerShare = Math.round(price * 0.7);
-            const platformShare = price - providerShare;
-            await db.$executeRawUnsafe(
-                `UPDATE session_pricing SET price = $1, provider_share = $2, platform_share = $3 WHERE provider_type = $4 AND duration_minutes = $5`,
-                price, providerShare, platformShare, session.providerType, duration
-            );
-        }
-    }
+			const price = Number(session.price);
+			if (!Number.isFinite(price) || price < 0) continue;
+
+			const explicitProviderShare = Number((session as any).providerShare);
+			const explicitPlatformShare = Number((session as any).platformShare);
+			const hasExplicitProvider = Number.isFinite(explicitProviderShare);
+			const hasExplicitPlatform = Number.isFinite(explicitPlatformShare);
+
+			let providerShare = 0;
+			let platformShare = 0;
+
+			if (hasExplicitProvider || hasExplicitPlatform) {
+				if (hasExplicitProvider && hasExplicitPlatform) {
+					providerShare = explicitProviderShare;
+					platformShare = explicitPlatformShare;
+				} else if (hasExplicitProvider) {
+					providerShare = explicitProviderShare;
+					platformShare = price - providerShare;
+				} else {
+					platformShare = explicitPlatformShare;
+					providerShare = price - platformShare;
+				}
+
+				if (providerShare < 0 || platformShare < 0 || Math.round(providerShare + platformShare) !== price) {
+					throw new Error(`Invalid explicit session split for ${session.providerType}/${duration}`);
+				}
+			} else {
+				if (!defaultCommissionSplit) {
+					throw new Error('Missing default commission config. Configure key "commission" before updating session pricing without explicit shares.');
+				}
+				platformShare = Math.round((price * defaultCommissionSplit.platformPercent) / 100);
+				providerShare = price - platformShare;
+			}
+
+			await db.$executeRawUnsafe(
+				`INSERT INTO session_pricing (id, provider_type, duration_minutes, price, provider_share, platform_share, active)
+				 VALUES ($1, $2, $3, $4, $5, $6, $7)
+				 ON CONFLICT (provider_type, duration_minutes) DO UPDATE SET
+				   price = EXCLUDED.price,
+				   provider_share = EXCLUDED.provider_share,
+				   platform_share = EXCLUDED.platform_share,
+				   active = EXCLUDED.active,
+				   updated_at = NOW()`,
+				randomUUID(),
+				session.providerType,
+				duration,
+				price,
+				providerShare,
+				platformShare,
+				session.active !== false,
+			);
+		}
+	}
 
 	if (normalizedInput.premiumBundles && Array.isArray(normalizedInput.premiumBundles)) {
 		for (const bundle of normalizedInput.premiumBundles) {
@@ -287,6 +447,13 @@ export const updatePricingConfig = async (input: any) => {
 		}
 	}
 
+	const latest = await getPricingConfigFromTables();
+	await upsertPlatformConfig({
+		key: 'pricing',
+		value: buildPlatformPricingPayload(latest),
+		updatedById: updatedById ?? null,
+	});
+
 	return getPricingConfig();
 };
 
@@ -322,6 +489,11 @@ export const getActivePlatformPlan = async (planKey?: string) => {
 		return { key: 'free', name: 'Free Tier', price: 0 };
 	}
 	return { key: row[0].plan_key, name: row[0].plan_name, price: row[0].price };
+};
+
+export const getPricingConfigVersion = async (): Promise<number> => {
+	const config = await getPlatformConfig('pricing', { allowMissing: true });
+	return Number(config?.version || 1);
 };
 
 export const getAdminPricingConfigWithImpact = async () => {

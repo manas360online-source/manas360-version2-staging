@@ -69,6 +69,18 @@ export const adminAnalyticsExportRateLimiter = rateLimit({
 	},
 });
 
+export const auditExportRateLimiter = rateLimit({
+	windowMs: 60 * 1000,
+	max: 5,
+	standardHeaders: true,
+	legacyHeaders: false,
+	keyGenerator: (req) => String(req.auth?.userId || req.ip),
+	message: {
+		success: false,
+		message: 'Too many audit export requests. Try again in a minute.',
+	},
+});
+
 export const documentsRateLimiter = rateLimit({
 	windowMs: 10 * 60 * 1000,
 	max: 50,
