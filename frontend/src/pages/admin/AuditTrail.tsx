@@ -1,294 +1,400 @@
-import { useState, useEffect, useMemo } from 'react';
-import { api } from '../../api/admin.api';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Card } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { toast } from 'sonner';
-import { 
-  Search, 
-  ShieldCheck, 
-  History, 
-  User, 
-  Activity, 
-  Globe, 
-  Info,
-  ArrowUpDown,
-  FileSpreadsheet
-} from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
+import {
+	getAdminInvoiceDetail,
+	getAdminPaymentReliabilityDetail,
+	getAdminUserById,
+	exportAuditLogs,
+	getAuditLogs,
+	type AdminAuditLog,
+} from '../../api/admin.api';
+import AdminPageLayout from '../../components/admin/AdminPageLayout';
+import ActionBar from '../../components/admin/ActionBar';
+import AdminTable from '../../components/admin/AdminTable';
 
-interface AuditLog {
-  id: string;
-  timestamp: string;
-  adminName: string;
-  action: string;
-  entity: string;
-  details: string;
-  ip: string;
+const DEFAULT_META = {
+	page: 1,
+	limit: 20,
+	totalItems: 0,
+	totalPages: 1,
+};
+
+const MAX_JSON_PREVIEW = 5000;
+
+const statusClass = (status: string): string => {
+	const normalized = String(status || '').toUpperCase();
+	if (normalized === 'DENIED') return 'bg-rose-100 text-rose-700';
+	if (normalized === 'FAILED') return 'bg-orange-100 text-orange-700';
+	return 'bg-emerald-100 text-emerald-700';
+};
+
+const formatDateTime = (value?: string | null): string => {
+	if (!value) return '-';
+	const date = new Date(value);
+	if (Number.isNaN(date.getTime())) return '-';
+	return date.toLocaleString('en-IN', {
+		day: '2-digit',
+		month: 'short',
+		year: 'numeric',
+		hour: '2-digit',
+		minute: '2-digit',
+	});
+};
+
+const truncate = (value: string, max = 52): string => {
+	const text = String(value || '').trim();
+	if (!text) return '-';
+	if (text.length <= max) return text;
+	return `${text.slice(0, max - 3)}...`;
+};
+
+const criticalActionClass = (action: string): string => {
+	const normalized = String(action || '').toUpperCase();
+	if (normalized === 'ACCESS_DENIED') return 'bg-rose-100 text-rose-700';
+	if (normalized === 'PAYMENT_RETRY') return 'bg-orange-100 text-orange-700';
+	if (normalized === 'USER_SUSPENDED') return 'bg-amber-100 text-amber-700';
+	return 'bg-ink-100 text-ink-700';
+};
+
+const getJsonPreview = (value: unknown, expanded: boolean): { text: string; truncated: boolean } => {
+	const serialized = JSON.stringify(value ?? null, null, 2) || 'null';
+	if (expanded || serialized.length <= MAX_JSON_PREVIEW) {
+		return { text: serialized, truncated: false };
+	}
+	return {
+		text: `${serialized.slice(0, MAX_JSON_PREVIEW)}\n... (truncated)` ,
+		truncated: true,
+	};
+};
+
+export default function AuditTrailPage() {
+	const navigate = useNavigate();
+	const [rows, setRows] = useState<AdminAuditLog[]>([]);
+	const [meta, setMeta] = useState(DEFAULT_META);
+	const [loading, setLoading] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+	const [entityType, setEntityType] = useState('');
+	const [action, setAction] = useState('');
+	const [policy, setPolicy] = useState('');
+	const [actor, setActor] = useState('');
+	const [fromDate, setFromDate] = useState('');
+	const [toDate, setToDate] = useState('');
+	const [deniedOnly, setDeniedOnly] = useState(false);
+	const [selected, setSelected] = useState<AdminAuditLog | null>(null);
+	const [expandedJson, setExpandedJson] = useState<{ before: boolean; after: boolean; metadata: boolean }>({
+		before: false,
+		after: false,
+		metadata: false,
+	});
+
+	const loadAudit = async (page = meta.page): Promise<void> => {
+		setLoading(true);
+		setError(null);
+		try {
+			const response = await getAuditLogs({
+				page,
+				limit: meta.limit,
+				entityType: entityType || undefined,
+				action: action.trim() || undefined,
+				policy: policy.trim() || undefined,
+				actor: actor.trim() || undefined,
+				from: fromDate || undefined,
+				to: toDate || undefined,
+				deniedOnly,
+			});
+			const payload = response?.data;
+			setRows(Array.isArray(payload?.data) ? payload.data : []);
+			setMeta(payload?.meta || DEFAULT_META);
+		} catch (err) {
+			setRows([]);
+			setMeta(DEFAULT_META);
+			setError(err instanceof Error ? err.message : 'Unable to load audit logs.');
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	useEffect(() => {
+		void loadAudit(1);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
+
+	const entityOptions = useMemo(() => {
+		const set = new Set(rows.map((row) => row.entityType).filter(Boolean));
+		return Array.from(set).sort((a, b) => a.localeCompare(b));
+	}, [rows]);
+
+	const policyOptions = useMemo(() => {
+		const set = new Set(rows.map((row) => row.policy || '').filter(Boolean));
+		return Array.from(set).sort((a, b) => a.localeCompare(b));
+	}, [rows]);
+
+	const openEntity = async (log: AdminAuditLog): Promise<void> => {
+		const entity = String(log.entityType || '').toLowerCase();
+		const entityId = String(log.entityId || '').trim();
+
+		if (!entityId) {
+			toast.error('Entity id missing for this audit row.');
+			return;
+		}
+
+		try {
+			if (entity === 'user') {
+				await getAdminUserById(entityId);
+				navigate(`/admin/identity/users/${encodeURIComponent(entityId)}`);
+				return;
+			}
+			if (entity === 'payment') {
+				await getAdminPaymentReliabilityDetail(entityId);
+				navigate('/admin/billing/payment-reliability');
+				return;
+			}
+			if (entity === 'invoice') {
+				await getAdminInvoiceDetail(entityId);
+				navigate(`/admin/billing/invoices?invoiceId=${encodeURIComponent(entityId)}`);
+				return;
+			}
+
+			toast.error('Unsupported entity link type.');
+		} catch {
+			toast.error('Entity not found or deleted');
+		}
+	};
+
+	const columns = [
+		{
+			key: 'time',
+			head: 'Time',
+			render: (row: AdminAuditLog) => <span className="text-xs text-ink-700">{formatDateTime(row.createdAt)}</span>,
+		},
+		{
+			key: 'actor',
+			head: 'Actor',
+			render: (row: AdminAuditLog) => (
+				<div>
+					<p className="text-sm text-ink-800">{row.actor.name}</p>
+					<p className="text-xs text-ink-500">{row.actor.email || row.actor.id}</p>
+				</div>
+			),
+		},
+		{
+			key: 'policy',
+			head: 'Policy',
+			render: (row: AdminAuditLog) => (
+				<span className="inline-flex rounded-full bg-ink-100 px-2.5 py-1 text-xs font-semibold text-ink-700">
+					{row.policy ? `${row.policy}${row.policyVersion ? ` (v${row.policyVersion})` : ''}` : '-'}
+				</span>
+			),
+		},
+		{
+			key: 'action',
+			head: 'Action',
+			render: (row: AdminAuditLog) => (
+				<span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${criticalActionClass(row.action)}`}>
+					{row.action}
+				</span>
+			),
+		},
+		{
+			key: 'entity',
+			head: 'Entity',
+			render: (row: AdminAuditLog) => (
+				<div>
+					<p className="text-xs font-semibold text-ink-700">{row.entityType}</p>
+					<p className="text-xs text-ink-500">{truncate(row.entityId || '-')}</p>
+				</div>
+			),
+		},
+		{
+			key: 'status',
+			head: 'Status',
+			render: (row: AdminAuditLog) => (
+				<span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(row.status)}`}>
+					{row.status}
+				</span>
+			),
+		},
+		{
+			key: 'actions',
+			head: 'Actions',
+			render: (row: AdminAuditLog) => (
+				<div className="flex gap-2">
+					<button
+						onClick={() => {
+							setSelected(row);
+							setExpandedJson({ before: false, after: false, metadata: false });
+						}}
+						className="rounded-md border border-ink-200 px-2.5 py-1.5 text-xs font-medium text-ink-700 hover:bg-ink-50"
+					>
+						View
+					</button>
+					<button
+						onClick={() => {
+							void openEntity(row);
+						}}
+						disabled={!row.entityId}
+						className="rounded-md border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-xs font-medium text-sky-700 hover:bg-sky-100 disabled:opacity-50"
+					>
+						Open Entity
+					</button>
+				</div>
+			),
+		},
+	];
+
+	const beforePreview = getJsonPreview((selected?.details as any)?.before || (selected?.details as any)?.beforeJson || null, expandedJson.before);
+	const afterPreview = getJsonPreview((selected?.details as any)?.after || (selected?.details as any)?.afterJson || null, expandedJson.after);
+	const metadataPreview = getJsonPreview(selected?.details || {}, expandedJson.metadata);
+
+	const runExport = async (format: 'csv' | 'json'): Promise<void> => {
+		try {
+			const blob = await exportAuditLogs({
+				format,
+				limit: 5000,
+				entityType: entityType || undefined,
+				action: action.trim() || undefined,
+				policy: policy.trim() || undefined,
+				actor: actor.trim() || undefined,
+				from: fromDate || undefined,
+				to: toDate || undefined,
+				deniedOnly,
+			});
+
+			const url = URL.createObjectURL(blob);
+			const stamp = new Date().toISOString().slice(0, 10);
+			const anchor = document.createElement('a');
+			anchor.href = url;
+			anchor.download = `audit-logs-${stamp}.${format}`;
+			anchor.click();
+			URL.revokeObjectURL(url);
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : 'Unable to export audit logs');
+		}
+	};
+
+	return (
+		<AdminPageLayout
+			title="Audit Logs"
+			description="Governance timeline with policy-aware traces, entity linking, and denial visibility."
+			actions={
+				<>
+					<select value={entityType} onChange={(event) => setEntityType(event.target.value)} className="rounded-lg border border-ink-100 bg-white px-3 py-2 text-sm text-ink-700 outline-none ring-sage-500 transition focus:ring-2">
+						<option value="">All entities</option>
+						{entityOptions.map((item) => <option key={item} value={item}>{item}</option>)}
+					</select>
+					<select value={policy} onChange={(event) => setPolicy(event.target.value)} className="rounded-lg border border-ink-100 bg-white px-3 py-2 text-sm text-ink-700 outline-none ring-sage-500 transition focus:ring-2">
+						<option value="">All policies</option>
+						{policyOptions.map((item) => <option key={item} value={item}>{item}</option>)}
+					</select>
+					<input value={action} onChange={(event) => setAction(event.target.value)} placeholder="Action" className="rounded-lg border border-ink-100 bg-white px-3 py-2 text-sm text-ink-700 outline-none ring-sage-500 transition focus:ring-2" />
+					<input value={actor} onChange={(event) => setActor(event.target.value)} placeholder="Actor" className="rounded-lg border border-ink-100 bg-white px-3 py-2 text-sm text-ink-700 outline-none ring-sage-500 transition focus:ring-2" />
+					<input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} className="rounded-lg border border-ink-100 bg-white px-3 py-2 text-sm text-ink-700 outline-none ring-sage-500 transition focus:ring-2" />
+					<input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} className="rounded-lg border border-ink-100 bg-white px-3 py-2 text-sm text-ink-700 outline-none ring-sage-500 transition focus:ring-2" />
+					<label className="inline-flex items-center gap-2 rounded-lg border border-ink-100 bg-white px-3 py-2 text-xs font-medium text-ink-700">
+						<input type="checkbox" checked={deniedOnly} onChange={(event) => setDeniedOnly(event.target.checked)} />
+						ACCESS_DENIED only
+					</label>
+					<button onClick={() => { void loadAudit(1); }} className="rounded-lg bg-sage-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sage-700">Apply</button>
+				</>
+			}
+		>
+			<ActionBar>
+				<div className="rounded-md bg-ink-50 px-2 py-1 text-xs text-ink-600">Total: {meta.totalItems}</div>
+				<button onClick={() => { void loadAudit(meta.page); toast.success('Audit logs refreshed'); }} className="rounded-md border border-ink-200 px-3 py-1.5 text-xs font-medium text-ink-700 hover:bg-ink-50">Refresh</button>
+				<button onClick={() => { void runExport('csv'); }} className="rounded-md border border-ink-200 px-3 py-1.5 text-xs font-medium text-ink-700 hover:bg-ink-50">Export CSV</button>
+				<button onClick={() => { void runExport('json'); }} className="rounded-md border border-ink-200 px-3 py-1.5 text-xs font-medium text-ink-700 hover:bg-ink-50">Export JSON</button>
+			</ActionBar>
+
+			{error ? <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
+
+			<AdminTable
+				columns={columns}
+				rows={rows}
+				rowKey={(row) => row.id}
+				loading={loading}
+				loadingText="Loading audit logs..."
+				emptyText="No audit logs found for this filter."
+			/>
+
+			<div className="mt-2 flex items-center justify-between rounded-xl border border-ink-100 bg-white px-4 py-3 text-sm">
+				<p className="text-ink-500">
+					Page <span className="font-semibold text-ink-700">{meta.page}</span> of <span className="font-semibold text-ink-700">{meta.totalPages || 1}</span>
+				</p>
+				<div className="flex gap-2">
+					<button disabled={loading || meta.page <= 1} onClick={() => { void loadAudit(meta.page - 1); }} className="rounded-md border border-ink-200 px-3 py-1.5 text-xs font-medium text-ink-700 hover:bg-ink-50 disabled:opacity-50">Previous</button>
+					<button disabled={loading || meta.page >= (meta.totalPages || 1)} onClick={() => { void loadAudit(meta.page + 1); }} className="rounded-md border border-ink-200 px-3 py-1.5 text-xs font-medium text-ink-700 hover:bg-ink-50 disabled:opacity-50">Next</button>
+				</div>
+			</div>
+
+			{selected ? (
+				<aside className="fixed right-0 top-0 z-50 h-full w-full max-w-xl overflow-y-auto border-l border-ink-100 bg-white p-5 shadow-soft-lg">
+					<div className="flex items-start justify-between">
+						<div>
+							<h3 className="font-display text-lg font-bold text-ink-800">Audit Inspector</h3>
+							<p className="text-xs text-ink-500">{selected.id}</p>
+						</div>
+						<button onClick={() => setSelected(null)} className="rounded-md border border-ink-200 px-2 py-1 text-xs text-ink-600 hover:bg-ink-50">Close</button>
+					</div>
+
+					<div className="mt-4 space-y-3 text-sm">
+						<DetailRow label="Action" value={selected.action} />
+						<DetailRow label="Policy" value={selected.policy ? `${selected.policy}${selected.policyVersion ? ` (v${selected.policyVersion})` : ''}` : '-'} />
+						<DetailRow label="Actor" value={`${selected.actor.name} (${selected.actor.id})`} />
+						<DetailRow label="Entity" value={`${selected.entityType}${selected.entityId ? ` (${selected.entityId})` : ''}`} />
+						<DetailRow label="Status" value={selected.status} />
+						<DetailRow label="Time" value={formatDateTime(selected.createdAt)} />
+					</div>
+
+					<div className="mt-4 rounded-lg border border-ink-100 p-3">
+						<p className="text-xs font-semibold text-ink-600">Before</p>
+						<pre className="mt-2 max-h-52 overflow-auto rounded bg-ink-50 p-2 text-[11px] text-ink-700">{beforePreview.text}</pre>
+						{beforePreview.truncated ? (
+							<button
+								onClick={() => setExpandedJson((prev) => ({ ...prev, before: true }))}
+								className="mt-2 rounded-md border border-ink-200 px-2 py-1 text-[11px] font-medium text-ink-700 hover:bg-ink-50"
+							>
+								Show more
+							</button>
+						) : null}
+					</div>
+
+					<div className="mt-4 rounded-lg border border-ink-100 p-3">
+						<p className="text-xs font-semibold text-ink-600">After</p>
+						<pre className="mt-2 max-h-52 overflow-auto rounded bg-ink-50 p-2 text-[11px] text-ink-700">{afterPreview.text}</pre>
+						{afterPreview.truncated ? (
+							<button
+								onClick={() => setExpandedJson((prev) => ({ ...prev, after: true }))}
+								className="mt-2 rounded-md border border-ink-200 px-2 py-1 text-[11px] font-medium text-ink-700 hover:bg-ink-50"
+							>
+								Show more
+							</button>
+						) : null}
+					</div>
+
+					<div className="mt-4 rounded-lg border border-ink-100 p-3">
+						<p className="text-xs font-semibold text-ink-600">Metadata</p>
+						<pre className="mt-2 max-h-64 overflow-auto rounded bg-ink-50 p-2 text-[11px] text-ink-700">{metadataPreview.text}</pre>
+						{metadataPreview.truncated ? (
+							<button
+								onClick={() => setExpandedJson((prev) => ({ ...prev, metadata: true }))}
+								className="mt-2 rounded-md border border-ink-200 px-2 py-1 text-[11px] font-medium text-ink-700 hover:bg-ink-50"
+							>
+								Show more
+							</button>
+						) : null}
+					</div>
+				</aside>
+			) : null}
+		</AdminPageLayout>
+	);
 }
 
-export default function AuditTrail() {
-  const [logs, setLogs] = useState<AuditLog[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
-
-  const fetchAuditLogs = async () => {
-    try {
-      setLoading(true);
-      const res = await api.get('/v1/admin/audit?limit=100');
-      setLogs(res.data.logs || []);
-    } catch (err) {
-      console.error(err);
-      toast.error('Failed to load audit trail');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchAuditLogs();
-  }, []);
-
-  const filteredAndSortedLogs = useMemo(() => {
-    const result = logs.filter(log =>
-      log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.details.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (log.adminName && log.adminName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (log.entity && log.entity.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
-
-    return result.sort((a, b) => {
-      const dateA = new Date(a.timestamp).getTime();
-      const dateB = new Date(b.timestamp).getTime();
-      return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
-    });
-  }, [searchTerm, logs, sortOrder]);
-
-  const exportCSV = () => {
-    if (filteredAndSortedLogs.length === 0) {
-      toast.error('No logs to export');
-      return;
-    }
-
-    const headers = ['Timestamp', 'Admin', 'Action', 'Entity', 'Details', 'IP Address'];
-    const rows = filteredAndSortedLogs.map(log => [
-      new Date(log.timestamp).toLocaleString(),
-      log.adminName || 'System',
-      log.action,
-      log.entity || 'N/A',
-      `"${log.details.replace(/"/g, '""')}"`,
-      log.ip
-    ]);
-
-    const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `manas360-audit-trail-${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    toast.success('Audit trail exported successfully');
-  };
-
-  const getActionBadgeVariant = (action: string) => {
-    const act = action.toLowerCase();
-    if (act.includes('create') || act.includes('add') || act.includes('approve')) return 'success';
-    if (act.includes('delete') || act.includes('remove') || act.includes('reject')) return 'destructive';
-    if (act.includes('update') || act.includes('edit')) return 'warning';
-    return 'info';
-  };
-
-  if (loading) {
-    return (
-      <div className="p-8 flex flex-col items-center justify-center min-h-[500px] space-y-4">
-        <div className="w-12 h-12 border-4 border-slate-200 border-t-emerald-600 rounded-full animate-spin" />
-        <p className="text-slate-500 font-medium animate-pulse">Retrieving secure audit logs...</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="p-8 max-w-[1600px] mx-auto space-y-8 min-h-screen pb-20">
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div className="space-y-2">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-emerald-100 rounded-lg">
-              <ShieldCheck className="w-6 h-6 text-emerald-700" />
-            </div>
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900 font-outfit">Audit Trail</h1>
-          </div>
-          <p className="text-slate-500 max-w-2xl font-inter">
-            Immutable security and governance log. Track every administrative action across the platform for accountability and security oversight.
-          </p>
-        </div>
-        
-        <div className="flex flex-wrap items-center gap-3 bg-white p-2 rounded-2xl shadow-sm border border-slate-200/60 transition-smooth hover:shadow-md">
-          <div className="relative group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 group-focus-within:text-emerald-500 transition-colors" />
-            <Input
-              placeholder="Filter by admin, action, or details..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 w-full md:w-[350px] bg-slate-50/50 border-none focus-visible:ring-1 focus-visible:ring-emerald-500 h-11 rounded-xl"
-            />
-          </div>
-          <Button 
-            onClick={exportCSV} 
-            variant="secondary"
-            className="h-11 px-6 rounded-xl hover:bg-slate-100 transition-all font-semibold gap-2"
-          >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-            Export CSV
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
-            className="h-11 w-11 p-0 rounded-xl"
-            title="Toggle Sort Order"
-          >
-            <ArrowUpDown className={`w-4 h-4 transition-transform duration-300 ${sortOrder === 'asc' ? 'rotate-180' : ''}`} />
-          </Button>
-        </div>
-      </div>
-
-      {/* Stats Summary - Mini Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: 'Total Logs', value: logs.length, icon: History, color: 'text-blue-600', bg: 'bg-blue-50' },
-          { label: 'Recent 24h', value: logs.filter(l => new Date(l.timestamp).getTime() > Date.now() - 86400000).length, icon: Activity, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-          { label: 'System Actions', value: logs.filter(l => !l.adminName || l.adminName === 'System').length, icon: Info, color: 'text-slate-600', bg: 'bg-slate-50' },
-          { label: 'Network IPs', value: new Set(logs.map(l => l.ip)).size, icon: Globe, color: 'text-amber-600', bg: 'bg-amber-50' },
-        ].map((stat, i) => (
-          <Card key={i} className="p-4 border-slate-200/60 shadow-sm flex items-center gap-4 hover:shadow-md transition-all group">
-            <div className={`p-3 rounded-xl ${stat.bg} ${stat.color} group-hover:scale-110 transition-transform`}>
-              <stat.icon className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{stat.label}</p>
-              <p className="text-xl font-bold text-slate-900">{stat.value}</p>
-            </div>
-          </Card>
-        ))}
-      </div>
-
-      {/* Main Log Table */}
-      <Card className="border-none shadow-xl shadow-slate-200/50 overflow-hidden bg-white/50 backdrop-blur-xl">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[1000px]">
-            <thead>
-              <tr className="bg-slate-50/80 border-b border-slate-200/80">
-                <th className="px-6 py-5 text-sm font-bold text-slate-800 uppercase tracking-tight">Timeline</th>
-                <th className="px-6 py-5 text-sm font-bold text-slate-800 uppercase tracking-tight">Administrator</th>
-                <th className="px-6 py-5 text-sm font-bold text-slate-800 uppercase tracking-tight text-center">Action</th>
-                <th className="px-6 py-5 text-sm font-bold text-slate-800 uppercase tracking-tight">Entity Context</th>
-                <th className="px-6 py-5 text-sm font-bold text-slate-800 uppercase tracking-tight">Transaction Details</th>
-                <th className="px-6 py-5 text-sm font-bold text-slate-800 uppercase tracking-tight text-right">Identifier (IP)</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              <AnimatePresence mode="popLayout">
-                {filteredAndSortedLogs.map((log) => (
-                  <motion.tr 
-                    key={log.id}
-                    layout
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    className="hover:bg-slate-50/80 transition-all group relative border-l-2 border-l-transparent hover:border-l-emerald-500"
-                  >
-                    <td className="px-6 py-5">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-bold text-slate-900">
-                          {new Date(log.timestamp).toLocaleDateString(undefined, { 
-                            month: 'short', day: 'numeric', year: 'numeric' 
-                          })}
-                        </span>
-                        <span className="text-xs font-mono text-slate-500 mt-0.5">
-                          {new Date(log.timestamp).toLocaleTimeString(undefined, { 
-                            hour: '2-digit', minute: '2-digit', second: '2-digit' 
-                          })}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-5">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 overflow-hidden shadow-inner">
-                          <User className="w-4 h-4" />
-                        </div>
-                        <span className="font-semibold text-slate-700">{log.adminName || 'System Process'}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-5 text-center">
-                      <Badge 
-                        variant={getActionBadgeVariant(log.action)} 
-                        className="px-3 py-1 font-bold tracking-tight shadow-sm min-w-[100px] justify-center"
-                      >
-                        {log.action}
-                      </Badge>
-                    </td>
-                    <td className="px-6 py-5">
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200 whitespace-nowrap">
-                        {log.entity || 'N/A'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-5">
-                      <p className="text-sm text-slate-600 max-w-sm line-clamp-2 leading-relaxed font-medium">
-                        {log.details}
-                      </p>
-                    </td>
-                    <td className="px-6 py-5 text-right">
-                      <span className="text-xs font-mono bg-slate-100 px-2 py-1 rounded text-slate-500 border border-slate-200 group-hover:bg-slate-900 group-hover:text-white group-hover:border-slate-900 transition-all duration-300">
-                        {log.ip}
-                      </span>
-                    </td>
-                  </motion.tr>
-                ))}
-              </AnimatePresence>
-              
-              {filteredAndSortedLogs.length === 0 && !loading && (
-                <tr>
-                  <td colSpan={6} className="px-6 py-32 text-center bg-slate-50/30">
-                    <div className="flex flex-col items-center justify-center space-y-4">
-                      <div className="p-4 bg-white rounded-2xl shadow-sm ring-1 ring-slate-200">
-                        <History className="w-10 h-10 text-slate-300" />
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xl font-bold text-slate-900">No activity matching your search</p>
-                        <p className="text-slate-500 max-w-sm mx-auto">We couldn't find any log entries for the current filters. Try refining your keywords or clearing the search.</p>
-                      </div>
-                      <Button 
-                        variant="secondary" 
-                        onClick={() => setSearchTerm('')}
-                        className="mt-2"
-                      >
-                        Clear Search
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        
-        {/* Footer info */}
-        <div className="px-6 py-4 bg-slate-50/80 border-t border-slate-200/80 flex items-center justify-between">
-          <p className="text-xs text-slate-500 flex items-center gap-2 font-medium">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            Secure encryption applied to all log transmission. Entries are immutable.
-          </p>
-          <div className="text-xs text-slate-400">
-            Showing {filteredAndSortedLogs.length} of {logs.length} entries
-          </div>
-        </div>
-      </Card>
-    </div>
-  );
+function DetailRow({ label, value }: { label: string; value: string }) {
+	return (
+		<div className="grid grid-cols-[100px_1fr] gap-2 rounded-md bg-ink-50 px-3 py-2 text-xs">
+			<p className="font-semibold text-ink-600">{label}</p>
+			<p className="break-all text-ink-800">{value || '-'}</p>
+		</div>
+	);
 }

@@ -139,9 +139,18 @@ export const activateProviderSubscription = async (
 	providerId: string,
 	planKey: ProviderPlanKey,
 	paymentId?: string,
+	options?: {
+		priceOverride?: number;
+		planVersion?: number;
+		priceLocked?: boolean;
+	},
 ) => {
 	const plan = PROVIDER_PLANS[planKey];
 	if (!plan) throw new AppError('Invalid provider plan', 422);
+	const resolvedPrice = Number.isFinite(Number(options?.priceOverride))
+		? Number(options?.priceOverride)
+		: Number(plan.price || 0);
+	const planVersion = Number.isFinite(Number(options?.planVersion)) ? Number(options?.planVersion) : 1;
 
 	return withProviderSubscriptionLock(providerId, async (current) => {
 		if (planKey === 'free') {
@@ -151,6 +160,8 @@ export const activateProviderSubscription = async (
 					plan: planKey,
 					tier: null,
 					price: 0,
+					planVersion,
+					priceLocked: false,
 					leadsPerWeek: 0,
 					bonusLeads: 0,
 					startDate: new Date(),
@@ -195,7 +206,9 @@ export const activateProviderSubscription = async (
 			data: {
 				plan: planKey,
 				tier: mappedTier,
-				price: plan.price,
+				price: resolvedPrice,
+				planVersion,
+				priceLocked: options?.priceLocked ?? true,
 				leadsPerWeek: Number(tierConfig?.leadsPerWeek ?? plan.leadsPerWeek),
 				bonusLeads: Number(tierConfig?.bonusLeads ?? 0),
 				startDate: new Date(),

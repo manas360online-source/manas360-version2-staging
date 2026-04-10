@@ -718,6 +718,8 @@ const extractValidatedAdminListUsersQuery = (req: Request, _res: Response, next:
 	req.validatedAdminListUsersQuery = {
 		role: typeof req.query.role === 'string' ? req.query.role : undefined,
 		status: typeof req.query.status === 'string' ? req.query.status : undefined,
+		sortBy: typeof req.query.sortBy === 'string' ? (req.query.sortBy as 'createdAt' | 'email' | 'role') : undefined,
+		sortOrder: typeof req.query.sortOrder === 'string' ? (req.query.sortOrder as 'asc' | 'desc') : undefined,
 		page: pagination.page,
 		limit: pagination.limit,
 	};
@@ -736,6 +738,16 @@ export const validateAdminListUsersQuery: RequestHandler[] = [
 		.isString()
 		.isIn(['active', 'deleted'])
 		.withMessage('status must be one of: active, deleted'),
+	query('sortBy')
+		.optional()
+		.isString()
+		.isIn(['createdAt', 'email', 'role'])
+		.withMessage('sortBy must be one of: createdAt, email, role'),
+	query('sortOrder')
+		.optional()
+		.isString()
+		.isIn(['asc', 'desc'])
+		.withMessage('sortOrder must be one of: asc, desc'),
 	query('page').optional().isInt({ min: 1 }).withMessage('page must be a positive integer'),
 	query('limit').optional().isInt({ min: 1, max: 50 }).withMessage('limit must be between 1 and 50'),
 	(req, _res, next) => applyValidationResult(req, next),

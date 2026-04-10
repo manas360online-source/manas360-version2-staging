@@ -14,7 +14,7 @@ import {
 } from './dailyCheckIn.service';
 import { syncTreatmentPlanFromAssessment } from './treatment-plan.service';
 import { getSessionQuote } from './pricing.service';
-import { getActivePlatformPlan } from './pricing.service';
+import { getActivePlatformPlan, getPricingConfigVersion } from './pricing.service';
 import { scoreGAD7, scorePHQ9 } from './riskScoring';
 import { sendSubscriptionActivationEmail } from './email.service';
 import { calculateGraceEndDate } from './subscription.helper';
@@ -837,12 +837,15 @@ const ensureSubscriptionRecord = async (userId: string) => {
 	let subscription = await db.patientSubscription.findUnique({ where: { userId } }).catch(() => null);
 	if (!subscription) {
 		const activePlan = (await getActivePlatformPlan()) || { key: 'free', name: 'Free Tier', price: 0 };
+		const planVersion = await getPricingConfigVersion();
 		const renewalDate = new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000);
 		subscription = await db.patientSubscription.create({
 			data: {
 				userId,
 				planName: activePlan.name,
 				price: activePlan.price,
+				planVersion,
+				priceLocked: false,
 				billingCycle: 'monthly',
 				status: 'inactive',
 				autoRenew: false,
@@ -883,6 +886,7 @@ const ensureSubscriptionRecord = async (userId: string) => {
 		}
 
 		const activePlan = (await getActivePlatformPlan()) || { key: 'free', name: 'Free Tier', price: 0 };
+		const planVersion = await getPricingConfigVersion();
 		const renewalDays = String(current.billingCycle || '').toLowerCase() === 'yearly' ? 365 : 30;
 		const nextRenewalDate = new Date(Date.now() + renewalDays * 24 * 60 * 60 * 1000);
 
@@ -892,6 +896,8 @@ const ensureSubscriptionRecord = async (userId: string) => {
 				data: {
 					planName: activePlan.name,
 					price: activePlan.price,
+					planVersion,
+					priceLocked: Number(activePlan.price || 0) > 0,
 					renewalDate: nextRenewalDate,
 				},
 			}).catch(() => current);
@@ -942,12 +948,15 @@ export const getPatientSubscription = async (userId: string) => {
 			const inactive = String(subscription.status || '').toLowerCase() === 'inactive';
 			if (looksFree || inactive) {
 				const premiumPlan = (await getActivePlatformPlan('premium_monthly')) || activePlan || { key: 'premium_monthly', name: 'Premium', price: 299 };
+				const planVersion = await getPricingConfigVersion();
 				const nextRenewalDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 				const updated = await db.patientSubscription.update({
 					where: { userId },
 					data: {
 						planName: premiumPlan.name,
 						price: Number(premiumPlan.price || 0),
+						planVersion,
+						priceLocked: true,
 						status: 'active',
 						autoRenew: true,
 						renewalDate: nextRenewalDate,
@@ -991,6 +1000,7 @@ export const updatePatientSubscriptionPlan = async (userId: string, action: 'upg
 	const updated = await withPatientSubscriptionLock(userId, async (subscription) => {
 		if (!subscription) throw new AppError('Subscription data unavailable', 500);
 		const activePlan = (await getActivePlatformPlan()) || { key: 'free', name: 'Free Tier', price: 0 };
+		const planVersion = await getPricingConfigVersion();
 
 		const planOrder = ['basic', 'premium', 'pro'];
 		const current = String(subscription.planName || 'premium').toLowerCase().replace(' plan', '');
@@ -1009,6 +1019,8 @@ export const updatePatientSubscriptionPlan = async (userId: string, action: 'upg
 			data: {
 				planName: nextPlanName,
 				price,
+				planVersion,
+				priceLocked: Number(price || 0) > 0,
 				billingCycle: nextPlan === 'pro' ? 'yearly' : 'monthly',
 				status: 'active',
 				autoRenew: true,
@@ -1071,10 +1083,25 @@ export const cancelPatientSubscription = async (userId: string) => {
 	});
 };
 
-export const reactivatePatientSubscription = async (userId: string, paymentId?: string, planKey?: string) => {
+export const reactivatePatientSubscription = async (
+	userId: string,
+	paymentId?: string,
+	planKey?: string,
+	options?: {
+		planName?: string;
+		planVersion?: number;
+		priceLockedMinor?: number;
+		priceLocked?: boolean;
+	},
+) => {
 	const updated = await withPatientSubscriptionLock(userId, async (subscription) => {
 		const activePlan = (await getActivePlatformPlan(planKey)) || { key: 'free', name: 'Free Tier', price: 0 };
-		const isFreePlan = Number(activePlan.price || 0) <= 0;
+		const planVersion = options?.planVersion ?? (await getPricingConfigVersion());
+		const lockedPriceInr = Number.isFinite(Number(options?.priceLockedMinor))
+			? Math.round(Number(options?.priceLockedMinor) / 100)
+			: Number(activePlan.price || 0);
+		const resolvedPlanName = String(options?.planName || activePlan.name || 'Plan');
+		const isFreePlan = Number(lockedPriceInr || 0) <= 0;
 		const currentStatus = String(subscription?.status || '').toLowerCase();
 		const hasPaidSubscriptionAlready = Number(subscription?.price || 0) > 0
 			&& ['active', 'trial', 'trialing', 'grace'].includes(currentStatus);
@@ -1088,8 +1115,10 @@ export const reactivatePatientSubscription = async (userId: string, paymentId?: 
 		const next = await db.patientSubscription.update({
 			where: { userId },
 			data: {
-				planName: activePlan.name,
-				price: activePlan.price,
+				planName: resolvedPlanName,
+				price: lockedPriceInr,
+				planVersion,
+				priceLocked: !isFreePlan && (options?.priceLocked ?? true),
 				status: nextStatus,
 				autoRenew: !isFreePlan,
 				paymentId: paymentId || undefined,

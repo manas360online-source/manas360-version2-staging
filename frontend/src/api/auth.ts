@@ -28,6 +28,9 @@ export interface AuthUser {
 	providerProfileVerified?: boolean;
 	requiresPlatformPayment?: boolean;
 	platformAccessActive?: boolean;
+	permissions?: string[];
+	adminPolicies?: Record<string, string[]>;
+	adminPolicyVersion?: number;
 }
 
 export interface LoginPayload {

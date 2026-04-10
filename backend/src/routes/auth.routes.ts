@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import {
+	acceptLegalDocumentsController,
 	googleLoginController,
+	getRequiredLegalDocumentsController,
 	loginController,
 	logoutController,
 	meController,
@@ -36,6 +38,8 @@ router.post('/mfa/setup', requireAuth, asyncHandler(mfaSetupController));
 router.post('/mfa/verify', requireAuth, asyncHandler(mfaVerifyController));
 
 router.get('/me', requireAuth, asyncHandler(meController));
+router.get('/legal/required', requireAuth, asyncHandler(getRequiredLegalDocumentsController));
+router.post('/legal/accept', requireAuth, asyncHandler(acceptLegalDocumentsController));
 router.get('/sessions', requireAuth, asyncHandler(sessionsController));
 router.delete('/sessions/:sessionId', requireAuth, asyncHandler(revokeSessionController));
 router.post('/logout', requireAuth, requireCsrf, asyncHandler(logoutController));

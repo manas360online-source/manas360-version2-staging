@@ -203,6 +203,15 @@ export type AdminPricingConfig = {
 	};
 };
 
+export type PlatformConfigRecord = {
+	key: string;
+	value: unknown;
+	version: number;
+	createdAt: string;
+	updatedAt: string;
+	updatedById: string | null;
+};
+
 export type AdminScreeningTemplate = {
 	id: string;
 	key: string;
@@ -306,12 +315,16 @@ export const getAdminUsers = async (params?: {
 	limit?: number;
 	role?: AdminUserRole;
 	status?: 'active' | 'deleted';
+	sortBy?: 'createdAt' | 'email' | 'role';
+	sortOrder?: 'asc' | 'desc';
 }): Promise<ApiEnvelope<AdminUsersResponse>> => {
 	const query = buildQuery({
 		page: params?.page,
 		limit: params?.limit,
 		role: params?.role,
 		status: params?.status,
+		sortBy: params?.sortBy,
+		sortOrder: params?.sortOrder,
 	});
 
 	return (await client.get<ApiEnvelope<AdminUsersResponse>>(`/v1/admin/users${query}`)).data;
@@ -321,8 +334,156 @@ export const getAdminUserById = async (userId: string): Promise<ApiEnvelope<Admi
 	return (await client.get<ApiEnvelope<AdminUserDetail>>(`/v1/admin/users/${encodeURIComponent(userId)}`)).data;
 };
 
+export const updateAdminUserStatus = async (
+	userId: string,
+	status: 'ACTIVE' | 'SUSPENDED',
+	reason?: string,
+): Promise<ApiEnvelope<unknown>> => {
+	return (await client.patch<ApiEnvelope<unknown>>(`/v1/admin/users/${encodeURIComponent(userId)}/status`, { status, reason })).data;
+};
+
+export const updateAdminUsersBulkStatus = async (
+	userIds: string[],
+	status: 'ACTIVE' | 'SUSPENDED',
+	reason?: string,
+): Promise<ApiEnvelope<{ requestedCount: number; successCount: number; failedCount: number; failedIds: string[]; status: string; reason?: string }>> => {
+	return (await client.post<ApiEnvelope<{ requestedCount: number; successCount: number; failedCount: number; failedIds: string[]; status: string; reason?: string }>>('/v1/admin/users/bulk-status', {
+		userIds,
+		status,
+		reason,
+	})).data;
+};
+
+export type AdminGlobalSearchResult = {
+	users: Array<{ id: string; name: string; email: string; role: string }>;
+	payments: Array<{ id: string; status: string; amountMinor: number; currency: string }>;
+	sessions: Array<{ id: string; status: string; scheduledAt: string | null }>;
+};
+
+export const searchAdminEntities = async (q: string, limit = 8): Promise<ApiEnvelope<AdminGlobalSearchResult>> => {
+	const query = buildQuery({ q, limit });
+	return (await client.get<ApiEnvelope<AdminGlobalSearchResult>>(`/v1/admin/search${query}`)).data;
+};
+
 export const getAdminMetrics = async (): Promise<ApiEnvelope<AdminMetrics>> => {
 	return (await client.get<ApiEnvelope<AdminMetrics>>('/v1/admin/metrics')).data;
+};
+
+export type AdminInvoiceLifecycleStatus = 'DRAFT' | 'ISSUED' | 'PAID' | 'FAILED' | 'REFUNDED';
+
+export type AdminInvoice = {
+	id: string;
+	paymentId: string | null;
+	userId: string;
+	tenantId: string | null;
+	customerName: string;
+	customerEmail: string | null;
+	invoiceNumber: string;
+	invoiceYear: number;
+	sequenceNumber: number;
+	amountMinor: number;
+	status: string;
+	lifecycleStatus: AdminInvoiceLifecycleStatus;
+	issuedAt: string | null;
+	paidAt: string | null;
+	refundedAt: string | null;
+	createdAt: string;
+	updatedAt: string;
+	version: number;
+	pdfPath: string | null;
+	htmlPath: string | null;
+	emailedTo: string | null;
+	metadata?: Record<string, unknown> | null;
+};
+
+export type AdminInvoiceListResponse = {
+	success: boolean;
+	message?: string;
+	data: AdminInvoice[];
+	meta: {
+		page: number;
+		limit: number;
+		totalItems: number;
+		totalPages: number;
+	};
+};
+
+export type AdminInvoiceDetail = {
+	invoice: AdminInvoice;
+	events: Array<{
+		id: string;
+		eventType: string;
+		actorUserId: string | null;
+		idempotencyKey: string | null;
+		createdAt: string;
+	}>;
+	payment: {
+		id: string;
+		status: string;
+		amountMinor: number;
+		currency: string;
+		merchantTransactionId: string;
+	} | null;
+	auditLogs: Array<{
+		id: string;
+		action: string;
+		resource: string;
+		createdAt: string;
+		userId: string;
+	}>;
+};
+
+export const listAdminInvoices = async (params?: {
+	page?: number;
+	limit?: number;
+	q?: string;
+	sortBy?: 'createdAt' | 'issuedAt' | 'invoiceNumber' | 'amountMinor';
+	sortOrder?: 'asc' | 'desc';
+	status?: AdminInvoiceLifecycleStatus;
+}): Promise<AdminInvoiceListResponse> => {
+	const query = buildQuery({
+		page: params?.page,
+		limit: params?.limit,
+		q: params?.q,
+		sortBy: params?.sortBy,
+		sortOrder: params?.sortOrder,
+		status: params?.status,
+	});
+
+	return (await client.get<AdminInvoiceListResponse>(`/v1/invoices${query}`)).data;
+};
+
+export const getAdminInvoiceDetail = async (invoiceId: string): Promise<ApiEnvelope<AdminInvoiceDetail>> => {
+	return (await client.get<ApiEnvelope<AdminInvoiceDetail>>(`/v1/invoices/${encodeURIComponent(invoiceId)}`)).data;
+};
+
+export const resendAdminInvoice = async (paymentId: string): Promise<ApiEnvelope<AdminInvoice>> => {
+	return (await client.post<ApiEnvelope<AdminInvoice>>(`/v1/invoices/payments/${encodeURIComponent(paymentId)}/resend`)).data;
+};
+
+export const requestAdminInvoiceRefund = async (
+	invoiceId: string,
+	payload: { reason?: string; amountMinor?: number },
+): Promise<ApiEnvelope<{ invoiceId: string; refundId: string; merchantRefundId: string; status: string }>> => {
+	return (await client.post<ApiEnvelope<{ invoiceId: string; refundId: string; merchantRefundId: string; status: string }>>(`/v1/invoices/${encodeURIComponent(invoiceId)}/refund`, payload)).data;
+};
+
+export const bulkResendAdminInvoices = async (
+	invoiceIds: string[],
+): Promise<ApiEnvelope<{ requestedCount: number; successCount: number; failedIds: string[] }>> => {
+	return (await client.post<ApiEnvelope<{ requestedCount: number; successCount: number; failedIds: string[] }>>('/v1/invoices/resend-bulk', { invoiceIds })).data;
+};
+
+export const downloadAdminInvoicePdf = async (invoiceId: string): Promise<Blob> => {
+	const response = await client.get(`/v1/invoices/${encodeURIComponent(invoiceId)}/pdf`, {
+		responseType: 'blob',
+	});
+	return response.data as Blob;
+};
+
+export const exportAdminInvoicesCsv = async (q?: string): Promise<Blob> => {
+	const response = await client.post('/v1/invoices/export', { q }, { responseType: 'blob' });
+	return response.data as Blob;
 };
 
 export const getAdminSubscriptions = async (params?: {
@@ -384,6 +545,22 @@ export const updateAdminPricingConfig = async (payload: {
 	}>;
 }): Promise<ApiEnvelope<AdminPricingConfig>> => {
 	return (await client.patch<ApiEnvelope<AdminPricingConfig>>('/v1/admin/pricing', payload)).data;
+};
+
+export const listPlatformConfigs = async (keys?: string[]): Promise<ApiEnvelope<PlatformConfigRecord[]>> => {
+	const query = buildQuery({ keys: keys?.join(',') });
+	return (await client.get<ApiEnvelope<PlatformConfigRecord[]>>(`/v1/admin/platform-config${query}`)).data;
+};
+
+export const getPlatformConfig = async (key: string): Promise<ApiEnvelope<PlatformConfigRecord>> => {
+	return (await client.get<ApiEnvelope<PlatformConfigRecord>>(`/v1/admin/platform-config/${encodeURIComponent(key)}`)).data;
+};
+
+export const upsertPlatformConfig = async (
+	key: string,
+	payload: { value: unknown; expectedVersion?: number }
+): Promise<ApiEnvelope<PlatformConfigRecord>> => {
+	return (await client.put<ApiEnvelope<PlatformConfigRecord>>(`/v1/admin/platform-config/${encodeURIComponent(key)}`, payload)).data;
 };
 
 export const getAdminScreeningTemplates = async (): Promise<ApiEnvelope<{ items: AdminScreeningTemplate[] }>> => {
@@ -509,33 +686,138 @@ export type AdminSystemHealthMetrics = {
 	services: {
 		backend: string;
 		database: string;
+		queue?: string;
 		redis: string;
 		zohoDesk: string;
 		phonePe: string;
 	};
 	lastChecked: string;
+	diagnostics?: {
+		dbProbeMs?: number | null;
+		queuedExports?: number;
+		failedExports24h?: number;
+		warnings?: string[];
+	};
 };
 
-export type AdminPaymentReliabilityDaily = {
-	date: string;
-	total: number;
-	success: number;
-	failed: number;
-	retryAttempts: number;
-	retrySuccess: number;
-	revenueMinor: number;
+export type AdminComplianceStatus = {
+	compliance_percentage: number;
+	pending: number;
+	critical_gaps: string[];
+};
+
+export type AdminLegalDocument = {
+	id: string;
+	title: string;
+	document_type: string;
+	current_version: number;
+	status: 'PUBLISHED' | 'ARCHIVED';
+	published_at: string;
+};
+
+export type AdminUserAcceptance = {
+	id: string;
+	userName: string;
+	documentType: string;
+	acceptedAt: string;
+	ip: string | null;
+};
+
+export type AdminPaymentReliabilityStatus = 'FAILED' | 'PENDING' | 'SUCCESS';
+export type AdminPaymentReliabilityRiskLevel = 'HIGH' | 'MEDIUM' | 'LOW';
+
+export type AdminPaymentReliabilityRow = {
+	id: string;
+	merchantTransactionId: string;
+	provider: string;
+	status: AdminPaymentReliabilityStatus;
+	dbStatus: string;
+	amountMinor: number;
+	currency: string;
+	retryCount: number;
+	riskLevel: AdminPaymentReliabilityRiskLevel;
+	failureReason: string | null;
+	nextRetryAt: string | null;
+	createdAt: string;
+	updatedAt: string;
+	capturedAt: string | null;
+	failedAt: string | null;
+	user: {
+		id: string | null;
+		email: string | null;
+		name: string;
+	};
+};
+
+export type AdminPaymentReliabilityListPayload = {
+	data: AdminPaymentReliabilityRow[];
+	meta: {
+		page: number;
+		limit: number;
+		totalItems: number;
+		totalPages: number;
+	};
 };
 
 export type AdminPaymentReliabilityMetrics = {
-	windowDays: number;
 	totalPayments: number;
 	successRate: number;
+	failureRate: number;
 	retrySuccessRate: number;
-	revenueMinor: number;
-	revenueInr: number;
-	failureReasons: Array<{ reason: string; count: number }>;
-	revenuePerPlanMinor: Record<string, number>;
-	daily: AdminPaymentReliabilityDaily[];
+	failedCount: number;
+	pendingCount: number;
+	recoveredRevenueMinor: number;
+};
+
+export type AdminPaymentReliabilityDetail = {
+	payment: {
+		id: string;
+		merchantTransactionId: string;
+		provider: string;
+		status: AdminPaymentReliabilityStatus;
+		dbStatus: string;
+		amountMinor: number;
+		currency: string;
+		retryCount: number;
+		riskLevel: AdminPaymentReliabilityRiskLevel;
+		nextRetryAt: string | null;
+		createdAt: string;
+		updatedAt: string;
+		capturedAt: string | null;
+		failedAt: string | null;
+		patientId: string | null;
+		providerId: string | null;
+	};
+	invoice: {
+		id: string;
+		invoiceNumber: string;
+		lifecycleStatus: string;
+		status: string;
+		amountMinor: number;
+		pdfPath: string | null;
+		issuedAt: string | null;
+		paidAt: string | null;
+	} | null;
+	retries: Array<{
+		id: string;
+		actorType: string;
+		actorId: string | null;
+		reason: string | null;
+		retryCount: number;
+		createdAt: string;
+		before: unknown;
+		after: unknown;
+	}>;
+	failureReason: string | null;
+	gatewayResponse: unknown;
+	auditLogs: Array<{
+		id: string;
+		action: string;
+		resource: string;
+		actorId: string | null;
+		createdAt: string;
+		details: unknown;
+	}>;
 };
 
 export const getAdminRevenueAnalytics = async (): Promise<ApiEnvelope<AdminRevenueAnalytics>> => {
@@ -556,6 +838,21 @@ export const getAdminMarketplaceMetrics = async (): Promise<ApiEnvelope<AdminMar
 
 export const getAdminSystemHealth = async () => {
 	const response = await client.get<ApiEnvelope<AdminSystemHealthMetrics>>('/v1/admin/analytics/health');
+	return response.data;
+};
+
+export const getAdminComplianceStatus = async () => {
+	const response = await client.get<AdminComplianceStatus>('/v1/admin/compliance/status');
+	return response.data;
+};
+
+export const getAdminLegalDocuments = async () => {
+	const response = await client.get<{ documents: AdminLegalDocument[] }>('/v1/admin/legal/documents');
+	return response.data;
+};
+
+export const getAdminUserAcceptances = async () => {
+	const response = await client.get<{ acceptances: AdminUserAcceptance[] }>('/v1/admin/acceptances');
 	return response.data;
 };
 
@@ -612,8 +909,50 @@ export const getAdminTherapistPerformance = async () => {
 	return response.data;
 };
 
-export const getAdminPaymentReliabilityMetrics = async (days = 30): Promise<ApiEnvelope<AdminPaymentReliabilityMetrics>> => {
-	return (await client.get<ApiEnvelope<AdminPaymentReliabilityMetrics>>(`/v1/admin/analytics/payments?days=${encodeURIComponent(String(days))}`)).data;
+export const listAdminPaymentReliability = async (params?: {
+	page?: number;
+	limit?: number;
+	status?: AdminPaymentReliabilityStatus;
+	riskLevel?: AdminPaymentReliabilityRiskLevel;
+	provider?: 'PHONEPE';
+	from?: string;
+	to?: string;
+	sortBy?: 'createdAt' | 'amountMinor' | 'retryCount';
+	sortOrder?: 'asc' | 'desc';
+}): Promise<ApiEnvelope<AdminPaymentReliabilityListPayload>> => {
+	const query = buildQuery({
+		page: params?.page,
+		limit: params?.limit,
+		status: params?.status,
+		riskLevel: params?.riskLevel,
+		provider: params?.provider,
+		from: params?.from,
+		to: params?.to,
+		sortBy: params?.sortBy,
+		sortOrder: params?.sortOrder,
+	});
+
+	return (await client.get<ApiEnvelope<AdminPaymentReliabilityListPayload>>(`/v1/admin/payments/reliability${query}`)).data;
+};
+
+export const getAdminPaymentReliabilityMetrics = async (params?: {
+	provider?: 'PHONEPE';
+	from?: string;
+	to?: string;
+}): Promise<ApiEnvelope<AdminPaymentReliabilityMetrics>> => {
+	const query = buildQuery({ provider: params?.provider, from: params?.from, to: params?.to });
+	return (await client.get<ApiEnvelope<AdminPaymentReliabilityMetrics>>(`/v1/admin/payments/reliability/metrics${query}`)).data;
+};
+
+export const getAdminPaymentReliabilityDetail = async (paymentId: string): Promise<ApiEnvelope<AdminPaymentReliabilityDetail>> => {
+	return (await client.get<ApiEnvelope<AdminPaymentReliabilityDetail>>(`/v1/admin/payments/${encodeURIComponent(paymentId)}`)).data;
+};
+
+export const retryAdminPaymentReliability = async (
+	paymentId: string,
+	payload?: { reason?: string },
+): Promise<ApiEnvelope<{ success: boolean; message: string; data: { paymentId: string; status: string; retryCount: number; nextRetryAt: string | null; riskLevel: AdminPaymentReliabilityRiskLevel } }>> => {
+	return (await client.post<ApiEnvelope<{ success: boolean; message: string; data: { paymentId: string; status: string; retryCount: number; nextRetryAt: string | null; riskLevel: AdminPaymentReliabilityRiskLevel } }>>(`/v1/admin/payments/${encodeURIComponent(paymentId)}/retry`, payload || {})).data;
 };
 
 // --- Phase 2: Enhanced Verification & Payouts ---
@@ -901,17 +1240,31 @@ export interface CrisisAlert {
 	createdAt: string;
 }
 
-export interface AuditLog {
+export interface AdminAuditLog {
 	id: string;
-	userId: string;
-	action: string;
-	resource: string;
-	details: any;
 	createdAt: string;
-	user?: {
-		firstName: string;
-		lastName: string;
-		email: string;
+	actorId: string;
+	actor: {
+		id: string;
+		name: string;
+		email: string | null;
+	};
+	action: string;
+	entityType: string;
+	entityId: string;
+	policy: string | null;
+	policyVersion: number | null;
+	status: string;
+	details: Record<string, unknown> | null;
+}
+
+export interface AdminAuditListResponse {
+	data: AdminAuditLog[];
+	meta: {
+		page: number;
+		limit: number;
+		totalItems: number;
+		totalPages: number;
 	};
 }
 
@@ -930,9 +1283,64 @@ export const respondToCrisis = async (id: string, data: { action: string; notes?
 	return response.data;
 };
 
-export const getAuditLogs = async () => {
-	const response = await client.get<ApiEnvelope<AuditLog[]>>('/v1/admin/audit');
+export const getAuditLogs = async (params?: {
+	page?: number;
+	limit?: number;
+	entityType?: string;
+	action?: string;
+	policy?: string;
+	actorId?: string;
+	actor?: string;
+	from?: string;
+	to?: string;
+	deniedOnly?: boolean;
+}) => {
+	const query = buildQuery({
+		page: params?.page,
+		limit: params?.limit,
+		entityType: params?.entityType,
+		action: params?.action,
+		policy: params?.policy,
+		actorId: params?.actorId,
+		actor: params?.actor,
+		from: params?.from,
+		to: params?.to,
+		deniedOnly: params?.deniedOnly ? 'true' : undefined,
+	});
+	const response = await client.get<ApiEnvelope<AdminAuditListResponse>>(`/v1/admin/audit${query}`);
 	return response.data;
+};
+
+export const exportAuditLogs = async (params?: {
+	format?: 'csv' | 'json';
+	limit?: number;
+	entityType?: string;
+	action?: string;
+	policy?: string;
+	actorId?: string;
+	actor?: string;
+	from?: string;
+	to?: string;
+	deniedOnly?: boolean;
+}): Promise<Blob> => {
+	const response = await client.post(
+		'/v1/admin/audit/export',
+		{
+			format: params?.format || 'csv',
+			limit: params?.limit,
+			entityType: params?.entityType,
+			action: params?.action,
+			policy: params?.policy,
+			actorId: params?.actorId,
+			actor: params?.actor,
+			from: params?.from,
+			to: params?.to,
+			deniedOnly: params?.deniedOnly,
+		},
+		{ responseType: 'blob' },
+	);
+
+	return response.data as Blob;
 };
 
 export const triggerAnalyticsExport = async (
@@ -1057,6 +1465,109 @@ export const updateRolePermissions = async (role: string, permissions: string[])
 
 export const createPlatformAdminAccount = async (payload: CreatePlatformAdminPayload): Promise<ApiEnvelope<CreatePlatformAdminResponse>> => {
 	const response = await client.post<ApiEnvelope<CreatePlatformAdminResponse>>('/v1/admin/rbac/platform-admins', payload);
+	return response.data;
+};
+
+// --- Payout System ---
+
+export type AdminPayoutStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+export type AdminPayoutMethod = 'BANK' | 'UPI';
+
+export interface AdminPayout {
+	id: string;
+	providerId: string;
+	amountMinor: string;
+	currency: string;
+	status: AdminPayoutStatus;
+	method: AdminPayoutMethod;
+	createdAt: string;
+	processedAt: string | null;
+	failureReason: string | null;
+	version: number;
+}
+
+export interface AdminPayoutItem {
+	id: string;
+	payoutId: string;
+	invoiceId: string;
+	amountMinor: string;
+}
+
+export interface AdminPayoutMetrics {
+	pending: { count: number; totalAmountMinor: string };
+	completed: { count: number; totalAmountMinor: string };
+	failed: { count: number; totalAmountMinor: string };
+	totalVolume: string;
+}
+
+export interface AdminPayoutListResponse {
+	success: boolean;
+	data: {
+		items: Array<AdminPayout & { provider?: any; items?: AdminPayoutItem[] }>;
+		page: number;
+		limit: number;
+		total: number;
+	};
+}
+
+export interface AdminPayoutDetail {
+	payout: AdminPayout;
+	items: AdminPayoutItem[];
+	invoices: any[];
+	auditLogs: Array<{ id: string; action: string; userId: string; createdAt: string; details?: any }>;
+}
+
+export const listAdminPayouts = async (params?: {
+	page?: number;
+	limit?: number;
+	status?: AdminPayoutStatus;
+	providerId?: string;
+	from?: string;
+	to?: string;
+	sortBy?: 'createdAt' | 'amountMinor';
+	sortOrder?: 'asc' | 'desc';
+}): Promise<AdminPayoutListResponse> => {
+	const query = buildQuery({
+		page: params?.page,
+		limit: params?.limit,
+		status: params?.status,
+		providerId: params?.providerId,
+		from: params?.from,
+		to: params?.to,
+		sortBy: params?.sortBy,
+		sortOrder: params?.sortOrder,
+	});
+	const response = await client.get<AdminPayoutListResponse>(`/v1/admin/payouts${query}`);
+	return response.data;
+};
+
+export const getAdminPayoutMetrics = async (): Promise<ApiEnvelope<AdminPayoutMetrics>> => {
+	const response = await client.get<ApiEnvelope<AdminPayoutMetrics>>('/v1/admin/payouts/metrics');
+	return response.data;
+};
+
+export const getAdminPayoutDetail = async (payoutId: string): Promise<ApiEnvelope<AdminPayoutDetail>> => {
+	const response = await client.get<ApiEnvelope<AdminPayoutDetail>>(`/v1/admin/payouts/${encodeURIComponent(payoutId)}`);
+	return response.data;
+};
+
+export const createAdminPayout = async (
+	data: { providerId: string; invoiceIds: string[]; method: AdminPayoutMethod },
+	idempotencyKey: string,
+): Promise<ApiEnvelope<{ id: string; amountMinor: string; invoiceCount: number }>> => {
+	const response = await client.post<ApiEnvelope<{ id: string; amountMinor: string; invoiceCount: number }>>('/v1/admin/payouts', data, {
+		headers: { 'Idempotency-Key': idempotencyKey },
+	});
+	return response.data;
+};
+
+export const processAdminPayout = async (payoutId: string): Promise<ApiEnvelope<{ id: string; status: AdminPayoutStatus }>> => {
+	const response = await client.post<ApiEnvelope<{ id: string; status: AdminPayoutStatus }>>(`/v1/admin/payouts/${encodeURIComponent(payoutId)}/process`);
+	return response.data;
+};
+
+export const retryAdminPayout = async (payoutId: string): Promise<ApiEnvelope<{ id: string; status: AdminPayoutStatus }>> => {
+	const response = await client.post<ApiEnvelope<{ id: string; status: AdminPayoutStatus }>>(`/v1/admin/payouts/${encodeURIComponent(payoutId)}/retry`);
 	return response.data;
 };
 

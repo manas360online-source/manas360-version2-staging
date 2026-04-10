@@ -1,8 +1,9 @@
 import type { Request, Response } from 'express';
 import { AppError } from '../middleware/error.middleware';
-import { listUsers, getUserById, verifyTherapist, verifyProvider, approveProvider, getMetrics, listSubscriptions, getUserApprovals, updateUserApprovalStatus, listLiveSessions, getFeedback, resolveFeedback, updateUserStatus, getRoles, updateRolePermissions, getPlatformAdminRoleInventory, createPlatformAdminAccount } from '../services/admin.service';
+import { listUsers, getUserById, verifyTherapist, verifyProvider, approveProvider, getMetrics, listSubscriptions, getUserApprovals, updateUserApprovalStatus, listLiveSessions, getFeedback, resolveFeedback, updateUserStatus, updateUsersBulkStatus, getRoles, updateRolePermissions, getPlatformAdminRoleInventory, createPlatformAdminAccount, searchAdminEntities, getEffectiveAdminPolicies } from '../services/admin.service';
 import { prisma } from '../config/db';
 import { sendSuccess } from '../utils/response';
+import { REQUIRED_LEGAL_TYPES, ensureCanonicalLegalDocuments } from '../services/legal-compliance.service';
 
 /**
  * GET /api/v1/admin/users
@@ -19,6 +20,8 @@ export const listUsersController = async (req: Request, res: Response): Promise<
 	const result = await listUsers(query.page, query.limit, {
 		role: query.role,
 		status: query.status,
+		sortBy: query.sortBy as 'createdAt' | 'email' | 'role' | undefined,
+		sortOrder: query.sortOrder as 'asc' | 'desc' | undefined,
 	});
 
 	sendSuccess(res, result, 'Users fetched successfully');
@@ -57,6 +60,16 @@ export const createPlatformAdminAccountController = async (req: Request, res: Re
 	});
 
 	sendSuccess(res, result, 'Platform admin account created successfully', 201);
+};
+
+export const getEffectiveAdminPoliciesController = async (req: Request, res: Response): Promise<void> => {
+	const userId = req.auth?.userId;
+	if (!userId) {
+		throw new AppError('Authentication required', 401);
+	}
+
+	const result = await getEffectiveAdminPolicies(userId);
+	sendSuccess(res, result, 'Effective admin policies fetched successfully');
 };
 
 /**
@@ -231,7 +244,7 @@ export const resolveAdminFeedbackController = async (req: Request, res: Response
  */
 export const updateAdminUserStatusController = async (req: Request, res: Response): Promise<void> => {
 	const userId = req.params['id'] as string;
-	const { status } = req.body;
+	const { status, reason } = req.body;
 
 	if (!userId) {
 		throw new AppError('User ID is required', 400);
@@ -241,9 +254,44 @@ export const updateAdminUserStatusController = async (req: Request, res: Respons
 		throw new AppError('Status is required', 400);
 	}
 
-	await updateUserStatus(userId, status);
+	await updateUserStatus(userId, status, reason);
 
 	sendSuccess(res, null, `User status updated to ${status} successfully`);
+};
+
+export const updateAdminUsersBulkStatusController = async (req: Request, res: Response): Promise<void> => {
+	const { userIds, status, reason } = req.body as {
+		userIds?: string[];
+		status?: string;
+		reason?: string;
+	};
+	const adminUserId = req.auth?.userId;
+
+	if (!Array.isArray(userIds) || userIds.length === 0) {
+		throw new AppError('userIds must be a non-empty array', 400);
+	}
+
+	if (!status) {
+		throw new AppError('status is required', 400);
+	}
+
+	if (!adminUserId) {
+		throw new AppError('Authentication required', 401);
+	}
+
+	const result = await updateUsersBulkStatus(userIds, status, adminUserId, req.auth?.role, reason);
+	sendSuccess(
+		res,
+		result,
+		`Bulk update complete: ${result.successCount} succeeded, ${result.failedCount} failed`,
+	);
+};
+
+export const searchAdminEntitiesController = async (req: Request, res: Response): Promise<void> => {
+	const q = String(req.query.q || '').trim();
+	const limit = Number(req.query.limit || 8);
+	const result = await searchAdminEntities(q, limit);
+	sendSuccess(res, result, 'Search results fetched successfully');
 };
 
 /**
@@ -282,26 +330,52 @@ export const updateRolePermissionsController = async (req: Request, res: Respons
 
 export const getUserAcceptancesController = async (req: Request, res: Response): Promise<void> => {
 	try {
-		const acceptances = await prisma.consent.findMany({
-			where: { status: 'GRANTED' },
-			include: {
-				user: {
-					select: {
-						phone: true,
-						email: true,
+		let formatted: Array<{ id: string; userName: string; documentType: string; acceptedAt: Date; ip: string | null }> = [];
+		try {
+			const acceptances = await prisma.userAcceptance.findMany({
+				include: {
+					user: {
+						select: {
+							phone: true,
+							email: true,
+						},
+					},
+					document: {
+						select: { type: true },
 					},
 				},
-			},
-			orderBy: { grantedAt: 'desc' },
-		});
+				orderBy: { acceptedAt: 'desc' },
+			});
 
-		const formatted = acceptances.map((a) => ({
-			id: a.id,
-			userName: a.user.phone ?? a.user.email ?? 'N/A',
-			documentType: a.consentType,
-			acceptedAt: a.grantedAt,
-			ip: typeof (a.metadata as any)?.ipAddress === 'string' ? (a.metadata as any).ipAddress : null,
-		}));
+			formatted = acceptances.map((a: any) => ({
+				id: a.id,
+				userName: a.user.phone ?? a.user.email ?? 'N/A',
+				documentType: a.document.type,
+				acceptedAt: a.acceptedAt,
+				ip: typeof a.ipAddress === 'string' ? a.ipAddress : null,
+			}));
+		} catch {
+			const acceptances = await prisma.consent.findMany({
+				where: { status: 'GRANTED' },
+				include: {
+					user: {
+						select: {
+							phone: true,
+							email: true,
+						},
+					},
+				},
+				orderBy: { grantedAt: 'desc' },
+			});
+
+			formatted = acceptances.map((a) => ({
+				id: a.id,
+				userName: a.user.phone ?? a.user.email ?? 'N/A',
+				documentType: a.consentType,
+				acceptedAt: a.grantedAt,
+				ip: typeof (a.metadata as any)?.ipAddress === 'string' ? (a.metadata as any).ipAddress : null,
+			}));
+		}
 
 		res.json({ acceptances: formatted });
 	} catch (_err) {
@@ -311,85 +385,96 @@ export const getUserAcceptancesController = async (req: Request, res: Response):
 
 export const getComplianceStatusController = async (_req: Request, res: Response): Promise<void> => {
 	try {
-		const requiredConsentTypes = ['TERMS_OF_SERVICE', 'PRIVACY_POLICY', 'INFORMED_CONSENT'];
+		await ensureCanonicalLegalDocuments();
 
-		const [totalUsers, grantedConsents] = await Promise.all([
+		const [totalUsers, activeDocs] = await Promise.all([
 			prisma.user.count({ where: { isDeleted: false } }),
-			prisma.consent.findMany({
+			prisma.legalDocument.findMany({
 				where: {
-					status: 'GRANTED',
-					consentType: { in: requiredConsentTypes },
+					isActive: true,
+					type: { in: [...REQUIRED_LEGAL_TYPES] },
 				},
-				select: {
-					userId: true,
-					consentType: true,
-				},
+				select: { id: true, type: true, version: true },
 			}),
 		]);
 
-		const userConsentMap = new Map<string, Set<string>>();
-		for (const consent of grantedConsents) {
-			if (!userConsentMap.has(consent.userId)) {
-				userConsentMap.set(consent.userId, new Set<string>());
+		const acceptances = await prisma.userAcceptance.findMany({
+			where: { documentId: { in: activeDocs.map((doc: any) => doc.id) } },
+			select: {
+				userId: true,
+				documentVer: true,
+				document: { select: { type: true, version: true } },
+			},
+		});
+
+		const userConsentMap = new Map<string, Map<string, number>>();
+		for (const acceptance of acceptances) {
+			if (!userConsentMap.has(acceptance.userId)) {
+				userConsentMap.set(acceptance.userId, new Map<string, number>());
 			}
-			userConsentMap.get(consent.userId)?.add(consent.consentType);
+			const current = userConsentMap.get(acceptance.userId)?.get(acceptance.document.type) || 0;
+			userConsentMap.get(acceptance.userId)?.set(
+				acceptance.document.type,
+				Math.max(current, Number(acceptance.documentVer || 0)),
+			);
 		}
 
-		const acceptedCount = Array.from(userConsentMap.values()).filter((types) =>
-			requiredConsentTypes.every((requiredType) => types.has(requiredType)),
+		const requiredByType = new Map<string, number>(activeDocs.map((doc: any) => [String(doc.type), Number(doc.version)]));
+
+		const acceptedCount = Array.from(userConsentMap.values()).filter((acceptedVersions) =>
+			Array.from(requiredByType.entries()).every(([requiredType, requiredVersion]) =>
+				(acceptedVersions.get(requiredType) || 0) >= requiredVersion,
+			),
 		).length;
 		const pending = Math.max(totalUsers - acceptedCount, 0);
 		const compliancePercentage = totalUsers > 0 ? Math.round((acceptedCount / totalUsers) * 100) : 0;
 
-		const missingByType = requiredConsentTypes
-			.map((type) => {
-				const withType = new Set(grantedConsents.filter((consent) => consent.consentType === type).map((consent) => consent.userId)).size;
-				return { type, missing: Math.max(totalUsers - withType, 0) };
+		const missingByType = Array.from(requiredByType.entries())
+			.map(([type, version]) => {
+				let withType = 0;
+				for (const accepted of userConsentMap.values()) {
+					if ((accepted.get(type) || 0) >= version) withType += 1;
+				}
+				return { type, version, missing: Math.max(totalUsers - withType, 0) };
 			})
 			.filter((entry) => entry.missing > 0)
-			.map((entry) => `${entry.type.replace(/_/g, ' ')} missing for ${entry.missing} users`);
+			.map((entry) => `${entry.type.replace(/_/g, ' ')} v${entry.version} missing for ${entry.missing} users`);
 
 		res.json({
 			compliance_percentage: compliancePercentage,
 			pending,
 			critical_gaps: missingByType,
 		});
-	} catch (_err) {
+	} catch {
 		res.status(500).json({ error: 'Failed to load compliance status' });
 	}
 };
 
 export const getLegalDocumentsController = async (_req: Request, res: Response): Promise<void> => {
 	try {
-		const consents = await prisma.consent.findMany({
-			where: { status: 'GRANTED' },
+		await ensureCanonicalLegalDocuments();
+		const documents = await prisma.legalDocument.findMany({
+			orderBy: [{ type: 'asc' }, { version: 'desc' }],
 			select: {
-				consentType: true,
-				metadata: true,
+				id: true,
+				type: true,
+				version: true,
+				title: true,
+				isActive: true,
+				publishedAt: true,
 			},
 		});
 
-		const aggregateByType = new Map<string, { maxVersion: number; count: number }>();
-		for (const consent of consents) {
-			const type = consent.consentType;
-			const rawVersion = (consent.metadata as any)?.version;
-			const version = typeof rawVersion === 'number' && rawVersion > 0 ? rawVersion : 1;
-			const prev = aggregateByType.get(type) ?? { maxVersion: 1, count: 0 };
-			aggregateByType.set(type, {
-				maxVersion: Math.max(prev.maxVersion, version),
-				count: prev.count + 1,
-			});
-		}
-
-		const documents = Array.from(aggregateByType.entries()).map(([type, details]) => ({
-			id: type,
-			title: type.toLowerCase().split('_').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' '),
-			document_type: type.toLowerCase(),
-			current_version: details.maxVersion,
-			status: details.count > 0 ? 'PUBLISHED' : 'DRAFT',
-		}));
-
-		res.json({ documents });
+		res.json({
+			documents: documents.map((doc: any) => ({
+				id: doc.id,
+				title: doc.title,
+				document_type: String(doc.type).toLowerCase(),
+				current_version: doc.version,
+				status: doc.isActive ? 'PUBLISHED' : 'ARCHIVED',
+				published_at: doc.publishedAt,
+			})),
+		});
 	} catch (_err) {
 		res.status(500).json({ error: 'Failed to load legal documents' });
 	}
@@ -403,50 +488,37 @@ export const downloadLegalDocumentController = async (req: Request, res: Respons
 			return;
 		}
 
-		const latestConsent = await prisma.consent.findFirst({
-			where: {
-				consentType: id,
-				status: 'GRANTED',
-			},
-			orderBy: { grantedAt: 'desc' },
+		const legalDoc = await prisma.legalDocument.findUnique({
+			where: { id },
 			select: {
-				consentType: true,
-				metadata: true,
-				grantedAt: true,
+				id: true,
+				type: true,
+				version: true,
+				title: true,
+				content: true,
+				publishedAt: true,
 			},
 		});
 
-		if (!latestConsent) {
+		if (!legalDoc) {
 			res.status(404).json({ error: 'Document not found' });
 			return;
 		}
 
-		const version = Number((latestConsent.metadata as any)?.version || 1);
-		const readableType = latestConsent.consentType
-			.toLowerCase()
-			.split('_')
-			.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-			.join(' ');
-
 		const lines = [
-			`MANAS360 - ${readableType}`,
-			`Version: ${version}`,
-			`Effective Date: ${new Date(latestConsent.grantedAt).toISOString()}`,
+			`MANAS360 - ${legalDoc.title}`,
+			`Type: ${String(legalDoc.type)}`,
+			`Version: ${Number(legalDoc.version)}`,
+			`Effective Date: ${new Date(legalDoc.publishedAt).toISOString()}`,
 			'',
-			'This legal artifact is generated from accepted consent records.',
-			'For canonical legal text, refer to the corresponding legal policy page in MANAS360.',
+			'Canonical legal document content',
 			'',
-			'Core clauses:',
-			'1. Platform usage is permitted only for lawful wellness and care purposes.',
-			'2. Data processing follows applicable privacy and security laws and standards.',
-			'3. Billing, refunds, and cancellations are governed by published policy timelines.',
-			'4. Users consent to communication records, transaction records, and compliance auditing.',
-			'5. By accepting, users confirm they have read and understood the legal terms.',
+			legalDoc.content,
 			'',
-			`Document ID: ${id}`,
+			`Document ID: ${legalDoc.id}`,
 		];
 
-		const fileName = `${latestConsent.consentType.toLowerCase()}-v${version}.txt`;
+		const fileName = `${String(legalDoc.type).toLowerCase()}-v${Number(legalDoc.version)}.txt`;
 		res.setHeader('Content-Type', 'text/plain; charset=utf-8');
 		res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
 		res.status(200).send(lines.join('\n'));

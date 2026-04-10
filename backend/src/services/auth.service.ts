@@ -28,6 +28,11 @@ import {
 import { createTokenPair, verifyRefreshToken } from '../utils/jwt';
 import { logger } from '../utils/logger';
 import { sendPlatformAdminPasswordResetEmail } from './email.service';
+import {
+	getActiveLegalDocuments,
+	getPendingLegalDocumentsForUser,
+	recordUserAcceptances,
+} from './legal-compliance.service';
 import { sendWhatsAppMessage } from './whatsapp.service';
 import type { WhatsAppUserType } from './whatsapp.service';
 import type {
@@ -163,6 +168,20 @@ const resolveUserCompanyMeta = async (userId: string, email?: string | null) => 
 	} catch {
 		return existingMeta;
 	}
+};
+
+const resolveLegalAcceptanceState = async (userId: string) => {
+	const pendingState = await getPendingLegalDocumentsForUser(userId);
+	return {
+		legalAcceptanceRequired: pendingState.pendingCount > 0,
+		pendingLegalDocuments: pendingState.pending.map((doc: any) => ({
+			id: doc.id,
+			type: doc.type,
+			version: doc.version,
+			title: doc.title,
+			publishedAt: doc.publishedAt,
+		})),
+	};
 };
 
 const getSupportedUserRoles = async (): Promise<Set<string>> => {
@@ -527,49 +546,19 @@ export const verifyPhoneOtp = async (input: VerifyPhoneOtpInput, meta: RequestMe
 	});
 
 	if (isFirstPhoneVerification && input.acceptedTerms) {
-		const defaultConsentTypes = ['TERMS_OF_SERVICE', 'PRIVACY_POLICY', 'INFORMED_CONSENT'];
-		const optionalConsentTypes = new Set([
-			'THERAPIST_IC_AGREEMENT',
-			'THERAPIST_NDA',
-			'THERAPIST_DATA_PROCESSING_AGREEMENT',
-		]);
+		const activeDocs = await getActiveLegalDocuments();
+		const requiredDocIds = activeDocs
+			.filter((doc: any) => ['TERMS_OF_SERVICE', 'PRIVACY_POLICY', 'INFORMED_CONSENT'].includes(String(doc.type)))
+			.map((doc: any) => String(doc.id));
 
-		const acceptedFromInput = Array.isArray(input.acceptedDocuments)
-			? input.acceptedDocuments
-				.map((doc) => String(doc).trim().toUpperCase())
-				.filter((doc) => optionalConsentTypes.has(doc))
-			: [];
-
-		const consentTypes = Array.from(new Set([...defaultConsentTypes, ...acceptedFromInput]));
-		const existing = await db.consent.findMany({
-			where: {
+		if (requiredDocIds.length > 0) {
+			await recordUserAcceptances({
 				userId: String(user.id),
-				status: 'GRANTED',
-				consentType: { in: consentTypes },
-			},
-			select: { consentType: true },
-		});
-
-		const existingTypes = new Set<string>(existing.map((entry: { consentType: string }) => entry.consentType));
-		const now = new Date();
-		const toCreate = consentTypes
-			.filter((consentType) => !existingTypes.has(consentType))
-			.map((consentType) => ({
-				userId: String(user.id),
-				consentType,
-				purpose: 'REGISTRATION',
-				status: 'GRANTED',
-				grantedAt: now,
-				metadata: {
-					source: 'signup_phone_otp',
-					ipAddress: meta.ipAddress || null,
-					userAgent: meta.userAgent || null,
-					version: 1,
-				},
-			}));
-
-		if (toCreate.length > 0) {
-			await db.consent.createMany({ data: toCreate });
+				documentIds: requiredDocIds,
+				ipAddress: meta.ipAddress,
+				userAgent: meta.userAgent,
+				source: 'signup_phone_otp',
+			});
 		}
 
 		// Send WhatsApp welcome message for first-time users (non-blocking)
@@ -591,6 +580,8 @@ export const verifyPhoneOtp = async (input: VerifyPhoneOtpInput, meta: RequestMe
 			console.error('[Auth] Failed to send WhatsApp welcome message:', err.message);
 		});
 	}
+
+	const legalState = await resolveLegalAcceptanceState(String(user.id));
 
 	const tokenPair = await issueSessionTokens(String(user.id), meta);
 	const therapistProfile = await db.therapistProfile.findUnique({
@@ -633,6 +624,7 @@ export const verifyPhoneOtp = async (input: VerifyPhoneOtpInput, meta: RequestMe
 			providerOnboardingCompleted: Boolean((therapistProfile as any)?.onboardingCompleted),
 			providerProfileVerified: Boolean((therapistProfile as any)?.isVerified),
 			requiresPlatformPayment,
+			...legalState,
 			...companyAdminMeta,
 		},
 		...tokenPair,
@@ -737,6 +729,8 @@ export const loginWithPassword = async (input: LoginInput, meta: RequestMeta) =>
 		console.error('[AUTH] Error checking provider subscription status:', err);
 	}
 
+	const legalState = await resolveLegalAcceptanceState(String(user.id));
+
 	return {
 		user: {
 			id: String(user.id),
@@ -751,6 +745,7 @@ export const loginWithPassword = async (input: LoginInput, meta: RequestMeta) =>
 			providerOnboardingCompleted: Boolean((therapistProfile as any)?.onboardingCompleted),
 			providerProfileVerified: Boolean((therapistProfile as any)?.isVerified),
 			requiresPlatformPayment,
+			...legalState,
 			...companyAdminMeta,
 		},
 		...tokenPair,
@@ -830,6 +825,8 @@ export const loginWithGoogle = async (input: GoogleLoginInput, meta: RequestMeta
 		console.error('[AUTH] Error checking provider subscription status:', err);
 	}
 
+	const legalState = await resolveLegalAcceptanceState(String(user.id));
+
 	return {
 		user: {
 			id: String(user.id),
@@ -844,6 +841,7 @@ export const loginWithGoogle = async (input: GoogleLoginInput, meta: RequestMeta
 			providerOnboardingCompleted: Boolean((therapistProfile as any)?.onboardingCompleted),
 			providerProfileVerified: Boolean((therapistProfile as any)?.isVerified),
 			requiresPlatformPayment,
+			...legalState,
 			...companyAdminMeta,
 		},
 		...tokenPair,
