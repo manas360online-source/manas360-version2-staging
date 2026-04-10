@@ -1,5 +1,5 @@
 import React from 'react';
-import DigitalPetHub from '../../components/common/DigitalPetHub.jsx';
+import DigitalPetHub from '../../components/common/DigitalPetHub';
 
 /**
  * DigitalPetPage - Displays the Digital Pet Hub Component

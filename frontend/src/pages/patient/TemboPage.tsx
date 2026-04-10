@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import Tembo from '../../components/common/Tembo.jsx';
+import Tembo from '../../components/common/Tembo';
 
 const TemboPage: React.FC = () => {
   useEffect(() => {

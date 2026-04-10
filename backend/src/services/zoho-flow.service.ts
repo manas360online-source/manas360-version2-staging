@@ -1,7 +1,6 @@
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/error.middleware';
 import { logger } from '../utils/logger';
-import fetch from 'node-fetch';
 
 export type SwipePayload = {
   customer_info: {
@@ -145,14 +144,17 @@ export const sendToZohoFlow = async (
         invoiceId: payload.transaction_details.transaction_id,
       });
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
       const response = await fetch(ZOHO_WEBHOOK_URL!, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),
-        timeout: 10000,
-      });
+        signal: controller.signal,
+      }).finally(() => clearTimeout(timeoutId));
 
       if (!response.ok) {
         throw new Error(`Zoho Flow returned status ${response.status}: ${response.statusText}`);
