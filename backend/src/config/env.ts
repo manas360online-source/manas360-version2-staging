@@ -38,10 +38,13 @@ const parseNumber = (value: string | undefined, fallback: number): number => {
 
 const parseCorsOrigins = (value: string | undefined): string[] => {
 	const raw = value ?? 'http://localhost:5173';
-	return raw
+	const parsed = raw
 		.split(',')
 		.map((origin) => origin.trim())
-		.filter((origin) => origin.length > 0);
+		.filter((origin) => origin.length > 0)
+		.map((origin) => origin.replace(/\/+$/, ''));
+
+	return Array.from(new Set(parsed));
 };
 
 const parseFrontendUrl = (value: string | undefined, corsOrigins: string[]): string => {

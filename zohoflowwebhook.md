@@ -207,3 +207,103 @@ Reference: ${data.transactionId}
 
 Do not send final invoice confirmation to user at payment success alone.
 Send it only after Swipe confirms invoice creation.
+
+## 12) Combined Payloads (Use As-Is)
+
+Below is one unified payload format that combines standard event fields + Swipe fields + session fields in a single structure.
+
+### Unified Zoho Flow Webhook Call (Combined)
+
+```bash
+curl -X POST "https://flow.zoho.in/60067414515/flow/webhook/incoming?zapikey=1001.ef1acdfdf4a4419e0d102c879060bd88.fcb96a39ef777046940e24368c0937f0&isdebug=false" \
+-H "Content-Type: application/json" \
+-d '{
+  "event": "PAYMENT_SUCCESS",
+  "role": "PATIENT",
+  "timestamp": "2026-04-10T20:40:00.000Z",
+  "source": "MANAS360",
+  "data": {
+    "userId": "u_test_1001",
+    "name": "Chandu",
+    "phone": "919636269114",
+    "email": "chandu@manas360.com",
+
+    "detailsLink": "https://manas360.com/...",
+    "certificateName": "CBT Level 1",
+    "amount": "₹699",
+    "status": "success",
+    "specialization": "Clinical Psychologist",
+    "clinicalType": "PHQ9_CRITICAL",
+    "assessmentScore": "14",
+    "severity": "MODERATE",
+    "licenseNumber": "RCI-12345",
+    "expiryDate": "30 April 2026",
+    "payoutAmount": "₹2,500",
+    "contractLink": "https://sign.zoho.com/...",
+    "reason": "therapist unavailable",
+    "sessionId": "sess_7a3f",
+    "districtName": "Rangareddy",
+
+    "transactionId": "T260410_TEST_99",
+    "amountPaid": 699,
+    "paymentMode": "PhonePe",
+    "swipeItemId": "THERAPY_699_V3",
+    "quantity": 1,
+    "serviceCategory": "Clinical",
+    "notes": "PhonePe Ref: T260410_TEST_99",
+    "therapistName": "Dr. Rajesh",
+    "date": "10 April 2026",
+    "time": "8:30 PM IST",
+    "meetingLink": "https://meet.jit.si/manas360-test"
+  }
+}'
+```
+
+### Unified Combined Payload Template (Single Structure)
+
+```json
+{
+  "event": "PAYMENT_SUCCESS",
+  "role": "PATIENT",
+  "timestamp": "2026-04-07T10:30:00.000Z",
+  "source": "MANAS360",
+  "data": {
+    "userId": "u_1001",
+    "name": "Dr. Priya Sharma",
+    "phone": "919636269114",
+    "email": "priya@example.com",
+    "therapistName": "Dr. Rajesh",
+    "date": "10 April 2026",
+    "time": "6:00 PM IST",
+    "meetingLink": "https://meet.jit.si/...",
+    "detailsLink": "https://manas360.com/...",
+    "certificateName": "CBT Level 1",
+    "amount": "₹699",
+    "status": "success",
+    "specialization": "Clinical Psychologist",
+    "clinicalType": "PHQ9_CRITICAL",
+    "assessmentScore": "14",
+    "severity": "MODERATE",
+    "licenseNumber": "RCI-12345",
+    "expiryDate": "30 April 2026",
+    "payoutAmount": "₹2,500",
+    "contractLink": "https://sign.zoho.com/...",
+    "reason": "therapist unavailable",
+    "sessionId": "sess_7a3f",
+    "districtName": "Rangareddy",
+    "transactionId": "T240325123456",
+    "amountPaid": 699,
+    "paymentMode": "PhonePe",
+    "swipeItemId": "THERAPY_699_V3",
+    "quantity": 1,
+    "serviceCategory": "Clinical",
+    "notes": "PhonePe Ref: T240325123456"
+  }
+}
+```
+
+### Combined Guidance (Single Payload)
+
+- Use this one structure for all events.
+- For non-payment events, keep `swipe*` fields empty or omit them.
+- For `PAYMENT_SUCCESS`, fill all Swipe fields.

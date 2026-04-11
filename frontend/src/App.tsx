@@ -16,6 +16,7 @@ import { OnboardingName } from './pages/OnboardingName'
 import { OnboardingEmail } from './pages/OnboardingEmail'
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
 const SignupPage = lazy(() => import('./pages/auth/SignupPage'));
+const LegalAcceptancePage = lazy(() => import('./pages/auth/LegalAcceptancePage'));
 import ProtectedRoute from './components/ProtectedRoute'
 import PlatformAdminRoute from './components/PlatformAdminRoute'
 import CorporateRoute from './components/CorporateRoute'
@@ -274,6 +275,9 @@ function App() {
             <Route path="/my-digital-clinic" element={<MyDigitalClinicPricingPage />} />
             <Route path="/my-digital-clinic/dashboard" element={<MyDigitalClinicDashboard />} />
             <Route path="/clinic" element={<Navigate to="/my-digital-clinic" replace />} />
+            <Route path="/golden-puppy" element={<GoldenPupPage />} />
+            <Route path="/wise-owl" element={<DinoPage />} />
+            <Route path="/patience-turtle" element={<ChintuPage />} />
             <Route path="/pet" element={<DigitalPetPage />} />
             <Route path="/chintu" element={<ChintuPage />} />
             <Route path="/dino" element={<DinoPage />} />
@@ -396,6 +400,14 @@ function App() {
             <Route path="/psychiatrist/*" element={<Navigate to="/provider/dashboard" replace />} />
             <Route path="/psychologist/*" element={<Navigate to="/provider/dashboard" replace />} />
             <Route path="/auth/signup" element={<SignupPage />} />
+            <Route
+              path="/auth/legal-accept"
+              element={
+                <ProtectedRoute>
+                  <LegalAcceptancePage />
+                </ProtectedRoute>
+              }
+            />
             <Route path="/payment/status" element={<PaymentStatusPage />} />
             <Route
               path="/plans"

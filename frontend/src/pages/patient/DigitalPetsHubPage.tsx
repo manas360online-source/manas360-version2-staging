@@ -188,10 +188,18 @@ export default function DigitalPetsHubPage() {
           <div className="tier-section">
             <div className="tier-header"><h2>Tier 2 - Interactive Companions</h2><span className="badge paid">₹99/mo or ₹199 OWN</span></div>
             <div className="pets-row">
-              <div className="pet-card"><div className="pet-visual" style={{ background: 'linear-gradient(135deg,#FEF3C7,#FDE68A)' }}><span className="pet-price paid">₹99/mo</span>🐕</div><div className="pet-body"><div className="pet-name">Golden Puppy</div><div className="pet-env">🌻 Sunny Meadow</div><span className="pet-benefit joy">Joy</span><span className="pet-benefit joy">Routine Building</span></div></div>
-              <div className="pet-card"><div className="pet-visual" style={{ background: 'linear-gradient(135deg,#E0F2FE,#BAE6FD)' }}><span className="pet-price paid">₹99/mo</span>🦉</div><div className="pet-body"><div className="pet-name">Wise Owl</div><div className="pet-env">📚 Forest Library</div><span className="pet-benefit mind">Cognitive</span><span className="pet-benefit mind">Quiz Games</span></div></div>
-              <div className="pet-card"><div className="pet-visual" style={{ background: 'linear-gradient(135deg,#D1FAE5,#6EE7B7)' }}><span className="pet-price paid">₹99/mo</span>🐘</div><div className="pet-body"><div className="pet-name"><Link to="/elephant" style={{ textDecoration: 'none', color: 'inherit' }}>Healing Elephant</Link></div><div className="pet-env">🌳 Sacred Grove</div><span className="pet-benefit strength">Emotional Strength</span><span className="pet-benefit mind">Memory</span></div></div>
-              <div className="pet-card"><div className="pet-visual" style={{ background: 'linear-gradient(135deg,#FED7AA,#FDBA74)' }}><span className="pet-price paid">₹99/mo</span>🐒</div><div className="pet-body"><div className="pet-name">Patience Turtle</div><div className="pet-env">🏖️ Quiet Beach</div><span className="pet-benefit growth">Patience</span><span className="pet-benefit calm">Slow Living</span></div></div>
+              <Link to="/golden-puppy" style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
+                <div className="pet-card"><div className="pet-visual" style={{ background: 'linear-gradient(135deg,#FEF3C7,#FDE68A)' }}><span className="pet-price paid">₹99/mo</span>🐕</div><div className="pet-body"><div className="pet-name">Golden Puppy</div><div className="pet-env">🌻 Sunny Meadow</div><span className="pet-benefit joy">Joy</span><span className="pet-benefit joy">Routine Building</span></div></div>
+              </Link>
+              <Link to="/wise-owl" style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
+                <div className="pet-card"><div className="pet-visual" style={{ background: 'linear-gradient(135deg,#E0F2FE,#BAE6FD)' }}><span className="pet-price paid">₹99/mo</span>🦉</div><div className="pet-body"><div className="pet-name">Wise Owl</div><div className="pet-env">📚 Forest Library</div><span className="pet-benefit mind">Cognitive</span><span className="pet-benefit mind">Quiz Games</span></div></div>
+              </Link>
+              <Link to="/elephant" style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
+                <div className="pet-card"><div className="pet-visual" style={{ background: 'linear-gradient(135deg,#D1FAE5,#6EE7B7)' }}><span className="pet-price paid">₹99/mo</span>🐘</div><div className="pet-body"><div className="pet-name">Healing Elephant</div><div className="pet-env">🌳 Sacred Grove</div><span className="pet-benefit strength">Emotional Strength</span><span className="pet-benefit mind">Memory</span></div></div>
+              </Link>
+              <Link to="/patience-turtle" style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
+                <div className="pet-card"><div className="pet-visual" style={{ background: 'linear-gradient(135deg,#FED7AA,#FDBA74)' }}><span className="pet-price paid">₹99/mo</span>🐒</div><div className="pet-body"><div className="pet-name">Patience Turtle</div><div className="pet-env">🏖️ Quiet Beach</div><span className="pet-benefit growth">Patience</span><span className="pet-benefit calm">Slow Living</span></div></div>
+              </Link>
             </div>
           </div>
         </div>

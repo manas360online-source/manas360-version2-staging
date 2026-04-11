@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
-import { prisma } from '../config/db';
-import { AppError } from '../middleware/error.middleware';
-import { logger } from '../utils/logger';
+import { prisma } from '../../config/db';
+import { AppError } from '../../middleware/error.middleware';
+import { logger } from '../../utils/logger';
 
 /**
  * GET /admin/invoices/swipe-items

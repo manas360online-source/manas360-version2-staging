@@ -13,3 +13,5 @@ backend/.pgdata/
 # Build
 dist/
 build/
+# Local env
+backend/.env.local
