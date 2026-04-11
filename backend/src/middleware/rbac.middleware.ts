@@ -124,9 +124,10 @@ const getRolePermissions = async (roleName: UserRole): Promise<string[]> => {
 		return cached.permissions;
 	}
 
+	const normalizedRoleName = normalizeRoleName(roleName);
 	const roleDataRows = (await db.$queryRawUnsafe(
-		'SELECT permissions FROM roles WHERE LOWER(name) = LOWER($1) LIMIT 1',
-		roleName,
+		"SELECT permissions FROM roles WHERE REPLACE(REPLACE(REPLACE(LOWER(name), '_', ''), '-', ''), ' ', '') = $1 LIMIT 1",
+		normalizedRoleName,
 	)) as Array<{ permissions: string[] | null }>;
 	const roleData = roleDataRows[0] ?? null;
 
@@ -361,7 +362,7 @@ export const requireCorporateMemberAccess = async (
 			return;
 		}
 
-		const role = String(user.role).toLowerCase() as UserRole;
+		const role = normalizeRoleName(user.role);
 		const isPlatformAdmin = ['admin', 'superadmin', 'clinicaldirector', 'financemanager', 'complianceofficer'].includes(role);
 		if (isPlatformAdmin) {
 			if (!req.auth) {

@@ -1,6 +1,6 @@
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import DigitalPetHub from '../components/common/DigitalPetHub';
 
-const ChintuPage: React.FC = () => <Navigate to="/pet" replace />;
+const ChintuPage: React.FC = () => <DigitalPetHub selectedPet="patience-turtle" />;
 
 export default ChintuPage;

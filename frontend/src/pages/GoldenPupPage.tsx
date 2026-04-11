@@ -1,6 +1,6 @@
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import DigitalPetHub from '../components/common/DigitalPetHub';
 
-const GoldenPupPage: React.FC = () => <Navigate to="/pet" replace />;
+const GoldenPupPage: React.FC = () => <DigitalPetHub selectedPet="golden-puppy" />;
 
 export default GoldenPupPage;

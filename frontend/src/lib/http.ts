@@ -113,10 +113,19 @@ if (http && http.interceptors && http.interceptors.response && typeof http.inter
 			const baseUrl = error?.config?.baseURL || '';
 			const relativeUrl = normalizeApiUrl(error?.config?.url || '');
 			const fullUrl = `${baseUrl}${relativeUrl}`;
+				const errorCode = String(error?.response?.data?.details?.code || '');
 
 			(error as any).isExpectedAuthFailure = isExpectedAuthFailure(status, fullUrl);
 
 			const originalRequest = error?.config as (typeof error.config & { _retry?: boolean }) | undefined;
+			if (status === 428 && errorCode === 'LEGAL_REACCEPTANCE_REQUIRED' && typeof window !== 'undefined') {
+				const currentHash = window.location.hash || '#/';
+				if (!currentHash.startsWith('#/auth/legal-accept')) {
+					const returnTo = encodeURIComponent(currentHash.replace(/^#/, '') || '/');
+					window.location.hash = `/auth/legal-accept?returnTo=${returnTo}`;
+				}
+			}
+
 			if (status === 401 && originalRequest && !originalRequest._retry && !isAuthRoute(fullUrl)) {
 				originalRequest._retry = true;
 				try {
