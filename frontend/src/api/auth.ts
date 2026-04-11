@@ -7,6 +7,14 @@ interface ApiEnvelope<T> {
 	data: T;
 }
 
+export interface LegalDocument {
+	id: string;
+	type: string;
+	version: number;
+	title: string;
+	publishedAt?: string;
+}
+
 export interface AuthUser {
 	id: string;
 	email: string | null;
@@ -28,6 +36,8 @@ export interface AuthUser {
 	providerProfileVerified?: boolean;
 	requiresPlatformPayment?: boolean;
 	platformAccessActive?: boolean;
+	legalAcceptanceRequired?: boolean;
+	pendingLegalDocuments?: LegalDocument[];
 	permissions?: string[];
 	adminPolicies?: Record<string, string[]>;
 	adminPolicyVersion?: number;
@@ -144,6 +154,32 @@ export const verifyPhoneSignupOtp = async (
 
 export const me = async (): Promise<AuthUser> => {
 	const response = await http.get<ApiEnvelope<AuthUser>>('/v1/auth/me');
+	return response.data.data;
+};
+
+export const getRequiredLegalDocuments = async (): Promise<{
+	legalAcceptanceRequired: boolean;
+	pendingDocuments: LegalDocument[];
+}> => {
+	const response = await http.get<ApiEnvelope<{
+		legalAcceptanceRequired: boolean;
+		pendingDocuments: LegalDocument[];
+	}>>('/v1/auth/legal/required');
+
+	return response.data.data;
+};
+
+export const acceptLegalDocuments = async (documentIds: string[]): Promise<{
+	legalAcceptanceRequired: boolean;
+	pendingDocuments: LegalDocument[];
+}> => {
+	const response = await http.post<ApiEnvelope<{
+		legalAcceptanceRequired: boolean;
+		pendingDocuments: LegalDocument[];
+	}>>('/v1/auth/legal/accept', {
+		documentIds,
+	});
+
 	return response.data.data;
 };
 

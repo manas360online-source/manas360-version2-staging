@@ -28,7 +28,6 @@ import {
 	getClientIpFromRequest,
 } from '../services/phonepe.service';
 import { logger } from '../utils/logger';
-import { invoiceService } from '../services/invoice.service';
 
 const getAuthUserId = (req: Request): string => {
 	const userId = req.auth?.userId;
@@ -641,14 +640,7 @@ export const getRefundStatusController = async (req: Request, res: Response): Pr
 					},
 				});
 
-				if (newStatus === 'COMPLETED' || newStatus === 'CONFIRMED') {
-					await invoiceService.transitionInvoiceLifecycleByPaymentId({
-						paymentId: String(refund.paymentId || ''),
-						nextStatus: 'REFUNDED',
-						eventType: 'REFUND_CONFIRMED',
-						actorUserId: patientId,
-					});
-				}
+				// Invoice lifecycle updates intentionally disabled.
 
 				sendSuccess(res, updatedRefund, 'Refund status retrieved', 200);
 				return;

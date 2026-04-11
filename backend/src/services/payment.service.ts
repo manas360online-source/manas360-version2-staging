@@ -10,7 +10,6 @@ import { activateProviderSubscription } from './provider-subscription.service';
 import { activateAllPendingComponents, expirePendingComponents } from './provider-subscription.pending.service';
 import { extractDeclineReasonFromPhonePe, formatDeclineMessage } from './phonepe-decline-reasons.service';
 import { sendWhatsAppMessage } from './whatsapp.service';
-import { invoiceService } from './invoice.service';
 import { logger } from '../utils/logger';
 import { getPlatformConfig } from './platform-config.service';
 
@@ -320,18 +319,7 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 					}).catch((err) => console.error('[Payment] Failed to send payment_success WhatsApp:', err.message));
 				}
 
-					void invoiceService.ensureInvoiceForPayment(String(capturedPayment.id))
-						.then(() => invoiceService.transitionInvoiceLifecycleByPaymentId({
-							paymentId: String(capturedPayment.id),
-							nextStatus: 'PAID',
-							eventType: 'PAYMENT_CONFIRMED',
-						}))
-						.catch((err) => {
-						logger.error('[PaymentService] Session invoice generation failed', {
-							paymentId: String(capturedPayment.id),
-							error: err?.message || err,
-						});
-						});
+					// Invoice generation intentionally disabled.
 			}
 
 			logger.info(`[PaymentService] Session payment processed and capture recorded`, { merchantTransactionId });
@@ -468,18 +456,7 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 					}).catch((err) => console.error('[Payment] Failed to send subscription payment_success WhatsApp:', err.message));
 				}
 
-				void invoiceService.ensureInvoiceForPayment(String(payment.id))
-					.then(() => invoiceService.transitionInvoiceLifecycleByPaymentId({
-						paymentId: String(payment.id),
-						nextStatus: 'PAID',
-						eventType: 'PAYMENT_CONFIRMED',
-					}))
-					.catch((err) => {
-					logger.error('[PaymentService] Subscription invoice generation failed', {
-						paymentId: String(payment.id),
-						error: err?.message || err,
-					});
-					});
+				// Invoice generation intentionally disabled.
 			}
 			
 			logger.info(`[PaymentService] Patient subscription activated successfully`, { merchantTransactionId, userId, planKey });
@@ -668,18 +645,7 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 					}).catch((err) => console.error('[Payment] Failed to send provider subscription payment_success WhatsApp:', err.message));
 				}
 
-				void invoiceService.ensureInvoiceForPayment(String(payment.id))
-					.then(() => invoiceService.transitionInvoiceLifecycleByPaymentId({
-						paymentId: String(payment.id),
-						nextStatus: 'PAID',
-						eventType: 'PAYMENT_CONFIRMED',
-					}))
-					.catch((err) => {
-					logger.error('[PaymentService] Provider subscription invoice generation failed', {
-						paymentId: String(payment.id),
-						error: err?.message || err,
-					});
-					});
+				// Invoice generation intentionally disabled.
 			}
 
 			logger.info(`[PaymentService] Provider subscription activated successfully (Phase 2)`, {

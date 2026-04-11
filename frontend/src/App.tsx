@@ -16,6 +16,7 @@ import { OnboardingName } from './pages/OnboardingName'
 import { OnboardingEmail } from './pages/OnboardingEmail'
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
 const SignupPage = lazy(() => import('./pages/auth/SignupPage'));
+const LegalAcceptancePage = lazy(() => import('./pages/auth/LegalAcceptancePage'));
 import ProtectedRoute from './components/ProtectedRoute'
 import PlatformAdminRoute from './components/PlatformAdminRoute'
 import CorporateRoute from './components/CorporateRoute'
@@ -93,7 +94,6 @@ const UserApprovals = lazy(() => import('./pages/admin/UserApprovals'));
 const LiveSessions = lazy(() => import('./pages/admin/LiveSessions'));
 const Feedback = lazy(() => import('./pages/admin/Feedback'));
 const AllUsers = lazy(() => import('./pages/admin/AllUsers'));
-const AdminInvoices = lazy(() => import('./pages/admin/Invoices'));
 const AdminPaymentReliability = lazy(() => import('./pages/admin/PaymentReliability'));
 const CertificationsPage = lazy(() => import('./pages/CertificationsPage'));
 const CertificationLandingPage = lazy(() => import('./pages/CertificationLandingPage'));
@@ -112,7 +112,6 @@ const CorporateSessionAllocationPage = lazy(() => import('./pages/corporate/Corp
 const CorporateUtilizationReportsPage = lazy(() => import('./pages/corporate/CorporateUtilizationReportsPage'));
 const CorporateWellbeingReportsPage = lazy(() => import('./pages/corporate/CorporateWellbeingReportsPage'));
 const CorporateEngagementReportsPage = lazy(() => import('./pages/corporate/CorporateEngagementReportsPage'));
-const CorporateInvoicesPage = lazy(() => import('./pages/corporate/CorporateInvoicesPage'));
 const CorporatePaymentMethodsPage = lazy(() => import('./pages/corporate/CorporatePaymentMethodsPage'));
 const CorporatePlanPage = lazy(() => import('./pages/corporate/CorporatePlanPage'));
 const CorporateHelpPage = lazy(() => import('./pages/corporate/CorporateHelpPage'));
@@ -274,6 +273,9 @@ function App() {
             <Route path="/my-digital-clinic" element={<MyDigitalClinicPricingPage />} />
             <Route path="/my-digital-clinic/dashboard" element={<MyDigitalClinicDashboard />} />
             <Route path="/clinic" element={<Navigate to="/my-digital-clinic" replace />} />
+            <Route path="/golden-puppy" element={<GoldenPupPage />} />
+            <Route path="/wise-owl" element={<DinoPage />} />
+            <Route path="/patience-turtle" element={<ChintuPage />} />
             <Route path="/pet" element={<DigitalPetPage />} />
             <Route path="/chintu" element={<ChintuPage />} />
             <Route path="/dino" element={<DinoPage />} />
@@ -396,6 +398,14 @@ function App() {
             <Route path="/psychiatrist/*" element={<Navigate to="/provider/dashboard" replace />} />
             <Route path="/psychologist/*" element={<Navigate to="/provider/dashboard" replace />} />
             <Route path="/auth/signup" element={<SignupPage />} />
+            <Route
+              path="/auth/legal-accept"
+              element={
+                <ProtectedRoute>
+                  <LegalAcceptancePage />
+                </ProtectedRoute>
+              }
+            />
             <Route path="/payment/status" element={<PaymentStatusPage />} />
             <Route
               path="/plans"
@@ -494,7 +504,6 @@ function App() {
                 <Route path="billing/pricing" element={<PricingSubscriptionsPage />} />
                 <Route path="billing/offers" element={<OfferMarqueeEditor />} />
                 <Route path="billing/payouts" element={<AdminPayoutsPage />} />
-                <Route path="billing/invoices" element={<AdminInvoices />} />
                 <Route path="billing/payment-reliability" element={<AdminPaymentReliability />} />
 
                 <Route path="operations/sessions" element={<LiveSessions />} />
@@ -536,7 +545,6 @@ function App() {
                 <Route path="pricing-subscriptions" element={<Navigate to="/admin/billing/pricing" replace />} />
                 <Route path="offer-marquee" element={<Navigate to="/admin/billing/offers" replace />} />
                 <Route path="payouts" element={<Navigate to="/admin/billing/payouts" replace />} />
-                <Route path="invoices" element={<Navigate to="/admin/billing/invoices" replace />} />
                 <Route path="payment-reliability" element={<Navigate to="/admin/billing/payment-reliability" replace />} />
                 <Route path="live-sessions" element={<Navigate to="/admin/operations/sessions" replace />} />
                 <Route path="templates" element={<Navigate to="/admin/operations/templates" replace />} />
@@ -585,7 +593,8 @@ function App() {
             <Route path="/corporate/reports/utilization" element={<CorporateRoute><CorporateUtilizationReportsPage /></CorporateRoute>} />
             <Route path="/corporate/reports/wellbeing" element={<CorporateRoute><CorporateWellbeingReportsPage /></CorporateRoute>} />
             <Route path="/corporate/reports/engagement" element={<CorporateRoute><CorporateEngagementReportsPage /></CorporateRoute>} />
-            <Route path="/corporate/billing/invoices" element={<CorporateRoute><CorporateInvoicesPage /></CorporateRoute>} />
+                
+                
             <Route path="/corporate/billing/payment-methods" element={<CorporateRoute><CorporatePaymentMethodsPage /></CorporateRoute>} />
             <Route path="/corporate/billing/plan" element={<CorporateRoute><CorporatePlanPage /></CorporateRoute>} />
             <Route path="/corporate/account/help" element={<CorporateRoute><CorporateHelpPage /></CorporateRoute>} />

@@ -33,18 +33,25 @@ const localDevOrigins = [
 	'http://127.0.0.1:3000',
 ];
 
+const normalizeOrigin = (origin: string): string => origin.replace(/\/+$/, '');
+
 const allowedCorsOrigins = Array.from(new Set([
 	...env.corsOrigins,
 	...localDevOrigins,
 	'https://www.manas360.com',
 	'https://manas360.com',
 	'http://www.manas360.com',
-]));
+].map(normalizeOrigin)));
 
 app.use(cors({
 	origin: (origin, callback) => {
-		if (!origin || allowedCorsOrigins.includes(origin)) {
+		if (!origin) {
 			return callback(null, true);
+		}
+
+		const normalizedOrigin = normalizeOrigin(origin);
+		if (allowedCorsOrigins.includes(normalizedOrigin)) {
+			return callback(null, normalizedOrigin);
 		}
 
 		logger.warn(`Blocked by CORS origin: ${origin}`);
@@ -60,6 +67,24 @@ app.use(cors({
 	credentials: true,
 	optionsSuccessStatus: 204,
 }));
+
+// Defensive normalization in case upstream/middleware appends duplicate origin values.
+app.use((_req, res, next) => {
+	const headerValue = res.getHeader('Access-Control-Allow-Origin');
+
+	if (typeof headerValue === 'string' && headerValue.includes(',')) {
+		const firstOrigin = headerValue
+			.split(',')
+			.map((value) => value.trim())
+			.find((value) => value.length > 0);
+
+		if (firstOrigin) {
+			res.setHeader('Access-Control-Allow-Origin', firstOrigin);
+		}
+	}
+
+	next();
+});
 
 // app.options('*', cors());
 app.use(

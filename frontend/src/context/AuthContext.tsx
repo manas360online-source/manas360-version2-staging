@@ -93,6 +93,10 @@ export const isPlatformAdminUser = (user: AuthUser | null | undefined): boolean 
 export const getPostLoginRoute = (user: AuthUser | null | undefined): string => {
   if (!user) return '/patient/dashboard';
 
+  if ((user as any)?.legalAcceptanceRequired) {
+    return '/auth/legal-accept';
+  }
+
   // If patient requires subscription, route to plans page
   if ((user as any)?.requiresSubscription) {
     return '/plans';

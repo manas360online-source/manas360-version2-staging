@@ -165,8 +165,8 @@ export default function CorporateDashboardPage() {
                 <Link to="/corporate/reports/utilization" className="block rounded-lg border border-ink-200 px-3 py-2 text-sm font-medium text-ink-700 hover:bg-ink-50">
                   Export Utilization Report
                 </Link>
-                <Link to="/corporate/billing/invoices" className="block rounded-lg border border-ink-200 px-3 py-2 text-sm font-medium text-ink-700 hover:bg-ink-50">
-                  Review Invoices
+                <Link to="/corporate/billing/payment-methods" className="block rounded-lg border border-ink-200 px-3 py-2 text-sm font-medium text-ink-700 hover:bg-ink-50">
+                  Billing & Payment Methods
                 </Link>
               </div>
             </section>

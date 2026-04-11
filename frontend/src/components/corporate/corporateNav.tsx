@@ -53,7 +53,6 @@ export const corporateNavSections: CorporateNavSection[] = [
   {
     title: 'BILLING',
     items: [
-      { key: 'invoices', label: 'Invoices & GST', to: '/corporate/billing/invoices', icon: <FileText className="h-4 w-4" /> },
       { key: 'payments', label: 'Payment Methods', to: '/corporate/billing/payment-methods', icon: <CreditCard className="h-4 w-4" /> },
       { key: 'plan', label: 'Plan & Subscription', to: '/corporate/billing/plan', icon: <Building2 className="h-4 w-4" /> },
     ],

@@ -61,7 +61,7 @@ export default function CorporateTopbar({ title, companyName, locationLabel = 'B
                   <Shield className="h-4 w-4" />
                   SSO Settings
                 </Link>
-                <Link to="/corporate/billing/invoices" onClick={() => setOpen(false)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-ink-700 hover:bg-ink-50">
+                <Link to="/corporate/billing/payment-methods" onClick={() => setOpen(false)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-ink-700 hover:bg-ink-50">
                   <Settings className="h-4 w-4" />
                   Billing
                 </Link>

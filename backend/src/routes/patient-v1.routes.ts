@@ -18,7 +18,6 @@ import {
 	completePatientExerciseController,
 	completeTreatmentPlanTaskController,
 	createMoodController,
-	downloadPatientInvoiceController,
 	downgradePatientSubscriptionController,
 	getPatientExercisesController,
 	getPatientInsightsController,
@@ -33,7 +32,6 @@ import {
 	createPatientRecordShareLinkController,
 	streamSharedPatientRecordController,
 	getPatientDashboardController,
-	getPatientInvoicesController,
 	getPatientMoodController,
 	getJourneyRecommendationController,
 	getMyCareTeamController,
@@ -50,7 +48,6 @@ import {
 	patientConfirmProposedAppointmentSlotController,
 	requestAppointmentWithPreferredProvidersController,
 	reactivatePatientSubscriptionController,
-	sessionInvoicePdfController,
 	sessionDetailController,
 	sessionHistoryController,
 	sessionSummaryPdfController,
@@ -116,7 +113,6 @@ router.post('/sessions/book', requireAuth, requireRole('patient'), requireSubscr
 router.get('/sessions/upcoming', requireAuth, requireRole('patient'), asyncHandler(upcomingSessionsController));
 router.get('/sessions/history', requireAuth, requireRole('patient'), asyncHandler(sessionHistoryController));
 router.get('/sessions/:id/documents/session-pdf', requireAuth, requireRole('patient'), asyncHandler(sessionSummaryPdfController));
-router.get('/sessions/:id/documents/invoice', requireAuth, requireRole('patient'), asyncHandler(sessionInvoicePdfController));
 router.get('/sessions/:id', requireAuth, requireRole('patient'), asyncHandler(sessionDetailController));
 
 router.post('/payments/verify', requireAuth, requireRole('patient'), asyncHandler(verifyPaymentController));
@@ -150,9 +146,6 @@ router.patch('/subscription/auto-renew', requireAuth, requireRole('patient'), as
 
 router.get('/payment-method', requireAuth, requireRole('patient'), asyncHandler(getPatientPaymentMethodController));
 router.put('/payment-method', requireAuth, requireRole('patient'), asyncHandler(updatePatientPaymentMethodController));
-
-router.get('/invoices', requireAuth, requireRole('patient'), asyncHandler(getPatientInvoicesController));
-router.get('/invoices/:id/download', requireAuth, requireRole('patient'), asyncHandler(downloadPatientInvoiceController));
 
 router.get('/mood', requireAuth, requireRole('patient'), asyncHandler(getPatientMoodController));
 

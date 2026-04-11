@@ -309,12 +309,11 @@ export const updatePricingConfig = async (input: any, updatedById?: string | nul
 	if (normalizedInput.preferredTimeSurcharge !== undefined) {
         const val = normalizedInput.preferredTimeSurcharge;
 		await db.$executeRawUnsafe(
-			`INSERT INTO system_settings (id, key, value)
-			 VALUES ($1, 'preferred_time_surcharge', $2)
+			`INSERT INTO system_settings (key, value)
+			 VALUES ('preferred_time_surcharge', $1)
 			 ON CONFLICT (key) DO UPDATE SET
 			   value = EXCLUDED.value,
 			   updated_at = NOW()`,
-			randomUUID(),
 			String(val),
 		);
 	}
