@@ -117,6 +117,7 @@ const CorporatePlanPage = lazy(() => import('./pages/corporate/CorporatePlanPage
 const CorporateHelpPage = lazy(() => import('./pages/corporate/CorporateHelpPage'));
 const SSOSettingsPage = lazy(() => import('./pages/corporate/SSOSettingsPage'));
 const CorporateDashboardPage = lazy(() => import('./pages/corporate/CorporateDashboard'));
+const EapScreeningPage = lazy(() => import('./pages/corporate/EapScreeningPage'));
 const CorporateOnboardingPage = lazy(() => import('./pages/corporate/CorporateOnboardingPage'));
 const MyDigitalClinicPricingPage = lazy(() => import('./pages/clinic/PricingPage'));
 const MyDigitalClinicDashboard = lazy(() => import('./pages/clinic/ClinicDashboard'));
@@ -242,6 +243,7 @@ function App() {
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/assessment" element={<Assessment onSubmit={handleAssessmentSubmit} />} />
+            <Route path="/eap/:companyKey/screen" element={<EapScreeningPage />} />
 
             {/* ── Certification Sub-App ── */}
             <Route element={<CertificationLayout />}>

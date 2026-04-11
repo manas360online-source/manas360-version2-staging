@@ -104,6 +104,11 @@ import {
 } from '../controllers/admin-groups.controller';
 import {
 	createAdminQrCodeController,
+	createCheckinQrCodeController,
+	createSessionJoinQrCodeController,
+	createScreeningQrCodeController,
+	getAdminQrAnalyticsBySourceController,
+	getAdminQrAnalyticsByTypeController,
 	listAdminQrCodesController,
 	updateAdminQrCodeController,
 } from '../controllers/admin-qr.controller';
@@ -465,6 +470,11 @@ router.post('/offers/publish', requireAuth, requireRole('admin'), requireAdminPo
 // === QR CODE MANAGEMENT ===
 router.get('/qr-codes', requireAuth, requireRole(['admin', 'superadmin']), requireAdminPolicy('qr.manage'), asyncHandler(listAdminQrCodesController));
 router.post('/qr-codes', requireAuth, requireRole(['admin', 'superadmin']), requireAdminPolicy('qr.manage'), asyncHandler(createAdminQrCodeController));
+router.get('/qr/analytics/by-type', requireAuth, requireRole(['admin', 'superadmin']), requireAdminPolicy('qr.manage'), asyncHandler(getAdminQrAnalyticsByTypeController));
+router.get('/qr/analytics/by-source', requireAuth, requireRole(['admin', 'superadmin']), requireAdminPolicy('qr.manage'), asyncHandler(getAdminQrAnalyticsBySourceController));
+router.post('/qr/screening/generate', requireAuth, requireRole(['admin', 'superadmin']), requireAdminPolicy('qr.manage'), asyncHandler(createScreeningQrCodeController));
+router.post('/qr/checkin/generate', requireAuth, requireRole(['admin', 'superadmin']), requireAdminPolicy('qr.manage'), asyncHandler(createCheckinQrCodeController));
+router.post('/qr/join/generate', requireAuth, requireRole(['admin', 'superadmin']), requireAdminPolicy('qr.manage'), asyncHandler(createSessionJoinQrCodeController));
 router.patch('/qr-codes/:code', requireAuth, requireRole(['admin', 'superadmin']), requireAdminPolicy('qr.manage'), asyncHandler(updateAdminQrCodeController));
 
 router.get('/pricing/contracts', requireAuth, requireRole('admin'), requireAdminPolicy('pricing.manage'), getPricingContractsController);

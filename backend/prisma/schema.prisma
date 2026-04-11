@@ -162,6 +162,12 @@ model Role {
 model QrCode {
   code            String   @id
   redirectUrl     String   @map("redirect_url")
+  qrType          String?  @map("qr_type")
+  destinationUrl  String?  @map("destination_url")
+  ownerId         String?  @map("owner_id")
+  isDynamic       Boolean  @default(true) @map("is_dynamic")
+  expiresAt       DateTime? @map("expires_at")
+  lastScannedAt   DateTime? @map("last_scanned_at")
   templateId      String   @default("classic-black") @map("template_id")
   stylePreset     String   @default("rounded") @map("style_preset")
   foregroundColor String   @default("#0F172A") @map("foreground_color")
@@ -174,10 +180,52 @@ model QrCode {
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
   createdBy       User?    @relation("QrCodeCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  scans           QrScan[]
+  conversions     QrConversion[]
 
   @@index([createdById])
   @@index([createdAt])
+  @@index([qrType])
+  @@index([ownerId])
+  @@index([expiresAt])
   @@map("qr_codes")
+}
+
+model QrScan {
+  id            String   @id @default(uuid())
+  qrCodeCode    String   @map("qr_code_code")
+  scanTimestamp DateTime @default(now()) @map("scan_timestamp")
+  deviceType    String?  @map("device_type")
+  deviceOs      String?  @map("device_os")
+  ipAddress     String?  @map("ip_address")
+  sessionId     String?  @map("session_id")
+  userAgent     String?  @map("user_agent")
+  createdAt     DateTime @default(now()) @map("created_at")
+  qrCode        QrCode   @relation(fields: [qrCodeCode], references: [code], onDelete: Cascade)
+  conversions   QrConversion[]
+
+  @@index([qrCodeCode, scanTimestamp])
+  @@index([sessionId])
+  @@map("qr_scans")
+}
+
+model QrConversion {
+  id                String   @id @default(uuid())
+  qrCodeCode        String   @map("qr_code_code")
+  qrScanId          String?  @map("qr_scan_id")
+  sessionId         String?  @map("session_id")
+  conversionType    String   @map("conversion_type")
+  attributedRevenue Decimal  @default(0) @db.Decimal(10, 2) @map("attributed_revenue")
+  conversionData    Json?    @map("conversion_data")
+  conversionAt      DateTime @default(now()) @map("conversion_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+  qrCode            QrCode   @relation(fields: [qrCodeCode], references: [code], onDelete: Cascade)
+  qrScan            QrScan?  @relation(fields: [qrScanId], references: [id], onDelete: SetNull)
+
+  @@index([qrCodeCode, conversionType])
+  @@index([sessionId])
+  @@index([conversionAt])
+  @@map("qr_conversions")
 }
 
 model CareTeamAssignment {

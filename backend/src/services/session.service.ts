@@ -8,6 +8,7 @@ import { buildPaginationMeta, normalizePagination } from '../utils/pagination';
 import { decryptSessionNote, encryptSessionNote } from '../utils/encryption';
 import { analyticsService } from './analytics.service';
 import { transcribeSession } from './aiService';
+import { recordQrConversion } from './qr-conversion.service';
 import { createClient } from 'redis';
 import { env } from '../config/env';
 import PDFDocument from 'pdfkit';
@@ -21,6 +22,8 @@ const db = prisma as any;
 interface BookSessionInput {
 	therapistId: string;
 	dateTime: Date;
+	qrCode?: string;
+	sid?: string;
 }
 
 interface SessionHistoryQuery {
@@ -284,6 +287,21 @@ export const bookPatientSession = async (userId: string, input: BookSessionInput
 				detailsLink: 'https://manas360.com/therapist-dashboard',
 			},
 		}).catch((err) => console.error('[Session] Failed to send booking_confirmed WhatsApp to therapist:', err.message));
+	}
+
+	const qrCode = String(input.qrCode || '').trim();
+	if (qrCode) {
+		await recordQrConversion({
+			qrCode,
+			sessionId: String(input.sid || '').trim(),
+			conversionType: 'session_booked',
+			attributedRevenue: Number(session.sessionFeeMinor || 0) / 100,
+			conversionData: {
+				sessionId: String(session.id),
+				bookingReferenceId,
+				therapistId: String(therapist.id),
+			},
+		}).catch(() => undefined);
 	}
 
 	return {

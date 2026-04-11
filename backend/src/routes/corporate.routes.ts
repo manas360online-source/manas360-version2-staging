@@ -6,6 +6,7 @@ import { asyncHandler } from '../middleware/validate.middleware';
 import {
   bulkUploadCorporateEmployeesController,
   createCorporateCampaignController,
+  createCorporateEapQrController,
   createCorporatePaymentMethodController,
   createCorporateProgramController,
   createCorporateWorkshopController,
@@ -15,6 +16,7 @@ import {
   getCorporateInvoicesController,
   getCorporatePaymentMethodsController,
   getCorporateSessionAllocationsController,
+  getCorporateEapQrAnalyticsController,
   listCorporateCompaniesController,
   getCorporateProgramsController,
   getCorporateReportsController,
@@ -45,6 +47,8 @@ router.get('/workshops', requireAuth, requireCorporateMemberAccess, asyncHandler
 router.post('/workshops', requireAuth, requireCorporateMemberAccess, asyncHandler(createCorporateWorkshopController));
 router.get('/campaigns', requireAuth, requireCorporateMemberAccess, asyncHandler(getCorporateCampaignsController));
 router.post('/campaigns', requireAuth, requireCorporateMemberAccess, asyncHandler(createCorporateCampaignController));
+router.get('/qr/eap/analytics', requireAuth, requireCorporateMemberAccess, asyncHandler(getCorporateEapQrAnalyticsController));
+router.post('/qr/eap/generate', requireAuth, requireCorporateMemberAccess, asyncHandler(createCorporateEapQrController));
 router.get('/employees', requireAuth, requireCorporateMemberAccess, asyncHandler(getCorporateEmployeesController));
 router.get('/invoices', requireAuth, requireCorporateMemberAccess, asyncHandler(getCorporateInvoicesController));
 router.get('/payment-methods', requireAuth, requireCorporateMemberAccess, asyncHandler(getCorporatePaymentMethodsController));

@@ -57,6 +57,26 @@ type DashboardApiPayload = {
   };
 };
 
+type EapQrAnalytics = {
+  companyKey?: string;
+  companyName?: string;
+  qrCount?: number;
+  totals?: {
+    scans?: number;
+    screenings?: number;
+    bookings?: number;
+    revenue?: number;
+  };
+  breakdown?: Array<{
+    code?: string;
+    location?: string;
+    scans?: number;
+    screenings?: number;
+    bookings?: number;
+    revenue?: number;
+  }>;
+};
+
 export default function CorporateDashboard() {
   const [wellnessChallenges, setWellnessChallenges] = useState<WellnessChallenge[]>([]);
   const [challengesLoading, setChallengesLoading] = useState(true);
@@ -72,6 +92,10 @@ export default function CorporateDashboard() {
   const [leaderboardEntries, setLeaderboardEntries] = useState<LeaderboardEntry[]>([]);
   const [leaderboardLoading, setLeaderboardLoading] = useState(true);
   const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
+  const [eapAnalytics, setEapAnalytics] = useState<EapQrAnalytics | null>(null);
+  const [eapLoading, setEapLoading] = useState(true);
+  const [eapError, setEapError] = useState<string | null>(null);
+  const [eapGenerating, setEapGenerating] = useState(false);
 
   const fetchChallenges = useCallback(async () => {
     setChallengesLoading(true);
@@ -287,6 +311,42 @@ export default function CorporateDashboard() {
     void fetchLeaderboard();
   }, [fetchLeaderboard]);
 
+  const fetchEapAnalytics = useCallback(async () => {
+    setEapLoading(true);
+    setEapError(null);
+
+    try {
+      const payload = await corporateApi.getEapQrAnalytics('techcorp-india');
+      const data = ((payload as { data?: EapQrAnalytics } | null)?.data ?? payload ?? {}) as EapQrAnalytics;
+      setEapAnalytics(data);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to load EAP QR analytics.';
+      setEapError(message);
+      setEapAnalytics(null);
+    } finally {
+      setEapLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchEapAnalytics();
+  }, [fetchEapAnalytics]);
+
+  const handleCreateEapQr = async () => {
+    const location = window.prompt('Enter EAP standee location', 'blr-campus-1')?.trim() || 'blr-campus-1';
+    setEapGenerating(true);
+    try {
+      await corporateApi.createEapQr({ location }, 'techcorp-india');
+      toast.success('EAP QR generated');
+      await fetchEapAnalytics();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to create EAP QR.';
+      toast.error(message);
+    } finally {
+      setEapGenerating(false);
+    }
+  };
+
   const totalParticipants = useMemo(
     () => wellnessChallenges.reduce((sum, challenge) => sum + challenge.participants, 0),
     [wellnessChallenges]
@@ -421,6 +481,53 @@ export default function CorporateDashboard() {
       title="Corporate Dashboard"
       subtitle="Drive healthier teams with challenge participation, check-ins, and measurable outcomes."
     >
+      <div className="mb-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <div className="rounded-xl border border-ink-100 bg-slate-950 p-5 text-white xl:col-span-2">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-300">Corporate EAP QR</p>
+          <h2 className="mt-2 font-display text-2xl font-semibold">Anonymous screening standees</h2>
+          <p className="mt-2 max-w-3xl text-sm text-slate-300">
+            Generate branded QR standees for campuses, cafeterias, and HR offices. Employees scan into an anonymous screening flow; HR only sees aggregate scans, screenings, and bookings.
+          </p>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                void handleCreateEapQr();
+              }}
+              disabled={eapGenerating}
+              className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-950 transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {eapGenerating ? 'Generating...' : 'Generate standee QR'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                void fetchEapAnalytics();
+              }}
+              className="rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+            >
+              Refresh analytics
+            </button>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-ink-100 bg-white p-5">
+          <p className="text-xs font-semibold uppercase tracking-wider text-ink-500">Current snapshot</p>
+          {eapLoading ? (
+            <p className="mt-3 text-sm text-ink-600">Loading EAP metrics...</p>
+          ) : eapError ? (
+            <p className="mt-3 text-sm text-rose-600">{eapError}</p>
+          ) : (
+            <div className="mt-3 space-y-2 text-sm text-ink-700">
+              <p><span className="font-semibold">Standees:</span> {eapAnalytics?.qrCount ?? 0}</p>
+              <p><span className="font-semibold">Scans:</span> {eapAnalytics?.totals?.scans ?? 0}</p>
+              <p><span className="font-semibold">Screenings:</span> {eapAnalytics?.totals?.screenings ?? 0}</p>
+              <p><span className="font-semibold">Bookings:</span> {eapAnalytics?.totals?.bookings ?? 0}</p>
+            </div>
+          )}
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="rounded-xl border border-ink-100 bg-white p-5 lg:col-span-2">
           <p className="text-xs font-semibold uppercase tracking-wider text-ink-500">Program Snapshot</p>
