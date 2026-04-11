@@ -94,7 +94,6 @@ const UserApprovals = lazy(() => import('./pages/admin/UserApprovals'));
 const LiveSessions = lazy(() => import('./pages/admin/LiveSessions'));
 const Feedback = lazy(() => import('./pages/admin/Feedback'));
 const AllUsers = lazy(() => import('./pages/admin/AllUsers'));
-const AdminInvoices = lazy(() => import('./pages/admin/Invoices'));
 const AdminPaymentReliability = lazy(() => import('./pages/admin/PaymentReliability'));
 const CertificationsPage = lazy(() => import('./pages/CertificationsPage'));
 const CertificationLandingPage = lazy(() => import('./pages/CertificationLandingPage'));
@@ -113,7 +112,6 @@ const CorporateSessionAllocationPage = lazy(() => import('./pages/corporate/Corp
 const CorporateUtilizationReportsPage = lazy(() => import('./pages/corporate/CorporateUtilizationReportsPage'));
 const CorporateWellbeingReportsPage = lazy(() => import('./pages/corporate/CorporateWellbeingReportsPage'));
 const CorporateEngagementReportsPage = lazy(() => import('./pages/corporate/CorporateEngagementReportsPage'));
-const CorporateInvoicesPage = lazy(() => import('./pages/corporate/CorporateInvoicesPage'));
 const CorporatePaymentMethodsPage = lazy(() => import('./pages/corporate/CorporatePaymentMethodsPage'));
 const CorporatePlanPage = lazy(() => import('./pages/corporate/CorporatePlanPage'));
 const CorporateHelpPage = lazy(() => import('./pages/corporate/CorporateHelpPage'));
@@ -506,7 +504,6 @@ function App() {
                 <Route path="billing/pricing" element={<PricingSubscriptionsPage />} />
                 <Route path="billing/offers" element={<OfferMarqueeEditor />} />
                 <Route path="billing/payouts" element={<AdminPayoutsPage />} />
-                <Route path="billing/invoices" element={<AdminInvoices />} />
                 <Route path="billing/payment-reliability" element={<AdminPaymentReliability />} />
 
                 <Route path="operations/sessions" element={<LiveSessions />} />
@@ -548,7 +545,6 @@ function App() {
                 <Route path="pricing-subscriptions" element={<Navigate to="/admin/billing/pricing" replace />} />
                 <Route path="offer-marquee" element={<Navigate to="/admin/billing/offers" replace />} />
                 <Route path="payouts" element={<Navigate to="/admin/billing/payouts" replace />} />
-                <Route path="invoices" element={<Navigate to="/admin/billing/invoices" replace />} />
                 <Route path="payment-reliability" element={<Navigate to="/admin/billing/payment-reliability" replace />} />
                 <Route path="live-sessions" element={<Navigate to="/admin/operations/sessions" replace />} />
                 <Route path="templates" element={<Navigate to="/admin/operations/templates" replace />} />
@@ -597,7 +593,8 @@ function App() {
             <Route path="/corporate/reports/utilization" element={<CorporateRoute><CorporateUtilizationReportsPage /></CorporateRoute>} />
             <Route path="/corporate/reports/wellbeing" element={<CorporateRoute><CorporateWellbeingReportsPage /></CorporateRoute>} />
             <Route path="/corporate/reports/engagement" element={<CorporateRoute><CorporateEngagementReportsPage /></CorporateRoute>} />
-            <Route path="/corporate/billing/invoices" element={<CorporateRoute><CorporateInvoicesPage /></CorporateRoute>} />
+                
+                
             <Route path="/corporate/billing/payment-methods" element={<CorporateRoute><CorporatePaymentMethodsPage /></CorporateRoute>} />
             <Route path="/corporate/billing/plan" element={<CorporateRoute><CorporatePlanPage /></CorporateRoute>} />
             <Route path="/corporate/account/help" element={<CorporateRoute><CorporateHelpPage /></CorporateRoute>} />

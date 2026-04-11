@@ -180,9 +180,9 @@ export const corporateApi = {
     });
     return unwrap(response.data);
   },
-  getInvoices: async (companyKey?: string) => {
-    const response = await http.get('/v1/corporate/invoices', { params: companyKey ? { companyKey } : undefined });
-    return unwrap(response.data);
+  getInvoices: async (_companyKey?: string) => {
+    // Disabled: corporate invoices removed
+    return [] as unknown as any;
   },
   getPaymentMethods: async (companyKey?: string) => {
     const response = await http.get('/v1/corporate/payment-methods', { params: companyKey ? { companyKey } : undefined });

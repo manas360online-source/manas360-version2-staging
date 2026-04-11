@@ -93,6 +93,7 @@ CREATE TYPE "PayoutMethod" AS ENUM ('BANK', 'UPI');
 BEGIN;
 CREATE TYPE "PayoutStatus_new" AS ENUM ('PENDING', 'PROCESSING', 'COMPLETED', 'FAILED');
 ALTER TABLE "payout_requests" ALTER COLUMN "status" DROP DEFAULT;
+ALTER TABLE "payouts" ALTER COLUMN "status" DROP DEFAULT;
 ALTER TABLE "payouts" ALTER COLUMN "status" TYPE "PayoutStatus_new" USING ("status"::text::"PayoutStatus_new");
 ALTER TYPE "PayoutStatus" RENAME TO "PayoutStatus_old";
 ALTER TYPE "PayoutStatus_new" RENAME TO "PayoutStatus";

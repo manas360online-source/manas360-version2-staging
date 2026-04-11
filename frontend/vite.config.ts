@@ -82,7 +82,6 @@ export default defineConfig({
           if (id.includes('/src/pages/admin/')) return 'pages-admin'
           if (id.includes('/src/components/')) return 'components-core'
           if (id.includes('/src/api/')) return 'api-core'
-          if (id.includes('/src/lib/')) return 'lib-core'
         },
       },
     },

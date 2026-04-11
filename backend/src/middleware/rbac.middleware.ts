@@ -67,6 +67,47 @@ export const ADMIN_POLICIES: Record<string, string[]> = {
 
 const normalizeRoleName = (value: unknown): UserRole => String(value || '').toLowerCase().replace(/[_\s-]/g, '') as UserRole;
 
+// Safety fallback when `roles` table is empty or not seeded in local/staging.
+// This keeps platform-admin routes usable instead of returning blanket 403s.
+const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, string[]> = {
+	patient: ['view_own_records', 'book_sessions', 'view_dashboard'],
+	therapist: ['view_patients', 'manage_sessions', 'prescribe_treatments', 'view_dashboard'],
+	psychologist: ['view_patients', 'manage_sessions', 'conduct_assessments', 'view_dashboard'],
+	psychiatrist: ['view_patients', 'manage_sessions', 'prescribe_medications', 'order_labs', 'view_dashboard'],
+	coach: ['view_assigned_patients', 'manage_coaching_sessions', 'view_dashboard'],
+	admin: [
+		'manage_users',
+		'manage_therapists',
+		'view_analytics',
+		'manage_payments',
+		'view_reports',
+		'payouts_approve',
+		'pricing_edit',
+		'offers_edit',
+		'view_feedback',
+		'manage_compliance',
+	],
+	superadmin: [
+		'manage_users',
+		'manage_admins',
+		'manage_therapists',
+		'view_analytics',
+		'manage_payments',
+		'view_reports',
+		'payouts_approve',
+		'pricing_edit',
+		'offers_edit',
+		'system_settings',
+		'manage_roles',
+		'audit_logs',
+		'view_feedback',
+		'manage_compliance',
+	],
+	clinicaldirector: ['view_analytics', 'manage_therapists', 'view_reports', 'clinical_approvals', 'view_dashboard'],
+	financemanager: ['view_analytics', 'manage_payments', 'payouts_approve', 'view_reports', 'financial_exports'],
+	complianceofficer: ['view_analytics', 'view_reports', 'audit_logs', 'compliance_status', 'legal_documents', 'user_acceptances', 'view_feedback', 'manage_compliance'],
+};
+
 /**
  * Role hierarchy for logical grouping
  * Useful for future permission inheritance
@@ -126,12 +167,25 @@ const getRolePermissions = async (roleName: UserRole): Promise<string[]> => {
 
 	const normalizedRoleName = normalizeRoleName(roleName);
 	const roleDataRows = (await db.$queryRawUnsafe(
-		"SELECT permissions FROM roles WHERE REPLACE(REPLACE(REPLACE(LOWER(name), '_', ''), '-', ''), ' ', '') = $1 LIMIT 1",
+		"SELECT permissions FROM roles WHERE REPLACE(REPLACE(REPLACE(LOWER(name), '_', ''), '-', ''), ' ', '') = $1",
 		normalizedRoleName,
 	)) as Array<{ permissions: string[] | null }>;
-	const roleData = roleDataRows[0] ?? null;
 
-	const permissions = roleData?.permissions || [];
+	// Multiple rows may normalize to same role name (e.g. ADMIN/admin).
+	// Merge all matched permissions to avoid nondeterministic 403s.
+	const mergedPermissions = Array.from(
+		new Set(
+			roleDataRows.flatMap((row) => (Array.isArray(row?.permissions) ? row.permissions : [])),
+		),
+	);
+
+	const permissions = mergedPermissions.length > 0
+		? mergedPermissions
+		: (DEFAULT_ROLE_PERMISSIONS[normalizedRoleName] || []);
+
+	if ((roleDataRows.length === 0 || mergedPermissions.length === 0) && permissions.length > 0) {
+		console.warn(`[RBAC] Using fallback permissions for role '${normalizedRoleName}' because roles table entry is missing/empty.`);
+	}
 	
 	permissionsCache.set(roleName, {
 		permissions,
