@@ -130,7 +130,7 @@ export const LandingPage: React.FC = () => {
       </Helmet>
 
       {/* Main Page Structure */}
-      <div className="relative min-h-screen overflow-x-hidden bg-[#f5f3ef] text-charcoal">
+      <div className="landing-root relative min-h-screen overflow-x-hidden bg-[#f5f3ef] text-charcoal">
         <Header />
         <QuickAccessRail />
         <Hero />

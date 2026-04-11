@@ -8,6 +8,25 @@ import './index.css'
 import { store } from './store'
 import { ErrorBoundary } from './components/ui/ErrorBoundary'
 import { VideoSessionProvider } from './context/VideoSessionContext'
+import { applyThemePreference, getStoredThemePreference } from './lib/themePreference'
+
+const initialPreference = getStoredThemePreference()
+applyThemePreference(initialPreference)
+
+if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+  const darkModeQuery = window.matchMedia('(prefers-color-scheme: dark)')
+  const handleSystemThemeChange = () => {
+    if (getStoredThemePreference() === null) {
+      applyThemePreference(null)
+    }
+  }
+
+  if (typeof darkModeQuery.addEventListener === 'function') {
+    darkModeQuery.addEventListener('change', handleSystemThemeChange)
+  } else if (typeof darkModeQuery.addListener === 'function') {
+    darkModeQuery.addListener(handleSystemThemeChange)
+  }
+}
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <HelmetProvider>

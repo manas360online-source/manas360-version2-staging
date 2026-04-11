@@ -28,6 +28,20 @@
     --sans: 'DM Sans', sans-serif;
   }
 
+  :root[data-theme='dark'] {
+    --calm-sage: #5f8f7f;
+    --soft-lavender: #9f93b8;
+    --warm-terracotta: #c18f80;
+    --gentle-blue: #7c98b1;
+    --cream: #111a1f;
+    --charcoal: #e7f1ec;
+    --wellness-primary: #5f8f7f;
+    --wellness-text: #e7f1ec;
+    --wellness-aqua: #1a2e31;
+    --wellness-card: #122329;
+    --wellness-border: #243c3f;
+  }
+
   * {
     @apply m-0 p-0 box-border;
   }
@@ -49,6 +63,195 @@
     line-height: 1.7;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  :root[data-theme='dark'] {
+    color-scheme: dark;
+  }
+
+  :root[data-theme='dark'] body {
+    color: #e7f1ec;
+    background:
+      radial-gradient(900px 480px at 10% -10%, rgba(90, 136, 119, 0.28), transparent 62%),
+      radial-gradient(760px 360px at 100% 0%, rgba(65, 113, 147, 0.24), transparent 58%),
+      linear-gradient(180deg, #0d1519 0%, #111a1f 48%, #152227 100%);
+  }
+
+  :root[data-theme='dark'] h1,
+  :root[data-theme='dark'] h2,
+  :root[data-theme='dark'] h3,
+  :root[data-theme='dark'] h4,
+  :root[data-theme='dark'] h5,
+  :root[data-theme='dark'] h6 {
+    color: #edf7f2;
+  }
+
+  :root[data-theme='dark'] main,
+  :root[data-theme='dark'] section,
+  :root[data-theme='dark'] article,
+  :root[data-theme='dark'] aside,
+  :root[data-theme='dark'] nav,
+  :root[data-theme='dark'] header,
+  :root[data-theme='dark'] footer {
+    background-color: transparent;
+  }
+
+  :root[data-theme='dark'] .bg-white,
+  :root[data-theme='dark'] .bg-cream,
+  :root[data-theme='dark'] .bg-wellness-surface,
+  :root[data-theme='dark'] .bg-wellness-bg,
+  :root[data-theme='dark'] .bg-surface-bg,
+  :root[data-theme='dark'] .bg-surface-card,
+  :root[data-theme='dark'] [class*='bg-white'],
+  :root[data-theme='dark'] [class*='bg-cream'],
+  :root[data-theme='dark'] [class*='bg-gray-'],
+  :root[data-theme='dark'] [class*='bg-slate-'],
+  :root[data-theme='dark'] [class*='bg-zinc-'],
+  :root[data-theme='dark'] [class*='bg-neutral-'],
+  :root[data-theme='dark'] [class*='bg-stone-'],
+  :root[data-theme='dark'] [class*='bg-wellness-'],
+  :root[data-theme='dark'] [class*='bg-[#'],
+  :root[data-theme='dark'] .wellness-panel,
+  :root[data-theme='dark'] .wellness-panel-strong,
+  :root[data-theme='dark'] .wellness-panel-muted,
+  :root[data-theme='dark'] .patient-content-shell,
+  :root[data-theme='dark'] .card-soft,
+  :root[data-theme='dark'] .card-calm {
+    background: #122329 !important;
+    border-color: rgba(130, 173, 159, 0.22) !important;
+    color: #e7f1ec;
+  }
+
+  :root[data-theme='dark'] .text-charcoal,
+  :root[data-theme='dark'] .text-wellness-text,
+  :root[data-theme='dark'] .text-ink-800,
+  :root[data-theme='dark'] .text-gray-900,
+  :root[data-theme='dark'] .text-gray-800,
+  :root[data-theme='dark'] .text-gray-700,
+  :root[data-theme='dark'] .text-slate-900,
+  :root[data-theme='dark'] .text-slate-800,
+  :root[data-theme='dark'] .text-slate-700,
+  :root[data-theme='dark'] [class*='text-charcoal'],
+  :root[data-theme='dark'] [class*='text-wellness-'],
+  :root[data-theme='dark'] [class*='text-ink-'],
+  :root[data-theme='dark'] [class*='text-gray-'],
+  :root[data-theme='dark'] [class*='text-slate-'],
+  :root[data-theme='dark'] [class*='text-zinc-'],
+  :root[data-theme='dark'] [class*='text-neutral-'],
+  :root[data-theme='dark'] [class*='text-stone-'],
+  :root[data-theme='dark'] [class*='text-[#'],
+  :root[data-theme='dark'] p,
+  :root[data-theme='dark'] li,
+  :root[data-theme='dark'] span,
+  :root[data-theme='dark'] label,
+  :root[data-theme='dark'] small,
+  :root[data-theme='dark'] strong {
+    color: #e7f1ec !important;
+    opacity: 1 !important;
+  }
+
+  :root[data-theme='dark'] .border,
+  :root[data-theme='dark'] .border-gray-100,
+  :root[data-theme='dark'] .border-gray-200,
+  :root[data-theme='dark'] .border-slate-200,
+  :root[data-theme='dark'] .border-calm-sage\/20,
+  :root[data-theme='dark'] .border-calm-sage\/10,
+  :root[data-theme='dark'] [class*='border-gray-'],
+  :root[data-theme='dark'] [class*='border-slate-'],
+  :root[data-theme='dark'] [class*='border-zinc-'],
+  :root[data-theme='dark'] [class*='border-neutral-'],
+  :root[data-theme='dark'] [class*='border-stone-'],
+  :root[data-theme='dark'] [class*='border-[#'] {
+    border-color: rgba(130, 173, 159, 0.22) !important;
+  }
+
+  :root[data-theme='dark'] .landing-root {
+    background: linear-gradient(180deg, #0d1519 0%, #111a1f 48%, #152227 100%) !important;
+    color: #eaf7f2;
+  }
+
+  :root[data-theme='dark'] .group-sessions-strip {
+    background-image: linear-gradient(135deg, #0f1b20 0%, #132730 100%) !important;
+  }
+
+  :root[data-theme='dark'] .group-sessions-strip .group-session-card {
+    background: linear-gradient(170deg, #0f2530 0%, #0b1f29 100%) !important;
+    border-color: rgba(114, 160, 166, 0.35) !important;
+    box-shadow: 0 14px 34px rgba(6, 16, 20, 0.45) !important;
+  }
+
+  :root[data-theme='dark'] .group-sessions-strip .group-session-card [class*='bg-white'] {
+    background: rgba(255, 255, 255, 0.08) !important;
+  }
+
+  :root[data-theme='dark'] input,
+  :root[data-theme='dark'] textarea,
+  :root[data-theme='dark'] select {
+    background-color: #0f1b20 !important;
+    color: #eef8f3 !important;
+  }
+
+  :root[data-theme='dark'] ::placeholder {
+    color: #b8cbc2 !important;
+    opacity: 1;
+  }
+
+  /* Force all green/teal/emerald text to white in dark mode */
+  :root[data-theme='dark'] .text-green-50,
+  :root[data-theme='dark'] .text-green-100,
+  :root[data-theme='dark'] .text-green-200,
+  :root[data-theme='dark'] .text-green-300,
+  :root[data-theme='dark'] .text-green-400,
+  :root[data-theme='dark'] .text-green-500,
+  :root[data-theme='dark'] .text-green-600,
+  :root[data-theme='dark'] .text-green-700,
+  :root[data-theme='dark'] .text-green-800,
+  :root[data-theme='dark'] .text-green-900,
+  :root[data-theme='dark'] .text-teal-50,
+  :root[data-theme='dark'] .text-teal-100,
+  :root[data-theme='dark'] .text-teal-200,
+  :root[data-theme='dark'] .text-teal-300,
+  :root[data-theme='dark'] .text-teal-400,
+  :root[data-theme='dark'] .text-teal-500,
+  :root[data-theme='dark'] .text-teal-600,
+  :root[data-theme='dark'] .text-teal-700,
+  :root[data-theme='dark'] .text-teal-800,
+  :root[data-theme='dark'] .text-teal-900,
+  :root[data-theme='dark'] .text-emerald-50,
+  :root[data-theme='dark'] .text-emerald-100,
+  :root[data-theme='dark'] .text-emerald-200,
+  :root[data-theme='dark'] .text-emerald-300,
+  :root[data-theme='dark'] .text-emerald-400,
+  :root[data-theme='dark'] .text-emerald-500,
+  :root[data-theme='dark'] .text-emerald-600,
+  :root[data-theme='dark'] .text-emerald-700,
+  :root[data-theme='dark'] .text-emerald-800,
+  :root[data-theme='dark'] .text-emerald-900 {
+    color: #ffffff !important;
+  }
+
+  /* Force text-cream to be light in dark mode */
+  :root[data-theme='dark'] .text-cream {
+    color: #ffffff !important;
+  }
+
+  body,
+  #root,
+  main,
+  section,
+  article,
+  nav,
+  header,
+  footer,
+  aside,
+  div,
+  button,
+  a,
+  input,
+  textarea,
+  select {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
   }
 
   /* Headings - softer hierarchy */

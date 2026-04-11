@@ -1,15 +1,26 @@
 import React, { useState } from 'react';
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Instagram, Linkedin, MessageCircle, Youtube } from 'lucide-react';
+import { Instagram, Linkedin, MessageCircle, Moon, Sun, Youtube } from 'lucide-react';
 import { MegaNav } from './MegaNav';
 import { theme } from '../../theme/theme';
+import {
+  applyTheme,
+  getStoredThemePreference,
+  persistThemePreference,
+  resolveTheme,
+  THEME_STORAGE_KEY,
+  type ThemePreference,
+} from '../../lib/themePreference';
 
 const LANG_OPTIONS = ['English', 'हिन्दी', 'தமிழ்', 'తెలుగు', 'ಕನ್ನಡ'];
 
 export const Header: React.FC = () => {
   const [activeLang, setActiveLang] = useState('English');
   const [scrollProgress, setScrollProgress] = useState(0);
+  const [activeTheme, setActiveTheme] = useState<ThemePreference>(() => {
+    return resolveTheme(getStoredThemePreference());
+  });
 
   useEffect(() => {
     const onScroll = () => {
@@ -35,6 +46,49 @@ export const Header: React.FC = () => {
       window.removeEventListener('resize', onScroll);
     };
   }, []);
+
+  useEffect(() => {
+    applyTheme(activeTheme);
+  }, [activeTheme]);
+
+  useEffect(() => {
+    const handleStorage = (event: StorageEvent) => {
+      if (!event.key || event.key === THEME_STORAGE_KEY) {
+        setActiveTheme(resolveTheme(getStoredThemePreference()));
+      }
+    };
+
+    const darkModeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleSystemThemeChange = () => {
+      if (getStoredThemePreference() === null) {
+        setActiveTheme(resolveTheme(null));
+      }
+    };
+
+    window.addEventListener('storage', handleStorage);
+
+    if (typeof darkModeQuery.addEventListener === 'function') {
+      darkModeQuery.addEventListener('change', handleSystemThemeChange);
+    } else if (typeof darkModeQuery.addListener === 'function') {
+      darkModeQuery.addListener(handleSystemThemeChange);
+    }
+
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+
+      if (typeof darkModeQuery.removeEventListener === 'function') {
+        darkModeQuery.removeEventListener('change', handleSystemThemeChange);
+      } else if (typeof darkModeQuery.removeListener === 'function') {
+        darkModeQuery.removeListener(handleSystemThemeChange);
+      }
+    };
+  }, []);
+
+  const toggleTheme = () => {
+    const nextTheme: ThemePreference = activeTheme === 'dark' ? 'light' : 'dark';
+    setActiveTheme(nextTheme);
+    persistThemePreference(nextTheme);
+  };
 
   return (
     <header className="fixed inset-x-0 top-0 z-50" role="banner">
@@ -81,6 +135,20 @@ export const Header: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/30 bg-white/10 text-cream transition-all duration-300 hover:border-white/50 hover:bg-white/20 hover:text-white"
+              aria-label={activeTheme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+              title={activeTheme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+            >
+              {activeTheme === 'dark' ? (
+                <Sun className="h-4 w-4" />
+              ) : (
+                <Moon className="h-4 w-4" />
+              )}
+            </button>
+
             <Link
               to="/patient/pricing"
               className="hidden rounded-full px-4 py-2 text-xs font-medium tracking-wide text-cream/75 transition-all duration-300 hover:text-cream sm:inline-flex md:text-sm"
