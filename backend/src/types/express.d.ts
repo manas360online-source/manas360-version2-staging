@@ -55,6 +55,8 @@ interface TherapistMatchQuery {
 interface BookSessionPayload {
 	therapistId: string;
 	dateTime: Date;
+	qrCode?: string;
+	sid?: string;
 }
 
 interface PatientSessionHistoryQuery {

@@ -3,6 +3,7 @@ import { AppError } from '../middleware/error.middleware';
 import { publishPlaceholderNotificationEvent } from './notification.service';
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env';
+import { buildSessionJoinQr } from './session-join-qr.service';
 import cuid from 'cuid';
 
 export class SessionActionsService {
@@ -70,6 +71,9 @@ export class SessionActionsService {
       || 'Your therapist',
     );
 
+    const joinQr = await buildSessionJoinQr(sessionId).catch(() => null);
+    const sessionJoinLink = joinQr?.sessionJoinUrl || `${env.frontendUrl}/video-session/${sessionId}`;
+
     const ev = await publishPlaceholderNotificationEvent({
       eventType: 'REMINDER',
       entityType: 'THERAPY_SESSION',
@@ -77,7 +81,21 @@ export class SessionActionsService {
       userId: patientUserId,
       title: 'Session reminder',
       message: `${therapistName} sent a reminder for your upcoming session.`,
-      payload: { via, templateId, patientName, therapistName },
+      payload: {
+        via,
+        templateId,
+        patientName,
+        therapistName,
+        sessionJoinLink,
+        sessionJoinQr: joinQr
+          ? {
+              trackingPath: joinQr.trackingPath,
+              trackingUrl: joinQr.trackingUrl,
+              uniqueId: joinQr.uniqueId,
+              qrImageAvailable: Boolean(joinQr.qrImageBase64),
+            }
+          : null,
+      },
     });
 
     await prisma.sessionAuditLog.create({ data: { sessionId, userId: options.requestorId || therapistId, action: 'REMIND', entityType: 'THERAPY_SESSION', entityId: sessionId, changes: { queued: true, event: ev } } } as any);

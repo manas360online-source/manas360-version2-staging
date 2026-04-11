@@ -64,6 +64,13 @@ export type CorporateCreateAccountPayload = {
   email?: string;
 };
 
+export type CorporateEapQrPayload = {
+  companyKey?: string;
+  location?: string;
+  destinationUrl?: string;
+  isActive?: boolean;
+};
+
 export const corporateApi = {
   requestDemo: async (payload: CorporateDemoRequestPayload) => {
     const requestBody: CorporateDemoRequestApiPayload = {
@@ -211,6 +218,14 @@ export const corporateApi = {
   },
   updateSessionAllocation: async (allocations: Array<{ department: string; allocatedSessions: number }>, companyKey?: string) => {
     const response = await http.patch('/v1/corporate/session-allocation', { allocations }, { params: companyKey ? { companyKey } : undefined });
+    return unwrap(response.data);
+  },
+  createEapQr: async (payload: CorporateEapQrPayload, companyKey?: string) => {
+    const response = await http.post('/v1/corporate/qr/eap/generate', payload, { params: companyKey ? { companyKey } : undefined });
+    return unwrap(response.data);
+  },
+  getEapQrAnalytics: async (companyKey?: string) => {
+    const response = await http.get('/v1/corporate/qr/eap/analytics', { params: companyKey ? { companyKey } : undefined });
     return unwrap(response.data);
   },
   getRoi: async (companyKey?: string) => {

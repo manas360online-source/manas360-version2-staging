@@ -8,6 +8,7 @@ import {
   createCorporatePaymentMethod,
   createCorporateProgram,
   createCorporateWorkshop,
+  createCorporateEapQr,
   getCorporateCompanies,
   getCorporateCampaigns,
   getCorporateDashboard,
@@ -18,6 +19,7 @@ import {
   getCorporateReports,
   getCorporateRoi,
   getCorporateSessionAllocations,
+  getCorporateEapQrAnalytics,
   getCorporateSettings,
   getCorporateWorkshops,
   updateCorporatePaymentMethod,
@@ -303,4 +305,22 @@ export const requestCorporateOtpController = async (req: Request, res: Response)
 export const createCorporateAccountController = async (req: Request, res: Response): Promise<void> => {
   const data = await createCorporateAccount(req.body || {});
   sendSuccess(res, data, 'Corporate account created successfully', 201);
+};
+
+export const createCorporateEapQrController = async (req: Request, res: Response): Promise<void> => {
+  const companyKey = resolveCompanyKey(req);
+  const data = await createCorporateEapQr({
+    companyKey,
+    location: String(req.body?.location || req.body?.standeeLocation || '').trim(),
+    destinationUrl: req.body?.destinationUrl ? String(req.body.destinationUrl) : undefined,
+    isActive: req.body?.isActive,
+  }, req.auth?.userId);
+
+  sendSuccess(res, data, 'Corporate EAP QR created successfully', 201);
+};
+
+export const getCorporateEapQrAnalyticsController = async (req: Request, res: Response): Promise<void> => {
+  const companyKey = resolveCompanyKey(req);
+  const data = await getCorporateEapQrAnalytics(companyKey);
+  sendSuccess(res, data, 'Corporate EAP QR analytics retrieved successfully');
 };

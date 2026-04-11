@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import { useProviderDashboard } from '../../../hooks/useProviderDashboard';
 import { useQuery } from '@tanstack/react-query';
-import { fetchProviderEarnings } from '../../../api/provider';
+import { fetchProviderEarnings, fetchProviderMyQr, fetchProviderMyQrAnalytics } from '../../../api/provider';
 import type { SmartAlertItem } from '../../../api/provider';
+import { QRCodeSVG } from 'qrcode.react';
 
 type ProviderKind = 'THERAPIST' | 'PSYCHIATRIST' | 'COACH' | 'PSYCHOLOGIST';
 
@@ -115,6 +116,17 @@ export default function ProviderDashboard() {
   const earningsQuery = useQuery({
     queryKey: ['providerEarnings', 'dashboard-widget'],
     queryFn: fetchProviderEarnings,
+    staleTime: 60 * 1000,
+    refetchInterval: 30 * 1000,
+  });
+  const providerQrQuery = useQuery({
+    queryKey: ['providerQr', 'my-qr'],
+    queryFn: fetchProviderMyQr,
+    staleTime: 5 * 60 * 1000,
+  });
+  const providerQrAnalyticsQuery = useQuery({
+    queryKey: ['providerQr', 'analytics'],
+    queryFn: fetchProviderMyQrAnalytics,
     staleTime: 60 * 1000,
     refetchInterval: 30 * 1000,
   });
@@ -278,6 +290,96 @@ export default function ProviderDashboard() {
               </div>
             ))}
           </div>
+        </article>
+      </section>
+
+      <section className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm xl:col-span-1">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-base font-semibold text-slate-900">Your Profile QR</h2>
+            <button
+              type="button"
+              onClick={() => void providerQrQuery.refetch()}
+              className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+            >
+              Refresh
+            </button>
+          </div>
+
+          {providerQrQuery.isLoading ? (
+            <div className="h-40 animate-pulse rounded-lg bg-slate-100" />
+          ) : providerQrQuery.data ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-4">
+                <div className="rounded-lg border border-slate-200 bg-white p-2">
+                  <QRCodeSVG value={providerQrQuery.data.trackingUrl} size={120} fgColor="#032467" bgColor="#FFFFFF" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">QR Code</p>
+                  <p className="truncate text-sm font-semibold text-slate-900">{providerQrQuery.data.qrCode.code}</p>
+                  <p className="mt-1 truncate text-xs text-slate-500">{providerQrQuery.data.trackingPath}</p>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => void navigator.clipboard?.writeText(providerQrQuery.data.trackingUrl)}
+                  className="rounded-md bg-[#032467] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#021d54]"
+                >
+                  Copy Link
+                </button>
+                <a
+                  href={providerQrQuery.data.trackingUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Open
+                </a>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500">QR not available right now.</p>
+          )}
+        </article>
+
+        <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm xl:col-span-2">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-base font-semibold text-slate-900">QR Performance</h2>
+            <button
+              type="button"
+              onClick={() => void providerQrAnalyticsQuery.refetch()}
+              className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+            >
+              Refresh
+            </button>
+          </div>
+
+          {providerQrAnalyticsQuery.isLoading ? (
+            <div className="h-24 animate-pulse rounded-lg bg-slate-100" />
+          ) : providerQrAnalyticsQuery.data ? (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">Month Scans</p>
+                <p className="mt-1 text-xl font-bold text-slate-900">{providerQrAnalyticsQuery.data.month.scans}</p>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">Month Bookings</p>
+                <p className="mt-1 text-xl font-bold text-slate-900">{providerQrAnalyticsQuery.data.month.bookings}</p>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">Conversion</p>
+                <p className="mt-1 text-xl font-bold text-slate-900">{providerQrAnalyticsQuery.data.month.conversionRate}%</p>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">Revenue</p>
+                <p className="mt-1 text-xl font-bold text-slate-900">₹{new Intl.NumberFormat('en-IN').format(providerQrAnalyticsQuery.data.month.revenue)}</p>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500">Analytics not available right now.</p>
+          )}
         </article>
       </section>
     </div>
