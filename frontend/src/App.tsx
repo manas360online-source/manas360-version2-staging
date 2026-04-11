@@ -58,7 +58,6 @@ const LegalDocuments = lazy(() => import('./pages/admin/LegalDocuments'));
 const AdminShellLayout = lazy(() => import('./components/admin/AdminShellLayout'));
 const AdminEntryGate = lazy(() => import('./components/admin/AdminEntryGate'));
 const AdminUsersPage = lazy(() => import('./pages/admin/Users'));
-const AdminRolesPage = lazy(() => import('./pages/admin/Roles'));
 const AdminCompaniesPage = lazy(() => import('./pages/admin/Companies'));
 const AdminCompanySubscriptionsPage = lazy(() => import('./pages/admin/CompanySubscriptions'));
 const AdminReportsPage = lazy(() => import('./pages/admin/Reports'));
@@ -101,6 +100,7 @@ const CorporateAnalyticsPage = lazy(() => import('./pages/corporate/CorporateAna
 const CorporateEmployeeDirectoryPage = lazy(() => import('./pages/corporate/CorporateEmployeeDirectoryPage'));
 const CorporateEnrollmentPage = lazy(() => import('./pages/corporate/CorporateEnrollmentPage'));
 const CorporateSessionAllocationPage = lazy(() => import('./pages/corporate/CorporateSessionAllocationPage'));
+const CorporateAgreementPage = lazy(() => import('./pages/corporate/CorporateAgreementPage'));
 const CorporateUtilizationReportsPage = lazy(() => import('./pages/corporate/CorporateUtilizationReportsPage'));
 const CorporateWellbeingReportsPage = lazy(() => import('./pages/corporate/CorporateWellbeingReportsPage'));
 const CorporateEngagementReportsPage = lazy(() => import('./pages/corporate/CorporateEngagementReportsPage'));
@@ -114,6 +114,7 @@ const CorporateOnboardingPage = lazy(() => import('./pages/corporate/CorporateOn
 const MyDigitalClinicPricingPage = lazy(() => import('./pages/clinic/PricingPage'));
 const MyDigitalClinicDashboard = lazy(() => import('./pages/clinic/ClinicDashboard'));
 const HowItWorksPage = lazy(() => import('./pages/how-it-works/HowItWorksPage'));
+const SpecializedCarePage = lazy(() => import('./pages/SpecializedCarePage'));
 const ProviderCalendarPage = lazy(() => import('./pages/provider/Calendar'));
 const ProviderInboxPage = lazy(() => import('./pages/provider/Messages'));
 const ProviderEarningsPage = lazy(() => import('./pages/provider/Earnings'));
@@ -263,6 +264,7 @@ function App() {
             <Route path="/results" element={<ResultsPage data={assessmentData} />} />
             <Route path="/crisis" element={<CrisisPage />} />
             <Route path="/how-it-works" element={<HowItWorksPage />} />
+            <Route path="/specialized-care" element={<SpecializedCarePage />} />
             <Route path="/my-digital-clinic" element={<MyDigitalClinicPricingPage />} />
             <Route path="/my-digital-clinic/dashboard" element={<MyDigitalClinicDashboard />} />
             <Route path="/clinic" element={<Navigate to="/my-digital-clinic" replace />} />
@@ -522,6 +524,8 @@ function App() {
             <Route path="/corporate/employees/directory" element={<CorporateRoute><CorporateEmployeeDirectoryPage /></CorporateRoute>} />
             <Route path="/corporate/employees/enrollment" element={<CorporateRoute><CorporateEnrollmentPage /></CorporateRoute>} />
             <Route path="/corporate/employees/allocation" element={<CorporateRoute><CorporateSessionAllocationPage /></CorporateRoute>} />
+            <Route path="/corporate/dashboard/agreements" element={<CorporateRoute><CorporateAgreementPage /></CorporateRoute>} />
+            <Route path="/corporate/employees/agreement" element={<Navigate to="/corporate/dashboard/agreements" replace />} />
             <Route path="/corporate/reports/utilization" element={<CorporateRoute><CorporateUtilizationReportsPage /></CorporateRoute>} />
             <Route path="/corporate/reports/wellbeing" element={<CorporateRoute><CorporateWellbeingReportsPage /></CorporateRoute>} />
             <Route path="/corporate/reports/engagement" element={<CorporateRoute><CorporateEngagementReportsPage /></CorporateRoute>} />

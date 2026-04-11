@@ -37,6 +37,7 @@ import groupTherapyRoutes from './group-therapy.routes';
 import legalRoutes from './legal.routes';
 import qrRoutes from './qr.routes';
 import invoiceRoutes from './invoice.routes';
+import institutionalAgreementRoutes from './institutional-agreement.routes';
 
 
 const router = Router();
@@ -107,6 +108,8 @@ router.use('/v1/wallet', walletRoutes);
 router.use('/v1/legal', legalRoutes);
 router.use('/v1/qr', qrRoutes);
 router.use('/v1/invoices', invoiceRoutes);
+router.use('/agreements', institutionalAgreementRoutes);
+router.use('/v1/agreements', institutionalAgreementRoutes);
 
 export default router;
 

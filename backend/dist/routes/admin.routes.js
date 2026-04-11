@@ -112,7 +112,7 @@ router.get('/screening/provider-questions', auth_middleware_1.requireAuth, (0, r
  */
 router.get('/modules/:module/summary', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, validate_middleware_1.asyncHandler)(admin_module_controller_1.getAdminModuleSummaryController));
 // ==================== DASHBOARD & CORE ====================
-router.get('/analytics/health', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, validate_middleware_1.asyncHandler)(admin_analytics_controller_1.getAdminSystemHealthController));
+// Removed duplicate analytics/health route. Only permission-guarded version remains below.
 router.get('/company-reports', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin']), (0, validate_middleware_1.asyncHandler)(admin_analytics_controller_1.getAdminCompanyReportsController));
 router.get('/analytics/bi-summary', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin']), (0, validate_middleware_1.asyncHandler)(admin_analytics_controller_1.getAdminBICorporateSummaryController));
 router.get('/analytics/therapist-performance', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin']), (0, validate_middleware_1.asyncHandler)(admin_analytics_controller_1.getAdminTherapistPerformanceController));
@@ -274,8 +274,8 @@ router.post('/groups', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requ
 router.put('/groups/:id', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), admin_groups_controller_1.updateGroupCategoryController);
 router.delete('/groups/:id', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), admin_groups_controller_1.deleteGroupCategoryController);
 // === DYNAMIC ROLE MANAGEMENT ===
-router.get('/roles', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('superadmin'), (0, validate_middleware_1.asyncHandler)(admin_controller_1.getRolesController));
+router.get('/roles', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin', 'clinicaldirector', 'financemanager', 'complianceofficer']), (0, validate_middleware_1.asyncHandler)(admin_controller_1.getRolesController));
 router.patch('/roles/:role', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('superadmin'), (0, validate_middleware_1.asyncHandler)(admin_controller_1.updateRolePermissionsController));
-router.get('/rbac/platform-admins', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('superadmin'), (0, validate_middleware_1.asyncHandler)(admin_controller_1.getPlatformAdminRoleInventoryController));
+router.get('/rbac/platform-admins', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin', 'clinicaldirector', 'financemanager', 'complianceofficer']), (0, validate_middleware_1.asyncHandler)(admin_controller_1.getPlatformAdminRoleInventoryController));
 router.post('/rbac/platform-admins', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('superadmin'), (0, validate_middleware_1.asyncHandler)(admin_controller_1.createPlatformAdminAccountController));
 exports.default = router;

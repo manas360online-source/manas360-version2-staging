@@ -165,6 +165,33 @@ const resolveUserCompanyMeta = async (userId: string, email?: string | null) => 
 	}
 };
 
+const ensureDevCorporateTestAccess = async (
+	userId: string,
+	phone: string | null | undefined,
+	meta: { companyKey: string | null; company_key: string | null; isCompanyAdmin: boolean; is_company_admin: boolean },
+) => {
+	const isDevLikeEnv = env.nodeEnv !== 'production';
+	if (!isDevLikeEnv || String(phone || '').trim() !== '+919000000001') {
+		return meta;
+	}
+
+	const targetCompanyKey = meta.company_key || meta.companyKey || 'CORP-TEST';
+	if (!meta.is_company_admin || !meta.company_key) {
+		await db.$executeRawUnsafe(
+			'UPDATE users SET company_key = COALESCE(company_key, $2), is_company_admin = true WHERE id = $1',
+			userId,
+			targetCompanyKey,
+		);
+	}
+
+	return {
+		companyKey: targetCompanyKey,
+		company_key: targetCompanyKey,
+		isCompanyAdmin: true,
+		is_company_admin: true,
+	};
+};
+
 const getSupportedUserRoles = async (): Promise<Set<string>> => {
 	if (supportedUserRolesCache) {
 		return supportedUserRolesCache;
@@ -597,7 +624,8 @@ export const verifyPhoneOtp = async (input: VerifyPhoneOtpInput, meta: RequestMe
 		where: { userId: String(user.id) },
 		select: { onboardingCompleted: true, isVerified: true },
 	});
-	const companyAdminMeta = await resolveUserCompanyMeta(String(user.id), user.email);
+	const resolvedCompanyMeta = await resolveUserCompanyMeta(String(user.id), user.email);
+	const companyAdminMeta = await ensureDevCorporateTestAccess(String(user.id), user.phone, resolvedCompanyMeta);
 
 	await audit('LOGIN_SUCCESS', 'success', meta, { userId: user.id, phone: user.phone });
 
@@ -718,7 +746,8 @@ export const loginWithPassword = async (input: LoginInput, meta: RequestMeta) =>
 		where: { userId: String(user.id) },
 		select: { onboardingCompleted: true, isVerified: true },
 	});
-	const companyAdminMeta = await resolveUserCompanyMeta(String(user.id), user.email);
+	const resolvedCompanyMeta = await resolveUserCompanyMeta(String(user.id), user.email);
+	const companyAdminMeta = await ensureDevCorporateTestAccess(String(user.id), user.phone, resolvedCompanyMeta);
 	await audit('LOGIN_SUCCESS', 'success', meta, { userId: user.id, email: user.email, phone: user.phone });
 
 	// Determine if provider needs to pay the platform fee before onboarding

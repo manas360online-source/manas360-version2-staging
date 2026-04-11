@@ -192,6 +192,8 @@ export const processSubscriptionWebhook = async (
 
 					await sendWhatsAppMessage({
 						phoneNumber: user.phone,
+						templateType: 'subscription_renewed',
+						userType: 'user',
 						templateName: 'subscription_renewal_success',
 						parameters: {
 							plan_name: planDisplay,
@@ -241,6 +243,8 @@ export const processSubscriptionWebhook = async (
 
 					await sendWhatsAppMessage({
 						phoneNumber: user.phone,
+						templateType: 'payment_failed',
+						userType: 'user',
 						templateName: 'subscription_payment_failure',
 						parameters: {
 							plan_name: sub.plan.charAt(0) + sub.plan.slice(1).toLowerCase(),

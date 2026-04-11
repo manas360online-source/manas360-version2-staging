@@ -40,6 +40,7 @@ export const corporateNavSections: CorporateNavSection[] = [
       { key: 'directory', label: 'Employee Directory', to: '/corporate/employees/directory', icon: <Users className="h-4 w-4" /> },
       { key: 'enrollment', label: 'Bulk Enrollment', to: '/corporate/employees/enrollment', icon: <UserCog className="h-4 w-4" /> },
       { key: 'allocation', label: 'Session Allocation', to: '/corporate/employees/allocation', icon: <BarChart3 className="h-4 w-4" /> },
+      { key: 'agreement', label: 'Agreement', to: '/corporate/dashboard/agreements', icon: <FileText className="h-4 w-4" /> },
     ],
   },
   {
