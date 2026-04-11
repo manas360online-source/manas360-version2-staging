@@ -48,6 +48,34 @@ const token = (userId: string) => {
 	return createAccessToken({ sub: userId, sessionId: randomUUID(), jti: randomUUID() });
 };
 
+const acceptPendingLegalDocuments = async (accessToken: string): Promise<void> => {
+	const requiredRes = await request(app)
+		.get('/api/v1/auth/legal/required')
+		.set('Authorization', `Bearer ${accessToken}`);
+
+	if (requiredRes.status !== 200) {
+		throw new Error(`Failed to fetch legal requirements: ${requiredRes.status}`);
+	}
+
+	const pendingDocuments = requiredRes.body?.data?.pendingDocuments;
+	const documentIds = Array.isArray(pendingDocuments)
+		? pendingDocuments.map((doc: any) => String(doc?.id || '')).filter(Boolean)
+		: [];
+
+	if (documentIds.length === 0) {
+		return;
+	}
+
+	const acceptRes = await request(app)
+		.post('/api/v1/auth/legal/accept')
+		.set('Authorization', `Bearer ${accessToken}`)
+		.send({ documentIds });
+
+	if (acceptRes.status !== 200) {
+		throw new Error(`Failed to accept legal documents: ${acceptRes.status}`);
+	}
+};
+
 // ─── lifecycle ───────────────────────────────────────────────────────────────
 
 beforeAll(async () => {
@@ -172,6 +200,14 @@ beforeAll(async () => {
 	providerBToken = token(providerBUserId);
 	patientAToken = token(patientAUserId);
 	patientBToken = token(patientBUserId);
+
+	await Promise.all([
+		acceptPendingLegalDocuments(adminToken),
+		acceptPendingLegalDocuments(providerAToken),
+		acceptPendingLegalDocuments(providerBToken),
+		acceptPendingLegalDocuments(patientAToken),
+		acceptPendingLegalDocuments(patientBToken),
+	]);
 }, 30000);
 
 afterAll(async () => {

@@ -421,9 +421,11 @@ export const patientApi = {
   updatePaymentMethod: async (payload: { cardLast4: string; cardBrand: string; expiryMonth: number; expiryYear: number }) =>
     (await http.put('/v1/patient/payment-method', payload)).data,
   getInvoices: async () =>
-    (await http.get('/v1/patient/invoices')).data,
-  downloadInvoice: async (id: string) =>
-    (await http.get(`/v1/patient/invoices/${encodeURIComponent(id)}/download`, { responseType: 'blob' })).data,
+    // Disabled: invoices removed from backend
+    [],
+  downloadInvoice: async (_id: string) => {
+    throw new Error('Invoice downloads are disabled');
+  },
   getExercises: async () => (await http.get('/v1/patient/exercises')).data,
   logWellnessLibraryActivity: async (payload: { title: string; duration?: number; category?: string; kind?: 'audio' | 'interactive' }) =>
     (await http.post('/v1/patient/exercises/library', payload)).data,

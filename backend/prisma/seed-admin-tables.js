@@ -27,6 +27,9 @@ const DEFAULT_ROLES = [
       'payouts_approve',
       'pricing_edit',
       'offers_edit',
+      'view_feedback',
+      'manage_compliance',
+      'view_audit',
     ],
   },
   {
@@ -45,6 +48,9 @@ const DEFAULT_ROLES = [
       'system_settings',
       'manage_roles',
       'audit_logs',
+      'view_feedback',
+      'manage_compliance',
+      'view_audit',
     ],
   },
   {
@@ -107,7 +113,21 @@ async function seedRoles() {
     });
 
     if (existing) {
-      console.log(`✓ Role "${role.name}" already exists, skipping`);
+      const existingPermissions = Array.isArray(existing.permissions) ? existing.permissions : [];
+      const mergedPermissions = Array.from(new Set([...existingPermissions, ...role.permissions]));
+
+      if (mergedPermissions.length !== existingPermissions.length) {
+        await prisma.role.update({
+          where: { name: role.name },
+          data: {
+            description: role.description,
+            permissions: mergedPermissions,
+          },
+        });
+        console.log(`✓ Role "${role.name}" updated with missing permissions`);
+      } else {
+        console.log(`✓ Role "${role.name}" already exists, no permission changes`);
+      }
       continue;
     }
 

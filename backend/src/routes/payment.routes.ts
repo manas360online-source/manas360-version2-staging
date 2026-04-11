@@ -11,7 +11,6 @@ import {
 	initiateUniversalPaymentController,
 	confirmUniversalPaymentController,
 	verifyUniversalPaymentController,
-	getUniversalInvoiceController,
 } from '../controllers/payment.controller';
 import { requireAuth } from '../middleware/auth.middleware';
 import { requireRole } from '../middleware/rbac.middleware';
@@ -41,6 +40,4 @@ router.get('/refund/:refundId/status', requireAuth, requireRole('patient'), asyn
 router.post('/universal/initiate', requireAuth, paymentRateLimiter, asyncHandler(initiateUniversalPaymentController));
 router.post('/universal/confirm', requireAuth, paymentRateLimiter, asyncHandler(confirmUniversalPaymentController));
 router.get('/universal/verify', requireAuth, asyncHandler(verifyUniversalPaymentController));
-router.get('/universal/invoice/:orderId', requireAuth, asyncHandler(getUniversalInvoiceController));
-
 export default router;

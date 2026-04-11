@@ -9,12 +9,10 @@ import {
   getMyActiveCbtAssignmentsController,
   getMyCbtAssignmentDetailController,
   upsertMyCbtAssignmentResponseController,
-  downloadPatientInvoiceController,
   downgradePatientSubscriptionController,
   getPatientDashboardController,
   getPatientExercisesController,
   getPatientInsightsController,
-  getPatientInvoicesController,
   getPatientMoodController,
   getPatientMoodStatsController,
   getPatientMoodTodayController,
@@ -84,9 +82,6 @@ router.patch('/subscription/auto-renew', requireAuth, requireRole('patient'), as
 
 router.get('/payment-method', requireAuth, requireRole('patient'), asyncHandler(getPatientPaymentMethodController));
 router.put('/payment-method', requireAuth, requireRole('patient'), asyncHandler(updatePatientPaymentMethodController));
-
-router.get('/invoices', requireAuth, requireRole('patient'), asyncHandler(getPatientInvoicesController));
-router.get('/invoices/:id/download', requireAuth, requireRole('patient'), asyncHandler(downloadPatientInvoiceController));
 
 router.get('/mood', requireAuth, requireRole('patient'), asyncHandler(getPatientMoodController));
 router.post('/mood', requireAuth, requireRole('patient'), asyncHandler(createMoodController));

@@ -2,7 +2,6 @@ import { prisma } from '../config/db';
 import { AppError } from '../middleware/error.middleware';
 import { logger } from '../utils/logger';
 import crypto from 'crypto';
-import { invoiceService } from './invoice.service';
 
 /**
  * Track webhook to prevent duplicate processing
@@ -116,12 +115,7 @@ export const processOrderCompletedEvent = async (payload: any): Promise<void> =>
 		},
 	});
 
-	void invoiceService.ensureInvoiceForPayment(String(payment.id)).catch((error) => {
-		logger.error('[PhonePeWebhook] Invoice generation failed after checkout completion', {
-			paymentId: payment.id,
-			error: error?.message || error,
-		});
-	});
+	// Invoice generation intentionally disabled.
 
 	// ── Provider Platform Access activation ──
 	const paymentMeta = (payment.metadata as any) || {};

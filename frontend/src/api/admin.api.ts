@@ -433,7 +433,7 @@ export type AdminInvoiceDetail = {
 	}>;
 };
 
-export const listAdminInvoices = async (params?: {
+export const listAdminInvoices = async (_params?: {
 	page?: number;
 	limit?: number;
 	q?: string;
@@ -441,49 +441,42 @@ export const listAdminInvoices = async (params?: {
 	sortOrder?: 'asc' | 'desc';
 	status?: AdminInvoiceLifecycleStatus;
 }): Promise<AdminInvoiceListResponse> => {
-	const query = buildQuery({
-		page: params?.page,
-		limit: params?.limit,
-		q: params?.q,
-		sortBy: params?.sortBy,
-		sortOrder: params?.sortOrder,
-		status: params?.status,
-	});
-
-	return (await client.get<AdminInvoiceListResponse>(`/v1/invoices${query}`)).data;
+	// Invoices disabled — return empty list to avoid runtime errors
+	return {
+		success: false,
+		message: 'Invoices are disabled in this deployment',
+		data: [],
+		meta: { page: 1, limit: 0, totalItems: 0, totalPages: 0 },
+	} as AdminInvoiceListResponse;
 };
 
-export const getAdminInvoiceDetail = async (invoiceId: string): Promise<ApiEnvelope<AdminInvoiceDetail>> => {
-	return (await client.get<ApiEnvelope<AdminInvoiceDetail>>(`/v1/invoices/${encodeURIComponent(invoiceId)}`)).data;
+export const getAdminInvoiceDetail = async (_invoiceId: string): Promise<ApiEnvelope<AdminInvoiceDetail>> => {
+	throw new Error('Invoices are disabled');
 };
 
-export const resendAdminInvoice = async (paymentId: string): Promise<ApiEnvelope<AdminInvoice>> => {
-	return (await client.post<ApiEnvelope<AdminInvoice>>(`/v1/invoices/payments/${encodeURIComponent(paymentId)}/resend`)).data;
+export const resendAdminInvoice = async (_paymentId: string): Promise<ApiEnvelope<AdminInvoice>> => {
+	throw new Error('Invoices are disabled');
 };
 
 export const requestAdminInvoiceRefund = async (
-	invoiceId: string,
-	payload: { reason?: string; amountMinor?: number },
+	_invoiceId: string,
+	_payload: { reason?: string; amountMinor?: number },
 ): Promise<ApiEnvelope<{ invoiceId: string; refundId: string; merchantRefundId: string; status: string }>> => {
-	return (await client.post<ApiEnvelope<{ invoiceId: string; refundId: string; merchantRefundId: string; status: string }>>(`/v1/invoices/${encodeURIComponent(invoiceId)}/refund`, payload)).data;
+	throw new Error('Invoices are disabled');
 };
 
 export const bulkResendAdminInvoices = async (
-	invoiceIds: string[],
+	_invoiceIds: string[],
 ): Promise<ApiEnvelope<{ requestedCount: number; successCount: number; failedIds: string[] }>> => {
-	return (await client.post<ApiEnvelope<{ requestedCount: number; successCount: number; failedIds: string[] }>>('/v1/invoices/resend-bulk', { invoiceIds })).data;
+	throw new Error('Invoices are disabled');
 };
 
-export const downloadAdminInvoicePdf = async (invoiceId: string): Promise<Blob> => {
-	const response = await client.get(`/v1/invoices/${encodeURIComponent(invoiceId)}/pdf`, {
-		responseType: 'blob',
-	});
-	return response.data as Blob;
+export const downloadAdminInvoicePdf = async (_invoiceId: string): Promise<Blob> => {
+	throw new Error('Invoices are disabled');
 };
 
-export const exportAdminInvoicesCsv = async (q?: string): Promise<Blob> => {
-	const response = await client.post('/v1/invoices/export', { q }, { responseType: 'blob' });
-	return response.data as Blob;
+export const exportAdminInvoicesCsv = async (_q?: string): Promise<Blob> => {
+	throw new Error('Invoices are disabled');
 };
 
 export const getAdminSubscriptions = async (params?: {

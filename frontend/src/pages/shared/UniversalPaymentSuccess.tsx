@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { CheckCircle2, Download, Home, Copy, Loader } from 'lucide-react';
+import { CheckCircle2, Home, Copy, Loader } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -99,7 +99,7 @@ export default function PaymentSuccessPage() {
   const [payment, setPayment] = useState<PaymentDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [downloadingPDF, setDownloadingPDF] = useState(false);
+  
 
   // Fetch and verify payment
   useEffect(() => {
@@ -132,35 +132,7 @@ export default function PaymentSuccessPage() {
     verifyPayment();
   }, [transactionId, type, planId]);
 
-  // Handle invoice download
-  const handleDownloadInvoice = async () => {
-    if (!payment || !transactionId) return;
-
-    setDownloadingPDF(true);
-    try {
-      const response = await http.get(`/v1/payments/universal/invoice/${transactionId}`, {
-        responseType: 'blob',
-      });
-
-      if (!response?.data) {
-        throw new Error('Failed to generate invoice');
-      }
-
-      // Get PDF blob
-      const blob = response.data as Blob;
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `invoice-${transactionId}.pdf`;
-      link.click();
-      window.URL.revokeObjectURL(url);
-      toast.success('Invoice downloaded');
-    } catch (err: any) {
-      toast.error('Failed to download invoice');
-    } finally {
-      setDownloadingPDF(false);
-    }
-  };
+  // Invoice generation disabled — invoice downloads removed.
 
   // Copy transaction ID
   const copyTransactionId = () => {
@@ -383,7 +355,7 @@ export default function PaymentSuccessPage() {
             <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-200">
               <h4 className="font-bold text-emerald-900 mb-2">What's Next?</h4>
               <p className="text-emerald-800 text-sm leading-relaxed">
-                Your plan is now active. You can access all features immediately. An invoice has
+                Your plan is now active. You can access all features immediately. A confirmation has
                 been sent to your registered email address.
               </p>
             </div>
@@ -392,24 +364,7 @@ export default function PaymentSuccessPage() {
 
         {/* Action Buttons */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Button
-            onClick={handleDownloadInvoice}
-            disabled={downloadingPDF}
-            variant="secondary"
-            className="flex items-center justify-center gap-2"
-          >
-            {downloadingPDF ? (
-              <>
-                <Loader className="animate-spin" size={18} />
-                Generating...
-              </>
-            ) : (
-              <>
-                <Download size={18} />
-                Download Invoice
-              </>
-            )}
-          </Button>
+          <div />
 
           <Button
             onClick={() => navigate(dashboardRoute)}
