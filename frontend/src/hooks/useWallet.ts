@@ -12,8 +12,9 @@ export interface WalletBalance {
   lifetime_expired: number;
 }
 
-export const useWallet = () => {
+export const useWallet = (options?: { enabled?: boolean }) => {
   const queryClient = useQueryClient();
+  const enabled = options?.enabled ?? true;
 
   // Fetch current wallet (used in HitASixerGame, header, etc.)
   // Normalize API response to the expected WalletBalance shape.
@@ -24,6 +25,8 @@ export const useWallet = () => {
       return (resp && (resp.data ?? resp)) ?? null;
     },
     staleTime: 0, // always fresh after game play
+    enabled,
+    retry: enabled,
   });
 
   // 🔥 AUTO-APPLY wallet credits to ANY payment (bookings, subscriptions, etc.)

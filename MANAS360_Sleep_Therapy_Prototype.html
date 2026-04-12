@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MANAS360 — Sleep Therapy</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;600;700;800&family=Quicksand:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --night:#1a1a2e;--night2:#16213e;--night3:#0f3460;
+  --moon:#F5F0E1;--star:#FFF8E1;
+  --lavender:#B39DDB;--lavender-light:#EDE7F6;
+  --indigo:#5C6BC0;--indigo-light:#E8EAF6;
+  --teal:#4DB6AC;--teal-light:#E0F2F1;
+  --slate:#1E293B;--slate3:#475569;--slate4:#64748B;
+  --stone:#94A3B8;--border:#E2E8F0;
+  --white:#FFFFFF;--bg:#FAFBFC;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:'Quicksand',sans-serif;background:var(--white);color:var(--slate);
+  min-height:100vh;display:flex;flex-direction:column;align-items:center;
+  -webkit-font-smoothing:antialiased;
+}
+
+.container{width:100%;max-width:420px;padding:0 16px 40px}
+
+/* ═══ HEADER ═══ */
+.header{
+  text-align:center;padding:32px 16px 20px;
+}
+.header .logo{font-family:'Baloo 2',cursive;font-size:13px;font-weight:700;color:var(--lavender);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px}
+.header h1{font-family:'Baloo 2',cursive;font-size:28px;font-weight:800;color:var(--night);margin-bottom:6px}
+.header p{font-size:13px;color:var(--slate4);font-weight:500;line-height:1.5}
+
+/* ═══ MODE TOGGLE ═══ */
+.mode-toggle{
+  display:flex;background:#F1F5F9;border-radius:14px;padding:4px;margin:16px 0 24px;
+}
+.mode-btn{
+  flex:1;padding:10px 8px;border-radius:11px;border:none;background:transparent;
+  font-family:'Quicksand',sans-serif;font-size:13px;font-weight:700;color:var(--slate4);
+  cursor:pointer;transition:all .25s;text-align:center;
+}
+.mode-btn.active{background:var(--white);color:var(--night);box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.mode-btn .icon{font-size:16px;display:block;margin-bottom:2px}
+
+/* ═══ STEP CARDS ═══ */
+.steps-list{display:flex;flex-direction:column;gap:12px}
+
+.step-card{
+  background:var(--white);border:1.5px solid var(--border);border-radius:16px;
+  padding:16px 16px 16px 56px;position:relative;transition:all .3s;
+  cursor:pointer;
+}
+.step-card:hover{border-color:var(--lavender);box-shadow:0 4px 16px rgba(179,157,219,.12)}
+.step-card.active{border-color:var(--indigo);background:#F8F7FF;box-shadow:0 4px 20px rgba(92,107,192,.12)}
+.step-card.done{border-color:var(--teal);background:#F7FDFC}
+.step-card.done .step-num{background:var(--teal);color:var(--white)}
+
+.step-num{
+  position:absolute;left:14px;top:16px;
+  width:30px;height:30px;border-radius:50%;
+  background:#F1F5F9;color:var(--slate4);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Baloo 2',cursive;font-size:14px;font-weight:800;
+  transition:all .3s;
+}
+.step-card.active .step-num{background:var(--indigo);color:var(--white)}
+
+.step-title{font-family:'Baloo 2',cursive;font-size:16px;font-weight:700;color:var(--slate);margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.step-title .emoji{font-size:18px}
+.step-desc{font-size:12.5px;color:var(--slate4);line-height:1.5;font-weight:500}
+.step-time{font-size:11px;color:var(--stone);font-weight:600;margin-top:6px;display:flex;align-items:center;gap:4px}
+
+/* ═══ EXPANDED STEP CONTENT ═══ */
+.step-expand{
+  max-height:0;overflow:hidden;transition:max-height .4s ease,padding .3s;
+  padding:0;
+}
+.step-card.active .step-expand{max-height:500px;padding:12px 0 0}
+
+.step-detail{
+  background:#F8FAFC;border-radius:10px;padding:12px;
+  font-size:12px;color:var(--slate3);line-height:1.6;
+}
+.step-detail strong{color:var(--night)}
+
+/* PRESCRIPTION TAG */
+.rx-tag{
+  display:inline-flex;align-items:center;gap:4px;
+  background:var(--lavender-light);color:#7E57C2;
+  font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;
+  margin-top:8px;
+}
+.self-tag{
+  display:inline-flex;align-items:center;gap:4px;
+  background:var(--teal-light);color:#00897B;
+  font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;
+  margin-top:8px;
+}
+
+/* ═══ SOUND PLAYER ═══ */
+.sound-player{
+  background:linear-gradient(135deg,var(--night),var(--night2));
+  border-radius:16px;padding:20px;margin:20px 0;color:var(--moon);
+  position:relative;overflow:hidden;
+}
+.sound-player::before{
+  content:'';position:absolute;top:-30px;right:-20px;width:100px;height:100px;
+  background:radial-gradient(circle,rgba(245,240,225,.08),transparent 70%);
+  border-radius:50%;
+}
+.sound-label{font-family:'Baloo 2',cursive;font-size:16px;font-weight:700;margin-bottom:4px;position:relative}
+.sound-sub{font-size:11px;color:rgba(245,240,225,.6);margin-bottom:14px;position:relative}
+
+.sound-options{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;position:relative}
+.sound-chip{
+  padding:6px 12px;border-radius:20px;border:1.5px solid rgba(245,240,225,.2);
+  background:transparent;color:var(--moon);font-size:11px;font-weight:600;
+  font-family:'Quicksand',sans-serif;cursor:pointer;transition:all .2s;
+}
+.sound-chip:hover{border-color:rgba(245,240,225,.5)}
+.sound-chip.active{background:rgba(245,240,225,.15);border-color:var(--moon)}
+
+.sound-controls{display:flex;align-items:center;gap:12px;position:relative}
+.play-btn{
+  width:44px;height:44px;border-radius:50%;border:2px solid var(--moon);
+  background:transparent;color:var(--moon);font-size:18px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:all .2s;
+}
+.play-btn:hover{background:rgba(245,240,225,.1)}
+.play-btn.playing{background:var(--moon);color:var(--night)}
+
+.timer-display{font-family:'Baloo 2',cursive;font-size:28px;font-weight:800;color:var(--moon)}
+.timer-label{font-size:10px;color:rgba(245,240,225,.5);font-weight:600}
+
+/* Wave animation */
+.wave-bar{display:flex;gap:3px;align-items:end;height:24px;margin-left:auto}
+.wave-bar span{
+  width:3px;background:var(--moon);border-radius:2px;
+  opacity:.3;transition:height .2s;
+}
+.wave-bar.playing span{opacity:.8;animation:wave .6s ease-in-out infinite alternate}
+.wave-bar span:nth-child(1){height:8px;animation-delay:0s}
+.wave-bar span:nth-child(2){height:16px;animation-delay:.1s}
+.wave-bar span:nth-child(3){height:10px;animation-delay:.2s}
+.wave-bar span:nth-child(4){height:20px;animation-delay:.15s}
+.wave-bar span:nth-child(5){height:12px;animation-delay:.25s}
+.wave-bar span:nth-child(6){height:6px;animation-delay:.3s}
+.wave-bar span:nth-child(7){height:14px;animation-delay:.05s}
+@keyframes wave{
+  0%{height:4px}
+  100%{height:22px}
+}
+
+/* ═══ BODY SCANNER ═══ */
+.body-scanner{
+  background:var(--white);border:1.5px solid var(--border);border-radius:16px;
+  padding:20px;margin:16px 0;text-align:center;
+}
+.scanner-title{font-family:'Baloo 2',cursive;font-size:16px;font-weight:700;color:var(--night);margin-bottom:4px}
+.scanner-sub{font-size:12px;color:var(--slate4);margin-bottom:16px;font-weight:500}
+
+.body-map{position:relative;width:120px;height:220px;margin:0 auto 16px}
+.body-outline{width:100%;height:100%}
+.body-part{
+  position:absolute;border-radius:20px;cursor:pointer;
+  transition:all .3s;border:2px solid transparent;
+}
+.body-part:hover{border-color:var(--lavender);background:rgba(179,157,219,.1)}
+.body-part.relaxing{background:rgba(77,182,172,.15);border-color:var(--teal);animation:pulse-relax 2s ease-in-out infinite}
+.body-part.relaxed{background:rgba(77,182,172,.08);border-color:rgba(77,182,172,.3)}
+.body-part .part-label{
+  position:absolute;font-size:9px;font-weight:700;color:var(--slate4);
+  white-space:nowrap;pointer-events:none;
+}
+
+@keyframes pulse-relax{
+  0%,100%{opacity:.6;transform:scale(1)}
+  50%{opacity:1;transform:scale(1.03)}
+}
+
+.body-part-head{left:38px;top:0;width:44px;height:36px;border-radius:50%}
+.body-part-head .part-label{left:50px;top:10px}
+.body-part-neck{left:46px;top:34px;width:28px;height:16px;border-radius:8px}
+.body-part-neck .part-label{left:34px;top:0}
+.body-part-shoulders{left:18px;top:46px;width:84px;height:20px;border-radius:10px}
+.body-part-shoulders .part-label{left:88px;top:2px}
+.body-part-chest{left:30px;top:64px;width:60px;height:32px;border-radius:12px}
+.body-part-chest .part-label{left:64px;top:8px}
+.body-part-belly{left:34px;top:94px;width:52px;height:28px;border-radius:10px}
+.body-part-belly .part-label{left:56px;top:6px}
+.body-part-hips{left:30px;top:120px;width:60px;height:22px;border-radius:10px}
+.body-part-hips .part-label{left:64px;top:2px}
+.body-part-legs{left:28px;top:140px;width:64px;height:50px;border-radius:10px}
+.body-part-legs .part-label{left:68px;top:16px}
+.body-part-feet{left:26px;top:188px;width:68px;height:26px;border-radius:10px}
+.body-part-feet .part-label{left:72px;top:4px}
+
+.scan-btn{
+  padding:10px 24px;border-radius:12px;border:none;
+  background:linear-gradient(135deg,var(--indigo),var(--lavender));
+  color:var(--white);font-family:'Quicksand',sans-serif;font-size:13px;font-weight:700;
+  cursor:pointer;transition:all .2s;margin-top:4px;
+}
+.scan-btn:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(92,107,192,.25)}
+.scan-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+
+.scan-status{
+  font-size:12px;color:var(--indigo);font-weight:600;margin-top:10px;
+  min-height:18px;transition:all .3s;
+}
+
+/* ═══ PROGRESS RING ═══ */
+.progress-section{
+  display:flex;align-items:center;gap:16px;
+  background:#F8F7FF;border-radius:14px;padding:16px;margin:16px 0;
+}
+.ring-wrap{position:relative;width:56px;height:56px;flex-shrink:0}
+.ring-wrap svg{transform:rotate(-90deg)}
+.ring-bg{stroke:#E8EAF6;fill:none;stroke-width:5}
+.ring-fill{stroke:var(--indigo);fill:none;stroke-width:5;stroke-linecap:round;transition:stroke-dashoffset .5s}
+.ring-text{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  font-family:'Baloo 2',cursive;font-size:16px;font-weight:800;color:var(--indigo);
+}
+.progress-info h3{font-family:'Baloo 2',cursive;font-size:15px;color:var(--night);margin-bottom:2px}
+.progress-info p{font-size:11px;color:var(--slate4);font-weight:500;line-height:1.4}
+
+/* ═══ COMING SOON ═══ */
+.coming-soon{
+  border:1.5px dashed var(--border);border-radius:16px;
+  padding:24px;text-align:center;margin:24px 0;
+}
+.coming-soon .badge{
+  display:inline-block;background:#F1F5F9;color:var(--slate4);
+  font-size:10px;font-weight:700;padding:3px 10px;border-radius:8px;
+  letter-spacing:.5px;text-transform:uppercase;margin-bottom:10px;
+}
+.coming-soon h3{font-family:'Baloo 2',cursive;font-size:18px;color:var(--night);margin-bottom:8px}
+.coming-soon ul{
+  list-style:none;text-align:left;display:inline-block;
+}
+.coming-soon li{
+  font-size:12.5px;color:var(--slate4);padding:4px 0;font-weight:500;
+  display:flex;align-items:center;gap:6px;
+}
+.coming-soon li::before{content:'◇';color:var(--lavender);font-size:10px}
+
+/* ═══ FOOTER ═══ */
+.footer{text-align:center;padding:20px 0;font-size:11px;color:var(--stone);font-weight:500}
+.footer strong{color:var(--slate3)}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="logo">MANAS360 Sleep Therapy</div>
+    <h1>🌙 Nidra — Sleep Well</h1>
+    <p>A guided sleep hygiene program that helps you wind down, disconnect, and fall into deep restorative sleep.</p>
+  </div>
+
+  <!-- MODE TOGGLE -->
+  <div class="mode-toggle">
+    <button class="mode-btn active" onclick="setMode('self',this)">
+      <span class="icon">🔍</span>Self Discovery
+    </button>
+    <button class="mode-btn" onclick="setMode('rx',this)">
+      <span class="icon">📋</span>Prescription Mode
+    </button>
+  </div>
+
+  <!-- PROGRESS -->
+  <div class="progress-section">
+    <div class="ring-wrap">
+      <svg width="56" height="56" viewBox="0 0 56 56">
+        <circle class="ring-bg" cx="28" cy="28" r="24"/>
+        <circle class="ring-fill" id="progressRing" cx="28" cy="28" r="24"
+          stroke-dasharray="150.8" stroke-dashoffset="150.8"/>
+      </svg>
+      <span class="ring-text" id="progressPct">0%</span>
+    </div>
+    <div class="progress-info">
+      <h3>Tonight's Sleep Prep</h3>
+      <p id="progressMsg">Tap each step when done. Complete all 7 for best results.</p>
+    </div>
+  </div>
+
+  <!-- STEPS -->
+  <div class="steps-list" id="stepsList">
+
+    <div class="step-card" data-step="1" onclick="toggleStep(this)">
+      <div class="step-num">1</div>
+      <div class="step-title"><span class="emoji">📵</span> Shut Off All Gadgets</div>
+      <div class="step-desc">Power down screens 45 minutes before bed. Blue light blocks melatonin production.</div>
+      <div class="step-time">⏱ 8:15 PM · 45 min before sleep</div>
+      <div class="step-expand">
+        <div class="step-detail">
+          <strong>Why it works:</strong> Screen blue light suppresses melatonin by up to 50%. Even 30 minutes of screen-free time measurably improves sleep onset latency.
+          <br><br>
+          <strong>Do this:</strong> Set all devices to Do Not Disturb. Place phone face-down in another room. Turn off laptop, tablet, and gaming console. If you use phone as alarm, switch to a simple alarm clock.
+        </div>
+        <span class="self-tag" id="tag1">🔍 Self Discovery</span>
+      </div>
+    </div>
+
+    <div class="step-card" data-step="2" onclick="toggleStep(this)">
+      <div class="step-num">2</div>
+      <div class="step-title"><span class="emoji">🔌</span> No Phone Charging Nearby</div>
+      <div class="step-desc">Charge your phone in a different room. Not beside the bed. Not even in the bedroom.</div>
+      <div class="step-time">⏱ 8:15 PM · Place in another room</div>
+      <div class="step-expand">
+        <div class="step-detail">
+          <strong>Why it works:</strong> Phone proximity creates unconscious vigilance — your brain stays alert for notifications even in sleep. Distance eliminates the temptation to "just check one thing."
+          <br><br>
+          <strong>Do this:</strong> Pick a charging spot in the living room or kitchen. Make it a permanent spot. Your morning routine now includes walking to your phone — which helps you wake up too.
+        </div>
+        <span class="rx-tag" id="tag2">📋 Prescribed</span>
+      </div>
+    </div>
+
+    <div class="step-card" data-step="3" onclick="toggleStep(this)">
+      <div class="step-num">3</div>
+      <div class="step-title"><span class="emoji">📺</span> No TV in Bedroom</div>
+      <div class="step-desc">The bedroom is for sleep only. Train your brain to associate bed = sleep, nothing else.</div>
+      <div class="step-time">⏱ Permanent change</div>
+      <div class="step-expand">
+        <div class="step-detail">
+          <strong>Why it works:</strong> Stimulus control therapy — one of the most evidence-backed CBT-I techniques. When your brain only associates the bedroom with sleep, falling asleep becomes automatic.
+          <br><br>
+          <strong>Do this:</strong> If removing the TV isn't possible, cover it with a cloth at night. Never watch TV in bed. If you can't sleep after 20 min, get up and go to another room until sleepy.
+        </div>
+        <span class="rx-tag" id="tag3">📋 CBT-I Protocol</span>
+      </div>
+    </div>
+
+    <div class="step-card" data-step="4" onclick="toggleStep(this)">
+      <div class="step-num">4</div>
+      <div class="step-title"><span class="emoji">🌑</span> Lights Off at 9 PM</div>
+      <div class="step-desc">Complete darkness signals melatonin release. Even small light sources disrupt deep sleep cycles.</div>
+      <div class="step-time">⏱ 9:00 PM sharp · Non-negotiable</div>
+      <div class="step-expand">
+        <div class="step-detail">
+          <strong>Why it works:</strong> Your suprachiasmatic nucleus (brain's master clock) uses light to regulate the circadian cycle. Darkness triggers melatonin. Even dim light from LEDs on devices, street lights, or standby indicators can reduce melatonin by 20%.
+          <br><br>
+          <strong>Do this:</strong> Use blackout curtains. Cover any LED standby lights with tape. If needed, use a dim red/amber night light only (red light has minimal melatonin impact). Set a "lights off" alarm at 9 PM.
+        </div>
+        <span class="rx-tag" id="tag4">📋 Prescribed</span>
+      </div>
+    </div>
+
+    <div class="step-card" data-step="5" onclick="toggleStep(this)">
+      <div class="step-num">5</div>
+      <div class="step-title"><span class="emoji">🎵</span> 5-Min Relaxation Soundscape</div>
+      <div class="step-desc">Play a calming sound track to transition your nervous system from alert to rest mode.</div>
+      <div class="step-time">⏱ 9:00 PM · 5 minutes</div>
+      <div class="step-expand">
+        <div class="step-detail">
+          <strong>Why it works:</strong> Auditory stimuli at 432Hz or nature sounds activate the parasympathetic nervous system, lowering heart rate by 3-8 BPM within 5 minutes. This shifts the body from sympathetic (fight-or-flight) to parasympathetic (rest-and-digest).
+          <br><br>
+          <strong>Choose a sound below and press play.</strong>
+        </div>
+        <span class="self-tag" id="tag5">🔍 Choose your sound</span>
+      </div>
+    </div>
+
+    <div class="step-card" data-step="6" onclick="toggleStep(this)">
+      <div class="step-num">6</div>
+      <div class="step-title"><span class="emoji">🧘</span> Progressive Body Relaxation</div>
+      <div class="step-desc">Systematically release tension from head to toe. 5 seconds per body zone, total ~2 minutes.</div>
+      <div class="step-time">⏱ 9:05 PM · 2 minutes</div>
+      <div class="step-expand">
+        <div class="step-detail">
+          <strong>Why it works:</strong> Progressive Muscle Relaxation (PMR) was developed by Dr. Edmund Jacobson. Tensing then releasing each muscle group teaches the body what "relaxed" feels like. Reduces cortisol by up to 25% in one session.
+          <br><br>
+          <strong>Use the body scanner below to guide you through each zone.</strong>
+        </div>
+        <span class="rx-tag" id="tag6">📋 PMR Protocol</span>
+      </div>
+    </div>
+
+    <div class="step-card" data-step="7" onclick="toggleStep(this)">
+      <div class="step-num">7</div>
+      <div class="step-title"><span class="emoji">😴</span> Sleep Position & Let Go</div>
+      <div class="step-desc">Lie on your back or side. Hands unclenched. Jaw loose. Breathe naturally. Let gravity hold you.</div>
+      <div class="step-time">⏱ 9:07 PM · Drift off</div>
+      <div class="step-expand">
+        <div class="step-detail">
+          <strong>Why it works:</strong> The military sleep technique (used by US Navy) teaches falling asleep in 2 minutes by: relaxing face muscles, dropping shoulders, releasing hands, clearing the mind with "don't think, don't think" for 10 seconds.
+          <br><br>
+          <strong>Final checklist:</strong> Jaw unclenched? Shoulders dropped from ears? Hands open, palms up? Tongue relaxed from roof of mouth? Forehead smooth? Let gravity hold every part of you. You are safe. Goodnight.
+        </div>
+        <span class="self-tag" id="tag7">🔍 Self-guided</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- SOUND PLAYER -->
+  <div class="sound-player">
+    <div class="sound-label">🎵 Relaxation Soundscape</div>
+    <div class="sound-sub">Choose a sound · 5-minute guided wind-down</div>
+
+    <div class="sound-options">
+      <button class="sound-chip active" onclick="selectSound('rain',this)">🌧 Rain</button>
+      <button class="sound-chip" onclick="selectSound('ocean',this)">🌊 Ocean</button>
+      <button class="sound-chip" onclick="selectSound('forest',this)">🌲 Forest</button>
+      <button class="sound-chip" onclick="selectSound('singing',this)">🕉 Singing Bowl</button>
+      <button class="sound-chip" onclick="selectSound('wind',this)">🍃 Night Wind</button>
+    </div>
+
+    <div class="sound-controls">
+      <button class="play-btn" id="playBtn" onclick="togglePlay()">▶</button>
+      <div>
+        <div class="timer-display" id="timerDisplay">5:00</div>
+        <div class="timer-label" id="timerLabel">TAP TO START</div>
+      </div>
+      <div class="wave-bar" id="waveBar">
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- BODY SCANNER -->
+  <div class="body-scanner">
+    <div class="scanner-title">🧘 Progressive Body Relaxation</div>
+    <div class="scanner-sub">Tap "Start Scan" — relax each zone as it highlights (5s each)</div>
+
+    <div class="body-map">
+      <!-- Simple body outline via positioned divs -->
+      <div class="body-part body-part-head" data-zone="head">
+        <span class="part-label">Head</span>
+      </div>
+      <div class="body-part body-part-neck" data-zone="neck">
+        <span class="part-label">Neck</span>
+      </div>
+      <div class="body-part body-part-shoulders" data-zone="shoulders">
+        <span class="part-label">Shoulders</span>
+      </div>
+      <div class="body-part body-part-chest" data-zone="chest">
+        <span class="part-label">Chest</span>
+      </div>
+      <div class="body-part body-part-belly" data-zone="belly">
+        <span class="part-label">Belly</span>
+      </div>
+      <div class="body-part body-part-hips" data-zone="hips">
+        <span class="part-label">Hips</span>
+      </div>
+      <div class="body-part body-part-legs" data-zone="legs">
+        <span class="part-label">Legs</span>
+      </div>
+      <div class="body-part body-part-feet" data-zone="feet">
+        <span class="part-label">Feet</span>
+      </div>
+    </div>
+
+    <button class="scan-btn" id="scanBtn" onclick="startScan()">Start Body Scan</button>
+    <div class="scan-status" id="scanStatus"></div>
+  </div>
+
+  <!-- COMING SOON -->
+  <div class="coming-soon">
+    <span class="badge">Coming Soon</span>
+    <h3>🔮 Advanced Sleep Features</h3>
+    <ul>
+      <li>AI sleep pattern analysis with 7-day tracking</li>
+      <li>CBT-I full protocol (6-week structured program)</li>
+      <li>Smart alarm with sleep cycle detection</li>
+      <li>Sleep debt calculator & recovery planner</li>
+      <li>Therapist-prescribed custom sleep schedules</li>
+      <li>Binaural beats & 432Hz deep sleep frequencies</li>
+      <li>Dream journaling with AI interpretation</li>
+      <li>Sleep environment sensor integration (light, temp, noise)</li>
+      <li>Paired therapy with Bhaalu Bear (Endorphin wind-down)</li>
+      <li>Multilingual guided relaxation (Hindi, Kannada, Tamil, Telugu)</li>
+    </ul>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    🌙 <strong>MANAS360</strong> · Nidra Sleep Therapy · Premium Wellness Hub<br>
+    Prototype · February 2026
+  </div>
+
+</div>
+
+<script>
+// ═══ MODE TOGGLE ═══
+let mode = 'self';
+function setMode(m, el) {
+  mode = m;
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+
+  // Toggle tags visibility
+  const rxTags = ['tag2','tag3','tag4','tag6'];
+  const selfTags = ['tag1','tag5','tag7'];
+
+  if (m === 'rx') {
+    rxTags.forEach(id => {
+      const e = document.getElementById(id);
+      if(e) e.style.display = 'inline-flex';
+    });
+    selfTags.forEach(id => {
+      const e = document.getElementById(id);
+      if(e) e.style.display = 'none';
+    });
+  } else {
+    selfTags.forEach(id => {
+      const e = document.getElementById(id);
+      if(e) e.style.display = 'inline-flex';
+    });
+    rxTags.forEach(id => {
+      const e = document.getElementById(id);
+      if(e) e.style.display = 'none';
+    });
+  }
+}
+
+// ═══ STEP CARDS ═══
+let completedSteps = new Set();
+
+function toggleStep(card) {
+  const stepNum = parseInt(card.dataset.step);
+  const wasActive = card.classList.contains('active');
+  const wasDone = card.classList.contains('done');
+
+  // Close all
+  document.querySelectorAll('.step-card').forEach(c => c.classList.remove('active'));
+
+  if (wasDone) {
+    // Toggle done off
+    card.classList.remove('done');
+    completedSteps.delete(stepNum);
+    updateProgress();
+    return;
+  }
+
+  if (wasActive) {
+    // Mark as done
+    card.classList.add('done');
+    card.classList.remove('active');
+    completedSteps.add(stepNum);
+    updateProgress();
+  } else {
+    // Open/expand
+    card.classList.add('active');
+  }
+}
+
+function updateProgress() {
+  const total = 7;
+  const done = completedSteps.size;
+  const pct = Math.round((done / total) * 100);
+
+  document.getElementById('progressPct').textContent = pct + '%';
+
+  const circumference = 150.8;
+  const offset = circumference - (circumference * pct / 100);
+  document.getElementById('progressRing').style.strokeDashoffset = offset;
+
+  const msg = document.getElementById('progressMsg');
+  if (done === 0) msg.textContent = 'Tap each step when done. Complete all 7 for best results.';
+  else if (done < 4) msg.textContent = `${done}/7 complete. Keep going — each step counts.`;
+  else if (done < 7) msg.textContent = `${done}/7 done! Almost there. Your body is thanking you.`;
+  else msg.textContent = '🌟 All 7 steps complete! Perfect sleep hygiene tonight. Goodnight.';
+}
+
+// ═══ SOUND PLAYER ═══
+let selectedSound = 'rain';
+let playing = false;
+let timerSeconds = 300; // 5 min
+let timerInterval = null;
+
+function selectSound(sound, el) {
+  selectedSound = sound;
+  document.querySelectorAll('.sound-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function togglePlay() {
+  playing = !playing;
+  const btn = document.getElementById('playBtn');
+  const bar = document.getElementById('waveBar');
+  const label = document.getElementById('timerLabel');
+
+  if (playing) {
+    btn.textContent = '⏸';
+    btn.classList.add('playing');
+    bar.classList.add('playing');
+    label.textContent = selectedSound.toUpperCase() + ' · PLAYING';
+
+    timerInterval = setInterval(() => {
+      timerSeconds--;
+      if (timerSeconds <= 0) {
+        timerSeconds = 0;
+        togglePlay(); // auto stop
+        label.textContent = 'SESSION COMPLETE ✓';
+      }
+      updateTimerDisplay();
+    }, 1000);
+  } else {
+    btn.textContent = '▶';
+    btn.classList.remove('playing');
+    bar.classList.remove('playing');
+    label.textContent = 'PAUSED';
+    clearInterval(timerInterval);
+  }
+}
+
+function updateTimerDisplay() {
+  const m = Math.floor(timerSeconds / 60);
+  const s = timerSeconds % 60;
+  document.getElementById('timerDisplay').textContent =
+    m + ':' + s.toString().padStart(2, '0');
+}
+
+// ═══ BODY SCANNER ═══
+const zones = ['head','neck','shoulders','chest','belly','hips','legs','feet'];
+const zoneInstructions = {
+  head: 'Relax your forehead... unclench your jaw... soften your eyes...',
+  neck: 'Let your neck go heavy... release the tension holding your head...',
+  shoulders: 'Drop your shoulders away from your ears... let them melt down...',
+  chest: 'Feel your chest open... breathe slowly... let the ribs soften...',
+  belly: 'Release your belly... no holding... let it be completely soft...',
+  hips: 'Unclench your hips... let your lower back press into the bed...',
+  legs: 'Your thighs are heavy... knees relaxed... calves sinking down...',
+  feet: 'Wiggle your toes once... then let them go completely still... heavy and warm...'
+};
+
+let scanning = false;
+let scanIndex = 0;
+
+function startScan() {
+  if (scanning) return;
+  scanning = true;
+  scanIndex = 0;
+
+  const btn = document.getElementById('scanBtn');
+  btn.disabled = true;
+  btn.textContent = 'Scanning...';
+
+  // Reset all zones
+  document.querySelectorAll('.body-part').forEach(p => {
+    p.classList.remove('relaxing','relaxed');
+  });
+
+  scanNextZone();
+}
+
+function scanNextZone() {
+  if (scanIndex >= zones.length) {
+    // Done!
+    scanning = false;
+    const btn = document.getElementById('scanBtn');
+    btn.disabled = false;
+    btn.textContent = 'Restart Body Scan';
+    document.getElementById('scanStatus').textContent =
+      '✓ Full body relaxed. You are ready for sleep.';
+    return;
+  }
+
+  const zone = zones[scanIndex];
+  const el = document.querySelector(`[data-zone="${zone}"]`);
+
+  // Highlight current
+  document.querySelectorAll('.body-part').forEach(p => p.classList.remove('relaxing'));
+  el.classList.add('relaxing');
+
+  document.getElementById('scanStatus').textContent = zoneInstructions[zone];
+
+  // After 5 seconds, mark done and move on
+  setTimeout(() => {
+    el.classList.remove('relaxing');
+    el.classList.add('relaxed');
+    scanIndex++;
+    scanNextZone();
+  }, 5000);
+}
+
+// Init
+setMode('self', document.querySelector('.mode-btn.active'));
+</script>
+</body>
+</html>

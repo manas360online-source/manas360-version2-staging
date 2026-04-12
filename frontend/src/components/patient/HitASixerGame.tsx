@@ -7,10 +7,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { patientApi } from '@/api/patient';
 import { useWallet } from '@/hooks/useWallet';
+import { useAuth } from '@/context/AuthContext';
+import { Link } from 'react-router-dom';
 
 const HitASixerGame: React.FC = () => {
   const queryClient = useQueryClient();
-  const { balance, refreshWallet } = useWallet();
+  const { isAuthenticated, user } = useAuth();
+  const normalizedRole = String(user?.role || '').toLowerCase().replace(/_/g, '');
+  const canClaimWallet = isAuthenticated && normalizedRole === 'patient';
+  const { balance, refreshWallet } = useWallet({ enabled: canClaimWallet });
   const total = Number((balance as any)?.total_balance || 0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animFrameRef = useRef<number>(0);
@@ -20,13 +25,19 @@ const HitASixerGame: React.FC = () => {
   const [credit, setCredit] = useState(0);
   const [hitQuality, setHitQuality] = useState<'perfect' | 'good' | 'miss'>('miss');
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [guestGamesPlayed, setGuestGamesPlayed] = useState(0);
+  const [guestBest, setGuestBest] = useState<'sixer' | 'four' | 'out' | null>(null);
 
   // Eligibility
-  const { data: eligibility } = useQuery({
+  const eligibilityQuery = useQuery({
     queryKey: ['cricket-eligibility'],
     queryFn: () => patientApi.getGameEligibility(),
     refetchInterval: 15000,
+    retry: false,
+    enabled: canClaimWallet,
   });
+  const eligibility = eligibilityQuery.data;
+  const eligibilityError = (eligibilityQuery.error as any)?.response?.data?.message || '';
 
   // Play → Backend decides outcome
   const playMutation = useMutation({
@@ -246,14 +257,28 @@ const HitASixerGame: React.FC = () => {
         }
         setHitQuality(quality);
         setStage('result');
-        refreshWallet();
-        queryClient.invalidateQueries({ queryKey: ['wallet'] });
-        toast.success(
-          finalOutcome === 'sixer' ? '🏏 SIXER! +₹108'
-          : finalOutcome === 'four' ? '🏏 FOUR! +₹50'
-          : '🏏 OUT! +₹10',
-          { description: quality === 'perfect' ? 'Perfect Timing 🔥' : quality === 'good' ? 'Good Swing!' : 'Better luck next time' }
-        );
+        if (!canClaimWallet) {
+          setGuestGamesPlayed(prev => prev + 1);
+          setGuestBest(prev => {
+            const rank = { out: 1, four: 2, sixer: 3 } as const;
+            if (!prev) return finalOutcome;
+            return rank[finalOutcome] > rank[prev] ? finalOutcome : prev;
+          });
+        }
+        if (canClaimWallet) {
+          refreshWallet();
+          queryClient.invalidateQueries({ queryKey: ['wallet'] });
+          toast.success(
+            finalOutcome === 'sixer' ? '🏏 SIXER! +₹108'
+            : finalOutcome === 'four' ? '🏏 FOUR! +₹50'
+            : '🏏 OUT! +₹10',
+            { description: quality === 'perfect' ? 'Perfect Timing 🔥' : quality === 'good' ? 'Good Swing!' : 'Better luck next time' }
+          );
+        } else {
+          toast.success('Nice shot!', {
+            description: 'Guest game complete. Register as patient to claim wallet rewards.',
+          });
+        }
       }
     };
 
@@ -282,8 +307,19 @@ const HitASixerGame: React.FC = () => {
   };
 
   const handlePlayNow = () => {
-    if (!eligibility?.eligible) return;
-    playMutation.mutate();
+    if (canClaimWallet) {
+      if (!eligibility?.eligible) return;
+      playMutation.mutate();
+      return;
+    }
+
+    const random = Math.random();
+    const guestOutcome: 'sixer' | 'four' | 'out' = random < 0.04 ? 'sixer' : random < 0.12 ? 'four' : 'out';
+    const guestCredit = guestOutcome === 'sixer' ? 108 : guestOutcome === 'four' ? 50 : 10;
+    setOutcome(guestOutcome);
+    setCredit(guestCredit);
+    setStage('start');
+    setIsFullScreen(true);
   };
 
   const handleStartBowling = () => {
@@ -321,6 +357,24 @@ const HitASixerGame: React.FC = () => {
   return (
     <>
       <div className="max-w-5xl mx-auto px-4 py-8 md:px-8">
+        {!canClaimWallet && (
+          <motion.div className="mb-6 rounded-2xl border-2 border-blue-200 bg-blue-50 px-6 py-5 text-center text-base font-semibold text-blue-900">
+            <div>🏏 Hit big. Win rewards.</div>
+            <div>👉 Sign up to unlock your earnings</div>
+            <div className="mt-4">
+              <Link to="/auth/signup" className="inline-flex items-center justify-center rounded-xl bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800">
+                🏏 Hit big. Win rewards. Sign up to unlock your earnings
+              </Link>
+            </div>
+          </motion.div>
+        )}
+
+        <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="rounded-xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">🔥 Today's Attempts: {canClaimWallet ? '0/1' : `${Math.min(guestGamesPlayed, 1)}/1`}</div>
+          <div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900">🏆 Best: {guestBest ? guestBest.toUpperCase() : 'No score yet'}</div>
+          <div className="rounded-xl bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-900">📈 Daily Streak: {canClaimWallet ? 'Available in account' : 'Register to unlock streak tracking'}</div>
+        </div>
+
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
           <div className="flex items-center gap-4">
             <span className="text-5xl">🏏</span>
@@ -328,24 +382,34 @@ const HitASixerGame: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-6">
-            <div className="bg-white px-7 py-4 rounded-3xl shadow flex items-center gap-3 text-xl">
+            <div
+              className="bg-white px-7 py-4 rounded-3xl shadow flex items-center gap-3 text-xl"
+              title="Rewards are only credited to registered users"
+            >
               <span className="font-semibold text-emerald-700">Wallet</span>
-                <span className="font-bold text-3xl">₹{total}</span>
+              <span className="font-bold text-3xl">₹{total}</span>
+              {!canClaimWallet && <span className="text-sm font-medium text-slate-500">(Start earning now)</span>}
             </div>
 
             <button
               onClick={handlePlayNow}
-              disabled={!eligibility?.eligible || stage !== 'ready' || playMutation.isPending}
-              className="px-10 py-5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 text-white text-2xl font-bold rounded-3xl shadow-xl transition flex items-center gap-3"
+              disabled={(canClaimWallet && !eligibility?.eligible) || stage !== 'ready' || playMutation.isPending}
+              className="px-10 py-5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 text-white text-2xl font-bold rounded-3xl shadow-xl transition flex items-center gap-3 animate-pulse"
             >
-              {playMutation.isPending ? '⏳ Starting...' : '🎾 Play Now'}
+              {playMutation.isPending ? '⏳ Starting...' : '🎯 Take Your Shot'}
             </button>
           </div>
         </div>
 
-        {eligibility && (
+        {canClaimWallet && eligibility?.eligible && (
           <motion.div className="mb-8 px-8 py-5 rounded-3xl text-2xl font-medium text-center bg-emerald-100 text-emerald-800 flex justify-center items-center gap-2">
             ✅ Eligible! {eligibility.timeLeft} left today
+          </motion.div>
+        )}
+
+        {canClaimWallet && !eligibility?.eligible && (eligibility?.reason || eligibilityError) && (
+          <motion.div className="mb-8 px-8 py-5 rounded-3xl text-lg font-medium text-center bg-amber-100 text-amber-900">
+            {eligibility?.reason || eligibilityError}
           </motion.div>
         )}
 
@@ -355,13 +419,15 @@ const HitASixerGame: React.FC = () => {
               <span>🏏</span>
               <span>🔴</span>
             </div>
-            <h2 className="text-4xl font-bold mb-4">Ready to bat?</h2>
-            <p className="text-xl">You’ll get one shot.<br />Swing at the right moment!</p>
+            <h2 className="text-4xl font-bold mb-4">🏏 Ready to hit a SIX?</h2>
+            <p className="text-xl">🎯 One shot. One chance.<br />Hit it right and win rewards!</p>
           </div>
         )}
 
             <p className="text-center text-sm text-gray-500 mt-8">
-            4% SIXER (₹108) • 8% FOUR (₹50) • 88% OUT (₹10) • 1 play/day • Credits expire in 30 days
+            {canClaimWallet
+              ? '4% SIXER (₹108) • 8% FOUR (₹50) • 88% OUT (₹10) • 1 play/day • Credits expire in 30 days'
+              : '4% SIXER • 8% FOUR • 88% OUT • Guest mode (no wallet credit)'}
           </p>
       </div>
 
@@ -444,6 +510,17 @@ const HitASixerGame: React.FC = () => {
                          <div className={`h-full rounded-full transition-all duration-500 ${hitQuality === 'perfect' ? 'bg-yellow-400 w-full' : hitQuality === 'good' ? 'bg-emerald-400 w-2/3' : 'bg-red-400 w-1/6'}`} />
                        </div>
                     </div>
+
+                    {!canClaimWallet && (
+                      <div className="mt-6 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-900">
+                        🎉 You scored! Register now to claim your rewards in wallet.
+                        <div className="mt-3">
+                          <Link to="/auth/signup" className="inline-flex items-center justify-center rounded-lg bg-blue-700 px-3 py-2 text-xs font-bold text-white hover:bg-blue-800">
+                            Sign up and unlock earnings
+                          </Link>
+                        </div>
+                      </div>
+                    )}
 
                     <button
                       onClick={exitGame}

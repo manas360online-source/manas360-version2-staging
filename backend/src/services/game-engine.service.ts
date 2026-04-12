@@ -1,6 +1,5 @@
 import crypto from 'crypto';
 import prisma from '../config/db';
-import { isSubscriptionValidForGames } from './subscription.helper';
 import { addCredit } from './wallet.service';
 
 const db = prisma as any;

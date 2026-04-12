@@ -412,6 +412,7 @@ function App() {
               }
             />
             <Route path="/payment/status" element={<PaymentStatusPage />} />
+            <Route path="/hit-a-sixer" element={<HitASixerGamePage />} />
             <Route
               path="/plans"
               element={

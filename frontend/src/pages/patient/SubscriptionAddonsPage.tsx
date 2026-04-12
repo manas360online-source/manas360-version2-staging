@@ -83,10 +83,6 @@ export default function SubscriptionAddonsPage() {
 
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm">
-              <span>VentBuddy Unlimited (INR 99)</span>
-              <input type="checkbox" checked={addons.ventBuddyUnlimited} onChange={(e) => setAddons((prev) => ({ ...prev, ventBuddyUnlimited: e.target.checked }))} />
-            </label>
-            <label className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm">
               <span>Digital Pet Hub Unlock {planId === 'premium_monthly' ? '(Included)' : '(INR 99)'}</span>
               <input type="checkbox" checked={addons.digitalPetHubUnlock} onChange={(e) => setAddons((prev) => ({ ...prev, digitalPetHubUnlock: e.target.checked }))} disabled={planId === 'premium_monthly'} />
             </label>
