@@ -8,6 +8,7 @@ import {
 	validateAdminListSubscriptionsQuery,
 	asyncHandler,
 } from '../middleware/validate.middleware';
+import { verifyProviderWebhookController, rejectProviderWebhookController } from '../controllers/providerVerification.controller';
 import { listUsersController, getUserController, verifyProviderController, verifyTherapistController, approveProviderController, getMetricsController, listSubscriptionsController, getAdminUserApprovalsController, updateAdminUserApprovalController, getAdminLiveSessionsController, getAdminFeedbackController, resolveAdminFeedbackController, updateAdminUserStatusController, updateAdminUsersBulkStatusController, searchAdminEntitiesController, getRolesController, updateRolePermissionsController, getUserAcceptancesController, getComplianceStatusController, getLegalDocumentsController, downloadLegalDocumentController, getPlatformAdminRoleInventoryController, createPlatformAdminAccountController, getEffectiveAdminPoliciesController } from '../controllers/admin.controller';
 import {
 	getAdminAnalyticsSummaryController,
@@ -169,6 +170,11 @@ router.post(
 	...validateTherapistProfileIdParam,
 	asyncHandler(verifyProviderController),
 );
+
+// Webhook endpoints: called by Zoho Flow / Zoho Desk when manual review completes.
+// These endpoints are protected by the Zoho Flow webhook secret header `x-zoho-flow-secret`.
+router.post('/verify-provider', asyncHandler(verifyProviderWebhookController));
+router.post('/reject-provider', asyncHandler(rejectProviderWebhookController));
 
 /**
  * POST /api/v1/admin/approve-provider/:id
