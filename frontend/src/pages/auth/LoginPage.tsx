@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { getApiErrorMessage, signupWithPhone, verifyPhoneSignupOtp } from '../../api/auth';
+import { getApiErrorMessage, me as fetchMe, signupWithPhone, verifyPhoneSignupOtp } from '../../api/auth';
 import { patientApi } from '../../api/patient';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
@@ -95,8 +95,23 @@ export default function LoginPage() {
 		try {
 			const result = await verifyPhoneSignupOtp(phone.trim(), otp.trim());
 			await checkAuth({ force: true });
+
+			// Use canonical auth user (from /auth/me) for routing, as OTP response may omit corporate flags.
+			let resolvedUser = result.user;
+			try {
+				resolvedUser = await fetchMe();
+			} catch {
+				// Keep OTP response user as fallback.
+			}
+			
+			// Check corporate access first - corporate admins bypass subscription checks
+			if (hasCorporateAccess(resolvedUser)) {
+				navigate('/corporate/dashboard', { replace: true });
+				return;
+			}
+			
 			// Redirect patients without subscription to plans
-			if ((result.user as any)?.requiresSubscription) {
+			if ((resolvedUser as any)?.requiresSubscription) {
 				let hasActiveSubscription = false;
 				try {
 					const subscriptionResponse = await patientApi.getSubscription();
@@ -108,7 +123,7 @@ export default function LoginPage() {
 
 				if (hasActiveSubscription) {
 					const candidate = from || afterLogin || next || null;
-					const postLoginRoute = await resolvePostLoginRouteWithSubscription(candidate, result.user?.role, result.user);
+					const postLoginRoute = await resolvePostLoginRouteWithSubscription(candidate, resolvedUser?.role, resolvedUser);
 					navigate(postLoginRoute, { replace: true });
 					return;
 				}
@@ -119,7 +134,7 @@ export default function LoginPage() {
 				return;
 			}
 			const candidate = from || afterLogin || next || null;
-			const postLoginRoute = await resolvePostLoginRouteWithSubscription(candidate, result.user?.role, result.user);
+			const postLoginRoute = await resolvePostLoginRouteWithSubscription(candidate, resolvedUser?.role, resolvedUser);
 			navigate(postLoginRoute, { replace: true });
 		} catch (err: any) {
 			const message = String(err?.response?.data?.message || '');

@@ -31,7 +31,9 @@ export type WhatsAppUserType = 'patient' | 'therapist' | 'psychiatrist' | 'psych
 interface WhatsAppMessageInput {
 	phoneNumber: string; // Normalized for WATI: 919876543210
 	templateType: WhatsAppTemplateType;
+	templateName?: string;
 	userType: WhatsAppUserType;
+	parameters?: Record<string, string>;
 	templateVariables?: Record<string, string>; // Variables to substitute in template
 	language?: string; // Language code, default 'en'
 	flowEvent?: string;
@@ -134,7 +136,7 @@ const resolveFlowEvent = (templateType: WhatsAppTemplateType): string => {
 };
 
 const buildFlowData = (input: WhatsAppMessageInput, templateName: string, normalizedPhone: string) => {
-	const variables = input.templateVariables || {};
+	const variables = input.templateVariables || input.parameters || {};
 	const explicit = input.flowData || {};
 	const name = getFirstNonEmpty(
 		explicit.name,
