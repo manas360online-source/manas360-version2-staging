@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { getApiErrorMessage, me as fetchMe, signupWithPhone, verifyPhoneSignupOtp } from '../../api/auth';
 import { patientApi } from '../../api/patient';
@@ -30,7 +30,20 @@ export default function LoginPage() {
 	const [devOtp, setDevOtp] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
-	const adminPortalLogin = '/admin-portal/login';
+
+	const calmingQuotes = useMemo(
+		() => [
+			'Small steps every day.',
+			'You are not alone.',
+			'Healing begins with showing up for yourself.',
+		],
+		[],
+	);
+	const selectedQuote = useMemo(() => {
+		const index = Math.floor(Math.random() * calmingQuotes.length);
+		return calmingQuotes[index] || 'Small steps every day.';
+	}, [calmingQuotes]);
+	const loginBackgroundUrl = String(import.meta.env.VITE_LOGIN_BG_URL || '').trim();
 
 	const hasSessionCookieHint = (): boolean => {
 		if (typeof document === 'undefined') return false;
@@ -157,129 +170,125 @@ export default function LoginPage() {
 	};
 
 	return (
-		<div className="responsive-page">
-			<div className="responsive-container py-6 sm:py-10">
-				<div className="mx-auto w-full max-w-lg rounded-3xl border border-calm-sage/20 bg-wellness-surface p-5 shadow-soft-md sm:p-8">
-					<div className="mb-3">
-						<Link to="/" className="text-sm text-calm-sage underline underline-offset-2 hover:text-wellness-text">
-							Back to Home
-						</Link>
-					</div>
-					<h1 className="text-2xl font-semibold text-wellness-text sm:text-3xl">Welcome back</h1>
-					<p className="mt-2 text-sm text-wellness-muted sm:text-base">Login with your phone number and OTP.</p>
+		<div className="relative min-h-screen overflow-hidden">
+			<div
+				className="absolute inset-0 scale-[1.02] bg-cover bg-center blur-[1px]"
+				style={{
+					backgroundImage: loginBackgroundUrl
+						? `linear-gradient(rgba(240, 248, 245, 0.6), rgba(240, 248, 245, 0.6)), url('${loginBackgroundUrl}')`
+						: 'linear-gradient(135deg, rgba(211, 233, 226, 0.94), rgba(233, 242, 249, 0.92), rgba(250, 247, 240, 0.9))',
+				}}
+			/>
+			<div className="absolute inset-0 bg-gradient-to-br from-[#e4f2ee]/70 via-[#edf7f4]/65 to-[#e8f0f6]/70" />
+			<div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.28),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(92,107,192,0.10),transparent_30%)]" />
 
-					<div className="mt-6 space-y-4">
-						<Input
-							id="login-phone"
-							label="Phone Number"
-							type="tel"
-							autoComplete="tel"
-							placeholder="+919876543210"
-							value={phone}
-							onChange={(event) => setPhone(event.target.value)}
-							required
-						/>
+			<div className="relative z-10 mx-auto flex min-h-screen w-full max-w-7xl items-center px-4 py-6 sm:px-6 lg:px-8">
+				<div className="grid w-full items-stretch gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:gap-12">
+					<section className="hidden lg:flex lg:flex-col lg:justify-center lg:animate-fadeIn">
+						<div>
+							<p className="text-sm font-semibold uppercase tracking-[0.18em] text-white/85">MANAS360</p>
+							<h2 className="mt-8 max-w-lg text-4xl font-semibold leading-tight text-white">
+								Your mental well-being matters.
+							</h2>
+							<p className="mt-4 max-w-md text-lg text-white/85">
+								Take a step toward a calmer, healthier you.
+							</p>
+						</div>
+						<p className="mt-8 max-w-sm text-base italic text-white/90 animate-fadeInUp">"{selectedQuote}"</p>
+					</section>
 
-						{otpSent ? (
+					<section className="mx-auto w-full max-w-lg justify-self-center rounded-[24px] border border-white/70 bg-white/80 p-5 shadow-[0_18px_48px_rgba(16,24,40,0.14)] backdrop-blur-xl sm:p-8 lg:justify-self-end lg:animate-scaleIn">
+						<div className="mb-3 flex items-center justify-between">
+							<Link to="/" className="text-sm text-calm-sage underline underline-offset-2 hover:text-wellness-text">
+								Back to Home
+							</Link>
+						</div>
+
+						<div className="mb-3 inline-flex items-center gap-2 rounded-full border border-calm-sage/20 bg-white/75 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-wellness-muted lg:hidden">
+							<span className="h-2 w-2 rounded-full bg-calm-sage" />
+							{selectedQuote}
+						</div>
+						<h1 className="text-2xl font-semibold text-wellness-text sm:text-3xl">Welcome back</h1>
+						<p className="mt-2 text-sm text-wellness-muted sm:text-base">Continue your wellness journey</p>
+						<p className="mt-1 text-xs text-wellness-muted">
+							Universal login - patients, doctors, and staff use the same access.
+						</p>
+
+						<div className="mt-6 space-y-4">
 							<Input
-								id="login-otp"
-								label="OTP"
-								inputMode="numeric"
-								pattern="\\d{6}"
-								maxLength={6}
-								autoComplete="one-time-code"
-								placeholder="6-digit OTP"
-								value={otp}
-								onChange={(event) => setOtp(event.target.value.replace(/\D/g, '').slice(0, 6))}
+								id="login-phone"
+								label="Phone Number"
+								type="tel"
+								autoComplete="tel"
+								placeholder="+919876543210"
+								helperText="Use your phone number to continue"
+								value={phone}
+								onChange={(event) => setPhone(event.target.value)}
 								required
 							/>
+
+							{otpSent ? (
+								<Input
+									id="login-otp"
+									label="One-Time Code"
+									inputMode="numeric"
+									pattern="\\d{6}"
+									maxLength={6}
+									autoComplete="one-time-code"
+									placeholder="6-digit OTP"
+									helperText="We'll send you a one-time code"
+									value={otp}
+									onChange={(event) => setOtp(event.target.value.replace(/\D/g, '').slice(0, 6))}
+									required
+								/>
+							) : null}
+
+							{!otpSent ? (
+								<Button
+									type="button"
+									fullWidth
+									loading={loading}
+									className="min-h-[48px] rounded-2xl bg-gradient-to-r from-[#87a799] to-[#6f9c94] text-white shadow-soft-md hover:shadow-soft-lg focus:ring-2 focus:ring-calm-sage/30"
+									onClick={requestOtp}
+								>
+									{loading ? 'Preparing...' : 'Continue'}
+								</Button>
+							) : (
+								<Button
+									type="button"
+									fullWidth
+									loading={loading}
+									className="min-h-[48px] rounded-2xl bg-gradient-to-r from-[#87a799] to-[#6f9c94] text-white shadow-soft-md hover:shadow-soft-lg focus:ring-2 focus:ring-calm-sage/30"
+									onClick={verifyOtp}
+								>
+									{loading ? 'Verifying...' : 'Continue to wellness'}
+								</Button>
+							)}
+						</div>
+
+						<p className="mt-3 rounded-2xl bg-wellness-aqua/70 px-4 py-3 text-xs font-medium text-wellness-text/80">
+							🔒 Your data is secure and confidential.
+						</p>
+
+						{devOtp ? (
+							<p className="mt-3 text-xs text-wellness-muted">
+								Development OTP: <span className="font-semibold text-wellness-text">{devOtp}</span>
+							</p>
 						) : null}
 
-						{!otpSent ? (
-							<Button type="button" fullWidth loading={loading} className="min-h-[48px]" onClick={requestOtp}>
-								{loading ? 'Sending OTP...' : 'Send OTP'}
-							</Button>
-						) : (
-							<Button type="button" fullWidth loading={loading} className="min-h-[48px]" onClick={verifyOtp}>
-								{loading ? 'Verifying OTP...' : 'Verify OTP and Login'}
-							</Button>
-						)}
-					</div>
+						{error ? (
+							<p role="alert" aria-live="polite" className="mt-3 text-sm text-red-600">
+								{error}
+							</p>
+						) : null}
 
-					{devOtp ? (
-						<p className="mt-3 text-xs text-wellness-muted">
-							Development OTP: <span className="font-semibold text-wellness-text">{devOtp}</span>
+						<p className="mt-4 text-center text-sm text-wellness-muted">
+							Need to create an account?{' '}
+							<Link to="/auth/signup" className="text-calm-sage underline underline-offset-2 hover:text-wellness-text">
+								Register here
+							</Link>
 						</p>
-					) : null}
-
-					{error ? (
-						<p role="alert" aria-live="polite" className="mt-3 text-sm text-red-600">
-							{error}
-						</p>
-					) : null}
-
-					<p className="mt-2 text-center text-sm text-wellness-muted">
-						Need to create an account?{' '}
-						<Link to="/auth/signup" className="text-calm-sage underline underline-offset-2 hover:text-wellness-text">
-							Register here
-						</Link>
-					</p>
-
-					<div className="mt-3 text-center">
-						<button
-							type="button"
-							className="text-calm-sage underline underline-offset-2 hover:text-wellness-text text-sm"
-							onClick={() => {
-								// Navigate to a corporate-specific hash for corporate login flows
-								window.location.hash = '/corporate';
-							}}
-						>
-							Corporate login
-						</button>
-					</div>
-
-					<div className="mt-10 pt-6 border-t border-gray-100">
-						<p className="text-[10px] uppercase font-bold text-gray-400 mb-4 text-center tracking-widest">
-							Developer Sandbox — Quick Admin Login
-						</p>
-						<div className="grid grid-cols-1 gap-2">
-							<Button 
-								variant="soft" 
-								size="sm"
-				className="text-xs py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-100"
-								onClick={() => navigate(adminPortalLogin, {
-									state: { identifier: 'superadmin@manas360.com', password: 'Admin@123' },
-								})}
-							>
-								🚀 Login as Super Admin
-							</Button>
-							<div className="grid grid-cols-2 gap-2">
-								<Button 
-									variant="soft" 
-									size="sm"
-									className="text-[10px] py-1.5"
-									onClick={() => navigate(adminPortalLogin, {
-										state: { identifier: 'finance@manas360.com', password: 'Admin@123' },
-									})}
-								>
-									💳 Finance Manager
-								</Button>
-								<Button 
-									variant="soft" 
-									size="sm"
-									className="text-[10px] py-1.5"
-									onClick={() => navigate(adminPortalLogin, {
-										state: { identifier: 'clinical@manas360.com', password: 'Admin@123' },
-									})}
-								>
-									🏥 Clinical Director
-								</Button>
-							</div>
-						</div>
-						<p className="mt-2 text-[9px] text-gray-400 text-center italic">
-							Note: Click a role then click "Verify and Login". Uses dev bypass.
-						</p>
-					</div>
+					</section>
 				</div>
 			</div>
 		</div>
