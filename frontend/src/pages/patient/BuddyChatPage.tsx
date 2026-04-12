@@ -1,51 +1,33 @@
 import { FormEvent, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { patientApi } from '../../api/patient';
-
-type BuddyKind = 'anytime' | 'vent';
 
 type ChatMessage = {
   role: 'user' | 'assistant';
   content: string;
 };
 
-const copyByMode: Record<BuddyKind, { title: string; subtitle: string; placeholder: string }> = {
-  anytime: {
-    title: 'AnytimeBuddy',
-    subtitle: '24/7 companion support. ₹150/call or Premium Free.',
-    placeholder: 'Share how you are feeling right now...',
-  },
-  vent: {
-    title: 'VentBuddy',
-    subtitle: 'A safe emotional release space with empathetic listening.',
-    placeholder: 'Vent freely. Type anything you need to release...',
-  },
+const copy = {
+  title: 'AnytimeBuddy',
+  subtitle: '24/7 companion support. ₹150/call or Premium Free.',
+  placeholder: 'Share how you are feeling right now...',
 };
 
 export default function BuddyChatPage() {
   const navigate = useNavigate();
-  const { mode } = useParams<{ mode: string }>();
-  const normalizedMode: BuddyKind = mode === 'vent' ? 'vent' : 'anytime';
-  const content = copyByMode[normalizedMode];
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: 'assistant',
-      content:
-        normalizedMode === 'vent'
-          ? 'I am here with you. You can vent without judgment. What feels heaviest right now?'
-          : 'Hi, I am AnytimeBuddy. I can support you between sessions. What would help most right now?',
+      content: 'Hi, I am AnytimeBuddy. I can support you between sessions. What would help most right now?',
     },
   ]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
 
   const quickPrompts = useMemo(
-    () =>
-      normalizedMode === 'vent'
-        ? ['I feel angry and overwhelmed', 'I need to release stress', 'I am frustrated and tired']
-        : ['Help me calm anxiety quickly', 'Give me a sleep reset plan', 'Guide me through a 2-minute grounding'],
-    [normalizedMode],
+    () => ['Help me calm anxiety quickly', 'Give me a sleep reset plan', 'Guide me through a 2-minute grounding'],
+    [],
   );
 
   const send = async (event?: FormEvent<HTMLFormElement>, explicit?: string) => {
@@ -59,7 +41,7 @@ export default function BuddyChatPage() {
 
     try {
       const response = await patientApi.aiChat({
-        message: normalizedMode === 'vent' ? `Vent mode: ${value}` : value,
+        message: value,
         bot_type: 'mood_ai',
         response_style: 'concise',
       });
@@ -85,8 +67,8 @@ export default function BuddyChatPage() {
         <header className="mb-4 flex items-center justify-between rounded-2xl border border-white/60 bg-white/70 px-4 py-3 shadow-[0_12px_30px_rgba(18,38,55,0.10)] backdrop-blur">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.15em] text-charcoal/55">Full-Screen AI Interface</p>
-            <h1 className="text-xl font-bold text-charcoal">{content.title}</h1>
-            <p className="text-sm text-charcoal/66">{content.subtitle}</p>
+            <h1 className="text-xl font-bold text-charcoal">{copy.title}</h1>
+            <p className="text-sm text-charcoal/66">{copy.subtitle}</p>
           </div>
           <button
             type="button"
@@ -133,7 +115,7 @@ export default function BuddyChatPage() {
             <input
               value={input}
               onChange={(event) => setInput(event.target.value)}
-              placeholder={content.placeholder}
+              placeholder={copy.placeholder}
               className="h-11 flex-1 rounded-xl border border-ink-200 bg-white px-3 text-sm text-charcoal outline-none focus:border-calm-sage"
             />
             <button

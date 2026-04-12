@@ -32,6 +32,12 @@ export default function LoginPage() {
 	const [error, setError] = useState<string | null>(null);
 	const adminPortalLogin = '/admin-portal/login';
 
+	const hasSessionCookieHint = (): boolean => {
+		if (typeof document === 'undefined') return false;
+		const csrfCookieName = (import.meta.env.VITE_CSRF_COOKIE_NAME || 'csrf_token').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+		return new RegExp(`(?:^|; )${csrfCookieName}=`).test(document.cookie);
+	};
+
 	const resolvePostLoginRouteWithSubscription = async (candidate: string | null, role: string | undefined, userOverride?: any) => {
 		const effectiveUser = userOverride || user;
 
@@ -94,14 +100,16 @@ export default function LoginPage() {
 		setLoading(true);
 		try {
 			const result = await verifyPhoneSignupOtp(phone.trim(), otp.trim());
-			await checkAuth({ force: true });
+			await checkAuth();
 
 			// Use canonical auth user (from /auth/me) for routing, as OTP response may omit corporate flags.
 			let resolvedUser = result.user;
-			try {
-				resolvedUser = await fetchMe();
-			} catch {
-				// Keep OTP response user as fallback.
+			if (hasSessionCookieHint()) {
+				try {
+					resolvedUser = await fetchMe();
+				} catch {
+					// Keep OTP response user as fallback.
+				}
 			}
 			
 			// Check corporate access first - corporate admins bypass subscription checks

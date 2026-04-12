@@ -2,7 +2,6 @@ export type PatientPlanId = 'free' | 'monthly' | 'quarterly' | 'premium_monthly'
 
 export interface PatientAddonSelection {
   anytimeBuddyPack: 'none' | '1h' | '3h' | '5h';
-  ventBuddyUnlimited: boolean;
   digitalPetHubUnlock: boolean;
   soundTrackCount: number;
   soundBundleCount: number;
@@ -92,7 +91,6 @@ export const PATIENT_PLANS: Array<{
 
 export const DEFAULT_ADDONS: PatientAddonSelection = {
   anytimeBuddyPack: 'none',
-  ventBuddyUnlimited: false,
   digitalPetHubUnlock: false,
   soundTrackCount: 0,
   soundBundleCount: 0,
@@ -105,7 +103,6 @@ const ANYTIME_BUDDY_PRICING: Record<PatientAddonSelection['anytimeBuddyPack'], n
   '5h': 169900,
 };
 
-const VENT_BUDDY_UNLIMITED_MINOR = 9900;
 const DIGITAL_PET_HUB_UNLOCK_MINOR = 9900;
 const SOUND_TRACK_MINOR = 3000;
 const SOUND_BUNDLE_MINOR = 25000;
@@ -125,7 +122,6 @@ export const getAddonSubtotalMinor = (cart: PatientSubscriptionCart): number => 
 
   return (
     ANYTIME_BUDDY_PRICING[addons.anytimeBuddyPack]
-    + (addons.ventBuddyUnlimited ? VENT_BUDDY_UNLIMITED_MINOR : 0)
     + petHubMinor
     + Math.max(0, Math.round(addons.soundTrackCount || 0)) * SOUND_TRACK_MINOR
     + Math.max(0, Math.round(addons.soundBundleCount || 0)) * SOUND_BUNDLE_MINOR

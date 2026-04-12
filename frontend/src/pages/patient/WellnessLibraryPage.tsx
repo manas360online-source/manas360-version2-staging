@@ -43,19 +43,6 @@ const modules: ModuleCard[] = [
     badge: 'FREE CONTENT',
   },
   {
-    id: 'vent-buddy',
-    code: 'PT09',
-    title: 'VentBuddy',
-    emoji: '🔥',
-    description: 'Voice/text emotional release room with empathetic AI listening and immediate calming prompts.',
-    highlights: ['Voice-first venting', 'Text journaling mode', 'Anger and overload release'],
-    goal: 'Emotional Release & Anger Mgmt',
-    cta: 'Vent Now →',
-    to: '/patient/buddy/vent',
-    themeClass: 'from-[#9b4f2a]/85 via-[#bb6435]/80 to-[#cf7c4a]/75',
-    badge: 'PREMIUM',
-  },
-  {
     id: 'digital-pets',
     code: 'PT06',
     title: 'Digital Pets Hub',
@@ -101,7 +88,7 @@ export default function WellnessLibraryPage() {
           Premium wellness modules for daily regulation and resilience
         </h1>
         <p className="mt-2 max-w-3xl text-sm text-charcoal/70">
-          Lifestyle-first care hub with focused modules for sleep, sound, emotional release, and AI companionship.
+          Lifestyle-first care hub with focused modules for sleep, sound, and AI companionship.
         </p>
       </div>
 
