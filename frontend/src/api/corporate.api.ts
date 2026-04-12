@@ -293,6 +293,28 @@ export const corporateApi = {
     const response = await http.get('/v1/corporate/dashboard', { params: companyKey ? { companyKey } : undefined });
     return unwrap(response.data);
   },
+  getEapQrAnalytics: async (companyKey?: string) => {
+    const params = companyKey ? { companyKey } : undefined;
+    try {
+      const response = await http.get('/v1/corporate/eap-qr/analytics', { params });
+      return unwrap(response.data);
+    } catch (error: any) {
+      if (Number(error?.response?.status || 0) !== 404) throw error;
+      const fallback = await http.get('/v1/corporate/eap/qr/analytics', { params });
+      return unwrap(fallback.data);
+    }
+  },
+  createEapQr: async (payload: Record<string, unknown>, companyKey?: string) => {
+    const params = companyKey ? { companyKey } : undefined;
+    try {
+      const response = await http.post('/v1/corporate/eap-qr', payload, { params });
+      return unwrap(response.data);
+    } catch (error: any) {
+      if (Number(error?.response?.status || 0) !== 404) throw error;
+      const fallback = await http.post('/v1/corporate/eap/qr', payload, { params });
+      return unwrap(fallback.data);
+    }
+  },
   getPrograms: async (companyKey?: string) => {
     const response = await http.get('/v1/corporate/programs', { params: companyKey ? { companyKey } : undefined });
     return unwrap(response.data);

@@ -127,7 +127,6 @@ export default function AgreementDashboard() {
         setError(null);
         return;
       }
-      const message = String(err?.response?.data?.message || err?.message || 'Failed to load agreements');
       // Avoid blocking the page when backend route is not yet available.
       setError(null);
       setAgreements(fallbackSeedAgreements);
