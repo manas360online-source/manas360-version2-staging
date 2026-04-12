@@ -398,8 +398,28 @@ model AuthAuditLog {
 
   @@index([userId, createdAt])
   @@index([event, createdAt])
-  @@map("auth_audit_logs")
 }
+
+model ProviderVerification {
+  id          String   @id @default(uuid())
+  userId      String
+  license     String
+  licenseType String
+  status      String
+  checks      Json?
+  flagReasons Json?
+  verifiedAt  DateTime?
+  reviewedBy  String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // relation to `User` intentionally omitted to avoid adding inverse field on User model
+
+  @@index([userId])
+  @@map("provider_verifications")
+}
+ 
 
 model PatientProfile {
   id                           String                       @id @default(uuid())

@@ -93,8 +93,18 @@ CREATE TYPE "PayoutMethod" AS ENUM ('BANK', 'UPI');
 BEGIN;
 CREATE TYPE "PayoutStatus_new" AS ENUM ('PENDING', 'PROCESSING', 'COMPLETED', 'FAILED');
 ALTER TABLE "payout_requests" ALTER COLUMN "status" DROP DEFAULT;
-ALTER TABLE "payouts" ALTER COLUMN "status" DROP DEFAULT;
-ALTER TABLE "payouts" ALTER COLUMN "status" TYPE "PayoutStatus_new" USING ("status"::text::"PayoutStatus_new");
+ALTER TABLE "payout_requests" ALTER COLUMN "status" TYPE TEXT USING ("status"::text);
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'payouts'
+    ) THEN
+        ALTER TABLE "payouts" ALTER COLUMN "status" DROP DEFAULT;
+        ALTER TABLE "payouts" ALTER COLUMN "status" TYPE "PayoutStatus_new" USING ("status"::text::"PayoutStatus_new");
+    END IF;
+END $$;
 ALTER TYPE "PayoutStatus" RENAME TO "PayoutStatus_old";
 ALTER TYPE "PayoutStatus_new" RENAME TO "PayoutStatus";
 DROP TYPE "PayoutStatus_old";
@@ -170,106 +180,106 @@ ALTER TABLE "wallet_credits" DROP CONSTRAINT "wallet_credits_transaction_id_fkey
 ALTER TABLE "wallet_credits" DROP CONSTRAINT "wallet_credits_user_id_fkey";
 
 -- DropIndex
-DROP INDEX "audit_logs_userId_createdAt_idx";
+DROP INDEX IF EXISTS "audit_logs_userId_createdAt_idx";
 
 -- DropIndex
-DROP INDEX "idx_audit_logs_details_gin";
+DROP INDEX IF EXISTS "idx_audit_logs_details_gin";
 
 -- DropIndex
-DROP INDEX "idx_audit_logs_resource_created_at_desc";
+DROP INDEX IF EXISTS "idx_audit_logs_resource_created_at_desc";
 
 -- DropIndex
-DROP INDEX "idx_audit_logs_user_id_created_at_desc";
+DROP INDEX IF EXISTS "idx_audit_logs_user_id_created_at_desc";
 
 -- DropIndex
-DROP INDEX "crisis_alerts_monitoring_idx";
+DROP INDEX IF EXISTS "crisis_alerts_monitoring_idx";
 
 -- DropIndex
-DROP INDEX "financial_sessions_createdAt_idx";
+DROP INDEX IF EXISTS "financial_sessions_createdAt_idx";
 
 -- DropIndex
-DROP INDEX "financial_sessions_razorpayOrderId_key";
+DROP INDEX IF EXISTS "financial_sessions_razorpayOrderId_key";
 
 -- DropIndex
-DROP INDEX "group_therapy_enrollments_guest_email_status_idx";
+DROP INDEX IF EXISTS "group_therapy_enrollments_guest_email_status_idx";
 
 -- DropIndex
-DROP INDEX "group_therapy_enrollments_session_id_status_idx";
+DROP INDEX IF EXISTS "group_therapy_enrollments_session_id_status_idx";
 
 -- DropIndex
-DROP INDEX "group_therapy_enrollments_user_id_status_idx";
+DROP INDEX IF EXISTS "group_therapy_enrollments_user_id_status_idx";
 
 -- DropIndex
-DROP INDEX "group_therapy_sessions_host_therapist_id_status_idx";
+DROP INDEX IF EXISTS "group_therapy_sessions_host_therapist_id_status_idx";
 
 -- DropIndex
-DROP INDEX "group_therapy_sessions_requested_by_id_created_at_idx";
+DROP INDEX IF EXISTS "group_therapy_sessions_requested_by_id_created_at_idx";
 
 -- DropIndex
-DROP INDEX "group_therapy_sessions_session_mode_status_idx";
+DROP INDEX IF EXISTS "group_therapy_sessions_session_mode_status_idx";
 
 -- DropIndex
-DROP INDEX "group_therapy_sessions_status_scheduled_at_idx";
+DROP INDEX IF EXISTS "group_therapy_sessions_status_scheduled_at_idx";
 
 -- DropIndex
-DROP INDEX "leads_issue_idx";
+DROP INDEX IF EXISTS "leads_issue_idx";
 
 -- DropIndex
-DROP INDEX "leads_razorpayOrderId_key";
+DROP INDEX IF EXISTS "leads_razorpayOrderId_key";
 
 -- DropIndex
-DROP INDEX "marketplace_subscriptions_razorpaySubscriptionId_key";
+DROP INDEX IF EXISTS "marketplace_subscriptions_razorpaySubscriptionId_key";
 
 -- DropIndex
-DROP INDEX "marquee_offers_isActive_idx";
+DROP INDEX IF EXISTS "marquee_offers_isActive_idx";
 
 -- DropIndex
-DROP INDEX "marquee_offers_sortOrder_idx";
+DROP INDEX IF EXISTS "marquee_offers_sortOrder_idx";
 
 -- DropIndex
-DROP INDEX "patient_assessments_patientId_createdAt_idx";
+DROP INDEX IF EXISTS "patient_assessments_patientId_createdAt_idx";
 
 -- DropIndex
-DROP INDEX "roles_name_idx";
+DROP INDEX IF EXISTS "roles_name_idx";
 
 -- DropIndex
-DROP INDEX "screening_attempts_patientId_createdAt_idx";
+DROP INDEX IF EXISTS "screening_attempts_patientId_createdAt_idx";
 
 -- DropIndex
-DROP INDEX "session_booking_intents_razorpayOrderId_key";
+DROP INDEX IF EXISTS "session_booking_intents_razorpayOrderId_key";
 
 -- DropIndex
-DROP INDEX "therapy_sessions_patientProfileId_dateTime_idx";
+DROP INDEX IF EXISTS "therapy_sessions_patientProfileId_dateTime_idx";
 
 -- DropIndex
-DROP INDEX "therapy_sessions_therapistProfileId_dateTime_idx";
+DROP INDEX IF EXISTS "therapy_sessions_therapistProfileId_dateTime_idx";
 
 -- DropIndex
-DROP INDEX "idx_created_at";
+DROP INDEX IF EXISTS "idx_created_at";
 
 -- DropIndex
-DROP INDEX "idx_source";
+DROP INDEX IF EXISTS "idx_source";
 
 -- DropIndex
-DROP INDEX "idx_transaction_type";
+DROP INDEX IF EXISTS "idx_transaction_type";
 
 -- DropIndex
-DROP INDEX "idx_user_transactions";
+DROP INDEX IF EXISTS "idx_user_transactions";
 
 -- DropIndex
-DROP INDEX "idx_updated_at";
+DROP INDEX IF EXISTS "idx_updated_at";
 
 -- DropIndex
-DROP INDEX "idx_user_balance";
+DROP INDEX IF EXISTS "idx_user_balance";
+
+-- DropConstraint (index is owned by unique constraint)
+ALTER TABLE "user_wallets" DROP CONSTRAINT IF EXISTS "user_wallet_user_id_key";
 
 -- DropIndex
-DROP INDEX "user_wallet_user_id_key";
+DROP INDEX IF EXISTS "idx_fully_used";
 
 -- DropIndex
-DROP INDEX "idx_fully_used";
-
--- DropIndex
-DROP INDEX "idx_wallet_credits_source";
+DROP INDEX IF EXISTS "idx_wallet_credits_source";
 
 -- AlterTable
 ALTER TABLE "audit_logs" DROP COLUMN "createdAt",
@@ -360,7 +370,7 @@ DROP COLUMN "status",
 ADD COLUMN     "status" "PayoutRequestStatus" NOT NULL DEFAULT 'REQUESTED';
 
 -- AlterTable
-ALTER TABLE "payouts" DROP COLUMN "status",
+ALTER TABLE IF EXISTS "payouts" DROP COLUMN "status",
 ADD COLUMN     "status" "PayoutStatus" NOT NULL DEFAULT 'PENDING',
 DROP COLUMN "method",
 ADD COLUMN     "method" "PayoutMethod" NOT NULL DEFAULT 'BANK';
@@ -1160,7 +1170,7 @@ CREATE INDEX "payout_requests_providerId_status_requestedAt_idx" ON "payout_requ
 CREATE INDEX "payout_requests_status_requestedAt_idx" ON "payout_requests"("status", "requestedAt" DESC);
 
 -- CreateIndex
-CREATE INDEX "payouts_status_createdAt_idx" ON "payouts"("status", "createdAt" DESC);
+CREATE INDEX IF NOT EXISTS "payouts_status_createdAt_idx" ON "payouts"("status", "createdAt" DESC);
 
 -- CreateIndex
 CREATE INDEX "prescriptions_provider_id_created_at_idx" ON "prescriptions"("provider_id", "created_at" DESC);
@@ -1271,28 +1281,28 @@ ALTER TABLE "corporate_workshops" ADD CONSTRAINT "corporate_workshops_companyId_
 ALTER TABLE "patient_pathway_state" ADD CONSTRAINT "patient_pathway_state_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
 
 -- RenameIndex
-ALTER INDEX "idempotency_keys_endpoint_actor_request_hash_key" RENAME TO "idempotency_keys_endpoint_actor_id_request_hash_key";
+ALTER INDEX IF EXISTS "idempotency_keys_endpoint_actor_request_hash_key" RENAME TO "idempotency_keys_endpoint_actor_id_request_hash_key";
 
 -- RenameIndex
-ALTER INDEX "idx_invoice_is_paid_out" RENAME TO "invoices_isPaidOut_idx";
+ALTER INDEX IF EXISTS "idx_invoice_is_paid_out" RENAME TO "invoices_isPaidOut_idx";
 
 -- RenameIndex
-ALTER INDEX "idx_invoice_payment_id" RENAME TO "invoices_paymentId_idx";
+ALTER INDEX IF EXISTS "idx_invoice_payment_id" RENAME TO "invoices_paymentId_idx";
 
 -- RenameIndex
-ALTER INDEX "idx_payout_item_payout" RENAME TO "payout_items_payoutId_idx";
+ALTER INDEX IF EXISTS "idx_payout_item_payout" RENAME TO "payout_items_payoutId_idx";
 
 -- RenameIndex
-ALTER INDEX "payout_items_invoiceId_unique" RENAME TO "payout_items_invoiceId_key";
+ALTER INDEX IF EXISTS "payout_items_invoiceId_unique" RENAME TO "payout_items_invoiceId_key";
 
 -- RenameIndex
-ALTER INDEX "idx_payout_provider_created" RENAME TO "payouts_providerId_createdAt_idx";
+ALTER INDEX IF EXISTS "idx_payout_provider_created" RENAME TO "payouts_providerId_createdAt_idx";
 
 -- RenameIndex
-ALTER INDEX "idx_payout_status_created" RENAME TO "payouts_status_createdAt_idx";
+ALTER INDEX IF EXISTS "idx_payout_status_created" RENAME TO "payouts_status_createdAt_idx";
 
 -- RenameIndex
-ALTER INDEX "user_wallet_transactions_wallet_created_idx_new" RENAME TO "user_wallet_transactions_walletId_createdAt_idx";
+ALTER INDEX IF EXISTS "user_wallet_transactions_wallet_created_idx_new" RENAME TO "user_wallet_transactions_walletId_createdAt_idx";
 
 -- RenameIndex
-ALTER INDEX "wallet_credits_wallet_status_idx_new" RENAME TO "wallet_credits_walletId_status_idx";
+ALTER INDEX IF EXISTS "wallet_credits_wallet_status_idx_new" RENAME TO "wallet_credits_walletId_status_idx";
