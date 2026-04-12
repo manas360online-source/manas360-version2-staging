@@ -11,6 +11,8 @@ const breadcrumbMap: Record<string, string[]> = {
   '/corporate/employees/directory': ['Employees', 'Directory'],
   '/corporate/employees/enrollment': ['Employees', 'Bulk Enrollment'],
   '/corporate/employees/allocation': ['Employees', 'Session Allocation'],
+  '/corporate/dashboard/agreements': ['Employees', 'Agreement'],
+  '/corporate/employees/agreement': ['Employees', 'Agreement'],
   '/corporate/reports/utilization': ['Reports', 'Utilization'],
   '/corporate/reports/wellbeing': ['Reports', 'Wellbeing'],
   '/corporate/reports/engagement': ['Reports', 'Engagement'],

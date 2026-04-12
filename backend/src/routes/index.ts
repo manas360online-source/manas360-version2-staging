@@ -1,6 +1,5 @@
 import { getLivePricingController } from '../controllers/pricing.controller';
 import { submitCorporateDemoRequestController } from '../controllers/corporate.controller';
-import { redirectUniversalQrCodeController } from '../controllers/qr.controller';
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/validate.middleware';
 import authRoutes from './auth.routes';
@@ -37,7 +36,8 @@ import walletRoutes from './wallet.routes';
 import groupTherapyRoutes from './group-therapy.routes';
 import legalRoutes from './legal.routes';
 import qrRoutes from './qr.routes';
-import mdcRoutes from './mdc.routes';
+import invoiceRoutes from './invoice.routes';
+import institutionalAgreementRoutes from './institutional-agreement.routes';
 
 
 const router = Router();
@@ -107,9 +107,9 @@ router.use('/v1/game', gameRoutes);
 router.use('/v1/wallet', walletRoutes);
 router.use('/v1/legal', legalRoutes);
 router.use('/v1/qr', qrRoutes);
-router.use('/v1/mdc', mdcRoutes);
-router.get('/q/:qr_type/:unique_id', asyncHandler(redirectUniversalQrCodeController));
-
+router.use('/v1/invoices', invoiceRoutes);
+router.use('/agreements', institutionalAgreementRoutes);
+router.use('/v1/agreements', institutionalAgreementRoutes);
 
 export default router;
 

@@ -61,4 +61,19 @@ router.get('/settings', requireAuth, requireCorporateMemberAccess, asyncHandler(
 router.patch('/settings', requireAuth, requireCorporateMemberAccess, asyncHandler(updateCorporateSettingsController));
 router.post('/employees/bulk-upload', requireAuth, requireCorporateMemberAccess, corporateUpload.single('file'), asyncHandler(bulkUploadCorporateEmployeesController));
 
+// Agreement & Template Endpoints
+import {
+  createInstitutionalAgreementController,
+  getInstitutionalAgreementStatusController,
+  listAgreementTemplatesController,
+  listInstitutionalAgreementsController,
+  sendInstitutionalAgreementController,
+} from '../controllers/institutional-agreement.controller';
+
+router.get('/agreement-templates', requireAuth, requireCorporateMemberAccess, asyncHandler(listAgreementTemplatesController));
+router.get('/agreements', requireAuth, requireCorporateMemberAccess, asyncHandler(listInstitutionalAgreementsController));
+router.post('/agreements', requireAuth, requireCorporateMemberAccess, asyncHandler(createInstitutionalAgreementController));
+router.post('/agreements/:id/send', requireAuth, requireCorporateMemberAccess, asyncHandler(sendInstitutionalAgreementController));
+router.get('/agreements/:id/status', requireAuth, requireCorporateMemberAccess, asyncHandler(getInstitutionalAgreementStatusController));
+
 export default router;
