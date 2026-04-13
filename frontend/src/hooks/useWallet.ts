@@ -21,8 +21,17 @@ export const useWallet = (options?: { enabled?: boolean }) => {
   const { data: balance = null, refetch: refreshWallet } = useQuery({
     queryKey: ['wallet'],
     queryFn: async () => {
-      const resp = await patientApi.getWalletBalance();
-      return (resp && (resp.data ?? resp)) ?? null;
+      try {
+        const resp = await patientApi.getWalletBalance();
+        return (resp && (resp.data ?? resp)) ?? null;
+      } catch (error: any) {
+        // Provider/admin routes can mount shared UI pieces that reference wallet.
+        // Avoid noisy 403s in console and treat as unavailable wallet data.
+        if (error?.response?.status === 403) {
+          return null;
+        }
+        throw error;
+      }
     },
     staleTime: 0, // always fresh after game play
     enabled,

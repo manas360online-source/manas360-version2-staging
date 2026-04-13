@@ -77,17 +77,21 @@ const startServer = async (): Promise<void> => {
 		reconcilePendingPayments().catch(err => console.error('[CRON] Reconciliation failed', err));
 	}, 30000);
 
-	// Real-time Metrics Push (every 30s)
-	setInterval(async () => {
-		try {
-			const metrics = await calculateLiveMetrics();
-			if (socketIO) {
-				socketIO.to('admin-room').emit('metrics-update', metrics);
+	// Real-time Metrics Push (every 30s) - can be disabled via env.disableMetricsCron
+	if (!env.disableMetricsCron) {
+		setInterval(async () => {
+			try {
+				const metrics = await calculateLiveMetrics();
+				if (socketIO) {
+					socketIO.to('admin-room').emit('metrics-update', metrics);
+				}
+			} catch (err) {
+				console.error('[CRON] Metrics push failed', err);
 			}
-		} catch (err) {
-			console.error('[CRON] Metrics push failed', err);
-		}
-	}, 30000);
+		}, 30000);
+	} else {
+		console.log('Metrics cron is disabled via DISABLE_METRICS_CRON');
+	}
 
 	// Financial idempotency retention cleanup (every 6h, retain 7 days).
 	setInterval(() => {

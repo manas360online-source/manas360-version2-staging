@@ -83,11 +83,20 @@
   - Made the column `userId` on table `user_wallets` required. This step will fail if there are existing NULL values in that column.
 
 */
--- CreateEnum
-CREATE TYPE "PayoutRequestStatus" AS ENUM ('REQUESTED', 'APPROVED', 'PAID', 'REJECTED', 'FAILED');
+-- CreateEnum (guarded)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'payoutrequeststatus') THEN
+        CREATE TYPE "PayoutRequestStatus" AS ENUM ('REQUESTED', 'APPROVED', 'PAID', 'REJECTED', 'FAILED');
+    END IF;
+END $$;
 
--- CreateEnum
-CREATE TYPE "PayoutMethod" AS ENUM ('BANK', 'UPI');
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'payoutmethod') THEN
+        CREATE TYPE "PayoutMethod" AS ENUM ('BANK', 'UPI');
+    END IF;
+END $$;
 
 -- AlterEnum
 BEGIN;

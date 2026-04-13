@@ -43,21 +43,6 @@ import {
 	getAdminPricingConfigController,
 	updateAdminPricingConfigController,
 } from '../controllers/pricing.controller';
-import {
-	createQuestionOptionAdminController,
-	createScreeningTemplateAdminController,
-	createTemplateQuestionAdminController,
-	ensureScreeningTemplateDefaultAdminController,
-	listAllProviderExtraQuestionsAdminController,
-	listScoringBandsAdminController,
-	listScreeningTemplatesAdminController,
-	listTemplateQuestionsAdminController,
-	replaceScoringBandsAdminController,
-	simulateTemplateScoringController,
-	updateQuestionOptionAdminController,
-	updateScreeningTemplateAdminController,
-	updateTemplateQuestionAdminController,
-} from '../controllers/free-screening-admin.controller';
 import { 
 	updateVerificationController, 
 	getVerificationsController, 
@@ -238,23 +223,6 @@ router.get('/platform-config/:key', requireAuth, requireRole(['admin', 'superadm
 router.put('/platform-config/:key', requireAuth, requireRole('superadmin'), requireAdminPolicy('config.manage'), asyncHandler(upsertPlatformConfigController));
 router.patch('/platform-config/:key', requireAuth, requireRole('superadmin'), requireAdminPolicy('config.manage'), asyncHandler(upsertPlatformConfigController));
 router.post('/platform-config/:key/rollback', requireAuth, requireRole('superadmin'), requireAdminPolicy('config.manage'), asyncHandler(rollbackPlatformConfigController));
-
-router.get('/screening/templates', requireAuth, requireRole('admin'), requireAdminPolicy('screening.manage'), asyncHandler(listScreeningTemplatesAdminController));
-router.post('/screening/templates', requireAuth, requireRole('admin'), requireAdminPolicy('screening.manage'), asyncHandler(createScreeningTemplateAdminController));
-router.post('/screening/templates/defaults/:templateKey/ensure', requireAuth, requireRole('admin'), requireAdminPolicy('screening.manage'), asyncHandler(ensureScreeningTemplateDefaultAdminController));
-router.put('/screening/templates/:templateId', requireAuth, requireRole('admin'), requireAdminPolicy('screening.manage'), asyncHandler(updateScreeningTemplateAdminController));
-
-router.get('/screening/templates/:templateId/questions', requireAuth, requireRole('admin'), requireAdminPolicy('screening.manage'), asyncHandler(listTemplateQuestionsAdminController));
-router.post('/screening/templates/:templateId/questions', requireAuth, requireRole('admin'), requireAdminPolicy('screening.manage'), asyncHandler(createTemplateQuestionAdminController));
-router.put('/screening/questions/:questionId', requireAuth, requireRole('admin'), requireAdminPolicy('screening.manage'), asyncHandler(updateTemplateQuestionAdminController));
-
-router.post('/screening/questions/:questionId/options', requireAuth, requireRole('admin'), requireAdminPolicy('screening.manage'), asyncHandler(createQuestionOptionAdminController));
-router.put('/screening/options/:optionId', requireAuth, requireRole('admin'), requireAdminPolicy('screening.manage'), asyncHandler(updateQuestionOptionAdminController));
-
-router.get('/screening/templates/:templateId/scoring-bands', requireAuth, requireRole('admin'), requireAdminPolicy('screening.manage'), asyncHandler(listScoringBandsAdminController));
-router.put('/screening/templates/:templateId/scoring-bands', requireAuth, requireRole('admin'), requireAdminPolicy('screening.manage'), asyncHandler(replaceScoringBandsAdminController));
-router.post('/screening/templates/:templateId/simulate', requireAuth, requireRole('admin'), requireAdminPolicy('screening.manage'), asyncHandler(simulateTemplateScoringController));
-router.get('/screening/provider-questions', requireAuth, requireRole('admin'), requireAdminPolicy('screening.manage'), asyncHandler(listAllProviderExtraQuestionsAdminController));
 
 /**
  * GET /api/v1/admin/modules/:module/summary

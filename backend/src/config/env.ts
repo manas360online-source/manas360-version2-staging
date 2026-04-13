@@ -108,6 +108,8 @@ export interface EnvConfig {
 	sessionNotesEncryptionKey: string;
 	redisUrl: string;
 	analyticsRollupIntervalSeconds?: number;
+	// When true, the server should not start the periodic metrics push cron
+	disableMetricsCron: boolean;
 	disableAuthRateLimit: boolean;
 	// When true, disable adding ServerSideEncryption header for S3 uploads (useful for MinIO)
 	awsS3DisableServerSideEncryption: boolean;
@@ -170,6 +172,8 @@ export const env: EnvConfig = Object.freeze({
 	sessionNotesEncryptionKey: process.env.SESSION_NOTES_ENCRYPTION_KEY ?? '',
 	redisUrl: process.env.REDIS_URL ?? 'redis://127.0.0.1:6379',
 	analyticsRollupIntervalSeconds: parseNumber(process.env.ANALYTICS_ROLLUP_INTERVAL_SECONDS, 3600),
+	// When true, disable the periodic metrics push cron (useful during migrations)
+	disableMetricsCron: parseBoolean(process.env.DISABLE_METRICS_CRON, false),
 	disableAuthRateLimit: parseBoolean(process.env.DISABLE_AUTH_RATE_LIMIT, false),
 	phonePeWebhookUsername: process.env.PHONEPE_WEBHOOK_USERNAME,
 	phonePeWebhookPassword: process.env.PHONEPE_WEBHOOK_PASSWORD,

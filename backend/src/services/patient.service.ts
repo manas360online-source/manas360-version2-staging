@@ -479,14 +479,34 @@ export const getMyTherapistMatches = async (userId: string, query: TherapistMatc
 		throw new AppError('Patient profile not found. Please create profile first.', 404);
 	}
 
+	const [hasPhq, hasGad] = await Promise.all([
+		prisma.patientAssessment.findFirst({
+			where: { patientId: patientProfile.id, type: 'PHQ-9' },
+			select: { id: true },
+			orderBy: { createdAt: 'desc' },
+		}),
+		prisma.patientAssessment.findFirst({
+			where: { patientId: patientProfile.id, type: 'GAD-7' },
+			select: { id: true },
+			orderBy: { createdAt: 'desc' },
+		}),
+	]);
+
+	if (!hasPhq || !hasGad) {
+		throw new AppError('Please complete PHQ-9 and GAD-7 assessment first before connecting with providers.', 403);
+	}
+
 	const latestAssessment = await prisma.patientAssessment.findFirst({
-		where: { patientId: patientProfile.id },
+		where: {
+			patientId: patientProfile.id,
+			type: { in: ['PHQ-9', 'GAD-7'] },
+		},
 		select: { severityLevel: true, createdAt: true },
 		orderBy: { createdAt: 'desc' },
 	});
 
 	if (!latestAssessment) {
-		throw new AppError('Assessment not found. Please complete assessment first.', 404);
+		throw new AppError('Clinical assessment not found. Please complete PHQ-9 or GAD-7 first.', 404);
 	}
 
 	const targetSpecializations = normalizeStrings(severityToSpecializationMap[latestAssessment.severityLevel] ?? []);

@@ -413,7 +413,7 @@ export default function AssessmentsPage() {
     setLoading(true);
     setMessage('');
     try {
-      const response = await patientApi.submitAssessment({
+      const response = await patientApi.submitClinicalJourney({
         type: selectedClinical,
         score,
       });

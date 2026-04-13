@@ -46,6 +46,7 @@ services:
       FRONTEND_URL: http://localhost:${FRONTEND_HOST_PORT:-3000}
       CORS_ORIGIN: http://localhost:${FRONTEND_HOST_PORT:-3000},http://localhost:5173
       ADMIN_SEED_ENABLED: "false"
+      DISABLE_METRICS_CRON: "false"
     depends_on:
       db:
         condition: service_healthy
@@ -60,7 +61,9 @@ services:
       retries: 5
     ports:
       - "${BACKEND_HOST_PORT:-5001}:5000"
-    command: sh -c "npx prisma migrate deploy && node dist/server.js"
+    # Temporarily disable auto-migrations on container start to avoid
+    # restart loops when a migration fails. Run migrations manually instead.
+    command: sh -c "node dist/server.js"
 
   ai_engine:
     build:
