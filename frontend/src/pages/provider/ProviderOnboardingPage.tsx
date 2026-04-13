@@ -68,8 +68,10 @@ type FormState = {
   licenseNmc: string;
   clinicalCategories: string[];
   specializations: string;
+  certifications: string;
   selectedLanguages: string[];
   corporateReady: boolean;
+  nriSessionEnabled: boolean;
   shiftPreferences: string[];
   maxSessionsPerDay: number;
   consultationFee: number;
@@ -99,8 +101,10 @@ const initialForm: FormState = {
   licenseNmc: '',
   clinicalCategories: [],
   specializations: '',
+  certifications: '',
   selectedLanguages: ['English'],
   corporateReady: false,
+  nriSessionEnabled: false,
   shiftPreferences: ['MORNING'],
   maxSessionsPerDay: 6,
   consultationFee: 0,
@@ -225,8 +229,10 @@ function ProviderOnboardingPage() {
         licenseNmc: form.licenseNmc || undefined,
         clinicalCategories: form.clinicalCategories,
         specializations: form.specializations.split(',').map((item) => item.trim()).filter(Boolean),
+        certifications: form.certifications.split(',').map((item) => item.trim()).filter(Boolean),
         languages: form.selectedLanguages,
         corporateReady: Boolean(form.corporateReady),
+        nriSessionEnabled: Boolean(form.nriSessionEnabled),
         shiftPreferences: form.shiftPreferences,
         consultationFee: Number(form.consultationFee || 0),
         bankDetails: {
@@ -561,6 +567,17 @@ function ProviderOnboardingPage() {
                 />
               </label>
 
+              <label className="grid gap-1.5">
+                <span className="text-sm font-medium text-slate-700">Certifications</span>
+                <input
+                  className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
+                  placeholder="Comma-separated, e.g. CBT, EMDR, Family Therapy"
+                  value={form.certifications}
+                  onChange={(e) => setForm((p) => ({ ...p, certifications: e.target.value }))}
+                />
+                <p className="text-xs text-slate-500">Used for ranking, trust, and NRI/corporate matching quality.</p>
+              </label>
+
               <p className="text-xs text-slate-500">{form.clinicalCategories.length} categories selected</p>
             </div>
           )}
@@ -603,6 +620,19 @@ function ProviderOnboardingPage() {
                 <div>
                   <p className="text-sm font-medium text-slate-800">Interest in Corporate Wellness Programs</p>
                   <p className="mt-0.5 text-xs text-slate-500">I am open to conducting group workshops and EAP sessions for corporate clients.</p>
+                </div>
+              </label>
+
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-orange-200 bg-orange-50 p-4">
+                <input
+                  type="checkbox"
+                  checked={form.nriSessionEnabled}
+                  onChange={(e) => setForm((p) => ({ ...p, nriSessionEnabled: e.target.checked }))}
+                  className="mt-0.5 h-4 w-4 rounded border-orange-300 text-orange-600 focus:ring-orange-500"
+                />
+                <div>
+                  <p className="text-sm font-medium text-slate-800">I can conduct NRI-focused sessions</p>
+                  <p className="mt-0.5 text-xs text-slate-600">Enable this to be considered for NRI lead matching and NRI patient bookings.</p>
                 </div>
               </label>
             </div>
@@ -751,6 +781,10 @@ function ProviderOnboardingPage() {
                   <span className="font-medium text-slate-500">Categories</span><span className="text-slate-800">{form.clinicalCategories.length} selected</span>
                   <span className="font-medium text-slate-500">Languages</span><span className="text-slate-800">{form.selectedLanguages.join(', ') || '—'}</span>
                   <span className="font-medium text-slate-500">Corporate</span><span className="text-slate-800">{form.corporateReady ? 'Yes' : 'No'}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-2 p-4 text-sm">
+                  <span className="font-medium text-slate-500">Certifications</span><span className="text-slate-800">{form.certifications || '—'}</span>
+                  <span className="font-medium text-slate-500">NRI Sessions</span><span className="text-slate-800">{form.nriSessionEnabled ? 'Enabled' : 'No'}</span>
                 </div>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-2 p-4 text-sm">
                   <span className="font-medium text-slate-500">Shifts</span><span className="text-slate-800">{form.shiftPreferences.map((s) => s.charAt(0) + s.slice(1).toLowerCase()).join(', ')}</span>

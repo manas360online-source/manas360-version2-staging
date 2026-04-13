@@ -15,6 +15,7 @@ const schedule = [
 ];
 
 import { Link } from 'react-router-dom';
+import Pt06HeroVideoFrame from '../../components/common/Pt06HeroVideoFrame';
 
 export default function DigitalPetsHubPage() {
   const scrollToId = (id: string) => {
@@ -37,7 +38,6 @@ export default function DigitalPetsHubPage() {
         .pet360-root .hero{background:linear-gradient(175deg,#F5F0FF 0%,#EDE9FE 40%,#FFF 100%);padding:48px 0 36px;text-align:center;position:relative;overflow:hidden;}
         .pet360-root .hero-top{display:flex;align-items:center;justify-content:center;gap:24px;flex-wrap:wrap;margin-bottom:28px;}
         .pet360-root .video-frame{width:220px;height:390px;border-radius:20px;overflow:hidden;box-shadow:0 12px 40px rgba(124,58,237,.15);border:3px solid rgba(124,58,237,.2);background:#000;position:relative;}
-        .pet360-root .video-label{position:absolute;bottom:10px;left:10px;right:10px;text-align:center;background:rgba(0,0,0,.6);border-radius:10px;padding:6px 10px;font-size:10px;color:white;font-weight:600;letter-spacing:.5px;}
         .pet360-root .hero-text{text-align:left;max-width:440px;}
         .pet360-root .hero-text h1{font-size:clamp(28px,4.5vw,38px);font-weight:700;line-height:1.18;margin-bottom:10px;color:#1E293B;}
         .pet360-root .hero-text .accent{color:#7C3AED;}
@@ -112,7 +112,7 @@ export default function DigitalPetsHubPage() {
         <div className="shell">
           <div className="nav-inner">
             <div className="logo">MANAS<em>360</em></div>
-            <div className="nav-crumb"><span>PT01 Hub</span> {'->'} <span>PT06</span> {'->'} <span style={{ color: '#475569', fontWeight: 600 }}>Digital Pet Hub</span></div>
+            <div className="nav-crumb"><span>PT01</span> {'->'} <span>PT06</span> {'->'} <span style={{ color: '#475569', fontWeight: 600 }}>Digital Pet</span></div>
           </div>
         </div>
       </div>
@@ -120,7 +120,7 @@ export default function DigitalPetsHubPage() {
       <div className="hero">
         <div className="shell">
           <div className="hero-top">
-            <div className="video-frame"><div className="video-label">🎬 Avatar Pitch - "Your Digital Companion"</div></div>
+            <Pt06HeroVideoFrame className="video-frame" />
             <div className="hero-text">
               <div className="badge" style={{ background: '#EDE9FE', color: '#7C3AED', marginBottom: 12 }}>🐾 PT06 - Digital Pet Hub</div>
               <h1>Your <span className="accent">Oxytocin</span> Engine - A Companion Who&apos;s Always Happy to See You</h1>
