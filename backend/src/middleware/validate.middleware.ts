@@ -302,30 +302,6 @@ export const validatePatientMoodHistoryQuery: RequestHandler[] = [
 	extractValidatedPatientMoodHistoryQuery,
 ];
 
-const extractValidatedTherapistMatchQuery = (req: Request, _res: Response, next: NextFunction): void => {
-	req.validatedTherapistMatchQuery = {
-		languagePreference:
-			typeof req.query.languagePreference === 'string' && req.query.languagePreference.trim().length > 0
-				? req.query.languagePreference.trim()
-				: undefined,
-		specializationPreference:
-			typeof req.query.specializationPreference === 'string' && req.query.specializationPreference.trim().length > 0
-				? req.query.specializationPreference.trim()
-				: undefined,
-		nextHours: typeof req.query.nextHours === 'string' ? Number(req.query.nextHours) : 72,
-	};
-
-	next();
-};
-
-export const validateTherapistMatchQuery: RequestHandler[] = [
-	query('languagePreference').optional().isString().trim().isLength({ min: 2, max: 50 }).withMessage('languagePreference must be 2-50 characters'),
-	query('specializationPreference').optional().isString().trim().isLength({ min: 2, max: 80 }).withMessage('specializationPreference must be 2-80 characters'),
-	query('nextHours').optional().isInt({ min: 1, max: 336 }).withMessage('nextHours must be an integer between 1 and 336'),
-	(req, _res, next) => applyValidationResult(req, next),
-	extractValidatedTherapistMatchQuery,
-];
-
 const extractValidatedBookSessionPayload = (req: Request, _res: Response, next: NextFunction): void => {
 	req.validatedBookSessionPayload = {
 		therapistId: String(req.body.therapistId),

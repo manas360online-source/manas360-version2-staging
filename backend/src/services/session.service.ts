@@ -16,6 +16,7 @@ import path from 'path';
 import fs from 'fs';
 import { s3Client } from './s3.service';
 import { PutObjectCommand, ServerSideEncryption } from '@aws-sdk/client-s3';
+import { assertPatientHasCompletedBothPHQandGAD7 } from './patient-v1.service';
 
 const db = prisma as any;
 
@@ -150,6 +151,8 @@ const ensurePatientProfile = async (userId: string) => {
 const getSlotMinuteOfDay = (date: Date): number => date.getHours() * 60 + date.getMinutes();
 
 export const bookPatientSession = async (userId: string, input: BookSessionInput) => {
+	await assertPatientHasCompletedBothPHQandGAD7(userId);
+
 	const patientProfile = await ensurePatientProfile(userId);
 
 	const therapist = await db.user.findUnique({

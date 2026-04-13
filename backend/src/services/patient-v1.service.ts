@@ -18,6 +18,8 @@ import { getActivePlatformPlan, getPricingConfigVersion } from './pricing.servic
 import { scoreGAD7, scorePHQ9 } from './riskScoring';
 import { sendSubscriptionActivationEmail } from './email.service';
 import { calculateGraceEndDate } from './subscription.helper';
+import { hasAcceptedNriTerms } from './legal-compliance.service';
+import { hasNriProviderCapability } from './provider-match.engine';
 
 const db = prisma as any;
 const SUBSCRIPTION_LOCK_TIMEOUT_MS = 5 * 60 * 1000;
@@ -117,6 +119,7 @@ type ProviderFilters = {
 	role?: string;
 	page?: number;
 	limit?: number;
+	onlyNriProviders?: boolean;
 };
 
 const DEFAULT_SESSION_FEE_MINOR = 150000;
@@ -145,6 +148,14 @@ const roleToProviderType = (role: string | null | undefined): 'specialized-thera
 	if (normalized === 'PSYCHOLOGIST') return 'clinical-psychologist';
 	if (normalized === 'PSYCHIATRIST') return 'psychiatrist';
 	return 'specialized-therapist';
+};
+
+const roleToNriProviderType = (role: string | null | undefined): 'nri-therapist' | 'nri-psychologist' | 'nri-psychiatrist' | 'nri-coach' => {
+	const normalized = normalizeProviderRole(role);
+	if (normalized === 'PSYCHOLOGIST') return 'nri-psychologist';
+	if (normalized === 'PSYCHIATRIST') return 'nri-psychiatrist';
+	if (normalized === 'COACH') return 'nri-coach';
+	return 'nri-therapist';
 };
 
 const roleLabel = (role: string | null | undefined): string => {
@@ -531,6 +542,7 @@ const toProviderListItem = async (user: any) => {
 			languages: Array.isArray(profile?.languages) && profile.languages.length > 0 ? profile.languages : ['English'],
 			rating_avg: profile?.averageRating && profile.averageRating > 0 ? profile.averageRating : (completedSessions > 0 ? 4.8 : 4.5),
 			is_active: !user.isDeleted && user.status === 'ACTIVE',
+			nriEligible: hasNriProviderCapability(profile),
 		};
 	} catch (error) {
 		console.error('Error in toProviderListItem:', error);
@@ -999,11 +1011,18 @@ export const getPatientSubscription = async (userId: string) => {
 export const updatePatientSubscriptionPlan = async (userId: string, action: 'upgrade' | 'downgrade') => {
 	const updated = await withPatientSubscriptionLock(userId, async (subscription) => {
 		if (!subscription) throw new AppError('Subscription data unavailable', 500);
+		const currentPriceMinor = Number(subscription.price || 0);
+		const isCurrentFreePlan = currentPriceMinor <= 0 || String(subscription.planName || '').toLowerCase().includes('free');
+
+		if (!isCurrentFreePlan) {
+			throw new AppError('Paid subscriptions cannot be changed from the patient side. Use the active paid plan or contact support.', 409);
+		}
+
 		const activePlan = (await getActivePlatformPlan()) || { key: 'free', name: 'Free Tier', price: 0 };
 		const planVersion = await getPricingConfigVersion();
 
 		const planOrder = ['basic', 'premium', 'pro'];
-		const current = String(subscription.planName || 'premium').toLowerCase().replace(' plan', '');
+		const current = String(subscription.planName || 'free').toLowerCase().replace(' plan', '');
 		const currentIndex = Math.max(planOrder.indexOf(current), 0);
 		const nextIndex = action === 'upgrade'
 			? Math.min(planOrder.length - 1, currentIndex + 1)
@@ -1461,6 +1480,9 @@ export const listProviders = async (filters: ProviderFilters) => {
 	}
 	if (typeof filters.minPrice === 'number') items = items.filter((p) => p.session_rate >= filters.minPrice!);
 	if (typeof filters.maxPrice === 'number') items = items.filter((p) => p.session_rate <= filters.maxPrice!);
+	if (filters.onlyNriProviders) {
+		items = items.filter((p: any) => Boolean((p as any).nriEligible));
+	}
 
 	return {
 		items,
@@ -1513,6 +1535,46 @@ const generateAgoraDetails = (sessionId: string, scheduledAt: Date, durationMinu
 	return { channel, token, expireAt };
 };
 
+const hasCompletedBothPHQAndGAD7 = async (userId: string): Promise<boolean> => {
+	const patientProfile = await getPatientProfile(userId);
+
+	const [latestPhqClinical, latestGadClinical, latestPhq9, latestGad7] = await Promise.all([
+		db.patientAssessment.findFirst({
+			where: { patientId: patientProfile.id, type: 'PHQ-9' },
+			select: { id: true },
+			orderBy: { createdAt: 'desc' },
+		}),
+		db.patientAssessment.findFirst({
+			where: { patientId: patientProfile.id, type: 'GAD-7' },
+			select: { id: true },
+			orderBy: { createdAt: 'desc' },
+		}),
+		db.pHQ9Assessment.findFirst({
+			where: { userId },
+			select: { id: true },
+			orderBy: { assessedAt: 'desc' },
+		}),
+		db.gAD7Assessment.findFirst({
+			where: { userId },
+			select: { id: true },
+			orderBy: { assessedAt: 'desc' },
+		}),
+	]);
+
+	const hasPhq = Boolean(latestPhqClinical || latestPhq9);
+	const hasGad = Boolean(latestGadClinical || latestGad7);
+	return hasPhq && hasGad;
+};
+
+export const assertPatientHasCompletedBothPHQandGAD7 = async (userId: string): Promise<void> => {
+	const hasBothAssessments = await hasCompletedBothPHQAndGAD7(userId);
+	if (!hasBothAssessments) {
+		throw new AppError('Please complete PHQ-9 and GAD-7 assessment first before connecting with providers.', 403, {
+			code: 'BOTH_ASSESSMENTS_REQUIRED',
+		});
+	}
+};
+
 export const initiateSessionBooking = async (
 	userId: string,
 	input: {
@@ -1526,6 +1588,8 @@ export const initiateSessionBooking = async (
 	},
 ) => {
 	await getPatientProfile(userId);
+	const isNriUser = await hasAcceptedNriTerms(userId).catch(() => false);
+	await assertPatientHasCompletedBothPHQandGAD7(userId);
 	const provider = await db.user.findUnique({
 		where: { id: input.providerId },
 		select: {
@@ -1535,11 +1599,19 @@ export const initiateSessionBooking = async (
 			therapistProfile: {
 				select: {
 					availability: true,
+					specializations: true,
+					clinicalCategories: true,
+					certifications: true,
+					shiftPreferences: true,
+					bio: true,
 				},
 			},
 		},
 	});
 	if (!provider || provider.isDeleted || !normalizeProviderRole(String(provider.role))) throw new AppError('Provider not found', 404);
+	if (isNriUser && !hasNriProviderCapability(provider.therapistProfile)) {
+		throw new AppError('NRI users can only book NRI-enabled providers', 403);
+	}
 
 	const scheduledAt = new Date(input.scheduledAt);
 	if (Number.isNaN(scheduledAt.getTime()) || scheduledAt <= new Date()) throw new AppError('scheduledAt must be a future datetime', 422);
@@ -1550,7 +1622,7 @@ export const initiateSessionBooking = async (
 		throw new AppError('Selected slot is outside provider working hours', 409);
 	}
 	const quote = await getSessionQuote({
-		providerType: input.providerType || roleToProviderType(provider.role),
+		providerType: input.providerType || (isNriUser ? roleToNriProviderType(provider.role) : roleToProviderType(provider.role)),
 		durationMinutes: duration,
 		preferredTime: Boolean(input.preferredTime),
 	});
@@ -2882,7 +2954,9 @@ export const listAvailableProvidersForPatient = async (
 	filters: ProviderFilters & { search?: string },
 ) => {
 	await getPatientProfile(userId);
-	const result = await listProviders(filters);
+	const isNriUser = await hasAcceptedNriTerms(userId).catch(() => false);
+	await assertPatientHasCompletedBothPHQandGAD7(userId);
+	const result = await listProviders({ ...filters, onlyNriProviders: isNriUser || filters.onlyNriProviders });
 	let items = result.items.map((provider: any) => ({
 		id: provider.id,
 		name: provider.name,
@@ -2956,6 +3030,8 @@ export const requestAppointmentWithPreferredProviders = async (
 		note?: string;
 	},
 ) => {
+	await assertPatientHasCompletedBothPHQandGAD7(userId);
+	const isNriUser = await hasAcceptedNriTerms(userId).catch(() => false);
 	const providerIds = Array.from(new Set((input.providerIds || []).map((id) => String(id || '').trim()).filter(Boolean)));
 	if (!providerIds.length) {
 		throw new AppError('At least one provider is required', 422);
@@ -2975,7 +3051,22 @@ export const requestAppointmentWithPreferredProviders = async (
 				isDeleted: false,
 				role: { in: ['THERAPIST', 'PSYCHIATRIST', 'COACH', 'PSYCHOLOGIST'] },
 			},
-			select: { id: true, name: true, firstName: true, lastName: true, role: true },
+			select: {
+				id: true,
+				name: true,
+				firstName: true,
+				lastName: true,
+				role: true,
+				therapistProfile: {
+					select: {
+						specializations: true,
+						clinicalCategories: true,
+						certifications: true,
+						shiftPreferences: true,
+						bio: true,
+					},
+				},
+			},
 		}),
 	]);
 
@@ -2986,11 +3077,18 @@ export const requestAppointmentWithPreferredProviders = async (
 		throw new AppError('No valid providers found for appointment request', 422);
 	}
 
+	const eligibleProviders = isNriUser
+		? providers.filter((provider: any) => hasNriProviderCapability(provider.therapistProfile))
+		: providers;
+	if (!eligibleProviders.length) {
+		throw new AppError('No NRI-enabled providers found for appointment request', 422);
+	}
+
 	const patientName = String(patientUser.name || `${patientUser.firstName || ''} ${patientUser.lastName || ''}`.trim() || 'Patient');
 	const requestRef = `APR-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
 
 	await Promise.all([
-		...providers.map((provider: any) =>
+		...eligibleProviders.map((provider: any) =>
 			db.notification.create({
 				data: {
 					userId: String(provider.id),
@@ -3018,10 +3116,10 @@ export const requestAppointmentWithPreferredProviders = async (
 				userId,
 				type: 'APPOINTMENT_REQUEST_SUBMITTED',
 				title: 'Appointment request submitted',
-				message: `Your request was sent to ${providers.length} preferred provider${providers.length > 1 ? 's' : ''}.`,
+				message: `Your request was sent to ${eligibleProviders.length} preferred provider${eligibleProviders.length > 1 ? 's' : ''}.`,
 				payload: {
 					requestRef,
-					providerIds: providers.map((provider: any) => String(provider.id)),
+					providerIds: eligibleProviders.map((provider: any) => String(provider.id)),
 					carePath: input.carePath || 'direct-selection',
 					urgency: input.urgency || 'routine',
 					preferredLanguage: input.preferredLanguage || null,
@@ -3037,8 +3135,8 @@ export const requestAppointmentWithPreferredProviders = async (
 	return {
 		requestRef,
 		requestedAt: new Date().toISOString(),
-		providerCount: providers.length,
-		providers: providers.map((provider: any) => ({
+		providerCount: eligibleProviders.length,
+		providers: eligibleProviders.map((provider: any) => ({
 			id: String(provider.id),
 			name: String(provider.name || `${provider.firstName || ''} ${provider.lastName || ''}`.trim() || 'Provider'),
 			role: String(provider.role || '').toLowerCase(),

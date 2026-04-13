@@ -50,7 +50,6 @@ const ADMIN_DOMAINS: AdminDomain[] = [
 		label: 'Operations',
 		items: [
 			{ to: '/admin/operations/sessions', label: 'Sessions', shortLabel: 'Ses' },
-			{ to: '/admin/operations/templates', label: 'Screening Framework', shortLabel: 'Tpl' },
 			{ to: '/admin/operations/groups', label: 'Group Therapy', shortLabel: 'Grp' },
 			{ to: '/admin/operations/qr', label: 'QR Codes', shortLabel: 'QR' },
 			{ to: '/admin/operations/crisis', label: 'Crisis Console', shortLabel: 'Crs' },

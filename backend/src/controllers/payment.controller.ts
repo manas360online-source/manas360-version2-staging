@@ -430,11 +430,12 @@ export const getUniversalInvoiceController = async (req: Request, res: Response)
 			}
 
 			if (providerPlanKey === 'free') {
+				const requireGateway = env.nodeEnv === 'production' || env.nodeEnv === 'staging';
 				const platformPayment = await initiateProviderPlatformPayment(
 					userId,
 					platformCycle,
 					effectiveFinalAmountMinor,
-					{ redirectUrlOverride: successRedirectUrl, idempotencyKey, requireGateway: true }
+					{ redirectUrlOverride: successRedirectUrl, idempotencyKey, requireGateway }
 				);
 
 				await prisma.universalCheckoutPayment.update({

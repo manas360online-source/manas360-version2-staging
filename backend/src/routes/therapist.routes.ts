@@ -74,12 +74,6 @@ import {
 	putMyTherapistStructuredSessionNoteController,
 } from '../controllers/therapist-modules.controller';
 import {
-	assignProviderQuestionController,
-	createProviderExtraQuestionController,
-	listProviderExtraQuestionsController,
-	listProviderQuestionAssignmentsController,
-} from '../controllers/free-screening-provider.controller';
-import {
 	acceptAppointmentController,
 	rejectAppointmentController,
 } from '../controllers/smart-match.controller';
@@ -149,12 +143,5 @@ router.post(
 	...validateUploadTherapistDocumentRequest,
 	asyncHandler(uploadMyTherapistDocumentController),
 );
-
-// Template actions
-
-router.get('/me/free-screening/questions', requireAuth, requireTherapistRole, asyncHandler(listProviderExtraQuestionsController));
-router.post('/me/free-screening/questions', requireAuth, requireTherapistRole, asyncHandler(createProviderExtraQuestionController));
-router.post('/me/free-screening/questions/:questionId/assign', requireAuth, requireTherapistRole, asyncHandler(assignProviderQuestionController));
-router.get('/me/free-screening/assignments', requireAuth, requireTherapistRole, asyncHandler(listProviderQuestionAssignmentsController));
 
 export default router;

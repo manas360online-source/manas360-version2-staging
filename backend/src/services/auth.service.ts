@@ -28,6 +28,7 @@ import {
 import { createTokenPair, verifyRefreshToken } from '../utils/jwt';
 import { logger } from '../utils/logger';
 import { sendPlatformAdminPasswordResetEmail } from './email.service';
+import { NRI_CONSENT_TYPE, getActiveLegalDocuments, hasAcceptedNriTerms, recordUserAcceptances } from './legal-compliance.service';
 import { sendWhatsAppMessage } from './whatsapp.service';
 import type { WhatsAppUserType } from './whatsapp.service';
 import type {
@@ -281,15 +282,31 @@ type ProviderRegisterInput = {
 	registrationType?: 'RCI' | 'NMC' | 'STATE_COUNCIL' | 'OTHER';
 	yearsExperience: number;
 	highestQual: string;
+	clinicalCategories?: string[];
 	specializations: string[];
 	languages: string[];
+	certifications?: string[];
+	corporateReady?: boolean;
+	shiftPreferences?: string[];
 	hourlyRate: number;
+	bankDetails?: {
+		accountName?: string;
+		accountNumber?: string;
+		ifsc?: string;
+		bankName?: string;
+		upiId?: string;
+	};
+	tagline?: string;
+	digitalSignature?: string;
+	nriSessionEnabled?: boolean;
 	bio?: string;
 	documents?: Array<{
 		documentType: 'DEGREE' | 'ID_PROOF' | 'LICENSE';
 		url: string;
 	}>;
 };
+
+const NRI_PROVIDER_CERT_MARKER = 'NRI_SESSION_ENABLED';
 
 const toProviderDisplayName = (displayName: string): string => {
 	const normalized = String(displayName || '').trim();
@@ -340,6 +357,11 @@ export const registerProviderProfile = async (userId: string, input: ProviderReg
 		}
 
 		const displayName = toProviderDisplayName(input.displayName || String(user.name || `${user.firstName || ''} ${user.lastName || ''}`));
+		const normalizedClinicalCategories = Array.from(new Set((input.clinicalCategories || []).map((item) => String(item).trim()).filter(Boolean)));
+		const normalizedSpecializations = Array.from(new Set((input.specializations || []).map((item) => String(item).trim()).filter(Boolean)));
+		const normalizedLanguages = Array.from(new Set((input.languages || []).map((item) => String(item).trim()).filter(Boolean)));
+		const normalizedShiftPreferences = Array.from(new Set((input.shiftPreferences || []).map((item) => String(item).trim()).filter(Boolean)));
+		const certifications = input.nriSessionEnabled ? [NRI_PROVIDER_CERT_MARKER] : [];
 
 		const profile = await tx.therapistProfile.create({
 			data: {
@@ -352,15 +374,19 @@ export const registerProviderProfile = async (userId: string, input: ProviderReg
 				highestQual: input.highestQual.trim(),
 				licenseRci: input.registrationType === 'RCI' ? normalizedRegistrationNum : undefined,
 				licenseNmc: input.registrationType === 'NMC' ? normalizedRegistrationNum : undefined,
-				clinicalCategories: [],
-				specializations: Array.from(new Set((input.specializations || []).map((item) => String(item).trim()).filter(Boolean))),
-				languages: Array.from(new Set((input.languages || []).map((item) => String(item).trim()).filter(Boolean))),
-				corporateReady: false,
-				shiftPreferences: [],
+				clinicalCategories: normalizedClinicalCategories,
+				specializations: normalizedSpecializations,
+				languages: normalizedLanguages,
+				certifications: Array.from(new Set((input.certifications || []).map((item) => String(item).trim()).filter(Boolean))),
+				corporateReady: Boolean(input.corporateReady),
+				shiftPreferences: normalizedShiftPreferences,
 				yearsExperience: Math.max(0, Number(input.yearsExperience || 0)),
 				yearsOfExperience: Math.max(0, Number(input.yearsExperience || 0)),
 				hourlyRate: Math.max(0, Number(input.hourlyRate || 0)),
 				consultationFee: Math.max(0, Number(input.hourlyRate || 0)),
+				bankDetails: input.bankDetails || undefined,
+				tagline: input.tagline?.trim() || undefined,
+				digitalSignature: input.digitalSignature?.trim() || undefined,
 				bio: input.bio?.trim() || undefined,
 				onboardingCompleted: false,
 				isVerified: false,
@@ -538,6 +564,10 @@ export const verifyPhoneOtp = async (input: VerifyPhoneOtpInput, meta: RequestMe
 		throw new AppError('Invalid OTP', 400);
 	}
 
+	if (input.nri_declared && !input.nri_tos_accepted) {
+		throw new AppError('Please accept NRI Terms of Service to register', 422);
+	}
+
 	const isFirstPhoneVerification = !Boolean(user.phoneVerified);
 	if (isFirstPhoneVerification && !input.acceptedTerms) {
 		throw new AppError('Please accept Terms & Conditions to register', 422);
@@ -559,6 +589,7 @@ export const verifyPhoneOtp = async (input: VerifyPhoneOtpInput, meta: RequestMe
 			'THERAPIST_IC_AGREEMENT',
 			'THERAPIST_NDA',
 			'THERAPIST_DATA_PROCESSING_AGREEMENT',
+			NRI_CONSENT_TYPE,
 		]);
 
 		const acceptedFromInput = Array.isArray(input.acceptedDocuments)
@@ -568,6 +599,9 @@ export const verifyPhoneOtp = async (input: VerifyPhoneOtpInput, meta: RequestMe
 			: [];
 
 		const consentTypes = Array.from(new Set([...defaultConsentTypes, ...acceptedFromInput]));
+		if (input.nri_declared && input.nri_tos_accepted) {
+			consentTypes.push(NRI_CONSENT_TYPE);
+		}
 		const existing = await db.consent.findMany({
 			where: {
 				userId: String(user.id),
@@ -592,11 +626,37 @@ export const verifyPhoneOtp = async (input: VerifyPhoneOtpInput, meta: RequestMe
 					ipAddress: meta.ipAddress || null,
 					userAgent: meta.userAgent || null,
 					version: 1,
+					nriDeclared: Boolean(input.nri_declared),
+					nriAcceptedAt: input.nri_tos_accepted_at || null,
 				},
 			}));
 
 		if (toCreate.length > 0) {
 			await db.consent.createMany({ data: toCreate });
+		}
+
+		// Keep new legal acceptance tables in sync at registration time so users
+		// are not re-prompted right after onboarding.
+		try {
+			const legalDocs = await getActiveLegalDocuments();
+			const docIds = legalDocs
+				.filter((doc: any) => defaultConsentTypes.includes(String(doc.type || '').toUpperCase()))
+				.map((doc: any) => String(doc.id));
+
+			if (docIds.length > 0) {
+				await recordUserAcceptances({
+					userId: String(user.id),
+					documentIds: docIds,
+					ipAddress: meta.ipAddress || undefined,
+					userAgent: meta.userAgent || undefined,
+					source: 'signup_phone_otp',
+				});
+			}
+		} catch (legalSyncError) {
+			logger.warn('Legal acceptance sync skipped during OTP verification', {
+				userId: String(user.id),
+				error: (legalSyncError as Error)?.message,
+			});
 		}
 
 		// Send WhatsApp welcome message for first-time users (non-blocking)
@@ -661,6 +721,7 @@ export const verifyPhoneOtp = async (input: VerifyPhoneOtpInput, meta: RequestMe
 			providerOnboardingCompleted: Boolean((therapistProfile as any)?.onboardingCompleted),
 			providerProfileVerified: Boolean((therapistProfile as any)?.isVerified),
 			requiresPlatformPayment,
+			nriTermsAccepted: Boolean(input.nri_declared && input.nri_tos_accepted),
 			...companyAdminMeta,
 		},
 		...tokenPair,
@@ -748,6 +809,7 @@ export const loginWithPassword = async (input: LoginInput, meta: RequestMeta) =>
 	});
 	const resolvedCompanyMeta = await resolveUserCompanyMeta(String(user.id), user.email);
 	const companyAdminMeta = await ensureDevCorporateTestAccess(String(user.id), user.phone, resolvedCompanyMeta);
+	const nriTermsAccepted = await hasAcceptedNriTerms(String(user.id)).catch(() => false);
 	await audit('LOGIN_SUCCESS', 'success', meta, { userId: user.id, email: user.email, phone: user.phone });
 
 	// Determine if provider needs to pay the platform fee before onboarding
@@ -780,6 +842,7 @@ export const loginWithPassword = async (input: LoginInput, meta: RequestMeta) =>
 			providerOnboardingCompleted: Boolean((therapistProfile as any)?.onboardingCompleted),
 			providerProfileVerified: Boolean((therapistProfile as any)?.isVerified),
 			requiresPlatformPayment,
+			nriTermsAccepted,
 			...companyAdminMeta,
 		},
 		...tokenPair,

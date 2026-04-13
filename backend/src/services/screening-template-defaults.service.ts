@@ -261,76 +261,12 @@ const DEFAULT_SCREENING_TEMPLATES: Record<string, ScreeningTemplateDefault> = {
 };
 
 export const getDefaultScreeningTemplateDefinition = (key?: string): ScreeningTemplateDefault | null => {
-	const normalizedKey = String(key || FREE_SCREENING_TEMPLATE_KEY).trim() || FREE_SCREENING_TEMPLATE_KEY;
-	return DEFAULT_SCREENING_TEMPLATES[normalizedKey] ?? null;
+	void key;
+	return null;
 };
 
 export const ensureDefaultScreeningTemplate = async (db: any, key?: string) => {
-	const definition = getDefaultScreeningTemplateDefinition(key);
-	if (!definition) return null;
-
-	const existing = await db.screeningTemplate.findFirst({
-		where: { key: definition.key },
-		include: {
-			questions: { include: { options: { orderBy: { optionIndex: 'asc' } } }, orderBy: { orderIndex: 'asc' } },
-			scoringBands: { orderBy: { orderIndex: 'asc' } },
-		},
-	});
-	if (existing) return existing;
-
-	const created = await db.$transaction(async (tx: any) => {
-		const template = await tx.screeningTemplate.create({
-			data: {
-				key: definition.key,
-				title: definition.title,
-				description: definition.description,
-				estimatedMinutes: definition.estimatedMinutes,
-				isPublic: definition.isPublic,
-				randomizeOrder: definition.randomizeOrder,
-				status: definition.status,
-			},
-		});
-
-		for (const question of definition.questions) {
-			await tx.screeningQuestion.create({
-				data: {
-					templateId: template.id,
-					prompt: question.prompt,
-					sectionKey: question.sectionKey,
-					orderIndex: question.orderIndex,
-					isActive: true,
-					options: {
-						create: question.options.map((option) => ({
-							label: option.label,
-							optionIndex: option.optionIndex,
-							points: option.points,
-						})),
-					},
-				},
-			});
-		}
-
-		await tx.screeningScoringBand.createMany({
-			data: definition.scoringBands.map((band) => ({
-				templateId: template.id,
-				orderIndex: band.orderIndex,
-				minScore: band.minScore,
-				maxScore: band.maxScore,
-				severity: band.severity,
-				interpretation: band.interpretation,
-				recommendation: band.recommendation,
-				actionLabel: band.actionLabel,
-			})),
-		});
-
-		return template;
-	});
-
-	return db.screeningTemplate.findUnique({
-		where: { id: created.id },
-		include: {
-			questions: { include: { options: { orderBy: { optionIndex: 'asc' } } }, orderBy: { orderIndex: 'asc' } },
-			scoringBands: { orderBy: { orderIndex: 'asc' } },
-		},
-	});
+	void db;
+	void key;
+	return null;
 };

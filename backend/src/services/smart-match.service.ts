@@ -1,10 +1,13 @@
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/error.middleware';
 import { User, UserRole } from '@prisma/client';
-import type { TherapistProfile } from '@prisma/client';
 import { isSubscriptionValidForMatching } from './subscription.helper';
+import { env } from '../config/env';
+import { initiatePhonePePayment, checkPhonePeStatus } from './phonepe.service';
+import { assertPatientHasCompletedBothPHQandGAD7 } from './patient-v1.service';
+import { hasAcceptedNriTerms } from './legal-compliance.service';
+import { hasNriProviderCapability, scoreProviderMatch } from './provider-match.engine';
 
-const PAYMENT_WINDOW_BEFORE_SESSION_MS = 6 * 60 * 60 * 1000; // 6 hours in milliseconds
 const REQUEST_EXPIRY_HOURS = 24;
 const SESSION_QUOTE = {
   THERAPIST: 699 * 100, // ₹699 in minor units
@@ -183,6 +186,7 @@ export const findMatchingProviders = async (
   const requestedConcerns = (criteria?.concerns || []).map(normalizeToken).filter(Boolean);
   const requestedLanguages = (criteria?.languages || []).map(normalizeToken).filter(Boolean);
   const requestedModes = (criteria?.modes || []).map(normalizeToken).filter(Boolean);
+  const isNriUser = criteria?.patientUserId ? await hasAcceptedNriTerms(criteria.patientUserId).catch(() => false) : false;
   const weekStart = getWeekStartMonday();
 
   const eligibleProviderSubscriptions = await prisma.providerSubscription.findMany({
@@ -284,114 +288,46 @@ export const findMatchingProviders = async (
     .filter((t) => {
       if (!eligibleProviderIds.has(String(t.userId))) return false;
 
-      // Check if therapist has availability JSON
+      if (isNriUser && !hasNriProviderCapability(t)) return false;
+
       if (!t.availability) return false;
 
       try {
         const slots = t.availability as any;
         if (!Array.isArray(slots)) return false;
 
-        // Check if any of the requested days/times overlap with therapist's availability
         return hasSmartMatchAvailabilityOverlap(availabilityPrefs, slots as AvailabilitySlot[]);
       } catch {
         return false;
       }
     })
     .map((t) => {
-      const specs = (t.specializations || []).map((s) => normalizeToken(String(s)));
-      const certs = (t.certifications || []).map((c) => normalizeToken(String(c))).filter(Boolean);
-      const langs = (t.languages || []).map((l) => normalizeToken(String(l)));
-
-      const concernOverlap = requestedConcerns.length
-        ? requestedConcerns.filter((c) => specs.some((s) => s.includes(c) || c.includes(s))).length
-        : 1;
-      if (requestedConcerns.length > 0 && concernOverlap === 0) return null;
-
-      let specializationScore = 0;
-      if (concernOverlap >= 4) specializationScore = 30;
-      else if (concernOverlap >= 3) specializationScore = 25;
-      else if (concernOverlap >= 2) specializationScore = 18;
-      else if (concernOverlap >= 1) specializationScore = 12;
-
-      let certScore = 0;
-      if (certs.length >= 2) certScore = 10;
-      else if (certs.length >= 1) certScore = 7;
-      const expertise = Math.min(40, specializationScore + certScore);
-
-      const languageOverlap = requestedLanguages.length
-        ? requestedLanguages.filter((l) => langs.some((pl) => pl.includes(l) || l.includes(pl))).length
-        : 1;
-      if (requestedLanguages.length > 0 && languageOverlap === 0) return null;
-
-      let languageScore = 0;
-      if (languageOverlap >= 3) languageScore = 20;
-      else if (languageOverlap >= 2) languageScore = 16;
-      else if (languageOverlap >= 1) languageScore = 12;
-
-      const availabilitySlots = (t.availability as any[]) || [];
-      const overlappingTimeSlots = availabilityPrefs.timeSlots.filter((slot) =>
-        availabilityPrefs.daysOfWeek.some((day) =>
-          availabilitySlots.some((entry: AvailabilitySlot) =>
-            entry.dayOfWeek === day
-            && (entry.isAvailable ?? true)
-            && isTimeOverlap(slot.startMinute, slot.endMinute, entry.startMinute, entry.endMinute),
-          ),
-        ),
-      ).length;
-
-      let availabilityScore = 0;
-      if (overlappingTimeSlots >= 3) availabilityScore = 10;
-      else if (overlappingTimeSlots >= 2) availabilityScore = 8;
-      else if (overlappingTimeSlots >= 1) availabilityScore = 6;
-
-      const supportedModes = ['video', 'phone', 'chat'];
-      const modeOverlap = requestedModes.length
-        ? requestedModes.filter((mode) => supportedModes.includes(mode)).length
-        : 1;
-      let modeScore = 0;
-      if (modeOverlap >= 2) modeScore = 5;
-      else if (modeOverlap >= 1) modeScore = 3;
-
-      const communication = Math.min(35, languageScore + availabilityScore + modeScore);
-
       const qualityStats = qualityMap.get(String(t.userId)) || { total: 0, completed: 0, cancelled: 0 };
-      const totalSessions = Math.max(qualityStats.total, 1);
-      const retentionRate = qualityStats.completed / totalSessions;
-      const noShowRate = qualityStats.cancelled / totalSessions;
-
-      let healthScore = 0;
-      const rating = Number(t.averageRating || 0);
-      if (rating >= 4.5) healthScore += 5;
-      else if (rating >= 4.0) healthScore += 3;
-      else if (rating > 0) healthScore += 1;
-
-      if (retentionRate >= 0.7) healthScore += 4;
-      else if (retentionRate >= 0.5) healthScore += 2;
-      else if (retentionRate >= 0.3) healthScore += 1;
-
-      if (noShowRate < 0.03) healthScore += 3;
-      else if (noShowRate < 0.05) healthScore += 2;
-      else if (noShowRate < 0.1) healthScore += 1;
-
-      healthScore += 3;
-
       const continuitySessions = Number(continuityMap.get(String(t.userId)) || 0);
-      let continuityScore = 0;
-      if (continuitySessions >= 5) continuityScore = 10;
-      else if (continuitySessions >= 3) continuityScore = 8;
-      else if (continuitySessions >= 1) continuityScore = 5;
+      const match = scoreProviderMatch({
+        providerId: String(t.userId),
+        profile: {
+          specializations: t.specializations || [],
+          clinicalCategories: t.clinicalCategories || [],
+          certifications: t.certifications || [],
+          languages: t.languages || [],
+          shiftPreferences: t.shiftPreferences || [],
+          availability: (t.availability as any) || [],
+          bio: t.bio || '',
+          averageRating: t.averageRating || 0,
+        },
+        context,
+        requestedConcerns,
+        requestedLanguages,
+        requestedModes,
+        availabilityPrefs,
+        qualityStats,
+        continuitySessions,
+        isNriUser,
+      });
 
-      const quality = Math.min(25, healthScore + continuityScore);
+      if (!match) return null;
 
-      const total = Math.round(
-        expertise * contextMultiplier.expertise
-        + communication * contextMultiplier.communication
-        + quality * contextMultiplier.quality,
-      );
-
-      const tier = mapTierFromScore(total);
-      const matchBand = mapBandFromScore(total);
-      const matchChancePct = Math.max(25, Math.min(95, Math.round(total * 0.8)));
       const providerSubscription = subscriptionByProviderId.get(String(t.userId));
       const providerWeekStart = providerSubscription?.weekStartsAt ? new Date(providerSubscription.weekStartsAt) : null;
       const usedThisWeek = providerWeekStart && providerWeekStart.getTime() >= weekStart.getTime()
@@ -411,14 +347,14 @@ export const findMatchingProviders = async (
         consultationFee: t.consultationFee || 0,
         specializations: t.specializations || [],
         averageRating: t.averageRating || 0,
-        score: total,
-        tier,
-        matchBand,
-        matchChancePct,
+        score: match.score,
+        tier: match.tier,
+        matchBand: match.matchBand,
+        matchChancePct: match.matchChancePct,
         breakdown: {
-          expertise,
-          communication,
-          quality,
+          expertise: match.breakdown.expertise,
+          communication: match.breakdown.communication,
+          quality: match.breakdown.quality,
         },
         providerSubscriptionStatus: String(providerSubscription?.status || ''),
         providerSubscriptionGraceEndDate: providerGraceEndDate,
@@ -471,7 +407,16 @@ interface CreateAppointmentRequestInput {
     tier?: 'HOT' | 'WARM' | 'COLD';
     breakdown?: { expertise: number; communication: number; quality: number };
   }>;
+  payment?: {
+    merchantTransactionId?: string;
+  };
 }
+
+const isPhonePePaymentSuccess = (statusResponse: any): boolean => {
+  const code = String(statusResponse?.code || '').toUpperCase();
+  const state = String(statusResponse?.data?.state || '').toUpperCase();
+  return code === 'PAYMENT_SUCCESS' || state === 'COMPLETED';
+};
 
 // Create a broadcast appointment request that goes to multiple providers
 export const createAppointmentRequest = async (
@@ -481,7 +426,16 @@ export const createAppointmentRequest = async (
   status: string;
   providers: Array<{ providerId: string; name: string }>;
   message: string;
+  paymentRequired?: boolean;
+  payment?: {
+    merchantTransactionId: string;
+    redirectUrl: string;
+    amountMinor: number;
+    currency: 'INR';
+  };
 }> => {
+  await assertPatientHasCompletedBothPHQandGAD7(input.patientId);
+
   if (!input.providerIds || input.providerIds.length === 0) {
     throw new AppError('At least one provider must be selected', 422);
   }
@@ -511,6 +465,44 @@ export const createAppointmentRequest = async (
 
   if (providers.length !== input.providerIds.length) {
     throw new AppError('One or more providers not found or inactive', 404);
+  }
+
+  const amountMinor = providers.reduce((max, provider) => {
+    const quoted = SESSION_QUOTE[String(provider.providerType || 'THERAPIST') as keyof typeof SESSION_QUOTE] || SESSION_QUOTE.THERAPIST;
+    return Math.max(max, quoted);
+  }, SESSION_QUOTE.THERAPIST);
+
+  const merchantTransactionId = String(input.payment?.merchantTransactionId || '').trim();
+  if (!merchantTransactionId) {
+    const transactionId = `SMREQ_${Date.now()}_${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+    const callbackUrl = `${env.apiUrl}${env.apiPrefix}/v1/payments/phonepe/webhook`;
+    const redirectUrl = `${env.frontendUrl}/#/payment/status?transactionId=${encodeURIComponent(transactionId)}`;
+    const phonePeRedirectUrl = await initiatePhonePePayment({
+      transactionId,
+      userId: input.patientId,
+      amountInPaise: amountMinor,
+      callbackUrl,
+      redirectUrl,
+    });
+
+    return {
+      appointmentRequestId: '',
+      status: 'PAYMENT_REQUIRED',
+      providers: providers.map((p) => ({ providerId: p.id, name: `${p.firstName} ${p.lastName}`.trim() })),
+      message: 'Payment is required before sending request to providers.',
+      paymentRequired: true,
+      payment: {
+        merchantTransactionId: transactionId,
+        redirectUrl: phonePeRedirectUrl,
+        amountMinor,
+        currency: 'INR',
+      },
+    };
+  }
+
+  const paymentStatus = await checkPhonePeStatus(merchantTransactionId);
+  if (!isPhonePePaymentSuccess(paymentStatus)) {
+    throw new AppError('Payment not completed. Complete payment first before sending request to providers.', 409);
   }
 
   const eligibleSubscriptions = await prisma.providerSubscription.findMany({
@@ -582,6 +574,9 @@ export const createAppointmentRequest = async (
       preferredSpecialization: input.preferredSpecialization,
       durationMinutes: input.durationMinutes || 50,
       status: 'PENDING',
+      razorpayOrderId: merchantTransactionId,
+      amountMinor: BigInt(amountMinor),
+      currency: 'INR',
       expiresAt: new Date(Date.now() + REQUEST_EXPIRY_HOURS * 60 * 60 * 1000),
     },
   });
@@ -703,7 +698,7 @@ export const createAppointmentRequest = async (
       providerId: p.id,
       name: `${p.firstName} ${p.lastName}`.trim(),
     })),
-    message: `Request sent to ${input.providerIds.length} provider(s). We will notify you as soon as one accepts.`,
+    message: `Payment verified. Request sent to ${input.providerIds.length} provider(s).`,
   };
 };
 
@@ -720,7 +715,6 @@ export const acceptAppointmentRequest = async (
   status: string;
   appointmentRequestId: string;
   scheduledAt: string;
-  paymentDeadlineAt: string;
   amountMinor: number;
   message: string;
 }> => {
@@ -753,29 +747,16 @@ export const acceptAppointmentRequest = async (
     throw new AppError('Scheduled time must be in the future', 422);
   }
 
-  // Calculate payment deadline (6 hours before session)
-  const paymentDeadlineAt = new Date(
-    input.scheduledAt.getTime() - PAYMENT_WINDOW_BEFORE_SESSION_MS,
-  );
-  if (paymentDeadlineAt <= new Date()) {
-    throw new AppError(
-      'Session must be at least 6 hours away for booking to be valid',
-      422,
-    );
+  const amountMinor = Number(appointmentRequest.amountMinor || 0);
+
+  if (!appointmentRequest.razorpayOrderId) {
+    throw new AppError('Request payment reference is missing. Please create a new paid request.', 409);
   }
 
-  // Get provider type for fee calculation
-  const provider = await prisma.user.findUnique({
-    where: { id: input.providerId },
-    select: { providerType: true, therapistProfile: { select: { consultationFee: true } } },
-  });
-
-  if (!provider) throw new AppError('Provider not found', 404);
-
-  const amountMinor =
-    provider.therapistProfile?.consultationFee ||
-    SESSION_QUOTE[provider.providerType as keyof typeof SESSION_QUOTE] ||
-    SESSION_QUOTE.THERAPIST;
+  const paymentStatus = await checkPhonePeStatus(String(appointmentRequest.razorpayOrderId));
+  if (!isPhonePePaymentSuccess(paymentStatus)) {
+    throw new AppError('Patient payment is not completed. This request cannot be accepted yet.', 409);
+  }
 
   // Update appointment request: mark this provider as accepted, cancel others
   const updatedProviders = providers.map((p: any) => {
@@ -790,10 +771,8 @@ export const acceptAppointmentRequest = async (
     data: {
       acceptedProviderId: input.providerId,
       scheduledAt: input.scheduledAt,
-      paymentDeadlineAt,
-      amountMinor: BigInt(amountMinor),
       providers: updatedProviders as any,
-      status: 'ACCEPTED_BY_PROVIDER',
+      status: 'CONFIRMED',
     },
   });
 
@@ -802,16 +781,15 @@ export const acceptAppointmentRequest = async (
   await prisma.notification.create({
     data: {
       userId: String(appointmentRequest.patientId),
-      type: 'SMART_MATCH_PAYMENT_REQUIRED',
+      type: 'SMART_MATCH_REQUEST_CONFIRMED',
       title: 'Provider accepted your request',
-      message: `${acceptedProviderName} accepted your request. Complete payment within 6 hours to confirm your session.`,
+      message: `${acceptedProviderName} accepted your paid request. Your session request is now confirmed.`,
       payload: {
         appointmentRequestId: updated.id,
         providerId: input.providerId,
         scheduledAt: updated.scheduledAt?.toISOString(),
-        paymentDeadlineAt: paymentDeadlineAt.toISOString(),
         amountMinor,
-        requestStatus: 'ACCEPTED_BY_PROVIDER',
+        requestStatus: 'CONFIRMED',
       },
       sentAt: new Date(),
     },
@@ -842,9 +820,8 @@ export const acceptAppointmentRequest = async (
     status: updated.status,
     appointmentRequestId: updated.id,
     scheduledAt: updated.scheduledAt!.toISOString(),
-    paymentDeadlineAt: paymentDeadlineAt.toISOString(),
     amountMinor,
-    message: `You accepted the appointment request. Patient must pay ₹${(amountMinor / 100).toFixed(2)} within 6 hours to confirm.`,
+    message: `You accepted the appointment request. Payment is already verified for ₹${(amountMinor / 100).toFixed(2)}.`,
   };
 };
 

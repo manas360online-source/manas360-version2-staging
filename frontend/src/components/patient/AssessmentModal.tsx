@@ -60,7 +60,7 @@ export default function AssessmentModal({ isOpen, onClose, onComplete }: Assessm
   const submitAssessment = async (finalAnswers: number[]) => {
     try {
       setIsSubmitting(true);
-      await patientApi.submitPHQ9(finalAnswers);
+      await patientApi.submitClinicalJourney({ type: 'PHQ-9', answers: finalAnswers });
       setStep(10); // Move to completion screen
     } catch (_err) {
       alert('Failed to submit assessment. Please try again.');

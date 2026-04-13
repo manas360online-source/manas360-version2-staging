@@ -77,7 +77,6 @@ const AdminSettingsPage = lazy(() => import('./pages/admin/Settings'));
 const PlatformConfigPage = lazy(() => import('./pages/admin/PlatformConfig'));
 const ClinicalAssistantPage = lazy(() => import('./pages/admin/ClinicalAssistantPage'));
 const AdminSectionPage = lazy(() => import('./pages/admin/AdminSectionPage'));
-const AdminTemplatesPage = lazy(() => import('./pages/admin/Templates'));
 const AdminPayoutsPage = lazy(() => import('./pages/admin/Payouts'));
 const ZohoDeskPanel = lazy(() => import('./pages/admin/ZohoDeskPanel'));
 const OfferMarqueeEditor = lazy(() => import('./pages/admin/OfferMarqueeEditor'));
@@ -513,7 +512,6 @@ function App() {
                 <Route path="billing/payment-reliability" element={<AdminPaymentReliability />} />
 
                 <Route path="operations/sessions" element={<LiveSessions />} />
-                <Route path="operations/templates" element={<AdminTemplatesPage />} />
                 <Route path="operations/groups" element={<GroupManagement />} />
                 <Route path="operations/qr" element={<QrCodeManager />} />
                 <Route path="operations/crisis" element={<CrisisConsole />} />
@@ -553,7 +551,6 @@ function App() {
                 <Route path="payouts" element={<Navigate to="/admin/billing/payouts" replace />} />
                 <Route path="payment-reliability" element={<Navigate to="/admin/billing/payment-reliability" replace />} />
                 <Route path="live-sessions" element={<Navigate to="/admin/operations/sessions" replace />} />
-                <Route path="templates" element={<Navigate to="/admin/operations/templates" replace />} />
                 <Route path="groups" element={<Navigate to="/admin/operations/groups" replace />} />
                 <Route path="qr-codes" element={<Navigate to="/admin/operations/qr" replace />} />
                 <Route path="crisis-console" element={<Navigate to="/admin/operations/crisis" replace />} />

@@ -3,6 +3,7 @@ import { prisma } from '../config/db';
 const db = prisma as any;
 
 export const REQUIRED_LEGAL_TYPES = ['TERMS_OF_SERVICE', 'PRIVACY_POLICY', 'INFORMED_CONSENT'] as const;
+export const NRI_CONSENT_TYPE = 'NRI_TERMS_OF_SERVICE';
 
 export type RequiredLegalType = (typeof REQUIRED_LEGAL_TYPES)[number];
 
@@ -97,28 +98,32 @@ export const getPendingLegalDocumentsForUser = async (userId: string) => {
 		if (!isMissingLegalSchema(error)) {
 			throw error;
 		}
-
-		const legacyConsents = await db.consent.findMany({
-			where: {
-				userId,
-				status: 'GRANTED',
-				consentType: { in: [...REQUIRED_LEGAL_TYPES] },
-			},
-			select: {
-				consentType: true,
-				metadata: true,
-			},
-		});
-
-		acceptances = legacyConsents.map((consent: any) => ({
-			documentId: consent.consentType,
-			documentVer: Number((consent.metadata as any)?.version || 1),
-			document: {
-				type: consent.consentType,
-				version: Number((consent.metadata as any)?.version || 1),
-			},
-		}));
 	}
+
+	// Always include legacy consent records so existing users are not re-blocked
+	// after migrating to the legal_documents/user_acceptances schema.
+	const legacyConsents = await db.consent.findMany({
+		where: {
+			userId,
+			status: 'GRANTED',
+			consentType: { in: [...REQUIRED_LEGAL_TYPES] },
+		},
+		select: {
+			consentType: true,
+			metadata: true,
+		},
+	});
+
+	const legacyAcceptances = legacyConsents.map((consent: any) => ({
+		documentId: consent.consentType,
+		documentVer: Number((consent.metadata as any)?.version || 1),
+		document: {
+			type: consent.consentType,
+			version: Number((consent.metadata as any)?.version || 1),
+		},
+	}));
+
+	acceptances = [...acceptances, ...legacyAcceptances];
 
 	const acceptedByType = new Map<string, number>();
 	for (const acceptance of acceptances) {
@@ -144,6 +149,24 @@ export const getPendingLegalDocumentsForUser = async (userId: string) => {
 export const hasPendingLegalAcceptance = async (userId: string): Promise<boolean> => {
 	const status = await getPendingLegalDocumentsForUser(userId);
 	return status.pendingCount > 0;
+};
+
+export const hasGrantedConsent = async (userId: string, consentType: string): Promise<boolean> => {
+	const rows = await db.consent.findMany({
+		where: {
+			userId,
+			consentType,
+			status: 'GRANTED',
+		},
+		select: { grantedAt: true },
+		take: 1,
+	}).catch(() => [] as any[]);
+
+	return Boolean(rows?.length);
+};
+
+export const hasAcceptedNriTerms = async (userId: string): Promise<boolean> => {
+	return hasGrantedConsent(userId, NRI_CONSENT_TYPE);
 };
 
 export const recordUserAcceptances = async (input: {

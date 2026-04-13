@@ -322,11 +322,6 @@ export default function SignupPage() {
 	};
 
 	const requestOtp = async () => {
-		if (nriConsent.nri_declared && !nriConsent.nri_tos_accepted) {
-			setError('Please review and accept NRI Terms of Service to continue.');
-			return;
-		}
-
 		if (!isProviderFlow && !acceptedTerms) {
 			setError('Please accept Terms & Conditions to continue.');
 			return;
@@ -584,7 +579,6 @@ export default function SignupPage() {
 								loading={loading}
 								className="min-h-[48px]"
 								onClick={requestOtp}
-								disabled={nriConsent.nri_declared && !nriConsent.nri_tos_accepted}
 							>
 								{loading ? 'Sending OTP...' : 'Send OTP'}
 							</Button>
@@ -595,11 +589,16 @@ export default function SignupPage() {
 								loading={loading}
 								className="min-h-[48px]"
 								onClick={verifyOtp}
-								disabled={nriConsent.nri_declared && !nriConsent.nri_tos_accepted}
 							>
 								{loading ? 'Verifying OTP...' : 'Verify OTP and Register'}
 							</Button>
 						)}
+
+						{nriConsent.nri_declared && !nriConsent.nri_tos_accepted ? (
+							<p className="text-xs text-amber-700">
+								NRI Terms of Service must be accepted before final registration. You can send OTP now and accept NRI terms before verifying OTP.
+							</p>
+						) : null}
 					</div>
 
 					{activeAgreementConfig ? (

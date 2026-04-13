@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   Bell,
+  Brain,
   CalendarDays,
   ClipboardList,
   FileText,
@@ -20,18 +21,24 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { patientApi } from '../../api/patient';
 import { useWallet } from '@/hooks/useWallet';
 import { useAuth } from '../../context/AuthContext';
+import { getDraftStorageKey } from '../../hooks/useAssessmentFlow';
 
 const mainNavItems = [
   { to: '/patient/dashboard', label: 'Dashboard', icon: Home },
   { to: '/patient/therapy-plan', label: 'My Therapy Plan', icon: ClipboardList },
-  { to: '/patient/sessions', label: 'My Care', icon: CalendarDays, badge: '1 upcoming' },
+  { to: '/patient/sessions', label: 'My Care', icon: CalendarDays },
   { to: '/patient/group-therapy', label: 'Group Therapy', icon: CalendarDays, badge: 'Live' },
+];
+
+const clinicalNavItems = [
+  { to: '/patient/sessions', label: 'Attend Assessment', icon: Brain, badge: 'Required' },
+  { to: '/patient/progress', label: 'Assessment History', icon: BarChart3 },
 ];
 
 const selfCareNavItems = [
   { to: '/patient/messages', label: 'Anytime Buddy (AI)', icon: MessageSquare, badge: 'AI' },
   { to: '/patient/check-in', label: 'Daily Check-in', icon: HeartPulse },
-    { to: '/patient/hit-a-sixer', label: 'Hit a Sixer', icon: Sparkles },
+  { to: '/patient/hit-a-sixer', label: 'Hit a Sixer', icon: Sparkles },
   { to: '/patient/wellness-library', label: 'Wellness Library', icon: Sparkles },
 ];
 
@@ -136,6 +143,15 @@ export default function PatientDashboardLayout() {
     : `₹${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(walletBalance)}`;
 
   const handleLogout = async () => {
+    // Clear user-scoped assessment draft so the next user doesn't see stale gate state
+    try {
+      const scopedKey = getDraftStorageKey(user?.id || undefined);
+      localStorage.removeItem(scopedKey);
+      sessionStorage.removeItem(scopedKey);
+      // Also sweep legacy unscoped key (for backward compat with any old draft)
+      localStorage.removeItem('patient-clinical-assessment-draft-v1');
+      sessionStorage.removeItem('patient-clinical-assessment-draft-v1');
+    } catch { /* ignore storage errors */ }
     await logout();
     navigate('/auth/login', { replace: true });
   };
@@ -247,6 +263,7 @@ export default function PatientDashboardLayout() {
 
           <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4" aria-label="Patient dashboard navigation">
             {renderNavSection('Main', mainNavItems)}
+            {renderNavSection('Clinical', clinicalNavItems)}
             {renderNavSection('Self Care', selfCareNavItems)}
             {renderNavSection('Progress', progressNavItems)}
             {renderNavSection('Support', supportNavItems)}

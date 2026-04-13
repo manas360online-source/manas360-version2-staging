@@ -137,6 +137,11 @@ export type SmartMatchProvidersResult = {
   message?: string;
 };
 
+const DEFAULT_SMART_MATCH_AVAILABILITY = {
+  daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+  timeSlots: [{ startMinute: 0, endMinute: 1439 }],
+};
+
 const unwrapPayload = <T = any>(value: any): T => {
   if (value && typeof value === 'object') {
     if (value.data !== undefined) {
@@ -164,6 +169,57 @@ export const isOnboardingRequiredError = (error: any): boolean => {
   const message = String(error?.response?.data?.message || error?.message || '');
   if (isOnboardingMessage(message)) return true;
   return status === 404 && isOnboardingMessage(message);
+};
+
+const STRUCTURED_OPTIONS = [
+  { optionIndex: 0, label: 'Not at all', points: 0 },
+  { optionIndex: 1, label: 'Several days', points: 1 },
+  { optionIndex: 2, label: 'More than half the days', points: 2 },
+  { optionIndex: 3, label: 'Nearly every day', points: 3 },
+];
+
+const STRUCTURED_QUESTION_BANK: Record<'PHQ-9' | 'GAD-7', string[]> = {
+  'PHQ-9': [
+    'Little interest or pleasure in doing things',
+    'Feeling down, depressed, or hopeless',
+    'Trouble falling or staying asleep, or sleeping too much',
+    'Feeling tired or having little energy',
+    'Poor appetite or overeating',
+    'Feeling bad about yourself - or that you are a failure',
+    'Trouble concentrating on things, such as reading or watching television',
+    'Moving or speaking so slowly that other people could have noticed, or the opposite',
+    'Thoughts that you would be better off dead, or of hurting yourself',
+  ],
+  'GAD-7': [
+    'Feeling nervous, anxious, or on edge',
+    'Not being able to stop or control worrying',
+    'Worrying too much about different things',
+    'Trouble relaxing',
+    'Being so restless that it is hard to sit still',
+    'Becoming easily annoyed or irritable',
+    'Feeling afraid as if something awful might happen',
+  ],
+};
+
+const inferAssessmentType = (value: string): 'PHQ-9' | 'GAD-7' => {
+  const normalized = String(value || '').toUpperCase();
+  if (normalized.includes('GAD-7') || normalized.includes('GAD7')) return 'GAD-7';
+  return 'PHQ-9';
+};
+
+const severityFromScore = (type: 'PHQ-9' | 'GAD-7', score: number): string => {
+  if (type === 'PHQ-9') {
+    if (score >= 20) return 'severe';
+    if (score >= 15) return 'moderately-severe';
+    if (score >= 10) return 'moderate';
+    if (score >= 5) return 'mild';
+    return 'minimal';
+  }
+
+  if (score >= 15) return 'severe';
+  if (score >= 10) return 'moderate';
+  if (score >= 5) return 'mild';
+  return 'minimal';
 };
 
 export const patientApi = {
@@ -201,29 +257,91 @@ export const patientApi = {
     (await http.get(`/v1/sessions/${encodeURIComponent(id)}/documents/session-pdf`, { responseType: 'blob' })).data,
   downloadInvoicePdf: async (id: string) =>
     (await http.get(`/v1/sessions/${encodeURIComponent(id)}/documents/invoice`, { responseType: 'blob' })).data,
-  submitAssessment: async (payload: { type: string; score?: number; answers?: number[] }) =>
-    (await http.post('/v1/assessments/submit', payload)).data,
+  submitAssessment: async (payload: { type: string; score?: number; answers?: number[] }) => {
+    const normalizedType = inferAssessmentType(payload.type);
+    return (await http.post('/v1/patient-journey/clinical-assessment', {
+      type: normalizedType,
+      score: payload.score,
+      answers: payload.answers,
+    })).data;
+  },
 	submitPHQ9: async (answers: number[]) =>
-		(await http.post('/v1/assessments/phq9', { answers })).data,
+		(await http.post('/v1/patient-journey/clinical-assessment', { type: 'PHQ-9', answers })).data,
   submitQuickScreeningJourney: async (payload: JourneyQuickScreeningRequest): Promise<JourneyRecommendationResponse> =>
     (await http.post('/v1/patient-journey/quick-screening', payload)).data,
   submitClinicalJourney: async (payload: JourneyClinicalRequest): Promise<JourneyRecommendationResponse> =>
     (await http.post('/v1/patient-journey/clinical-assessment', payload)).data,
   startStructuredAssessment: async (payload: { templateKey: string }): Promise<StructuredAssessmentStartResponse> => {
-    const response = await http.post('/v1/free-screening/start/me', payload);
-    return response.data?.data ?? response.data;
+    const type = inferAssessmentType(payload.templateKey);
+    const questions = STRUCTURED_QUESTION_BANK[type].map((prompt, index) => ({
+      questionId: `${type}-${index + 1}`,
+      position: index + 1,
+      prompt,
+      sectionKey: type,
+      options: STRUCTURED_OPTIONS,
+    }));
+
+    return {
+      attemptId: `${type}-${Date.now()}`,
+      template: {
+        id: type,
+        key: payload.templateKey,
+        title: type,
+        description: `${type} standard assessment`,
+        estimatedMinutes: type === 'PHQ-9' ? 4 : 3,
+      },
+      questions,
+    };
   },
   submitStructuredAssessment: async (
     attemptId: string,
     payload: { answers: Array<{ questionId: string; optionIndex: number }> },
   ): Promise<StructuredAssessmentSubmitResponse> => {
-    const response = await http.post(`/v1/free-screening/${encodeURIComponent(attemptId)}/submit/me`, payload);
-    return response.data?.data ?? response.data;
+    const type = inferAssessmentType(attemptId);
+    const numericAnswers = (payload.answers || []).map((item) => Number(item.optionIndex || 0));
+    const totalScore = numericAnswers.reduce((sum, score) => sum + score, 0);
+
+    await http.post('/v1/patient-journey/clinical-assessment', {
+      type,
+      answers: numericAnswers,
+    });
+
+    return {
+      attemptId,
+      templateKey: type,
+      totalScore,
+      severityLevel: severityFromScore(type, totalScore),
+      interpretation: `${type} submitted successfully`,
+      recommendation: 'Continue with the recommended care pathway.',
+      action: 'Continue',
+    };
   },
   getStructuredAssessmentHistory: async () => {
-    const response = await http.get('/v1/free-screening/history');
-    return response.data?.data ?? response.data;
+    const response = await http.get('/v1/patient/me/assessments', { params: { page: 1, limit: 50 } });
+    const payload = response.data?.data ?? response.data;
+    const items = Array.isArray(payload?.items) ? payload.items : [];
+
+    return {
+      items: items
+        .filter((entry: any) => {
+          const type = String(entry.type || '').toLowerCase();
+          return type.includes('phq-9') || type.includes('phq9') || type.includes('gad-7') || type.includes('gad7');
+        })
+        .map((entry: any) => ({
+          attemptId: entry.id,
+          templateKey: entry.type,
+          templateTitle: entry.type,
+          totalScore: Number(entry.score || 0),
+          severityLevel: String(entry.severityLevel || 'mild'),
+          interpretation: '',
+          recommendation: '',
+          action: 'Continue',
+          submittedAt: entry.createdAt,
+        })),
+    };
   },
+  getPatientAssessmentHistory: async (params?: { page?: number; limit?: number; type?: string }) =>
+    (await http.get('/v1/patient/me/assessments', { params })).data,
   getJourneyRecommendation: async (): Promise<JourneyRecommendationResponse> =>
     (await http.get('/v1/patient-journey/recommendation')).data,
   selectJourneyPathway: async (payload: JourneySelectPathwayRequest): Promise<JourneySelectPathwayResponse> =>
@@ -452,8 +570,8 @@ export const patientApi = {
     const response = await http.patch(`/v1/patient/cbt-assignments/${encodeURIComponent(assignmentId)}`, payload);
     return response.data?.data ?? response.data;
   },
-  getPricing: async () =>
-    (await http.get('/v1/pricing')).data,
+  getPricing: async (params?: { mode?: 'domestic' | 'nri' }) =>
+    (await http.get('/v1/pricing', { params })).data,
   aiChat: async (payload: { message: string; bot_type?: 'mood_ai' | 'clinical_ai'; response_style?: 'concise' | 'detailed' }) =>
     (await http.post('/chat/message', {
       message: payload.message,
@@ -488,8 +606,38 @@ export const patientApi = {
     getDocumentDownloadUrl: async (id: string) => (await http.get(`/v1/patient/documents/${encodeURIComponent(id)}/download`)).data,
     // Care Team
     getMyProviders: async () => (await http.get('/v1/patient/care-team')).data,
-    getAvailableProviders: async (params?: { specialization?: string; language?: string; maxPrice?: number; role?: string }) =>
-      (await http.get('/v1/patient/providers/available', { params })).data,
+    getAvailableProviders: async (params?: { specialization?: string; language?: string; maxPrice?: number; role?: string }) => {
+      const result = await patientApi.getAvailableProvidersForSmartMatch(
+        DEFAULT_SMART_MATCH_AVAILABILITY,
+        params?.role,
+        {
+          languages: params?.language ? [params.language] : undefined,
+        },
+      );
+
+      let providers = Array.isArray(result.providers) ? result.providers : [];
+      if (params?.specialization) {
+        const specialization = String(params.specialization).toLowerCase();
+        providers = providers.filter((provider: any) => {
+          const specializations = Array.isArray(provider?.specializations)
+            ? provider.specializations
+            : [provider?.specialization].filter(Boolean);
+          return specializations.some((item: string) => String(item).toLowerCase().includes(specialization));
+        });
+      }
+      if (typeof params?.maxPrice === 'number') {
+        providers = providers.filter((provider: any) => Number(provider?.sessionPrice || provider?.session_rate || 0) <= Number(params.maxPrice));
+      }
+
+      return {
+        data: {
+          items: providers,
+          total: providers.length,
+          page: 1,
+          limit: providers.length,
+        },
+      };
+    },
       requestAppointmentToPreferredProviders: async (payload: {
         providerIds: string[];
         preferredLanguage?: string;
@@ -499,14 +647,21 @@ export const patientApi = {
         urgency?: string;
         note?: string;
       }) =>
-        (await http.post('/v1/patient/appointments/request', payload)).data,
+        (await http.post('/v1/patient/appointments/smart-match', {
+          availabilityPrefs: DEFAULT_SMART_MATCH_AVAILABILITY,
+          providerIds: payload.providerIds,
+          preferredSpecialization: payload.preferredSpecialization,
+          context: payload.carePath,
+          languages: payload.preferredLanguage ? [payload.preferredLanguage] : undefined,
+          note: payload.note,
+        })).data,
       confirmProposedAppointmentSlot: async (payload: {
         requestRef: string;
         providerId: string;
         proposedStartAt?: string;
         accept: boolean;
       }) =>
-        (await http.post('/v1/patient/appointments/confirm-slot', payload)).data,
+        (await http.post('/v1/patient/appointments/smart-match/confirm-slot', payload)).data,
     // Messaging
     getConversations: async () => (await http.get('/v1/patient/messages/conversations')).data,
     getMessages: async (conversationId: string) => (await http.get(`/v1/patient/messages/${encodeURIComponent(conversationId)}`)).data,

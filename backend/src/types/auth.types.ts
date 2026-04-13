@@ -17,6 +17,9 @@ export interface VerifyPhoneOtpInput {
 	otp: string;
 	acceptedTerms?: boolean;
 	acceptedDocuments?: string[];
+	nri_declared?: boolean;
+	nri_tos_accepted?: boolean;
+	nri_tos_accepted_at?: string;
 }
 
 export interface LoginInput {

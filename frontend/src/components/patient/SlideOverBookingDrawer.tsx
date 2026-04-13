@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Calendar as CalendarIcon, Clock, CreditCard, CheckCircle2 } from 'lucide-react';
 import { patientApi } from '../../api/patient';
 import { useWallet } from '../../hooks/useWallet';
+import { useAssessmentFlow } from '../../hooks/useAssessmentFlow';
 import { FRONTEND_URL } from '../../lib/runtimeEnv';
 
 interface Provider {
@@ -55,6 +56,7 @@ export default function SlideOverBookingDrawer({
   const [error, setError] = useState<string | null>(null);
   const [showSubscriptionWarning, setShowSubscriptionWarning] = useState(false);
   const { balance, applyWalletToPayment } = useWallet();
+  const { commitClinicAssessments } = useAssessmentFlow();
   const total = Number((balance as any)?.total_balance || 0);
 
   // Reset state only when drawer is opened.
@@ -160,6 +162,9 @@ export default function SlideOverBookingDrawer({
       if (!bookingId) {
         throw new Error('Failed to retrieve booking ID from server.');
       }
+
+      // 1b. Permanent commit of delayed clinical assessments (Save on Booking)
+      await commitClinicAssessments();
 
       const originalAmountRupees = provider.sessionPrice || 1500;
       const amountMinor = Math.round(Number(originalAmountRupees) * 100); // base price in paise
