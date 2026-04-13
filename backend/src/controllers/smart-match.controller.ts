@@ -10,6 +10,7 @@ import {
   getPatientPendingRequests,
   getPatientPaymentPendingRequest,
 } from '../services/smart-match.service';
+import { assertPatientHasCompletedBothPHQandGAD7 } from '../services/patient-v1.service';
 
 interface AvailabilityPrefs {
   daysOfWeek: number[];
@@ -32,6 +33,7 @@ const parseQueryList = (value: unknown): string[] => {
 export const getAvailableProvidersController = async (req: Request, res: Response): Promise<void> => {
   const patientId = req.auth?.userId;
   if (!patientId) throw new AppError('Unauthorized', 401);
+  await assertPatientHasCompletedBothPHQandGAD7(patientId);
 
   const { daysOfWeek, timeSlots, providerType, limit } = req.query;
 
@@ -110,6 +112,7 @@ export const createAppointmentRequestController = async (req: Request, res: Resp
   if (!patientId) {
     throw new AppError('Unauthorized', 401);
   }
+  await assertPatientHasCompletedBothPHQandGAD7(patientId);
   const {
     availabilityPrefs,
     providerIds,
@@ -120,6 +123,7 @@ export const createAppointmentRequestController = async (req: Request, res: Resp
     languages,
     modes,
     rankedProviders,
+    payment,
   } = req.body;
 
   if (!availabilityPrefs || !providerIds) {
@@ -153,9 +157,14 @@ export const createAppointmentRequestController = async (req: Request, res: Resp
     languages,
     modes,
     rankedProviders,
+    payment,
   });
 
-  sendSuccess(res, result, 'Appointment request created successfully', 201);
+  const statusCode = result.paymentRequired ? 202 : 201;
+  const message = result.paymentRequired
+    ? 'Payment required before request can be sent to providers'
+    : 'Appointment request created successfully';
+  sendSuccess(res, result, message, statusCode);
 };
 
 // GET /patient/appointments/requests/pending

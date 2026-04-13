@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MANAS360 — Janmabhoomi Vibes | NRI Teletherapy</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,500;0,700;1,500;1,700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ocean: #002365;
+  --ocean-deep: #001A4D;
+  --ocean-light: #E8EEF7;
+  --sky: #4A90D9;
+  --gold: #7F8000;
+  --gold-light: #F4F4E0;
+  --dark: #1A1A2E;
+  --dark-soft: #3D3D5C;
+  --white: #FFFFFF;
+  --gray: #666680;
+  --gray-light: #E8EDF2;
+  --gray-bg: #FAFCFF;
+  --rose: #E53E6B;
+  --green: #059669;
+  --orange: #D97706;
+  --nri-warm: #FFF3E0;
+  --nri-accent: #E65100;
+  --nri-deep: #BF360C;
+  --nri-earth: #5D4037;
+  --nri-sand: #FBE9E7;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'DM Sans', sans-serif; background: var(--gray-bg); color: var(--dark); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+
+@keyframes fadeInUp { from { opacity:0; transform:translateY(24px) } to { opacity:1; transform:translateY(0) } }
+@keyframes shimmer { 0%{background-position:-200% center} 100%{background-position:200% center} }
+@keyframes gentlePulse { 0%,100%{opacity:1} 50%{opacity:.85} }
+@keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+
+/* ─── TOP BAR ─── */
+.top-bar {
+  background: linear-gradient(90deg, var(--nri-deep), var(--nri-accent), #FF6D00);
+  padding: 10px 20px; display:flex; align-items:center; justify-content:center; gap:14px;
+  font-size:12px; color:var(--white); position:relative; overflow:hidden;
+}
+.top-bar::before {
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.1),transparent);
+  background-size:200% 100%; animation:shimmer 4s infinite;
+}
+.top-bar span { position:relative; z-index:1; }
+.top-bar a { color:#FFCC80; text-decoration:none; font-weight:700; position:relative; z-index:1; }
+
+/* ─── NAV ─── */
+.nav-bar {
+  background:var(--white); border-bottom:1px solid var(--gray-light);
+  padding:0 20px; display:flex; align-items:center; justify-content:space-between; height:52px;
+  max-width:1260px; margin:0 auto;
+}
+.logo { font-size:20px; font-weight:800; color:var(--ocean-deep); text-decoration:none; }
+.logo em { font-style:normal; color:var(--gold); }
+.nav-back { font-size:13px; color:var(--gray); text-decoration:none; display:flex; align-items:center; gap:6px; }
+.nav-back:hover { color:var(--ocean); }
+
+/* ─── HERO ─── */
+.hero {
+  background: linear-gradient(135deg, #FFF8E1 0%, var(--nri-warm) 40%, var(--nri-sand) 100%);
+  padding: 60px 20px 50px; text-align:center; position:relative; overflow:hidden;
+}
+.hero::before {
+  content:''; position:absolute; top:-40px; right:-60px; width:200px; height:200px;
+  background:radial-gradient(circle, rgba(230,81,0,.08), transparent 70%);
+  border-radius:50%;
+}
+.hero-eyebrow {
+  font-size:12px; font-weight:700; color:var(--nri-accent); text-transform:uppercase;
+  letter-spacing:2px; margin-bottom:12px; animation:fadeInUp .6s ease;
+}
+.hero h1 {
+  font-family:'Playfair Display', serif; font-size:clamp(28px,5vw,44px); font-weight:700;
+  color:var(--nri-earth); line-height:1.2; margin-bottom:14px; animation:fadeInUp .7s ease;
+}
+.hero h1 em { color:var(--nri-accent); font-style:italic; }
+.hero-sub {
+  font-size:15px; color:#795548; max-width:600px; margin:0 auto 24px; line-height:1.6;
+  animation:fadeInUp .8s ease;
+}
+.hero-features {
+  display:flex; flex-wrap:wrap; justify-content:center; gap:10px; margin-bottom:20px;
+  animation:fadeInUp .9s ease;
+}
+.hero-feat {
+  font-size:12px; font-weight:600; color:var(--nri-earth); background:rgba(255,255,255,.7);
+  padding:6px 14px; border-radius:20px; border:1px solid rgba(93,64,55,.1);
+  backdrop-filter:blur(4px);
+}
+
+/* ─── PRICING SECTION ─── */
+.pricing-section { padding:50px 20px 40px; max-width:1100px; margin:0 auto; }
+.pricing-title {
+  font-family:'Playfair Display', serif; font-size:28px; font-weight:700;
+  color:var(--dark); text-align:center; margin-bottom:6px;
+}
+.pricing-subtitle {
+  font-size:14px; color:var(--gray); text-align:center; margin-bottom:36px;
+}
+
+.pricing-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:20px; }
+
+.plan-card {
+  background:var(--white); border-radius:16px; border:1.5px solid var(--gray-light);
+  padding:28px 24px; position:relative; transition:all .3s;
+}
+.plan-card:hover { transform:translateY(-4px); box-shadow:0 12px 40px rgba(0,0,0,.08); }
+.plan-card.featured {
+  border:2.5px solid var(--nri-accent); box-shadow:0 8px 32px rgba(230,81,0,.12);
+}
+.plan-badge {
+  position:absolute; top:-12px; left:50%; transform:translateX(-50%);
+  font-size:11px; font-weight:700; padding:4px 16px; border-radius:14px;
+  white-space:nowrap;
+}
+.badge-starter { background:#E8F5E9; color:#1B5E20; }
+.badge-popular { background:linear-gradient(135deg,#E65100,#BF360C); color:var(--white); }
+.badge-premium { background:#FFF8E1; color:#F57F17; border:1px solid #FFE082; }
+
+.plan-name { font-size:20px; font-weight:800; color:var(--dark); margin:8px 0 2px; }
+.plan-name-sub { font-size:12px; color:var(--gray); font-style:italic; margin-bottom:12px; }
+
+.plan-price { margin-bottom:16px; }
+.plan-price .amount { font-size:36px; font-weight:800; color:var(--nri-deep); }
+.plan-price .period { font-size:14px; color:var(--gray); }
+.plan-price .inr { font-size:12px; color:#8D6E63; margin-top:2px; }
+
+.plan-divider { height:1px; background:var(--gray-light); margin:12px 0; }
+
+.plan-section-label {
+  font-size:11px; font-weight:700; color:var(--nri-accent); text-transform:uppercase;
+  letter-spacing:1px; margin:14px 0 8px; padding-top:6px; border-top:1px solid var(--gray-light);
+}
+.plan-section-label:first-of-type { border-top:none; padding-top:0; }
+
+.plan-feature {
+  font-size:13px; color:var(--dark-soft); padding:5px 0; display:flex; gap:8px;
+  align-items:flex-start; line-height:1.5;
+}
+.plan-feature .check { color:var(--green); font-weight:700; flex-shrink:0; font-size:14px; }
+
+.plan-cta {
+  display:block; width:100%; padding:12px; border-radius:12px; font-size:14px; font-weight:700;
+  text-align:center; cursor:pointer; transition:all .2s; border:none; margin-top:20px;
+}
+.cta-outline {
+  background:transparent; color:var(--nri-accent); border:1.5px solid var(--nri-accent);
+}
+.cta-outline:hover { background:var(--nri-sand); }
+.cta-primary {
+  background:linear-gradient(135deg, var(--nri-accent), var(--nri-deep));
+  color:var(--white); box-shadow:0 4px 16px rgba(191,54,12,.25);
+}
+.cta-primary:hover { transform:scale(1.02); box-shadow:0 6px 24px rgba(191,54,12,.35); }
+.cta-gold {
+  background:linear-gradient(135deg, #F57F17, #E65100);
+  color:var(--white); box-shadow:0 4px 16px rgba(245,127,23,.25);
+}
+.cta-gold:hover { transform:scale(1.02); }
+
+/* ─── COMPARISON TABLE ─── */
+.compare-section { padding:0 20px 40px; max-width:900px; margin:0 auto; }
+.compare-title {
+  font-size:20px; font-weight:700; color:var(--dark); text-align:center; margin-bottom:20px;
+}
+.compare-table {
+  width:100%; border-collapse:collapse; font-size:13px; background:var(--white);
+  border-radius:12px; overflow:hidden; border:1px solid var(--gray-light);
+}
+.compare-table th {
+  background:#FFF3E0; color:var(--nri-earth); font-weight:700; padding:10px 12px;
+  text-align:center; font-size:12px; border-bottom:2px solid #FFE0B2;
+}
+.compare-table th:first-child { text-align:left; }
+.compare-table td {
+  padding:8px 12px; border-bottom:1px solid var(--gray-light); text-align:center; color:var(--dark-soft);
+}
+.compare-table td:first-child { text-align:left; font-weight:500; color:var(--dark); }
+.compare-table tr:last-child td { border-bottom:none; }
+.compare-table tr:hover td { background:#FFFDE7; }
+.compare-table .yes { color:var(--green); font-weight:700; }
+.compare-table .no { color:#BDBDBD; }
+
+/* ─── TIMEZONE DISCLAIMER ─── */
+.tz-section {
+  padding:40px 20px; max-width:800px; margin:0 auto;
+}
+.tz-card {
+  background:linear-gradient(135deg, #ECEFF1, #FAFAFA);
+  border-radius:16px; padding:28px; border:1px solid #CFD8DC;
+}
+.tz-title {
+  font-size:18px; font-weight:700; color:var(--dark); margin-bottom:12px;
+  display:flex; align-items:center; gap:8px;
+}
+.tz-body { font-size:13px; color:var(--gray); line-height:1.7; }
+.tz-body strong { color:var(--dark-soft); }
+.tz-grid {
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px;
+  margin:16px 0;
+}
+.tz-item {
+  background:var(--white); border-radius:10px; padding:10px 14px;
+  border:1px solid var(--gray-light);
+}
+.tz-item .region { font-size:11px; font-weight:700; color:var(--nri-accent); text-transform:uppercase; }
+.tz-item .hours { font-size:14px; font-weight:600; color:var(--dark); margin-top:2px; }
+.tz-item .note { font-size:11px; color:var(--gray); margin-top:2px; }
+.tz-disclaimer {
+  font-size:12px; color:#8D6E63; background:#FFF8E1; padding:10px 14px;
+  border-radius:8px; margin-top:14px; line-height:1.6; border-left:3px solid #FFB74D;
+}
+
+/* ─── ANONYMITY SECTION ─── */
+.anon-section { padding:30px 20px 50px; max-width:800px; margin:0 auto; }
+.anon-card {
+  background:var(--white); border-radius:16px; padding:28px; border:1px solid var(--gray-light);
+}
+.anon-title { font-size:18px; font-weight:700; color:var(--dark); margin-bottom:10px; }
+.anon-body { font-size:13px; color:var(--gray); line-height:1.7; }
+.anon-features {
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:10px;
+  margin-top:14px;
+}
+.anon-feat {
+  background:var(--gray-bg); border-radius:10px; padding:10px 14px;
+  font-size:12px; color:var(--dark-soft); display:flex; gap:8px; align-items:flex-start; line-height:1.5;
+}
+.anon-feat .icon { font-size:16px; flex-shrink:0; }
+
+/* ─── FAMILY CARE ─── */
+.family-section { padding:0 20px 50px; max-width:800px; margin:0 auto; }
+.family-card {
+  background: linear-gradient(135deg, #E8F5E9, #F1F8E9);
+  border-radius:16px; padding:28px; border:1px solid #C8E6C9;
+}
+.family-title { font-size:18px; font-weight:700; color:#1B5E20; margin-bottom:10px; }
+.family-body { font-size:13px; color:#33691E; line-height:1.7; }
+
+/* ─── CTA FOOTER ─── */
+.cta-footer {
+  background:linear-gradient(135deg, var(--nri-deep), var(--ocean-deep));
+  padding:50px 20px; text-align:center;
+}
+.cta-footer h2 {
+  font-family:'Playfair Display', serif; font-size:28px; font-weight:700;
+  color:var(--white); margin-bottom:10px;
+}
+.cta-footer p { font-size:14px; color:rgba(255,255,255,.7); margin-bottom:24px; max-width:500px; margin-left:auto; margin-right:auto; }
+.cta-footer-btn {
+  display:inline-block; padding:14px 36px; border-radius:30px; font-size:15px; font-weight:700;
+  color:var(--nri-deep); background:linear-gradient(135deg, #FFE082, #FFB74D);
+  text-decoration:none; transition:all .2s; border:none; cursor:pointer;
+  box-shadow:0 4px 20px rgba(255,183,77,.3);
+}
+.cta-footer-btn:hover { transform:scale(1.04); box-shadow:0 8px 32px rgba(255,183,77,.45); }
+
+/* ─── FOOTER ─── */
+.page-footer {
+  background:var(--white); padding:20px; text-align:center; border-top:1px solid var(--gray-light);
+}
+.page-footer p { font-size:11px; color:var(--gray); }
+.page-footer a { color:var(--ocean); text-decoration:none; }
+
+/* ─── RESPONSIVE ─── */
+@media (max-width:700px) {
+  .pricing-grid { grid-template-columns:1fr; }
+  .compare-table { font-size:11px; }
+  .compare-table th, .compare-table td { padding:6px 8px; }
+}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="top-bar">
+  <span>🇮🇳 <strong>Janmabhoomi Vibes</strong> — Therapy in your mother tongue, from anywhere in the world</span>
+  <a href="#pricing">View Plans →</a>
+</div>
+
+<!-- NAV -->
+<div style="background:var(--white); border-bottom:1px solid var(--gray-light); position:sticky; top:0; z-index:90;">
+<div class="nav-bar">
+  <a href="/" class="logo">MANAS<em>360</em></a>
+  <a href="/" class="nav-back">← Back to Home</a>
+</div>
+</div>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-eyebrow">For NRIs & Global Indians</div>
+  <h1>Find Your <em>Janmabhoomi</em><br>Connection — Heal</h1>
+  <p class="hero-sub">
+    Therapy in your mother tongue with Indian therapists who understand your desi dilemma — 
+    career pressure abroad, family guilt, identity crisis, relationship bridges across continents.
+  </p>
+  <div class="hero-features">
+    <span class="hero-feat">🕐 Sessions in YOUR Timezone</span>
+    <span class="hero-feat">🗣️ Hindi · Tamil · Telugu · Kannada · English</span>
+    <span class="hero-feat">🔒 DPDPA Compliant</span>
+    <span class="hero-feat">💳 Pay in USD</span>
+    <span class="hero-feat">👨‍👩‍👧 Gift Sessions to Family in India</span>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section class="pricing-section" id="pricing">
+  <div class="pricing-title">Choose Your Plan</div>
+  <div class="pricing-subtitle">All plans include 21-day free trial with AnytimeBuddy AI access</div>
+
+  <div class="pricing-grid">
+
+    <!-- SAATHI -->
+    <div class="plan-card">
+      <span class="plan-badge badge-starter">Starter</span>
+      <div class="plan-name">Saathi</div>
+      <div class="plan-name-sub">"Your companion on the journey"</div>
+      <div class="plan-price">
+        <span class="amount">$49</span><span class="period">/month</span>
+        <div class="inr">≈ ₹4,100/mo</div>
+      </div>
+
+      <div class="plan-section-label">Live Sessions</div>
+      <div class="plan-feature"><span class="check">✓</span> 2 group sessions/month (60 min, 6-8 people)</div>
+      <div class="plan-feature"><span class="check">✓</span> Topic-based: anxiety, parenting, relationships, work stress</div>
+      <div class="plan-feature"><span class="check">✓</span> Camera-off option — full anonymity</div>
+
+      <div class="plan-section-label">Self-Help Tools (24/7)</div>
+      <div class="plan-feature"><span class="check">✓</span> AnytimeBuddy AI — unlimited, multilingual</div>
+      <div class="plan-feature"><span class="check">✓</span> Digital Pets for daily mood tracking</div>
+      <div class="plan-feature"><span class="check">✓</span> Sound therapy library (50+ tracks)</div>
+      <div class="plan-feature"><span class="check">✓</span> PHQ-9 / GAD-7 monthly check-in</div>
+
+      <div class="plan-section-label">Family Care</div>
+      <div class="plan-feature"><span class="check">✓</span> 1 free screening/month for family in India</div>
+
+      <button class="plan-cta cta-outline" onclick="startTrial('saathi')">Start Free Trial →</button>
+    </div>
+
+    <!-- BANDHAM (FEATURED) -->
+    <div class="plan-card featured">
+      <span class="plan-badge badge-popular">Most Popular</span>
+      <div class="plan-name">Bandham</div>
+      <div class="plan-name-sub">"The bond that heals"</div>
+      <div class="plan-price">
+        <span class="amount">$99</span><span class="period">/month</span>
+        <div class="inr">≈ ₹8,300/mo</div>
+      </div>
+
+      <div class="plan-section-label">Live Sessions</div>
+      <div class="plan-feature"><span class="check">✓</span> 2 individual sessions/month (50 min, 1-on-1 via Jitsi)</div>
+      <div class="plan-feature"><span class="check">✓</span> 2 group sessions/month (60 min, anonymous)</div>
+      <div class="plan-feature"><span class="check">✓</span> Therapist matched by language + specialization</div>
+      <div class="plan-feature"><span class="check">✓</span> Sessions scheduled in YOUR timezone</div>
+
+      <div class="plan-section-label">Self-Help Tools (24/7)</div>
+      <div class="plan-feature"><span class="check">✓</span> Everything in Saathi, plus:</div>
+      <div class="plan-feature"><span class="check">✓</span> Guided journaling with AI prompts</div>
+      <div class="plan-feature"><span class="check">✓</span> Therapist-assigned homework between sessions</div>
+
+      <div class="plan-section-label">Family Care</div>
+      <div class="plan-feature"><span class="check">✓</span> Gift 1 session/month to family member in India</div>
+      <div class="plan-feature"><span class="check">✓</span> Family screening alerts (with consent)</div>
+
+      <button class="plan-cta cta-primary" onclick="startTrial('bandham')">Start Free Trial →</button>
+    </div>
+
+    <!-- KUTUMBAM -->
+    <div class="plan-card">
+      <span class="plan-badge badge-premium">Premium</span>
+      <div class="plan-name">Kutumbam</div>
+      <div class="plan-name-sub">"For the whole family"</div>
+      <div class="plan-price">
+        <span class="amount">$179</span><span class="period">/month</span>
+        <div class="inr">≈ ₹15,000/mo</div>
+      </div>
+
+      <div class="plan-section-label">Live Sessions</div>
+      <div class="plan-feature"><span class="check">✓</span> 4 individual sessions/month (NRI or family in India)</div>
+      <div class="plan-feature"><span class="check">✓</span> Unlimited group sessions</div>
+      <div class="plan-feature"><span class="check">✓</span> 1 couples/family session per month (90 min)</div>
+      <div class="plan-feature"><span class="check">✓</span> Priority scheduling — pick any available slot</div>
+
+      <div class="plan-section-label">Self-Help Tools (24/7)</div>
+      <div class="plan-feature"><span class="check">✓</span> Everything in Bandham, plus:</div>
+      <div class="plan-feature"><span class="check">✓</span> Quarterly psychiatrist consultation</div>
+      <div class="plan-feature"><span class="check">✓</span> Wellness retreat ₹2,000 discount/quarter</div>
+
+      <div class="plan-section-label">Family Care</div>
+      <div class="plan-feature"><span class="check">✓</span> Up to 3 family members in India get sessions</div>
+      <div class="plan-feature"><span class="check">✓</span> Shared care dashboard (with consent)</div>
+      <div class="plan-feature"><span class="check">✓</span> Dedicated care coordinator across timezones</div>
+
+      <button class="plan-cta cta-gold" onclick="startTrial('kutumbam')">Start Free Trial →</button>
+    </div>
+
+  </div>
+</section>
+
+<!-- FEATURE COMPARISON TABLE -->
+<section class="compare-section">
+  <div class="compare-title">Feature Comparison</div>
+  <table class="compare-table">
+    <thead>
+      <tr>
+        <th>Feature</th>
+        <th>Saathi ($49)</th>
+        <th>Bandham ($99)</th>
+        <th>Kutumbam ($179)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Individual sessions/month</td><td class="no">—</td><td class="yes">2</td><td class="yes">4</td></tr>
+      <tr><td>Group sessions/month</td><td class="yes">2</td><td class="yes">2</td><td class="yes">Unlimited</td></tr>
+      <tr><td>Couples/family session</td><td class="no">—</td><td class="no">—</td><td class="yes">1/month</td></tr>
+      <tr><td>AnytimeBuddy AI (24/7)</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+      <tr><td>Digital Pets + Sound therapy</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+      <tr><td>Guided journaling</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+      <tr><td>Therapist homework</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+      <tr><td>Psychiatrist consultation</td><td class="no">—</td><td class="no">—</td><td class="yes">1/quarter</td></tr>
+      <tr><td>Gift sessions to India family</td><td class="no">Screening only</td><td class="yes">1/month</td><td class="yes">3 members</td></tr>
+      <tr><td>Care coordinator</td><td class="no">—</td><td class="no">—</td><td class="yes">Dedicated</td></tr>
+      <tr><td>Priority scheduling</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
+      <tr><td>Anonymous group attendance</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+      <tr><td>Retreat discount</td><td class="no">—</td><td class="no">—</td><td class="yes">₹2K/quarter</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- TIMEZONE DISCLAIMER -->
+<section class="tz-section">
+  <div class="tz-card">
+    <div class="tz-title">🕐 Timezone Scheduling — How It Works</div>
+    <div class="tz-body">
+      <p>Our therapists are based in India (IST). We maintain dedicated pools for each timezone so you get sessions at <strong>your</strong> convenient evening or morning hours.</p>
+      
+      <div class="tz-grid">
+        <div class="tz-item">
+          <div class="region">🇺🇸 US East Coast</div>
+          <div class="hours">6-9 PM EST</div>
+          <div class="note">IST 3:30-6:30 AM</div>
+        </div>
+        <div class="tz-item">
+          <div class="region">🇺🇸 US West Coast</div>
+          <div class="hours">6-9 PM PST</div>
+          <div class="note">IST 6:30-9:30 AM</div>
+        </div>
+        <div class="tz-item">
+          <div class="region">🇬🇧 United Kingdom</div>
+          <div class="hours">6-9 PM GMT</div>
+          <div class="note">IST 11:30 PM-2:30 AM</div>
+        </div>
+        <div class="tz-item">
+          <div class="region">🇦🇺 Australia</div>
+          <div class="hours">6-9 PM AEST</div>
+          <div class="note">IST 12:30-3:30 PM</div>
+        </div>
+        <div class="tz-item">
+          <div class="region">🇸🇬 Singapore</div>
+          <div class="hours">7-10 PM SGT</div>
+          <div class="note">IST 4:30-7:30 PM</div>
+        </div>
+        <div class="tz-item">
+          <div class="region">🇦🇪 UAE / Gulf</div>
+          <div class="hours">7-10 PM GST</div>
+          <div class="note">IST 8:30-11:30 PM</div>
+        </div>
+      </div>
+
+      <div class="tz-disclaimer">
+        <strong>Important:</strong> Session scheduling is subject to therapist availability in your preferred timezone window. 
+        Individual sessions (Bandham, Kutumbam) are booked based on mutual availability between you and your matched therapist. 
+        Group sessions run on a fixed weekly schedule across all timezone pools. 
+        During your free trial, we'll confirm your preferred slots before your first payment is processed.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ANONYMITY -->
+<section class="anon-section">
+  <div class="anon-card">
+    <div class="anon-title">🔒 Anonymous Group Attendance</div>
+    <div class="anon-body">
+      <p>We understand the NRI community is close-knit. Our group sessions are designed so you'll never worry about being "seen."</p>
+      <div class="anon-features">
+        <div class="anon-feat"><span class="icon">📷</span> Camera-off by default — video is your choice, never required</div>
+        <div class="anon-feat"><span class="icon">🏷️</span> First-name or alias only — other participants see "Participant 1, 2, 3..."</div>
+        <div class="anon-feat"><span class="icon">🚫</span> No recordings, no attendance list visible to other members</div>
+        <div class="anon-feat"><span class="icon">👨‍⚕️</span> Only your therapist sees your full details (for clinical safety)</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FAMILY CARE -->
+<section class="family-section">
+  <div class="family-card">
+    <div class="family-title">👨‍👩‍👧 Gift Therapy to Family Back Home</div>
+    <div class="family-body">
+      <p>Something no US therapy platform offers — use your plan to book sessions for parents, siblings, or spouse in India. 
+      You pay in USD, they receive care in their language, at IST-convenient hours. 
+      The Kutumbam plan covers up to 3 family members with a shared care dashboard (accessible only with consent).</p>
+    </div>
+  </div>
+</section>
+
+<!-- CTA FOOTER -->
+<section class="cta-footer">
+  <h2>Your Roots. Your Language. Your Healing.</h2>
+  <p>Start your 21-day free trial today. No payment required until your therapist match is confirmed.</p>
+  <button class="cta-footer-btn" onclick="startTrial('bandham')">🇮🇳 Start Free Trial — Connect to Home →</button>
+</section>
+
+<!-- FOOTER -->
+<footer class="page-footer">
+  <p>© 2025 MANAS360 Mental Wellness Pvt. Ltd. — Bengaluru, Karnataka, India | 
+    <a href="/">Home</a> · <a href="#">Privacy</a> · <a href="#">Terms</a> · 
+    All payments via PhonePe | INR billing only | +91 number required
+  </p>
+</footer>
+
+<script>
+function startTrial(plan) {
+  // Flow: Payment gateway → DB commitment → Lead Matching → Session
+  // For now, show confirmation and route to payment
+  const planNames = { saathi: 'Saathi ($49/mo)', bandham: 'Bandham ($99/mo)', kutumbam: 'Kutumbam ($179/mo)' };
+  const msg = `You selected: ${planNames[plan]}\n\n` +
+    `Next steps:\n` +
+    `1. ₹1 authorization (free trial)\n` +
+    `2. Timezone preference & language selection\n` +
+    `3. Therapist matching (within 24 hrs)\n` +
+    `4. First session scheduled\n\n` +
+    `Redirecting to secure payment...`;
+  alert(msg);
+  // In production: window.location.href = '/nri/subscribe?plan=' + plan;
+}
+</script>
+
+</body>
+</html>

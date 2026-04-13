@@ -10,6 +10,7 @@ import type {
   BookingContext,
   JourneyRecommendation
 } from '../types/patient';
+import { useAuth } from '../context/AuthContext';
 import { useErrorHandler } from './useErrorHandler';
 import { useLoadingStates } from './useLoadingStates';
 
@@ -20,7 +21,9 @@ const structuredTemplateKeys: Record<ClinicalAssessmentKey, string> = {
   'GAD-7': GAD7_TEMPLATE_KEY,
 };
 
-const ASSESSMENT_DRAFT_STORAGE_KEY = 'patient-clinical-assessment-draft-v1';
+const ASSESSMENT_DRAFT_BASE_KEY = 'patient-clinical-assessment-draft-v1';
+export const getDraftStorageKey = (userId?: string) =>
+  userId ? `${ASSESSMENT_DRAFT_BASE_KEY}:${userId}` : ASSESSMENT_DRAFT_BASE_KEY;
 const ASSESSMENT_DRAFT_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 const RESUMABLE_ASSESSMENT_PHASES: ClinicalFlowPhase[] = ['intro', 'question', 'loading-next', 'next-phase', 'provider-list'];
 
@@ -32,6 +35,10 @@ const toLocalDateKey = (value: Date = new Date()): string => {
 };
 
 export const useAssessmentFlow = () => {
+  const { user } = useAuth();
+  const userId = user?.id || undefined;
+  const ASSESSMENT_DRAFT_STORAGE_KEY = getDraftStorageKey(userId);
+
   const { addError } = useErrorHandler();
   const [loadingStates, loadingActions] = useLoadingStates({ assessment: false });
 
@@ -62,7 +69,7 @@ export const useAssessmentFlow = () => {
   const clearAssessmentDraft = useCallback(() => {
     sessionStorage.removeItem(ASSESSMENT_DRAFT_STORAGE_KEY);
     localStorage.removeItem(ASSESSMENT_DRAFT_STORAGE_KEY);
-  }, []);
+  }, [ASSESSMENT_DRAFT_STORAGE_KEY]);
 
   const saveAssessmentDraft = useCallback(() => {
     const draft: AssessmentDraft = {
@@ -84,6 +91,7 @@ export const useAssessmentFlow = () => {
     sessionStorage.setItem(ASSESSMENT_DRAFT_STORAGE_KEY, serialized);
     localStorage.setItem(ASSESSMENT_DRAFT_STORAGE_KEY, serialized);
   }, [
+    ASSESSMENT_DRAFT_STORAGE_KEY,
     clinicalFlowPhase,
     clinicalStartWith,
     assessmentOrder,
@@ -121,7 +129,7 @@ export const useAssessmentFlow = () => {
       clearAssessmentDraft();
       return null;
     }
-  }, [clearAssessmentDraft]);
+  }, [clearAssessmentDraft, ASSESSMENT_DRAFT_STORAGE_KEY]);
 
   // Assessment actions
   const resetClinicalAssessmentState = useCallback(() => {
@@ -162,31 +170,30 @@ export const useAssessmentFlow = () => {
   }, [addError, loadingActions]);
 
   const beginClinicalAssessment = useCallback(async () => {
-    // Check if user has already completed both assessments today
-    const today = new Date().toISOString().split('T')[0];
+    // Check if user has already completed both onboarding assessments once.
     const [structuredResponse] = await Promise.all([
       patientApi.getStructuredAssessmentHistory().catch(() => null),
     ]);
 
-    const structured = Array.isArray(structuredResponse?.data) ? structuredResponse.data : [];
-    const todayStructured = structured.filter((entry: any) => {
-      const entryDate = new Date(entry.submittedAt).toISOString().split('T')[0];
-      return entryDate === today;
-    });
+    const structured = Array.isArray((structuredResponse as any)?.items)
+      ? (structuredResponse as any).items
+      : Array.isArray((structuredResponse as any)?.data)
+        ? (structuredResponse as any).data
+        : [];
 
-    const hasCompletedPHQ9Today = todayStructured.some((entry: any) =>
+    const hasCompletedPHQ9 = structured.some((entry: any) =>
       String(entry.templateTitle || entry.templateKey || '').toLowerCase().includes('phq-9') ||
       String(entry.templateTitle || entry.templateKey || '').toLowerCase().includes('phq9')
     );
-    const hasCompletedGAD7Today = todayStructured.some((entry: any) =>
+    const hasCompletedGAD7 = structured.some((entry: any) =>
       String(entry.templateTitle || entry.templateKey || '').toLowerCase().includes('gad-7') ||
       String(entry.templateTitle || entry.templateKey || '').toLowerCase().includes('gad7')
     );
 
-    if (hasCompletedPHQ9Today && hasCompletedGAD7Today) {
+    if (hasCompletedPHQ9 && hasCompletedGAD7) {
       addError({
         type: 'validation',
-        message: 'You have already completed today\'s assessment.',
+        message: 'PHQ-9 and GAD-7 onboarding is already completed.',
         retryable: false,
       });
       return;
@@ -229,20 +236,26 @@ export const useAssessmentFlow = () => {
       }));
       const numericAnswers = structuredAttempt.questions.map((question: any) => answerMap[question.questionId]);
 
-      const [structuredResult, journeyResponse] = await Promise.all([
-        patientApi.submitStructuredAssessment(structuredAttempt.attemptId, { answers }),
-        patientApi.submitClinicalJourney({ type: activeType, answers: numericAnswers }),
-      ]);
-
+      // We call journey submission to get the recommendation (needed for care path)
+      // but we will 'commit' the assessment record itself only during booking confirmation
+      const journeyResponse = await patientApi.submitClinicalJourney({ type: activeType, answers: numericAnswers });
       const journey = parseJourneyPayload(journeyResponse);
       if (journey) setClinicalJourney(journey);
+
+      // Store answers and basic result in local state/draft
+      // Note: We are NOT calling patientApi.submitStructuredAssessment here yet
+      // unless we want to keep the score calculation logic on the backend.
+      // For now, we simulate the 'record' in clinicalResults.
+      const totalScore = Object.values(answerMap).reduce((acc, val) => acc + val, 0);
 
       setClinicalResults((prev) => [
         ...prev,
         {
           type: activeType,
-          score: Number(structuredResult.totalScore || 0),
-          severity: String(structuredResult.severityLevel || 'mild'),
+          score: totalScore,
+          severity: journey?.severity || 'mild',
+          attemptId: structuredAttempt.attemptId,
+          answers,
         },
       ]);
 
@@ -260,7 +273,7 @@ export const useAssessmentFlow = () => {
     } catch (error: any) {
       addError({
         type: 'server',
-        message: error?.message || 'Unable to submit assessment right now.',
+        message: error?.message || 'Unable to process assessment right now.',
         retryable: true,
         action: () => submitCurrentStructuredAssessment(answerMap),
       });
@@ -268,6 +281,29 @@ export const useAssessmentFlow = () => {
       loadingActions.stopLoading('assessment');
     }
   }, [structuredAttempt, assessmentOrder, activeAssessmentIndex, loadStructuredAssessment, loadingActions, addError]);
+
+  const commitClinicAssessments = useCallback(async () => {
+    if (clinicalResults.length === 0) return;
+
+    loadingActions.startLoading('assessment');
+    try {
+      // Final commit of all completed assessments in the current flow
+      await Promise.all(
+        clinicalResults.map(async (res: any) => {
+          if (res.attemptId && res.answers) {
+            await patientApi.submitStructuredAssessment(res.attemptId, { answers: res.answers });
+          }
+        })
+      );
+      // After committing, we can clear the draft
+      clearAssessmentDraft();
+    } catch (error) {
+      console.error('[ClinicalFlow] Failed to commit assessments:', error);
+      // Non-blocking for booking, but we should log it
+    } finally {
+      loadingActions.stopLoading('assessment');
+    }
+  }, [clinicalResults, loadingActions, clearAssessmentDraft]);
 
   const startCarePath = useCallback(async (path: 'recommended' | 'direct' | 'urgent') => {
     const pathway = path === 'urgent' ? 'urgent-care' : path === 'direct' ? 'direct-provider' : 'stepped-care';
@@ -431,6 +467,7 @@ export const useAssessmentFlow = () => {
     clearAssessmentDraft,
     saveAssessmentDraft,
     loadAssessmentDraft,
+    commitClinicAssessments,
 
     // Computed
     assessmentResumeCopy,

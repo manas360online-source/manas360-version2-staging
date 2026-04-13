@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import {
 	addDailyCheckInController,
-	createPatientAssessmentController,
 	createPatientProfileController,
 	getMyDocumentsController,
 	getMyMoodHistoryController,
@@ -17,7 +16,6 @@ import { requireAuth } from '../middleware/auth.middleware';
 import { requirePatientRole } from '../middleware/rbac.middleware';
 import {
 	asyncHandler,
-	validateCreatePatientAssessmentRequest,
 	validateCreatePatientProfileRequest,
 	validatePatientMoodHistoryQuery,
 	validatePatientAssessmentHistoryQuery,
@@ -31,7 +29,6 @@ const router = Router();
 
 router.post('/profile', requireAuth, requirePatientRole, ...validateCreatePatientProfileRequest, asyncHandler(createPatientProfileController));
 router.get('/me/profile', requireAuth, requirePatientRole, asyncHandler(getMyPatientProfileController));
-router.post('/me/assessments', requireAuth, requirePatientRole, ...validateCreatePatientAssessmentRequest, asyncHandler(createPatientAssessmentController));
 router.get('/me/assessments', requireAuth, requirePatientRole, ...validatePatientAssessmentHistoryQuery, asyncHandler(getMyPatientAssessmentHistoryController));
 router.get('/me/mood-history', requireAuth, requirePatientRole, ...validatePatientMoodHistoryQuery, asyncHandler(getMyMoodHistoryController));
 router.get('/me/therapy-plan', requireAuth, requirePatientRole, asyncHandler(getMyTherapyPlanController));

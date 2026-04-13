@@ -51,8 +51,6 @@ import {
 	sessionDetailController,
 	sessionHistoryController,
 	sessionSummaryPdfController,
-	submitAssessmentController,
-	submitPHQ9AssessmentController,
 	togglePatientSubscriptionAutoRenewController,
 	upcomingSessionsController,
 	updatePatientPaymentMethodController,
@@ -60,6 +58,7 @@ import {
 	checkoutPatientSubscriptionController,
 	verifyPaymentController,
 	getMyActiveCbtAssignmentsController,
+	getMyAssessmentsController,
 } from '../controllers/patient-v1.controller';
 import {
 	getAvailableProvidersController,
@@ -117,9 +116,10 @@ router.get('/sessions/:id', requireAuth, requireRole('patient'), asyncHandler(se
 
 router.post('/payments/verify', requireAuth, requireRole('patient'), asyncHandler(verifyPaymentController));
 
-router.post('/assessments/submit', requireAuth, requireRole('patient'), asyncHandler(submitAssessmentController));
-router.post('/assessments/phq9', requireAuth, requireRole('patient'), asyncHandler(submitPHQ9AssessmentController));
 router.get('/assessments/journey-recommendation', requireAuth, requireRole('patient'), asyncHandler(getJourneyRecommendationController));
+
+// Patient assessment history for current user
+router.get('/patient/me/assessments', requireAuth, requireRole('patient'), asyncHandler(getMyAssessmentsController));
 
 router.get('/therapy-plan', requireAuth, requireRole('patient'), asyncHandler(getMyTreatmentPlanController));
 router.patch('/therapy-plan/tasks/:id/complete', requireAuth, requireRole('patient'), asyncHandler(completeTreatmentPlanTaskController));

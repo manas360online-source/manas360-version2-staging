@@ -1,19 +1,35 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { http } from '../lib/http';
 import { theme } from '../theme/theme';
 
 interface AssessmentProps {
   onSubmit: (data: any, isCritical: boolean) => void;
 }
 
+const PHQ9_QUESTIONS: string[] = [
+  'Little interest or pleasure in doing things',
+  'Feeling down, depressed, or hopeless',
+  'Trouble falling or staying asleep, or sleeping too much',
+  'Feeling tired or having little energy',
+  'Poor appetite or overeating',
+  'Feeling bad about yourself - or that you are a failure',
+  'Trouble concentrating on things, such as reading or watching television',
+  'Moving or speaking so slowly that other people could have noticed, or the opposite',
+  'Thoughts that you would be better off dead, or of hurting yourself in some way',
+];
+
+const PHQ9_OPTIONS: Array<{ label: string; value: number }> = [
+  { label: 'Not at all', value: 0 },
+  { label: 'Several days', value: 1 },
+  { label: 'More than half the days', value: 2 },
+  { label: 'Nearly every day', value: 3 },
+];
+
 export const Assessment: React.FC<AssessmentProps> = ({ onSubmit }) => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>('');
-  const [attemptId, setAttemptId] = useState<string>('');
-  const [attemptToken, setAttemptToken] = useState<string>('');
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [questions, setQuestions] = useState<Array<{
     questionId: string;
@@ -28,11 +44,14 @@ export const Assessment: React.FC<AssessmentProps> = ({ onSubmit }) => {
       setLoading(true);
       setError('');
       try {
-        const res = await http.post('/v1/free-screening/start', {});
-        const payload = res?.data?.data || res?.data || {};
-        setAttemptId(String(payload.attemptId || ''));
-        setAttemptToken(String(payload.attemptToken || ''));
-        setQuestions(Array.isArray(payload.questions) ? payload.questions : []);
+        setQuestions(
+          PHQ9_QUESTIONS.map((prompt, idx) => ({
+            questionId: `PHQ-9-${idx + 1}`,
+            prompt,
+            sectionKey: 'PHQ-9',
+            options: PHQ9_OPTIONS.map((option) => ({ optionIndex: option.value, label: option.label })),
+          })),
+        );
         setCurrentQuestionIndex(0);
       } catch (err: any) {
         setError(err?.response?.data?.message || 'Unable to load assessment. Please refresh and try again.');
@@ -54,7 +73,7 @@ export const Assessment: React.FC<AssessmentProps> = ({ onSubmit }) => {
   };
 
   const handleFinish = async () => {
-    if (!attemptId || !attemptToken || questions.length === 0) {
+    if (questions.length === 0) {
       setError('Assessment is not ready yet. Please refresh and try again.');
       return;
     }
@@ -73,12 +92,14 @@ export const Assessment: React.FC<AssessmentProps> = ({ onSubmit }) => {
     setSubmitting(true);
     setError('');
     try {
-      const res = await http.post(`/v1/free-screening/${encodeURIComponent(attemptId)}/submit`, {
-        attemptToken,
-        answers: answersPayload,
-      });
-
-      const result = res?.data?.data || res?.data || {};
+      const totalScore = answersPayload.reduce((sum, item) => sum + Number(item.optionIndex || 0), 0);
+      const severityLevel = totalScore >= 20 ? 'severe' : totalScore >= 15 ? 'moderately-severe' : totalScore >= 10 ? 'moderate' : totalScore >= 5 ? 'mild' : 'minimal';
+      const result = {
+        attemptId: `PHQ-9-${Date.now()}`,
+        templateKey: 'PHQ-9',
+        totalScore,
+        severityLevel,
+      };
       const isCritical = String(result.severityLevel || '').toLowerCase() === 'severe';
 
       onSubmit(result, isCritical);

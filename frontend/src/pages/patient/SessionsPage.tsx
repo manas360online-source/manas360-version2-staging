@@ -5,6 +5,7 @@ import {
   type StructuredAssessmentQuestion,
   type StructuredAssessmentStartResponse,
 } from '../../api/patient';
+import { useAuth } from '../../context/AuthContext';
 import { parseJourneyPayload, type JourneyPayload } from '../../utils/journey';
 import SlideOverBookingDrawer from '../../components/patient/SlideOverBookingDrawer';
 import SmartMatchFlow from '../../components/patient/SmartMatchFlow';
@@ -42,6 +43,51 @@ const structuredTemplateKeys: Record<ClinicalAssessmentKey, string> = {
   'GAD-7': GAD7_TEMPLATE_KEY,
 };
 
+const STANDARD_OPTIONS = [
+  { optionIndex: 0, label: 'Not at all', points: 0 },
+  { optionIndex: 1, label: 'Several days', points: 1 },
+  { optionIndex: 2, label: 'More than half the days', points: 2 },
+  { optionIndex: 3, label: 'Nearly every day', points: 3 },
+];
+
+const ASSESSMENT_QUESTION_BANK: Record<ClinicalAssessmentKey, string[]> = {
+  'PHQ-9': [
+    'Little interest or pleasure in doing things',
+    'Feeling down, depressed, or hopeless',
+    'Trouble falling or staying asleep, or sleeping too much',
+    'Feeling tired or having little energy',
+    'Poor appetite or overeating',
+    'Feeling bad about yourself - or that you are a failure',
+    'Trouble concentrating on things, such as reading or watching television',
+    'Moving or speaking so slowly that other people could have noticed, or the opposite',
+    'Thoughts that you would be better off dead, or of hurting yourself',
+  ],
+  'GAD-7': [
+    'Feeling nervous, anxious, or on edge',
+    'Not being able to stop or control worrying',
+    'Worrying too much about different things',
+    'Trouble relaxing',
+    'Being so restless that it is hard to sit still',
+    'Becoming easily annoyed or irritable',
+    'Feeling afraid as if something awful might happen',
+  ],
+};
+
+const severityFromScore = (type: ClinicalAssessmentKey, score: number): string => {
+  if (type === 'PHQ-9') {
+    if (score >= 20) return 'severe';
+    if (score >= 15) return 'moderately-severe';
+    if (score >= 10) return 'moderate';
+    if (score >= 5) return 'mild';
+    return 'minimal';
+  }
+
+  if (score >= 15) return 'severe';
+  if (score >= 10) return 'moderate';
+  if (score >= 5) return 'mild';
+  return 'minimal';
+};
+
 const toLocalDateKey = (value: Date = new Date()): string => {
   const y = value.getFullYear();
   const m = String(value.getMonth() + 1).padStart(2, '0');
@@ -63,7 +109,10 @@ const asArray = (value: unknown): any[] => {
   return [];
 };
 
-const ASSESSMENT_DRAFT_STORAGE_KEY = 'patient-clinical-assessment-draft-v1';
+const ASSESSMENT_DRAFT_BASE_KEY = 'patient-clinical-assessment-draft-v1';
+/** Returns a user-scoped draft key so different users on the same browser don't share draft state */
+const draftStorageKey = (userId?: string) =>
+  userId ? `${ASSESSMENT_DRAFT_BASE_KEY}:${userId}` : ASSESSMENT_DRAFT_BASE_KEY;
 const ASSESSMENT_DRAFT_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 const RESUMABLE_ASSESSMENT_PHASES: ClinicalFlowPhase[] = ['intro', 'question', 'loading-next', 'next-phase', 'provider-list'];
 
@@ -85,6 +134,9 @@ type AssessmentDraft = {
 
 export default function SessionsPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const userId = user?.id || undefined;
+  const ASSESSMENT_DRAFT_STORAGE_KEY = draftStorageKey(userId);
   const [upcoming, setUpcoming] = useState<any[]>([]);
   const [history, setHistory] = useState<any[]>([]);
   const [myProviders, setMyProviders] = useState<any[]>([]);
@@ -153,61 +205,45 @@ export default function SessionsPage() {
   const loadAssessmentHistory = async () => {
     setAssessmentHistoryLoading(true);
     try {
-      const [structuredResponse, legacyResponse] = await Promise.all([
-        patientApi.getStructuredAssessmentHistory().catch(() => null),
-        patientApi.getMoodHistory().catch(() => null),
-      ]);
+      const response = await patientApi.getPatientAssessmentHistory({ page: 1, limit: 50 }).catch(() => null);
+      const items = asArray((response as any)?.data?.items ?? (response as any)?.items ?? response);
 
-      const structured = asArray((structuredResponse as any)?.data ?? structuredResponse).map((entry: any) => ({
-        id: entry.attemptId,
-        type: entry.templateTitle || entry.templateKey || 'Assessment',
-        score: Number(entry.totalScore || 0),
-        maxScore: String(entry.templateKey || '').toLowerCase().includes('gad-7') ? 21 : 27,
-        level: String(entry.severityLevel || 'mild').toLowerCase(),
-        createdAt: entry.submittedAt,
-      }));
-
-      const legacy = asArray(legacyResponse as any).map((entry: any) => ({
-        id: entry.id,
-        type: entry.type || 'Daily Check',
-        score: Number(entry.score || entry.mood || 0),
-        maxScore: 10,
-        level: String(entry.level || 'mild').toLowerCase(),
-        createdAt: entry.created_at || entry.createdAt,
-      }));
-
-      const merged = [...structured, ...legacy]
+      const merged = items
+        .map((entry: any) => ({
+          id: entry.id,
+          type: entry.type || 'Assessment',
+          score: Number(entry.score || 0),
+          maxScore: String(entry.type || '').toLowerCase().includes('gad-7') ? 21 : 27,
+          level: String(entry.severityLevel || 'mild').toLowerCase(),
+          createdAt: entry.createdAt,
+        }))
         .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
         .slice(0, 12);
+
       setAssessmentHistory(merged);
 
-      // Check if user has completed both PHQ-9 and GAD-7 today
-      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
-      const todayStructured = structured.filter(entry => {
-        const entryDate = new Date(entry.createdAt).toISOString().split('T')[0];
-        return entryDate === today;
-      });
-
-      const hasCompletedPHQ9Today = todayStructured.some(entry =>
+      // First-time requirement: once both are completed in history, do not require again for booking.
+      const hasCompletedPHQ9 = merged.some(entry =>
         String(entry.type).toLowerCase().includes('phq-9') ||
         String(entry.type).toLowerCase().includes('phq9')
       );
-      const hasCompletedGAD7Today = todayStructured.some(entry =>
+      const hasCompletedGAD7 = merged.some(entry =>
         String(entry.type).toLowerCase().includes('gad-7') ||
         String(entry.type).toLowerCase().includes('gad7')
       );
 
-      setHasCompletedCheckin(hasCompletedPHQ9Today && hasCompletedGAD7Today);
+      setHasCompletedCheckin(hasCompletedPHQ9 && hasCompletedGAD7);
 
-      // Set today's assessment results for display
-      if (hasCompletedPHQ9Today && hasCompletedGAD7Today) {
-        const results = todayStructured
+      // Show latest PHQ-9/GAD-7 results.
+      if (hasCompletedPHQ9 && hasCompletedGAD7) {
+        const results = merged
           .filter(entry =>
             String(entry.type).toLowerCase().includes('phq-9') ||
             String(entry.type).toLowerCase().includes('phq9') ||
             String(entry.type).toLowerCase().includes('gad-7') ||
             String(entry.type).toLowerCase().includes('gad7')
           )
+          .slice(0, 2)
           .map(entry => ({
             type: String(entry.type).toLowerCase().includes('phq-9') || String(entry.type).toLowerCase().includes('phq9') ? 'PHQ-9' : 'GAD-7',
             score: entry.score,
@@ -330,16 +366,35 @@ export default function SessionsPage() {
   };
 
   const loadStructuredAssessment = async (assessmentType: ClinicalAssessmentKey) => {
-    const response = await patientApi.startStructuredAssessment({ templateKey: structuredTemplateKeys[assessmentType] });
+    const questions = ASSESSMENT_QUESTION_BANK[assessmentType].map((prompt, index) => ({
+      questionId: `${assessmentType}-${index + 1}`,
+      position: index + 1,
+      prompt,
+      sectionKey: assessmentType,
+      options: STANDARD_OPTIONS,
+    }));
+
+    const response: StructuredAssessmentStartResponse = {
+      attemptId: `${assessmentType}-${Date.now()}`,
+      template: {
+        id: assessmentType,
+        key: structuredTemplateKeys[assessmentType],
+        title: assessmentType,
+        description: `${assessmentType} standard assessment`,
+        estimatedMinutes: assessmentType === 'PHQ-9' ? 4 : 3,
+      },
+      questions,
+    };
+
     setStructuredAttempt(response);
     setStructuredAnswers({});
     setCurrentStructuredQuestionIndex(0);
   };
 
   const beginClinicalAssessment = async () => {
-    // Check if user has already completed both assessments today
+    // First-time only onboarding assessment.
     if (hasCompletedCheckin) {
-      setClinicalFlowError('You have already completed today\'s assessment. You can view your results below.');
+      setClinicalFlowError('Initial PHQ-9 and GAD-7 are already completed. Booking is unlocked.');
       return;
     }
 
@@ -374,26 +429,21 @@ export default function SessionsPage() {
     setClinicalFlowError(null);
 
     try {
-      const answers = structuredAttempt.questions.map((question) => ({
-        questionId: question.questionId,
-        optionIndex: answerMap[question.questionId],
-      }));
       const numericAnswers = structuredAttempt.questions.map((question) => answerMap[question.questionId]);
 
-      const [structuredResult, journeyResponse] = await Promise.all([
-        patientApi.submitStructuredAssessment(structuredAttempt.attemptId, { answers }),
-        patientApi.submitClinicalJourney({ type: activeType, answers: numericAnswers }),
-      ]);
+      const journeyResponse = await patientApi.submitClinicalJourney({ type: activeType, answers: numericAnswers });
 
       const journey = parseJourneyPayload(journeyResponse);
       if (journey) setClinicalJourney(journey);
+
+      const totalScore = numericAnswers.reduce((acc, value) => acc + Number(value || 0), 0);
 
       setClinicalResults((prev) => [
         ...prev,
         {
           type: activeType,
-          score: Number(structuredResult.totalScore || 0),
-          severity: String(structuredResult.severityLevel || 'mild'),
+          score: totalScore,
+          severity: severityFromScore(activeType, totalScore),
         },
       ]);
 
@@ -527,36 +577,6 @@ export default function SessionsPage() {
     };
   }, []);
 
-  const assessmentResumeCopy = useMemo(() => {
-    if (!assessmentDraft) return null;
-
-    // Only show resume banner if user hasn't completed today's assessment
-    if (hasCompletedCheckin) return null;
-
-    switch (assessmentDraft.clinicalFlowPhase) {
-      case 'question':
-      case 'loading-next':
-        return {
-          title: 'Resume today\'s assessment',
-          detail: 'Your PHQ-9 + GAD-7 progress is saved. Continue from where you left off.',
-          button: 'Resume Assessment',
-        };
-      case 'next-phase':
-      case 'provider-list':
-        return {
-          title: 'Continue today\'s assessment',
-          detail: 'Your assessment is in progress. Complete it to see your results and booking options.',
-          button: 'Continue Assessment',
-        };
-      default:
-        return {
-          title: 'Continue today\'s assessment',
-          detail: 'Your assessment draft is available for today.',
-          button: 'Continue Assessment',
-        };
-    }
-  }, [assessmentDraft, hasCompletedCheckin]);
-
   const hasAttendedAssessment = useMemo(() => {
     return assessmentHistory.some((entry) => {
       const type = String(entry.type || '').toLowerCase();
@@ -564,15 +584,42 @@ export default function SessionsPage() {
     });
   }, [assessmentHistory]);
 
+  const isAssessmentComplete = hasCompletedCheckin || hasAttendedAssessment;
+
+  // Auto-open assessment from hash
+  useEffect(() => {
+    if (!assessmentHistoryLoading && window.location.hash === '#assessment' && !isAssessmentComplete) {
+      openClinicalAssessmentFlow();
+      // clear the hash so we don't retrigger continuously if state changes
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+  }, [assessmentHistoryLoading, isAssessmentComplete]);
+
   const isConsultingPatient = useMemo(() => {
     return myProviders.length > 0 || history.length > 0;
   }, [myProviders.length, history.length]);
 
-  const isAssessmentComplete = hasCompletedCheckin || hasAttendedAssessment;
+  const assessmentGateCopy = useMemo(() => {
+    if (isAssessmentComplete) return null;
+
+    if (assessmentDraft) {
+      return {
+        title: 'Complete mandatory assessment before booking',
+        detail: 'Your PHQ-9 + GAD-7 progress is saved. Finish both to unlock provider connection and session booking.',
+        button: 'Complete Assessment',
+      };
+    }
+
+    return {
+      title: 'Complete mandatory assessment before booking',
+      detail: 'Finish PHQ-9 and GAD-7 to unlock provider connection and session booking.',
+      button: 'Start Assessment',
+    };
+  }, [assessmentDraft, isAssessmentComplete]);
 
   const assessmentPrimaryCtaLabel = hasAttendedAssessment
-    ? 'Show Result'
-    : (assessmentResumeCopy ? assessmentResumeCopy.button : 'Attend Assessment');
+    ? 'View Result'
+    : (assessmentGateCopy ? assessmentGateCopy.button : 'Complete Assessment');
 
   const onAssessmentPrimaryAction = () => {
     if (hasAttendedAssessment) {
@@ -657,6 +704,19 @@ export default function SessionsPage() {
     }
   };
 
+  const handleOpenBookingDrawer = (
+    provider?: any,
+    context?: { fromAssessment: boolean; carePath?: 'recommended' | 'direct' | 'urgent'; preferredSpecialization?: string } | null,
+  ) => {
+    if (!isAssessmentComplete) {
+      setBookingFallbackError('Please complete PHQ-9 and GAD-7 assessment first. After that, booking will be unlocked.');
+      openClinicalAssessmentFlow();
+      return;
+    }
+
+    void openBookingDrawer(provider, context);
+  };
+
   const nextSession = upcoming[0];
   const nextSessionProviderName = nextSession?.provider?.name || 'your provider';
   const isLockedSession = Boolean(nextSession?.isLocked ?? nextSession?.is_locked);
@@ -717,24 +777,18 @@ export default function SessionsPage() {
   const handlePrimaryBookSession = () => {
     setBookingFallbackError(null);
 
-    if (isConsultingPatient && isAssessmentComplete) {
+    if (!isAssessmentComplete) {
+      setBookingFallbackError('Please complete PHQ-9 and GAD-7 assessment first. After that, booking will be unlocked.');
+      openClinicalAssessmentFlow();
+      return;
+    }
+
+    if (isConsultingPatient) {
       setSmartMatchPreferences({
         initialProviderType: 'ALL',
         lockProviderType: false,
       });
       setIsSmartMatchOpen(true);
-      return;
-    }
-
-    // Check if user has connected providers - if not, force assessment first
-    if (myProviders.length === 0) {
-      const draft = loadAssessmentDraft();
-      setBookingFallbackError('Please complete your PHQ-9 and GAD-7 assessment first. After that, booking will open.');
-      if (draft) {
-        openClinicalAssessmentFlow();
-        return;
-      }
-      openClinicalAssessmentFlow();
       return;
     }
 
@@ -1003,7 +1057,7 @@ export default function SessionsPage() {
                               </Link>
                               <button
                                 type="button"
-                                onClick={() => void openBookingDrawer({ ...provider, name }, bookingContext)}
+                                onClick={() => handleOpenBookingDrawer({ ...provider, name }, bookingContext)}
                                 className="ml-auto inline-flex items-center gap-1.5 rounded-xl bg-teal-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-teal-700"
                               >
                                 Book Now
@@ -1061,12 +1115,12 @@ export default function SessionsPage() {
         </div>
       )}
 
-      {assessmentResumeCopy && !isClinicalAssessmentOpen && (
+      {assessmentGateCopy && !isClinicalAssessmentOpen && (
         <section className="rounded-2xl border border-teal-200 bg-teal-50/80 p-4 shadow-soft-sm">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-sm font-bold text-teal-900">{assessmentResumeCopy.title}</p>
-              <p className="mt-1 text-xs text-teal-800/80">{assessmentResumeCopy.detail}</p>
+              <p className="text-sm font-bold text-teal-900">{assessmentGateCopy.title}</p>
+              <p className="mt-1 text-xs text-teal-800/80">{assessmentGateCopy.detail}</p>
             </div>
             <button
               type="button"
@@ -1175,11 +1229,13 @@ export default function SessionsPage() {
                 <h3 className="text-lg font-bold text-charcoal">No Upcoming Sessions</h3>
                 <p className="text-sm text-charcoal/70">Consistent therapy yields the best results. Let's get your next appointment on the books.</p>
                 <button
-                  onClick={handlePrimaryBookSession}
+                  onClick={!isAssessmentComplete ? onAssessmentPrimaryAction : handlePrimaryBookSession}
                   disabled={bookingFallbackLoading}
                   className="inline-flex items-center justify-center gap-2 rounded-xl bg-teal-600 px-6 py-3.5 text-sm font-bold text-white transition hover:bg-teal-700 disabled:opacity-50"
                 >
-                  {bookingFallbackLoading ? 'Loading Providers...' : 'Book a Session'}
+                  {bookingFallbackLoading
+                    ? 'Loading Providers...'
+                    : (!isAssessmentComplete ? 'Complete Assessment to Unlock Booking' : 'Book a Session')}
                 </button>
 
                 {hasPreviousConsultedProvider ? (
@@ -1206,7 +1262,7 @@ export default function SessionsPage() {
 
                       <div className="mt-4 flex flex-wrap gap-2">
                         <button
-                          onClick={() => void openBookingDrawer(provider)}
+                          onClick={() => handleOpenBookingDrawer(provider)}
                           className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-charcoal px-3 py-2 text-xs font-semibold text-white transition hover:bg-charcoal/90"
                         >
                           Book Session
@@ -1217,13 +1273,6 @@ export default function SessionsPage() {
                         >
                           Message
                         </Link>
-                        <button
-                          onClick={onAssessmentPrimaryAction}
-                          className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-teal-200 bg-teal-50 px-3 py-2 text-xs font-semibold text-teal-700 transition hover:bg-teal-100"
-                        >
-                          <ClipboardList className="h-3.5 w-3.5" />
-                          {assessmentPrimaryCtaLabel}
-                        </button>
                       </div>
                     </div>
                   </div>
@@ -1244,21 +1293,6 @@ export default function SessionsPage() {
                 </button>
               </div>
 
-              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-teal-300/40 bg-teal-50/40 p-6 text-center transition-colors hover:bg-teal-50/70">
-                <ClipboardList className="mb-3 h-8 w-8 text-teal-500" />
-                <p className="text-sm font-semibold text-charcoal">Clinical Assessment Check-in</p>
-                <p className="mt-1 max-w-[220px] text-xs text-charcoal/60">
-                  Complete PHQ-9 and GAD-7 one question at a time to update your care team.
-                </p>
-                <button
-                  type="button"
-                  onClick={onAssessmentPrimaryAction}
-                  className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-teal-200 bg-teal-100 px-4 py-2 text-xs font-semibold text-teal-800 transition hover:bg-teal-200"
-                >
-                  {assessmentPrimaryCtaLabel}
-                </button>
-              </div>
-
               {todaysAssessmentResults.length > 0 && (
                 <div className="rounded-2xl border border-teal-200/60 bg-teal-50/80 p-6">
                   <div className="flex items-center gap-3 mb-4">
@@ -1266,7 +1300,7 @@ export default function SessionsPage() {
                       <TrendingUp className="h-5 w-5 text-teal-600" />
                     </div>
                     <div>
-                      <h4 className="text-sm font-bold text-teal-900">Today's Assessment Results</h4>
+                      <h4 className="text-sm font-bold text-teal-900">Assessment Results</h4>
                       <p className="text-xs text-teal-700/80">Completed {new Date().toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}</p>
                     </div>
                   </div>
@@ -1287,14 +1321,6 @@ export default function SessionsPage() {
                       </div>
                     ))}
                   </div>
-                  <button
-                    type="button"
-                    onClick={onAssessmentPrimaryAction}
-                    className="mt-4 w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-teal-600 px-4 py-2 text-xs font-semibold text-white hover:bg-teal-700"
-                  >
-                    <ClipboardList className="h-3.5 w-3.5" />
-                    Show Result
-                  </button>
                 </div>
               )}
             </div>
@@ -1303,14 +1329,6 @@ export default function SessionsPage() {
           <section className="space-y-4 pt-6">
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-lg font-bold text-charcoal">Assessment History</h3>
-              <button
-                type="button"
-                onClick={onAssessmentPrimaryAction}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-teal-600 px-4 py-2 text-xs font-semibold text-white hover:bg-teal-700"
-              >
-                <ClipboardList className="h-3.5 w-3.5" />
-                {assessmentPrimaryCtaLabel}
-              </button>
             </div>
 
             {assessmentHistoryLoading ? (
@@ -1454,7 +1472,7 @@ export default function SessionsPage() {
                       type="button"
                       onClick={() => {
                         setIsPreviousProvidersOpen(false);
-                        void openBookingDrawer(provider);
+                        handleOpenBookingDrawer(provider);
                       }}
                       className="inline-flex items-center rounded-lg bg-teal-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-teal-700"
                     >
