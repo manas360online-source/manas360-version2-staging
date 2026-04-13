@@ -31,19 +31,158 @@ export default function LoginPage() {
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
-	const calmingQuotes = useMemo(
+	const inspirationalQuotes = useMemo(
 		() => [
-			'Small steps every day.',
-			'You are not alone.',
-			'Healing begins with showing up for yourself.',
+			{
+				text: 'Everything has beauty, but not everyone sees it.',
+				author: 'Confucius',
+			},
+			{
+				text: 'My mission in life is not merely to survive, but to thrive; and to do so with some passion, some compassion, some humor, and some style.',
+				author: 'Maya Angelou',
+			},
+			{
+				text: 'Whoever is happy will make others happy too.',
+				author: 'Anne Frank',
+			},
+			{
+				text: 'The best time to plant a tree was 20 years ago. The second best time is now.',
+				author: 'Chinese Proverb',
+			},
+			{
+				text: 'Success is not final, failure is not fatal: it is the courage to continue that counts.',
+				author: 'Winston Churchill',
+			},
+			{
+				text: 'Do what you can, with what you have, where you are.',
+				author: 'Theodore Roosevelt',
+			},
+			{
+				text: 'You miss 100% of the shots you do not take.',
+				author: 'Wayne Gretzky',
+			},
+			{
+				text: 'Believe you can and you are halfway there.',
+				author: 'Theodore Roosevelt',
+			},
+			{
+				text: 'Happiness depends upon ourselves.',
+				author: 'Aristotle',
+			},
+			{
+				text: 'Act as if what you do makes a difference. It does.',
+				author: 'William James',
+			},
+			{
+				text: 'Turn your wounds into wisdom.',
+				author: 'Oprah Winfrey',
+			},
+			{
+				text: 'If you can dream it, you can do it.',
+				author: 'Walt Disney',
+			},
+			{
+				text: 'Difficulties in life are intended to make us better, not bitter.',
+				author: 'Dan Reeves',
+			},
+			{
+				text: 'In the middle of every difficulty lies opportunity.',
+				author: 'Albert Einstein',
+			},
+			{
+				text: 'A journey of a thousand miles begins with a single step.',
+				author: 'Lao Tzu',
+			},
+			{
+				text: 'The secret of getting ahead is getting started.',
+				author: 'Mark Twain',
+			},
+			{
+				text: 'Start where you are. Use what you have. Do what you can.',
+				author: 'Arthur Ashe',
+			},
+			{
+				text: 'The future depends on what you do today.',
+				author: 'Mahatma Gandhi',
+			},
+			{
+				text: 'It always seems impossible until it is done.',
+				author: 'Nelson Mandela',
+			},
+			{
+				text: 'What lies behind us and what lies before us are tiny matters compared to what lies within us.',
+				author: 'Ralph Waldo Emerson',
+			},
+			{
+				text: 'Do not wait. The time will never be just right.',
+				author: 'Napoleon Hill',
+			},
+			{
+				text: 'You become what you believe.',
+				author: 'Oprah Winfrey',
+			},
+			{
+				text: 'Hardships often prepare ordinary people for an extraordinary destiny.',
+				author: 'C. S. Lewis',
+			},
+			{
+				text: 'The only way to do great work is to love what you do.',
+				author: 'Steve Jobs',
+			},
+			{
+				text: 'Your present circumstances do not determine where you can go; they merely determine where you start.',
+				author: 'Nido Qubein',
+			},
+			{
+				text: 'Keep your face always toward the sunshine and shadows will fall behind you.',
+				author: 'Walt Whitman',
+			},
+			{
+				text: 'No matter how you feel, get up, dress up, show up, and never give up.',
+				author: 'Regina Brett',
+			},
+			{
+				text: 'Well done is better than well said.',
+				author: 'Benjamin Franklin',
+			},
+			{
+				text: 'Be yourself; everyone else is already taken.',
+				author: 'Oscar Wilde',
+			},
 		],
 		[],
 	);
 	const selectedQuote = useMemo(() => {
-		const index = Math.floor(Math.random() * calmingQuotes.length);
-		return calmingQuotes[index] || 'Small steps every day.';
-	}, [calmingQuotes]);
-	const loginBackgroundUrl = String(import.meta.env.VITE_LOGIN_BG_URL || '').trim();
+		const index = Math.floor(Math.random() * inspirationalQuotes.length);
+		return inspirationalQuotes[index] || inspirationalQuotes[0];
+	}, [inspirationalQuotes]);
+	const loginBackgroundUrl = useMemo(() => {
+		const backgroundImages = [
+			'/bg_img/anastasiya-romanova-zyLQdpu4XHk-unsplash.webp',
+			'/bg_img/clara-metivier-beukes-a73hUXlL9V0-unsplash.webp',
+			'/bg_img/fermin-rodriguez-penelas-b8kEUZqMNoQ-unsplash.webp',
+			'/bg_img/gustav-schwiering-sWk_wiHCCf4-unsplash.webp',
+			'/bg_img/jensen-ragoonath-oh2iXAXWHt8-unsplash.webp',
+			'/bg_img/jeremy-hynes-T-eIwyf0Xds-unsplash.webp',
+			'/bg_img/keegan-houser--Q_t4SCN8c4-unsplash.webp',
+			'/bg_img/kevin-oetiker-Y5MuIllbUG4-unsplash.webp',
+			'/bg_img/kevin-oetiker-gwaXgnf3pE4-unsplash.webp',
+			'/bg_img/kevin-oetiker-v17IhTzLICs-unsplash.webp',
+			'/bg_img/leonard-cotte-c1Jp-fo53U8-unsplash.webp',
+			'/bg_img/michael-N23MvbnG2BA-unsplash.webp',
+			'/bg_img/moses-londo-iCds42Otudg-unsplash.webp',
+			'/bg_img/niklas-jonasson-hg05ZMKDvSk-unsplash.webp',
+			'/bg_img/nikolai-lehmann-agEBTnS_Nuc-unsplash.webp',
+			'/bg_img/rhythm-goyal-_-Ofoh09q_o-unsplash.webp',
+			'/bg_img/roman-qDS20PClmPg-unsplash.webp',
+			'/bg_img/saurav-mahto-ijWb7URJQyo-unsplash.webp',
+			'/bg_img/tamara-malaniy-0UxRTGI4OYg-unsplash.webp',
+			'/bg_img/zhangzui-Pf23Y30hD68-unsplash.webp',
+		];
+
+		const randomIndex = Math.floor(Math.random() * backgroundImages.length);
+		return backgroundImages[randomIndex] || backgroundImages[0];
+	}, []);
 
 	const hasSessionCookieHint = (): boolean => {
 		if (typeof document === 'undefined') return false;
@@ -174,27 +313,22 @@ export default function LoginPage() {
 			<div
 				className="absolute inset-0 scale-[1.02] bg-cover bg-center blur-[1px]"
 				style={{
-					backgroundImage: loginBackgroundUrl
-						? `linear-gradient(rgba(240, 248, 245, 0.6), rgba(240, 248, 245, 0.6)), url('${loginBackgroundUrl}')`
-						: 'linear-gradient(135deg, rgba(211, 233, 226, 0.94), rgba(233, 242, 249, 0.92), rgba(250, 247, 240, 0.9))',
+					backgroundImage: `linear-gradient(rgba(0, 35, 101, 0.30), rgba(0, 35, 101, 0.30)), url('${loginBackgroundUrl}')`,
 				}}
 			/>
-			<div className="absolute inset-0 bg-gradient-to-br from-[#e4f2ee]/70 via-[#edf7f4]/65 to-[#e8f0f6]/70" />
+			<div className="absolute inset-0 bg-[#002365]/30" />
 			<div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.28),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(92,107,192,0.10),transparent_30%)]" />
 
 			<div className="relative z-10 mx-auto flex min-h-screen w-full max-w-7xl items-center px-4 py-6 sm:px-6 lg:px-8">
 				<div className="grid w-full items-stretch gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:gap-12">
 					<section className="hidden lg:flex lg:flex-col lg:justify-center lg:animate-fadeIn">
 						<div>
-							<p className="text-sm font-semibold uppercase tracking-[0.18em] text-white/85">MANAS360</p>
-							<h2 className="mt-8 max-w-lg text-4xl font-semibold leading-tight text-white">
-								Your mental well-being matters.
-							</h2>
-							<p className="mt-4 max-w-md text-lg text-white/85">
-								Take a step toward a calmer, healthier you.
-							</p>
+							<blockquote className="max-w-2xl text-3xl font-semibold leading-tight text-white">
+								"{selectedQuote.text}"
+							</blockquote>
+							<p className="mt-4 text-lg text-white/90">{selectedQuote.author}</p>
 						</div>
-						<p className="mt-8 max-w-sm text-base italic text-white/90 animate-fadeInUp">"{selectedQuote}"</p>
+						<p className="mt-8 max-w-sm text-base italic text-white/90 animate-fadeInUp">Choose growth, one step at a time.</p>
 					</section>
 
 					<section className="mx-auto w-full max-w-lg justify-self-center rounded-[24px] border border-white/70 bg-white/80 p-5 shadow-[0_18px_48px_rgba(16,24,40,0.14)] backdrop-blur-xl sm:p-8 lg:justify-self-end lg:animate-scaleIn">
@@ -206,8 +340,9 @@ export default function LoginPage() {
 
 						<div className="mb-3 inline-flex items-center gap-2 rounded-full border border-calm-sage/20 bg-white/75 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-wellness-muted lg:hidden">
 							<span className="h-2 w-2 rounded-full bg-calm-sage" />
-							{selectedQuote}
+							{selectedQuote.author}
 						</div>
+						<p className="mb-3 text-sm italic text-wellness-muted lg:hidden">"{selectedQuote.text}"</p>
 						<h1 className="text-2xl font-semibold text-wellness-text sm:text-3xl">Welcome back</h1>
 						<p className="mt-2 text-sm text-wellness-muted sm:text-base">Continue your wellness journey</p>
 						<p className="mt-1 text-xs text-wellness-muted">
