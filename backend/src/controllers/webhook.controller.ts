@@ -3,6 +3,7 @@ import { asyncHandler } from '../middleware/validate.middleware';
 import { logger } from '../utils/logger';
 import { io } from '../socket';
 import { verifyPhonePeWebhook } from '../services/phonepe.service';
+import { processPhonePeWebhook } from '../services/payment.service';
 import { crisisService } from '../services/crisis.service';
 import { triggerZohoFlow } from '../services/zohoDesk.service';
 
@@ -22,19 +23,25 @@ export const phonePeWebhookHandler = asyncHandler(async (req: Request, res: Resp
     return res.status(401).send('Invalid Signature');
   }
 
-  if (body.code === 'PAYMENT_SUCCESS') {
-    // Update payment record in database (already handled by services in typical flow)
+  const decoded = typeof body?.response === 'string' && body.response.trim().length > 0
+    ? JSON.parse(Buffer.from(body.response, 'base64').toString('utf8'))
+    : body;
+
+  // Ensure payment state is persisted even when integrators post to /webhooks/phonepe.
+  await processPhonePeWebhook(decoded);
+
+  if (decoded?.code === 'PAYMENT_SUCCESS') {
     // Emit real-time notification to admin-room
     if (io) {
       io.to('admin-room').emit('payment-received', {
-        transactionId: body.merchantTransactionId,
-        amount: body.amount,
+        transactionId: decoded?.data?.merchantTransactionId || decoded?.merchantTransactionId,
+        amount: decoded?.data?.amount || decoded?.amount,
         status: 'SUCCESS'
       });
     }
     
     // Trigger Zoho Flow for post-payment workflows
-    await triggerZohoFlow('payment_success_automation', body);
+    await triggerZohoFlow('payment_success_automation', decoded);
   }
 
   res.status(200).send('OK');

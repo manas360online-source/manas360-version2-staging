@@ -346,8 +346,16 @@ ALTER COLUMN "allow_guest_join" SET DEFAULT false,
 ALTER COLUMN "requires_admin_gate" SET DEFAULT false,
 ALTER COLUMN "requires_payment" SET DEFAULT false;
 
--- AlterTable
-ALTER TABLE "idempotency_keys" ALTER COLUMN "expires_at" DROP DEFAULT;
+-- AlterTable (guarded: only run if the column exists)
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'idempotency_keys' AND column_name = 'expires_at'
+    ) THEN
+        ALTER TABLE "idempotency_keys" ALTER COLUMN "expires_at" DROP DEFAULT;
+    END IF;
+END $$;
 
 -- AlterTable
 ALTER TABLE "invoices" ALTER COLUMN "updatedAt" DROP DEFAULT;
@@ -375,8 +383,16 @@ ADD COLUMN     "status" "PayoutStatus" NOT NULL DEFAULT 'PENDING',
 DROP COLUMN "method",
 ADD COLUMN     "method" "PayoutMethod" NOT NULL DEFAULT 'BANK';
 
--- AlterTable
-ALTER TABLE "platform_configs" ALTER COLUMN "updated_at" DROP DEFAULT;
+-- AlterTable (guarded: only run if table exists)
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'platform_configs'
+    ) THEN
+        ALTER TABLE "platform_configs" ALTER COLUMN "updated_at" DROP DEFAULT;
+    END IF;
+END $$;
 
 -- AlterTable
 ALTER TABLE "qr_codes" ALTER COLUMN "updated_at" DROP DEFAULT;

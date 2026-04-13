@@ -1513,6 +1513,46 @@ const generateAgoraDetails = (sessionId: string, scheduledAt: Date, durationMinu
 	return { channel, token, expireAt };
 };
 
+const hasCompletedBothPHQAndGAD7 = async (userId: string): Promise<boolean> => {
+	const patientProfile = await getPatientProfile(userId);
+
+	const [latestPhqClinical, latestGadClinical, latestPhq9, latestGad7] = await Promise.all([
+		db.patientAssessment.findFirst({
+			where: { patientId: patientProfile.id, type: 'PHQ-9' },
+			select: { id: true },
+			orderBy: { createdAt: 'desc' },
+		}),
+		db.patientAssessment.findFirst({
+			where: { patientId: patientProfile.id, type: 'GAD-7' },
+			select: { id: true },
+			orderBy: { createdAt: 'desc' },
+		}),
+		db.pHQ9Assessment.findFirst({
+			where: { userId },
+			select: { id: true },
+			orderBy: { assessedAt: 'desc' },
+		}),
+		db.gAD7Assessment.findFirst({
+			where: { userId },
+			select: { id: true },
+			orderBy: { assessedAt: 'desc' },
+		}),
+	]);
+
+	const hasPhq = Boolean(latestPhqClinical || latestPhq9);
+	const hasGad = Boolean(latestGadClinical || latestGad7);
+	return hasPhq && hasGad;
+};
+
+export const assertPatientHasCompletedBothPHQandGAD7 = async (userId: string): Promise<void> => {
+	const hasBothAssessments = await hasCompletedBothPHQAndGAD7(userId);
+	if (!hasBothAssessments) {
+		throw new AppError('Please complete PHQ-9 and GAD-7 assessment first before connecting with providers.', 403, {
+			code: 'BOTH_ASSESSMENTS_REQUIRED',
+		});
+	}
+};
+
 export const initiateSessionBooking = async (
 	userId: string,
 	input: {
@@ -1526,6 +1566,7 @@ export const initiateSessionBooking = async (
 	},
 ) => {
 	await getPatientProfile(userId);
+	await assertPatientHasCompletedBothPHQandGAD7(userId);
 	const provider = await db.user.findUnique({
 		where: { id: input.providerId },
 		select: {
@@ -2882,6 +2923,7 @@ export const listAvailableProvidersForPatient = async (
 	filters: ProviderFilters & { search?: string },
 ) => {
 	await getPatientProfile(userId);
+	await assertPatientHasCompletedBothPHQandGAD7(userId);
 	const result = await listProviders(filters);
 	let items = result.items.map((provider: any) => ({
 		id: provider.id,
@@ -2956,6 +2998,7 @@ export const requestAppointmentWithPreferredProviders = async (
 		note?: string;
 	},
 ) => {
+	await assertPatientHasCompletedBothPHQandGAD7(userId);
 	const providerIds = Array.from(new Set((input.providerIds || []).map((id) => String(id || '').trim()).filter(Boolean)));
 	if (!providerIds.length) {
 		throw new AppError('At least one provider is required', 422);

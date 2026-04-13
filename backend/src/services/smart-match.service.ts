@@ -3,8 +3,10 @@ import { AppError } from '../middleware/error.middleware';
 import { User, UserRole } from '@prisma/client';
 import type { TherapistProfile } from '@prisma/client';
 import { isSubscriptionValidForMatching } from './subscription.helper';
+import { env } from '../config/env';
+import { initiatePhonePePayment, checkPhonePeStatus } from './phonepe.service';
+import { assertPatientHasCompletedBothPHQandGAD7 } from './patient-v1.service';
 
-const PAYMENT_WINDOW_BEFORE_SESSION_MS = 6 * 60 * 60 * 1000; // 6 hours in milliseconds
 const REQUEST_EXPIRY_HOURS = 24;
 const SESSION_QUOTE = {
   THERAPIST: 699 * 100, // ₹699 in minor units
@@ -471,7 +473,16 @@ interface CreateAppointmentRequestInput {
     tier?: 'HOT' | 'WARM' | 'COLD';
     breakdown?: { expertise: number; communication: number; quality: number };
   }>;
+  payment?: {
+    merchantTransactionId?: string;
+  };
 }
+
+const isPhonePePaymentSuccess = (statusResponse: any): boolean => {
+  const code = String(statusResponse?.code || '').toUpperCase();
+  const state = String(statusResponse?.data?.state || '').toUpperCase();
+  return code === 'PAYMENT_SUCCESS' || state === 'COMPLETED';
+};
 
 // Create a broadcast appointment request that goes to multiple providers
 export const createAppointmentRequest = async (
@@ -481,7 +492,16 @@ export const createAppointmentRequest = async (
   status: string;
   providers: Array<{ providerId: string; name: string }>;
   message: string;
+  paymentRequired?: boolean;
+  payment?: {
+    merchantTransactionId: string;
+    redirectUrl: string;
+    amountMinor: number;
+    currency: 'INR';
+  };
 }> => {
+  await assertPatientHasCompletedBothPHQandGAD7(input.patientId);
+
   if (!input.providerIds || input.providerIds.length === 0) {
     throw new AppError('At least one provider must be selected', 422);
   }
@@ -511,6 +531,44 @@ export const createAppointmentRequest = async (
 
   if (providers.length !== input.providerIds.length) {
     throw new AppError('One or more providers not found or inactive', 404);
+  }
+
+  const amountMinor = providers.reduce((max, provider) => {
+    const quoted = SESSION_QUOTE[String(provider.providerType || 'THERAPIST') as keyof typeof SESSION_QUOTE] || SESSION_QUOTE.THERAPIST;
+    return Math.max(max, quoted);
+  }, SESSION_QUOTE.THERAPIST);
+
+  const merchantTransactionId = String(input.payment?.merchantTransactionId || '').trim();
+  if (!merchantTransactionId) {
+    const transactionId = `SMREQ_${Date.now()}_${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+    const callbackUrl = `${env.apiUrl}${env.apiPrefix}/v1/payments/phonepe/webhook`;
+    const redirectUrl = `${env.frontendUrl}/#/payment/status?transactionId=${encodeURIComponent(transactionId)}`;
+    const phonePeRedirectUrl = await initiatePhonePePayment({
+      transactionId,
+      userId: input.patientId,
+      amountInPaise: amountMinor,
+      callbackUrl,
+      redirectUrl,
+    });
+
+    return {
+      appointmentRequestId: '',
+      status: 'PAYMENT_REQUIRED',
+      providers: providers.map((p) => ({ providerId: p.id, name: `${p.firstName} ${p.lastName}`.trim() })),
+      message: 'Payment is required before sending request to providers.',
+      paymentRequired: true,
+      payment: {
+        merchantTransactionId: transactionId,
+        redirectUrl: phonePeRedirectUrl,
+        amountMinor,
+        currency: 'INR',
+      },
+    };
+  }
+
+  const paymentStatus = await checkPhonePeStatus(merchantTransactionId);
+  if (!isPhonePePaymentSuccess(paymentStatus)) {
+    throw new AppError('Payment not completed. Complete payment first before sending request to providers.', 409);
   }
 
   const eligibleSubscriptions = await prisma.providerSubscription.findMany({
@@ -582,6 +640,9 @@ export const createAppointmentRequest = async (
       preferredSpecialization: input.preferredSpecialization,
       durationMinutes: input.durationMinutes || 50,
       status: 'PENDING',
+      razorpayOrderId: merchantTransactionId,
+      amountMinor: BigInt(amountMinor),
+      currency: 'INR',
       expiresAt: new Date(Date.now() + REQUEST_EXPIRY_HOURS * 60 * 60 * 1000),
     },
   });
@@ -703,7 +764,7 @@ export const createAppointmentRequest = async (
       providerId: p.id,
       name: `${p.firstName} ${p.lastName}`.trim(),
     })),
-    message: `Request sent to ${input.providerIds.length} provider(s). We will notify you as soon as one accepts.`,
+    message: `Payment verified. Request sent to ${input.providerIds.length} provider(s).`,
   };
 };
 
@@ -720,7 +781,6 @@ export const acceptAppointmentRequest = async (
   status: string;
   appointmentRequestId: string;
   scheduledAt: string;
-  paymentDeadlineAt: string;
   amountMinor: number;
   message: string;
 }> => {
@@ -753,29 +813,16 @@ export const acceptAppointmentRequest = async (
     throw new AppError('Scheduled time must be in the future', 422);
   }
 
-  // Calculate payment deadline (6 hours before session)
-  const paymentDeadlineAt = new Date(
-    input.scheduledAt.getTime() - PAYMENT_WINDOW_BEFORE_SESSION_MS,
-  );
-  if (paymentDeadlineAt <= new Date()) {
-    throw new AppError(
-      'Session must be at least 6 hours away for booking to be valid',
-      422,
-    );
+  const amountMinor = Number(appointmentRequest.amountMinor || 0);
+
+  if (!appointmentRequest.razorpayOrderId) {
+    throw new AppError('Request payment reference is missing. Please create a new paid request.', 409);
   }
 
-  // Get provider type for fee calculation
-  const provider = await prisma.user.findUnique({
-    where: { id: input.providerId },
-    select: { providerType: true, therapistProfile: { select: { consultationFee: true } } },
-  });
-
-  if (!provider) throw new AppError('Provider not found', 404);
-
-  const amountMinor =
-    provider.therapistProfile?.consultationFee ||
-    SESSION_QUOTE[provider.providerType as keyof typeof SESSION_QUOTE] ||
-    SESSION_QUOTE.THERAPIST;
+  const paymentStatus = await checkPhonePeStatus(String(appointmentRequest.razorpayOrderId));
+  if (!isPhonePePaymentSuccess(paymentStatus)) {
+    throw new AppError('Patient payment is not completed. This request cannot be accepted yet.', 409);
+  }
 
   // Update appointment request: mark this provider as accepted, cancel others
   const updatedProviders = providers.map((p: any) => {
@@ -790,10 +837,8 @@ export const acceptAppointmentRequest = async (
     data: {
       acceptedProviderId: input.providerId,
       scheduledAt: input.scheduledAt,
-      paymentDeadlineAt,
-      amountMinor: BigInt(amountMinor),
       providers: updatedProviders as any,
-      status: 'ACCEPTED_BY_PROVIDER',
+      status: 'CONFIRMED',
     },
   });
 
@@ -802,16 +847,15 @@ export const acceptAppointmentRequest = async (
   await prisma.notification.create({
     data: {
       userId: String(appointmentRequest.patientId),
-      type: 'SMART_MATCH_PAYMENT_REQUIRED',
+      type: 'SMART_MATCH_REQUEST_CONFIRMED',
       title: 'Provider accepted your request',
-      message: `${acceptedProviderName} accepted your request. Complete payment within 6 hours to confirm your session.`,
+      message: `${acceptedProviderName} accepted your paid request. Your session request is now confirmed.`,
       payload: {
         appointmentRequestId: updated.id,
         providerId: input.providerId,
         scheduledAt: updated.scheduledAt?.toISOString(),
-        paymentDeadlineAt: paymentDeadlineAt.toISOString(),
         amountMinor,
-        requestStatus: 'ACCEPTED_BY_PROVIDER',
+        requestStatus: 'CONFIRMED',
       },
       sentAt: new Date(),
     },
@@ -842,9 +886,8 @@ export const acceptAppointmentRequest = async (
     status: updated.status,
     appointmentRequestId: updated.id,
     scheduledAt: updated.scheduledAt!.toISOString(),
-    paymentDeadlineAt: paymentDeadlineAt.toISOString(),
     amountMinor,
-    message: `You accepted the appointment request. Patient must pay ₹${(amountMinor / 100).toFixed(2)} within 6 hours to confirm.`,
+    message: `You accepted the appointment request. Payment is already verified for ₹${(amountMinor / 100).toFixed(2)}.`,
   };
 };
 

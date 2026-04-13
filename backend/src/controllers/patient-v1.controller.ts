@@ -93,6 +93,69 @@ export const getPatientDashboardController = async (req: Request, res: Response)
 	sendSuccess(res, data, 'Patient dashboard fetched');
 };
 
+export const getMyAssessmentsController = async (req: Request, res: Response): Promise<void> => {
+	const userId = authUserId(req);
+
+	try {
+		// Log for debugging
+		console.log(`[ClinicalAssessment] Fetching history for user: ${userId}`);
+
+		// Defensive check: ensure prisma models exist on the client to avoid crash if client is out of sync
+		const phq9Model = (prisma as any).pHQ9Assessment;
+		const gad7Model = (prisma as any).gAD7Assessment;
+
+		if (!phq9Model || !gad7Model) {
+			console.warn(`[ClinicalAssessment] Warning: One or more assessment models missing from Prisma client.`);
+			sendSuccess(res, { items: [] }, 'Patient assessments (partial/unavailable)');
+			return;
+		}
+
+		const [phq9Assessments, gad7Assessments] = await Promise.all([
+			phq9Model.findMany({
+				where: { userId },
+				orderBy: { createdAt: 'desc' },
+				select: { id: true, totalScore: true, answers: true, createdAt: true },
+			}),
+			gad7Model.findMany({
+				where: { userId },
+				orderBy: { createdAt: 'desc' },
+				select: { id: true, totalScore: true, answers: true, createdAt: true },
+			}),
+		]);
+
+		const normalized = [
+			...(phq9Assessments || []).map((item: any) => ({
+				id: item.id,
+				type: 'PHQ-9' as const,
+				createdAt: item.createdAt instanceof Date ? item.createdAt : new Date(item.createdAt || Date.now()),
+				score: Number(item.totalScore || 0),
+				severityLevel: null,
+			})),
+			...(gad7Assessments || []).map((item: any) => ({
+				id: item.id,
+				type: 'GAD-7' as const,
+				createdAt: item.createdAt instanceof Date ? item.createdAt : new Date(item.createdAt || Date.now()),
+				score: Number(item.totalScore || 0),
+				severityLevel: null,
+			})),
+		]
+			.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+			.map((item) => ({
+				id: item.id,
+				type: item.type,
+				score: item.score,
+				severityLevel: item.severityLevel || 'mild',
+				createdAt: item.createdAt.toISOString(),
+			}));
+
+		sendSuccess(res, { items: normalized }, 'Patient assessments fetched');
+	} catch (error: any) {
+		console.error(`[ClinicalAssessment] Error fetching assessment history for user ${userId}:`, error);
+		// Return empty items instead of 500 to keep the frontend functional
+		sendSuccess(res, { items: [], error: error.message }, 'Unable to fetch assessment history at this time');
+	}
+};
+
 export const listProvidersController = async (req: Request, res: Response): Promise<void> => {
 	const result = await listProviders({
 		specialization: typeof req.query.specialization === 'string' ? req.query.specialization : undefined,
