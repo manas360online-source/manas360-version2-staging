@@ -98,16 +98,16 @@ DO $$
 BEGIN
     IF EXISTS (
         SELECT 1
-        FROM information_schema.tables
-        WHERE table_schema = 'public' AND table_name = 'payouts'
+        FROM pg_type
+        WHERE typname = 'payoutstatus'
     ) THEN
-        ALTER TABLE "payouts" ALTER COLUMN "status" DROP DEFAULT;
-        ALTER TABLE "payouts" ALTER COLUMN "status" TYPE "PayoutStatus_new" USING ("status"::text::"PayoutStatus_new");
+        ALTER TYPE "PayoutStatus" RENAME TO "PayoutStatus_old";
+        ALTER TYPE "PayoutStatus_new" RENAME TO "PayoutStatus";
+        DROP TYPE "PayoutStatus_old";
+    ELSE
+        ALTER TYPE "PayoutStatus_new" RENAME TO "PayoutStatus";
     END IF;
 END $$;
-ALTER TYPE "PayoutStatus" RENAME TO "PayoutStatus_old";
-ALTER TYPE "PayoutStatus_new" RENAME TO "PayoutStatus";
-DROP TYPE "PayoutStatus_old";
 COMMIT;
 
 -- DropForeignKey
