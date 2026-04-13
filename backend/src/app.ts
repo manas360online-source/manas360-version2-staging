@@ -13,6 +13,7 @@ import client from 'prom-client';
 import * as Sentry from '@sentry/node';
 import { initSentry } from './config/sentry';
 import { logger } from './utils/logger';
+import { prisma } from './config/db';
 
 // Initialize Sentry before anything else
 initSentry();
@@ -23,7 +24,7 @@ const app = express();
 Sentry.setupExpressErrorHandler(app);
 
 app.disable('x-powered-by');
-app.set('trust proxy', 1);
+app.set('trust proxy', env.trustProxy as any);
 app.use(helmet());
 
 const localDevOrigins = [
@@ -35,12 +36,16 @@ const localDevOrigins = [
 
 const normalizeOrigin = (origin: string): string => origin.replace(/\/+$/, '');
 
-const allowedCorsOrigins = Array.from(new Set([
-	...env.corsOrigins,
-	...localDevOrigins,
+const productionOrigins = [
 	'https://www.manas360.com',
 	'https://manas360.com',
 	'http://www.manas360.com',
+];
+
+const allowedCorsOrigins = Array.from(new Set([
+	...env.corsOrigins,
+	...(env.isDevelopment ? localDevOrigins : []),
+	...productionOrigins,
 ].map(normalizeOrigin)));
 
 app.use(cors({
@@ -101,7 +106,17 @@ app.use(requestLogger);
 
 // Health check endpoint
 app.get('/health', (_req, res) => {
-    res.status(200).json({ status: 'OK' });
+    res.status(200).json({ status: 'OK', service: 'manas360-backend' });
+});
+
+// Readiness probe for AWS target groups/containers.
+app.get('/ready', async (_req, res) => {
+	try {
+		await prisma.$queryRawUnsafe('SELECT 1');
+		res.status(200).json({ status: 'READY' });
+	} catch (error) {
+		res.status(503).json({ status: 'NOT_READY' });
+	}
 });
 
 app.use(env.apiPrefix, apiRoutes);

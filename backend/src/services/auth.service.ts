@@ -28,6 +28,7 @@ import {
 import { createTokenPair, verifyRefreshToken } from '../utils/jwt';
 import { logger } from '../utils/logger';
 import { sendPlatformAdminPasswordResetEmail } from './email.service';
+import { getActiveLegalDocuments, recordUserAcceptances } from './legal-compliance.service';
 import { sendWhatsAppMessage } from './whatsapp.service';
 import type { WhatsAppUserType } from './whatsapp.service';
 import type {
@@ -597,6 +598,30 @@ export const verifyPhoneOtp = async (input: VerifyPhoneOtpInput, meta: RequestMe
 
 		if (toCreate.length > 0) {
 			await db.consent.createMany({ data: toCreate });
+		}
+
+		// Keep new legal acceptance tables in sync at registration time so users
+		// are not re-prompted right after onboarding.
+		try {
+			const legalDocs = await getActiveLegalDocuments();
+			const docIds = legalDocs
+				.filter((doc: any) => defaultConsentTypes.includes(String(doc.type || '').toUpperCase()))
+				.map((doc: any) => String(doc.id));
+
+			if (docIds.length > 0) {
+				await recordUserAcceptances({
+					userId: String(user.id),
+					documentIds: docIds,
+					ipAddress: meta.ipAddress || undefined,
+					userAgent: meta.userAgent || undefined,
+					source: 'signup_phone_otp',
+				});
+			}
+		} catch (legalSyncError) {
+			logger.warn('Legal acceptance sync skipped during OTP verification', {
+				userId: String(user.id),
+				error: (legalSyncError as Error)?.message,
+			});
 		}
 
 		// Send WhatsApp welcome message for first-time users (non-blocking)
