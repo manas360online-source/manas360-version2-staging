@@ -102,19 +102,6 @@ const CONFETTI_COLORS  = ['#FFD600', '#FF8A65', '#a78bfa', '#06b6d4', '#5dba3e',
 const ENDO_CONFETTI    = ['#FFD54F', '#F48FB1', '#FFAB91', '#FFF9C4', '#FF8A65', '#fff'];
 const FIRE_COLORS      = ['#ff4800', '#ff9100', '#ffcd00', '#FF8A65', '#fff'];
 
-const withAlpha = (color, alphaHex = '88') => {
-  if (typeof color !== 'string') return color;
-  if (!color.startsWith('#')) return color;
-  if (color.length === 4) {
-    const r = color[1];
-    const g = color[2];
-    const b = color[3];
-    return `#${r}${r}${g}${g}${b}${b}${alphaHex}`;
-  }
-  if (color.length === 7) return `${color}${alphaHex}`;
-  return color;
-};
-
 const CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=DM+Sans:ital,wght@0,300;0,500;0,700;1,300&display=swap');
 
@@ -189,7 +176,6 @@ const CSS = `
   .chintu-logo-icon.endo-mode { background:linear-gradient(135deg,#FF8A65,#FFD54F); box-shadow:0 0 28px rgba(255,171,145,.5); }
   .chintu-logo-text h1 { font-family:'Syne',sans-serif; font-size:1.5rem; font-weight:800; color:var(--text); letter-spacing:-.5px; }
   .chintu-logo-text p  { font-size:.72rem; font-weight:300; color:var(--text-dim); letter-spacing:3px; text-transform:uppercase; margin-top:1px; }
-  .chintu-logo-note { font-size:.65rem; color:rgba(255,214,0,.5); margin-top:4px; letter-spacing:1.5px; text-transform:uppercase; }
   .chintu-status-pill  { display:flex; align-items:center; gap:8px; background:var(--panel); border:1px solid var(--border); border-radius:50px; padding:7px 14px; font-size:.75rem; color:var(--text-mid); }
   .chintu-status-dot   { width:7px;height:7px; border-radius:50%; background:#555; transition:background .4s,box-shadow .4s; }
   .chintu-status-dot.ready { background:#5dba3e; box-shadow:0 0 8px #5dba3e; }
@@ -312,21 +298,8 @@ const CSS = `
   .chintu-statusbar .msg { display:flex; align-items:center; gap:6px; }
 
   @media (max-width:768px) {
-    .chintu-layout { padding:12px 10px 18px; }
-    .chintu-header { padding-bottom:10px; margin-bottom:10px; }
-    .chintu-logo { gap:8px; }
-    .chintu-logo-icon { width:36px; height:36px; border-radius:10px; font-size:18px; }
-    .chintu-logo-text h1 { font-size:1.1rem; line-height:1.1; }
-    .chintu-logo-text p { font-size:.6rem; letter-spacing:1.3px; }
-    .chintu-logo-note { font-size:.52rem; letter-spacing:1px; margin-top:2px; }
-    .chintu-status-pill { padding:5px 10px; font-size:.64rem; }
-
-    .chintu-main { grid-template-columns:1fr; gap:10px; }
-    .chintu-viewer-wrap { position:sticky; top:8px; z-index:12; }
-    .chintu-iframe-container { height:300px; }
-    .chintu-sidebar { gap:10px; }
-    .chintu-reward-btn { padding:11px 7px; }
-    .chintu-statusbar { margin-top:12px; padding-top:10px; font-size:.66rem; }
+    .chintu-main { grid-template-columns:1fr; }
+    .chintu-iframe-container { height:320px; }
   }
 `;
 
@@ -471,7 +444,7 @@ export default function Chintu() {
       fireParRef.current.forEach(p => {
         p.x += p.vx; p.y -= p.speed; p.speed += .05; p.alpha -= .012; p.size *= .98;
         const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size);
-        g.addColorStop(0, p.color); g.addColorStop(.6, withAlpha(p.color, '88')); g.addColorStop(1,'transparent');
+        g.addColorStop(0, p.color); g.addColorStop(.6, p.color+'88'); g.addColorStop(1,'transparent');
         ctx.save(); ctx.globalAlpha = p.alpha; ctx.fillStyle = g; ctx.shadowBlur = 16; ctx.shadowColor = p.color;
         ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill(); ctx.restore();
       });
@@ -727,7 +700,7 @@ export default function Chintu() {
             <div className="chintu-logo-text">
               <h1>Chintu</h1>
               <p>Dopamine Engine · MANAS360</p>
-              <div className="chintu-logo-note">💪 You're Not Alone</div>
+              <div style={{fontSize:'.65rem',color:'rgba(255,214,0,.5)',marginTop:'4px',letterSpacing:'1.5px',textTransform:'uppercase'}}>💪 You're Not Alone</div>
             </div>
           </div>
           <div className="chintu-status-pill">
