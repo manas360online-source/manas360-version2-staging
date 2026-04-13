@@ -51,8 +51,6 @@ const buildAgreementUrlCandidates = (v1Path: string, fallbackPath: string): stri
   const pathCandidates = new Set<string>([
     normalizePath(v1Path),
     normalizePath(fallbackPath),
-    `api/${normalizePath(v1Path)}`,
-    `api/${normalizePath(fallbackPath)}`,
   ]);
 
   if (/\/api\/v1$/i.test(base)) {
@@ -184,6 +182,21 @@ export type CreateAgreementPayload = {
   template_data: Record<string, unknown>;
 };
 
+export type CreateAdminContractPayload = {
+  entity_id: string | null;
+  contract_type: string;
+  pricing_model: string;
+  price_per_member_per_year: number | null;
+  flat_annual_rate: number | null;
+  max_members: number;
+  contract_start_date: string;
+  contract_end_date: string;
+  payment_terms: string;
+  discount_percent: number;
+  signed_by_entity: string;
+  signed_date: string;
+};
+
 export const corporateApi = {
   requestDemo: async (payload: CorporateDemoRequestPayload) => {
     const requestBody: CorporateDemoRequestApiPayload = {
@@ -255,8 +268,12 @@ export const corporateApi = {
     const response = await http.post('/v1/corporate/public/create-account', payload);
     return unwrap(response.data);
   },
+  createAdminContract: async (payload: CreateAdminContractPayload) => {
+    const response = await http.post('/v1/admin/contracts/create', payload);
+    return unwrap(response.data);
+  },
   createAgreement: async (payload: CreateAgreementPayload) => {
-    return requestAgreementApi('post', '/v1/agreements/create', '/agreements/create', payload);
+    return requestAgreementApi('post', '/v1/corporate/agreements', '/v1/agreements/create', payload);
   },
   getAgreements: async (params?: { status?: string; partner_type?: string; limit?: number; offset?: number }) => {
     const requestParams = {
@@ -264,7 +281,7 @@ export const corporateApi = {
       _ts: Date.now(),
     };
     try {
-      const response = await http.get(toAbsoluteAgreementUrl('/v1/agreements'), {
+      const response = await http.get(toAbsoluteAgreementUrl('/v1/corporate/agreements'), {
         params: requestParams,
         headers: {
           'Cache-Control': 'no-cache',
@@ -273,17 +290,17 @@ export const corporateApi = {
       });
       return unwrap(response.data);
     } catch {
-      return requestAgreementApi('get', '/v1/agreements', '/agreements', undefined, requestParams);
+      return requestAgreementApi('get', '/v1/corporate/agreements', '/v1/agreements', undefined, requestParams);
     }
   },
   getAgreementTemplates: async (params?: { include_inactive?: boolean }) => {
-    return requestAgreementApi('get', '/v1/agreements/templates', '/agreements/templates', undefined, params || undefined);
+    return requestAgreementApi('get', '/v1/corporate/agreement-templates', '/v1/agreements/templates', undefined, params || undefined);
   },
   sendForSignature: async (id: number | string) => {
-    return requestAgreementApi('post', `/v1/agreements/${id}/send`, `/agreements/${id}/send`);
+    return requestAgreementApi('post', `/v1/corporate/agreements/${id}/send`, `/v1/agreements/${id}/send`);
   },
   checkStatus: async (id: number | string) => {
-    return requestAgreementApi('get', `/v1/agreements/${id}/status`, `/agreements/${id}/status`);
+    return requestAgreementApi('get', `/v1/corporate/agreements/${id}/status`, `/v1/agreements/${id}/status`);
   },
   listCompanies: async () => {
     const response = await http.get('/v1/corporate/companies');
@@ -296,23 +313,32 @@ export const corporateApi = {
   getEapQrAnalytics: async (companyKey?: string) => {
     const params = companyKey ? { companyKey } : undefined;
     try {
-      const response = await http.get('/v1/corporate/eap-qr/analytics', { params });
+      const response = await http.get('/v1/corporate/qr/eap/analytics', { params });
       return unwrap(response.data);
     } catch (error: any) {
       if (Number(error?.response?.status || 0) !== 404) throw error;
-      const fallback = await http.get('/v1/corporate/eap/qr/analytics', { params });
+      const fallback = await http.get('/v1/corporate/eap-qr/analytics', { params });
       return unwrap(fallback.data);
     }
   },
   createEapQr: async (payload: Record<string, unknown>, companyKey?: string) => {
     const params = companyKey ? { companyKey } : undefined;
     try {
-      const response = await http.post('/v1/corporate/eap-qr', payload, { params });
+      // Primary endpoint - /qr/eap/generate
+      const response = await http.post('/v1/corporate/qr/eap/generate', payload, { params });
       return unwrap(response.data);
     } catch (error: any) {
       if (Number(error?.response?.status || 0) !== 404) throw error;
-      const fallback = await http.post('/v1/corporate/eap/qr', payload, { params });
-      return unwrap(fallback.data);
+      try {
+        // Fallback 1: legacy nested path
+        const fallback1 = await http.post('/v1/corporate/qr/eap', payload, { params });
+        return unwrap(fallback1.data);
+      } catch (err: any) {
+        if (Number(err?.response?.status || 0) !== 404) throw err;
+        // Fallback 2: historical endpoints
+        const fallback2 = await http.post('/v1/corporate/eap-qr', payload, { params });
+        return unwrap(fallback2.data);
+      }
     }
   },
   getPrograms: async (companyKey?: string) => {

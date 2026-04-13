@@ -2820,6 +2820,7 @@ model InstitutionalAgreement {
   id                    Int                     @id @default(autoincrement())
   agreement_number      String                  @unique
   template_id           Int
+  entity_id             String?
   agreement_type        String
   partner_name          String
   partner_type          String
@@ -2837,12 +2838,44 @@ model InstitutionalAgreement {
   status                String                  @default("draft")
   created_at            DateTime                @default(now())
   template              AgreementTemplate       @relation(fields: [template_id], references: [id], onDelete: Restrict)
+  entity                Entity?                 @relation(fields: [entity_id], references: [id], onDelete: SetNull)
   signature_logs        AgreementSignatureLog[]
 
   @@index([template_id])
+  @@index([entity_id])
   @@index([status])
   @@index([signature_status])
   @@map("institutional_agreements")
+}
+
+model Entity {
+  id          String                   @id @default(uuid())
+  entity_name String
+  entity_type String
+  admin_name  String?
+  admin_email String                   @unique
+  created_at  DateTime                 @default(now())
+
+  contracts   Contract[]
+  agreements  InstitutionalAgreement[]
+}
+
+model Contract {
+  id                String   @id @default(uuid())
+  entityId          String
+  entity            Entity   @relation(fields: [entityId], references: [id])
+
+  contract_number   String   @unique
+  pricing_model     String
+  price_per_member  Float?
+  max_members       Int?
+
+  start_date        DateTime
+  end_date          DateTime
+
+  created_at        DateTime @default(now())
+
+  @@index([entityId])
 }
 
 model AgreementSignatureLog {

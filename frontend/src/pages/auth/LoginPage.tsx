@@ -100,7 +100,8 @@ export default function LoginPage() {
 		setLoading(true);
 		try {
 			const result = await verifyPhoneSignupOtp(phone.trim(), otp.trim());
-			await checkAuth();
+			// Force a session probe after OTP verify so auth state updates immediately.
+			await checkAuth({ force: true });
 
 			// Use canonical auth user (from /auth/me) for routing, as OTP response may omit corporate flags.
 			let resolvedUser = result.user;

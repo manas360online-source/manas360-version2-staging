@@ -346,8 +346,19 @@ ALTER COLUMN "allow_guest_join" SET DEFAULT false,
 ALTER COLUMN "requires_admin_gate" SET DEFAULT false,
 ALTER COLUMN "requires_payment" SET DEFAULT false;
 
--- AlterTable
-ALTER TABLE "idempotency_keys" ALTER COLUMN "expires_at" DROP DEFAULT;
+-- AlterTable (guarded for shadow DB compatibility)
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+            AND table_name = 'idempotency_keys'
+            AND column_name = 'expires_at'
+    ) THEN
+        ALTER TABLE "idempotency_keys" ALTER COLUMN "expires_at" DROP DEFAULT;
+    END IF;
+END $$;
 
 -- AlterTable
 ALTER TABLE "invoices" ALTER COLUMN "updatedAt" DROP DEFAULT;
@@ -376,10 +387,10 @@ DROP COLUMN "method",
 ADD COLUMN     "method" "PayoutMethod" NOT NULL DEFAULT 'BANK';
 
 -- AlterTable
-ALTER TABLE "platform_configs" ALTER COLUMN "updated_at" DROP DEFAULT;
+ALTER TABLE IF EXISTS "platform_configs" ALTER COLUMN "updated_at" DROP DEFAULT;
 
 -- AlterTable
-ALTER TABLE "qr_codes" ALTER COLUMN "updated_at" DROP DEFAULT;
+ALTER TABLE IF EXISTS "qr_codes" ALTER COLUMN "updated_at" DROP DEFAULT;
 
 -- AlterTable
 ALTER TABLE "session_booking_intents" DROP COLUMN "razorpayOrderId",
@@ -1169,8 +1180,18 @@ CREATE INDEX "payout_requests_providerId_status_requestedAt_idx" ON "payout_requ
 -- CreateIndex
 CREATE INDEX "payout_requests_status_requestedAt_idx" ON "payout_requests"("status", "requestedAt" DESC);
 
--- CreateIndex
-CREATE INDEX IF NOT EXISTS "payouts_status_createdAt_idx" ON "payouts"("status", "createdAt" DESC);
+-- CreateIndex (guarded for shadow DB compatibility)
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+            AND table_name = 'payouts'
+    ) THEN
+        CREATE INDEX IF NOT EXISTS "payouts_status_createdAt_idx" ON "payouts"("status", "createdAt" DESC);
+    END IF;
+END $$;
 
 -- CreateIndex
 CREATE INDEX "prescriptions_provider_id_created_at_idx" ON "prescriptions"("provider_id", "created_at" DESC);
