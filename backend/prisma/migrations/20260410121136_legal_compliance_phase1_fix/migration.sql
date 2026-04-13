@@ -83,33 +83,6 @@
   - Made the column `userId` on table `user_wallets` required. This step will fail if there are existing NULL values in that column.
 
 */
--- CreateEnum
-CREATE TYPE "PayoutRequestStatus" AS ENUM ('REQUESTED', 'APPROVED', 'PAID', 'REJECTED', 'FAILED');
-
--- CreateEnum
-CREATE TYPE "PayoutMethod" AS ENUM ('BANK', 'UPI');
-
--- AlterEnum
-BEGIN;
-CREATE TYPE "PayoutStatus_new" AS ENUM ('PENDING', 'PROCESSING', 'COMPLETED', 'FAILED');
-ALTER TABLE "payout_requests" ALTER COLUMN "status" DROP DEFAULT;
-ALTER TABLE "payout_requests" ALTER COLUMN "status" TYPE TEXT USING ("status"::text);
-DO $$
-BEGIN
-    IF EXISTS (
-        SELECT 1
-        FROM pg_type
-        WHERE typname = 'payoutstatus'
-    ) THEN
-        ALTER TYPE "PayoutStatus" RENAME TO "PayoutStatus_old";
-        ALTER TYPE "PayoutStatus_new" RENAME TO "PayoutStatus";
-        DROP TYPE "PayoutStatus_old";
-    ELSE
-        ALTER TYPE "PayoutStatus_new" RENAME TO "PayoutStatus";
-    END IF;
-END $$;
-COMMIT;
-
 -- DropForeignKey
 ALTER TABLE "audit_logs" DROP CONSTRAINT "audit_logs_userId_fkey";
 
@@ -371,18 +344,6 @@ ADD COLUMN     "phonepePlanId" TEXT NOT NULL,
 ADD COLUMN     "phonepeSubscriptionId" TEXT NOT NULL,
 ALTER COLUMN "providerGateway" SET DEFAULT 'PHONEPE';
 
--- AlterTable
-ALTER TABLE "payout_requests" ADD COLUMN     "platform_amount" BIGINT,
-ADD COLUMN     "therapist_amount" BIGINT,
-DROP COLUMN "status",
-ADD COLUMN     "status" "PayoutRequestStatus" NOT NULL DEFAULT 'REQUESTED';
-
--- AlterTable
-ALTER TABLE IF EXISTS "payouts" DROP COLUMN "status",
-ADD COLUMN     "status" "PayoutStatus" NOT NULL DEFAULT 'PENDING',
-DROP COLUMN "method",
-ADD COLUMN     "method" "PayoutMethod" NOT NULL DEFAULT 'BANK';
-
 -- AlterTable (guarded: only run if table exists)
 DO $$
 BEGIN
@@ -499,59 +460,11 @@ DROP TYPE "GroupTherapyMode";
 -- DropEnum
 DROP TYPE "GroupTherapyStatus";
 
--- CreateTable
-CREATE TABLE "legal_documents" (
-    "id" TEXT NOT NULL,
-    "type" TEXT NOT NULL,
-    "version" INTEGER NOT NULL,
-    "title" TEXT NOT NULL,
-    "content" TEXT NOT NULL,
-    "isActive" BOOLEAN NOT NULL DEFAULT false,
-    "publishedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedById" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "legal_documents_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "user_acceptances" (
-    "id" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
-    "documentId" TEXT NOT NULL,
-    "documentVer" INTEGER NOT NULL,
-    "acceptedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "ipAddress" TEXT,
-    "userAgent" TEXT,
-    "source" TEXT NOT NULL DEFAULT 'web',
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "user_acceptances_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "global_settings" (
-    "key" TEXT NOT NULL,
-    "value" TEXT NOT NULL,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "global_settings_pkey" PRIMARY KEY ("key")
 );
 
--- CreateTable
-CREATE TABLE "invoice_sequences" (
-    "year" INTEGER NOT NULL,
-    "lastSequence" INTEGER NOT NULL DEFAULT 0,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "invoice_sequences_pkey" PRIMARY KEY ("year")
-);
-
--- CreateTable
-CREATE TABLE "platform_access" (
     "id" TEXT NOT NULL,
     "providerId" TEXT NOT NULL,
     "billingCycle" TEXT NOT NULL,
@@ -1180,15 +1093,6 @@ CREATE UNIQUE INDEX "marketplace_subscriptions_phonepeSubscriptionId_key" ON "ma
 CREATE INDEX "patient_assessments_patientId_createdAt_idx" ON "patient_assessments"("patientId", "createdAt" DESC);
 
 -- CreateIndex
-CREATE INDEX "payout_requests_providerId_status_requestedAt_idx" ON "payout_requests"("providerId", "status", "requestedAt" DESC);
-
--- CreateIndex
-CREATE INDEX "payout_requests_status_requestedAt_idx" ON "payout_requests"("status", "requestedAt" DESC);
-
--- CreateIndex
-CREATE INDEX IF NOT EXISTS "payouts_status_createdAt_idx" ON "payouts"("status", "createdAt" DESC);
-
--- CreateIndex
 CREATE INDEX "prescriptions_provider_id_created_at_idx" ON "prescriptions"("provider_id", "created_at" DESC);
 
 -- CreateIndex
@@ -1304,18 +1208,6 @@ ALTER INDEX IF EXISTS "idx_invoice_is_paid_out" RENAME TO "invoices_isPaidOut_id
 
 -- RenameIndex
 ALTER INDEX IF EXISTS "idx_invoice_payment_id" RENAME TO "invoices_paymentId_idx";
-
--- RenameIndex
-ALTER INDEX IF EXISTS "idx_payout_item_payout" RENAME TO "payout_items_payoutId_idx";
-
--- RenameIndex
-ALTER INDEX IF EXISTS "payout_items_invoiceId_unique" RENAME TO "payout_items_invoiceId_key";
-
--- RenameIndex
-ALTER INDEX IF EXISTS "idx_payout_provider_created" RENAME TO "payouts_providerId_createdAt_idx";
-
--- RenameIndex
-ALTER INDEX IF EXISTS "idx_payout_status_created" RENAME TO "payouts_status_createdAt_idx";
 
 -- RenameIndex
 ALTER INDEX IF EXISTS "user_wallet_transactions_wallet_created_idx_new" RENAME TO "user_wallet_transactions_walletId_createdAt_idx";
