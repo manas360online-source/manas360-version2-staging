@@ -37,7 +37,11 @@ export const bookMySessionController = async (req: Request, res: Response): Prom
 		throw new AppError('Invalid booking payload', 400);
 	}
 
-	const session = await bookPatientSession(userId, req.validatedBookSessionPayload);
+	const session = await bookPatientSession(userId, {
+		...req.validatedBookSessionPayload,
+		qrCode: req.validatedBookSessionPayload.qrCode || (typeof req.query.qr === 'string' ? req.query.qr : undefined),
+		sid: req.validatedBookSessionPayload.sid || (typeof req.query.sid === 'string' ? req.query.sid : undefined),
+	});
 
 	sendSuccess(res, session, 'Session booked successfully', 201);
 };

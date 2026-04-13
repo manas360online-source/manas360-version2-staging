@@ -70,7 +70,7 @@ export const GroupSessionsStrip: React.FC = () => {
 
   return (
     <>
-      <section className="py-8 px-4 sm:px-6 lg:px-16 bg-gradient-to-br from-[#f5f3ef] to-[#f9f7f3] font-sans">
+      <section className="group-sessions-strip py-8 px-4 sm:px-6 lg:px-16 bg-gradient-to-br from-[#f5f3ef] to-[#f9f7f3] font-sans dark:from-[#0f1b20] dark:to-[#132730]">
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-3">
@@ -91,7 +91,7 @@ export const GroupSessionsStrip: React.FC = () => {
             {displaySessions.map((session) => (
               <div 
                 key={session.id} 
-                className={`${session.bg} border-2 ${session.border} rounded-3xl p-6 flex flex-col justify-between animate-in fade-in zoom-in-95 duration-500 hover:shadow-lg transition-shadow cursor-pointer group`}
+                className={`group-session-card ${session.bg} border-2 ${session.border} rounded-3xl p-6 flex flex-col justify-between animate-in fade-in zoom-in-95 duration-500 hover:shadow-lg transition-shadow cursor-pointer group dark:bg-[#10212a] dark:border-[#31535a]`}
               >
                 <div>
                   <div className="flex justify-between items-start mb-4">

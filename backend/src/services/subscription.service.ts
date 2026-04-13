@@ -194,7 +194,8 @@ export const processSubscriptionWebhook = async (
 						phoneNumber: user.phone,
 						templateType: 'subscription_renewed',
 						userType: 'user',
-						templateVariables: {
+						templateName: 'subscription_renewal_success',
+						parameters: {
 							plan_name: planDisplay,
 							amount: amountDisplay,
 							currency: payment.currency,
@@ -203,7 +204,7 @@ export const processSubscriptionWebhook = async (
 								month: 'long',
 								day: 'numeric',
 							}),
-							user_name: user.name || 'User'
+							user_name: user.name || 'User',
 						},
 					});
 				}
@@ -244,11 +245,12 @@ export const processSubscriptionWebhook = async (
 						phoneNumber: user.phone,
 						templateType: 'payment_failed',
 						userType: 'user',
-						templateVariables: {
+						templateName: 'subscription_payment_failure',
+						parameters: {
 							plan_name: sub.plan.charAt(0) + sub.plan.slice(1).toLowerCase(),
 							failure_reason: failureReason,
 							user_name: user.name || 'User',
-							action_link: `${process.env.APP_URL || 'https://manas360.io'}/subscription/retry?id=${sub.id}`
+							action_link: `${process.env.APP_URL || 'https://manas360.io'}/subscription/retry?id=${sub.id}`,
 						},
 					});
 				}

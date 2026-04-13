@@ -4,6 +4,7 @@ const express_1 = require("express");
 const auth_middleware_1 = require("../middleware/auth.middleware");
 const rbac_middleware_1 = require("../middleware/rbac.middleware");
 const validate_middleware_1 = require("../middleware/validate.middleware");
+const providerVerification_controller_1 = require("../controllers/providerVerification.controller");
 const admin_controller_1 = require("../controllers/admin.controller");
 const admin_analytics_controller_1 = require("../controllers/admin-analytics.controller");
 const admin_payment_reliability_controller_1 = require("../controllers/admin-payment-reliability.controller");
@@ -53,6 +54,10 @@ router.post('/users/bulk-status', auth_middleware_1.requireAuth, (0, rbac_middle
  */
 router.patch('/therapists/:id/verify', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requireAdminPolicy)('providers.verify'), ...validate_middleware_1.validateTherapistProfileIdParam, (0, validate_middleware_1.asyncHandler)(admin_controller_1.verifyTherapistController));
 router.post('/verify-provider/:id', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requireAdminPolicy)('providers.verify'), ...validate_middleware_1.validateTherapistProfileIdParam, (0, validate_middleware_1.asyncHandler)(admin_controller_1.verifyProviderController));
+// Webhook endpoints: called by Zoho Flow / Zoho Desk when manual review completes.
+// These endpoints are protected by the Zoho Flow webhook secret header `x-zoho-flow-secret`.
+router.post('/verify-provider', (0, validate_middleware_1.asyncHandler)(providerVerification_controller_1.verifyProviderWebhookController));
+router.post('/reject-provider', (0, validate_middleware_1.asyncHandler)(providerVerification_controller_1.rejectProviderWebhookController));
 /**
  * POST /api/v1/admin/approve-provider/:id
  * Approve provider onboarding — sets isVerified, onboardingStatus = COMPLETED
@@ -275,6 +280,11 @@ router.post('/offers/publish', auth_middleware_1.requireAuth, (0, rbac_middlewar
 // === QR CODE MANAGEMENT ===
 router.get('/qr-codes', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin']), (0, rbac_middleware_1.requireAdminPolicy)('qr.manage'), (0, validate_middleware_1.asyncHandler)(admin_qr_controller_1.listAdminQrCodesController));
 router.post('/qr-codes', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin']), (0, rbac_middleware_1.requireAdminPolicy)('qr.manage'), (0, validate_middleware_1.asyncHandler)(admin_qr_controller_1.createAdminQrCodeController));
+router.get('/qr/analytics/by-type', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin']), (0, rbac_middleware_1.requireAdminPolicy)('qr.manage'), (0, validate_middleware_1.asyncHandler)(admin_qr_controller_1.getAdminQrAnalyticsByTypeController));
+router.get('/qr/analytics/by-source', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin']), (0, rbac_middleware_1.requireAdminPolicy)('qr.manage'), (0, validate_middleware_1.asyncHandler)(admin_qr_controller_1.getAdminQrAnalyticsBySourceController));
+router.post('/qr/screening/generate', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin']), (0, rbac_middleware_1.requireAdminPolicy)('qr.manage'), (0, validate_middleware_1.asyncHandler)(admin_qr_controller_1.createScreeningQrCodeController));
+router.post('/qr/checkin/generate', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin']), (0, rbac_middleware_1.requireAdminPolicy)('qr.manage'), (0, validate_middleware_1.asyncHandler)(admin_qr_controller_1.createCheckinQrCodeController));
+router.post('/qr/join/generate', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin']), (0, rbac_middleware_1.requireAdminPolicy)('qr.manage'), (0, validate_middleware_1.asyncHandler)(admin_qr_controller_1.createSessionJoinQrCodeController));
 router.patch('/qr-codes/:code', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin']), (0, rbac_middleware_1.requireAdminPolicy)('qr.manage'), (0, validate_middleware_1.asyncHandler)(admin_qr_controller_1.updateAdminQrCodeController));
 router.get('/pricing/contracts', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requireAdminPolicy)('pricing.manage'), admin_pricing_controller_1.getPricingContractsController);
 router.post('/pricing/contracts/draft', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('admin'), (0, rbac_middleware_1.requireAdminPolicy)('pricing.manage'), admin_pricing_controller_1.createPricingDraftController);

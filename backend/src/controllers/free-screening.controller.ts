@@ -1,11 +1,36 @@
 import type { Request, Response } from 'express';
 import { AppError } from '../middleware/error.middleware';
 import { sendSuccess } from '../utils/response';
+import { recordQrConversion } from '../services/qr-conversion.service';
 import {
 	getMyFreeScreeningHistory,
 	startFreeScreeningAttempt,
 	submitFreeScreeningAttempt,
 } from '../services/free-screening.service';
+
+const trackAssessmentCompletion = async (req: Request, payload: {
+	attemptId: string;
+	templateKey: string;
+	totalScore: number;
+	severityLevel: string;
+}) => {
+	const qrCode = String(req.query['qr'] || '').trim();
+	const sid = String(req.query['sid'] || '').trim();
+	if (!qrCode) return;
+
+	await recordQrConversion({
+		qrCode,
+		sessionId: sid,
+		conversionType: 'assessment_completed',
+		attributedRevenue: 0,
+		conversionData: {
+			attemptId: payload.attemptId,
+			templateKey: payload.templateKey,
+			totalScore: payload.totalScore,
+			severityLevel: payload.severityLevel,
+		},
+	}).catch(() => undefined);
+};
 
 const getAttemptIdParam = (req: Request): string => {
 	const attemptId = String(req.params.attemptId || '').trim();
@@ -40,6 +65,7 @@ export const submitFreeScreeningPublicController = async (req: Request, res: Res
 		attemptToken: typeof req.body?.attemptToken === 'string' ? req.body.attemptToken : undefined,
 		answers: normalizeAnswers(req.body?.answers),
 	});
+	await trackAssessmentCompletion(req, data);
 	sendSuccess(res, data, 'Free screening submitted');
 };
 
@@ -57,6 +83,7 @@ export const submitFreeScreeningForPatientController = async (req: Request, res:
 		patientUserId: authUserId(req),
 		answers: normalizeAnswers(req.body?.answers),
 	});
+	await trackAssessmentCompletion(req, data);
 	sendSuccess(res, data, 'Free screening submitted');
 };
 

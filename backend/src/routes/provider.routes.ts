@@ -41,6 +41,10 @@ import {
 	getPatientDocuments,
     createAddendum,
 } from '../controllers/provider.controller';
+import {
+	getProviderMyQrAnalyticsController,
+	getProviderMyQrController,
+} from '../controllers/provider-qr.controller';
 import { requireAuth } from '../middleware/auth.middleware';
 import { requireRole, type UserRole } from '../middleware/rbac.middleware';
 import { requireProviderSubscription } from '../middleware/subscription.middleware';
@@ -63,6 +67,9 @@ router.get(
 	requireRole(providerRoles),
 	asyncHandler(getProviderDashboardController),
 );
+
+router.get('/my-qr', requireAuth, requireRole(providerRoles), asyncHandler(getProviderMyQrController));
+router.get('/my-qr/analytics', requireAuth, requireRole(providerRoles), asyncHandler(getProviderMyQrAnalyticsController));
 
 router.get('/calendar', requireAuth, requireRole(providerRoles), asyncHandler(getProviderCalendarSessions));
 router.get('/patients', requireAuth, requireRole(providerRoles), asyncHandler(getProviderPatients));

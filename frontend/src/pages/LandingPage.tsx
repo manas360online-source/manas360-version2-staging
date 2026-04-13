@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
+import { Link } from 'react-router-dom';
 import {
   Header,
   Hero,
@@ -130,7 +131,7 @@ export const LandingPage: React.FC = () => {
       </Helmet>
 
       {/* Main Page Structure */}
-      <div className="relative min-h-screen overflow-x-hidden bg-[#f5f3ef] text-charcoal">
+      <div className="landing-root relative min-h-screen overflow-x-hidden bg-[#f5f3ef] text-charcoal">
         <Header />
         <QuickAccessRail />
         <Hero />
@@ -142,6 +143,25 @@ export const LandingPage: React.FC = () => {
           <section className="bg-cream px-4 pt-10 pb-2 sm:px-6 md:px-8 lg:px-12 xl:px-16">
             <div className="mx-auto max-w-6xl">
               <TrustMetrics />
+            </div>
+          </section>
+
+          <section className="bg-white px-4 py-6 sm:px-6 md:px-8 lg:px-12 xl:px-16">
+            <div className="mx-auto max-w-6xl rounded-3xl border border-emerald-200 bg-emerald-50 p-5 sm:p-7">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-emerald-900 sm:text-2xl">Play Hit a Sixer for Free</h2>
+                  <p className="mt-1 text-sm text-emerald-800 sm:text-base">
+                    Anyone can play now. Create a patient account to claim winnings directly in wallet.
+                  </p>
+                </div>
+                <Link
+                  to="/hit-a-sixer"
+                  className="inline-flex items-center justify-center rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-800"
+                >
+                  Play Now
+                </Link>
+              </div>
             </div>
           </section>
 

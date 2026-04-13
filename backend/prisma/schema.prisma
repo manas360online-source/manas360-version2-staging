@@ -1,3 +1,31 @@
+model CorporateAgreementTemplate {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  content     String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  agreements  CorporateAgreement[]
+
+  @@map("corporate_agreement_templates")
+}
+
+model CorporateAgreement {
+  id          String   @id @default(uuid())
+  templateId  String
+  email       String
+  value       String?
+  status      String   @default("Draft")
+  companyKey  String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  template    CorporateAgreementTemplate @relation(fields: [templateId], references: [id])
+
+  @@map("corporate_agreements")
+}
 generator client {
   provider      = "prisma-client-js"
   binaryTargets = ["native", "linux-musl-openssl-3.0.x", "linux-musl-arm64-openssl-3.0.x"]
@@ -162,6 +190,12 @@ model Role {
 model QrCode {
   code            String   @id
   redirectUrl     String   @map("redirect_url")
+  qrType          String?  @map("qr_type")
+  destinationUrl  String?  @map("destination_url")
+  ownerId         String?  @map("owner_id")
+  isDynamic       Boolean  @default(true) @map("is_dynamic")
+  expiresAt       DateTime? @map("expires_at")
+  lastScannedAt   DateTime? @map("last_scanned_at")
   templateId      String   @default("classic-black") @map("template_id")
   stylePreset     String   @default("rounded") @map("style_preset")
   foregroundColor String   @default("#0F172A") @map("foreground_color")
@@ -174,10 +208,52 @@ model QrCode {
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
   createdBy       User?    @relation("QrCodeCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  scans           QrScan[]
+  conversions     QrConversion[]
 
   @@index([createdById])
   @@index([createdAt])
+  @@index([qrType])
+  @@index([ownerId])
+  @@index([expiresAt])
   @@map("qr_codes")
+}
+
+model QrScan {
+  id            String   @id @default(uuid())
+  qrCodeCode    String   @map("qr_code_code")
+  scanTimestamp DateTime @default(now()) @map("scan_timestamp")
+  deviceType    String?  @map("device_type")
+  deviceOs      String?  @map("device_os")
+  ipAddress     String?  @map("ip_address")
+  sessionId     String?  @map("session_id")
+  userAgent     String?  @map("user_agent")
+  createdAt     DateTime @default(now()) @map("created_at")
+  qrCode        QrCode   @relation(fields: [qrCodeCode], references: [code], onDelete: Cascade)
+  conversions   QrConversion[]
+
+  @@index([qrCodeCode, scanTimestamp])
+  @@index([sessionId])
+  @@map("qr_scans")
+}
+
+model QrConversion {
+  id                String   @id @default(uuid())
+  qrCodeCode        String   @map("qr_code_code")
+  qrScanId          String?  @map("qr_scan_id")
+  sessionId         String?  @map("session_id")
+  conversionType    String   @map("conversion_type")
+  attributedRevenue Decimal  @default(0) @db.Decimal(10, 2) @map("attributed_revenue")
+  conversionData    Json?    @map("conversion_data")
+  conversionAt      DateTime @default(now()) @map("conversion_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+  qrCode            QrCode   @relation(fields: [qrCodeCode], references: [code], onDelete: Cascade)
+  qrScan            QrScan?  @relation(fields: [qrScanId], references: [id], onDelete: SetNull)
+
+  @@index([qrCodeCode, conversionType])
+  @@index([sessionId])
+  @@index([conversionAt])
+  @@map("qr_conversions")
 }
 
 model CareTeamAssignment {
@@ -350,8 +426,28 @@ model AuthAuditLog {
 
   @@index([userId, createdAt])
   @@index([event, createdAt])
-  @@map("auth_audit_logs")
 }
+
+model ProviderVerification {
+  id          String   @id @default(uuid())
+  userId      String
+  license     String
+  licenseType String
+  status      String
+  checks      Json?
+  flagReasons Json?
+  verifiedAt  DateTime?
+  reviewedBy  String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // relation to `User` intentionally omitted to avoid adding inverse field on User model
+
+  @@index([userId])
+  @@map("provider_verifications")
+}
+ 
 
 model PatientProfile {
   id                           String                       @id @default(uuid())
@@ -2702,6 +2798,66 @@ model system_settings {
   key        String   @id @db.VarChar(100)
   value      String   @db.VarChar(100)
   updated_at DateTime @default(now()) @db.Timestamp(6)
+}
+
+model AgreementTemplate {
+  id                 Int                      @id @default(autoincrement())
+  template_name      String                   @unique
+  template_type      String
+  template_html      String
+  template_variables Json
+  description        String?
+  version            String                   @default("1.0")
+  is_active          Boolean                  @default(true)
+  usage_count        Int                      @default(0)
+  created_at         DateTime                 @default(now())
+  agreements         InstitutionalAgreement[]
+
+  @@map("agreement_templates")
+}
+
+model InstitutionalAgreement {
+  id                    Int                     @id @default(autoincrement())
+  agreement_number      String                  @unique
+  template_id           Int
+  agreement_type        String
+  partner_name          String
+  partner_type          String
+  partner_contact_name  String
+  partner_contact_email String
+  partner_contact_phone String
+  start_date            DateTime
+  end_date              DateTime?
+  annual_value          Float?
+  payment_terms         String?
+  billing_cycle         String?
+  template_data         Json
+  generated_pdf_path    String?
+  signature_status      String                  @default("draft")
+  status                String                  @default("draft")
+  created_at            DateTime                @default(now())
+  template              AgreementTemplate       @relation(fields: [template_id], references: [id], onDelete: Restrict)
+  signature_logs        AgreementSignatureLog[]
+
+  @@index([template_id])
+  @@index([status])
+  @@index([signature_status])
+  @@map("institutional_agreements")
+}
+
+model AgreementSignatureLog {
+  id          Int                    @id @default(autoincrement())
+  agreement_id Int
+  event_type  String
+  actor_type  String
+  actor_name  String
+  event_data  Json?
+  created_at  DateTime               @default(now())
+  agreement   InstitutionalAgreement @relation(fields: [agreement_id], references: [id], onDelete: Cascade)
+
+  @@index([agreement_id])
+  @@index([event_type])
+  @@map("agreement_signature_logs")
 }
 
 enum UserRole {

@@ -1,4 +1,5 @@
 import { http } from '../lib/http';
+import { getApiBaseUrl } from '../lib/runtimeEnv';
 
 type ApiEnvelope<T> = {
   success?: boolean;
@@ -12,6 +13,109 @@ const unwrap = <T>(payload: ApiEnvelope<T> | T): T => {
     return maybe.data as T;
   }
   return payload as T;
+};
+
+const isRouteNotFoundError = (error: any): boolean => {
+  const status = Number(error?.response?.status || 0);
+  const message = String(error?.response?.data?.message || '').toLowerCase();
+  return status === 404 && message.includes('route not found');
+};
+
+const normalizePath = (value: string): string => String(value || '').replace(/^\/+/, '');
+
+const joinBaseAndPath = (base: string, path: string): string => {
+  const cleanBase = String(base || '').replace(/\/+$/, '');
+  let cleanPath = normalizePath(path);
+  const lowerBase = cleanBase.toLowerCase();
+
+  if (lowerBase.endsWith('/api/v1') && cleanPath.toLowerCase().startsWith('api/v1/')) {
+    cleanPath = cleanPath.slice(7);
+  }
+  if (lowerBase.endsWith('/api') && cleanPath.toLowerCase().startsWith('api/')) {
+    cleanPath = cleanPath.slice(4);
+  }
+  if (lowerBase.endsWith('/v1') && cleanPath.toLowerCase().startsWith('v1/')) {
+    cleanPath = cleanPath.slice(3);
+  }
+
+  return `${cleanBase}/${cleanPath}`;
+};
+
+const buildAgreementUrlCandidates = (v1Path: string, fallbackPath: string): string[] => {
+  const base = String(getApiBaseUrl() || '/api').replace(/\/+$/, '');
+  const baseCandidates = new Set<string>([base, '/api', '/api/v1']);
+  if (typeof window !== 'undefined' && /^localhost$|^127\.0\.0\.1$/.test(window.location.hostname)) {
+    baseCandidates.add('http://localhost:5001/api');
+    baseCandidates.add('http://localhost:3000/api');
+  }
+  const pathCandidates = new Set<string>([
+    normalizePath(v1Path),
+    normalizePath(fallbackPath),
+    `api/${normalizePath(v1Path)}`,
+    `api/${normalizePath(fallbackPath)}`,
+  ]);
+
+  if (/\/api\/v1$/i.test(base)) {
+    baseCandidates.add(base.replace(/\/v1$/i, ''));
+  } else if (/\/api$/i.test(base)) {
+    baseCandidates.add(`${base}/v1`);
+  } else {
+    baseCandidates.add(`${base}/api`);
+    baseCandidates.add(`${base}/api/v1`);
+  }
+
+  const urls = new Set<string>();
+  for (const candidateBase of baseCandidates) {
+    for (const candidatePath of pathCandidates) {
+      urls.add(joinBaseAndPath(candidateBase, candidatePath));
+    }
+  }
+
+  return Array.from(urls);
+};
+
+const toAbsoluteAgreementUrl = (path: string): string => {
+  const base = String(getApiBaseUrl() || '/api').replace(/\/+$/, '');
+  const cleanPath = String(path || '').replace(/^\/+/, '');
+  return `${base}/${cleanPath}`;
+};
+
+const requestAgreementApi = async <T = unknown>(
+  method: 'get' | 'post',
+  v1Path: string,
+  fallbackPath: string,
+  payload?: unknown,
+  params?: Record<string, unknown>,
+): Promise<T> => {
+  const candidates = [
+    toAbsoluteAgreementUrl(v1Path),
+    toAbsoluteAgreementUrl(fallbackPath),
+    ...buildAgreementUrlCandidates(v1Path, fallbackPath),
+  ];
+
+  const tried = new Set<string>();
+  let lastError: any;
+
+  for (const url of candidates) {
+    if (!url || tried.has(url)) continue;
+    tried.add(url);
+
+    try {
+      const response = await http.request({ method, url, data: payload, params });
+      return unwrap(response.data as ApiEnvelope<T> | T);
+    } catch (error: any) {
+      lastError = error;
+      const status = Number(error?.response?.status || 0);
+      if (status > 0 && status !== 404) {
+        throw error;
+      }
+      if (status === 404 && !isRouteNotFoundError(error)) {
+        throw error;
+      }
+    }
+  }
+
+  throw lastError;
 };
 
 export type BulkEmployeeRow = {
@@ -62,6 +166,22 @@ export type CorporateCreateAccountPayload = {
   country?: string;
   contactName?: string;
   email?: string;
+};
+
+export type CreateAgreementPayload = {
+  template_id: number;
+  agreement_type: string;
+  partner_name: string;
+  partner_type: 'school' | 'corporate' | 'insurance' | 'vendor' | string;
+  partner_contact_name: string;
+  partner_contact_email: string;
+  partner_contact_phone: string;
+  start_date: string;
+  end_date?: string | null;
+  annual_value?: number | null;
+  payment_terms?: string | null;
+  billing_cycle?: string | null;
+  template_data: Record<string, unknown>;
 };
 
 export const corporateApi = {
@@ -135,6 +255,36 @@ export const corporateApi = {
     const response = await http.post('/v1/corporate/public/create-account', payload);
     return unwrap(response.data);
   },
+  createAgreement: async (payload: CreateAgreementPayload) => {
+    return requestAgreementApi('post', '/v1/agreements/create', '/agreements/create', payload);
+  },
+  getAgreements: async (params?: { status?: string; partner_type?: string; limit?: number; offset?: number }) => {
+    const requestParams = {
+      ...(params || {}),
+      _ts: Date.now(),
+    };
+    try {
+      const response = await http.get(toAbsoluteAgreementUrl('/v1/agreements'), {
+        params: requestParams,
+        headers: {
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache',
+        },
+      });
+      return unwrap(response.data);
+    } catch {
+      return requestAgreementApi('get', '/v1/agreements', '/agreements', undefined, requestParams);
+    }
+  },
+  getAgreementTemplates: async (params?: { include_inactive?: boolean }) => {
+    return requestAgreementApi('get', '/v1/agreements/templates', '/agreements/templates', undefined, params || undefined);
+  },
+  sendForSignature: async (id: number | string) => {
+    return requestAgreementApi('post', `/v1/agreements/${id}/send`, `/agreements/${id}/send`);
+  },
+  checkStatus: async (id: number | string) => {
+    return requestAgreementApi('get', `/v1/agreements/${id}/status`, `/agreements/${id}/status`);
+  },
   listCompanies: async () => {
     const response = await http.get('/v1/corporate/companies');
     return unwrap(response.data);
@@ -142,6 +292,28 @@ export const corporateApi = {
   getDashboard: async (companyKey?: string) => {
     const response = await http.get('/v1/corporate/dashboard', { params: companyKey ? { companyKey } : undefined });
     return unwrap(response.data);
+  },
+  getEapQrAnalytics: async (companyKey?: string) => {
+    const params = companyKey ? { companyKey } : undefined;
+    try {
+      const response = await http.get('/v1/corporate/eap-qr/analytics', { params });
+      return unwrap(response.data);
+    } catch (error: any) {
+      if (Number(error?.response?.status || 0) !== 404) throw error;
+      const fallback = await http.get('/v1/corporate/eap/qr/analytics', { params });
+      return unwrap(fallback.data);
+    }
+  },
+  createEapQr: async (payload: Record<string, unknown>, companyKey?: string) => {
+    const params = companyKey ? { companyKey } : undefined;
+    try {
+      const response = await http.post('/v1/corporate/eap-qr', payload, { params });
+      return unwrap(response.data);
+    } catch (error: any) {
+      if (Number(error?.response?.status || 0) !== 404) throw error;
+      const fallback = await http.post('/v1/corporate/eap/qr', payload, { params });
+      return unwrap(fallback.data);
+    }
   },
   getPrograms: async (companyKey?: string) => {
     const response = await http.get('/v1/corporate/programs', { params: companyKey ? { companyKey } : undefined });
@@ -180,9 +352,9 @@ export const corporateApi = {
     });
     return unwrap(response.data);
   },
-  getInvoices: async (_companyKey?: string) => {
-    // Disabled: corporate invoices removed
-    return [] as unknown as any;
+  getInvoices: async (companyKey?: string) => {
+    const response = await http.get('/v1/corporate/invoices', { params: companyKey ? { companyKey } : undefined });
+    return unwrap(response.data);
   },
   getPaymentMethods: async (companyKey?: string) => {
     const response = await http.get('/v1/corporate/payment-methods', { params: companyKey ? { companyKey } : undefined });
@@ -241,3 +413,9 @@ export const corporateApi = {
     return unwrap(response.data);
   },
 };
+
+export const createAgreement = (data: CreateAgreementPayload) => corporateApi.createAgreement(data);
+export const getAgreements = () => corporateApi.getAgreements();
+export const getAgreementTemplates = () => corporateApi.getAgreementTemplates();
+export const sendForSignature = (id: number | string) => corporateApi.sendForSignature(id);
+export const checkStatus = (id: number | string) => corporateApi.checkStatus(id);

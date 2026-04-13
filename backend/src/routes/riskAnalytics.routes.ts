@@ -15,18 +15,20 @@ import {
 
 const router = Router();
 
-router.use(requireAuth);
-router.use(requireRole(['patient', 'therapist', 'psychologist', 'psychiatrist', 'coach', 'admin', 'superadmin']));
+const riskAccess = [
+	requireAuth,
+	requireRole(['patient', 'therapist', 'psychologist', 'psychiatrist', 'coach', 'admin', 'superadmin']),
+] as const;
 
-router.get('/risk/:userId/current', asyncHandler(getCurrentRiskController));
-router.get('/risk/:userId/history', asyncHandler(getRiskHistoryController));
+router.get('/risk/:userId/current', ...riskAccess, asyncHandler(getCurrentRiskController));
+router.get('/risk/:userId/history', ...riskAccess, asyncHandler(getRiskHistoryController));
 
-router.get('/mood/:userId/prediction', asyncHandler(getMoodPredictionController));
-router.get('/mood/:userId/history', asyncHandler(getMoodHistoryController));
-router.get('/mood/:userId/accuracy', asyncHandler(getMoodAccuracyController));
+router.get('/mood/:userId/prediction', ...riskAccess, asyncHandler(getMoodPredictionController));
+router.get('/mood/:userId/history', ...riskAccess, asyncHandler(getMoodHistoryController));
+router.get('/mood/:userId/accuracy', ...riskAccess, asyncHandler(getMoodAccuracyController));
 
-router.get('/escalations/open', asyncHandler(getOpenEscalationsController));
-router.post('/escalations/:id/acknowledge', asyncHandler(acknowledgeEscalationController));
-router.post('/escalations/:id/resolve', asyncHandler(resolveEscalationController));
+router.get('/escalations/open', ...riskAccess, asyncHandler(getOpenEscalationsController));
+router.post('/escalations/:id/acknowledge', ...riskAccess, asyncHandler(acknowledgeEscalationController));
+router.post('/escalations/:id/resolve', ...riskAccess, asyncHandler(resolveEscalationController));
 
 export default router;

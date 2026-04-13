@@ -6,6 +6,7 @@ import { asyncHandler } from '../middleware/validate.middleware';
 import {
   bulkUploadCorporateEmployeesController,
   createCorporateCampaignController,
+  createCorporateEapQrController,
   createCorporatePaymentMethodController,
   createCorporateProgramController,
   createCorporateWorkshopController,
@@ -15,6 +16,7 @@ import {
   getCorporateInvoicesController,
   getCorporatePaymentMethodsController,
   getCorporateSessionAllocationsController,
+  getCorporateEapQrAnalyticsController,
   listCorporateCompaniesController,
   getCorporateProgramsController,
   getCorporateReportsController,
@@ -45,6 +47,8 @@ router.get('/workshops', requireAuth, requireCorporateMemberAccess, asyncHandler
 router.post('/workshops', requireAuth, requireCorporateMemberAccess, asyncHandler(createCorporateWorkshopController));
 router.get('/campaigns', requireAuth, requireCorporateMemberAccess, asyncHandler(getCorporateCampaignsController));
 router.post('/campaigns', requireAuth, requireCorporateMemberAccess, asyncHandler(createCorporateCampaignController));
+router.get('/qr/eap/analytics', requireAuth, requireCorporateMemberAccess, asyncHandler(getCorporateEapQrAnalyticsController));
+router.post('/qr/eap/generate', requireAuth, requireCorporateMemberAccess, asyncHandler(createCorporateEapQrController));
 router.get('/employees', requireAuth, requireCorporateMemberAccess, asyncHandler(getCorporateEmployeesController));
 router.get('/invoices', requireAuth, requireCorporateMemberAccess, asyncHandler(getCorporateInvoicesController));
 router.get('/payment-methods', requireAuth, requireCorporateMemberAccess, asyncHandler(getCorporatePaymentMethodsController));
@@ -56,5 +60,20 @@ router.get('/roi', requireAuth, requireCorporateMemberAccess, asyncHandler(getCo
 router.get('/settings', requireAuth, requireCorporateMemberAccess, asyncHandler(getCorporateSettingsController));
 router.patch('/settings', requireAuth, requireCorporateMemberAccess, asyncHandler(updateCorporateSettingsController));
 router.post('/employees/bulk-upload', requireAuth, requireCorporateMemberAccess, corporateUpload.single('file'), asyncHandler(bulkUploadCorporateEmployeesController));
+
+// Agreement & Template Endpoints
+import {
+  createInstitutionalAgreementController,
+  getInstitutionalAgreementStatusController,
+  listAgreementTemplatesController,
+  listInstitutionalAgreementsController,
+  sendInstitutionalAgreementController,
+} from '../controllers/institutional-agreement.controller';
+
+router.get('/agreement-templates', requireAuth, requireCorporateMemberAccess, asyncHandler(listAgreementTemplatesController));
+router.get('/agreements', requireAuth, requireCorporateMemberAccess, asyncHandler(listInstitutionalAgreementsController));
+router.post('/agreements', requireAuth, requireCorporateMemberAccess, asyncHandler(createInstitutionalAgreementController));
+router.post('/agreements/:id/send', requireAuth, requireCorporateMemberAccess, asyncHandler(sendInstitutionalAgreementController));
+router.get('/agreements/:id/status', requireAuth, requireCorporateMemberAccess, asyncHandler(getInstitutionalAgreementStatusController));
 
 export default router;

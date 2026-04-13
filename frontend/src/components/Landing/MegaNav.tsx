@@ -27,7 +27,7 @@ const tabs: TabConfig[] = [
       { icon: '🩺', title: 'Quick Check-In', description: 'Start with a brief guided check-in', route: '/checkin' },
       { icon: '🧠', title: 'Find a Therapist', description: 'Browse and connect with therapists', route: '/therapists' },
       { icon: '💊', title: 'See a Psychiatrist', description: 'Medical consultation options', route: '/psychiatry' },
-      { icon: '🌱', title: 'Specialized Care', description: 'Focused support pathways', route: '/specialized' },
+      { icon: '🌱', title: 'Specialized Care', description: 'Focused support pathways', route: '/specialized-care' },
       { icon: '👥', title: 'Group Sessions', description: 'Shared support and healing groups', route: '/groups' },
       { icon: '🚨', title: 'Crisis Support', description: 'Immediate urgent support options', route: '/crisis' },
     ],

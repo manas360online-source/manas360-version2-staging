@@ -62,8 +62,9 @@ export const isNativeApp = (): boolean => {
 };
 
 export const getApiBaseUrl = (): string => {
-  if (isNativeApp()) {
-    return APP_API_BASE_URL;
+  const appEnv = String(import.meta.env.VITE_APP_ENV || '').trim().toLowerCase();
+  if (import.meta.env.DEV || appEnv === 'development') {
+    return '/api';
   }
 
   const envBase = import.meta.env.VITE_API_BASE_URL?.trim();
@@ -74,6 +75,10 @@ export const getApiBaseUrl = (): string => {
   const envApi = import.meta.env.VITE_API_URL?.trim();
   if (envApi) {
     return envApi;
+  }
+
+  if (isNativeApp()) {
+    return APP_API_BASE_URL;
   }
 
   return '/api';

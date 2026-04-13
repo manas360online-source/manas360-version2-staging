@@ -23,6 +23,36 @@ export interface DashboardData {
   todaySessions: DashboardSessionItem[];
 }
 
+export interface ProviderQrCodeItem {
+  code: string;
+  qrType?: string | null;
+  destinationUrl?: string | null;
+  scanCount: number;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ProviderMyQrResponse {
+  qrCode: ProviderQrCodeItem;
+  trackingPath: string;
+  trackingUrl: string;
+  uniqueId: string;
+}
+
+export interface ProviderMyQrAnalyticsResponse extends ProviderMyQrResponse {
+  month: {
+    scans: number;
+    bookings: number;
+    conversionRate: number;
+    revenue: number;
+  };
+  lifetime: {
+    scans: number;
+    bookings: number;
+  };
+}
+
 export interface PatientListItem {
   id: string;
   name: string;
@@ -375,6 +405,16 @@ const unwrap = <T>(response: Envelope<T>): T => {
 export const fetchProviderDashboard = async (): Promise<DashboardData> => {
   const response = await http.get<Envelope<DashboardData>>('/v1/provider/dashboard');
   return unwrap<DashboardData>(response.data);
+};
+
+export const fetchProviderMyQr = async (): Promise<ProviderMyQrResponse> => {
+  const response = await http.get<Envelope<ProviderMyQrResponse>>('/v1/provider/my-qr');
+  return unwrap<ProviderMyQrResponse>(response.data);
+};
+
+export const fetchProviderMyQrAnalytics = async (): Promise<ProviderMyQrAnalyticsResponse> => {
+  const response = await http.get<Envelope<ProviderMyQrAnalyticsResponse>>('/v1/provider/my-qr/analytics');
+  return unwrap<ProviderMyQrAnalyticsResponse>(response.data);
 };
 
 export const fetchProviderPatients = async (): Promise<PatientListItem[]> => {

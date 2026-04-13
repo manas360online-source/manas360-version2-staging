@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 export interface MegaNavOption {
   icon: string;
@@ -26,6 +26,7 @@ export const MegaPanel: React.FC<MegaPanelProps> = ({
   fullBleedDesktop = false,
 }) => {
   const isLight = tone === 'light';
+  const navigate = useNavigate();
 
   return (
     <div
@@ -42,9 +43,12 @@ export const MegaPanel: React.FC<MegaPanelProps> = ({
       <ul className={`grid ${mobile ? 'grid-cols-1' : desktopGridClass} gap-x-3 gap-y-1.5`}>
         {items.map((item, index) => (
           <li key={`${item.route}-${item.title}-${index}`}>
-            <Link
-              to={item.route}
-              onClick={onNavigate}
+            <button
+              type="button"
+              onClick={() => {
+                onNavigate?.();
+                navigate(item.route);
+              }}
               className={`group flex items-start gap-2 rounded-md border border-transparent px-1.5 py-1.5 text-left transition-all duration-[200ms] focus:outline-none focus:ring-2 focus:ring-gentle-blue/60 ${
                 isLight
                   ? 'hover:border-gentle-blue/45 hover:bg-white/80 hover:shadow-[0_0_14px_rgba(157,173,190,0.18)]'
@@ -63,7 +67,7 @@ export const MegaPanel: React.FC<MegaPanelProps> = ({
                 <span className={`block text-xs font-semibold leading-tight ${isLight ? 'text-charcoal' : 'text-cream'}`}>{item.title}</span>
                 <span className={`block truncate text-[11px] leading-snug ${isLight ? 'text-charcoal/65' : 'text-cream/65'}`}>{item.description}</span>
               </span>
-            </Link>
+              </button>
           </li>
         ))}
       </ul>

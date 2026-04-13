@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { prisma as db } from '../config/db';
 import { triggerZohoFlow, zohoDesk } from '../services/zohoDesk.service';
 import { sendWhatsApp } from '../services/twilio.service';
+import { ensureProviderProfileQr } from '../services/provider-qr.service';
 import { io } from '../socket';
 
 /**
@@ -9,8 +10,12 @@ import { io } from '../socket';
  * Approve or Reject a provider verification request.
  */
 export const updateVerificationController = async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = String(req.params.id || '');
   const { action, rejection_reason } = req.body;
+
+  if (!id) {
+    return res.status(422).json({ success: false, message: 'id is required' });
+  }
 
   const therapist = await db.therapistProfile.findUnique({ 
     where: { userId: id },
@@ -38,6 +43,10 @@ export const updateVerificationController = async (req: Request, res: Response) 
     where: { id },
     data: { onboardingStatus: newStatus as any }
   });
+
+  if (action === 'approve') {
+    await ensureProviderProfileQr(id).catch(() => null);
+  }
 
   // Zoho Desk Blueprint 1 transition (simulated/service call)
   // Note: zoho_ticket_id would need to be in the schema if used, 

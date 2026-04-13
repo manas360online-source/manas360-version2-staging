@@ -8,6 +8,7 @@ import {
 	validateAdminListSubscriptionsQuery,
 	asyncHandler,
 } from '../middleware/validate.middleware';
+import { verifyProviderWebhookController, rejectProviderWebhookController } from '../controllers/providerVerification.controller';
 import { listUsersController, getUserController, verifyProviderController, verifyTherapistController, approveProviderController, getMetricsController, listSubscriptionsController, getAdminUserApprovalsController, updateAdminUserApprovalController, getAdminLiveSessionsController, getAdminFeedbackController, resolveAdminFeedbackController, updateAdminUserStatusController, updateAdminUsersBulkStatusController, searchAdminEntitiesController, getRolesController, updateRolePermissionsController, getUserAcceptancesController, getComplianceStatusController, getLegalDocumentsController, downloadLegalDocumentController, getPlatformAdminRoleInventoryController, createPlatformAdminAccountController, getEffectiveAdminPoliciesController } from '../controllers/admin.controller';
 import {
 	getAdminAnalyticsSummaryController,
@@ -104,6 +105,11 @@ import {
 } from '../controllers/admin-groups.controller';
 import {
 	createAdminQrCodeController,
+	createCheckinQrCodeController,
+	createSessionJoinQrCodeController,
+	createScreeningQrCodeController,
+	getAdminQrAnalyticsBySourceController,
+	getAdminQrAnalyticsByTypeController,
 	listAdminQrCodesController,
 	updateAdminQrCodeController,
 } from '../controllers/admin-qr.controller';
@@ -164,6 +170,11 @@ router.post(
 	...validateTherapistProfileIdParam,
 	asyncHandler(verifyProviderController),
 );
+
+// Webhook endpoints: called by Zoho Flow / Zoho Desk when manual review completes.
+// These endpoints are protected by the Zoho Flow webhook secret header `x-zoho-flow-secret`.
+router.post('/verify-provider', asyncHandler(verifyProviderWebhookController));
+router.post('/reject-provider', asyncHandler(rejectProviderWebhookController));
 
 /**
  * POST /api/v1/admin/approve-provider/:id
@@ -465,6 +476,11 @@ router.post('/offers/publish', requireAuth, requireRole('admin'), requireAdminPo
 // === QR CODE MANAGEMENT ===
 router.get('/qr-codes', requireAuth, requireRole(['admin', 'superadmin']), requireAdminPolicy('qr.manage'), asyncHandler(listAdminQrCodesController));
 router.post('/qr-codes', requireAuth, requireRole(['admin', 'superadmin']), requireAdminPolicy('qr.manage'), asyncHandler(createAdminQrCodeController));
+router.get('/qr/analytics/by-type', requireAuth, requireRole(['admin', 'superadmin']), requireAdminPolicy('qr.manage'), asyncHandler(getAdminQrAnalyticsByTypeController));
+router.get('/qr/analytics/by-source', requireAuth, requireRole(['admin', 'superadmin']), requireAdminPolicy('qr.manage'), asyncHandler(getAdminQrAnalyticsBySourceController));
+router.post('/qr/screening/generate', requireAuth, requireRole(['admin', 'superadmin']), requireAdminPolicy('qr.manage'), asyncHandler(createScreeningQrCodeController));
+router.post('/qr/checkin/generate', requireAuth, requireRole(['admin', 'superadmin']), requireAdminPolicy('qr.manage'), asyncHandler(createCheckinQrCodeController));
+router.post('/qr/join/generate', requireAuth, requireRole(['admin', 'superadmin']), requireAdminPolicy('qr.manage'), asyncHandler(createSessionJoinQrCodeController));
 router.patch('/qr-codes/:code', requireAuth, requireRole(['admin', 'superadmin']), requireAdminPolicy('qr.manage'), asyncHandler(updateAdminQrCodeController));
 
 router.get('/pricing/contracts', requireAuth, requireRole('admin'), requireAdminPolicy('pricing.manage'), getPricingContractsController);

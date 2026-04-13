@@ -4,6 +4,7 @@ import { prisma } from '../config/db';
 import { AppError } from '../middleware/error.middleware';
 import { hashPassword, generateNumericOtp, hashOtp, verifyOtp } from '../utils/hash';
 import { env } from '../config/env';
+import { createQrCode } from './admin-qr.service';
 
 type BulkEmployeeRow = {
   employeeId?: string;
@@ -102,6 +103,13 @@ type CorporateAccountCreateInput = {
   email?: string;
 };
 
+type CorporateEapQrCreateInput = {
+  companyKey?: string;
+  location?: string;
+  destinationUrl?: string;
+  isActive?: boolean;
+};
+
 const DEFAULT_COMPANY_KEY = 'techcorp-india';
 // See note in psychiatrist.service.ts — use typeof prisma for compatibility
 type DbClient = typeof prisma;
@@ -155,6 +163,29 @@ const normalizeRisk = (value: string | null | undefined): 'HIGH' | 'MEDIUM' | 'L
   if (raw === 'HIGH') return 'HIGH';
   if (raw === 'MEDIUM') return 'MEDIUM';
   return 'LOW';
+};
+
+const normalizeQrSegment = (value: string, fallback = 'standee'): string => {
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  return normalized || fallback;
+};
+
+const isMissingQrInfraError = (error: unknown): boolean => {
+  const message = String((error as any)?.message || '').toLowerCase();
+  const code = String((error as any)?.code || '').toUpperCase();
+
+  return (
+    code === 'P2021'
+    || code === 'P2022'
+    || code === 'P2010'
+    || message.includes('qr_scans')
+    || message.includes('qr_conversions')
+  );
 };
 
 export const ensureCorporateTables = async (): Promise<void> => {
@@ -1356,5 +1387,162 @@ export const createCorporateAccount = async (payload: CorporateAccountCreateInpu
     corporateMember: corporateMemberPayload,
     // Backward compatibility for older consumers still reading `corporateAdmin`.
     corporateAdmin: corporateMemberPayload,
+  };
+};
+
+export const createCorporateEapQr = async (input: CorporateEapQrCreateInput, createdById?: string) => {
+  await ensureCorporateTables();
+
+  const companyKey = String(input.companyKey || DEFAULT_COMPANY_KEY).trim() || DEFAULT_COMPANY_KEY;
+  const company = await resolveCompany(companyKey);
+  const locationSlug = normalizeQrSegment(String(input.location || 'standee'));
+  const uniqueId = `${normalizeQrSegment(company.companyKey, 'corporate')}-${locationSlug}`;
+  const code = `EAP_${uniqueId}`.toUpperCase();
+  const destinationUrl = String(input.destinationUrl || '').trim()
+    || `${env.frontendUrl}/eap/${company.companyKey}/screen`;
+
+  const qrCode = await createQrCode(
+    {
+      code,
+      qrType: 'eap',
+      redirectUrl: destinationUrl,
+      destinationUrl,
+      ownerId: company.companyId,
+      isDynamic: true,
+      isActive: input.isActive ?? true,
+    },
+    createdById,
+  );
+
+  return {
+    qrCode,
+    companyKey: company.companyKey,
+    companyId: company.companyId,
+    companyName: company.companyName,
+    location: locationSlug,
+    uniqueId,
+    trackingPath: `/q/eap/${uniqueId}`,
+    trackingUrl: `${env.apiUrl}${env.apiPrefix}/q/eap/${uniqueId}`,
+    destinationUrl,
+  };
+};
+
+export const getCorporateEapQrAnalytics = async (companyKey?: string) => {
+  await ensureCorporateTables();
+
+  const company = await resolveCompany(companyKey);
+  let qrCodes: Array<{
+    code: string;
+    redirectUrl: string;
+    destinationUrl: string | null;
+    ownerId: string | null;
+    createdAt: Date;
+    scanCount: number;
+    lastScannedAt: Date | null;
+    scans?: Array<{ id: string; sessionId: string | null; scanTimestamp: Date }>;
+    conversions?: Array<{ conversionType: string; attributedRevenue: any }>;
+  }> = [];
+
+  try {
+    qrCodes = await prisma.qrCode.findMany({
+      where: {
+        qrType: 'eap',
+        ownerId: company.companyId,
+      },
+      select: {
+        code: true,
+        redirectUrl: true,
+        destinationUrl: true,
+        ownerId: true,
+        createdAt: true,
+        scanCount: true,
+        lastScannedAt: true,
+        scans: {
+          select: {
+            id: true,
+            sessionId: true,
+            scanTimestamp: true,
+          },
+        },
+        conversions: {
+          select: {
+            conversionType: true,
+            attributedRevenue: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  } catch (error) {
+    if (!isMissingQrInfraError(error)) {
+      throw error;
+    }
+
+    qrCodes = await prisma.qrCode.findMany({
+      where: {
+        qrType: 'eap',
+        ownerId: company.companyId,
+      },
+      select: {
+        code: true,
+        redirectUrl: true,
+        destinationUrl: true,
+        ownerId: true,
+        createdAt: true,
+        scanCount: true,
+        lastScannedAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  const breakdown = qrCodes.map((qr) => {
+    const scans = Array.isArray(qr.scans) ? qr.scans.length : Number(qr.scanCount || 0);
+    const screenings = Array.isArray(qr.conversions)
+      ? qr.conversions.filter((conversion) => conversion.conversionType === 'assessment_completed').length
+      : 0;
+    const bookings = Array.isArray(qr.conversions)
+      ? qr.conversions.filter((conversion) => conversion.conversionType === 'session_booked').length
+      : 0;
+    const revenue = Array.isArray(qr.conversions)
+      ? qr.conversions.reduce((sum, conversion) => sum + Number(conversion.attributedRevenue || 0), 0)
+      : 0;
+    const location = String(qr.code || '')
+      .replace(/^EAP_/, '')
+      .toLowerCase()
+      .replace(new RegExp(`^${normalizeQrSegment(company.companyKey, 'corporate')}-`), '')
+      .replace(/-/g, ' ');
+
+    return {
+      code: qr.code,
+      location: location || 'standee',
+      scans,
+      screenings,
+      bookings,
+      revenue,
+      lastScannedAt: qr.lastScannedAt,
+    };
+  });
+
+  const totals = breakdown.reduce((acc, item) => {
+    acc.scans += item.scans;
+    acc.screenings += item.screenings;
+    acc.bookings += item.bookings;
+    acc.revenue += item.revenue;
+    return acc;
+  }, { scans: 0, screenings: 0, bookings: 0, revenue: 0 });
+
+  return {
+    companyKey: company.companyKey,
+    companyId: company.companyId,
+    companyName: company.companyName,
+    qrCount: qrCodes.length,
+    totals: {
+      scans: totals.scans,
+      screenings: totals.screenings,
+      bookings: totals.bookings,
+      revenue: Number(totals.revenue.toFixed(2)),
+    },
+    breakdown,
   };
 };
