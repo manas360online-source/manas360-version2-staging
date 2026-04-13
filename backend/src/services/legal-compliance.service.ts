@@ -97,28 +97,32 @@ export const getPendingLegalDocumentsForUser = async (userId: string) => {
 		if (!isMissingLegalSchema(error)) {
 			throw error;
 		}
-
-		const legacyConsents = await db.consent.findMany({
-			where: {
-				userId,
-				status: 'GRANTED',
-				consentType: { in: [...REQUIRED_LEGAL_TYPES] },
-			},
-			select: {
-				consentType: true,
-				metadata: true,
-			},
-		});
-
-		acceptances = legacyConsents.map((consent: any) => ({
-			documentId: consent.consentType,
-			documentVer: Number((consent.metadata as any)?.version || 1),
-			document: {
-				type: consent.consentType,
-				version: Number((consent.metadata as any)?.version || 1),
-			},
-		}));
 	}
+
+	// Always include legacy consent records so existing users are not re-blocked
+	// after migrating to the legal_documents/user_acceptances schema.
+	const legacyConsents = await db.consent.findMany({
+		where: {
+			userId,
+			status: 'GRANTED',
+			consentType: { in: [...REQUIRED_LEGAL_TYPES] },
+		},
+		select: {
+			consentType: true,
+			metadata: true,
+		},
+	});
+
+	const legacyAcceptances = legacyConsents.map((consent: any) => ({
+		documentId: consent.consentType,
+		documentVer: Number((consent.metadata as any)?.version || 1),
+		document: {
+			type: consent.consentType,
+			version: Number((consent.metadata as any)?.version || 1),
+		},
+	}));
+
+	acceptances = [...acceptances, ...legacyAcceptances];
 
 	const acceptedByType = new Map<string, number>();
 	for (const acceptance of acceptances) {

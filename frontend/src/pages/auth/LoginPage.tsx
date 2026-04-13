@@ -345,9 +345,6 @@ export default function LoginPage() {
 						<p className="mb-3 text-sm italic text-wellness-muted lg:hidden">"{selectedQuote.text}"</p>
 						<h1 className="text-2xl font-semibold text-wellness-text sm:text-3xl">Welcome back</h1>
 						<p className="mt-2 text-sm text-wellness-muted sm:text-base">Continue your wellness journey</p>
-						<p className="mt-1 text-xs text-wellness-muted">
-							Universal login - patients, doctors, and staff use the same access.
-						</p>
 
 						<div className="mt-6 space-y-4">
 							<Input

@@ -51,8 +51,7 @@ const startServer = async (): Promise<void> => {
 	server.on('error', (error: NodeJS.ErrnoException) => {
 		if (error.code === 'EADDRINUSE') {
 			console.error(`Port ${env.port} is already in use.`);
-			console.error('On macOS this is often ControlCenter (AirPlay Receiver) on port 5000.');
-			console.error('Disable AirPlay Receiver in System Settings > General > AirDrop & Handoff, then restart backend.');
+			console.error('Ensure only one backend process is running and your container/task port mapping is correct.');
 			process.exit(1);
 		}
 	});
@@ -63,42 +62,46 @@ const startServer = async (): Promise<void> => {
 		if (io) setSocketIO(io);
 	}).catch((err) => console.error('Socket init failed', err));
 
-	// start analytics rollup job
-	// void startAnalyticsRollup(); // Commented out - references missing patient_sessions table
-	startDailyMoodPredictionJob();
-	startChatRetentionJob();
-	initSubscriptionCron();
-	initProviderLeadCron();
-	initLeadDistributionCrons();
-	// startPatientSharedReportCleanupJob(); // Commented out - references psychologist_reports table
+	if (env.enableBackgroundJobs) {
+		// start analytics rollup job
+		// void startAnalyticsRollup(); // Commented out - references missing patient_sessions table
+		startDailyMoodPredictionJob();
+		startChatRetentionJob();
+		initSubscriptionCron();
+		initProviderLeadCron();
+		initLeadDistributionCrons();
+		// startPatientSharedReportCleanupJob(); // Commented out - references psychologist_reports table
 
-	// PhonePe reconciliation CRON (every 30s)
-	setInterval(() => {
-		reconcilePendingPayments().catch(err => console.error('[CRON] Reconciliation failed', err));
-	}, 30000);
-
-	// Real-time Metrics Push (every 30s) - can be disabled via env.disableMetricsCron
-	if (!env.disableMetricsCron) {
-		setInterval(async () => {
-			try {
-				const metrics = await calculateLiveMetrics();
-				if (socketIO) {
-					socketIO.to('admin-room').emit('metrics-update', metrics);
-				}
-			} catch (err) {
-				console.error('[CRON] Metrics push failed', err);
-			}
+		// PhonePe reconciliation CRON (every 30s)
+		setInterval(() => {
+			reconcilePendingPayments().catch(err => console.error('[CRON] Reconciliation failed', err));
 		}, 30000);
-	} else {
-		console.log('Metrics cron is disabled via DISABLE_METRICS_CRON');
-	}
 
-	// Financial idempotency retention cleanup (every 6h, retain 7 days).
-	setInterval(() => {
-		cleanupIdempotencyKeys(7).catch((err) => {
-			console.error('[CRON] Idempotency cleanup failed', err);
-		});
-	}, 6 * 60 * 60 * 1000);
+		// Real-time Metrics Push (every 30s) - can be disabled via env.disableMetricsCron
+		if (!env.disableMetricsCron) {
+			setInterval(async () => {
+				try {
+					const metrics = await calculateLiveMetrics();
+					if (socketIO) {
+						socketIO.to('admin-room').emit('metrics-update', metrics);
+					}
+				} catch (err) {
+					console.error('[CRON] Metrics push failed', err);
+				}
+			}, 30000);
+		} else {
+			console.log('Metrics cron is disabled via DISABLE_METRICS_CRON');
+		}
+
+		// Financial idempotency retention cleanup (every 6h, retain 7 days).
+		setInterval(() => {
+			cleanupIdempotencyKeys(7).catch((err) => {
+				console.error('[CRON] Idempotency cleanup failed', err);
+			});
+		}, 6 * 60 * 60 * 1000);
+	} else {
+		console.log('Background jobs are disabled via ENABLE_BACKGROUND_JOBS=false');
+	}
 
 	const shutdown = async (signal: string): Promise<void> => {
 		console.log(`${signal} received. Shutting down gracefully...`);

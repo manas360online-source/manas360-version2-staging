@@ -23,7 +23,10 @@ const parseBoolean = (value: string | undefined, fallback = false): boolean => {
 		return fallback;
 	}
 
-	return value === 'true';
+	const normalized = String(value).trim().toLowerCase();
+	if (['true', '1', 'yes', 'on'].includes(normalized)) return true;
+	if (['false', '0', 'no', 'off'].includes(normalized)) return false;
+	return fallback;
 };
 
 const parseNumber = (value: string | undefined, fallback: number): number => {
@@ -70,6 +73,22 @@ const parseApiUrl = (value: string | undefined, port: number): string => {
 	return `http://localhost:${port}`;
 };
 
+const parseTrustProxy = (value: string | undefined): boolean | number => {
+	const raw = String(value ?? '').trim();
+	if (!raw) return 1;
+
+	const normalized = raw.toLowerCase();
+	if (normalized === 'true') return true;
+	if (normalized === 'false') return false;
+
+	const asNumber = Number(raw);
+	if (Number.isInteger(asNumber) && asNumber >= 0) {
+		return asNumber;
+	}
+
+	return 1;
+};
+
 const JWT_ACCESS_FALLBACK = 'change-access-secret';
 const JWT_REFRESH_FALLBACK = 'change-refresh-secret';
 
@@ -90,6 +109,7 @@ export interface EnvConfig {
 	cookieSecure: boolean;
 	refreshCookieName: string;
 	csrfCookieName: string;
+	trustProxy: boolean | number;
 	otpTtlMinutes: number;
 	resetOtpTtlMinutes: number;
 	maxLoginAttempts: number;
@@ -111,6 +131,7 @@ export interface EnvConfig {
 	// When true, the server should not start the periodic metrics push cron
 	disableMetricsCron: boolean;
 	disableAuthRateLimit: boolean;
+	enableBackgroundJobs: boolean;
 	// When true, disable adding ServerSideEncryption header for S3 uploads (useful for MinIO)
 	awsS3DisableServerSideEncryption: boolean;
 	phonePeWebhookUsername?: string;
@@ -149,9 +170,10 @@ export const env: EnvConfig = Object.freeze({
 	jwtAccessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN ?? '15m',
 	jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '7d',
 	cookieDomain: process.env.COOKIE_DOMAIN,
-	cookieSecure: parseBoolean(process.env.COOKIE_SECURE),
+	cookieSecure: parseBoolean(process.env.COOKIE_SECURE, ['production', 'staging'].includes(parseNodeEnv(process.env.NODE_ENV))),
 	refreshCookieName: process.env.REFRESH_COOKIE_NAME ?? 'refresh_token',
 	csrfCookieName: process.env.CSRF_COOKIE_NAME ?? 'csrf_token',
+	trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
 	otpTtlMinutes: parseNumber(process.env.OTP_TTL_MINUTES, 10),
 	resetOtpTtlMinutes: parseNumber(process.env.RESET_OTP_TTL_MINUTES, 15),
 	maxLoginAttempts: parseNumber(process.env.MAX_LOGIN_ATTEMPTS, 5),
@@ -175,6 +197,7 @@ export const env: EnvConfig = Object.freeze({
 	// When true, disable the periodic metrics push cron (useful during migrations)
 	disableMetricsCron: parseBoolean(process.env.DISABLE_METRICS_CRON, false),
 	disableAuthRateLimit: parseBoolean(process.env.DISABLE_AUTH_RATE_LIMIT, false),
+	enableBackgroundJobs: parseBoolean(process.env.ENABLE_BACKGROUND_JOBS, true),
 	phonePeWebhookUsername: process.env.PHONEPE_WEBHOOK_USERNAME,
 	phonePeWebhookPassword: process.env.PHONEPE_WEBHOOK_PASSWORD,
 	paymentProviderSharePercent: parseNumber(process.env.PAYMENT_PROVIDER_SHARE_PERCENT, 60),
@@ -212,6 +235,14 @@ if (
 	&& (env.jwtAccessSecret === JWT_ACCESS_FALLBACK || env.jwtRefreshSecret === JWT_REFRESH_FALLBACK)
 ) {
 	throw new Error('JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must be configured for staging/production');
+}
+
+if ((env.nodeEnv === 'production' || env.nodeEnv === 'staging') && !String(env.databaseUrl || '').trim()) {
+	throw new Error('DATABASE_URL must be configured for staging/production');
+}
+
+if ((env.nodeEnv === 'production' || env.nodeEnv === 'staging') && /^http:\/\/localhost/i.test(env.apiUrl)) {
+	throw new Error('API_URL must be a public/stable URL in staging/production (not localhost)');
 }
 
 if (env.nodeEnv === 'production' || env.nodeEnv === 'staging') {
