@@ -53,16 +53,6 @@ const isSameLocalDay = (value: unknown, dayKey: string) => {
   return localDateKey(date) === dayKey;
 };
 
-const isSubscriptionActive = (subscription: any): boolean => {
-  if (!subscription) return false;
-  const status = String(subscription?.status || '').toLowerCase();
-  const freeLike = Number(subscription?.price || 0) <= 0 || String(subscription?.planName || '').toLowerCase().includes('free');
-  const activeLike = ['active', 'trial', 'trialing', 'grace', 'renewal_pending'].includes(status);
-  if (subscription?.isActive === true || subscription?.active === true) return !freeLike;
-  if (status === 'active' || status === 'trialing') return !freeLike;
-  return activeLike && !freeLike;
-};
-
 export default function DashboardPage() {
   const navigate = useNavigate();
   const [dashboard, setDashboard] = useState<any>(null);
@@ -70,8 +60,6 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeAssignments, setActiveAssignments] = useState<ActiveCbtAssignment[]>([]);
-  const [subscriptionActive, setSubscriptionActive] = useState(false);
-  const [nowTick, setNowTick] = useState<number>(Date.now());
 
   const fetchDashboardData = async () => {
     const dashboardRes = await patientApi.getDashboardV2();
@@ -103,12 +91,10 @@ export default function DashboardPage() {
         setError(null);
         await fetchDashboardData();
 
-        const [subscription] = await Promise.all([
+        // Subscription status fetched but not currently used in UI
+        await Promise.all([
           patientApi.getSubscription().catch(() => null),
         ]);
-
-        const subPayload = (subscription as any)?.data ?? subscription;
-        setSubscriptionActive(isSubscriptionActive(subPayload));
       } catch (err: any) {
         if (isOnboardingRequiredError(err)) {
           navigate('/patient/onboarding?next=/patient/sessions', { replace: true });
@@ -121,12 +107,6 @@ export default function DashboardPage() {
     })();
   }, [navigate]);
 
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      setNowTick(Date.now());
-    }, 60 * 1000);
-    return () => window.clearInterval(id);
-  }, []);
 
   const userName = dashboard?.user?.name?.split(' ')[0] || 'there';
   const upcomingSession = dashboard?.upcomingSession || null;

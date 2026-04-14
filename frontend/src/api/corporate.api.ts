@@ -7,6 +7,21 @@ type ApiEnvelope<T> = {
   data?: T;
 };
 
+type CreateAdminContractPayload = {
+  entity_id: string | null;
+  contract_type: string;
+  pricing_model: string;
+  price_per_member_per_year: number | null;
+  flat_annual_rate: number | null;
+  max_members: number;
+  contract_start_date: string;
+  contract_end_date: string;
+  payment_terms: string;
+  discount_percent: number;
+  signed_by_entity: string;
+  signed_date: string;
+};
+
 const unwrap = <T>(payload: ApiEnvelope<T> | T): T => {
   const maybe = payload as ApiEnvelope<T>;
   if (maybe && typeof maybe === 'object' && 'data' in maybe) {

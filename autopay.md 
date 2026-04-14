@@ -1,0 +1,3081 @@
+Introduction
+
+PhonePe Payment Gateway introduces UPI Autopay as a recurring payment feature within the standard checkout experience. Users can authorize recurring payments on a daily, weekly, monthly, or yearly basis through a one time UPI mandate. Once authorized, future payments are automatically debited without requiring repeated approvals, enabling a smooth and frictionless payment experience for Subscriptions and Services.
+How It Works
+Customers can now authorize recurring payments (daily, weekly, monthly, yearly, or as presented) via UPI. After the initial authorization, all future charges will be debited automatically without the need for repeat customer intervention.
+Key Benefits for You
+Seamless Integration: Create UPI AutoPay mandates by directly integrating with your standard checkout flows, utilizing existing APIs or client side SDKs.
+Frictionless Payments: Offer your customers a smooth experience by automating future payments for subscriptions, leading to better retention.
+Flexible Checkout: You can continue to accept both one time payments and set up AutoPay mandates through Standard Checkout.
+Autopay Integration
+
+Here’s how the integration process with PhonePe Payment Gateway works.
+Follow the steps outlined below to set up and verify your payment flow with ease.
+
+
+1. Generate an authorization token to authenticate your system
+Authentication is the first step in PhonePe Payment Gateway’s Standard Autopay API integration. It involves generating an authorization token to make further API calls. 
+Creating an authorization token to make API calls means generating a unique key or password that proves your system has permission to interact with PhonePe Payment Gateway. This token identifies and authenticates your website when it requests services like processing payments, checking status, etc.
+For complete details, refer to the Generate Authorization Token.
+2. Subscription Setup
+In this step, you will simultaneously create a user subscription and set up its payment mandate. The integration flow differs based on your platform:
+Web Applications: Use the Checkout API to create the subscription and initiate the mandate setup directly within the web interface.
+Mobile Applications: Use the Order Token API to generate a unique orderToken. Pass this token to the Mobile SDK to allow the user to authorize the mandate via their preferred UPI app.
+Once the user completes the mandate through mandate supported apps( PhonePe, BHIM, GPay, Paytm, CRED, Amazon Pay, SuperMoney), use Subscription Order Status API to check the status of a Subscription Setup after initiating it.
+To check the status of the Subscription, use the Subscription Status API to retrieve the current Subscription Status.
+3. Notify Redemption
+In this step, You must notify users 24 hours before a scheduled debit. This is a mandatory requirement for all active subscriptions to ensure transparency before funds are deducted. This API call is a prerequisite; you cannot execute a subscription redemption without first completing this step.
+For complete details, refer to the Notify Redemption.
+After initiating a redemption request for an active subscription, use the Redemption Order Status API to check the execution status and check whether the redemption has been notified, is in pending, or completed.
+4. Execute Redemption
+The Redemption Execute API is to directly debit the required payment from a user’s bank account, thereby initiating and completing the actual financial transaction. This API should be called from the backend only if the auto-debit is set to false.
+For complete details, refer to the Execute Redemption.
+After executing the redemption for an active subscription, use the Redemption Order Status API to check the execution status and check whether the redemption is successful, is in pending, or failed.
+5. Verifying Payment Response
+In a subscription system, it’s important to know whether a payment was successful, failed, or still pending.
+PhonePe supports this with automated callbacks for two key events:
+Subscription Callbacks
+Sent when a new subscription is created. These confirm if the user’s first payment was successful or not, helping you handle activation or failure from the start.
+Redemption Callbacks
+Sent for ongoing auto debits. These share the status of each recurring payment and provide individual transaction details, which are useful for retries and reconciliation.
+Other features:
+Cancel Subscription: Use the Cancel Subscription API to deactivate an active autopay subscription that is no longer required.
+Pause or Unpause Subscription: PhonePe will send an Webhook callback to notify you that the subscription has been Paused/Unpaused from the user’s end.
+Revoke Subscription: PhonePe will send an Webhook callback to notify you that the subscription has been cancelled from the user’s end.
+Initiate Refund and Check Refund Status: The Refund API allows you to initiate refunds for specific transactions, returning funds to customers for reasons like order cancellations, returns, or payment adjustments. You can also check the status of the initiated refund.
+Generate Authorization Token
+
+This API generates an authorization token, which is essential for securely authenticating all subsequent API requests. The token must be included in the request headers to ensure that each call is verified and processed by the server.
+The token can be used for many API calls until it expires.
+Save the token and check the “expires_at” field to know when it will expire. Make sure to refresh the token before it expires by calling the same API again.
+Environment
+Environment
+HTTP Method
+API
+Sandbox
+POST
+https://api-preprod.phonepe.com/apis/pg-sandbox/v1/oauth/token
+Production
+POST
+https://api.phonepe.com/apis/identity-manager/v1/oauth/token
+
+Request
+Request Headers
+Header Name
+Header Value
+Content-Type
+application/x-www-form-urlencoded
+
+Request Parameters
+Parameter Name
+Parameter Value
+client_id
+Client ID shared by PhonePe PG
+client_version
+Client Version shared by PhonePe PG
+client_secret
+Client secret shared by PhonePe PG
+grant_type
+The value should be set to “client_credentials“
+
+Sample Request
+curl --location 'https://api-preprod.phonepe.com/apis/pg-sandbox/v1/oauth/token' \
+--header 'Content-Type: application/x-www-form-urlencoded' \
+--data-urlencode 'client_id=CLIENT_ID' \
+--data-urlencode 'client_version=1' \
+--data-urlencode 'client_secret=CLIENT_SECRET' \
+--data-urlencode 'grant_type=client_credentials'
+Response
+Sample Response
+{
+    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHBpcmVzT24iOjE3MjA2MzUzMjE5OTYsIm1lcmNoYW50SWQiOiJWUlVBVCJ9.4YjYHI6Gy6gzOisD_628wfbaI46dMSc5T_0gZ2-SAJo",
+    "encrypted_access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHBpcmVzT24iOjE3MjA2MzUzMjE5OTYsIm1lcmNoYW50SWQiOiJWUlVBVCJ9.4YjYHI6Gy6gzOisD_628wfbaI46dMSc5T_0gZ2-SAJo",
+    "expires_in": null,
+    "issued_at": 1706073005,
+    "expires_at": 1706697605,
+    "session_expires_at": 1706697605,
+    "token_type": "O-Bearer"
+}
+Response Parameters
+Parameter Name
+Data Type
+Description
+access_token
+String
+The token generated by PhonePe. This token is valid for a specific time, which can be determined using the expires_at field. Once expired, the token must be refreshed using the same API.
+issued_at
+DateTime
+The timestamp in epoch (in seconds) when the token was generated.
+expires_at
+DateTime
+Token expiry timestamp in epoch.
+token_type
+String
+The type of token, which will be “O-Bearer”.
+
+ℹ️ Access Token Guidelines!
+
+You should depend on the following key response parameters:
+access_token: This is the token that must be included in API calls with PhonePe for authentication.
+expires_at: This indicates the token’s validity (in seconds). You must ensure that the token is refreshed before it expires. If it expires, you will have to send the request again.
+The auth_token is required for all subsequent API calls. Use the above access token to initiate the payment process.
+Run a Sample Token Request!
+📘 Accessing Your Credentials
+
+You can view your Client ID and Client Secret from the PhonePe Business Dashboard. Navigate to Developer Settings to find your API keys and use them to try out the sample code.
+body params
+Client Id
+string
+required
+Enter your client Id
+Client Secret
+string
+required
+Enter your client Secret
+node
+node
+shell
+javascript
+python
+axios
+axios
+api
+node-fetch
+http
+request
+const axios = require('axios');
+
+
+const requestHeaders = {
+ "Content-Type": "application/x-www-form-urlencoded"
+};
+
+
+const requestBodyJson = {
+ "client_version": 1,
+ "grant_type": "client_credentials"
+};
+
+
+const requestBody = new URLSearchParams(requestBodyJson).toString();
+
+
+const options = {
+ method: 'POST',
+ url: 'https://api-preprod.phonepe.com/apis/pg-sandbox/v1/oauth/token',
+ headers: requestHeaders,
+ data: requestBody
+};
+
+
+axios.request(options)
+ .then(function (response) {
+   console.log(response.data);
+ })
+ .catch(function (error) {
+   console.error(error);
+ });
+
+
+Copy CodeRun
+API Response
+Loading...
+Setup Subscription using API
+
+This API is used to set up a subscription for a customer.
+Environment
+Environment
+HTTP Method
+API
+Sandbox
+POST
+https://api-preprod.phonepe.com/apis/pg-sandbox/checkout/v2/pay
+Production
+POST
+https://api.phonepe.com/apis/pg/checkout/v2/pay
+
+Request
+Header Name
+Header Value
+Description
+Content-Type
+application/json
+
+
+Authorization
+O-Bearer <access_token>
+Pass access_token received in Authorization call
+
+Sample Request
+{
+    "merchantOrderId": "{{merchantOrderId}}",
+    "amount": 47900,
+    "paymentFlow": {
+        "type": "SUBSCRIPTION_CHECKOUT_SETUP",
+        "merchantUrls": {
+            "redirectUrl": "www.google.com"
+        },
+        "subscriptionDetails": {
+            "subscriptionType": "RECURRING",
+            "merchantSubscriptionId": "{{merchantSubId}}",
+            "authWorkflowType": "TRANSACTION",
+            "amountType": "FIXED",
+            "maxAmount": 47900,
+            "frequency": "ON_DEMAND",
+            "productType": "UPI_MANDATE",
+            "expireAt": 1779689282000
+        }
+    },
+    "expireAfter": 3000,
+    "metaInfo": {
+        "udf1": "some meta info of max length 256",
+        "udf2": "some meta info of max length 256",
+        "udf3": "some meta info of max length 256",
+        "udf4": "some meta info of max length 256",
+        "udf5": "some meta info of max length 256",
+        "udf6": "some meta info of max length 256",
+        "udf7": "some meta info of max length 256",
+        "udf8": "some meta info of max length 256",
+        "udf10": "some meta info of max length 256",
+        "udf11": "some meta info of max length 50",
+        "udf12": "some meta info of max length 50",
+        "udf13": "some meta info of max length 50",
+        "udf14": "some meta info of max length 50",
+        "udf15": "some meta info of max length 50"
+    }
+}
+Request Parameters
+Parameter Name
+Data Type
+Description
+Mandatory
+Constraints
+merchantOrderId
+String
+Unique merchant order id generated by merchant.
+Yes
+• Max Length = 63 characters.
+• No Special characters allowed except underscore “_” and hyphen “-“
+amount
+Long
+Order amount in paisa to setup a mandate based on the authWorkflowType.
+Yes
+• For PENNY_DROP flow, the amount should be equal to 200 (In Paise)
+
+• For TRANSACTION flow, the amount should be greater than or equal to 100 or the first debit amount(In Paise)
+expireAt
+DateTime
+Order expiry in seconds. If not passed default value will be used.
+No
+Min Value = 300, Max Value = 3600
+metaInfo
+Object
+Merchant defined meta info to store additional information.
+Same data will be returned in status and callback response.
+No
+• For udf1 to udf10, there is no constraint. Maximum length = 256 characters
+• For udf11 to udf15, alphanumeric values with _-+@. are allowed. Maximum length = 50 characters
+Note: It is mandatory to keep the parameter names udf1, udf2, etc., exactly as they are in the metainfo block. Renaming these key values will result in a production error.
+paymentFlow
+Object
+Additional details required by this flow
+Yes
+
+
+
+The paymentFlow object contains additional parameters, which are explained in the table below.
+Parameter Name
+Data Type
+Mandatory
+Description
+Constraints
+paymentFlow.type
+String
+Yes
+Type of payment flow. 
+Allowed value = [“SUBSCRIPTION_CHECKOUT_SETUP”]
+paymentFlow.subscriptionDetails
+Object
+Yes
+Provides details on the subscription.
+
+
+paymentFlow.subscriptionDetails.subscriptionType
+String
+Yes
+Defines the type of the subscription
+Allowed value = “RECURRING”
+paymentFlow.subscriptionDetails.merchantSubscriptionId
+String
+Yes
+Unique merchant Subscription Id generated by merchant.
+Max Length = 63 characters.
+paymentFlow.subscriptionDetails.authWorkflowType
+String
+Yes
+Defines the type of workflow verification whether it is TRANSACTION or PENNY DROP
+Allowed values = “TRANSACTION” or “PENNY DROP”
+paymentFlow.subscriptionDetails.amountType
+String
+Yes
+Defines the type of the amount to be debited throughout the subscription cycle.
+Allowed values = “FIXED” or “VARIABLE”
+paymentFlow.subscriptionDetails.maxAmount
+Long
+Yes
+max amount to be redeemed throughout the subscription cycle. The amount must be in paisa.
+Max Limit: 1500000 paisa(i.e., Rs. 15,000)
+paymentFlow.subscriptionDetails.frequency
+String
+Yes
+Defines the Redemption Frequency.
+Allowed values =
+• DAILY
+• WEEKLY
+• MONTHLY
+• FORTNIGHTLY
+• BIMONTHLY
+• QUARTERLY
+• HALFYEARLY
+• YEARLY
+• ONDEMAND
+paymentFlow.subscriptionDetails.expireAt
+epoch
+No
+Defines the Subscription Expiry.
+Max value =
+30 Years.
+paymentFlow.subscriptionDetails.productType
+String
+Yes
+Defines the mandate instrument type.
+Allowed value = UPI_MANDATE
+paymentFlow.merchantUrls
+Object
+Yes
+Object to store different merchant Urls:
+• redirectUrl
+• cancelUrl
+
+
+paymentFlow.merchantUrls.redirectUrl
+String
+Yes
+Url where user will be redirected after success/failed payment.
+
+
+
+Response
+Sample Response
+{
+    "orderId": "OMO123456789",
+    "state": "PENDING",
+    "expireAt": 1703756259307,     
+    "redirectUrl": "../transact/pgv2?token=<token>" 
+}
+Response Parameters
+Field Name
+Data Type
+Description
+orderId
+String
+Internal order ID generated by PhonePe Payment Gateway.
+state
+String
+State of the order created, expected value is PENDING.
+expiryAt
+Long
+Order expiry timestamp in epoch format.
+redirectUrl
+String
+Intent url to invoke the payment app that initiates the mandate and completes the payment.
+
+Check Setup Order Status
+
+This API helps you check whether the subscription has been successfully created, is still pending user action, has failed, or is complete.
+Once the customer completes the mandate through Payment Service Provider( PhonePe, BHIM, GPay, Paytm, CRED, Amazon Pay) app, use this API to check the status of a subscription setup after initiating it.
+Environment
+Environment
+HTTP Method
+API
+Sandbox
+GET
+https://api-preprod.phonepe.com/apis/pg-sandbox/checkout/v2/order/{merchantOrderId}/status
+Production
+GET
+https://api.phonepe.com/apis/pg/checkout/v2/order/{merchantOrderId}/status
+
+Request
+Request Headers
+Header Name
+Header Value
+Content-Type
+application/json
+Authorization
+O-Bearer <merchant-auth-token>
+
+Path Parameters
+Parameter Name
+DataType
+Mandatory
+Description
+merchantOrderId
+String
+Yes
+unique merchant order Id generated by the merchant.
+details
+Boolean
+No
+• true → return all attempt details under paymentDetails list
+• false → return only latest attempt details under paymentDetails list
+
+Response
+Sample Response
+{
+    "merchantId": "INFINITYSTORE",
+    "merchantOrderId": "TEST_12243",
+    "orderId": "OMO2602231553596470745286",
+    "state": "COMPLETED",
+    "amount": 47900,
+    "expireAt": 1772015036470,
+    "metaInfo": {
+        "udf15": "some meta info of max length 50",
+        "udf14": "some meta info of max length 50",
+        "udf13": "some meta info of max length 50",
+        "udf12": "some meta info of max length 50",
+        "udf5": "some meta info of max length 256",
+        "udf11": "some meta info of max length 50",
+        "udf6": "some meta info of max length 256",
+        "udf10": "some meta info of max length 256",
+        "udf3": "some meta info of max length 256",
+        "udf4": "some meta info of max length 256",
+        "udf1": "some meta info of max length 256",
+        "udf2": "some meta info of max length 256",
+        "udf7": "some meta info of max length 256",
+        "udf8": "some meta info of max length 256"
+    },
+    "paymentFlow": {
+        "type": "SUBSCRIPTION_CHECKOUT_SETUP",
+        "merchantSubscriptionId": "{{merchantSubId}}",
+        "authWorkflowType": null,
+        "amountType": null,
+        "maxAmount": null,
+        "frequency": null,
+        "expireAt": 1772015036470,
+        "subscriptionId": null
+    },
+    "paymentDetails": [
+        {
+            "transactionId": "OM2602231553567707945516",
+            "paymentMode": null,
+            "timestamp": 1771842258086,
+            "amount": 47900,
+            "state": "COMPLETED",
+            "instrument": {
+                "type": "ACCOUNT",
+                "maskedAccountNumber": "XXXXXXX20100",
+                "ifsc": "TEST0000000",
+                "accountHolderName": "TEST0000000",
+                "accountType": "SAVINGS"
+            },
+            "rail": {
+                "type": "UPI",
+                "utr": "712920414278",
+                "vpa": "9999999999@ybl",
+                "umn": "5e0bb6dfccf14nn1gbaf87fae06c3bbf@ybl"
+            },
+            "splitInstruments": [
+                {
+                    "instrument": {
+                        "type": "ACCOUNT",
+                        "accountType": "SAVINGS"
+                    },
+                    "rail": {
+                        "type": "UPI",
+                        "utr": "712920414278",
+                        "umn": "5e0bb6dfccf14nn1gbaf87fae06c3bbf@ybl"
+                    },
+                    "amount": "47900"
+                }
+            ]
+        }
+    ]
+}
+Response Parameters
+Field Name
+Data Type
+Description
+orderId
+String
+PG generated internal order id
+state
+String
+State of order, Expected Values:
+• PENDING
+• FAILED
+• COMPLETED
+amount
+Long
+Order amount in paisa
+expireAt
+Long
+order expiry time in epoch
+metaInfo
+Object
+Merchant defined meta info passed at the time of order creation
+paymentDetails
+List
+Contain list of details of each payment attempt made corresponding to this order.
+paymentDetails[*].paymentMode
+String
+Mode of payment. Expected Values:
+• UPI_INTENT
+• UPI_QR
+paymentDetails[*].timestamp
+Long
+Transaction attempt timestamp in epoch
+paymentDetails[*].amount
+Long
+Amount in paisa, corresponding to payment attempt
+paymentDetails[*].transactionId
+String
+internal transaction id for given payment attempt
+paymentDetails[*].state
+String
+Transaction attempt state. Expected Values:
+• PENDING
+• COMPLETED
+• FAILED
+paymentDetails[*].errorCode
+String
+Error code (Only present when transaction state is failed)
+paymentDetails[*].detailedErrorCode
+String
+Detailed Error Code (Only present when transaction state is failed)
+
+Verify a Sample Payment Status!
+headers
+Token
+string
+required
+Access Token you recieved
+url params
+merchantOrderId
+string
+required
+Enter your merchantOrderId
+
+
+Check Subscription Status
+
+This API is used to check the current status of a subscription after it has been set up. It helps determine whether the subscription is Active (successfully set up and ongoing), Cancelled (manually cancelled by the user), or Revoked(withdrawn by the user).
+Environment
+Environment
+HTTP Method
+API
+Sandbox
+GET
+https://api-preprod.phonepe.com/apis/pg-sandbox/checkout/v2/subscriptions/{merchantSubscriptionId}/status
+Production
+GET
+https://api.phonepe.com/apis/pg/checkout/v2/subscriptions/{merchantSubscriptionId}/status
+
+Request
+Request Headers
+Header Name
+Header Value
+Content-Type
+application/json
+Authorization
+O-Bearer <merchant-auth-token>
+
+Path Parameters
+Parameter Name
+Description
+merchantSubscriptionId
+The unique merchant subscription ID provided by the merchant when creating the subscription
+
+Response
+Sample Response
+{
+    "merchantSubscriptionId": "MS597cc71b",
+    "subscriptionId": "OMS2602061522174978849048",
+    "state": "ACTIVE",
+    "productType": null,
+    "authInstrumentType": null,
+    "authWorkflowType": "TRANSACTION",
+    "amountType": "FIXED",
+    "currency": "INR",
+    "maxAmount": 47900,
+    "frequency": "ON_DEMAND",
+    "expireAt": 2717056337500,
+    "pauseStartDate": null,
+    "pauseEndDate": null
+}
+Response Parameters
+Parameter Name
+Data Type
+Description
+merchantSubscriptionId
+String
+merchant subscription Id
+subscriptionId
+String
+
+
+state
+String
+State of the Subscription
+authWorkflowType
+String
+TRANSACTION, PENNY_DROP
+amountType
+String
+FIXED, VARIABLE
+currency
+String
+INR
+maxAmount
+Long
+maximum mandate amount
+frequency
+String
+DAILY, MONTHLY
+expireAt
+epoch
+
+
+
+Try it yourself!
+const axios = require('axios');
+
+
+const requestHeaders = {
+ "Content-Type": "application/json"
+};
+
+
+const options = {
+ method: 'GET',
+ url: 'https://api-preprod.phonepe.com/apis/pg-sandbox/checkout/v2/subscriptions/{merchantSubscriptionId}/status',
+ headers: requestHeaders,
+};
+
+
+axios.request(options)
+ .then(function (response) {
+   console.log(response.data);
+ })
+ .catch(function (error) {
+   console.error(error);
+ });
+
+Token
+string
+required
+Access Token you recieved
+url params
+merchantSubscriptionId
+string
+required
+Enter your merchantSubscriptionId
+
+
+Notify Redemption
+
+Once the subscription is set up, the next step is to collect the redemption amount based on the selected subscription cycle.
+Redemption involves two steps:
+Notify: Inform the user about the upcoming payment.
+Execute: Debit the redemption amount from the user.
+⚠️ Validate Subscription State Before Notify!
+
+Always verify that the subscription is in the ACTIVE state using the Subscription Status API before calling the Notify API, to prevent avoidable failures.
+⚠️ Validate Subscription State Before Notify!
+
+When paymentFlow.redemptionRetryStrategy is set to CUSTOM:
+Merchants must retry until a terminal status (COMPLETED or FAILED) is reached.
+You are limited to one initial attempt and three retries over a maximum of 48 hours.
+Retries must be executed only during the non peak periods – 9:31 PM to 9:59 AM and 1:01 PM to 4:59 PM
+When paymentFlow.redemptionRetryStrategy is set to STANDARD:
+PhonePe will automatically handle all internal redemption retries for you.
+Retries are managed internally by PhonePe, with a maximum time window of 48 hours to achieve a terminal status.
+Retries must be executed only during the non peak periods – 9:31 PM to 9:59 AM and 1:01 PM to 4:59 PM
+No action or changes are required from the merchant.
+Default Value: STANDARD.
+Environment
+Environment
+HTTP Method
+API
+Sandbox
+POST
+https://api-preprod.phonepe.com/apis/pg-sandbox/checkout/v2/subscriptions/notify
+Production
+POST
+https://api.phonepe.com/apis/pg/checkout/v2/subscriptions/notify
+
+Request
+Request Headers
+Header Name
+Header Value
+Content-Type
+application/json
+Authorization
+O-Bearer <merchant-auth-token>
+
+Sample Request
+{
+    "merchantOrderId": "<merchantOrderId>",
+    "amount":47900,
+    "paymentFlow": {
+        "type": "SUBSCRIPTION_CHECKOUT_REDEMPTION",
+        "merchantSubscriptionId": "<merchantSubscriptionId>",
+        "redemptionRetryStrategy": "STANDARD",
+        "autoDebit": false
+    }
+}
+Request Parameters
+Parameter Name
+Data Type
+Mandatory(Y/N)
+Description
+Contraints
+merchantOrderId
+String
+Y
+Unique merchant order id generated by merchant
+Max Length = 63 charactersNo Special characters allowed except underscore “_” and hyphen “-“
+amount
+Long
+Y
+Order amount in paisa
+Min Value = 1
+paymentFlow
+Object
+Y
+Additional details required by this flow
+ 
+paymentFlow.type
+String
+Y
+Type of payment flow. 
+Valued Allowed = [ SUBSCRIPTION_CHECKOUT_REDEMPTION ]
+paymentFlow.merchantSubscriptionId
+String
+Y
+merchant subscription Id
+ 
+paymentFlow.redemptionRetryStrategy
+String
+N
+Redemption Retry Strategy
+
+
+paymentFlow.autoDebit
+boolean
+N
+autoDebit
+
+
+
+Response
+Sample Response
+{
+    "orderId": "OMO2603101528244777924698BW",
+    "state": "NOTIFICATION_IN_PROGRESS",
+    "expireAt": 1773309503656
+}
+Response Parameters
+Parameter Name
+Description
+orderId
+Payment Gateway generated internal order ID
+state
+Order state
+expireAt
+Expiry in Epoch Timestamp(in milliseconds)
+
+Try it yourself!
+headers
+Token
+string
+required
+Access Token you recieved
+body params
+merchantOrderId
+string
+required
+Enter your merchantOrderId
+const axios = require('axios');
+
+
+const requestHeaders = {
+ "Content-Type": "application/json"
+};
+
+
+const requestBody = {
+ "amount": 47900,
+ "paymentFlow": {
+   "type": "SUBSCRIPTION_CHECKOUT_REDEMPTION",
+   "merchantSubscriptionId": "",
+   "redemptionRetryStrategy": "STANDARD",
+   "autoDebit": false
+ }
+};
+
+
+const options = {
+ method: 'POST',
+ url: 'https://api-preprod.phonepe.com/apis/pg-sandbox/checkout/v2/subscriptions/notify',
+ headers: requestHeaders,
+ data: requestBody
+};
+
+
+axios.request(options)
+ .then(function (response) {
+   console.log(response.data);
+ })
+ .catch(function (error) {
+   console.error(error);
+ });
+In case you want to check the status of the notify redemption, use the Redemption Order Status API. You will call this API at two different points in your Autopay workflow:
+After Notify Redemption : Call this to ensure the system successfully sent the execution notification to the user.
+After Execute Redemption: Call this to confirm the redemption was successfully executed.
+
+
+Redemption Execute
+The Redemption API is used to debit the payment from the user’s bank account as part of a recurring subscription. This process is initiated after the Notify step has been completed and serves as the actual payment transaction. By calling this API, the merchant requests the system to initiate the payment transfer to process the required amount from the user’s account.
+📘 Check Subscription Status Before Execution!
+
+Before calling the Execute API, you must first verify that the subscription state is ACTIVE by using the Subscription Status API. This ensures that the transaction proceeds without any issues or failures.
+Environment
+Environment
+HTTP Method
+API
+Sandbox
+POST
+https://api-preprod.phonepe.com/apis/pg-sandbox/checkout/v2/subscriptions/redeem
+Production
+POST
+https://api.phonepe.com/apis/pg/checkout/v2/subscriptions/redeem
+
+Request
+Request Headers
+Header Name
+Header Value
+Content-Type
+application/json
+Authorization
+O-Bearer <merchant-auth-token>
+
+Sample Request
+{
+    "merchantOrderId": "{{merchantOrderId}}"
+}
+Request Parameters
+Parameter Name
+Data Type
+Description
+Mandatory (Yes/No)
+Constraints
+merchantOrderId
+String
+Pass the same merchantOrderId used in the Notify request.
+Yes
+• Maximum length is 63 characters.
+• Only underscore (_) and hyphen (-) are allowed as special characters.
+
+⚠️ Redemption Handling Alert!
+
+Custom:
+If paymentFlow.redemptionRetryStrategy is set to CUSTOM, merchants are required to retry the redemption until a terminal status (COMPLETED or FAILED) is achieved. The maximum time window to get a terminal status is by default 48 hours, and a maximum of 4 tries (1 attempt + 3 retries) are allowed.
++Subsequent redemption retry attempts must be separated by a minimum interval of 1.5 hours, following a terminal state for a previous attempt.
+Note: No further retries will be executed once the transaction status is marked as completed.+_
+Standard:
+If paymentFlow.redemptionRetryStrategy is set to STANDARD, PhonePe will handle the internal retries for redemption. The maximum time window to get a terminal status is by default 48 hours, and retries are managed by PhonePe internally.
+Default Value: STANDARD.
+Response
+Sample Response
+{
+    "transactionId": "OM2603101539420517924712BW",
+    "state": "PENDING"
+}
+Response Parameters
+Parameter Name
+Data Type
+Description
+transactionId
+String
+PG generated internal transactionId id
+state
+String
+State of the transaction created, Expected value is PENDING
+
+Try it yourself!
+headers
+Token
+string
+required
+Access Token you recieved
+body params
+merchantOrderId
+string
+required
+Enter your merchantOrderId
+
+
+const axios = require('axios');
+
+
+const requestHeaders = {
+ "Content-Type": "application/json"
+};
+
+
+const options = {
+ method: 'POST',
+ url: 'https://api-preprod.phonepe.com/apis/pg-sandbox/checkout/v2/subscriptions/redeem',
+ headers: requestHeaders,
+};
+
+
+axios.request(options)
+ .then(function (response) {
+   console.log(response.data);
+ })
+ .catch(function (error) {
+   console.error(error);
+ });
+Redemption Order Status
+
+Once a Redemption Request is initiated for an active subscription, this API can be used to track its execution status. It helps you identify whether the redemption has been notified to the customer, is currently in progress, or has been completed.
+Also verify the Execute Redemption status using this API, if the request was processed successfully, failed, or remains pending, along with other key payment details.
+Environment
+Environment
+HTTP Method
+API
+Sandbox
+GET
+https://api-preprod.phonepe.com/apis/pg-sandbox/checkout/v2/order/{merchantOrderId}/status
+Production
+GET
+https://api.phonepe.com/apis/pg/checkout/v2/order/{merchantOrderId}/status
+
+Request
+Request Headers
+Header Name
+Header Value
+Content-Type
+application/json
+Authorization
+O-Bearer <merchant-auth-token>
+
+Path Parameters
+Parameter Name
+Description
+merchantOrderId
+Merchant-generated order ID that was shared during the Redemption Notify API call.
+
+Sample Request in CURL
+curl --location 'https://api-preprod.phonepe.com/apis/pg-sandbox/subscriptions/v2/order/MO1709025691805/status?details=true' \
+--header 'Accept: application/json' \
+--header 'Authorization: O-Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHBpcmVzT24iOjE3MTIyNTM2MjU2NDQsIm1lcmNoYW50SWQiOiJWMlNVQlVBVCJ9.7aVzYI_f_77-bBicEcRNuYx093b2wCsgl_WFNkKqAPY'
+Response
+Sample Response when Subscription state is Notified
+{
+  "merchantId": "{{merchantId}}",  
+  "merchantOrderId": "{{merchantOrderId}}",
+  "orderId": "OMO2503162337146919338960",
+  "state": "NOTIFIED",
+  "amount": 100,
+  "expireAt": 1620891733101,
+  "paymentFlow": {
+    "type": "SUBSCRIPTION_REDEMPTION",
+    "merchantSubscriptionId": "MS121312",
+    "redemptionRetryStrategy": "STANDARD",
+    "autoDebit": true,
+    "validAfter": 1628229131000,
+    "validUpto": 1628574731000,
+    "notifiedAt": 1622539751586
+  },
+    "paymentDetails": []
+}
+Response Parameters
+Parameter Name
+Data Type
+Description
+merchantId
+String
+A unique ID assigned to the merchant by the PhonePe system during the onboarding process.
+merchantOrderId
+String
+A unique orderId provided by the merchant when creating the order.
+orderId
+String
+An orderId generated by PhonePe.
+state
+String
+Possible value:
+• NOTIFICATION_IN_PROGRESS
+• NOTIFIED
+amount
+Long
+The amount provided by the merchant in Paise.
+expireAt
+DateTime
+Represents the time in epoch (milliseconds).
+paymentFlow
+Array
+Provides the details of the subscription.
+paymentFlow.type
+String
+The type should be “SUBSCRIPTION_REDEMPTION“ for redemption-related actions.
+MetaInfo
+Array
+Contains metadata provided by the merchant.
+paymentFlow.merchantSubscriptionId
+String
+A unique subscriptionId provided by the merchant to identify and manage the subscription request.
+paymentFlow.retryStrategy
+String
+STANDARD
+paymentFlow.maxAmount
+Boolean
+If true, PhonePe will handle the execution process.
+paymentFlow.validAfter
+DateTime
+The start timestamp of the redemption window, provided in milliseconds.
+paymentFlow.subscriptionId
+DateTime
+The end timestamp of the redemption window, provided in milliseconds.
+paymentDetails
+DateTime
+The timestamp in milliseconds indicating when the customer was notified about the scheduled redemption.
+
+Sample Response when Subscription state is Redeemed
+{
+  "merchantId": "SWIGGY8",  
+  "merchantOrderId": "MO1232",
+  "orderId": "OMO12344",
+  "state": "COMPLETED",
+  "amount": 100,
+  "expireAt": 1620891733101,
+  "metaInfo": {
+    "udf1": 
+    "udf2": 
+    "udf3": 
+    "udf4": 
+    "udf5": 
+    "udf6": 
+    "udf7": 
+    "udf8": 
+    "udf9": 
+    "udf10": 
+    "udf11": 
+    "udf12": 
+    "udf13": 
+    "udf14": 
+    "udf15": 
+  },
+  "paymentFlow": {
+    "type": "SUBSCRIPTION_REDEMPTION",
+    "merchantSubscriptionId": "MS121312",
+    "redemptionRetryStrategy": "CUSTOM",
+    "autoDebit": true,
+    "validAfter": 1628229131000,
+    "validUpto": 1628574731000,
+    "notifiedAt": 1622539751586
+  },
+  "errorCode": 
+  "detailedErrorCode":   
+  "paymentDetails": [
+    {
+      "amount": 100
+      "paymentMode": "UPI_MANDATE",
+      "timestamp": 1620891733101      
+      "transactionId": "OM124",
+      "state": "COMPLETED", // FAILED, PENDING
+      "rail": {
+        "type": "UPI",
+        "utr": "2",
+        "vpa": "****@ybl", //add success@ybl/failure@ybl/pending@ybl here.
+        "umn": "544fcc8819d04cb08e26faa1fb07eee7@ybl"
+      },
+      "instrument": {
+        "type": "ACCOUNT",
+        "maskedAccountNumber": "XXX2312",
+        "ifsc": "VISA",
+        "accountHolderName": "Harshad",
+        "accountType": "SAVINGS"
+      },
+      "errorCode": 
+      "detailedErrorCode": 
+    }
+  ]
+}
+Response Parameters
+Parameter Name
+Data Type
+Description
+merchantId
+String
+A unique ID assigned to the merchant by the PhonePe system during the onboarding process.
+merchantOrderId
+String
+A unique orderId provided by the merchant when creating the order.
+orderId
+String
+An orderId generated by PhonePe.
+state
+String
+Possible value:
+• COMPLETED
+• FAILED
+• PENDING
+amount
+Long
+The amount provided by the merchant in Paise.
+expireAt
+DateTime
+Represents the time in epoch (milliseconds).
+paymentFlow
+Array
+Provides the details of the subscription.
+MetaInfo
+Array
+Contains metadata provided by the merchant.
+notifiedAt
+DateTime
+Time (in milliseconds) when the customer got the notification about the redemption.
+errorcode
+String
+Error code shown if the status is FAILED.
+detailedErrorCode
+String
+A detailed explanation of the error code, shown only when the status is FAILED.
+paymentMode
+String
+The method used to collect payment for the subscription.
+transactionId
+String
+Unique transaction ID generated by PhonePe.
+state
+String
+The current status of the debit.
+rail
+Array
+Details of the payment instrument used and UMRN associated with the transaction.
+instrument
+Array
+Details of the customer’s bank account.
+errorCode
+String
+Error code provided when the payment attempt fails.
+detailedErrorCode
+String
+An error code description will appear if the attempt fails.
+
+The metaInfo object contains additional parameters, which are explained in the table below.
+Request Parameters of metoInfo Object:
+Parameter Name
+Data Type
+Description
+Mandatory (Yes/No)
+Constraints
+metaInfo.udf1-15
+String
+Optional details you can add for more information
+No
+• Maximum length for Udf1-10 = 256 characters
+• Maximum length for Udf11-15 = 50 characters
+
+The paymentFlow object contains additional parameters, which are explained in the table below.
+Request Parameters of paymentFlow Object:
+Parameter Name
+Data Type
+Description
+paymentFlow.type
+String
+The type should be “SUBSCRIPTION_REDEMPTION“ for redemption-related actions.
+paymentFlow.merchantSubscriptionId
+String
+A unique subscriptionId provided by the merchant to identify and manage the subscription request.
+paymentFlow.autoDebit
+Boolean
+If set to true, PhonePe will handle the redemption execution automatically.
+paymentFlow.validAfter
+DateTime
+The time (in milliseconds) when the redemption window starts.
+paymentFlow.validUpto
+DateTime
+The time (in milliseconds) when the redemption window ends.
+
+Check Redemption Order status !
+headers
+Token
+string
+required
+Access Token you recieved
+url params
+merchantOrderId
+string
+required
+Enter your merchantOrderId
+
+
+const axios = require('axios');
+
+
+const requestHeaders = {
+ "Content-Type": "application/json"
+};
+
+
+const options = {
+ method: 'GET',
+ url: 'https://api-preprod.phonepe.com/apis/pg-sandbox/checkout/v2/subscriptions/order/{merchantOrderId}/status?details=true',
+ headers: requestHeaders,
+};
+
+
+axios.request(options)
+ .then(function (response) {
+   console.log(response.data);
+ })
+ .catch(function (error) {
+   console.error(error);
+ });
+Cancel Subscription
+
+Use the Cancel Subscription API to deactivate an active autopay subscription that is no longer required. This ensures that no further payments are processed. Once canceled, the subscription is terminated and will not trigger any future charges.
+Environment
+Environment
+HTTP Method
+API
+Sandbox
+POST
+https://api-preprod.phonepe.com/apis/pg-sandbox/checkout/v2/subscriptions/{merchantSubscriptionId}/cancel
+Production
+POST
+https://api.phonepe.com/apis/pg/checkout/v2/subscriptions/{merchantSubscriptionId}/cancel
+
+Request
+Request Headers
+Header Name
+Header Value
+Content-Type
+application/json
+Authorization
+O-Bearer <merchant-auth-token>
+
+Path Parameter
+Parameter Name
+Description
+merchantSubscriptionId
+A unique merchant subscription ID provided by the merchant at the time of subscription creation.
+
+Response
+Once the Cancel API is executed, a 204 No Content response is returned, indicating that the subscription cancellation request was successfully processed. This means the subscription is now inactive and no further payments will be triggered. To confirm the cancellation and view the updated state, you can use the Subscription Status API, which will return the current status of the subscription (e.g., state: cancelled).
+Try it yourself!
+headers
+Token
+string
+required
+Access Token you recieved
+body params
+merchantSubscriptionId
+string
+required
+Enter your merchantSubscriptionId
+node
+const axios = require('axios');
+
+
+const requestHeaders = {
+ "Content-Type": "application/json"
+};
+
+
+const options = {
+ method: 'POST',
+ url: 'https://api-preprod.phonepe.com/apis/pg-sandbox/checkout/v2/subscriptions/{merchantSubscriptionId}/cancel',
+ headers: requestHeaders,
+};
+
+
+axios.request(options)
+ .then(function (response) {
+   console.log(response.data);
+ })
+ .catch(function (error) {
+   console.error(error);
+ });
+Pause or Unpause Subscription
+
+Customers can Pause/Unpause their subscription anytime by going to the Autopay section in their PSP (Payment Service Provider) app and selecting “Pause/Unpause” for the active mandate. When this happens, the subscription will be Paused/Unpaused, and PhonePe will send an Webhook callback to notify you that the subscription has been paused/unpaused from the customer’s end.
+Webhook Configuration
+Callback URL – Your server endpoint where PhonePe will send subscription updates.
+Username – Create and set your own username.
+Password – Create and set your own password.
+Make sure the same username and password are used in your code to validate the Authorization header received in the callback from PhonePe.
+Callback Validation/Verification
+For incoming requests, extract the Authorization header, validate it against the username:password you configured with us, and accept the response only if the values match.
+Authorization: SHA256(username:password)
+Callback Event Types
+Callback Type
+subscription.paused
+subscription.unpaused
+
+📘 Webhook Handling Best Practices!
+
+Always use the root-level payload.state parameter to confirm the subscription status.
+Avoid strict deserialization of the webhook response.
+Do not depend on the type parameter (this will be deprecated); instead, use the event parameter to identify the webhook event.
+expireAt and timestamp values are provided in epoch time format (in milliseconds).
+Responses
+Sample Responses for Autopay Pause Subscription
+{
+    "type": "SUBSCRIPTION_PAUSED",
+    "payload": {
+        "merchantSubscriptionId": "MS1708797962855",
+        "subscriptionId": "OMS2402242336054995042603",
+        "state": "PAUSED",
+        "authWorkflowType": "TRANSACTION",
+        "amountType": "FIXED",
+        "maxAmount": 200,
+        "frequency": "ON_DEMAND",
+        "expireAt": 1737278524000,
+        "pauseStartDate": 1708798426196,
+        "pauseEndDate": 1708885799000
+    }
+}
+Sample Response for Autopay Unpause Subscription
+{
+    "type": "SUBSCRIPTION_UNPAUSED",
+    "payload": {
+        "merchantSubscriptionId": "MS1708797962855",
+        "subscriptionId": "OMS2402242336054995042603",
+        "state": "ACTIVE",
+        "authWorkflowType": "TRANSACTION",
+        "amountType": "FIXED",
+        "maxAmount": 200,
+        "frequency": "ON_DEMAND",
+        "expireAt": 1737278524000,
+        "pauseStartDate": null,
+        "pauseEndDate": null
+    }
+}
+UNPAUSE Subscription
+User can pause/unpause via the PSP app where the mandate was originally set up. You will not be able to unpause the subscription.
+If you receive a pauseEndDate in the Pause Callback and that date has passed, you can unpause the subscription automatically.
+If Redemption Notify has been successfully completed and then the user pauses the subscription, redemption cannot be executed while the subscription is paused.
+After a successful Redemption Notify, if the user pauses and then unpauses the subscription, you cannot execute redemption immediately. You need to send Redemption Notify again, and then execute redemption only after 24 hours from the successful notification.
+You can cancel or revoke the mandate even when the subscription is in the paused state.
+Best Practice:
+Before calling Redemption Notify or Redemption Execute, always check the subscription status using the Subscription Status API. Proceed only if the subscription state is ACTIVE to avoid failures.
+Revoke Subscription
+
+Customers can cancel their subscription anytime by going to the AutoPay section in their PSP (Payment Service Provider) app and selecting “Remove Autopay” for the active mandate. When this happens, the subscription is revoked, and PhonePe will send an Webhook callback to notify you that the subscription has been cancelled from the customer’s end.
+Webhook Configuration
+Callback URL – Your server endpoint where PhonePe will send subscription updates.
+Username – Create and set your own username.
+Password – Create and set your own password.
+Make sure the same username and password are used in your code to validate the Authorization header received in the callback from PhonePe.
+Callback Validation/Verification
+For incoming requests, extract the Authorization header, validate it against the username:password you configured with us, and accept the response only if the values match.
+Authorization: SHA256(username:password)
+Callback Event Types
+Callback Type
+subscription.revoked
+
+📘 Webhook Handling Best Practices!
+
+Always use the root-level payload.state parameter to confirm the subscription status.
+Avoid strict deserialization of the webhook response.
+Do not depend on the type parameter (this will be deprecated); instead, use the event parameter to identify the webhook event.
+expireAt and timestamp values are provided in epoch time format (in milliseconds).
+Response
+Sample Response – Revoke Subscription for Notification Success
+{
+    "type": "SUBSCRIPTION_REVOKED",
+    "payload": {
+        "merchantSubscriptionId": "MS1708797962855",
+        "subscriptionId": "OMS2402242336054995042603",
+        "state": "REVOKED",
+        "authWorkflowType": "TRANSACTION",
+        "amountType": "FIXED",
+        "maxAmount": 200,
+        "frequency": "ON_DEMAND",
+        "expireAt": 1737278524000,
+        "pauseStartDate": null,
+        "pauseEndDate": null
+    }
+}
+
+Initiate Refund and Check Refund Status
+
+Initiate Refund
+The Refund API allows you to initiate refunds for specific transactions, returning funds to customers for reasons like order cancellations, returns, or payment adjustments. This ensures smooth and direct refund processing through the payment gateway.
+Environment
+Environment
+HTTP Method
+API
+Sandbox
+POST
+https://api-preprod.phonepe.com/apis/pg-sandbox/payments/v2/refund 
+Production
+POST
+https://api.phonepe.com/apis/pg/payments/v2/refund 
+
+Initiating Refund Request
+Request Headers
+Header Name
+Header Value
+Content-Type
+application/json
+Authorization
+O-Bearer <merchant-auth-token>
+
+Sample Request
+{
+    "merchantRefundId": "Refund-id-12345",
+    "originalMerchantOrderId": "Tx123",
+    "amount": 100
+}
+Request Parameters
+Field Name
+Data Type
+Mandatory(Y/N)
+Description
+Constraints
+merchantRefundId
+String
+Yes
+A unique refund ID that you create to identify the refund request.
+Max Length = 63 characters
+originalMerchantOrderId
+String
+Yes
+The merchant OrderId for which you want to initiate the refund.
+
+
+amount
+Long
+Yes
+The amount to be refunded, specified in paisa.
+Min Value = 1 paisa
+
+⚠️ Invalid Refund Amount!
+
+The refund amount cannot exceed the initiated amount. It must always be less than or equal to the amount originally initiated.
+Refund Initiation Response
+Sample Response for Case 1: Refund initiated successfully
+{
+  "refundId": "OMR2604141058374994494413V",
+  "currency": "INR",
+  "amount": 100,
+  "state": "PENDING"
+}
+Response Parameters
+Field Name
+Data Type
+Description
+refundId
+String
+Payment Gateway generated internal order ID.
+amount
+Long
+Refund amount specified in paisa.
+state
+String
+Indicates the current state of the refund process. Expected value: PENDING.
+
+Try it yourself!
+headers
+Token
+string
+required
+Access Token you recieved
+body params
+merchantRefundId
+string
+required
+Enter your merchantRefundId
+originalMerchantOrderId
+string
+required
+Enter your originalMerchantOrderId
+amount
+Int
+required
+Enter your amount
+
+
+const axios = require('axios');
+
+
+const requestHeaders = {
+ "Content-Type": "application/json"
+};
+
+
+const options = {
+ method: 'POST',
+ url: 'https://api-preprod.phonepe.com/apis/pg-sandbox/payments/v2/refund',
+ headers: requestHeaders,
+};
+
+
+axios.request(options)
+ .then(function (response) {
+   console.log(response.data);
+ })
+ .catch(function (error) {
+   console.error(error);
+ });
+Check Refund Status
+Refund status provides information about the current progress of a refund request. It helps track whether the refund is still pending, completed, or failed, ensuring that merchants can monitor and manage the refund process effectively.
+Environment
+HTTP Method
+API
+Sandbox
+GET
+https://api-preprod.phonepe.com/apis/pg-sandbox/payments/v2/refund/{merchantRefundId}/status
+Production
+GET
+https://api.phonepe.com/apis/pg/payments/v2/refund/{merchantRefundId}/status
+
+Refund Status Request
+Request Headers
+Header Name
+Header Value
+Content-Type
+application/json
+Authorization
+O-Bearer <merchant-auth-token>
+
+Refund Status Response
+Sample Response for UPI
+{
+  "originalMerchantOrderId": "Tx123",
+  "currency": "INR",
+  "amount": 100,
+  "feesReversalAmount": 0,
+  "adjustedDiscountAmount": 0,
+  "refundableAmount": 100,
+  "state": "COMPLETED",
+  "refundId": "OMR2604141058374994494413V",
+  "timestamp": 1776144517501,
+  "splitInstruments": [
+    {
+      "instrument": {
+        "type": "ACCOUNT",
+        "maskedAccountNumber": "XXXXXX6392",
+        "ifsc": "SBIN0011290",
+        "accountType": "SAVINGS"
+      },
+      "rail": {
+        "type": "UPI",
+        "utr": "610408034245"
+      },
+      "currency": null,
+      "amount": 100
+    }
+  ],
+  "paymentDetails": [
+    {
+      "transactionId": "OMR2604141058374994494413V",
+      "paymentMode": "UPI_QR",
+      "timestamp": 1776144517501,
+      "currency": "INR",
+      "amount": 100,
+      "state": "COMPLETED",
+      "instrument": {
+        "type": "ACCOUNT",
+        "maskedAccountNumber": "XXXXXX4332",
+        "ifsc": "SBIN0011290",
+        "accountType": "SAVINGS"
+      },
+      "rail": {
+        "type": "UPI",
+        "utr": "610408034245"
+      },
+      "splitInstruments": [
+        {
+          "instrument": {
+            "type": "ACCOUNT",
+            "maskedAccountNumber": "XXXXXX4332",
+            "ifsc": "SBIN0011290",
+            "accountType": "SAVINGS"
+          },
+          "rail": {
+            "type": "UPI",
+            "utr": "610408034245"
+          },
+          "currency": null,
+          "amount": 100
+        }
+      ],
+      "phonepeTPAPTxnDetailsLink": "https://phon.pe/p9ffoswc"
+    }
+  ],
+  "phonepeTPAPTxnDetailsLink": "https://phon.pe/p9ffoswc"
+}
+Sample Response for RupayCC
+{
+    "originalMerchantOrderId": "MORD_79217538817499990968",
+    "currency": "INR",
+    "amount": 100,
+    "feesReversalAmount": 0,
+    "adjustedDiscountAmount": 0,
+    "refundableAmount": 100,
+    "state": "COMPLETED",
+    "refundId": "OMR2602171446159166189536W",
+    "timestamp": 1771319775918,
+    "splitInstruments": [
+        {
+            "instrument": {
+                "type": "ACCOUNT",
+                "maskedAccountNumber": "653047XXXXXXXX74",
+                "ifsc": "UTIB0AXISCC",
+                "accountHolderName": "RISHI",
+                "accountType": "CREDIT"
+            },
+            "rail": {
+                "type": "UPI",
+                "vpa": "33XXXXXXXXXXXXXXXXXXXXXXXXXXXX83@ybl"
+            },
+            "currency": null,
+            "amount": 100
+        }
+    ],
+    "phonepeTPAPTxnDetailsLink": "https://phon.pe/3gwea0kh"
+}
+Response Parameters
+Field Name
+Data Type
+Description
+originalMerchantOrderId
+String
+The original merchant order ID is used to identify the transaction for which the refund is being processed.
+amount
+String
+The amount to be refunded, specified in paisa.
+state
+String
+Refund state, Expected values:
+• PENDING
+• CONFIRMED
+• COMPLETED
+• FAILED
+timestamp
+Long
+Timestamp of the transaction attempt in epoch (in milliseconds).
+refundId
+String
+Refund Id generated by PhonePe.
+errorCode
+String
+Error code returned only if the transaction state is FAILED.
+detailedErrorCode
+String
+Detailed error code returned only when the transaction state is FAILED.
+splitInstruments.rail
+String
+Includes details of the processing rail used for the payment attempt.
+splitInstruments.rail.type
+String
+Specifies the type of processing rail used. Expected values:
+• UPI
+• PG
+splitInstruments.instrument
+String
+Includes the details of the payment instrument used for the transaction.
+splitInstruments.instrument.type
+String
+Specifies the type of payment instrument used. Expected values:
+• ACCOUNT
+• CREDIT_CARD
+• DEBIT_CARD
+• NET_BANKING
+
+Try it yourself!
+headers
+Token
+string
+required
+Access Token you recieved
+url params
+merchantRefundId
+string
+required
+Enter your merchantRefundId
+
+
+const axios = require('axios');
+
+
+const requestHeaders = {
+ "Content-Type": "application/json"
+};
+
+
+const options = {
+ method: 'GET',
+ url: 'https://api-preprod.phonepe.com/apis/pg-sandbox/payments/v2/refund/{{merchantRefundId}}/status',
+ headers: requestHeaders,
+};
+
+
+axios.request(options)
+ .then(function (response) {
+   console.log(response.data);
+ })
+ .catch(function (error) {
+   console.error(error);
+ });
+Webhook Handling
+In a subscription-based system, it’s essential to confirm the outcome of every payment event. Once a payment or recurring debit is initiated, your system should quickly identify whether it was successful, failed, or is still pending. This real-time verification helps you take timely actions like activating services, updating customer access, retrying failed payments, or sending notifications.
+To support this, PhonePe sends two types of webhook callbacks that your system should listen to:
+Subscription Callbacks – These indicate the result of the first payment made when a subscription is created.
+Redemption Callbacks – These provide the status of automated payments for ongoing subscriptions.
+1. Subscription Callback
+To start receiving essential subscription status updates in real-time, you’ll need to set up your Webhook callback. This ensures our system can notify yours about changes. To enable these crucial updates, you’ll configure the following:
+Callback URL – Your server endpoint where PhonePe will send subscription updates.
+Username – Create and set your own username.
+Password – Create and set your own password.
+Make sure the same username and password are used in your code to validate the Authorization header received in the callback from PhonePe.
+Callback Validation/Verification
+For incoming requests, extract the Authorization header, validate it against the username:password you configured with us, and accept the response only if the values match.
+Authorization: SHA256(username:password)
+Callback Event Types
+Flow
+Callback Type
+Setup
+checkout.order.completed
+checkout.order.failed
+
+State Change
+subscription.paused
+subscription.unpaused
+subscription.revoked
+subscription.cancelled
+Notification
+subscription.notification.completed
+subscription.notification.failed
+Redemption
+subscription.redemption.order.completed
+subscription.redemption.order.failed
+subscription.redemption.transaction.completed
+subscription.redemption.transaction.failed
+Refund
+pg.refund.accepted
+pg.refund.completed
+pg.refund.failed
+
+📘 Get It Right: Subscription Webhook Best Practices!
+
+Always use the root-level payload.state parameter to confirm the subscription status.
+Avoid strict deserialization of the webhook response.
+Do not depend on the type parameter (this will be deprecated); instead, use the event parameter to identify the webhook event.
+expireAt and timestamp values are provided in epoch time format (in milliseconds).
+Callbacks – Setup
+Subscription setup order – COMPLETED
+{
+  "type": "CHECKOUT_ORDER_COMPLETED",
+  "event": "checkout.order.completed",
+  "payload": {
+    "merchantId": "PRODTEST",
+    "merchantOrderId": "TEST_ORD76218257999841196127",
+    "orderId": "OMO2512091216567658772255V",
+    "state": "COMPLETED",
+    "currency": "INR",
+    "amount": 200,
+    "payableCurrency": "INR",
+    "payableAmount": 200,
+    "feeCurrency": "INR",
+    "feeAmount": 0,
+    "expireAt": 1765264016765,
+    "metaInfo": {
+        "udf1": "some meta info of max length 256",
+        "udf2": "some meta info of max length 256",
+        "udf3": "some meta info of max length 256",
+        "udf4": "some meta info of max length 256",
+        "udf5": "some meta info of max length 256",
+        "udf6": "some meta info of max length 256",
+        "udf7": "some meta info of max length 256",
+        "udf8": "some meta info of max length 256",
+        "udf10": "some meta info of max length 256",
+        "udf11": "some meta info of max length 50",
+        "udf12": "some meta info of max length 50",
+        "udf13": "some meta info of max length 50",
+        "udf14": "some meta info of max length 50",
+        "udf15": "some meta info of max length 50"
+    },
+    "paymentFlow": {
+      "type": "SUBSCRIPTION_CHECKOUT_SETUP",
+      "merchantSubscriptionId": "MSUB_5580745967290798888",
+      "authWorkflowType": "PENNY_DROP",
+      "amountType": "VARIABLE",
+      "maxAmount": 200,
+      "frequency": "DAILY",
+      "expireAt": 2711947616753,
+      "subscriptionId": "OMS2512091216567538772793V"
+    },
+    "paymentDetails": [
+      {
+        "transactionId": "OM2512091217085453615241V",
+        "paymentMode": "UPI_QR",
+        "timestamp": 1765262828576,
+        "currency": "INR",
+        "amount": 200,
+        "payableCurrency": "INR",
+        "payableAmount": 200,
+        "feeCurrency": "INR",
+        "feeAmount": 0,
+        "state": "COMPLETED",
+        "instrument": {
+          "type": "ACCOUNT",
+          "ifsc": "KKBK*****24",
+          "accountHolderName": "HRISHIKESH",
+          "accountType": "SAVINGS",
+          "bankId": "KKBK"
+        },
+        "rail": {
+          "type": "UPI",
+          "utr": "534312158356",
+          "vpa": "12****78@ybl",
+          "umn": "75103a529f684f1cb9fac5ae7de4edb8@ybl"
+        },
+        "splitInstruments": [
+          {
+            "instrument": {
+              "type": "ACCOUNT",
+              "ifsc": "KKBK0000724",
+              "accountHolderName": "RAVINDRA ",
+              "accountType": "SAVINGS",
+              "bankId": "KKBK"
+            },
+            "rail": {
+              "type": "UPI",
+              "utr": "534312158356",
+              "vpa": "12****78@ybl",
+              "umn": "75103a529f684f1cb9fac5ae7de4edb8@ybl"
+            },
+            "currency": "INR",
+            "amount": 200
+          }
+        ]
+      }
+    ]
+  }
+}
+Subscription setup order – FAILED
+{
+  "type": "CHECKOUT_ORDER_FAILED",
+  "event": "checkout.order.failed",
+  "payload": {
+    "merchantId": "PRODTEST",
+    "merchantOrderId": "TEST_ORD92782488154686223748",
+    "orderId": "OMO2512091220426054140059V",
+    "state": "FAILED",
+    "currency": "INR",
+    "amount": 200,
+    "expireAt": 1765264242605,
+    "errorCode": "OTHERS",
+    "detailedErrorCode": "INTENT_EXPIRED",
+    "metaInfo": {
+        "udf1": "some meta info of max length 256",
+        "udf2": "some meta info of max length 256",
+        "udf3": "some meta info of max length 256",
+        "udf4": "some meta info of max length 256",
+        "udf5": "some meta info of max length 256",
+        "udf6": "some meta info of max length 256",
+        "udf7": "some meta info of max length 256",
+        "udf8": "some meta info of max length 256",
+        "udf10": "some meta info of max length 256",
+        "udf11": "some meta info of max length 50",
+        "udf12": "some meta info of max length 50",
+        "udf13": "some meta info of max length 50",
+        "udf14": "some meta info of max length 50",
+        "udf15": "some meta info of max length 50"
+    },
+    "paymentFlow": {
+      "type": "SUBSCRIPTION_CHECKOUT_SETUP",
+      "merchantSubscriptionId": "MSUB_5843827890811415656",
+      "authWorkflowType": "PENNY_DROP",
+      "amountType": "VARIABLE",
+      "maxAmount": 200,
+      "frequency": "DAILY",
+      "expireAt": 2711947842592,
+      "subscriptionId": "OMS2512091220425914140379V"
+    },
+    "paymentDetails": [
+      {
+        "transactionId": "OM2512091225260208772899V",
+        "paymentMode": "UPI_QR",
+        "timestamp": 1765263326040,
+        "currency": "INR",
+        "amount": 200,
+        "payableCurrency": "INR",
+        "payableAmount": 200,
+        "feeCurrency": "INR",
+        "feeAmount": 0,
+        "state": "FAILED",
+        "errorCode": "OTHERS",
+        "detailedErrorCode": "INTENT_EXPIRED"
+      }
+    ]
+  }
+}
+Response Parameter
+Parameter Name
+Data Type
+Description
+merchantId
+String
+A unique ID assigned to the merchant by the PhonePe system during the onboarding process.
+merchantOrderId
+String
+A unique orderId provided by the merchant when creating the order. This helps in tracking and managing the specific transaction across systems.
+orderId
+String
+An orderId generated by PhonePe.
+state
+String
+Possible value:
+• COMPLETED
+• FAILED
+• PENDING
+amount
+Long
+The amount provided by the merchant in Paise.
+expireAt
+DateTime
+Represents the time in epoch (milliseconds).
+errorCode
+String
+Indicates the reason for the failure.
+[PRESENT ONLY IF STATE = FAILED]
+detailedErrorCode
+String
+Provides a detailed explanation for the failure.
+MetaInfo
+Array
+Contains metadata provided by the merchant.
+paymentFlow
+Object
+Provides the detailed information of the subscription.
+paymentFlow.type
+String
+The type should be set to “SUBSCRIPTION_REDEMPTION” for redemption transactions.
+paymentFlow.merchantSubscriptionId
+String
+A unique subscriptionId provided by the merchant to identify and manage the subscription request.
+paymentFlow.amountType
+String
+Nature of redemption amount
+Possible Values:
+• FIXED
+• VARIABLE
+paymentFlow.maxAmount
+Long
+Specifies the maximum amount that can be debited from the customer’s account for each redemption cycle.
+paymentFlow.frequency
+String
+Defines how often the payment will be deducted from the customer’s account.
+paymentFlow.subscriptionId
+String
+A subscriptionId generated by PhonePe to uniquely identify the user’s subscription.
+paymentDetails
+Array
+Contains the details of the payment.
+
+Callbacks – State Change
+Subscription Cancelled
+{
+    "event": "subscription.cancelled",
+    "payload": {
+        "merchantSubscriptionId": "MS1708797962855",
+        "subscriptionId": "OMS2402242336054995042603",
+        "state": "CANCELLED",
+        "authWorkflowType": "TRANSACTION",
+        "amountType": "FIXED",
+        "maxAmount": 200,
+        "frequency": "ON_DEMAND",
+        "expireAt": 1737278524000,
+        "pauseStartDate": 1708798426196,
+        "pauseEndDate": 1708885799000
+    }
+}
+Subscription Revoked
+{
+    "event": "subscription.revoked",
+    "payload": {
+        "merchantSubscriptionId": "MS1708797962855",
+        "subscriptionId": "OMS2402242336054995042603",
+        "state": "REVOKED",
+        "authWorkflowType": "TRANSACTION",
+        "amountType": "FIXED",
+        "maxAmount": 200,
+        "frequency": "ON_DEMAND",
+        "expireAt": 1737278524000,
+        "pauseStartDate": 1708798426196,
+        "pauseEndDate": 1708885799000
+    }
+}
+Subscription Paused
+{
+    "event": "subscription.paused",
+    "payload": {
+        "merchantSubscriptionId": "MS1708797962855",
+        "subscriptionId": "OMS2402242336054995042603",
+        "state": "PAUSED",
+        "authWorkflowType": "TRANSACTION",
+        "amountType": "FIXED",
+        "maxAmount": 200,
+        "frequency": "ON_DEMAND",
+        "expireAt": 1737278524000,
+        "pauseStartDate": 1708798426196,
+        "pauseEndDate": 1708885799000
+    }
+}
+Subscription Unpaused
+{
+    "event": "subscription.unpaused",
+    "payload": {
+        "merchantSubscriptionId": "MS1708797962855",
+        "subscriptionId": "OMS2402242336054995042603",
+        "state": "ACTIVE",
+        "authWorkflowType": "TRANSACTION",
+        "amountType": "FIXED",
+        "maxAmount": 200,
+        "frequency": "ON_DEMAND",
+        "expireAt": 1737278524000,
+        "pauseStartDate": null,
+        "pauseEndDate": null
+    }
+}
+Response Parameter
+Parameter Name
+Data Type
+Description
+merchantSubscriptionId
+String
+Unique merchant subscription Id passed by the merchant while creating the subscription.
+subscriptionId
+String
+The subscription ID generated by PhonePe.
+state
+String
+The current status of the subscription.
+Possible values:
+• ACTIVATION_IN_PROGRESS
+• ACTIVE
+• EXPIRED
+• FAILED
+• CANCEL_IN_PROGRESS
+• CANCELLED
+• REVOKE_IN_PROGRESS
+• REVOKED
+• PAUSE_IN_PROGRESS
+• PAUSED
+• UNPAUSE_IN_PROGRESS
+authWorkflowType
+String
+Type of Authorization
+amountType
+String
+Type of amount:
+• Fixed
+• Variable
+maxAmount
+String
+Maximum amount that can be charged.
+frequency
+String
+Frequency type of subscription.
+expireAt
+DateTime
+Subscription Expiry Time in Epoch (in milliseconds)
+pauseStartDate
+DateTime
+The start date of the subscription pause, applicable only when the subscription is in the “PAUSED” state. Otherwise, the value will be null. The date is provided in epoch (milliseconds).
+pauseEndDate
+DateTime
+The end date of the subscription pause, applicable only when the subscription is in the “PAUSED” state. Otherwise, the value will be null. The date is provided in epoch (milliseconds).
+
+2. Redemption Callback
+To ensure you receive timely notifications regarding changes in redemption status, you must set up your Webhook callback. This involves configuring the following parameters:
+Callback URL – Your server endpoint where PhonePe will send subscription updates.
+Username – Create and set your own username.
+Password – Create and set your own password.
+Make sure the same username and password are used in your code to validate the Authorization header received in the callback from PhonePe.
+Callback Validation/Verification
+For incoming requests, extract the Authorization header, validate it against the username:password you configured with us, and accept the response only if the values match.
+Authorization: SHA256(username:password)
+Callback Event Types
+Flow
+Callback Type
+Notification
+subscription.notification.completed
+subscription.notification.failed
+Redemption
+subscription.redemption.order.completed
+subscription.redemption.order.failed
+subscription.redemption.transaction.completed
+subscription.redemption.transaction.failed
+
+📘 Get It Right: Redemption Webhook Best Practices!
+
+Always use the root-level payload.state parameter to confirm the subscription status.
+Avoid strict deserialization of the webhook response.
+Do not depend on the type parameter (this will be deprecated); instead, use the event parameter to identify the webhook event.
+expireAt and timestamp values are provided in epoch time format (in milliseconds).
+Callbacks – Notification
+Subscription Notification – COMPLETED
+{
+  "event": "subscription.notification.completed",
+  "payload": {
+    "merchantId": "SWIGGY8",
+    "merchantOrderId": "MO1708797962855",
+    "orderId": "OMO12344",
+    "amount": 100,
+    "state": "NOTIFIED",
+    "expireAt": 1620891733101,
+    "paymentFlow": {
+      "type": "SUBSCRIPTION_REDEMPTION",
+      "merchantSubscriptionId": "MS121312",
+      "redemptionRetryStrategy": "CUSTOM",
+      "autoDebit": true,
+      "validAfter": 1628229131000,
+      "validUpto": 1628574731000,
+      "notifiedAt": 1622539751586
+    }
+  }
+}
+Callbacks – Redemption
+Callback for Redeemed State
+{
+  "event": "subscription.redemption.order.completed/subscription.redemption.order.failed",
+  "payload": {
+   "merchantId": "SWIGGY8",
+    "merchantOrderId": "MO1708797962855"
+    "orderId": "OMO12344",
+    "state": "COMPLETED",
+    "amount": 100,
+   "expireAt": 1620891733101,
+    "paymentFlow": {
+      "type": "SUBSCRIPTION_REDEMPTION",
+      "merchantSubscriptionId": "MS121312",
+      "redemptionRetryStrategy": "CUSTOM",
+      "autoDebit": true,
+      "validAfter": 1628229131000,
+      "validUpto": 1628574731000,
+      "notifiedAt": "1622539751586"
+    },
+    "errorCode": 
+    "detailedErrorCode":   
+    "paymentDetails": [
+        {
+            "amount": 100
+            "paymentMode": "UPI_AUTO_PAY",
+            "timestamp": 1620891733101      
+            "transactionId": "OM124",
+            "state": "COMPLETED", // FAILED, PENDING
+            "rail": {
+                "type": "UPI",
+                "utr": "2",
+                "vpa": "12****78@ybl",
+                "umn": "544fcc8819d04cb08e26faa1fb07eee7@ybl"
+            },
+            "instrument": {
+                "type": "ACCOUNT",
+                "maskedAccountNumber": "******1234",
+                "ifsc": "VISA",
+                "accountHolderName": "Harshad",
+                "accountType": "SAVINGS"
+            },
+            "errorCode": 
+           "detailedErrorCode": 
+        }
+    ]
+  }
+}
+Callback for Redemption Attempt
+{
+  "event": "subscription.redemption.transaction.completed/subscription.redemption.transaction.failed",
+  "payload": {
+   "merchantId": "SWIGGY8",
+    "merchantOrderId": "MO1708797962855"
+    "orderId": "OMO12344",
+    "state": "PENDING",
+    "amount": 100,
+   "expireAt": 1620891733101,
+    "paymentFlow": {
+      "type": "SUBSCRIPTION_REDEMPTION",
+      "merchantSubscriptionId": "MS121312",
+      "redemptionRetryStrategy": "CUSTOM",
+      "autoDebit": true,
+      "validAfter": 1628229131000,
+      "validUpto": 1628574731000,
+      "notifiedAt": 1622539751586
+    },
+    "errorCode": 
+    "detailedErrorCode":   
+    "paymentDetails": [
+        {
+            "amount": 100
+            "paymentMode": "UPI_AUTO_PAY",
+            "timestamp": 1620891733101      
+            "transactionId": "OM124",
+            "state": "COMPLETED", // FAILED, PENDING
+            "rail": {
+                "type": "UPI",
+                "utr": "2",
+                "vpa": "12****78@ybl",
+                "umn": "544fcc8819d04cb08e26faa1fb07eee7@ybl"
+            },
+            "instrument": {
+                "type": "ACCOUNT",
+                "maskedAccountNumber": "******1234",
+                "ifsc": "VISA",
+                "accountHolderName": "Harshad",
+                "accountType": "SAVINGS"
+            },
+            "errorCode": 
+           "detailedErrorCode": 
+        }
+    ]
+  }
+}
+Introduction to Autopay
+
+Managing recurring payments can be a hassle! PhonePe Payment Gateway simplifies the process by providing  an easy and secure solution with autopay feature, helping you streamline your billing processes. With a one-time authorization from your customer, you can schedule automatic deductions at specified periods, eliminating the need for the customer’s repeated involvement. This approach is particularly useful for services like OTT subscriptions, insurance premiums, and memberships, where regular payments are expected.
+User Journey
+The following user journey illustrates the complete payment lifecycle to help you understand the integration flow clearly.
+
+
+Prerequisites
+Before you start the integration process, ensure you have:
+Access to PhonePe PG’s UAT (User Acceptance Testing) and production environments
+API credentials, including the client ID and client secret
+A basic understanding of HTTP methods (GET, POST) and JSON
+A testing environment to simulate payment flows
+Environments
+Use the environment URLs provided below to integrate and test your API calls. The Sandbox environment is meant for testing purposes—it allows you to validate your integration and make sure everything is working correctly without affecting real users or data. Once your integration is fully tested and ready, use the Production environment for live transactions. Always remember to switch the base URL depending on whether you’re working in the Sandbox or Production environment.
+Environment
+API
+Sandbox
+https://api-preprod.phonepe.com/apis/pg-sandbox/<Endpoint>
+Production
+Authorization API: https://api.phonepe.com/apis/identity-manager/<Endpoint>
+Other APIs: https://api.phonepe.com/apis/pg/<Endpoint>
+
+📘 Test Before Production!
+
+To ensure a smooth integration, please integrate with the Test environment first and then move to production.
+API Endpoints
+Here’s a quick reference to the key APIs involved in the Autopay flow. Each API plays a specific role, from initiating a transaction to handling refunds and fetching statuses. Use this table to understand which endpoint to call for each step in the Autopay payment lifecycle.
+Endpoint Details:
+API
+Method
+Endpoint
+Authorization
+POST
+/v1/oauth/token
+Subscription Setup
+POST
+/subscriptions/v2/setup
+Subscription Order Status
+GET
+/subscriptions/v2/order/{merchantOrderId}/status
+Subscription Status
+GET
+/subscriptions/v2/{merchantSubscriptionId}/status
+Redemption – Notify
+POST
+/subscriptions/v2/notify
+Redemption – Execute
+POST
+/subscriptions/v2/redeem
+Redemption – Order Status
+GET
+/subscriptions/v2/order/{merchantOrderId}/status
+Subscription Cancel
+POST
+/subscriptions/v2/{merchantSubscriptionId}/cancel
+Refund
+POST
+/payments/v2/refund
+Refund Status
+GET
+/payments/v2/refund/{merchantRefundId}/status
+
+Autopay Integration
+
+Here’s how the integration process with PhonePe Payment Gateway works.
+Follow the steps outlined below to set up and verify your payment flow with ease.
+
+
+1. Generate an authorization token to authenticate your system
+Authentication is the first step in PhonePe Payment Gateway’s standard checkout API integration. It involves generating an authorization token to make further API calls. 
+Creating an authorization token to make API calls means generating a unique key or password that proves your system has permission to interact with PhonePe Payment Gateway. This token identifies and authenticates your website when it requests services like processing payments, checking status, etc.
+For complete details, refer to the Generate Authorization Token.
+2. Subscription Setup
+In this step, you will need to call the subscription setup API to setup a mandate for your user.
+For complete details, refer to the Subscription Setup.
+Once the user completes the mandate through mandate supported apps( PhonePe, BHIM, GPay, Paytm, CRED, Amazon Pay), use Subscription Order Status API to check the status of a Subscription Setup after initiating it.
+To check the status of the Subscription, use the Subscription Status API to retrieve the current Subscription Status.
+3. Redemption Notify
+In this step, you should call Redemption Notify API from your backend. This API will initiate a notification to your user informing them that their debit is scheduled after 24 hours.
+For complete details, refer to the Redemption Notify.
+4. Redemption Execute
+The Redemption Execute API is to directly debit the required payment from a user’s bank account, thereby initiating and completing the actual financial transaction. This API should be called from the backend only if it is Merchant controlled debit.
+For complete details, refer to the Redemption Execute.
+After initiating a redemption request for an active subscription, use the Redemption Order Status API to check the execution status and check whether the redemption has been notified, is in pending, or completed.
+5. Verifying Payment Response
+In a subscription system, it’s important to know whether a payment was successful, failed, or still pending.
+PhonePe supports this with automated callbacks for two key events:
+Subscription Callbacks
+Sent when a new subscription is created. These confirm if the user’s first payment was successful or not, helping you handle activation or failure from the start.
+Redemption Callbacks
+Sent for ongoing auto debits. These share the status of each recurring payment and provide individual transaction details, which are useful for retries and reconciliation.
+Other features:
+Cancel Subscription: Use the Cancel Subscription API to deactivate an active autopay subscription that is no longer required.
+Pause or Unpause Subscription: PhonePe will send an Webhook callback to notify you that the subscription has been Paused/Unpaused from the user’s end.
+Revoke Subscription: PhonePe will send an Webhook callback to notify you that the subscription has been cancelled from the user’s end.
+Initiate Refund and Check Refund Status: The Refund API allows you to initiate refunds for specific transactions, returning funds to customers for reasons like order cancellations, returns, or payment adjustments. You can also check the status of the initiated refund.
+
+
+Generate Authorization Token
+
+This API generates an authorization token, which is essential for securely authenticating all subsequent API requests. The token must be included in the request headers to ensure that each call is verified and processed by the server.
+The token can be used for many API calls until it expires.
+Save the token and check the “expires_at” field to know when it will expire. Make sure to refresh the token before it expires by calling the same API again.
+Environment
+Environment
+HTTP Method
+API
+Sandbox
+POST
+https://api-preprod.phonepe.com/apis/pg-sandbox/v1/oauth/token
+Production
+POST
+https://api.phonepe.com/apis/identity-manager/v1/oauth/token
+
+Request
+Request Headers
+Header Name
+Header Value
+Content-Type
+application/x-www-form-urlencoded
+
+Request Parameters
+Parameter Name
+Parameter Value
+client_id
+Client ID shared by PhonePe PG
+client_version
+Client Version shared by PhonePe PG
+client_secret
+Client secret shared by PhonePe PG
+grant_type
+The value should be set to “client_credentials“
+
+Sample Request
+curl --location 'https://api-preprod.phonepe.com/apis/pg-sandbox/v1/oauth/token' \
+--header 'Content-Type: application/x-www-form-urlencoded' \
+--data-urlencode 'client_id=CLIENT_ID' \
+--data-urlencode 'client_version=1' \
+--data-urlencode 'client_secret=CLIENT_SECRET' \
+--data-urlencode 'grant_type=client_credentials'
+Response
+Sample Response
+{
+    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHBpcmVzT24iOjE3MjA2MzUzMjE5OTYsIm1lcmNoYW50SWQiOiJWUlVBVCJ9.4YjYHI6Gy6gzOisD_628wfbaI46dMSc5T_0gZ2-SAJo",
+    "encrypted_access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHBpcmVzT24iOjE3MjA2MzUzMjE5OTYsIm1lcmNoYW50SWQiOiJWUlVBVCJ9.4YjYHI6Gy6gzOisD_628wfbaI46dMSc5T_0gZ2-SAJo",
+    "expires_in": null,
+    "issued_at": 1706073005,
+    "expires_at": 1706697605,
+    "session_expires_at": 1706697605,
+    "token_type": "O-Bearer"
+}
+Response Parameters
+Parameter Name
+Data Type
+Description
+access_token
+String
+The token generated by PhonePe. This token is valid for a specific time, which can be determined using the expires_at field. Once expired, the token must be refreshed using the same API.
+issued_at
+DateTime
+The timestamp in epoch (in seconds) when the token was generated.
+expires_at
+DateTime
+Token expiry timestamp in epoch.
+token_type
+String
+The type of token, which will be “O-Bearer”.
+
+ℹ️ Access Token Guidelines!
+
+You should depend on the following key response parameters:
+access_token: This is the token that must be included in API calls with PhonePe for authentication.
+expires_at: This indicates the token’s validity (in seconds). You must ensure that the token is refreshed before it expires. If it expires, you will have to send the request again.
+The auth_token is required for all subsequent API calls. Use the above access token to initiate the payment process.
+Run a Sample Token Request!
+📘 Accessing Your Credentials
+
+You can view your Client ID and Client Secret from the PhonePe Business Dashboard. Navigate to Developer Settings to find your API keys and use them to try out the sample code.
+body params
+Client Id
+string
+required
+Enter your client Id
+Client Secret
+string
+required
+Enter your client Secret
+const axios = require('axios');
+
+
+const requestHeaders = {
+ "Content-Type": "application/x-www-form-urlencoded"
+};
+
+
+const requestBodyJson = {
+ "client_version": 1,
+ "grant_type": "client_credentials"
+};
+
+
+const requestBody = new URLSearchParams(requestBodyJson).toString();
+
+
+const options = {
+ method: 'POST',
+ url: 'https://api-preprod.phonepe.com/apis/pg-sandbox/v1/oauth/token',
+ headers: requestHeaders,
+ data: requestBody
+};
+
+
+axios.request(options)
+ .then(function (response) {
+   console.log(response.data);
+ })
+ .catch(function (error) {
+   console.error(error);
+ });
+Setup Subscription
+
+This API is used to check the current status of a subscription after it has been set up. It helps determine whether the subscription is Active (successfully set up and ongoing), Cancelled (manually cancelled by the user), or Revoked(withdrawn by the user).
+Environment
+Environment
+HTTP Method
+API
+Sandbox
+POST
+https://api-preprod.phonepe.com/apis/pg-sandbox/subscriptions/v2/setup
+Production
+POST
+https://api.phonepe.com/apis/pg/subscriptions/v2/setup
+
+Request
+Header Name
+Header Value
+Description
+Content-Type
+application/json
+
+
+Authorization
+O-Bearer <access_token>
+Pass access_token received in Authorization call
+
+⚠️ For Partner Integrations!
+
+It is mandatory to include the X-MERCHANT-ID header with the MerchantID of the end merchant.
+Request for UPI Intent
+Sample Request
+{
+    "merchantOrderId": "M27",
+    "amount": 100,
+    "expireAt": 1807681114000,
+    "paymentFlow": {
+        "type": "SUBSCRIPTION_SETUP",
+        "merchantSubscriptionId": "MS27",
+        "authWorkflowType": "TRANSACTION",
+        "amountType": "FIXED",
+        "maxAmount": 100,
+        "frequency": "ON_DEMAND",
+        "expireAt": 1807681114000,
+        "paymentMode": {
+            "type": "UPI_INTENT",
+            "targetApp": "com.phonepe.app"
+        }
+    },
+    "deviceContext": {
+        "deviceOS": "ANDROID"
+    },
+    "metaInfo": {
+        "udf1": "some meta info of max length 256",
+        "udf2": "some meta info of max length 256",
+        "udf3": "some meta info of max length 256",
+        "udf4": "some meta info of max length 256",
+        "udf5": "some meta info of max length 256",
+        "udf6": "some meta info of max length 256",
+        "udf7": "some meta info of max length 256",
+        "udf8": "some meta info of max length 256",
+        "udf10": "some meta info of max length 256",
+        "udf11": "some meta info of max length 50",
+        "udf12": "some meta info of max length 50",
+        "udf13": "some meta info of max length 50",
+        "udf14": "some meta info of max length 50",
+        "udf15": "some meta info of max length 50"
+    }
+}
+Sample Request in CURL
+curl --location 'https://api-preprod.phonepe.com/apis/pg-sandbox/subscriptions/v2/setup' \
+--header 'Accept: application/json' \
+--header 'Authorization: O-Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHBpcmVzT24iOjE3MTIyNTM2MjU2NDQsIm1lcmNoYW50SWQiOiJWMlNVQlVBVCJ9.7aVzYI_f_77-bBicEcRNuYx093b2wCsgl_WFNkKqAPY' \
+--header 'Content-Type: application/json' \
+--data '{
+   "merchantOrderId": "MO1443709025658932",
+   "amount": 200,
+   "expireAt": 170905854,
+   "paymentFlow": {
+       "type": "SUBSCRIPTION_SETUP",
+       "merchantSubscriptionId": "MS1709025658932",
+       "authWorkflowType": "TRANSACTION",
+       "amountType": "FIXED",
+       "maxAmount": 200,
+       "frequency": "ON_DEMAND",
+       "expireAt": 1737278524000,
+       "paymentMode": {
+           "type": "UPI_INTENT",
+           "targetApp": "com.phonepe.app"
+       }
+   },
+    "deviceContext" : {
+        "deviceOS" : "ANDROID"
+    }
+}'
+Request Parameters
+Parameter Name
+Data Type
+Description
+Mandatory
+Constraints
+merchantOrderId
+String
+Unique merchant order id generated by merchant.
+Yes
+• Max Length = 63 characters.
+• No Special characters allowed except underscore “_” and hyphen “-“
+amount
+Long
+Order amount in paisa to setup a mandate based on the authWorkflowType.
+Yes
+• For PENNY_DROP flow, the amount should be equal to 200 (In Paise)
+
+• For TRANSACTION flow, the amount should be greater than or equal to 100 or the first debit amount(In Paise)
+expireAt
+DateTime
+Order expiry in seconds.
+No
+max limit is 15 min for intent expiry.
+metaInfo
+Object
+Merchant defined meta info to store additional information.
+Same data will be returned in status and callback response.
+No
+• For udf1 to udf10, there is no constraint. Maximum length = 256 characters
+• For udf11 to udf15, alphanumeric values with _-+@. are allowed. Maximum length = 50 characters
+Note: It is mandatory to keep the parameter names udf1, udf2, etc., exactly as they are in the metainfo block. Renaming these key values will result in a production error.
+paymentFlow
+Object
+Additional details required by this flow
+Yes
+
+
+deviceContext.deviceOS
+String
+The type of device OS.
+Yes
+Allowed values:
+• Android
+• iOS
+
+The paymentFlow object contains additional parameters, which are explained in the table below.
+Parameter Name
+Data Type
+Description
+Mandatory
+Constraints
+paymentFlow.type
+String
+Type of payment flow.
+Yes
+Allowed values = [SUBSCRIPTION_SETUP]
+paymentFlow.merchantSubscriptionId
+String
+Unique merchant reference subscription ID – used for subscription status.
+Yes
+
+
+paymentFlow.authWorkflowType
+String
+Defines the type of workflow verification whether it is TRANSACTION or PENNY DROP
+Yes
+Allowed values = “TRANSACTION” or “PENNY DROP”
+paymentFlow.amountType
+String
+Nature of redemption amount.
+Yes
+Possible Values :
+• FIXED
+• VARIABLE
+paymentFlow.maxAmount
+Long
+Max amount upto which redemptions will be allowed.
+Yes
+The MAXIMUM debit/redemption amount for the mandate.
+The amount is in Paise.
+
+Note:
+• For VARIABLE recurring debit, this amount would be considered as Max Cap Amount
+paymentFlow.frequency
+String
+Defines the Redemption Frequency.
+Yes
+Allowed values =
+• DAILY
+• WEEKLY
+• MONTHLY
+• FORTNIGHTLY
+• BIMONTHLY
+• QUARTERLY
+• HALFYEARLY
+• YEARLY
+• ONDEMAND
+paymentFlow.expireAt
+DateTime
+Defines Subscription cycle expiry. No operation allowed after subscription expires.
+(in milliseconds)
+No
+Default Value= 30 years
+paymentFlow.paymentMode
+Object
+Defines payment mode details for setup.
+Yes
+Allowed Value =
+{
+    “type”: “UPI_INTENT”
+}
+paymentFlow.paymentMode.targetApp
+String
+Defines target app for intent payment mode.
+Yes
+• Android: Package Name of the UPI app.
+{
+“targetApp”: “com.phonepe.app”
+}
+
+• iOS: Static Values like [PHONEPE, GPAY, PAYTM, CRED, SUPERMONEY, BHIM, AMAZON]
+
+Response for UPI Intent
+Sample Response
+{
+  "orderId": "OMO2604141111125363306797V",
+  "state": "PENDING",
+  "intentUrl": "upi://mandate?mn=Autopay&ver=01&rev=Y&purpose=14&validityend=14042027&QRts=2026-04-14T11:11:12.582158634+05:30&QRexpire=2026-04-14T11:26:11.582158634+05:30&txnType=CREATE&am=1.00&validitystart=14042026&orgId=180001&mode=04&pa=PRODTEST1@ybl&cu=INR&amrule=MAX&fam=1.00&mc=5262&qrMedium=00&recur=ASPRESENTED&mg=ONLINE&share=Y&block=N&tr=OM2604141111125613306810V&pn=Infinity%20Prod%20Test%201",
+  "nativeOtpEnabled": false
+}
+Response Parameters
+Field Name
+Data Type
+Description
+orderId
+String
+Internal order ID generated by PhonePe Payment Gateway.
+state
+String
+State of the order created, expected value is PENDING.
+redirectUrl
+String
+Intent url to invoke the payment app that initiates the mandate and completes the payment.
+
+Check Order Status
+
+This API allows you to check the status of a mandate after a subscription has been successfully set up. Once the mandate is created and the payment is debited, you can use this API to track the corresponding order status, including whether it is successful, pending, or failed.
+Environment
+Environment
+HTTP Method
+API
+Sandbox
+GET
+https://api-preprod.phonepe.com/apis/pg-sandbox/subscriptions/v2/order/{merchantOrderId}/status?details=true
+Production
+GET
+https://api.phonepe.com/apis/pg/subscriptions/v2/order/{merchantOrderId}/status?details=true
+
+Request
+Request Headers
+Header Name
+Header Value
+Content-Type
+application/json
+Authorization
+O-Bearer <merchant-auth-token>
+
+⚠️ For Partner Integrations!
+
+It is mandatory to include the X-MERCHANT-ID header with the MerchantID of the end merchant.
+Path Parameters Details
+Parameter Name
+Description
+merchantOrderId
+Merchant-generated order ID provided during the Subscription Setup API call.
+
+Sample Request in CURL
+curl --location 'https://api-preprod.phonepe.com/apis/pg-sandbox/subscriptions/v2/order/MO1709025691805/status?details=true' \
+--header 'Accept: application/json' \
+--header 'Authorization: O-Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHBpcmVzT24iOjE3MTIyNTM2MjU2NDQsIm1lcmNoYW50SWQiOiJWMlNVQlVBVCJ9.7aVzYI_f_77-bBicEcRNuYx093b2wCsgl_WFNkKqAPY'
+Response
+Sample Response for Success
+{
+  "merchantId": "Mer01",
+  "merchantOrderId": "M27",
+  "orderId": "OMO2604141111125363306797V",
+  "state": "COMPLETED",
+  "currency": "INR",
+  "amount": 100,
+  "expireAt": 1776146172517,
+  "paymentFlow": {
+    "type": "SUBSCRIPTION_SETUP",
+    "merchantSubscriptionId": "MS27",
+    "authWorkflowType": "TRANSACTION",
+    "amountType": "FIXED",
+    "maxAmount": 100,
+    "frequency": "ON_DEMAND",
+    "expireAt": 1807681114000,
+    "subscriptionId": "OMS2604141111125173306721V",
+    "productType": null,
+    "authInstrumentType": null
+  },
+  "paymentDetails": [
+    {
+      "transactionId": "OM2604141111125613306810V",
+      "paymentMode": "UPI_INTENT",
+      "timestamp": 1776145272562,
+      "currency": "INR",
+      "amount": 100,
+      "payableCurrency": "INR",
+      "payableAmount": 100,
+      "feeCurrency": "INR",
+      "feeAmount": 0,
+      "state": "COMPLETED",
+      "instrument": {
+        "type": "ACCOUNT",
+        "maskedAccountNumber": "XXXXXX6392",
+        "ifsc": "SBIN0011290",
+        "accountType": "SAVINGS",
+        "bankId": "SBIN"
+      },
+      "rail": {
+        "type": "UPI",
+        "utr": "610485002694",
+        "umn": "13e911bd03aa4a1db0b02e290a228342@axl"
+      },
+      "splitInstruments": [
+        {
+          "instrument": {
+            "type": "ACCOUNT",
+            "maskedAccountNumber": "XXXXXX6392",
+            "ifsc": "SBIN0011290",
+            "accountType": "SAVINGS",
+            "bankId": "SBIN"
+          },
+          "rail": {
+            "type": "UPI",
+            "utr": "610485002694",
+            "umn": "13e911bd03aa4a1db0b02e290a228342@axl"
+          },
+          "currency": "INR",
+          "amount": 100
+        }
+      ]
+    }
+  ],  
+  "metaInfo": {
+    "udf1": "some meta info of max length 256",
+    "udf2": "some meta info of max length 256",
+    "udf3": "some meta info of max length 256",
+    "udf4": "some meta info of max length 256",
+    "udf5": "some meta info of max length 256",
+    "udf6": "some meta info of max length 256",
+    "udf7": "some meta info of max length 256",
+    "udf8": "some meta info of max length 256",
+    "udf10": "some meta info of max length 256",
+    "udf11": "some meta info of max length 50",
+    "udf12": "some meta info of max length 50",
+    "udf13": "some meta info of max length 50",
+    "udf14": "some meta info of max length 50",
+    "udf15": "some meta info of max length 50"
+  }
+}
+Response Parameters
+Parameter Name
+Data Type
+Description
+merchantId
+String
+A unique ID assigned to the merchant by the PhonePe system during the onboarding process.
+merchantOrderId
+String
+A unique orderId provided by the merchant when creating the order. This helps in tracking and managing the specific transaction across systems.
+orderId
+String
+An orderId generated by PhonePe.
+state
+String
+Possible value:
+• COMPLETED
+• FAILED
+• PENDING
+amount
+Long
+The amount provided by the merchant in Paise.
+expireAt
+DateTime
+Represents the time in epoch (milliseconds).
+errorCode
+String
+Indicates the reason for the failure.
+[PRESENT ONLY IF STATE = FAILED]
+detailedErrorCode
+String
+Provides a detailed explanation for the failure.
+MetaInfo
+Object
+• For udf1 to udf10, there is no constraint. Maximum length = 256 characters
+• For udf11 to udf15, alphanumeric values with _-+@. are allowed. Maximum length = 50 characters
+Note: It is mandatory to keep the parameter names udf1, udf2, etc., exactly as they are in the metainfo block. Renaming these key values will result in a production error.
+paymentFlow
+Object
+Provides the detailed information of the subscription.
+paymentDetails
+Array
+Contains the details of the payment.
+
+The paymentFlow object contains additional parameters, which are explained in the table below.
+Request Parameters of paymentFlow Object:
+Parameter Name
+Data Type
+Description
+paymentFlow.type
+String
+The type should be set to “SUBSCRIPTION_REDEMPTION” for redemption transactions.
+paymentFlow.merchantSubscriptionId
+String
+A unique subscriptionId provided by the merchant to identify and manage the subscription request.
+paymentFlow.amountType
+String
+Nature of redemption amount
+Possible Values:
+• FIXED
+• VARIABLE
+paymentFlow.maxAmount
+Long
+Specifies the maximum amount that can be debited from the user’s account for each redemption cycle.
+paymentFlow.frequency
+String
+Defines how often the payment will be deducted from the user’s account.
+paymentFlow.subscriptionId
+String
+A subscriptionId generated by PhonePe to uniquely identify the user’s subscription.
+
+Check Subscription Order Status!
+headers
+Token
+string
+required
+Access Token you recieved
+url params
+merchantOrderId
+string
+required
+Enter your merchantOrderId
+const axios = require('axios');
+
+
+const requestHeaders = {
+ "Content-Type": "application/json"
+};
+
+
+const options = {
+ method: 'GET',
+ url: 'https://api-preprod.phonepe.com/apis/pg-sandbox/subscriptions/v2/order/{{merchantOrderId}}/status?details=true',
+ headers: requestHeaders,
+};
+
+
+axios.request(options)
+ .then(function (response) {
+   console.log(response.data);
+ })
+ .catch(function (error) {
+   console.error(error);
+ });
+Check Subscription Status
+
+This API is used to check the current status of a subscription after it has been set up. It helps determine whether the subscription is Active (successfully set up and ongoing), Cancelled (manually cancelled by the user), or Revoked(withdrawn by the user).
+Environment
+Environment
+HTTP Method
+API
+Sandbox
+GET
+https://api-preprod.phonepe.com/apis/pg-sandbox/subscriptions/v2/{merchantSubscriptionId}/status?details=true
+Production
+GET
+https://api.phonepe.com/apis/pg/subscriptions/v2/{merchantSubscriptionId}/status?details=true
+
+Request
+Request Headers
+Header Name
+Header Value
+Content-Type
+application/json
+Authorization
+O-Bearer <merchant-auth-token>
+
+⚠️ For Partner Integrations!
+
+It is mandatory to include the X-MERCHANT-ID header with the MerchantID of the end merchant.
+Path Parameters
+Parameter Name
+Description
+merchantSubscriptionId
+The unique merchant subscription ID provided by the merchant when creating the subscription
+
+Response
+Sample Response for State – Active/Cancelled/Revoked
+{
+  "merchantSubscriptionId": "MS27",
+  "subscriptionId": "OMS2604141111125173306721V",
+  "state": "ACTIVE",
+  "productType": "UPI_MANDATE",
+  "authInstrumentType": "UPI",
+  "authWorkflowType": "TRANSACTION",
+  "amountType": "FIXED",
+  "currency": "INR",
+  "maxAmount": 100,
+  "frequency": "ON_DEMAND",
+  "expireAt": 1807681114000,
+  "pauseStartDate": null,
+  "pauseEndDate": null
+}
+For State – Paused
+{
+    "merchantSubscriptionId": "MS1708797962855",
+    "subscriptionId": "OMS2402242336054995042603",
+    "state": "PAUSED",
+    "authWorkflowType": "TRANSACTION",
+    "amountType": "FIXED",
+    "maxAmount": 200,
+    "frequency": "ON_DEMAND",
+    "expireAt": 1737278524000,
+    "pauseStartDate": 1708798426196,
+    "pauseEndDate": 1708885799000
+}
+Response Parameters
+Parameter Name
+Data Type
+Description
+merchantSubscriptionId
+String
+Unique merchant subscription Id passed by the merchant while creating the subscription.
+subscriptionId
+String
+The subscription ID generated by PhonePe.
+state
+String
+The current status of the subscription.
+Possible values:
+• ACTIVATION_IN_PROGRESS
+• ACTIVE
+• EXPIRED
+• FAILED
+• CANCEL_IN_PROGRESS
+• CANCELLED
+• REVOKE_IN_PROGRESS
+• REVOKED
+• PAUSE_IN_PROGRESS
+• PAUSED
+• UNPAUSE_IN_PROGRESS
+authWorkflowType
+String
+Type of Authorization
+amountType
+String
+Type of amount:
+• Fixed
+• Variable
+maxAmount
+String
+Maximum amount that can be charged.
+frequency
+String
+Frequency type of subscription.
+expireAt
+DateTime
+Subscription Expiry Time in Epoch (in milliseconds)
+pauseStartDate
+DateTime
+The start date of the subscription pause, applicable only when the subscription is in the “PAUSED” state. Otherwise, the value will be null. The date is provided in epoch (milliseconds).
+pauseEndDate
+DateTime
+The end date of the subscription pause, applicable only when the subscription is in the “PAUSED” state. Otherwise, the value will be null. The date is provided in epoch (milliseconds).
+
+Try it yourself!
+headers
+Token
+string
+required
+Access Token you recieved
+url params
+merchantSubscriptionId
+string
+required
+Enter your merchantSubscriptionId
+
+
+const axios = require('axios');
+
+
+const requestHeaders = {
+ "Content-Type": "application/json"
+};
+
+
+const options = {
+ method: 'GET',
+ url: 'https://api-preprod.phonepe.com/apis/pg-sandbox/subscriptions/v2/{{merchantSubscriptionId}}/status?details=true',
+ headers: requestHeaders,
+};
+
+
+axios.request(options)
+ .then(function (response) {
+   console.log(response.data);
+ })
+ .catch(function (error) {
+   console.error(error);
+ });
+

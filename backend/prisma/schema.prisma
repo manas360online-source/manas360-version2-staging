@@ -1748,8 +1748,8 @@ model InvoiceEvent {
   actor          User?    @relation("InvoiceEventsActor", fields: [actorUserId], references: [id], onDelete: SetNull)
   invoice        Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
-  @@index([invoiceId])
-  @@index([idempotencyKey])
+  @@index([invoiceId], map: "idx_invoice_events_invoice_id")
+  @@index([idempotencyKey], map: "idx_invoice_events_idempotency_key")
   @@map("invoice_events")
 }
 

@@ -1,6 +1,8 @@
 type TemplateValue = string | number | boolean | null | undefined;
 
-export type AgreementTemplateValues = Record<string, TemplateValue | AgreementTemplateValues>;
+export interface AgreementTemplateValues {
+	[key: string]: TemplateValue | AgreementTemplateValues;
+}
 
 export type EditableInputRenderer = (variable: string, value: string) => string;
 
