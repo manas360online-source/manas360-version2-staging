@@ -6,6 +6,33 @@ import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import { getPostLoginRoute, hasCorporateAccess, useAuth } from '../../context/AuthContext';
 
+type SignupRole = 'patient' | 'therapist' | 'psychiatrist' | 'psychologist' | 'coach';
+
+const VALID_SIGNUP_ROLES = new Set<SignupRole>(['patient', 'therapist', 'psychiatrist', 'psychologist', 'coach']);
+
+const resolveSignupRole = (candidate: unknown): SignupRole | null => {
+	if (typeof candidate !== 'string') {
+		return null;
+	}
+
+	const normalized = candidate.trim().toLowerCase();
+	return VALID_SIGNUP_ROLES.has(normalized as SignupRole) ? (normalized as SignupRole) : null;
+};
+
+const inferSignupRoleFromPath = (path: string | null | undefined): SignupRole | null => {
+	const normalizedPath = String(path || '').trim().toLowerCase();
+	if (!normalizedPath) {
+		return null;
+	}
+
+	if (normalizedPath.startsWith('/psychiatrist')) return 'psychiatrist';
+	if (normalizedPath.startsWith('/psychologist')) return 'psychologist';
+	if (normalizedPath.startsWith('/coach')) return 'coach';
+	if (normalizedPath.startsWith('/therapist') || normalizedPath.startsWith('/provider')) return 'therapist';
+
+	return null;
+};
+
 const isSubscriptionActive = (subscription: any): boolean => {
 	if (!subscription) return false;
 
@@ -20,9 +47,14 @@ export default function LoginPage() {
 	const { user, isAuthenticated, checkAuth } = useAuth();
 	const navigate = useNavigate();
 	const location = useLocation();
-	const from = (location.state as { from?: string; afterLogin?: string } | null)?.from;
-	const afterLogin = (location.state as { from?: string; afterLogin?: string } | null)?.afterLogin;
+	const locationState = location.state as { from?: string; afterLogin?: string; role?: SignupRole } | null;
+	const from = locationState?.from;
+	const afterLogin = locationState?.afterLogin;
 	const next = new URLSearchParams(location.search).get('next');
+	const signupRoleFromQuery = resolveSignupRole(new URLSearchParams(location.search).get('role'));
+	const signupRoleFromState = resolveSignupRole(locationState?.role);
+	const signupRoleFromPath = inferSignupRoleFromPath(from || afterLogin || next);
+	const signupRole = signupRoleFromState || signupRoleFromQuery || signupRoleFromPath;
 
 	const [phone, setPhone] = useState('');
 	const [otp, setOtp] = useState('');
@@ -304,7 +336,18 @@ export default function LoginPage() {
 		} catch (err: any) {
 			const message = String(err?.response?.data?.message || '');
 			if (Number(err?.response?.status) === 422 && message.toLowerCase().includes('accept terms')) {
-				navigate(`/auth/signup?phone=${encodeURIComponent(phone.trim())}`, { replace: true });
+				const searchParams = new URLSearchParams({ phone: phone.trim() });
+				if (signupRole) {
+					searchParams.set('role', signupRole);
+				}
+				navigate(`/auth/signup?${searchParams.toString()}`, {
+					replace: true,
+					state: {
+						from,
+						afterLogin,
+						role: signupRole,
+					},
+				});
 				return;
 			}
 			setError(getApiErrorMessage(err, 'OTP verification failed'));
@@ -421,7 +464,11 @@ export default function LoginPage() {
 
 						<p className="mt-4 text-center text-sm text-wellness-muted">
 							Need to create an account?{' '}
-							<Link to="/auth/signup" className="text-calm-sage underline underline-offset-2 hover:text-wellness-text">
+							<Link
+								to={signupRole ? `/auth/signup?role=${encodeURIComponent(signupRole)}` : '/auth/signup'}
+								state={signupRole ? { role: signupRole } : undefined}
+								className="text-calm-sage underline underline-offset-2 hover:text-wellness-text"
+							>
 								Register here
 							</Link>
 						</p>

@@ -56,15 +56,30 @@ export const submitProviderOnboardingController = async (req: Request, res: Resp
 		: [];
 
 	const result = await registerProviderProfile(userId, {
-		professionalType: (typeof req.body?.professionalType === 'string' ? req.body.professionalType.trim().toUpperCase() : undefined) as 'THERAPIST' | 'PSYCHIATRIST' | 'PSYCHOLOGIST' | 'COACH' | undefined,
-		displayName: requiredString(req.body?.fullName ?? req.body?.displayName, 'displayName'),
+		displayName: requiredString(req.body?.displayName ?? req.body?.fullName, 'displayName'),
 		registrationType: (typeof req.body?.registrationType === 'string' ? req.body.registrationType.trim().toUpperCase() : 'OTHER') as 'RCI' | 'NMC' | 'STATE_COUNCIL' | 'OTHER',
 		registrationNum: requiredString(req.body?.registrationNum, 'registrationNum'),
-		yearsExperience: Number(req.body?.yearsExperience ?? 0),
-		highestQual: requiredString(req.body?.highestQual, 'highestQual'),
+		yearsExperience: Number(req.body?.yearsExperience ?? req.body?.yearsOfExperience ?? 0),
+		highestQual: requiredString(req.body?.highestQual ?? req.body?.education, 'highestQual'),
+		clinicalCategories: Array.isArray(req.body?.clinicalCategories) ? req.body.clinicalCategories.map(String) : [],
 		specializations: Array.isArray(req.body?.specializations) ? req.body.specializations.map(String) : [],
 		languages: Array.isArray(req.body?.languages) ? req.body.languages.map(String) : [],
-		hourlyRate: Number(req.body?.hourlyRate ?? 0),
+		corporateReady: Boolean(req.body?.corporateReady),
+		shiftPreferences: Array.isArray(req.body?.shiftPreferences) ? req.body.shiftPreferences.map(String) : [],
+		certifications: Array.isArray(req.body?.certifications) ? req.body.certifications.map(String) : [],
+		hourlyRate: Number(req.body?.hourlyRate ?? req.body?.consultationFee ?? 0),
+		bankDetails: typeof req.body?.bankDetails === 'object' && req.body?.bankDetails
+			? {
+				accountName: typeof req.body.bankDetails.accountName === 'string' ? req.body.bankDetails.accountName.trim() : undefined,
+				accountNumber: typeof req.body.bankDetails.accountNumber === 'string' ? req.body.bankDetails.accountNumber.trim() : undefined,
+				ifsc: typeof req.body.bankDetails.ifsc === 'string' ? req.body.bankDetails.ifsc.trim() : undefined,
+				bankName: typeof req.body.bankDetails.bankName === 'string' ? req.body.bankDetails.bankName.trim() : undefined,
+				upiId: typeof req.body.bankDetails.upiId === 'string' ? req.body.bankDetails.upiId.trim() : undefined,
+			}
+			: undefined,
+		tagline: typeof req.body?.tagline === 'string' ? req.body.tagline : undefined,
+		digitalSignature: typeof req.body?.digitalSignature === 'string' ? req.body.digitalSignature : undefined,
+		nriSessionEnabled: Boolean(req.body?.nriSessionEnabled),
 		bio: typeof req.body?.bio === 'string' ? req.body.bio : undefined,
 		documents,
 	});

@@ -10,7 +10,6 @@ import {
 	createPatientAssessment,
 	getMyPatientAssessmentHistory,
 	getMyMoodHistory,
-	getMyTherapistMatches,
 } from '../services/patient.service';
 import { env } from '../config/env';
 
@@ -145,18 +144,6 @@ export const getMyMoodHistoryController = async (req: Request, res: Response): P
 	const moodHistory = await getMyMoodHistory(userId, query);
 
 	sendSuccess(res, moodHistory, 'Mood history fetched');
-};
-
-export const getMyTherapistMatchesController = async (req: Request, res: Response): Promise<void> => {
-	const userId = getAuthUserId(req);
-
-	if (!req.validatedTherapistMatchQuery) {
-		throw new AppError('Invalid therapist match query', 400);
-	}
-
-	const matches = await getMyTherapistMatches(userId, req.validatedTherapistMatchQuery);
-
-	sendSuccess(res, matches, 'Therapist matches fetched');
 };
 
 export const getMyTherapyPlanController = async (req: Request, res: Response): Promise<void> => {

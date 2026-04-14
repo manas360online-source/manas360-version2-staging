@@ -38,54 +38,53 @@ export const CheckoutPage: React.FC = () => {
     const applicableWallet = Math.min(walletAmount, totalToday);
     const finalTotal = totalToday - applicableWallet;
 
-    const handlePayment = async () => {
-        if (!cert || !slug) return;
-        if (!fullName && !mobile) {
-            setGeneralError('Missing enrollment details. Please restart from the certification page.');
-            return;
-        }
-
+    const handleTransaction = async () => {
         setProcessing(true);
-        setGeneralError(null);
-        setDuplicateMessage(null);
         try {
-            const response = await fetch('/api/v1/certifications/register', {
+            const fullName = (location.state as any)?.fullName;
+            const email = (location.state as any)?.email;
+            const mobile = (location.state as any)?.mobile;
+            const city = (location.state as any)?.city;
+            const education = (location.state as any)?.education;
+            const motivation = (location.state as any)?.motivation;
+
+            const response = await fetch('/api/v1/enrollment/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     fullName,
+                    email,
                     mobile,
-                    certSlug: slug,
-                    paymentPlan: plan,
-                    installmentCount: plan === 'installment' ? 3 : 1,
+                    city,
+                    education,
+                    motivation,
+                    certName: cert.name,
+                    certSlug: cert.slug,
+                    price: finalTotal
                 }),
             });
 
             const data = await response.json();
 
-            if (response.status === 409) {
-                setDuplicateMessage(data?.message || 'You are already enrolled for this certification.');
-                setProcessing(false);
-                return;
+            if (response.ok && data.success && data.data.redirectUrl) {
+                // ── Redirect to PhonePe ──────────────────────────────────
+                window.location.href = data.data.redirectUrl;
+            } else if (response.ok && data.success && data.data.intentCreated) {
+                // Handle free/direct cases if backend supports it
+                navigate('/enrollment-confirmed', {
+                    state: {
+                        certName: cert.name,
+                        fullName,
+                        slug: cert.slug,
+                    },
+                });
+            } else {
+                throw new Error(data.message || 'Failed to initiate payment');
             }
-
-            if (!response.ok || !data?.success) {
-                throw new Error(data?.message || 'Unable to start payment.');
-            }
-
-            if (String(data?.data?.enrollmentMode || '').toLowerCase() === 'free') {
-                navigate(myCertificationsPath, { replace: true });
-                return;
-            }
-
-            const paymentUrl = data?.data?.paymentUrl;
-            if (!paymentUrl) {
-                throw new Error('Payment link not received. Please retry.');
-            }
-
-            window.location.href = paymentUrl;
-        } catch (error: any) {
-            setGeneralError(error?.message || 'Payment initialization failed. Please try again.');
+        } catch (err: any) {
+            console.error('Payment initiation error:', err);
+            navigate(`/payment-failed?slug=${cert.slug}`);
+        } finally {
             setProcessing(false);
         }
     };
@@ -174,18 +173,16 @@ export const CheckoutPage: React.FC = () => {
                 </div>
 
                 <div className="bg-white p-8 rounded-2xl shadow-xl border border-slate-100 h-fit">
-                    <h3 className="text-xl font-bold text-slate-800 mb-6">Select Payment Plan</h3>
-
-                    <div className="space-y-4 mb-8">
-                        <div
-                            onClick={() => setPlan('full')}
-                            className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${plan === 'full' ? 'border-purple-600 bg-purple-50 ring-1 ring-purple-600' : 'border-slate-100 hover:border-slate-200'}`}
-                        >
-                            <div className="flex justify-between items-center">
-                                <span className="font-bold text-slate-800">Pay in Full</span>
-                                {plan === 'full' && <CheckCircle size={20} className="text-purple-600" />}
-                            </div>
-                            <div className="text-2xl font-bold text-slate-900 mt-2">₹{cert.price_inr.toLocaleString()}</div>
+                    {cert.price_inr === 0 ? (
+                        <div className="text-center py-8">
+                            <h3 className="text-xl font-bold text-slate-800 mb-4">Free Enrollment</h3>
+                            <button
+                                onClick={() => handleTransaction()}
+                                disabled={processing}
+                                className="w-full bg-purple-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-purple-700 transition disabled:opacity-50"
+                            >
+                                {processing ? 'Enrolling...' : 'Confirm Enrollment'}
+                            </button>
                         </div>
 
                         <div
@@ -209,9 +206,23 @@ export const CheckoutPage: React.FC = () => {
                                         <span>Payment 3 due {monthAfter.toLocaleDateString()}</span>
                                     </div>
                                 </div>
-                            )}
-                        </div>
-                    </div>
+                            </div>
+
+                            {/* Pay button */}
+                            <button
+                                onClick={() => handleTransaction()}
+                                disabled={processing}
+                                className="w-full bg-purple-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-purple-700 transition flex items-center justify-center gap-2 disabled:opacity-70 mb-6"
+                            >
+                                {processing ? (
+                                    <>Processing...</>
+                                ) : (
+                                    <>
+                                        <Lock size={18} className="text-purple-200" />
+                                        Pay ₹{finalTotal.toLocaleString()}
+                                    </>
+                                )}
+                            </button>
 
                     <button
                         onClick={handlePayment}

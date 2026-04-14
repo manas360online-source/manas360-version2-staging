@@ -17,7 +17,7 @@ Role restriction: `patient` only (all endpoints below)
 | `/api/v1/patients/me/assessments` | POST | Yes | patient |
 | `/api/v1/patients/me/assessments` | GET | Yes | patient |
 | `/api/v1/patients/me/mood-history` | GET | Yes | patient |
-| `/api/v1/patients/me/therapist-matches` | GET | Yes | patient |
+| `/api/v1/patient/providers/smart-match` | GET | Yes | patient |
 | `/api/v1/patients/me/sessions/book` | POST | Yes | patient |
 | `/api/v1/patients/me/sessions` | GET | Yes | patient |
 
@@ -278,9 +278,9 @@ Role restriction: `patient` only (all endpoints below)
 
 ---
 
-## 6) Therapist Match Endpoint
+## 6) Smart Match Endpoint
 
-**Endpoint**: `/api/v1/patients/me/therapist-matches`  
+**Endpoint**: `/api/v1/patient/providers/smart-match`  
 **Method**: `GET`
 
 ### Request Body Schema
@@ -289,16 +289,17 @@ Role restriction: `patient` only (all endpoints below)
 
 ### Validation Rules
 
-- `languagePreference` optional string length `2..50`
-- `specializationPreference` optional string length `2..80`
-- `nextHours` optional integer `1..336` (default `72`)
+- `daysOfWeek` required array values in `0..6`
+- `timeSlots` required array in `startMinute-endMinute` format
+- `providerType` optional
+- `context` optional (`Standard | Corporate | Night | Buddy | Crisis`)
 
 ### Sample Success Response
 
 ```json
 {
   "success": true,
-  "message": "Therapist matches fetched",
+  "message": "Providers fetched",
   "data": {
     "algorithm": {
       "version": "v1",
@@ -588,34 +589,35 @@ paths:
       responses:
         '200':
           description: Mood history fetched
-  /api/v1/patients/me/therapist-matches:
+  /api/v1/patient/providers/smart-match:
     get:
       tags: [Patient]
       security:
         - bearerAuth: []
-      summary: Get ranked therapist matches
+      summary: Get ranked smart-match providers
       parameters:
         - in: query
-          name: languagePreference
+          name: daysOfWeek
+          schema:
+            type: array
+            items:
+              type: integer
+              minimum: 0
+              maximum: 6
+        - in: query
+          name: timeSlots
+          schema:
+            type: array
+            items:
+              type: string
+              example: "540-720"
+        - in: query
+          name: providerType
           schema:
             type: string
-            minLength: 2
-            maxLength: 50
-        - in: query
-          name: specializationPreference
-          schema:
-            type: string
-            minLength: 2
-            maxLength: 80
-        - in: query
-          name: nextHours
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 336
       responses:
         '200':
-          description: Therapist matches fetched
+          description: Smart-match providers fetched
   /api/v1/patients/me/sessions/book:
     post:
       tags: [Patient]
@@ -717,8 +719,8 @@ curl "http://localhost:5000/api/v1/patients/me/assessments?page=1&limit=10&type=
 curl "http://localhost:5000/api/v1/patients/me/mood-history?fromDate=2026-02-01T00:00:00.000Z&toDate=2026-02-28T23:59:59.999Z" \
   -H "Authorization: Bearer ${TOKEN}"
 
-# 6) Therapist matches
-curl "http://localhost:5000/api/v1/patients/me/therapist-matches?languagePreference=english&specializationPreference=cbt&nextHours=168" \
+# 6) Smart-match providers
+curl "http://localhost:5000/api/v1/patient/providers/smart-match?daysOfWeek=1&daysOfWeek=3&daysOfWeek=5&timeSlots=540-720&providerType=THERAPIST" \
   -H "Authorization: Bearer ${TOKEN}"
 
 # 7) Book session

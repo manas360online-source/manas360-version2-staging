@@ -657,70 +657,104 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 			return { handled: true, message: 'PhonePe provider subscription payment processed (with atomic pending activation)' };
 		}
 
-		// ================================================================
-		// CERT_ — Certification Enrollment Payment
-		// ================================================================
 		if (merchantTransactionId.startsWith('CERT_')) {
-			const verify = await checkPhonePeStatus(merchantTransactionId);
-			const verifyCode = String(verify?.code || '').toUpperCase();
-			const verifyState = String(verify?.data?.state || '').toUpperCase();
-			const isVerifiedByStatus = Boolean(verify) && (
-				verifyCode === 'PAYMENT_SUCCESS' || verifyState === 'COMPLETED'
-			);
+			const payment = await db.financialPayment.findUnique({
+				where: { merchantTransactionId: merchantTransactionId },
+			});
 
-			if (!isVerifiedByStatus) {
-				logger.warn('[PaymentService] Certification payment not verified', { merchantTransactionId, verifyCode, verifyState });
-				throw new AppError('Certification payment verification failed', 400);
+			if (!payment) {
+				logger.error('[PaymentService] Certification payment record not found', { merchantTransactionId });
+				return { handled: false, message: 'Payment record not found' };
 			}
 
-			// Extract certSlug and userId from metadata
-			const certSlug = String(data?.metadata?.certSlug || '');
-			const userId = String(data?.metadata?.userId || data?.metaInfo?.udf1 || '');
-
-			if (!userId) {
-				throw new AppError('Unable to resolve userId from certification payment', 422);
+			if (payment.status === 'CAPTURED') {
+				return { handled: true, message: 'Certification already processed' };
 			}
 
-			// Provision or update TherapistProfile
-			const existingProfile = await db.therapistProfile.findUnique({ where: { userId } });
-			const mergedCertifications = Array.from(new Set([
-				...((existingProfile?.certifications as string[] | undefined) || []),
-				...(certSlug ? [certSlug] : []),
-			]));
+			const metadata = payment.metadata as any;
+			const { email, mobile, fullName, certSlug } = metadata;
 
-			if (existingProfile) {
-				// Update existing profile with certification info
-				await db.therapistProfile.update({
-					where: { userId },
+			// 1. Find or create user
+			let user = await db.user.findFirst({
+				where: {
+					OR: [
+						{ email: email },
+						{ phone: mobile }
+					]
+				}
+			});
+
+			if (!user) {
+				user = await db.user.create({
 					data: {
-						certificationStatus: 'ENROLLED',
-						certificationPaymentId: merchantTransactionId,
-						leadBoostScore: 30,
-						certifications: mergedCertifications,
-					},
+						email,
+						phone: mobile,
+						firstName: fullName.split(' ')[0] || '',
+						lastName: fullName.split(' ').slice(1).join(' ') || '',
+						role: 'THERAPIST',
+						status: 'ACTIVE'
+					}
 				});
-				logger.info('[PaymentService] Updated existing TherapistProfile with certification', { userId, certSlug });
+			}
+
+			// 2. Find or create therapist profile
+			let profile = await db.therapistProfile.findUnique({
+				where: { userId: user.id }
+			});
+
+			if (!profile) {
+				profile = await db.therapistProfile.create({
+					data: {
+						userId: user.id,
+						displayName: fullName,
+						certifications: [certSlug]
+					}
+				});
 			} else {
-				// Fetch user info for display name
-				const user = await db.user.findUnique({ where: { id: userId }, select: { name: true } });
-
-				await db.therapistProfile.create({
-					data: {
-						userId,
-						displayName: user?.name || 'Provider',
-						certificationStatus: 'ENROLLED',
-						certificationPaymentId: merchantTransactionId,
-						leadBoostScore: 30,
-						certifications: certSlug ? [certSlug] : [],
-						onboardingCompleted: false,
-						isVerified: false,
-					},
-				});
-				logger.info('[PaymentService] Created new TherapistProfile for certification', { userId, certSlug });
+				// Append certification if not already present
+				const existingCerts = Array.isArray(profile.certifications) ? profile.certifications : [];
+				if (!existingCerts.includes(certSlug)) {
+					await db.therapistProfile.update({
+						where: { id: profile.id },
+						data: {
+							certifications: {
+								push: certSlug
+							}
+						}
+					});
+				}
 			}
 
-			logger.info('[PaymentService] Certification payment processed', { merchantTransactionId, userId, certSlug });
-			return { handled: true, message: 'Certification enrollment payment processed' };
+			// 3. Update payment record
+			await db.financialPayment.update({
+				where: { id: payment.id },
+				data: {
+					status: 'CAPTURED',
+					providerId: user.id,
+					capturedAt: new Date(),
+					metadata: {
+						...metadata,
+						userId: user.id,
+						provisionedAt: new Date().toISOString()
+					}
+				}
+			});
+
+			// 4. Record revenue (using CONTENT as proximity for certification)
+			await db.revenueLedger.create({
+				data: {
+					type: 'CONTENT',
+					grossAmountMinor: payment.amountMinor,
+					platformCommissionMinor: payment.amountMinor,
+					providerShareMinor: 0,
+					paymentType: 'PROVIDER_FEE',
+					currency: payment.currency,
+					referenceId: merchantTransactionId
+				}
+			});
+
+			logger.info(`[PaymentService] Certification provisioned for user ${user.id}`, { certSlug });
+			return { handled: true, message: 'Certification payment processed' };
 		}
 	}
 
