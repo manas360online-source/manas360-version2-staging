@@ -181,20 +181,19 @@ export type CreateAgreementPayload = {
   billing_cycle?: string | null;
   template_data: Record<string, unknown>;
 };
+export type AdminCreateAgreementPayload = {
+  company_legal_name: string;
+  signatory_email: string;
+  signatory_phone: string;
+  selected_tier: 'startup' | 'growth' | 'enterprise' | 'custom';
+  employee_count: number;
+};
 
-export type CreateAdminContractPayload = {
-  entity_id: string | null;
-  contract_type: string;
-  pricing_model: string;
-  price_per_member_per_year: number | null;
-  flat_annual_rate: number | null;
-  max_members: number;
-  contract_start_date: string;
-  contract_end_date: string;
-  payment_terms: string;
-  discount_percent: number;
-  signed_by_entity: string;
-  signed_date: string;
+export type AdminCreateAgreementResponse = {
+  agreement_id: string;
+  agreement_number: string;
+  share_token: string;
+  share_url: string;
 };
 
 export const corporateApi = {
@@ -440,7 +439,20 @@ export const corporateApi = {
   },
 };
 
-export const createAgreement = (data: CreateAgreementPayload) => corporateApi.createAgreement(data);
+export const createAgreement = async (payload: AdminCreateAgreementPayload): Promise<AdminCreateAgreementResponse> => {
+  try {
+    const response = await http.post('/v1/admin/agreements', payload);
+    return unwrap(response.data) as AdminCreateAgreementResponse;
+  } catch (error: any) {
+    const message =
+      String(error?.response?.data?.message || error?.response?.data?.error?.message || error?.message || 'Failed to create agreement');
+    const wrappedError = new Error(message);
+    (wrappedError as any).cause = error;
+    throw wrappedError;
+  }
+};
+
+export const createCorporateAgreement = (data: CreateAgreementPayload) => corporateApi.createAgreement(data);
 export const getAgreements = () => corporateApi.getAgreements();
 export const getAgreementTemplates = () => corporateApi.getAgreementTemplates();
 export const sendForSignature = (id: number | string) => corporateApi.sendForSignature(id);

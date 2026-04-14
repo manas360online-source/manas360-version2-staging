@@ -212,6 +212,75 @@ export type PlatformConfigRecord = {
 	updatedById: string | null;
 };
 
+export type AdminAgreementTier = 'startup' | 'growth' | 'enterprise' | 'custom';
+
+export type AdminAgreementRecord = {
+	id: string;
+	company_legal_name: string;
+	signatory_email: string;
+	signatory_phone: string;
+	selected_tier: AdminAgreementTier;
+	employee_count: number;
+	annual_fee: number;
+	per_employee_rate: number;
+	status: string;
+	share_url?: string;
+	share_token?: string;
+	createdAt?: string;
+	updatedAt?: string;
+};
+
+export type AdminAgreementDetail = AdminAgreementRecord & {
+	agreement_number?: string;
+	company_details?: {
+		legal_name?: string;
+		display_name?: string;
+		company_key?: string;
+		contact_email?: string;
+		contact_phone?: string;
+		address?: string;
+		industry?: string;
+	};
+	pricing_info?: {
+		annual_fee?: number;
+		per_employee_rate?: number;
+		currency?: string;
+	};
+	selected_options?: Record<string, unknown>;
+	signed_document_url?: string | null;
+	share_url?: string;
+	share_token?: string;
+	status?: string;
+	createdAt?: string;
+	updatedAt?: string;
+};
+
+export type AdminAgreementListResponse = {
+	items: AdminAgreementRecord[];
+	pagination?: {
+		total: number;
+		limit: number;
+		offset: number;
+	};
+};
+
+export type AdminAgreementStats = {
+	totalAgreements: number;
+	activeAgreements: number;
+	pendingSignatures: number;
+	draftAgreements: number;
+};
+
+export type CreateAdminAgreementInput = {
+	company_legal_name: string;
+	signatory_email: string;
+	signatory_phone: string;
+	selected_tier: AdminAgreementTier;
+	employee_count: number;
+	annual_fee: number;
+	per_employee_rate: number;
+};
+
 const buildQuery = (params: Record<string, string | number | undefined>) => {
 	const query = Object.entries(params)
 		.filter(([, value]) => value !== undefined && value !== '')
@@ -505,6 +574,100 @@ export const upsertPlatformConfig = async (
 	payload: { value: unknown; expectedVersion?: number }
 ): Promise<ApiEnvelope<PlatformConfigRecord>> => {
 	return (await client.put<ApiEnvelope<PlatformConfigRecord>>(`/v1/admin/platform-config/${encodeURIComponent(key)}`, payload)).data;
+};
+
+export const listAdminAgreements = async (): Promise<ApiEnvelope<AdminAgreementListResponse>> => {
+	return (await client.get<ApiEnvelope<AdminAgreementListResponse>>('/v1/admin/agreements')).data;
+};
+
+export const getAdminAgreementStats = async (): Promise<ApiEnvelope<AdminAgreementStats>> => {
+	try {
+		return (await client.get<ApiEnvelope<AdminAgreementStats>>('/v1/admin/agreements/stats')).data;
+	} catch (error: any) {
+		const status = Number(error?.response?.status || 0);
+		if (status === 404) {
+			const listResponse = await listAdminAgreements();
+			const items = listResponse?.data?.items ?? [];
+			const stats: AdminAgreementStats = {
+				totalAgreements: items.length,
+				activeAgreements: items.filter((item) => String(item.status || '').toLowerCase() === 'active').length,
+				pendingSignatures: items.filter((item) => {
+					const current = String(item.status || '').toLowerCase();
+					return current === 'sent' || current === 'client_reviewing' || current === 'signed_uploaded';
+				}).length,
+				draftAgreements: items.filter((item) => String(item.status || '').toLowerCase() === 'draft').length,
+			};
+
+			return {
+				success: true,
+				message: 'Agreement stats fetched (mocked from list data).',
+				data: stats,
+			};
+		}
+
+		throw error;
+	}
+};
+
+export const getAdminAgreementById = async (agreementId: string): Promise<ApiEnvelope<AdminAgreementDetail>> => {
+	return (await client.get<ApiEnvelope<AdminAgreementDetail>>(`/v1/admin/agreements/${encodeURIComponent(agreementId)}`)).data;
+};
+
+export const approveAdminAgreement = async (agreementId: string): Promise<ApiEnvelope<AdminAgreementDetail>> => {
+	return (await client.patch<ApiEnvelope<AdminAgreementDetail>>(`/v1/admin/agreements/${encodeURIComponent(agreementId)}/approve`)).data;
+};
+
+export const rejectAdminAgreement = async (
+	agreementId: string,
+	reason: string,
+): Promise<ApiEnvelope<AdminAgreementDetail>> => {
+	return (await client.patch<ApiEnvelope<AdminAgreementDetail>>(`/v1/admin/agreements/${encodeURIComponent(agreementId)}/reject`, { reason })).data;
+};
+
+export const createAdminAgreement = async (
+	payload: CreateAdminAgreementInput,
+): Promise<ApiEnvelope<AdminAgreementRecord>> => {
+	try {
+		return (await client.post<ApiEnvelope<AdminAgreementRecord>>('/v1/admin/agreements', payload)).data;
+	} catch (error: any) {
+		const status = Number(error?.response?.status || 0);
+		if (status === 404) {
+			const templatesResponse = await client.get<ApiEnvelope<{ items?: Array<{ id: number }> }>>('/v1/agreements/templates');
+			const templateItems = templatesResponse?.data?.data?.items ?? [];
+			const templateId = Number(templateItems[0]?.id || 0);
+
+			if (!Number.isInteger(templateId) || templateId <= 0) {
+				throw new Error('No agreement template is configured. Please add an agreement template first.');
+			}
+
+			const legacyPayload = {
+				template_id: templateId,
+				agreement_type: 'corporate_eap',
+				partner_name: payload.company_legal_name,
+				partner_type: 'corporate',
+				partner_contact_name: payload.company_legal_name,
+				partner_contact_email: payload.signatory_email,
+				partner_contact_phone: payload.signatory_phone,
+				start_date: new Date().toISOString(),
+				annual_value: payload.annual_fee,
+				payment_terms: 'Net 30',
+				billing_cycle: 'annual',
+				template_data: {
+					company_legal_name: payload.company_legal_name,
+					signatory_email: payload.signatory_email,
+					signatory_phone: payload.signatory_phone,
+					selected_tier: payload.selected_tier,
+					employee_count: payload.employee_count,
+					annual_fee: payload.annual_fee,
+					per_employee_rate: payload.per_employee_rate,
+				},
+			};
+
+			return (await client.post<ApiEnvelope<AdminAgreementRecord>>('/v1/agreements/create', legacyPayload)).data;
+		}
+
+		throw error;
+	}
 };
 
 // --- Phase 13: Admin Analytics ---

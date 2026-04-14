@@ -21,14 +21,24 @@ import { cleanupIdempotencyKeys } from './services/idempotency.service';
 import { ensureSuperadminFromEnv } from './services/superadmin-bootstrap.service';
 
 const startServer = async (): Promise<void> => {
-	await connectDatabase();
-	await ensureSuperadminFromEnv();
+	let databaseReady = false;
+	try {
+		await connectDatabase();
+		databaseReady = true;
+	} catch (error) {
+		console.error('Database connection failed. Starting in degraded mode.', error);
+	}
+
+	if (databaseReady) {
+		await ensureSuperadminFromEnv();
+	}
 
 	// Initialize PhonePe OAuth token refresh (proactive background refresh)
 	await initializePhonePeTokenRefresh();
 
-	// ensure SSO tables exist
-	void ensureSsoTables().catch((err) => {
+	// ensure SSO tables exist only when DB is reachable
+	if (databaseReady) {
+		void ensureSsoTables().catch((err) => {
 			const code = String((err as any)?.code || '');
 			const message = String((err as any)?.message || '').toLowerCase();
 			const transientSocketClose = code === 'UND_ERR_SOCKET' || message.includes('other side closed');
@@ -43,6 +53,7 @@ const startServer = async (): Promise<void> => {
 			}
 			console.error('SSO table init failed', err);
 		});
+	}
 
 	const server = app.listen(env.port, () => {
 		console.log(`Server running on port ${env.port}`);
