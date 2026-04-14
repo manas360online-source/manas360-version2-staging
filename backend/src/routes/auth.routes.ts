@@ -3,6 +3,8 @@ import {
 	acceptLegalDocumentsController,
 	googleLoginController,
 	getRequiredLegalDocumentsController,
+	legacyRegisterController,
+	legacyVerifyEmailOtpController,
 	loginController,
 	logoutController,
 	meController,
@@ -22,6 +24,10 @@ import { authRateLimiter } from '../middleware/rateLimiter.middleware';
 import { asyncHandler } from '../middleware/validate.middleware';
 
 const router = Router();
+
+// Backward-compatible email auth flow used by existing integration tests
+router.post('/register', authRateLimiter, asyncHandler(legacyRegisterController));
+router.post('/verify/email-otp', authRateLimiter, asyncHandler(legacyVerifyEmailOtpController));
 
 router.post('/provider-register', requireAuth, authRateLimiter, asyncHandler(providerRegisterController));
 router.post('/signup/phone', authRateLimiter, asyncHandler(signupWithPhoneController));

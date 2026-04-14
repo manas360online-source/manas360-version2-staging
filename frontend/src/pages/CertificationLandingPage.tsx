@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { JourneyMap } from '../components/CertificationJourneyMap';
 import { CERTIFICATIONS } from '../CertificationConstants';
 import { CardSkeleton } from '../components/CertificationSkeleton';
 import { SEO } from '../components/CertificationSEO';
+import { useAuth } from '../context/AuthContext';
 
 export const CertificationLandingPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
 
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 800);
@@ -35,6 +38,23 @@ export const CertificationLandingPage: React.FC = () => {
           <p className="text-xl md:text-2xl text-slate-300 max-w-3xl mx-auto mb-16 font-medium leading-relaxed animate-fade-in [animation-delay:200ms]">
             Choose from 6 specialized tracks designed to take you from a community champion to a professional consciousness master.
           </p>
+
+          {!user && (
+            <div className="flex flex-wrap justify-center gap-3 mb-10 animate-fade-in [animation-delay:260ms]">
+              <Link
+                to="/auth/login?next=/certifications"
+                className="px-6 py-3 rounded-xl border border-white/40 text-white font-bold hover:bg-white/10"
+              >
+                Login
+              </Link>
+              <Link
+                to="/auth/signup?next=/certifications"
+                className="px-6 py-3 rounded-xl bg-white text-slate-900 font-bold hover:bg-slate-100"
+              >
+                Register
+              </Link>
+            </div>
+          )}
           
           <div className="flex flex-wrap justify-center gap-8 mt-4 animate-fade-in [animation-delay:400ms]">
             {[

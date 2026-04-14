@@ -20,8 +20,17 @@ import { cleanupIdempotencyKeys } from './services/idempotency.service';
 import { ensureSuperadminFromEnv } from './services/superadmin-bootstrap.service';
 
 const startServer = async (): Promise<void> => {
-	await connectDatabase();
-	await ensureSuperadminFromEnv();
+	let databaseReady = false;
+	try {
+		await connectDatabase();
+		databaseReady = true;
+	} catch (error) {
+		console.error('Database connection failed. Starting in degraded mode.', error);
+	}
+
+	if (databaseReady) {
+		await ensureSuperadminFromEnv();
+	}
 
 	// Initialize PhonePe OAuth token refresh (proactive background refresh)
 	await initializePhonePeTokenRefresh();

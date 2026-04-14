@@ -1,97 +1,61 @@
 import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import {
-  ShieldCheck, CheckCircle, ArrowLeft,
-  User, Mail, Phone, MapPin, GraduationCap, MessageSquare,
-  AlertCircle, Loader2,
+  ShieldCheck, CheckCircle, ArrowLeft, Calendar,
+  User, Phone, AlertCircle, Loader2, FastForward
 } from 'lucide-react';
-
-interface FormData {
-  fullName: string;
-  email: string;
-  mobile: string;
-  city: string;
-  education: string;
-  motivation: string;
-}
+import { useAuth } from '../context/AuthContext';
+import { getApiErrorMessage, signupWithPhone, verifyPhoneSignupOtp } from '../api/auth';
 
 const EnrollmentRegistrationPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { slug: routeSlug } = useParams<{ slug: string }>();
+  const { user, checkAuth } = useAuth();
 
   const certName = (location.state as any)?.certName || 'Certification Program';
   const price = (location.state as any)?.price || 'Free';
-  const slug = (location.state as any)?.slug;
+  const slug = routeSlug || (location.state as any)?.slug;
+  const normalizedRole = String(user?.role || '').toLowerCase();
+  const isLoggedInProvider = ['learner', 'therapist', 'psychiatrist', 'psychologist', 'coach'].includes(normalizedRole);
+  const isAuthenticated = Boolean(user);
+  const providerName = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.email || 'Provider';
+
 
   const [processing, setProcessing] = useState(false);
   const [generalError, setGeneralError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof FormData, string>>>({});
+  const [fullName, setFullName] = useState('');
+  const [mobile, setMobile] = useState('');
+  const [otp, setOtp] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [devOtp, setDevOtp] = useState<string | null>(null);
+  const [paymentPlan, setPaymentPlan] = useState<'full' | 'installment'>('full');
 
-  const [form, setForm] = useState<FormData>({
-    fullName: '', email: '', mobile: '',
-    city: '', education: '', motivation: '',
-  });
+  const validateMobile = (value: string): boolean => value.replace(/\D/g, '').length >= 10;
 
-  const validate = (): boolean => {
-    const errors: Partial<Record<keyof FormData, string>> = {};
-
-    if (!form.fullName.trim())
-      errors.fullName = 'Full name is required.';
-
-    if (!form.email.trim())
-      errors.email = 'Email is required.';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
-      errors.email = 'Please enter a valid email address.';
-
-    if (!form.mobile.trim())
-      errors.mobile = 'Mobile number is required.';
-    else if (form.mobile.replace(/\D/g, '').length < 10)
-      errors.mobile = 'Please enter a valid 10-digit mobile number.';
-
-    if (!form.city.trim())
-      errors.city = 'City is required.';
-
-    if (!form.education)
-      errors.education = 'Please select your education level.';
-
-    setFieldErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value } = e.target;
-    setForm(prev => ({ ...prev, [name]: value }));
-    if (fieldErrors[name as keyof FormData]) {
-      setFieldErrors(prev => ({ ...prev, [name]: undefined }));
+  const continueToCheckout = (input: { fullName?: string; mobile?: string }) => {
+    if (!slug) {
+      setGeneralError('Certification link is invalid. Please reopen from certification details.');
+      return;
     }
-    setGeneralError(null);
-  };
 
-  /**
-   * Navigate to the checkout page with form data in state.
-   * Enrollment is NOT saved here — CheckoutPage handles that
-   * after payment is confirmed, preventing the "already enrolled"
-   * redirect that was firing before.
-   */
-  const navigateToCheckout = () => {
-    navigate(`/checkout/${slug}`, {
+    const query = paymentPlan === 'installment' ? '?plan=installment' : '?plan=full';
+    const inProviderShell = location.pathname.startsWith('/provider');
+    const checkoutPath = inProviderShell ? `/provider/checkout/${slug}${query}` : `/checkout/${slug}${query}`;
+    navigate(checkoutPath, {
       state: {
-        fullName: form.fullName.trim(),
-        email: form.email.trim(),
-        mobile: form.mobile.trim(),
-        city: form.city.trim(),
-        education: form.education,
-        motivation: form.motivation.trim(),
         certName,
         slug,
         price,
+        fullName: String(input.fullName || '').trim() || providerName,
+        mobile: String(input.mobile || '').trim() || undefined,
+        paymentPlan,
+        installmentCount: paymentPlan === 'installment' ? 3 : 1,
       },
     });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
 
@@ -100,12 +64,49 @@ const EnrollmentRegistrationPage: React.FC = () => {
     navigateToCheckout();
   };
 
-  const inputClass = (field: keyof FormData) =>
-    `w-full pl-9 pr-4 py-2.5 border rounded-lg text-sm text-slate-800 placeholder-slate-400
-     focus:outline-none focus:ring-1 transition
-     ${fieldErrors[field]
-      ? 'border-red-400 focus:border-red-400 focus:ring-red-200'
-      : 'border-slate-200 focus:border-purple-400 focus:ring-purple-200'}`;
+  const handleVerifyOtpAndEnroll = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setGeneralError(null);
+
+    if (!otp.trim()) {
+      setGeneralError('Please enter the OTP sent to your phone.');
+      return;
+    }
+
+    setProcessing(true);
+    try {
+      await verifyPhoneSignupOtp(mobile, otp.trim(), { acceptedTerms: true });
+      await checkAuth({ force: true });
+      continueToCheckout({ fullName, mobile });
+    } catch (error: any) {
+      setGeneralError(getApiErrorMessage(error, 'OTP verification failed. Please try again.'));
+      setProcessing(false);
+    }
+  };
+
+  const handleQuickEnroll = async () => {
+    setProcessing(true);
+    setGeneralError(null);
+
+    const quickMobile = (user?.phone || '').trim();
+    if (!quickMobile) {
+      setGeneralError('Your account is missing a phone number. Please enter mobile number below to continue.');
+      setProcessing(false);
+      return;
+    }
+
+    if (!slug) {
+      setGeneralError('Certification link is invalid. Please reopen enrollment from certification details.');
+      setProcessing(false);
+      return;
+    }
+
+    continueToCheckout({
+      fullName: providerName,
+      mobile: quickMobile,
+    });
+    setProcessing(false);
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 py-12 px-4">
@@ -130,7 +131,6 @@ const EnrollmentRegistrationPage: React.FC = () => {
           </div>
 
           <div className="p-6">
-
             {generalError && (
               <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl p-3 mb-5">
                 <AlertCircle size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
@@ -138,126 +138,125 @@ const EnrollmentRegistrationPage: React.FC = () => {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+            {isAuthenticated ? (
+              <div className="text-center py-6">
+                 <div className="mx-auto w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center mb-4">
+                    <FastForward className="text-teal-600 w-8 h-8" />
+                 </div>
+                 <h2 className="text-xl font-bold text-slate-800 mb-2">Welcome Back, {providerName}!</h2>
+                 <p className="text-slate-500 text-sm mb-6">
+                  {isLoggedInProvider
+                   ? "You're already logged in as a provider. Skip auth and enroll instantly."
+                   : 'You are already logged in. Continue with quick enrollment.'}
+                 </p>
+                 
+                 <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 text-left mb-6">
+                    <div className="flex justify-between items-center mb-2">
+                       <span className="font-bold text-slate-800 text-sm">Program Fee</span>
+                       <span className="font-bold text-purple-600 text-base">{price}</span>
+                    </div>
+                    <div className="text-xs text-slate-500 flex items-center gap-2">
+                       <ShieldCheck size={14} className="text-teal-500" />
+                       Includes +30 Lead Match Boost after clinical verification
+                    </div>
+                 </div>
 
-              {/* Full Name */}
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">
-                  Full Name
-                </label>
-                <div className="relative">
-                  <User size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text" name="fullName" required
-                    placeholder="Enter your full name"
-                    value={form.fullName} onChange={handleChange}
-                    className={inputClass('fullName')}
-                  />
-                </div>
-                {fieldErrors.fullName && (
-                  <p className="text-red-500 text-xs mt-1">{fieldErrors.fullName}</p>
-                )}
+                 <div className="grid grid-cols-2 gap-2 mb-5">
+                    <button
+                      type="button"
+                      onClick={() => setPaymentPlan('full')}
+                      className={`rounded-lg border px-3 py-2 text-xs font-bold ${paymentPlan === 'full' ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-slate-200 text-slate-600'}`}
+                    >
+                      Pay Full
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPaymentPlan('installment')}
+                      className={`rounded-lg border px-3 py-2 text-xs font-bold flex items-center justify-center gap-1 ${paymentPlan === 'installment' ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-slate-200 text-slate-600'}`}
+                    >
+                      <Calendar size={12} /> Installments
+                    </button>
+                 </div>
+
+                 <button
+                    onClick={handleQuickEnroll}
+                    disabled={processing}
+                    className="w-full bg-gradient-to-r from-teal-500 to-purple-600 text-white font-bold py-4 rounded-xl shadow-md hover:shadow-lg hover:scale-[1.01] transition-all text-sm disabled:opacity-60 flex items-center justify-center gap-2"
+                 >
+                    {processing ? <><Loader2 size={16} className="animate-spin" /> Preparing Checkout...</> : `Confirm & Pay ${price} →`}
+                 </button>
               </div>
-
-              {/* Email */}
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">
-                  Email
-                </label>
-                <div className="relative">
-                  <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="email" name="email" required
-                    placeholder="your@email.com"
-                    value={form.email} onChange={handleChange}
-                    className={inputClass('email')}
-                  />
-                </div>
-                {fieldErrors.email && (
-                  <p className="text-red-500 text-xs mt-1">{fieldErrors.email}</p>
-                )}
-              </div>
-
-              {/* Mobile */}
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">
-                  Mobile
-                </label>
-                <div className="relative">
-                  <Phone size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="tel" name="mobile" required
-                    placeholder="+91 XXXXX XXXXX"
-                    value={form.mobile} onChange={handleChange}
-                    className={inputClass('mobile')}
-                  />
-                </div>
-                {fieldErrors.mobile && (
-                  <p className="text-red-500 text-xs mt-1">{fieldErrors.mobile}</p>
-                )}
-              </div>
-
-              {/* City + Education */}
-              <div className="grid grid-cols-2 gap-3">
+            ) : (
+              <form onSubmit={otpSent ? handleVerifyOtpAndEnroll : handleSendOtp} className="space-y-4" noValidate>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">
-                    City
+                    Full Name (Optional)
                   </label>
                   <div className="relative">
-                    <MapPin size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <User size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
-                      type="text" name="city" required
-                      placeholder="Your city"
-                      value={form.city} onChange={handleChange}
-                      className={inputClass('city')}
+                      type="text"
+                      placeholder="Enter your full name"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-200 transition"
                     />
                   </div>
-                  {fieldErrors.city && (
-                    <p className="text-red-500 text-xs mt-1">{fieldErrors.city}</p>
-                  )}
                 </div>
+
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">
-                    Education
+                    Mobile Number
                   </label>
                   <div className="relative">
-                    <GraduationCap size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <select
-                      name="education" required
-                      value={form.education} onChange={handleChange}
-                      className={`${inputClass('education')} appearance-none bg-white`}
-                    >
-                      <option value="" disabled>Select</option>
-                      <option value="undergraduate">Undergraduate</option>
-                      <option value="graduate">Graduate</option>
-                      <option value="postgraduate">Postgraduate</option>
-                      <option value="doctorate">Doctorate</option>
-                      <option value="other">Other</option>
-                    </select>
+                    <Phone size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="tel"
+                      required
+                      placeholder="+91 XXXXX XXXXX"
+                      value={mobile}
+                      onChange={(e) => setMobile(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-200 transition"
+                    />
                   </div>
-                  {fieldErrors.education && (
-                    <p className="text-red-500 text-xs mt-1">{fieldErrors.education}</p>
-                  )}
                 </div>
-              </div>
 
-              {/* Motivation */}
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">
-                  Why do you want to become a coach?{' '}
-                  <span className="text-slate-400 normal-case font-normal">(optional)</span>
-                </label>
-                <div className="relative">
-                  <MessageSquare size={15} className="absolute left-3 top-3 text-slate-400" />
-                  <textarea
-                    name="motivation"
-                    placeholder="Share your motivation..."
-                    value={form.motivation} onChange={handleChange}
-                    rows={3}
-                    className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-200 transition resize-none"
-                  />
+                {otpSent && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">
+                      OTP
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={6}
+                      placeholder="Enter 6-digit OTP"
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-200 transition"
+                    />
+                    {devOtp && (
+                      <p className="text-[11px] text-amber-700 mt-2">Dev OTP: {devOtp}</p>
+                    )}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-2 mb-1">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentPlan('full')}
+                    className={`rounded-lg border px-3 py-2 text-xs font-bold ${paymentPlan === 'full' ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-slate-200 text-slate-600'}`}
+                  >
+                    Pay Full
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentPlan('installment')}
+                    className={`rounded-lg border px-3 py-2 text-xs font-bold flex items-center justify-center gap-1 ${paymentPlan === 'installment' ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-slate-200 text-slate-600'}`}
+                  >
+                    <Calendar size={12} /> Installments
+                  </button>
                 </div>
-              </div>
 
               {/* Fee Summary */}
               <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
@@ -297,14 +296,26 @@ const EnrollmentRegistrationPage: React.FC = () => {
                 {processing ? (
                   <>
                     <Loader2 size={16} className="animate-spin" />
-                    Saving your details...
+                    {otpSent ? 'Verifying OTP...' : 'Sending OTP...'}
                   </>
                 ) : (
-                  `Pay ${price} & Enroll →`
+                  otpSent ? `Verify OTP & Pay ${price} ->` : 'Get OTP to Continue'
                 )}
               </button>
 
+              {otpSent && (
+                <button
+                  type="button"
+                  onClick={handleSendOtp}
+                  disabled={processing}
+                  className="w-full text-xs text-slate-500 hover:text-slate-700 font-semibold"
+                >
+                  Resend OTP
+                </button>
+              )}
+
             </form>
+            )}
           </div>
         </div>
       </div>

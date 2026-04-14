@@ -592,7 +592,7 @@ export const createPsychiatricAssessment = async (userId: string, payload: any) 
     const id = randomUUID();
     await tx.$executeRaw`
     INSERT INTO psychiatric_assessments (
-      id, "psychiatristId", "patientId", chief_complaint, symptoms, duration_weeks,
+      id, psychiatrist_id, patient_id, chief_complaint, symptoms, duration_weeks,
       medical_history, lab_results, clinical_impression, severity, status, created_at, updated_at
     ) VALUES (
       ${id},${userId},${patientId},${String(payload.chiefComplaint || '').trim()},
@@ -615,8 +615,8 @@ export const listPsychiatricAssessments = async (userId: string, patientId?: str
   await assertPsychiatrist(userId);
 
   const rows = patientId
-    ? await prisma.$queryRaw`SELECT * FROM psychiatric_assessments WHERE "psychiatristId" = ${userId} AND "patientId" = ${patientId} ORDER BY created_at DESC LIMIT 100`
-    : await prisma.$queryRaw`SELECT * FROM psychiatric_assessments WHERE "psychiatristId" = ${userId} ORDER BY created_at DESC LIMIT 100`;
+    ? await prisma.$queryRaw`SELECT * FROM psychiatric_assessments WHERE psychiatrist_id = ${userId} AND patient_id = ${patientId} ORDER BY created_at DESC LIMIT 100`
+    : await prisma.$queryRaw`SELECT * FROM psychiatric_assessments WHERE psychiatrist_id = ${userId} ORDER BY created_at DESC LIMIT 100`;
 
   return { items: rows };
 };

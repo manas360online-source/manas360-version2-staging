@@ -86,6 +86,9 @@ const AuditTrail = lazy(() => import('./pages/admin/AuditTrail'));
 const GroupManagement = lazy(() => import('./pages/admin/GroupManagement'));
 const QrCodeManager = lazy(() => import('./pages/admin/QrCodeManager'));
 const TherapistPerformance = lazy(() => import('./pages/admin/TherapistPerformance'));
+const AgreementsPage = lazy(() => import('./pages/admin/AgreementsPage'));
+const AgreementDetailPage = lazy(() => import('./pages/admin/AgreementDetailPage'));
+const ClientAgreementPage = lazy(() => import('./pages/admin/ClientAgreementPage'));
 const SessionAnalytics = lazy(() => import('./pages/admin/SessionAnalytics'));
 const UserGrowthAnalytics = lazy(() => import('./pages/admin/UserGrowthAnalytics'));
 const RoleManagement = lazy(() => import('./pages/admin/RoleManagement'));
@@ -166,7 +169,6 @@ const CertificationAssignmentPage = lazy(() => import('./pages/CertificationAssi
 const CertificationQuizPage = lazy(() => import('./pages/CertificationQuizPage').then(m => ({ default: m.CertificationQuizPage })));
 const CertificationCertificatePage = lazy(() => import('./pages/CertificationCertificatePage'));
 const CertificateVerificationPage = lazy(() => import('./pages/CertificateVerificationPage'));
-const LeadBoastDashboard = lazy(() => import('./pages/LeadBoastDashboard'));
 
 interface AssessmentData {
   symptoms?: string[];
@@ -253,7 +255,9 @@ function App() {
               <Route path="/certifications/details" element={<CertificationsPage />} />
               <Route path="/my-certifications" element={<MyCertificationsPage />} />
               <Route path="/checkout/:slug" element={<CheckoutPage />} />
+              <Route path="/certification/enroll/:slug" element={<EnrollmentRegistrationPage />} />
               <Route path="/registration" element={<EnrollmentRegistrationPage />} />
+              <Route path="/enrollment-registration" element={<EnrollmentRegistrationPage />} />
               <Route path="/payment-success" element={<PaymentSuccessPage />} />
               <Route path="/payment-failed" element={<PaymentFailedPage />} />
               <Route path="/journey" element={<JourneyWireframePage />} />
@@ -267,7 +271,7 @@ function App() {
               <Route path="/certifications/assignments/:assignmentId" element={<CertificationAssignmentPage />} />
               <Route path="/certifications/quiz/:enrollmentId" element={<CertificationQuizPage />} />
               <Route path="/certifications/certificate/:enrollmentId" element={<CertificationCertificatePage />} />
-              <Route path="/dashboard" element={<LeadBoastDashboard />} />
+              <Route path="/dashboard" element={<Navigate to="/certifications" replace />} />
             </Route>
 
             <Route path="/results" element={<ResultsPage data={assessmentData} />} />
@@ -299,7 +303,7 @@ function App() {
             <Route
               path="/provider"
               element={
-                <ProtectedRoute allowedRoles={['therapist', 'psychiatrist', 'psychologist', 'coach']}>
+                <ProtectedRoute allowedRoles={['learner', 'therapist', 'psychiatrist', 'psychologist', 'coach']}>
                   <HubLayout />
                 </ProtectedRoute>
               }
@@ -329,6 +333,11 @@ function App() {
               <Route path="goals" element={<Navigate to="patient/123/goals" replace />} />
               <Route path="earnings" element={<ProviderEarningsPage />} />
               <Route path="appointments" element={<AppointmentRequestsPage />} />
+              <Route path="certifications" element={<CertificationLandingPage />} />
+              <Route path="certifications/:slug" element={<CertificationDetailsPage />} />
+              <Route path="certification/enroll/:slug" element={<EnrollmentRegistrationPage />} />
+              <Route path="checkout/:slug" element={<CheckoutPage />} />
+              <Route path="my-certifications" element={<MyCertificationsPage />} />
               <Route path="subscription" element={<ProviderSubscriptionPage />} />
               <Route path="platform-payment" element={<Navigate to="/provider/subscription" replace />} />
               <Route path="plans" element={<ProviderSubscriptionPage />} />
@@ -343,7 +352,7 @@ function App() {
             <Route
               path="/onboarding/provider-setup"
               element={
-                <ProtectedRoute allowedRoles={['therapist', 'psychiatrist', 'psychologist', 'coach']}>
+                <ProtectedRoute allowedRoles={['learner', 'therapist', 'psychiatrist', 'psychologist', 'coach']}>
                   <ProviderOnboardingPage />
                 </ProtectedRoute>
               }
@@ -515,6 +524,10 @@ function App() {
                 <Route path="operations/groups" element={<GroupManagement />} />
                 <Route path="operations/qr" element={<QrCodeManager />} />
                 <Route path="operations/crisis" element={<CrisisConsole />} />
+                  <Route path="operations/agreements" element={<AgreementsPage />} />
+                <Route path="operations/agreements/client" element={<ClientAgreementPage />} />
+                <Route path="operations/agreements/:agreementId" element={<AgreementDetailPage />} />
+                <Route path="operations/agreements/:agreementId/client" element={<ClientAgreementPage />} />
 
                 <Route path="intelligence/platform-analytics" element={<PlatformAnalytics />} />
                 <Route path="intelligence/user-growth" element={<UserGrowthAnalytics />} />
@@ -654,8 +667,6 @@ function App() {
               <Route path="checkout" element={<Navigate to="/checkout" replace />} />
               <Route path="confirmation" element={<Navigate to="/confirmation" replace />} />
               <Route path="check-in" element={<DailyCheckInPage />} />
-              <Route path="game" element={<HitASixerGamePage />} />
-              <Route path="hit-a-sixer" element={<HitASixerGamePage />} />
               <Route path="wallet" element={<WalletPage />} />
               <Route path="group-therapy" element={<GroupTherapySessionsPage />} />
             </Route>

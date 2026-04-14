@@ -59,13 +59,13 @@ export const validateOtp = (value: unknown): string => {
 	return otp;
 };
 
-export const validatePublicSignupRole = (value: unknown): 'patient' | 'therapist' | 'psychiatrist' | 'psychologist' | 'coach' => {
+export const validatePublicSignupRole = (value: unknown): 'patient' | 'learner' | 'therapist' | 'psychiatrist' | 'psychologist' | 'coach' => {
 	const role = assertString(value, 'role').toLowerCase();
 
-	if (role === 'patient' || role === 'therapist' || role === 'psychiatrist' || role === 'psychologist' || role === 'coach') {
+	if (role === 'patient' || role === 'learner' || role === 'therapist' || role === 'psychiatrist' || role === 'psychologist' || role === 'coach') {
 		return role;
 	}
 
-	throw new AppError('Invalid role. Allowed roles: patient, therapist, psychiatrist, psychologist, coach', 400);
+	throw new AppError('Invalid role. Allowed roles: patient, learner, therapist, psychiatrist, psychologist, coach', 400);
 };
 

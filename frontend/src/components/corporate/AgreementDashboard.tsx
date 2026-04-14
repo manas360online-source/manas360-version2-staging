@@ -10,8 +10,13 @@ type AgreementItem = {
   partner_type?: string;
   annual_value?: number | null;
   status?: string;
+  signed_date?: string | null;
+  signedDate?: string | null;
   signature_status?: string;
   generated_pdf_path?: string | null;
+  qr_code_url?: string | null;
+  qr_url?: string | null;
+  qrUrl?: string | null;
 };
 
 type AgreementListResponse = {
@@ -69,6 +74,31 @@ const toTitleCase = (value: string | undefined): string => {
     .replace(/\b\w/g, (ch) => ch.toUpperCase());
 };
 
+const formatSignatureStatus = (value: string | undefined): string => {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'signed') return 'Signed';
+  if (normalized === 'sent' || normalized === 'pending' || normalized === 'pending_signature') return 'Sent';
+  if (normalized === 'draft') return 'Draft';
+  if (!normalized) return '-';
+  return toTitleCase(normalized);
+};
+
+const hasSignedDate = (item: AgreementItem): boolean => {
+  const signedDate = String(item.signed_date || item.signedDate || '').trim();
+  return signedDate.length > 0;
+};
+
+const getDerivedStatusLabel = (item: AgreementItem): 'Active' | 'Pending Signature' => {
+  return hasSignedDate(item) ? 'Active' : 'Pending Signature';
+};
+
+const getStatusBadgeClassName = (statusLabel: 'Active' | 'Pending Signature'): string => {
+  if (statusLabel === 'Active') {
+    return 'inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800';
+  }
+  return 'inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800';
+};
+
 const getPendingSignatureCount = (agreements: AgreementItem[]): number => {
   return agreements.filter((item) => {
     const signatureStatus = String(item.signature_status || '').toLowerCase();
@@ -104,6 +134,7 @@ export default function AgreementDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [createdQrUrl, setCreatedQrUrl] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<Record<number, string>>({});
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
@@ -149,7 +180,7 @@ export default function AgreementDashboard() {
 
     const totalAgreements = mergedAgreements.length;
     const pendingSignatures = getPendingSignatureCount(mergedAgreements);
-    const activeAgreements = mergedAgreements.filter((item) => String(item.status || '').toLowerCase() === 'active').length;
+    const activeAgreements = mergedAgreements.filter((item) => getDerivedStatusLabel(item) === 'Active').length;
 
     return {
       totalAgreements,
@@ -161,6 +192,7 @@ export default function AgreementDashboard() {
   const withRowAction = async (agreementId: number, actionName: string, action: () => Promise<void>) => {
     setActionLoading((prev) => ({ ...prev, [agreementId]: actionName }));
     setActionMessage(null);
+    setCreatedQrUrl(null);
     if (actionName === 'send') {
       updateAgreementRow(agreementId, (item) => ({
         ...item,
@@ -246,6 +278,7 @@ export default function AgreementDashboard() {
                   const isSigned = String(item.signature_status || '').toLowerCase() === 'signed';
                   const pdfPath = String(item.generated_pdf_path || '').trim();
                   const canViewPdf = pdfPath.length > 0;
+                  const statusLabel = getDerivedStatusLabel(item);
 
                   return (
                     <tr key={item.id}>
@@ -253,8 +286,10 @@ export default function AgreementDashboard() {
                       <td className="px-4 py-3 text-ink-800">{item.partner_name || '-'}</td>
                       <td className="px-4 py-3 text-ink-700">{toTitleCase(item.partner_type)}</td>
                       <td className="px-4 py-3 text-ink-700">{formatCurrency(item.annual_value)}</td>
-                      <td className="px-4 py-3 text-ink-700">{toTitleCase(item.status)}</td>
-                      <td className="px-4 py-3 text-ink-700">{toTitleCase(item.signature_status)}</td>
+                      <td className="px-4 py-3 text-ink-700">
+                        <span className={getStatusBadgeClassName(statusLabel)}>{statusLabel}</span>
+                      </td>
+                      <td className="px-4 py-3 text-ink-700">{formatSignatureStatus(item.signature_status)}</td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-2">
                           <Button
@@ -307,9 +342,31 @@ export default function AgreementDashboard() {
       </div>
 
       {actionMessage ? (
-        <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-          {actionMessage}
-        </p>
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-800">
+          <p>{actionMessage}</p>
+          {createdQrUrl ? (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <a
+                href={createdQrUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-emerald-800 underline underline-offset-2 break-all"
+              >
+                {createdQrUrl}
+              </a>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  window.open(createdQrUrl, '_blank', 'noopener,noreferrer');
+                }}
+              >
+                View QR
+              </Button>
+            </div>
+          ) : null}
+        </div>
       ) : null}
 
       {error ? (
@@ -320,6 +377,13 @@ export default function AgreementDashboard() {
         isOpen={createModalOpen}
         onClose={() => setCreateModalOpen(false)}
         onSuccess={(createdAgreement) => {
+          const qrUrl = String(
+            (createdAgreement as any)?.qr_code_url ||
+            (createdAgreement as any)?.qr_url ||
+            (createdAgreement as any)?.qrUrl ||
+            '',
+          ).trim();
+
           if (createdAgreement) {
             setLocalCreatedAgreements((prev) => {
               if (prev.some((item) => item.agreement_number === createdAgreement.agreement_number)) {
@@ -327,9 +391,12 @@ export default function AgreementDashboard() {
               }
               return [createdAgreement as AgreementItem, ...prev];
             });
+            setActionMessage(`Agreement ${createdAgreement.agreement_number || ''} created successfully.`.trim());
+            setCreatedQrUrl(qrUrl || null);
           }
           // Keep server state in sync when API succeeds.
           void loadAgreements();
+          setCreateModalOpen(false);
         }}
       />
     </div>

@@ -50,139 +50,44 @@ export const getPlanController = async (req: Request, res: Response): Promise<vo
  * Get provider lead plan details
  */
 async function getProviderPlan(planId: string) {
-	// TODO: Replace with actual database query to ProviderSubscriptionPlan or similar table
-	// For now, return mock data structure
+	// Fetch from ProviderPlanConfig (JSON 'data' field)
+	const config = await prisma.providerPlanConfig.findFirst({
+		orderBy: { createdAt: 'desc' }
+	});
 
-	const plans: Record<string, any> = {
-		'lead-free': {
-			id: 'lead-free',
-			name: 'Free Plan',
-			description: 'Profile only access',
-			baseAmount: 0,
-			gstPercentage: 18,
-			features: [
-				'Basic profile',
-				'Profile visibility',
-				'No marketplace access',
-			],
-			validityDays: null,
-		},
-		'lead-basic': {
-			id: 'lead-basic',
-			name: 'Basic Plan',
-			description: 'Get started with lead distribution',
-			baseAmount: 99,
-			gstPercentage: 18,
-			features: [
-				'Up to 10 leads per month',
-				'Email support',
-				'Basic analytics',
-			],
-			validityDays: 30,
-		},
-		'lead-standard': {
-			id: 'lead-standard',
-			name: 'Standard Plan',
-			description: 'Scale your business',
-			baseAmount: 299,
-			gstPercentage: 18,
-			features: [
-				'Up to 50 leads per month',
-				'Priority email support',
-				'Advanced analytics',
-				'Lead filtering',
-			],
-			validityDays: 30,
-		},
-		'lead-premium': {
-			id: 'lead-premium',
-			name: 'Premium Plan',
-			description: 'Maximize your reach',
-			baseAmount: 599,
-			gstPercentage: 18,
-			features: [
-				'Unlimited leads',
-				'24/7 phone support',
-				'Real-time analytics',
-				'Lead filtering',
-				'Priority placement',
-			],
-			validityDays: 30,
-		},
+	if (config && typeof config.data === 'object' && config.data !== null) {
+		const plans = config.data as Record<string, any>;
+		return plans[planId] || null;
+	}
+
+	// Fallback to minimal mock if DB is empty
+	const fallbackPlans: Record<string, any> = {
+		'lead-free': { id: 'lead-free', name: 'Free Plan', baseAmount: 0, gstPercentage: 18 },
+		'lead-basic': { id: 'lead-basic', name: 'Basic Plan', baseAmount: 99, gstPercentage: 18 },
 	};
-
-	return plans[planId] || null;
+	return fallbackPlans[planId] || null;
 }
 
 /**
  * Get patient subscription plan details
  */
 async function getPatientPlan(planId: string) {
-	// TODO: Replace with actual database query to PatientSubscriptionPlan or similar table
-	// For now, return mock data structure
+	// Fetch from PatientPlanConfig
+	const plan = await prisma.patientPlanConfig.findUnique({
+		where: { key: planId }
+	});
 
-	const plans: Record<string, any> = {
-		'patient-free': {
-			id: 'patient-free',
-			name: 'Free Plan',
-			description: 'Start your wellness journey',
-			baseAmount: 0,
+	if (plan) {
+		return {
+			id: plan.key,
+			name: plan.name,
+			baseAmount: plan.price,
 			gstPercentage: 18,
-			features: [
-				'Basic mood tracking',
-				'Community access',
-				'Limited resources',
-			],
-			validityDays: null, // No expiry
-		},
-		'patient-1month': {
-			id: 'patient-1month',
-			name: '1 Month Plan',
-			description: 'Premium access for 1 month',
-			baseAmount: 99,
-			gstPercentage: 18,
-			features: [
-				'Unlimited mood tracking',
-				'Personalized coaching',
-				'Premium resources',
-				'Session bookings',
-			],
-			validityDays: 30,
-		},
-		'patient-3month': {
-			id: 'patient-3month',
-			name: '3 Month Plan',
-			description: 'Premium access for 3 months',
-			baseAmount: 249,
-			gstPercentage: 18,
-			features: [
-				'Unlimited mood tracking',
-				'Personalized coaching',
-				'Premium resources',
-				'Session bookings',
-				'Priority support',
-			],
-			validityDays: 90,
-		},
-		'patient-1year': {
-			id: 'patient-1year',
-			name: '1 Year Plan',
-			description: 'Best value annual plan',
-			baseAmount: 799,
-			gstPercentage: 18,
-			features: [
-				'Unlimited mood tracking',
-				'Personalized coaching',
-				'Premium resources',
-				'Unlimited sessions',
-				'24/7 priority support',
-				'Exclusive events access',
-			],
-			validityDays: 365,
-		},
-	};
+			active: plan.active
+		};
+	}
 
-	return plans[planId] || null;
+	return null;
 }
 
 /**
@@ -215,93 +120,28 @@ export const getAllPlansController = async (req: Request, res: Response): Promis
 };
 
 async function getAllProviderPlans() {
-	const plans: Record<string, any> = {
-		'lead-free': {
-			id: 'lead-free',
-			name: 'Free Plan',
-			description: 'Profile only access',
-			baseAmount: 0,
-			gstPercentage: 18,
-			features: ['Basic profile', 'Profile visibility', 'No marketplace access'],
-			validityDays: null,
-		},
-		'lead-basic': {
-			id: 'lead-basic',
-			name: 'Basic Plan',
-			description: 'Get started with lead distribution',
-			baseAmount: 99,
-			gstPercentage: 18,
-			features: ['Up to 10 leads per month', 'Email support', 'Basic analytics'],
-			validityDays: 30,
-		},
-		'lead-standard': {
-			id: 'lead-standard',
-			name: 'Standard Plan',
-			description: 'Scale your business',
-			baseAmount: 299,
-			gstPercentage: 18,
-			features: ['Up to 50 leads per month', 'Priority email support', 'Advanced analytics', 'Lead filtering'],
-			validityDays: 30,
-		},
-		'lead-premium': {
-			id: 'lead-premium',
-			name: 'Premium Plan',
-			description: 'Maximize your reach',
-			baseAmount: 599,
-			gstPercentage: 18,
-			features: ['Unlimited leads', '24/7 phone support', 'Real-time analytics', 'Lead filtering', 'Priority placement'],
-			validityDays: 30,
-		},
-	};
+	const config = await prisma.providerPlanConfig.findFirst({
+		orderBy: { createdAt: 'desc' }
+	});
 
-	return Object.values(plans);
+	if (config && typeof config.data === 'object' && config.data !== null) {
+		const plans = config.data as Record<string, any>;
+		return Object.entries(plans).map(([id, details]) => ({ id, ...details }));
+	}
+
+	return [];
 }
 
 async function getAllPatientPlans() {
-	const plans: Record<string, any> = {
-		'patient-free': {
-			id: 'patient-free',
-			name: 'Free Plan',
-			description: 'Start your wellness journey',
-			baseAmount: 0,
-			gstPercentage: 18,
-			features: ['Basic mood tracking', 'Community access', 'Limited resources'],
-			validityDays: null,
-		},
-		'patient-1month': {
-			id: 'patient-1month',
-			name: '1 Month Plan',
-			description: 'Premium access for 1 month',
-			baseAmount: 99,
-			gstPercentage: 18,
-			features: ['Unlimited mood tracking', 'Personalized coaching', 'Premium resources', 'Session bookings'],
-			validityDays: 30,
-		},
-		'patient-3month': {
-			id: 'patient-3month',
-			name: '3 Month Plan',
-			description: 'Premium access for 3 months',
-			baseAmount: 249,
-			gstPercentage: 18,
-			features: ['Unlimited mood tracking', 'Personalized coaching', 'Premium resources', 'Session bookings', 'Priority support'],
-			validityDays: 90,
-		},
-		'patient-1year': {
-			id: 'patient-1year',
-			name: '1 Year Plan',
-			baseAmount: 799,
-			gstPercentage: 18,
-			features: [
-				'Unlimited mood tracking',
-				'Personalized coaching',
-				'Premium resources',
-				'Unlimited sessions',
-				'24/7 priority support',
-				'Exclusive events access',
-			],
-			validityDays: 365,
-		},
-	};
+	const configs = await prisma.patientPlanConfig.findMany({
+		where: { active: true },
+		orderBy: { price: 'asc' }
+	});
 
-	return Object.values(plans);
+	return configs.map(c => ({
+		id: c.key,
+		name: c.name,
+		baseAmount: c.price,
+		gstPercentage: 18
+	}));
 }

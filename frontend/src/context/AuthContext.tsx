@@ -8,6 +8,7 @@ import {
 
 export type AppRole = 
   | 'patient' 
+  | 'learner'
   | 'therapist' 
   | 'psychiatrist' 
   | 'psychologist' 
@@ -26,6 +27,7 @@ const normalizeRole = (value: unknown): AppRole | null => {
   const normalized = value.toLowerCase().replace(/_/g, '');
   if (
     normalized === 'patient' ||
+    normalized === 'learner' ||
     normalized === 'therapist' ||
     normalized === 'psychiatrist' ||
     normalized === 'psychologist' ||
@@ -61,7 +63,7 @@ export const getDefaultRouteForRole = (role: unknown): string => {
 
 const isProviderRole = (role: unknown): boolean => {
   const normalizedRole = normalizeRole(role);
-  return normalizedRole === 'therapist' || normalizedRole === 'psychiatrist' || normalizedRole === 'psychologist' || normalizedRole === 'coach';
+  return normalizedRole === 'learner' || normalizedRole === 'therapist' || normalizedRole === 'psychiatrist' || normalizedRole === 'psychologist' || normalizedRole === 'coach';
 };
 
 const toBoolean = (value: unknown): boolean => value === true || value === 'true' || value === 1 || value === '1';
@@ -115,6 +117,10 @@ export const getPostLoginRoute = (user: AuthUser | null | undefined): string => 
   }
 
   if (isProviderRole(user.role)) {
+    if (normalizeRole(user.role) === 'learner') {
+      return '/provider/dashboard';
+    }
+
     // Dev/testing bypass only: never allow onboarding skip in production builds.
     const isProductionBuild = import.meta.env.PROD === true || String(import.meta.env.MODE || '').toLowerCase() === 'production';
     const skipFlagEnabled = (import.meta.env.VITE_SKIP_ONBOARDING || '').toString() === 'true';

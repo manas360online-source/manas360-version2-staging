@@ -61,9 +61,6 @@ services:
       retries: 5
     ports:
       - "${BACKEND_HOST_PORT:-5001}:5000"
-    # Temporarily disable auto-migrations on container start to avoid
-    # restart loops when a migration fails. Run migrations manually instead.
-    command: sh -c "node dist/server.js"
 
   ai_engine:
     build:

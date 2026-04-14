@@ -26,6 +26,7 @@ import {
 	validatePublicSignupRole,
 } from '../validators/auth.validator';
 import { AppError } from '../middleware/error.middleware';
+import { generateNumericOtp, hashOtp, hashPassword, verifyOtp } from '../utils/hash';
 import {
 	getActiveLegalDocuments,
 	hasAcceptedNriTerms,
@@ -154,6 +155,7 @@ export const providerRegisterController = async (req: Request, res: Response): P
 	};
 
 	const result = await registerProviderProfile(userId, {
+		professionalType: (typeof req.body.professionalType === 'string' ? req.body.professionalType.trim().toUpperCase() : undefined) as 'THERAPIST' | 'PSYCHIATRIST' | 'PSYCHOLOGIST' | 'COACH' | undefined,
 		displayName: requiredString(req.body.fullName ?? req.body.displayName, 'displayName'),
 		registrationType: (typeof req.body.registrationType === 'string'
 			? req.body.registrationType.trim().toUpperCase()
@@ -178,6 +180,84 @@ export const providerRegisterController = async (req: Request, res: Response): P
 	});
 
 	sendSuccess(res, result, 'Provider onboarding submitted', 201);
+};
+
+export const legacyRegisterController = async (req: Request, res: Response): Promise<void> => {
+	const email = String(req.body?.email || '').trim().toLowerCase();
+	const password = String(req.body?.password || '');
+	const roleRaw = String(req.body?.role || 'patient').trim().toUpperCase();
+	const name = String(req.body?.name || '').trim();
+
+	if (!email || !email.includes('@')) throw new AppError('Valid email is required', 422);
+	validatePassword(password);
+	validatePublicSignupRole(roleRaw.toLowerCase() as any);
+
+	const existingUser = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+	if (existingUser) throw new AppError('Email already registered', 409);
+
+	const otp = generateNumericOtp();
+	const otpHash = await hashOtp(otp);
+	const passwordHash = await hashPassword(password);
+
+	const [firstName, ...rest] = name.split(' ').filter(Boolean);
+	const lastName = rest.join(' ');
+
+	const user = await prisma.user.create({
+		data: {
+			email,
+			passwordHash,
+			role: roleRaw as any,
+			provider: 'LOCAL',
+			name: name || email.split('@')[0],
+			firstName: firstName || '',
+			lastName: lastName || '',
+			emailVerified: false,
+			emailVerificationOtpHash: otpHash,
+			emailVerificationOtpExpiresAt: new Date(Date.now() + env.otpTtlMinutes * 60 * 1000),
+		},
+		select: { id: true, email: true, role: true },
+	});
+
+	sendSuccess(res, {
+		id: user.id,
+		email: user.email,
+		role: String(user.role).toLowerCase(),
+		devOtp: env.nodeEnv !== 'production' ? otp : undefined,
+	}, 'User registered', 201);
+};
+
+export const legacyVerifyEmailOtpController = async (req: Request, res: Response): Promise<void> => {
+	const email = String(req.body?.email || '').trim().toLowerCase();
+	const otp = String(req.body?.otp || '').trim();
+	if (!email || !otp) throw new AppError('email and otp are required', 422);
+
+	const user = await prisma.user.findUnique({
+		where: { email },
+		select: {
+			id: true,
+			emailVerificationOtpHash: true,
+			emailVerificationOtpExpiresAt: true,
+		},
+	});
+
+	if (!user || !user.emailVerificationOtpHash || !user.emailVerificationOtpExpiresAt) {
+		throw new AppError('Email OTP not found', 400);
+	}
+	if (user.emailVerificationOtpExpiresAt < new Date()) throw new AppError('OTP expired', 400);
+
+	const validOtp = await verifyOtp(otp, user.emailVerificationOtpHash);
+	if (!validOtp) throw new AppError('Invalid OTP', 400);
+
+	await prisma.user.update({
+		where: { id: user.id },
+		data: {
+			emailVerified: true,
+			emailVerificationOtpHash: null,
+			emailVerificationOtpExpiresAt: null,
+		},
+	});
+
+	sendSuccess(res, { email, verified: true }, 'Email verified');
 };
 
 export const meController = async (req: Request, res: Response): Promise<void> => {

@@ -12,10 +12,10 @@ const resolveSocketUrl = (): string => {
     return explicitBackend.replace(/\/$/, '');
   }
 
-  // In local Vite dev, /api is proxied to backend:3000, but socket.io is not.
+  // In local Vite dev, /api is proxied to backend:5001, but socket.io is not.
   // Route websocket directly to backend to avoid ws://localhost:5173/socket.io failures.
   if (typeof window !== 'undefined' && import.meta.env.DEV) {
-    return window.location.origin.replace(/:\d+$/, ':3000');
+    return window.location.origin.replace(/:\d+$/, ':5001');
   }
 
   return window.location.origin;

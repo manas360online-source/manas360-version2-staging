@@ -1,12 +1,14 @@
 import React from 'react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import { Menu, X, ArrowLeft } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 // @ts-ignore
 import useEnrollmentStore from '../store/CertificationEnrollmentStore';
 
 export const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const location = useLocation();
+  const { user } = useAuth();
 
   const { enrollments } = useEnrollmentStore();
 
@@ -61,6 +63,22 @@ export const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) =
                   )}
                 </Link>
               ))}
+              {!user && (
+                <>
+                  <Link
+                    to="/auth/login?next=/certifications"
+                    className="text-sm font-bold text-slate-600 hover:text-slate-900"
+                  >
+                    Login
+                  </Link>
+                  <Link
+                    to="/auth/signup?next=/certifications"
+                    className="text-sm font-bold bg-slate-900 text-white px-4 py-2 rounded-full hover:bg-slate-800"
+                  >
+                    Register
+                  </Link>
+                </>
+              )}
             </div>
 
             {/* Mobile menu button */}
@@ -97,6 +115,24 @@ export const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) =
                   )}
                 </Link>
               ))}
+              {!user && (
+                <>
+                  <Link
+                    to="/auth/login?next=/certifications"
+                    onClick={() => setIsMenuOpen(false)}
+                    className="block px-4 py-3 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                  >
+                    Login
+                  </Link>
+                  <Link
+                    to="/auth/signup?next=/certifications"
+                    onClick={() => setIsMenuOpen(false)}
+                    className="block px-4 py-3 rounded-xl text-sm font-bold bg-slate-900 text-white"
+                  >
+                    Register
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         )}

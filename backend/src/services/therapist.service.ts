@@ -1,5 +1,6 @@
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/error.middleware';
+import { randomUUID } from 'crypto';
 
 const db = prisma as any;
 
@@ -106,11 +107,35 @@ export const createTherapistProfile = async (userId: string, input: TherapistPro
 		averageRating: 0,
 	} as any;
 
-	const profile = await db.therapistProfile.upsert({
-		where: { userId: user.id },
-		update: data,
-		create: data,
-	});
+	const profileRows = await db.$queryRawUnsafe(
+		`INSERT INTO "therapist_profiles"
+			("id", "userId", "displayName", "bio", "specializations", "languages", "yearsOfExperience", "consultationFee", "availability", "averageRating", "isDeleted", "createdAt", "updatedAt")
+		 VALUES
+			($1, $2, $3, $4, $5::text[], $6::text[], $7, $8, $9::jsonb, $10, false, NOW(), NOW())
+		 ON CONFLICT ("userId") DO UPDATE SET
+			"displayName" = EXCLUDED."displayName",
+			"bio" = EXCLUDED."bio",
+			"specializations" = EXCLUDED."specializations",
+			"languages" = EXCLUDED."languages",
+			"yearsOfExperience" = EXCLUDED."yearsOfExperience",
+			"consultationFee" = EXCLUDED."consultationFee",
+			"availability" = EXCLUDED."availability",
+			"updatedAt" = NOW()
+		 RETURNING "id", "displayName", "bio", "specializations", "languages", "yearsOfExperience", "consultationFee", "availability", "averageRating", "createdAt", "updatedAt"`,
+		randomUUID(),
+		String(user.id),
+		String(displayName),
+		data.bio,
+		Array.isArray(data.specializations) ? data.specializations : [],
+		Array.isArray(data.languages) ? data.languages : [],
+		Number(data.yearsOfExperience || 0),
+		Number(data.consultationFee || 0),
+		JSON.stringify(Array.isArray(data.availability) ? data.availability : []),
+		0,
+	);
+
+	const profile = Array.isArray(profileRows) ? profileRows[0] : null;
+	if (!profile) throw new AppError('Unable to persist therapist profile', 500);
 
 	return toSafeProfile(profile as any);
 };
@@ -120,7 +145,19 @@ export const getMyTherapistProfile = async (userId: string) => {
 	let profile: any = null;
 	try {
 		profile = await db.therapistProfile.findUnique({ where: { userId },
-			include: { user: { select: { createdAt: true, updatedAt: true } } },
+			select: {
+				id: true,
+				displayName: true,
+				bio: true,
+				specializations: true,
+				languages: true,
+				yearsOfExperience: true,
+				consultationFee: true,
+				availability: true,
+				averageRating: true,
+				createdAt: true,
+				updatedAt: true,
+			},
 		});
 	} catch {
 		// Older environments may miss optional columns; fall back to composed profile.

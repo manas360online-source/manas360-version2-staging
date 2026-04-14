@@ -1,6 +1,7 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Certification, BadgeColor } from '../CertificationTypes';
+import { useAuth } from '../context/AuthContext';
 
 interface JourneyMapProps {
   certifications: Certification[];
@@ -130,10 +131,18 @@ const IncentivesBanner: React.FC = () => (
 const CertificationCard: React.FC<{ cert: Certification }> = ({ cert }) => {
   const styles = getStyles(cert.badgeColor);
   const navigate = useNavigate();
+  const location = useLocation();
+  const { user } = useAuth();
+  const inProviderShell = location.pathname.startsWith('/provider');
+  const detailPath = inProviderShell ? `/provider/certifications/${cert.slug}` : `/certifications/${cert.slug}`;
+  const enrollPath = inProviderShell
+    ? `/provider/certification/enroll/${cert.slug}`
+    : `/certification/enroll/${cert.slug}`;
+  const guestAuthPath = `/auth/signup?next=${encodeURIComponent(enrollPath)}`;
 
   return (
     <div 
-      onClick={() => navigate(`/certifications/${cert.slug}`)}
+      onClick={() => navigate(detailPath)}
       className={`
         group relative bg-white rounded-2xl p-5 md:p-7 shadow-[0_4px_12px_rgba(0,0,0,0.05)] 
         hover:shadow-[0_15px_40px_rgba(0,0,0,0.1)] transition-all duration-400 
@@ -191,12 +200,16 @@ const CertificationCard: React.FC<{ cert: Certification }> = ({ cert }) => {
         <button 
         onClick={(e) => {
           e.stopPropagation();
-          navigate('/registration', {
+          if (!user) {
+            navigate(guestAuthPath);
+            return;
+          }
+          navigate(enrollPath, {
             state: {
               certName: cert.name,
               price: cert.price_inr === 0 ? 'Free' : `₹${cert.price_inr.toLocaleString()}`,
               slug: cert.slug,
-            }
+            },
           });
         }}
         className="flex-1 bg-gradient-to-r from-teal-500 to-emerald-600 text-white py-3.5 md:py-4 rounded-xl font-bold text-sm md:text-base shadow-lg shadow-teal-200 hover:shadow-xl hover:shadow-teal-300 hover:scale-[1.03] active:scale-[0.97] transition-all duration-200 flex items-center justify-center gap-2"
@@ -207,7 +220,7 @@ const CertificationCard: React.FC<{ cert: Certification }> = ({ cert }) => {
         <button 
           onClick={(e) => {
             e.stopPropagation();
-            navigate(`/certifications/${cert.slug}`);
+            navigate(detailPath);
           }}
           className="w-full sm:w-auto px-6 md:px-8 py-3.5 md:py-4 rounded-xl font-bold text-sm md:text-base border-2 border-slate-800 text-slate-800 bg-white shadow-md hover:bg-slate-800 hover:text-white hover:shadow-lg hover:scale-[1.03] active:scale-[0.97] transition-all duration-200"
         >

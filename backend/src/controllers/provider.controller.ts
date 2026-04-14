@@ -23,6 +23,7 @@ import {
 } from '../services/smart-match.service';
 
 type ProviderRole = 'THERAPIST' | 'PSYCHOLOGIST' | 'PSYCHIATRIST' | 'COACH';
+type ProviderDashboardRole = ProviderRole | 'LEARNER';
 type SmartTherapistAlert = {
 	patientId: string;
 	patientName: string;
@@ -260,7 +261,7 @@ const buildDefaultAvailabilityGrid = () =>
 		isAvailable: false,
 	}));
 
-const getProviderRole = async (providerId: string): Promise<ProviderRole> => {
+const getProviderRole = async (providerId: string, options?: { allowLearner?: boolean }): Promise<ProviderDashboardRole> => {
 	const user = await prisma.user.findUnique({
 		where: { id: providerId },
 		select: { role: true },
@@ -270,8 +271,10 @@ const getProviderRole = async (providerId: string): Promise<ProviderRole> => {
 		throw new AppError('Provider not found', 404);
 	}
 
-	const role = String(user.role).toUpperCase() as ProviderRole;
-	const allowedRoles: ProviderRole[] = ['THERAPIST', 'PSYCHOLOGIST', 'PSYCHIATRIST', 'COACH'];
+	const role = String(user.role).toUpperCase() as ProviderDashboardRole;
+	const allowedRoles: ProviderDashboardRole[] = options?.allowLearner
+		? ['THERAPIST', 'PSYCHOLOGIST', 'PSYCHIATRIST', 'COACH', 'LEARNER']
+		: ['THERAPIST', 'PSYCHOLOGIST', 'PSYCHIATRIST', 'COACH'];
 	if (!allowedRoles.includes(role)) {
 		throw new AppError('Access denied. Provider role required', 403);
 	}
@@ -513,7 +516,7 @@ const ensureProviderPatientAccess = async (providerId: string, patientId: string
 
 export const getProviderDashboardController = async (req: Request, res: Response): Promise<void> => {
 	const providerId = authUserId(req);
-	const role = await getProviderRole(providerId);
+	const role = await getProviderRole(providerId, { allowLearner: true });
 	const { startOfDay, endOfDay, startOfMonth } = getDateBounds();
 	const sevenDaysAgo = new Date();
 	sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -666,7 +669,7 @@ export const getProviderDashboardController = async (req: Request, res: Response
 	}).length;
 	const patientAlerts = scheduleAlerts + smartAlerts.length;
 
-	const statsByRole: Record<ProviderRole, Record<string, string | number>> = {
+	const statsByRole: Record<ProviderDashboardRole, Record<string, string | number>> = {
 		THERAPIST: {
 			totalSessions: totalSessionsToday,
 			activePatients,
@@ -690,6 +693,12 @@ export const getProviderDashboardController = async (req: Request, res: Response
 			activeGoals,
 			habitStreaks: completedSessionsThisMonth,
 			adherenceRate,
+		},
+		LEARNER: {
+			totalSessions: totalSessionsToday,
+			activePatients,
+			pendingNotes,
+			patientAlerts,
 		},
 	};
 

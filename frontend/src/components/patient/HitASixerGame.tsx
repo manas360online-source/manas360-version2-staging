@@ -306,20 +306,26 @@ const HitASixerGame: React.FC = () => {
     };
   };
 
-  const handlePlayNow = () => {
+  const handlePlayNow = async () => {
     if (canClaimWallet) {
       if (!eligibility?.eligible) return;
       playMutation.mutate();
       return;
     }
 
-    const random = Math.random();
-    const guestOutcome: 'sixer' | 'four' | 'out' = random < 0.04 ? 'sixer' : random < 0.12 ? 'four' : 'out';
-    const guestCredit = guestOutcome === 'sixer' ? 108 : guestOutcome === 'four' ? 50 : 10;
-    setOutcome(guestOutcome);
-    setCredit(guestCredit);
-    setStage('start');
-    setIsFullScreen(true);
+    try {
+      setStage('ready'); // Reset stage just in case
+      const res = await patientApi.getPublicGameRoll();
+      if (res.token) {
+        localStorage.setItem('guest_game_token', res.token);
+      }
+      setOutcome(res.outcome);
+      setCredit(res.credit);
+      setStage('start');
+      setIsFullScreen(true);
+    } catch (err) {
+      toast.error('Could not start game. Please try again.');
+    }
   };
 
   const handleStartBowling = () => {

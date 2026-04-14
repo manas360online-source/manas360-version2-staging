@@ -6,9 +6,18 @@ import {
   getGameEligibilityController,
   playGameController,
   getGameWinnersController,
+  publicRollController,
 } from '../controllers/game.controller';
 
 const router = Router();
+
+/**
+ * @openapi
+ * /game/public-roll:
+ *   get:
+ *     summary: Get unauthenticated game roll outcome
+ */
+router.get('/public-roll', asyncHandler(publicRollController));
 
 /**
  * @openapi

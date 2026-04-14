@@ -53,11 +53,13 @@ import { asyncHandler } from '../middleware/validate.middleware';
 const router = Router();
 
 const providerRoles: UserRole[] = ['therapist', 'psychologist', 'psychiatrist', 'coach'];
+const providerOnboardingRoles: UserRole[] = [...providerRoles, 'learner'];
+const providerDashboardRoles: UserRole[] = [...providerRoles, 'learner'];
 
 router.post(
 	'/onboarding',
 	requireAuth,
-	requireRole(providerRoles),
+	requireRole(providerOnboardingRoles),
 	asyncHandler(submitProviderOnboardingController),
 );
 

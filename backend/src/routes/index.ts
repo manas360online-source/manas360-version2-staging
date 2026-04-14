@@ -38,6 +38,10 @@ import legalRoutes from './legal.routes';
 import qrRoutes from './qr.routes';
 import invoiceRoutes from './invoice.routes';
 import institutionalAgreementRoutes from './institutional-agreement.routes';
+import freeScreeningRoutes from './free-screening.routes';
+import freeScreeningProviderRoutes from './free-screening-provider.routes';
+import freeScreeningAdminRoutes from './free-screening-admin.routes';
+import mdcRoutes from './mdc.routes';
 
 
 const router = Router();
@@ -73,7 +77,11 @@ router.use('/v1/users', userRoutes);
 router.use('/v1/patients', patientRoutes);
 router.use('/v1/therapists', therapistRoutes);
 router.use('/v1/therapist', therapistRoutes);
+// Mount provider-facing free-screening endpoints under therapist namespace
+router.use('/v1/therapist', freeScreeningProviderRoutes);
 router.use('/v1/admin', adminRoutes);
+// Mount admin-facing free-screening endpoints under admin namespace
+router.use('/v1/admin', freeScreeningAdminRoutes);
 router.use('/v1/corporate', corporateRoutes);
 router.use('/v1/presence', presenceRoutes);
 router.use('/v1/therapist/dashboard', dashboardRoutes);
@@ -81,6 +89,8 @@ router.use('/v1/therapists/dashboard', dashboardRoutes);
 router.use('/v1/psychiatrist', psychiatristRoutes);
 // router.use('/v1/psychologist', psychologistRoutes); // Commented out - not implementing psychologist functionality
 router.use('/v1/provider', providerRoutes);
+// Mount public & patient-facing free-screening routes under /v1
+router.use('/v1', freeScreeningRoutes);
 router.use('/v1/payments', paymentRoutes);
 router.use('/v1/sso', ssoRoutes);
 router.use('/v1/subscriptions', subscriptionRoutes);
@@ -107,6 +117,12 @@ router.use('/v1', riskAnalyticsRoutes);
 router.use('/v1/game', gameRoutes);
 router.use('/v1/wallet', walletRoutes);
 router.use('/v1/legal', legalRoutes);
+router.use('/v1/mdc', mdcRoutes);
+// Backward-compatibility: expose legacy public QR mounts so old public URLs work
+// Tests and external links use `/api/q/...` and `/q/...` paths; keep these
+// mounted to avoid 404s and noisy error logs.
+router.use('/api/q', qrRoutes);
+router.use('/q', qrRoutes);
 router.use('/v1/qr', qrRoutes);
 router.use('/v1/invoices', invoiceRoutes);
 router.use('/agreements', institutionalAgreementRoutes);

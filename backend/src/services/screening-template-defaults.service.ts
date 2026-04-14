@@ -261,12 +261,77 @@ const DEFAULT_SCREENING_TEMPLATES: Record<string, ScreeningTemplateDefault> = {
 };
 
 export const getDefaultScreeningTemplateDefinition = (key?: string): ScreeningTemplateDefault | null => {
-	void key;
-	return null;
+	const resolvedKey = String(key || FREE_SCREENING_TEMPLATE_KEY).trim() || FREE_SCREENING_TEMPLATE_KEY;
+	const template = DEFAULT_SCREENING_TEMPLATES[resolvedKey];
+	if (!template) return null;
+	return JSON.parse(JSON.stringify(template)) as ScreeningTemplateDefault;
 };
 
 export const ensureDefaultScreeningTemplate = async (db: any, key?: string) => {
-	void db;
-	void key;
-	return null;
+	const resolvedKey = String(key || FREE_SCREENING_TEMPLATE_KEY).trim() || FREE_SCREENING_TEMPLATE_KEY;
+	const template = DEFAULT_SCREENING_TEMPLATES[resolvedKey];
+	if (!template) return null;
+
+	return db.$transaction(async (tx: any) => {
+		const upserted = await tx.screeningTemplate.upsert({
+			where: { key: template.key },
+			update: {
+				title: template.title,
+				description: template.description,
+				estimatedMinutes: template.estimatedMinutes,
+				isPublic: template.isPublic,
+				randomizeOrder: template.randomizeOrder,
+				status: template.status,
+			},
+			create: {
+				key: template.key,
+				title: template.title,
+				description: template.description,
+				estimatedMinutes: template.estimatedMinutes,
+				isPublic: template.isPublic,
+				randomizeOrder: template.randomizeOrder,
+				status: template.status,
+			},
+			select: { id: true, key: true },
+		});
+
+		await tx.screeningScoringBand.deleteMany({ where: { templateId: upserted.id } });
+		await tx.screeningQuestion.deleteMany({ where: { templateId: upserted.id } });
+
+		for (const question of template.questions) {
+			await tx.screeningQuestion.create({
+				data: {
+					templateId: upserted.id,
+					prompt: question.prompt,
+					sectionKey: question.sectionKey,
+					orderIndex: Number(question.orderIndex),
+					isActive: true,
+					options: {
+						create: question.options.map((option) => ({
+							optionIndex: Number(option.optionIndex),
+							label: option.label,
+							points: Number(option.points),
+						})),
+					},
+				},
+			});
+		}
+
+		if (template.scoringBands.length > 0) {
+			await tx.screeningScoringBand.createMany({
+				data: template.scoringBands.map((band) => ({
+					templateId: upserted.id,
+					orderIndex: Number(band.orderIndex),
+					minScore: Number(band.minScore),
+					maxScore: Number(band.maxScore),
+					severity: band.severity,
+					interpretation: band.interpretation,
+					recommendation: band.recommendation,
+					actionLabel: band.actionLabel,
+				})),
+			});
+		}
+
+		return upserted;
+	});
 };
