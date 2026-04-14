@@ -303,7 +303,7 @@ ADD COLUMN     "patient_id" TEXT NOT NULL,
 ADD COLUMN     "resolution_notes" TEXT,
 ADD COLUMN     "responded_by" TEXT,
 ADD COLUMN     "status" TEXT NOT NULL DEFAULT 'pending',
-ADD COLUMN     "updated_at" TIMESTAMP(3) NOT NULL,
+ADD COLUMN     "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 ALTER COLUMN "id" SET DATA TYPE TEXT,
 ALTER COLUMN "severity" SET DEFAULT 'high',
 ADD CONSTRAINT "crisis_alerts_pkey" PRIMARY KEY ("id");

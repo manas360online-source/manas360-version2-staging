@@ -607,4 +607,41 @@ export const requireMinimumRole = (minimumRole: UserRole): ((req: Request, _res:
 	};
 };
 
+export const requireClinicalVerification = async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
+	const userId = req.auth?.userId;
 
+	if (!userId) {
+		next(new AppError('Authentication required', 401));
+		return;
+	}
+
+	try {
+        const user = await db.user.findUnique({
+            where: { id: userId },
+            select: { 
+				role: true, 
+				isTherapistVerified: true, 
+				platformAccess: { select: { isActive: true } }
+			}
+        });
+
+        if (!user) {
+            next(new AppError('User not found', 404));
+            return;
+        }
+
+        const role = String(user.role).toUpperCase();
+        if (role === 'THERAPIST' || role === 'PSYCHIATRIST' || role === 'PSYCHOLOGIST' || role === 'COACH') {
+            const hasPlatformAccess = Boolean(user.platformAccess?.isActive);
+            if (!user.isTherapistVerified || !hasPlatformAccess) {
+                next(new AppError('Clinical features locked. Please complete verification and platform fee.', 403));
+                return;
+            }
+        }
+
+        next();
+	} catch (error) {
+		console.error('[RBAC] Error during clinical verification check:', error);
+		next(new AppError('Authorization failed', 500));
+	}
+};
