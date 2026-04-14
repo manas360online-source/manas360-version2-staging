@@ -86,6 +86,9 @@ const AuditTrail = lazy(() => import('./pages/admin/AuditTrail'));
 const GroupManagement = lazy(() => import('./pages/admin/GroupManagement'));
 const QrCodeManager = lazy(() => import('./pages/admin/QrCodeManager'));
 const TherapistPerformance = lazy(() => import('./pages/admin/TherapistPerformance'));
+const AgreementsPage = lazy(() => import('./pages/admin/AgreementsPage'));
+const AgreementDetailPage = lazy(() => import('./pages/admin/AgreementDetailPage'));
+const ClientAgreementPage = lazy(() => import('./pages/admin/ClientAgreementPage'));
 const SessionAnalytics = lazy(() => import('./pages/admin/SessionAnalytics'));
 const UserGrowthAnalytics = lazy(() => import('./pages/admin/UserGrowthAnalytics'));
 const RoleManagement = lazy(() => import('./pages/admin/RoleManagement'));
@@ -515,6 +518,10 @@ function App() {
                 <Route path="operations/groups" element={<GroupManagement />} />
                 <Route path="operations/qr" element={<QrCodeManager />} />
                 <Route path="operations/crisis" element={<CrisisConsole />} />
+                  <Route path="operations/agreements" element={<AgreementsPage />} />
+                <Route path="operations/agreements/client" element={<ClientAgreementPage />} />
+                <Route path="operations/agreements/:agreementId" element={<AgreementDetailPage />} />
+                <Route path="operations/agreements/:agreementId/client" element={<ClientAgreementPage />} />
 
                 <Route path="intelligence/platform-analytics" element={<PlatformAnalytics />} />
                 <Route path="intelligence/user-growth" element={<UserGrowthAnalytics />} />

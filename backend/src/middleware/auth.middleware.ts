@@ -52,13 +52,21 @@ export const requireAuth = async (req: Request, _res: Response, next: NextFuncti
 		};
 
 		if (!isLegalAcceptanceBypassRoute(req.originalUrl)) {
-			const pendingLegalAcceptance = await hasPendingLegalAcceptance(payload.sub);
-			if (pendingLegalAcceptance) {
-				next(new AppError('Legal re-acceptance required', 428, {
-					code: 'LEGAL_REACCEPTANCE_REQUIRED',
-					message: 'Accept the latest legal documents to continue.',
-				}));
-				return;
+			try {
+				const pendingLegalAcceptance = await hasPendingLegalAcceptance(payload.sub);
+				if (pendingLegalAcceptance) {
+					next(new AppError('Legal re-acceptance required', 428, {
+						code: 'LEGAL_REACCEPTANCE_REQUIRED',
+						message: 'Accept the latest legal documents to continue.',
+					}));
+					return;
+				}
+			} catch (legalCheckError) {
+				if (process.env.NODE_ENV === 'development') {
+					console.warn('[AUTH] Skipping legal acceptance check due to DB unavailability in development.', legalCheckError);
+				} else {
+					throw legalCheckError;
+				}
 			}
 		}
 

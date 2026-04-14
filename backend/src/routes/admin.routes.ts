@@ -104,6 +104,14 @@ import {
 	rollbackPlatformConfigController,
 	upsertPlatformConfigController,
 } from '../controllers/platform-config.controller';
+import {
+	approveAdminAgreementController,
+	createAdminAgreementController,
+	getAdminAgreementByIdController,
+	listAdminAgreementsController,
+	rejectAdminAgreementController,
+	updateAdminAgreementStatusController,
+} from '../controllers/admin-agreement.controller';
 
 const router = Router();
 
@@ -223,6 +231,14 @@ router.get('/platform-config/:key', requireAuth, requireRole(['admin', 'superadm
 router.put('/platform-config/:key', requireAuth, requireRole('superadmin'), requireAdminPolicy('config.manage'), asyncHandler(upsertPlatformConfigController));
 router.patch('/platform-config/:key', requireAuth, requireRole('superadmin'), requireAdminPolicy('config.manage'), asyncHandler(upsertPlatformConfigController));
 router.post('/platform-config/:key/rollback', requireAuth, requireRole('superadmin'), requireAdminPolicy('config.manage'), asyncHandler(rollbackPlatformConfigController));
+
+// === ADMIN AGREEMENTS (COMPAT ROUTES) ===
+router.get('/agreements', requireAuth, requireRole(['admin', 'superadmin', 'clinicaldirector', 'financemanager']), asyncHandler(listAdminAgreementsController));
+router.post('/agreements', requireAuth, requireRole(['admin', 'superadmin', 'clinicaldirector', 'financemanager']), asyncHandler(createAdminAgreementController));
+router.get('/agreements/:agreementId', requireAuth, requireRole(['admin', 'superadmin', 'clinicaldirector', 'financemanager']), asyncHandler(getAdminAgreementByIdController));
+router.patch('/agreements/:agreementId/status', requireAuth, requireRole(['admin', 'superadmin', 'clinicaldirector', 'financemanager']), asyncHandler(updateAdminAgreementStatusController));
+router.patch('/agreements/:agreementId/approve', requireAuth, requireRole(['admin', 'superadmin', 'clinicaldirector', 'financemanager']), asyncHandler(approveAdminAgreementController));
+router.patch('/agreements/:agreementId/reject', requireAuth, requireRole(['admin', 'superadmin', 'clinicaldirector', 'financemanager']), asyncHandler(rejectAdminAgreementController));
 
 /**
  * GET /api/v1/admin/modules/:module/summary
