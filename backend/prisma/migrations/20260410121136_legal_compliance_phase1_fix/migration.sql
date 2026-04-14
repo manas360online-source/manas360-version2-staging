@@ -449,22 +449,70 @@ DROP TABLE "session_transcripts";
 DROP TABLE "system_status";
 
 -- DropEnum
-DROP TYPE "GroupTherapyEnrollmentStatus";
+DROP TYPE IF EXISTS "GroupTherapyEnrollmentStatus";
 
 -- DropEnum
-DROP TYPE "GroupTherapyInviteStatus";
+DROP TYPE IF EXISTS "GroupTherapyInviteStatus";
 
 -- DropEnum
-DROP TYPE "GroupTherapyMode";
+DROP TYPE IF EXISTS "GroupTherapyMode";
 
 -- DropEnum
-DROP TYPE "GroupTherapyStatus";
+DROP TYPE IF EXISTS "GroupTherapyStatus";
 
+-- CreateTable
+CREATE TABLE "legal_documents" (
+    "id" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "version" INTEGER NOT NULL,
+    "title" TEXT NOT NULL,
+    "content" TEXT NOT NULL,
+    "isActive" BOOLEAN NOT NULL DEFAULT false,
+    "publishedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedById" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "legal_documents_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "user_acceptances" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "documentId" TEXT NOT NULL,
+    "documentVer" INTEGER NOT NULL,
+    "acceptedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "ipAddress" TEXT,
+    "userAgent" TEXT,
+    "source" TEXT NOT NULL DEFAULT 'web',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "user_acceptances_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "global_settings" (
+    "key" TEXT NOT NULL,
+    "value" TEXT NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "global_settings_pkey" PRIMARY KEY ("key")
 );
 
+-- CreateTable
+CREATE TABLE "invoice_sequences" (
+    "year" INTEGER NOT NULL,
+    "lastSequence" INTEGER NOT NULL DEFAULT 0,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "invoice_sequences_pkey" PRIMARY KEY ("year")
+);
+
+-- CreateTable
+CREATE TABLE "platform_access" (
     "id" TEXT NOT NULL,
     "providerId" TEXT NOT NULL,
     "billingCycle" TEXT NOT NULL,
