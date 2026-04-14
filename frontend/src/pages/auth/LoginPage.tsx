@@ -251,7 +251,11 @@ export default function LoginPage() {
 		setError(null);
 		setLoading(true);
 		try {
-			const result = await verifyPhoneSignupOtp(phone.trim(), otp.trim());
+			const guestGameToken = localStorage.getItem('guest_game_token') || undefined;
+			const result = await verifyPhoneSignupOtp(phone.trim(), otp.trim(), undefined, guestGameToken);
+			if (guestGameToken) {
+				localStorage.removeItem('guest_game_token');
+			}
 			// Force a session probe after OTP verify so auth state updates immediately.
 			await checkAuth({ force: true });
 

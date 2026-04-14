@@ -318,6 +318,10 @@ export const findMatchingProviders = async (
       let certScore = 0;
       if (certs.length >= 2) certScore = 10;
       else if (certs.length >= 1) certScore = 7;
+
+      const leadBoostScore = typeof (t as any).leadBoostScore === 'number' ? (t as any).leadBoostScore : 0;
+      certScore += leadBoostScore;
+
       const expertise = Math.min(40, specializationScore + certScore);
 
       const languageOverlap = requestedLanguages.length

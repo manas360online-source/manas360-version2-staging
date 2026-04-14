@@ -88,16 +88,11 @@ export const checkEligibility = async (userId: string) => {
     };
   }
 
-  // Rule 2: Limit to 1 play per day
+  // Rule 2: Limit to 1 play PER LIFETIME (One-time use policy)
   let existingPlay: any = null;
   try {
-    existingPlay = await db.dailyGamePlay.findUnique({
-      where: {
-        userId_date: {
-          userId,
-          date: gameDate,
-        },
-      },
+    existingPlay = await db.dailyGamePlay.findFirst({
+      where: { userId },
     });
   } catch (error) {
     if (!isSchemaUnavailableError(error)) throw error;
@@ -106,10 +101,10 @@ export const checkEligibility = async (userId: string) => {
   if (existingPlay) {
     return {
       eligible: false,
-      error: 'Already played today. Come back tomorrow!',
+      error: 'You have already played Hit a Sixer. Winnings are stored in your wallet!',
       timing: {
-        time_remaining_seconds: Math.floor((nextPlayTime.getTime() - istNow.getTime()) / 1000),
-        closes_at: nextPlayTime.toISOString(),
+        time_remaining_seconds: 0,
+        closes_at: istNow.toISOString(),
       },
     };
   }

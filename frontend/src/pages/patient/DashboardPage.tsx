@@ -71,11 +71,7 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeAssignments, setActiveAssignments] = useState<ActiveCbtAssignment[]>([]);
   const [subscriptionActive, setSubscriptionActive] = useState(false);
-  const [playedToday, setPlayedToday] = useState(false);
-  const [nextPlayAt, setNextPlayAt] = useState<string | null>(null);
   const [nowTick, setNowTick] = useState<number>(Date.now());
-  const [, setWinners] = useState<any[]>([]);
-  const [, setWinnersLoading] = useState(false);
 
   const fetchDashboardData = async () => {
     const dashboardRes = await patientApi.getDashboardV2();
@@ -107,23 +103,12 @@ export default function DashboardPage() {
         setError(null);
         await fetchDashboardData();
 
-        setWinnersLoading(true);
-        const [subscription, eligibility, winnersResp] = await Promise.all([
+        const [subscription] = await Promise.all([
           patientApi.getSubscription().catch(() => null),
-          patientApi.getGameEligibility().catch(() => null),
-          patientApi.getGameWinners(12).catch(() => null),
         ]);
 
         const subPayload = (subscription as any)?.data ?? subscription;
         setSubscriptionActive(isSubscriptionActive(subPayload));
-
-        const eligibilityPayload = (eligibility as any)?.data ?? eligibility ?? {};
-        const hasPlayed = eligibilityPayload?.eligible === false && eligibilityPayload?.error === 'ALREADY PLAYED TODAY';
-        setPlayedToday(Boolean(hasPlayed));
-        setNextPlayAt(String(eligibilityPayload?.data?.next_play_at || ''));
-
-        const winnersPayload = (winnersResp as any)?.data ?? winnersResp ?? [];
-        setWinners(Array.isArray(winnersPayload) ? winnersPayload : []);
       } catch (err: any) {
         if (isOnboardingRequiredError(err)) {
           navigate('/patient/onboarding?next=/patient/sessions', { replace: true });
@@ -131,7 +116,6 @@ export default function DashboardPage() {
         }
         setError(err?.response?.data?.message || err?.message || 'Unable to load dashboard right now.');
       } finally {
-        setWinnersLoading(false);
         setLoading(false);
       }
     })();
@@ -172,18 +156,6 @@ export default function DashboardPage() {
       : ['Reflect on today', 'Help me protect this momentum'];
   }, [avgMood]);
 
-  const nextPlayCountdown = useMemo(() => {
-    if (!playedToday || !nextPlayAt) return '';
-    const next = new Date(nextPlayAt);
-    if (Number.isNaN(next.getTime())) return '';
-    const diffMs = next.getTime() - nowTick;
-    if (diffMs <= 0) return 'Next play available now';
-    const totalMinutes = Math.ceil(diffMs / 60000);
-    const hours = Math.floor(totalMinutes / 60);
-    const mins = totalMinutes % 60;
-    return `Next play available in ${hours} hours ${mins} min`;
-  }, [playedToday, nextPlayAt, nowTick]);
-
   if (loading) return <DashboardSkeletons />;
   if (error) return <div className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800">{error}</div>;
 
@@ -192,29 +164,6 @@ export default function DashboardPage() {
 
   return (
     <div className="mx-auto w-full max-w-[1400px] space-y-6 pb-20 lg:pb-6">
-      {subscriptionActive && (
-        <section className="rounded-3xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-amber-50 p-4 shadow-sm sm:p-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm font-semibold text-slate-800 sm:text-base">
-              {playedToday
-                ? (nextPlayCountdown || 'Next play time will unlock soon')
-                : '🏏 Play Hit a Sixer today & win up to ₹108 wallet credits!'}
-            </p>
-            <button
-              type="button"
-              onClick={() => navigate('/patient/hit-a-sixer')}
-              className="inline-flex min-h-[40px] items-center justify-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
-            >
-              {playedToday ? 'Open Game' : 'Play Now'}
-            </button>
-          </div>
-        </section>
-      )}
-
-      {/* Winners Feed: recent players */}
-      <div>
-        {/* WinnersFeed component removed: not exported from HitASixerGame.tsx. You can implement a new WinnersFeed or remove this section. */}
-      </div>
       
       {/* 1. HERO SECTION */}
       <section className="relative overflow-hidden rounded-[2rem] bg-gradient-wellness-hero p-6 shadow-wellness-md sm:p-8">

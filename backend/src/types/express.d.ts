@@ -155,6 +155,7 @@ declare global {
 				jti: string;
 				role?:
 					| 'patient'
+					| 'learner'
 					| 'therapist'
 					| 'psychiatrist'
 					| 'psychologist'

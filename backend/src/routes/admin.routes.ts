@@ -9,7 +9,7 @@ import {
 	asyncHandler,
 } from '../middleware/validate.middleware';
 import { verifyProviderWebhookController, rejectProviderWebhookController } from '../controllers/providerVerification.controller';
-import { listUsersController, getUserController, verifyProviderController, verifyTherapistController, approveProviderController, getMetricsController, listSubscriptionsController, getAdminUserApprovalsController, updateAdminUserApprovalController, getAdminLiveSessionsController, getAdminFeedbackController, resolveAdminFeedbackController, updateAdminUserStatusController, updateAdminUsersBulkStatusController, searchAdminEntitiesController, getRolesController, updateRolePermissionsController, getUserAcceptancesController, getComplianceStatusController, getLegalDocumentsController, downloadLegalDocumentController, getPlatformAdminRoleInventoryController, createPlatformAdminAccountController, getEffectiveAdminPoliciesController } from '../controllers/admin.controller';
+import { listUsersController, getUserController, verifyProviderController, verifyTherapistController, approveProviderController, getMetricsController, listSubscriptionsController, getAdminUserApprovalsController, updateAdminUserApprovalController, getAdminLiveSessionsController, getAdminFeedbackController, resolveAdminFeedbackController, updateAdminUserStatusController, updateAdminUsersBulkStatusController, searchAdminEntitiesController, getRolesController, updateRolePermissionsController, getUserAcceptancesController, getComplianceStatusController, getLegalDocumentsController, downloadLegalDocumentController, getPlatformAdminRoleInventoryController, createPlatformAdminAccountController, getEffectiveAdminPoliciesController, creditUserWalletController } from '../controllers/admin.controller';
 import {
 	getAdminAnalyticsSummaryController,
 	getAdminMostUsedTemplatesController,
@@ -114,6 +114,9 @@ import {
 } from '../controllers/admin-agreement.controller';
 
 const router = Router();
+
+router.post('/users/wallet/credit', requireAuth, requireRole(['admin', 'superadmin', 'financemanager']), requireAdminPolicy('payments.manage'), asyncHandler(creditUserWalletController));
+router.get('/ping', (req, res) => res.json({ message: 'pong' }));
 
 /**
  * GET /api/v1/admin/users

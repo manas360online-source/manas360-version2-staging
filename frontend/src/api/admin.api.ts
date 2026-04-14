@@ -1600,3 +1600,15 @@ export const retryAdminPayout = async (payoutId: string): Promise<ApiEnvelope<{ 
 	return response.data;
 };
 
+// --- Wallet & Balance ---
+
+export const creditUserWallet = async (payload: {
+	userId: string;
+	amount: number;
+	reason?: string;
+	expiresInDays?: number;
+}): Promise<ApiEnvelope<any>> => {
+	const response = await client.post<ApiEnvelope<any>>('/v1/admin/users/wallet/credit', payload);
+	return response.data;
+};
+

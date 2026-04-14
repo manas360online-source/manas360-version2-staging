@@ -63,3 +63,56 @@ export const getCertificationById = async (idOrSlug: string) => {
 
 	return certification;
 };
+
+export const getMyCertificationState = async (userId: string) => {
+	const normalizedUserId = String(userId || '').trim();
+	if (!normalizedUserId) {
+		throw new AppError('User id is required', 400);
+	}
+
+	const profile = await prisma.therapistProfile.findUnique({
+		where: { userId: normalizedUserId },
+		select: {
+			userId: true,
+			certificationStatus: true,
+			certificationCompletedAt: true,
+			certificationPaymentId: true,
+			leadBoostScore: true,
+			certifications: true,
+		},
+	});
+
+	if (!profile) {
+		return {
+			userId: normalizedUserId,
+			certificationStatus: 'NONE',
+			certificationCompletedAt: null,
+			certificationPaymentId: null,
+			leadBoostScore: 0,
+			certifications: [],
+		};
+	}
+
+	const certificationSlugs = Array.isArray(profile.certifications)
+		? profile.certifications.filter((slug) => typeof slug === 'string' && slug.trim().length > 0)
+		: [];
+
+	const certificationItems = certificationSlugs.length
+		? await prisma.certification.findMany({
+			where: { slug: { in: certificationSlugs } },
+			select: {
+				id: true,
+				slug: true,
+				code: true,
+				title: true,
+				level: true,
+				isActive: true,
+			},
+		})
+		: [];
+
+	return {
+		...profile,
+		certifications: certificationItems,
+	};
+};

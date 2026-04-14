@@ -41,5 +41,9 @@ ENV PRISMA_CLIENT_ENGINE_TYPE=binary
 
 EXPOSE 5000
 
+COPY docker-entrypoint.sh .
+RUN chmod +x docker-entrypoint.sh
+
 # Deployment-safe startup: apply migrations before serving traffic.
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]
+ENTRYPOINT ["./docker-entrypoint.sh"]
+CMD ["node", "dist/server.js"]

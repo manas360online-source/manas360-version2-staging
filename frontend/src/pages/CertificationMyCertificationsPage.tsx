@@ -6,12 +6,48 @@ import { useEnrollmentStore } from '../store/CertificationEnrollmentStore';
 import { CERTIFICATIONS } from '../CertificationConstants';
 import { Enrollment } from '../CertificationTypes';
 import { CertificatePreviewModal } from '../components/CertificationPreviewModal';
+import { useAuth } from '../context/AuthContext';
+import { getMyCertificationState } from '../api/certifications';
 
 export const MyCertificationsPage: React.FC = () => {
     const { enrollments, payInstallment, updateProgress, clearEnrollments } = useEnrollmentStore();
     const navigate = useNavigate();
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [certToDownload, setCertToDownload] = useState<Enrollment | null>(null);
+    const { user } = useAuth();
+    const [remoteLoading, setRemoteLoading] = React.useState(false);
+    const [remoteState, setRemoteState] = React.useState<{ certificationStatus: string; leadBoostScore: number; certifications: Array<{ slug: string; title: string; level: string }> } | null>(null);
+
+    React.useEffect(() => {
+        let active = true;
+        if (!user) {
+            setRemoteState(null);
+            return;
+        }
+
+        setRemoteLoading(true);
+        getMyCertificationState()
+            .then((state) => {
+                if (!active) return;
+                setRemoteState({
+                    certificationStatus: String(state.certificationStatus || 'NONE'),
+                    leadBoostScore: Number(state.leadBoostScore || 0),
+                    certifications: Array.isArray(state.certifications)
+                        ? state.certifications.map((c) => ({ slug: c.slug, title: c.title, level: c.level }))
+                        : [],
+                });
+            })
+            .catch(() => {
+                if (active) setRemoteState(null);
+            })
+            .finally(() => {
+                if (active) setRemoteLoading(false);
+            });
+
+        return () => {
+            active = false;
+        };
+    }, [user]);
 
     const handlePayInstallment = async (enrollment: Enrollment) => {
         setProcessingId(enrollment.id);
@@ -58,6 +94,13 @@ export const MyCertificationsPage: React.FC = () => {
                     <div>
                         <h1 className="text-2xl md:text-3xl font-serif font-bold text-slate-900 mb-2">My Certifications</h1>
                         <p className="text-slate-600 text-sm md:text-base">Track your progress, installments, and achievements.</p>
+                        {remoteState && (
+                            <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                                <span className="px-2 py-1 rounded bg-emerald-100 text-emerald-700 font-bold">Status: {remoteState.certificationStatus}</span>
+                                <span className="px-2 py-1 rounded bg-purple-100 text-purple-700 font-bold">Lead Boost: +{remoteState.leadBoostScore}</span>
+                                <span className="px-2 py-1 rounded bg-slate-100 text-slate-700 font-bold">Linked Certifications: {remoteState.certifications.length}</span>
+                            </div>
+                        )}
                     </div>
                     {enrollments.length > 0 && (
                         <button
@@ -69,7 +112,7 @@ export const MyCertificationsPage: React.FC = () => {
                     )}
                 </div>
 
-                {enrollments.length === 0 ? (
+                {enrollments.length === 0 && (!remoteState || remoteState.certifications.length === 0) ? (
                     <div className="bg-white rounded-3xl p-8 md:p-12 text-center border border-slate-100 shadow-sm animate-fade-in-up">
                         <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
                             <BookOpen size={32} className="text-slate-400" />
@@ -87,6 +130,25 @@ export const MyCertificationsPage: React.FC = () => {
                     </div>
                 ) : (
                     <div className="grid gap-6">
+                        {remoteLoading && (
+                            <div className="text-xs text-slate-500">Syncing linked certifications...</div>
+                        )}
+                        {remoteState && remoteState.certifications.map((cert) => (
+                            <div key={cert.slug} className="bg-white rounded-2xl p-4 border border-emerald-100">
+                                <div className="flex items-center justify-between gap-3">
+                                    <div>
+                                        <p className="text-sm font-bold text-slate-900">{cert.title}</p>
+                                        <p className="text-xs text-slate-500">Level: {cert.level}</p>
+                                    </div>
+                                    <button
+                                        onClick={() => navigate('/certifications')}
+                                        className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold"
+                                    >
+                                        Continue Learning
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
                         {enrollments.map((enrollment: Enrollment) => {
                             const certDetails = CERTIFICATIONS.find(c => c.id === enrollment.certificationId);
                             const isProcessing = processingId === enrollment.id;

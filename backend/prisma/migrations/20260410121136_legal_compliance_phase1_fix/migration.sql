@@ -383,10 +383,6 @@ ADD COLUMN     "status" "PayoutStatus" NOT NULL DEFAULT 'PENDING',
 DROP COLUMN "method",
 ADD COLUMN     "method" "PayoutMethod" NOT NULL DEFAULT 'BANK';
 
-<<<<<<< HEAD
--- AlterTable
-ALTER TABLE IF EXISTS "platform_configs" ALTER COLUMN "updated_at" DROP DEFAULT;
-=======
 -- AlterTable (guarded: only run if table exists)
 DO $$
 BEGIN
@@ -397,7 +393,6 @@ BEGIN
         ALTER TABLE "platform_configs" ALTER COLUMN "updated_at" DROP DEFAULT;
     END IF;
 END $$;
->>>>>>> 595e816c7a4642e3269284de4262af38f7f9eb42
 
 -- AlterTable
 ALTER TABLE IF EXISTS "qr_codes" ALTER COLUMN "updated_at" DROP DEFAULT;

@@ -458,6 +458,10 @@ export const patientApi = {
     const response = (await http.get('/v1/patient/subscription')).data;
     return unwrapPayload(response);
   },
+  getPublicGameRoll: async () => {
+    const response = (await http.get('/v1/game/public-roll')).data;
+    return unwrapPayload(response);
+  },
   getGameEligibility: async () => {
     const response = (await http.get('/v1/game/eligibility')).data;
     const raw = unwrapPayload(response);

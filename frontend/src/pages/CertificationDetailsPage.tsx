@@ -1,17 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { CERTIFICATIONS } from '../CertificationConstants';
 import { Breadcrumbs } from '../components/CertificationBreadcrumbs';
 import { Skeleton, TextSkeleton } from '../components/CertificationSkeleton';
 import { Check, Clock, Calendar, DollarSign, Award, ChevronDown, ChevronUp, PlayCircle, FileText, Star, ShieldCheck } from 'lucide-react';
 import { SEO } from '../components/CertificationSEO';
+import { useAuth } from '../context/AuthContext';
+import { getMyCertificationState } from '../api/certifications';
 
 export const CertificationDetailsPage: React.FC = () => {
     const { slug } = useParams<{ slug: string }>();
     const navigate = useNavigate();
+    const location = useLocation();
     const [activeTab, setActiveTab] = useState<'modules' | 'faq'>('modules');
     const [openFaq, setOpenFaq] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
+    const [alreadyEnrolled, setAlreadyEnrolled] = useState(false);
+    const [stateLoading, setStateLoading] = useState(false);
+    const { user } = useAuth();
 
     const cert = CERTIFICATIONS.find(c => c.slug === slug);
 
@@ -23,8 +29,45 @@ export const CertificationDetailsPage: React.FC = () => {
         return () => clearTimeout(timer);
     }, [slug]);
 
+    useEffect(() => {
+        let active = true;
+        if (!user || !slug) {
+            setAlreadyEnrolled(false);
+            return;
+        }
+
+        setStateLoading(true);
+        getMyCertificationState()
+            .then((state) => {
+                if (!active) return;
+                const enrolled = Array.isArray(state.certifications)
+                    ? state.certifications.some((c) => c.slug === slug)
+                    : false;
+                setAlreadyEnrolled(enrolled);
+            })
+            .catch(() => {
+                if (active) setAlreadyEnrolled(false);
+            })
+            .finally(() => {
+                if (active) setStateLoading(false);
+            });
+
+        return () => {
+            active = false;
+        };
+    }, [user, slug]);
+
     const handleEnroll = () => {
-        navigate('/registration', {
+        const inProviderShell = location.pathname.startsWith('/provider');
+        const myCertPath = inProviderShell ? '/provider/my-certifications' : '/my-certifications';
+        const enrollPath = inProviderShell
+            ? `/provider/certification/enroll/${cert?.slug || ''}`
+            : `/certification/enroll/${cert?.slug || ''}`;
+        if (alreadyEnrolled) {
+            navigate(myCertPath);
+            return;
+        }
+        navigate(enrollPath, {
             state: {
                 certName: cert?.name,
                 price: cert?.price_inr === 0 ? 'Free' : `₹${cert?.price_inr.toLocaleString()}`,
@@ -133,7 +176,7 @@ export const CertificationDetailsPage: React.FC = () => {
                             onClick={handleEnroll}
                             className="w-full bg-gradient-to-r from-teal-500 to-purple-600 text-white font-bold py-3 rounded-lg shadow-md text-sm"
                         >
-                            Enroll Now
+                            {alreadyEnrolled ? 'Continue Learning' : (stateLoading ? 'Checking access...' : 'Enroll Now')}
                         </button>
                     </div>
                 )}
@@ -347,8 +390,11 @@ export const CertificationDetailsPage: React.FC = () => {
                                 onClick={handleEnroll}
                                 className="w-full bg-gradient-to-r from-teal-500 to-purple-600 text-white font-bold py-3 rounded-lg shadow-md hover:shadow-lg hover:scale-[1.02] transition-all text-sm"
                             >
-                                Enroll Now
+                                {alreadyEnrolled ? 'Continue Learning' : (stateLoading ? 'Checking access...' : 'Enroll Now')}
                             </button>
+                            {alreadyEnrolled && (
+                                <p className="text-center text-[10px] text-emerald-600 mt-2 font-semibold">Already enrolled. Access unlocked.</p>
+                            )}
                             <p className="text-center text-[10px] text-slate-400 mt-2">30-day money-back guarantee</p>
                         </div>
                     )}

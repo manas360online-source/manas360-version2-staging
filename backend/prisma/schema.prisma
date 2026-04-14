@@ -513,12 +513,16 @@ model TherapistProfile {
   isVerified          Boolean           @default(false)
   verifiedAt          DateTime?
   verifiedByUserId    String?
-  certifications      String[]          @default([])
-  baseLatitude        Float?            @map("base_latitude")
-  baseLongitude       Float?            @map("base_longitude")
-  commissionOverride  Int?              @map("commission_override")
-  rejectionReason     String?           @map("rejection_reason")
-  user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  certifications           String[]            @default([])
+  baseLatitude             Float?              @map("base_latitude")
+  baseLongitude            Float?              @map("base_longitude")
+  commissionOverride       Int?                @map("commission_override")
+  rejectionReason          String?             @map("rejection_reason")
+  certificationStatus      CertificationStatus @default(NONE)
+  certificationCompletedAt DateTime?
+  certificationPaymentId   String?
+  leadBoostScore           Int                 @default(0)
+  user                     User                @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("therapist_profiles")
@@ -2894,6 +2898,7 @@ model AgreementSignatureLog {
 }
 
 enum UserRole {
+  LEARNER
   PATIENT
   THERAPIST
   ADMIN
@@ -3213,4 +3218,11 @@ enum PayoutStatus {
 enum PayoutMethod {
   BANK
   UPI
+}
+
+enum CertificationStatus {
+  NONE
+  ENROLLED
+  COMPLETED
+  EXPIRED
 }

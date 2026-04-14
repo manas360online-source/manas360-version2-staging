@@ -38,7 +38,6 @@ const clinicalNavItems = [
 const selfCareNavItems = [
   { to: '/patient/messages', label: 'Anytime Buddy (AI)', icon: MessageSquare, badge: 'AI' },
   { to: '/patient/check-in', label: 'Daily Check-in', icon: HeartPulse },
-  { to: '/patient/hit-a-sixer', label: 'Hit a Sixer', icon: Sparkles },
   { to: '/patient/wellness-library', label: 'Wellness Library', icon: Sparkles },
 ];
 

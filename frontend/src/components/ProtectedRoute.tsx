@@ -6,6 +6,7 @@ type ProtectedRouteProps = {
 	children: ReactNode;
 	allowedRoles?: Array<
 		| 'patient'
+		| 'learner'
 		| 'therapist'
 		| 'psychiatrist'
 		| 'psychologist'
@@ -22,7 +23,7 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
 	const { isAuthenticated, loading, user } = useAuth();
 	const location = useLocation();
 	const userRole = String(user?.role || '').toLowerCase().replace(/_/g, '');
-	const isProviderRole = userRole === 'therapist' || userRole === 'psychiatrist' || userRole === 'psychologist' || userRole === 'coach';
+	const isProviderRole = userRole === 'learner' || userRole === 'therapist' || userRole === 'psychiatrist' || userRole === 'psychologist' || userRole === 'coach';
 
 	if (loading) {
 		return <div className="p-6 text-center text-slate-600">Checking authentication...</div>;
@@ -55,6 +56,10 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
 	}
 
 	if (isProviderRole) {
+		if (userRole === 'learner') {
+			return <>{children}</>;
+		}
+
 		const isProductionBuild = import.meta.env.PROD === true || String(import.meta.env.MODE || '').toLowerCase() === 'production';
 		const skipFlagEnabled = (import.meta.env.VITE_SKIP_ONBOARDING || '').toString() === 'true';
 		const skipOnboarding = import.meta.env.DEV === true || (!isProductionBuild && skipFlagEnabled);

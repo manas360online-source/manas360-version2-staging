@@ -11,6 +11,7 @@ const db = prisma as any;
  */
 export type UserRole =
 	| 'patient'
+	| 'learner'
 	| 'therapist'
 	| 'psychologist'
 	| 'psychiatrist'
@@ -31,6 +32,7 @@ export const ADMIN_POLICIES: Record<string, string[]> = {
 	'providers.verify': ['manage_therapists'],
 	payments: ['manage_payments'],
 	'payments.view': ['view_analytics'],
+	'payments.manage': ['manage_payments'],
 	'payments.retry': ['manage_payments'],
 	invoices: ['manage_payments'],
 	'invoices.view': ['manage_payments'],
@@ -71,6 +73,7 @@ const normalizeRoleName = (value: unknown): UserRole => String(value || '').toLo
 // This keeps platform-admin routes usable instead of returning blanket 403s.
 const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, string[]> = {
 	patient: ['view_own_records', 'book_sessions', 'view_dashboard'],
+	learner: ['view_dashboard'],
 	therapist: ['view_patients', 'manage_sessions', 'prescribe_treatments', 'view_dashboard'],
 	psychologist: ['view_patients', 'manage_sessions', 'conduct_assessments', 'view_dashboard'],
 	psychiatrist: ['view_patients', 'manage_sessions', 'prescribe_medications', 'order_labs', 'view_dashboard'],
@@ -114,6 +117,7 @@ const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, string[]> = {
  */
 export const roleHierarchy: Record<UserRole, number> = {
 	patient: 1,
+	learner: 2,
 	therapist: 2,
 	psychologist: 2,
 	psychiatrist: 2,

@@ -2,8 +2,9 @@ import type { Request, Response } from 'express';
 import { AppError } from '../middleware/error.middleware';
 import { sendSuccess } from '../utils/response';
 import prisma from '../config/db';
-import { checkEligibility, playGame } from '../services/game-engine.service';
-
+import { checkEligibility, playGame, generateOutcome } from '../services/game-engine.service';
+import jwt from 'jsonwebtoken';
+import { env } from '../config/env';
 const db = prisma as any;
 
 const isSchemaUnavailableError = (error: unknown): boolean => {
@@ -40,6 +41,19 @@ export const getGameEligibilityController = async (req: Request, res: Response):
   // eslint-disable-next-line no-console
   console.log('[DEBUG] Eligibility response for user', userId, JSON.stringify(result));
   sendSuccess(res, result, 'Game eligibility');
+};
+
+export const publicRollController = async (req: Request, res: Response): Promise<void> => {
+  const { outcome, creditAmount } = generateOutcome();
+  
+  // Sign the outcome securely with a 24-hour expiry
+  const token = jwt.sign({ outcome, creditAmount }, env.jwtSecret, { expiresIn: '24h' });
+  
+  sendSuccess(res, {
+    outcome,
+    credit: creditAmount,
+    token
+  }, 'Public game outcome generated');
 };
 
 export const playGameController = async (req: Request, res: Response): Promise<void> => {

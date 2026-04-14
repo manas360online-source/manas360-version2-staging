@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Home, Users, Calendar, Settings, MessageSquare, CreditCard, LogOut, ClipboardCheck, Star, Radio } from 'lucide-react';
+import { Home, Users, Calendar, Settings, MessageSquare, CreditCard, LogOut, ClipboardCheck, Star, Radio, Award } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 export const ProviderSidebar = () => {
@@ -21,6 +21,24 @@ export const ProviderSidebar = () => {
   };
 
   const getMenuConfig = (_providerRole: string) => {
+    const isLearner = _providerRole === 'LEARNER';
+
+    if (isLearner) {
+      return [
+        {
+          category: 'LEARNER',
+          items: [
+            { label: 'Dashboard', path: '/provider/dashboard', icon: <Home size={18} /> },
+            { label: 'Certifications', path: '/provider/certifications', icon: <Award size={18} /> },
+            { label: 'My Certifications', path: '/provider/my-certifications', icon: <ClipboardCheck size={18} /> },
+            { label: 'Complete Onboarding', path: '/onboarding/provider-setup', icon: <Star size={18} /> },
+            { label: 'Messages', path: '/provider/messages', icon: <MessageSquare size={18} /> },
+            { label: 'Settings', path: '/provider/settings', icon: <Settings size={18} /> },
+          ],
+        },
+      ];
+    }
+
     const baseMenu = [
       {
         category: 'MAIN',
@@ -40,6 +58,7 @@ export const ProviderSidebar = () => {
         items: [
           { label: 'Earnings', path: '/provider/earnings', icon: <CreditCard size={18} /> },
           { label: 'Premium Plan', path: '/provider/subscription', icon: <Star size={18} /> },
+          { label: 'Certifications', path: '/provider/certifications', icon: <Award size={18} /> },
           { label: 'Messages', path: '/provider/messages', icon: <MessageSquare size={18} /> },
           { label: 'Settings', path: '/provider/settings', icon: <Settings size={18} /> },
         ]
