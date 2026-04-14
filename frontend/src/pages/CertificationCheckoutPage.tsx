@@ -45,62 +45,54 @@ export const CheckoutPage: React.FC = () => {
     const applicableWallet = Math.min(walletAmount, totalToday);
     const finalTotal = totalToday - applicableWallet;
 
-    const handleTransaction = async (isSuccess: boolean) => {
+    const handleTransaction = async () => {
         setProcessing(true);
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        setProcessing(false);
-
-        if (isSuccess) {
-            const enrollmentId = `ENR-${Date.now()}`;
+        try {
             const fullName = (location.state as any)?.fullName;
+            const email = (location.state as any)?.email;
+            const mobile = (location.state as any)?.mobile;
+            const city = (location.state as any)?.city;
+            const education = (location.state as any)?.education;
+            const motivation = (location.state as any)?.motivation;
 
-            const newEnrollment: Enrollment = {
-                id: enrollmentId,
-                certificationId: cert.id,
-                certificationName: cert.name,
-                slug: cert.slug,
-                badgeColor: cert.badgeColor,
-                enrollmentDate: new Date().toISOString().split('T')[0],
-                paymentStatus: plan === 'full' ? 'Paid' : 'Partial',
-                paymentPlan: plan,
-                amountPaid: totalToday,
-                totalAmount: cert.price_inr,
-                installmentsPaidCount: 1,
-                completionPercentage: 0,
-                modulesCompleted: 0,
-                nextInstallmentDue: plan === 'installment'
-                    ? nextMonth.toISOString()
-                    : undefined,
-                userName: fullName,
-                certId: Math.random().toString(36).substring(2, 8).toUpperCase(),
-            };
-
-            justPaid.current = true;
-            addEnrollment(newEnrollment);
-
-            if (applicableWallet > 0) {
-                try {
-                    await applyWalletToPayment({
-                        referenceId: enrollmentId,
-                        referenceType: 'certification',
-                        amount: Math.round(applicableWallet * 100), // amountMinor
-                    });
-                } catch (err) {
-                    console.warn('Failed to apply wallet credits:', err);
-                }
-            }
-
-            // ── Navigate to the enrollment confirmed/success page ──────────
-            navigate('/enrollment-confirmed', {
-                state: {
-                    certName: cert.name,
-                    enrollmentId,
+            const response = await fetch('/api/v1/enrollment/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
                     fullName,
-                    slug: cert.slug,
-                },
+                    email,
+                    mobile,
+                    city,
+                    education,
+                    motivation,
+                    certName: cert.name,
+                    certSlug: cert.slug,
+                    price: finalTotal
+                }),
             });
-        } else {
+
+            const data = await response.json();
+
+            if (response.ok && data.success && data.data.redirectUrl) {
+                // ── Redirect to PhonePe ──────────────────────────────────
+                window.location.href = data.data.redirectUrl;
+            } else if (response.ok && data.success && data.data.intentCreated) {
+                // Handle free/direct cases if backend supports it
+                navigate('/enrollment-confirmed', {
+                    state: {
+                        certName: cert.name,
+                        fullName,
+                        slug: cert.slug,
+                    },
+                });
+            } else {
+                throw new Error(data.message || 'Failed to initiate payment');
+            }
+        } catch (err: any) {
+            console.error('Payment initiation error:', err);
             navigate(`/payment-failed?slug=${cert.slug}`);
+        } finally {
+            setProcessing(false);
         }
     };
 
@@ -190,7 +182,7 @@ export const CheckoutPage: React.FC = () => {
                         <div className="text-center py-8">
                             <h3 className="text-xl font-bold text-slate-800 mb-4">Free Enrollment</h3>
                             <button
-                                onClick={() => handleTransaction(true)}
+                                onClick={() => handleTransaction()}
                                 disabled={processing}
                                 className="w-full bg-purple-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-purple-700 transition disabled:opacity-50"
                             >
@@ -260,7 +252,7 @@ export const CheckoutPage: React.FC = () => {
 
                             {/* Pay button */}
                             <button
-                                onClick={() => handleTransaction(true)}
+                                onClick={() => handleTransaction()}
                                 disabled={processing}
                                 className="w-full bg-purple-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-purple-700 transition flex items-center justify-center gap-2 disabled:opacity-70 mb-6"
                             >

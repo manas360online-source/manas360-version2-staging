@@ -21,8 +21,6 @@ export const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) =
   const navLinks = [
     { name: 'Journey', path: '/certifications' },
     { name: 'My Certifications', path: '/my-certifications' },
-    { name: 'Lead Boost', path: '/dashboard' },
-    { name: 'Admin', path: '/admin' },
   ];
 
   return (

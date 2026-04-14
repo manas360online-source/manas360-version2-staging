@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import Chintu from "./Chintu";
 import Dino from "./Dino";
+import Pt06HeroVideoFrame from "./Pt06HeroVideoFrame";
 
 const tokens = {
   teal: "#0C7C8A", tealDeep: "#064E5C", tealLight: "#E8F6F8", tealMist: "#F0FAFB",
@@ -57,11 +58,11 @@ const Nav = () => (
         MANAS<span style={{ color: tokens.gold }}>360</span>
       </div>
       <div style={{ fontSize: 12, color: tokens.stone, display: "flex", alignItems: "center", gap: 6 }}>
-        <a href="#" style={{ color: tokens.teal, textDecoration: "none", fontWeight: 600 }}>PT01 Hub</a>
+        <a href="#" style={{ color: tokens.teal, textDecoration: "none", fontWeight: 600 }}>PT01</a>
         {" → "}
         <a href="#" style={{ color: tokens.teal, textDecoration: "none", fontWeight: 600 }}>PT06</a>
         {" → "}
-        <span style={{ color: tokens.slate3, fontWeight: 600 }}>Digital Pet Hub</span>
+        <span style={{ color: tokens.slate3, fontWeight: 600 }}>Digital Pet</span>
       </div>
     </div>
   </nav>
@@ -78,21 +79,13 @@ const Hero = () => {
       <div style={{ position: "absolute", top: -60, right: -80, width: 350, height: 350, borderRadius: "50%", background: "radial-gradient(circle,rgba(124,58,237,.07),transparent 70%)", pointerEvents: "none" }} />
       <div style={{ maxWidth: 1060, margin: "0 auto", padding: "0 20px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 24, flexWrap: "wrap", marginBottom: 28 }}>
-          <div style={{
+          <Pt06HeroVideoFrame style={{
             width: 220, height: 390, borderRadius: 20, overflow: "hidden",
             boxShadow: "0 12px 40px rgba(124,58,237,.15)", border: "3px solid rgba(124,58,237,.2)",
             flexShrink: 0, background: "#1a1a2e", position: "relative",
             display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column",
             animation: "glow 3s ease infinite",
-          }}>
-            <div style={{ fontSize: 52, marginBottom: 12 }}>🎬</div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,.7)" }}>Avatar Pitch Video</div>
-            <div style={{
-              position: "absolute", bottom: 10, left: 10, right: 10, textAlign: "center",
-              background: "rgba(0,0,0,.6)", backdropFilter: "blur(6px)",
-              borderRadius: 10, padding: "6px 10px", fontSize: 10, color: "#fff", fontWeight: 600,
-            }}>🎬 Avatar Pitch — "Your Digital Companion"</div>
-          </div>
+          }} />
 
           <div style={{ textAlign: "left", maxWidth: 440 }}>
             <Badge bg={tokens.violetLight} color={tokens.violet} style={{ marginBottom: 12 }}>🐾 PT06 — Digital Pet Hub</Badge>

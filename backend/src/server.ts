@@ -10,7 +10,6 @@ import { startChatRetentionJob } from './jobs/chatRetention.job';
 import { initSubscriptionCron } from './jobs/subscriptionCron';
 import { initProviderLeadCron } from './cron/providerLeadCron';
 import { startPatientSharedReportCleanupJob } from './jobs/patientSharedReportCleanup.job';
-import { ensureSsoTables } from './services/sso.service';
 import { setSocketIO } from './routes/gps.routes';
 import { reconcilePendingPayments } from './cron/paymentReconciliation';
 import { initLeadDistributionCrons } from './cron/lead-distribution.cron';
@@ -27,22 +26,6 @@ const startServer = async (): Promise<void> => {
 	// Initialize PhonePe OAuth token refresh (proactive background refresh)
 	await initializePhonePeTokenRefresh();
 
-	// ensure SSO tables exist
-	void ensureSsoTables().catch((err) => {
-			const code = String((err as any)?.code || '');
-			const message = String((err as any)?.message || '').toLowerCase();
-			const transientSocketClose = code === 'UND_ERR_SOCKET' || message.includes('other side closed');
-			if (transientSocketClose) {
-				console.warn('SSO table init transient socket closure; scheduling retry');
-				setTimeout(() => {
-					void ensureSsoTables().catch((retryErr) => {
-						console.error('SSO table retry failed', retryErr);
-					});
-				}, 5000);
-				return;
-			}
-			console.error('SSO table init failed', err);
-		});
 
 	const server = app.listen(env.port, () => {
 		console.log(`Server running on port ${env.port}`);

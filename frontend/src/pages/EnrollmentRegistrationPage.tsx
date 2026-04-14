@@ -95,67 +95,9 @@ const EnrollmentRegistrationPage: React.FC = () => {
     e.preventDefault();
     if (!validate()) return;
 
-    setProcessing(true);
-    setGeneralError(null);
-
-    try {
-      const response = await fetch('/api/enrollment/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fullName: form.fullName.trim(),
-          email: form.email.trim().toLowerCase(),
-          mobile: form.mobile.trim(),
-          city: form.city.trim(),
-          education: form.education,
-          motivation: form.motivation.trim(),
-          certName,
-          certSlug: slug ?? null,
-          price: price ?? null,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        navigateToCheckout();
-        return;
-      }
-
-      if (response.status === 409) {
-        const isPhone = data.message?.toLowerCase().includes('phone');
-        setFieldErrors(prev => ({
-          ...prev,
-          [isPhone ? 'mobile' : 'email']: data.message,
-        }));
-        setProcessing(false);
-        return;
-      }
-
-      if (response.status === 400) {
-        setGeneralError(data.message || 'Please check your details and try again.');
-        setProcessing(false);
-        return;
-      }
-
-      throw new Error(data.message || 'Server error');
-
-    } catch (err: any) {
-      const isRouteNotFound =
-        err?.message?.toLowerCase().includes('route not found') ||
-        err?.message?.toLowerCase().includes('404') ||
-        err instanceof TypeError;
-
-      if (isRouteNotFound) {
-        // Backend not wired up yet — go straight to checkout
-        navigateToCheckout();
-        return;
-      }
-
-      setGeneralError('Something went wrong. Please try again.');
-    } finally {
-      setProcessing(false);
-    }
+    // We no longer call the API here. 
+    // We pass the form data to the Checkout page which will handle the payment initiation.
+    navigateToCheckout();
   };
 
   const inputClass = (field: keyof FormData) =>

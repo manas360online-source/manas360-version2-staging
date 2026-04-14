@@ -26,6 +26,7 @@ export const initiatePatientSubscriptionPayment = async (
 	const plan = await getActivePlatformPlan(planKey);
 	if (!plan) throw new AppError('Invalid subscription plan', 422);
 	const planVersion = await getPricingConfigVersion();
+	const planPriceMinor = Math.max(0, Math.round(Number(plan.price || 0) * 100));
 
 	const existingSubscription = await prisma.patientSubscription.findUnique({ where: { userId } }).catch(() => null);
 	const isAnyActiveSubscription = Boolean(
@@ -33,7 +34,8 @@ export const initiatePatientSubscriptionPayment = async (
 		&& String(existingSubscription.status || '').toLowerCase() === 'active'
 		&& new Date(existingSubscription.renewalDate).getTime() > Date.now(),
 	);
-	if (isAnyActiveSubscription) {
+	const isActivePaidSubscription = Boolean(isAnyActiveSubscription && Number(existingSubscription?.price || 0) > 0);
+	if (isActivePaidSubscription) {
 		throw new AppError('An active subscription already exists', 409);
 	}
 
@@ -89,7 +91,7 @@ export const initiatePatientSubscriptionPayment = async (
 		Math.round(
 			Number.isFinite(Number(options?.amountMinorOverride))
 				? Number(options?.amountMinorOverride)
-				: Number(plan.price || 0) * 100,
+				: planPriceMinor,
 		),
 	);
 	const planPriceInr = Math.round(amountMinor / 100);

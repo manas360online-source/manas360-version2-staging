@@ -656,6 +656,106 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 			});
 			return { handled: true, message: 'PhonePe provider subscription payment processed (with atomic pending activation)' };
 		}
+
+		if (merchantTransactionId.startsWith('CERT_')) {
+			const payment = await db.financialPayment.findUnique({
+				where: { merchantTransactionId: merchantTransactionId },
+			});
+
+			if (!payment) {
+				logger.error('[PaymentService] Certification payment record not found', { merchantTransactionId });
+				return { handled: false, message: 'Payment record not found' };
+			}
+
+			if (payment.status === 'CAPTURED') {
+				return { handled: true, message: 'Certification already processed' };
+			}
+
+			const metadata = payment.metadata as any;
+			const { email, mobile, fullName, certSlug } = metadata;
+
+			// 1. Find or create user
+			let user = await db.user.findFirst({
+				where: {
+					OR: [
+						{ email: email },
+						{ phone: mobile }
+					]
+				}
+			});
+
+			if (!user) {
+				user = await db.user.create({
+					data: {
+						email,
+						phone: mobile,
+						firstName: fullName.split(' ')[0] || '',
+						lastName: fullName.split(' ').slice(1).join(' ') || '',
+						role: 'THERAPIST',
+						status: 'ACTIVE'
+					}
+				});
+			}
+
+			// 2. Find or create therapist profile
+			let profile = await db.therapistProfile.findUnique({
+				where: { userId: user.id }
+			});
+
+			if (!profile) {
+				profile = await db.therapistProfile.create({
+					data: {
+						userId: user.id,
+						displayName: fullName,
+						certifications: [certSlug]
+					}
+				});
+			} else {
+				// Append certification if not already present
+				const existingCerts = Array.isArray(profile.certifications) ? profile.certifications : [];
+				if (!existingCerts.includes(certSlug)) {
+					await db.therapistProfile.update({
+						where: { id: profile.id },
+						data: {
+							certifications: {
+								push: certSlug
+							}
+						}
+					});
+				}
+			}
+
+			// 3. Update payment record
+			await db.financialPayment.update({
+				where: { id: payment.id },
+				data: {
+					status: 'CAPTURED',
+					providerId: user.id,
+					capturedAt: new Date(),
+					metadata: {
+						...metadata,
+						userId: user.id,
+						provisionedAt: new Date().toISOString()
+					}
+				}
+			});
+
+			// 4. Record revenue (using CONTENT as proximity for certification)
+			await db.revenueLedger.create({
+				data: {
+					type: 'CONTENT',
+					grossAmountMinor: payment.amountMinor,
+					platformCommissionMinor: payment.amountMinor,
+					providerShareMinor: 0,
+					paymentType: 'PROVIDER_FEE',
+					currency: payment.currency,
+					referenceId: merchantTransactionId
+				}
+			});
+
+			logger.info(`[PaymentService] Certification provisioned for user ${user.id}`, { certSlug });
+			return { handled: true, message: 'Certification payment processed' };
+		}
 	}
 
 	logger.warn(`[PaymentService] PhonePe Webhook unhandled condition (success: ${success}, code: ${code})`, { merchantTransactionId });

@@ -9,37 +9,49 @@ const formatCompact = (value: number): string => {
 };
 
 export const getLandingMetrics = async () => {
-	const [providers, patients, completedSessions, activeSubscriptions, activeCertifications, aiConversations] =
-		await prisma.$transaction([
-			prisma.user.count({
-				where: {
-					role: { in: [UserRole.THERAPIST, UserRole.PSYCHIATRIST, UserRole.COACH] },
-					isDeleted: false,
-				},
-			}),
-			prisma.user.count({
-				where: {
-					role: UserRole.PATIENT,
-					isDeleted: false,
-				},
-			}),
-			prisma.therapySession.count({
-				where: {
-					status: 'COMPLETED',
-				},
-			}),
-			prisma.marketplaceSubscription.count({
-				where: {
-					status: 'ACTIVE',
-				},
-			}),
-			prisma.certification.count({
-				where: {
-					isActive: true,
-				},
-			}),
-			prisma.aIConversation.count(),
-		]);
+	const db = prisma as any;
+
+	const safeCount = async (modelName: string, args?: any): Promise<number> => {
+		try {
+			const model = db?.[modelName];
+			if (!model || typeof model.count !== 'function') return 0;
+			const value = await model.count(args || {});
+			return Number(value || 0);
+		} catch {
+			return 0;
+		}
+	};
+
+	const [providers, patients, completedSessions, activeSubscriptions, activeCertifications, aiConversations] = await Promise.all([
+		safeCount('user', {
+			where: {
+				role: { in: [UserRole.THERAPIST, UserRole.PSYCHIATRIST, UserRole.COACH] },
+				isDeleted: false,
+			},
+		}),
+		safeCount('user', {
+			where: {
+				role: UserRole.PATIENT,
+				isDeleted: false,
+			},
+		}),
+		safeCount('therapySession', {
+			where: {
+				status: 'COMPLETED',
+			},
+		}),
+		safeCount('marketplaceSubscription', {
+			where: {
+				status: 'ACTIVE',
+			},
+		}),
+		safeCount('certification', {
+			where: {
+				isActive: true,
+			},
+		}),
+		safeCount('aIConversation'),
+	]);
 
 	const metrics = [
 		{ key: 'providers', label: 'Verified Providers', value: providers },

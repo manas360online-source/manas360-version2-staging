@@ -137,6 +137,11 @@ export type SmartMatchProvidersResult = {
   message?: string;
 };
 
+const DEFAULT_SMART_MATCH_AVAILABILITY = {
+  daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+  timeSlots: [{ startMinute: 0, endMinute: 1439 }],
+};
+
 const unwrapPayload = <T = any>(value: any): T => {
   if (value && typeof value === 'object') {
     if (value.data !== undefined) {
@@ -565,8 +570,8 @@ export const patientApi = {
     const response = await http.patch(`/v1/patient/cbt-assignments/${encodeURIComponent(assignmentId)}`, payload);
     return response.data?.data ?? response.data;
   },
-  getPricing: async () =>
-    (await http.get('/v1/pricing')).data,
+  getPricing: async (params?: { mode?: 'domestic' | 'nri' }) =>
+    (await http.get('/v1/pricing', { params })).data,
   aiChat: async (payload: { message: string; bot_type?: 'mood_ai' | 'clinical_ai'; response_style?: 'concise' | 'detailed' }) =>
     (await http.post('/chat/message', {
       message: payload.message,
@@ -601,8 +606,38 @@ export const patientApi = {
     getDocumentDownloadUrl: async (id: string) => (await http.get(`/v1/patient/documents/${encodeURIComponent(id)}/download`)).data,
     // Care Team
     getMyProviders: async () => (await http.get('/v1/patient/care-team')).data,
-    getAvailableProviders: async (params?: { specialization?: string; language?: string; maxPrice?: number; role?: string }) =>
-      (await http.get('/v1/patient/providers/available', { params })).data,
+    getAvailableProviders: async (params?: { specialization?: string; language?: string; maxPrice?: number; role?: string }) => {
+      const result = await patientApi.getAvailableProvidersForSmartMatch(
+        DEFAULT_SMART_MATCH_AVAILABILITY,
+        params?.role,
+        {
+          languages: params?.language ? [params.language] : undefined,
+        },
+      );
+
+      let providers = Array.isArray(result.providers) ? result.providers : [];
+      if (params?.specialization) {
+        const specialization = String(params.specialization).toLowerCase();
+        providers = providers.filter((provider: any) => {
+          const specializations = Array.isArray(provider?.specializations)
+            ? provider.specializations
+            : [provider?.specialization].filter(Boolean);
+          return specializations.some((item: string) => String(item).toLowerCase().includes(specialization));
+        });
+      }
+      if (typeof params?.maxPrice === 'number') {
+        providers = providers.filter((provider: any) => Number(provider?.sessionPrice || provider?.session_rate || 0) <= Number(params.maxPrice));
+      }
+
+      return {
+        data: {
+          items: providers,
+          total: providers.length,
+          page: 1,
+          limit: providers.length,
+        },
+      };
+    },
       requestAppointmentToPreferredProviders: async (payload: {
         providerIds: string[];
         preferredLanguage?: string;
@@ -612,14 +647,21 @@ export const patientApi = {
         urgency?: string;
         note?: string;
       }) =>
-        (await http.post('/v1/patient/appointments/request', payload)).data,
+        (await http.post('/v1/patient/appointments/smart-match', {
+          availabilityPrefs: DEFAULT_SMART_MATCH_AVAILABILITY,
+          providerIds: payload.providerIds,
+          preferredSpecialization: payload.preferredSpecialization,
+          context: payload.carePath,
+          languages: payload.preferredLanguage ? [payload.preferredLanguage] : undefined,
+          note: payload.note,
+        })).data,
       confirmProposedAppointmentSlot: async (payload: {
         requestRef: string;
         providerId: string;
         proposedStartAt?: string;
         accept: boolean;
       }) =>
-        (await http.post('/v1/patient/appointments/confirm-slot', payload)).data,
+        (await http.post('/v1/patient/appointments/smart-match/confirm-slot', payload)).data,
     // Messaging
     getConversations: async () => (await http.get('/v1/patient/messages/conversations')).data,
     getMessages: async (conversationId: string) => (await http.get(`/v1/patient/messages/${encodeURIComponent(conversationId)}`)).data,

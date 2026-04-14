@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import Pt06HeroVideoFrame from '../../components/common/Pt06HeroVideoFrame';
 
 // ── TEMBO MODAL ──────────────────────────────────────────────────────────────
 function TemboModal({ onClose }: { onClose: () => void }) {
@@ -673,11 +674,11 @@ export default function DigitalPetHubPage() {
               MANAS<span className="text-amber-500">360</span>
             </div>
             <div className="text-xs text-slate-600 flex items-center gap-2">
-              <a href="/" className="text-teal-600 font-semibold hover:text-teal-700">PT01 Hub</a>
+              <a href="/" className="text-teal-600 font-semibold hover:text-teal-700">PT01</a>
               <span>→</span>
               <a href="/" className="text-teal-600 font-semibold hover:text-teal-700">PT06</a>
               <span>→</span>
-              <span className="font-semibold text-slate-600">Digital Pet Hub</span>
+              <span className="font-semibold text-slate-600">Digital Pet</span>
             </div>
           </div>
         </div>
@@ -688,12 +689,7 @@ export default function DigitalPetHubPage() {
         <div className="max-w-6xl mx-auto px-6">
           <div className="flex gap-12 items-center">
             <div className="flex-shrink-0">
-              <div className="w-72 aspect-[9/16] rounded-3xl overflow-hidden bg-black shadow-2xl border-4 border-violet-100 flex items-center justify-center">
-                <div className="text-center text-white text-sm p-4">
-                  <span className="block text-2xl mb-2">🐾</span>
-                  Avatar Pitch — "Your Digital Companion"
-                </div>
-              </div>
+              <Pt06HeroVideoFrame className="w-72 aspect-[9/16] rounded-3xl overflow-hidden bg-black shadow-2xl border-4 border-violet-100" />
             </div>
             <div className="flex-1">
               <div className="inline-block px-3 py-1 rounded-full bg-violet-200 text-violet-700 text-xs font-bold mb-4 tracking-wider">
