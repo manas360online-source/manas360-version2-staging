@@ -1,5 +1,4 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
 import "./PremiumTheraphyLandingPage.css";
 
 type HubCard = {
@@ -22,16 +21,6 @@ const basicCards: HubCard[] = [
     status: "ACTIVE",
     action: "Explore Sounds →",
     price: "Free tier + Premium Unlimited"
-  },
-  {
-    icon: "🌙",
-    title: "Sleep Therapy",
-    description:
-      "Clinically-guided sleep programs combining relaxation, sleep hygiene coaching, and bedtime soundscapes for insomnia and restless nights.",
-    tags: ["PT02 - Sleep Programs", "PT03 - Session Player", "Progressive Relaxation", "Sleep Hygiene", "Body Scans"],
-    status: "ACTIVE",
-    action: "Start Sleep Program →",
-    price: "Free tier + Premium Full Library"
   },
   {
     icon: "🤖",
@@ -99,8 +88,6 @@ const advancedCards: HubCard[] = [
 ];
 
 const PremiumTheraphyLandingPage: React.FC = () => {
-  const navigate = useNavigate();
-
   return (
     <main className="premium-theraphy-page">
       <header className="premium-topbar">
@@ -158,8 +145,8 @@ const PremiumTheraphyLandingPage: React.FC = () => {
       </section>
 
       <section className="premium-shell section-head">
-        <h3>🟢 Basic Practices <span>LIVE NOW</span></h3>
-        <p>5 therapeutic tools available</p>
+        <h3>🟢 Active Therapies <span>LIVE NOW</span></h3>
+        <p>{basicCards.length} therapeutic tools available</p>
       </section>
 
       <section className="premium-shell tool-grid basic">
@@ -187,7 +174,7 @@ const PremiumTheraphyLandingPage: React.FC = () => {
       </section>
 
       <section className="premium-shell section-head">
-        <h3>🔮 Advanced Therapy <span className="soon">COMING SOON</span></h3>
+        <h3>⏳ Coming Soon <span className="soon">IN DEVELOPMENT</span></h3>
         <p>3 advanced therapies on the horizon - Premium users get first access</p>
       </section>
 
@@ -217,13 +204,12 @@ const PremiumTheraphyLandingPage: React.FC = () => {
 
       <section className="premium-shell sitemap">
         <h3>📐 Complete Patient Therapy Sitemap - V2</h3>
-        <p>Screen inventory after cleanup. Merged duplicate items are retained for traceability.</p>
+        <p>Screen inventory after cleanup. Strikethrough items were merged or removed.</p>
       </section>
 
       <footer className="premium-page-footer">
-        <button type="button" className="back-home" onClick={() => navigate("/")}>
-          ← Back to Home
-        </button>
+        <div className="premium-footer-brand">MANAS<span>360</span></div>
+        <p className="premium-footer-copy">Premium Therapy Hub - Your complete healing ecosystem. Explore freely or follow your therapist's prescription.</p>
       </footer>
     </main>
   );

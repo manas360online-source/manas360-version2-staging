@@ -13,6 +13,7 @@ const FindSparkLandingPage = lazy(() => import('./pages/FindSparkLandingPage'));
 const SelfHelpLandingPage = lazy(() => import('./pages/SelfHelpLandingPage'));
 const CorporateLandingPage = lazy(() => import('./pages/CorporateLandingPage'));
 const PremiumTheraphyLandingPage = lazy(() => import('./pages/PremiumTheraphyLandingPage'));
+const NRILandingPage = lazy(() => import('./pages/NRILandingPage'));
 import { AuthProvider, getPostLoginRoute, useAuth } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 import { Assessment } from './pages/Assessment'
@@ -260,6 +261,7 @@ function App() {
             <Route path="/self-help" element={<SelfHelpLandingPage />} />
             <Route path="/corporate-landing" element={<CorporateLandingPage />} />
             <Route path="/premium-theraphy" element={<PremiumTheraphyLandingPage />} />
+            <Route path="/nri-landing" element={<NRILandingPage />} />
             <Route path="/assessment" element={<Assessment onSubmit={handleAssessmentSubmit} />} />
             <Route path="/assessment-preset" element={<PresetAssessmentEntry />} />
             <Route path="/eap/:companyKey/screen" element={<EapScreeningPage />} />
