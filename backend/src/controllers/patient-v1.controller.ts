@@ -100,30 +100,56 @@ export const getMyAssessmentsController = async (req: Request, res: Response): P
 		// Log for debugging
 		console.log(`[ClinicalAssessment] Fetching history for user: ${userId}`);
 
+		const patientProfile = await prisma.patientProfile.findUnique({ where: { userId }, select: { id: true } });
+		if (!patientProfile) {
+			sendSuccess(res, { items: [] }, 'Patient assessments fetched');
+			return;
+		}
+
 		// Defensive check: ensure prisma models exist on the client to avoid crash if client is out of sync
 		const phq9Model = (prisma as any).pHQ9Assessment;
 		const gad7Model = (prisma as any).gAD7Assessment;
+		const patientAssessmentModel = (prisma as any).patientAssessment;
 
-		if (!phq9Model || !gad7Model) {
-			console.warn(`[ClinicalAssessment] Warning: One or more assessment models missing from Prisma client.`);
+		if (!patientAssessmentModel && !phq9Model && !gad7Model) {
+			console.warn(`[ClinicalAssessment] Warning: Assessment models missing from Prisma client.`);
 			sendSuccess(res, { items: [] }, 'Patient assessments (partial/unavailable)');
 			return;
 		}
 
-		const [phq9Assessments, gad7Assessments] = await Promise.all([
-			phq9Model.findMany({
-				where: { userId },
-				orderBy: { createdAt: 'desc' },
-				select: { id: true, totalScore: true, answers: true, createdAt: true },
-			}),
-			gad7Model.findMany({
-				where: { userId },
-				orderBy: { createdAt: 'desc' },
-				select: { id: true, totalScore: true, answers: true, createdAt: true },
-			}),
+		const [patientAssessments, phq9Assessments, gad7Assessments] = await Promise.all([
+			patientAssessmentModel
+				? patientAssessmentModel.findMany({
+					where: { patientId: patientProfile.id },
+					orderBy: { createdAt: 'desc' },
+					select: { id: true, type: true, totalScore: true, severityLevel: true, createdAt: true },
+				})
+				: Promise.resolve([]),
+			phq9Model
+				? phq9Model.findMany({
+					where: { userId },
+					orderBy: { createdAt: 'desc' },
+					select: { id: true, totalScore: true, answers: true, createdAt: true },
+				})
+				: Promise.resolve([]),
+			gad7Model
+				? gad7Model.findMany({
+					where: { userId },
+					orderBy: { createdAt: 'desc' },
+					select: { id: true, totalScore: true, answers: true, createdAt: true },
+				})
+				: Promise.resolve([]),
 		]);
 
-		const normalized = [
+		const canonicalRows = (patientAssessments || []).map((item: any) => ({
+			id: item.id,
+			type: String(item.type || 'Assessment'),
+			createdAt: item.createdAt instanceof Date ? item.createdAt : new Date(item.createdAt || Date.now()),
+			score: Number(item.totalScore || 0),
+			severityLevel: String(item.severityLevel || 'mild'),
+		}));
+
+		const legacyRows = [
 			...(phq9Assessments || []).map((item: any) => ({
 				id: item.id,
 				type: 'PHQ-9' as const,
@@ -138,7 +164,9 @@ export const getMyAssessmentsController = async (req: Request, res: Response): P
 				score: Number(item.totalScore || 0),
 				severityLevel: null,
 			})),
-		]
+		];
+
+		const normalized = (canonicalRows.length ? canonicalRows : legacyRows)
 			.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
 			.map((item) => ({
 				id: item.id,

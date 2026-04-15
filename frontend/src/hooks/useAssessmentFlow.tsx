@@ -13,12 +13,11 @@ import type {
 import { useAuth } from '../context/AuthContext';
 import { useErrorHandler } from './useErrorHandler';
 import { useLoadingStates } from './useLoadingStates';
+import { CLINICAL_ASSESSMENT_TEMPLATE_KEYS } from '../utils/clinicalAssessments';
 
-const PHQ9_TEMPLATE_KEY = 'phq-9-paid-assessment-v1';
-const GAD7_TEMPLATE_KEY = 'gad-7-paid-assessment-v1';
 const structuredTemplateKeys: Record<ClinicalAssessmentKey, string> = {
-  'PHQ-9': PHQ9_TEMPLATE_KEY,
-  'GAD-7': GAD7_TEMPLATE_KEY,
+  'PHQ-9': CLINICAL_ASSESSMENT_TEMPLATE_KEYS['PHQ-9'],
+  'GAD-7': CLINICAL_ASSESSMENT_TEMPLATE_KEYS['GAD-7'],
 };
 
 const ASSESSMENT_DRAFT_BASE_KEY = 'patient-clinical-assessment-draft-v1';

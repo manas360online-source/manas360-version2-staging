@@ -1,3 +1,10 @@
+import { useEffect } from 'react';
+import { Link } from 'react-router-dom';
+
+type DigitalPetsHubPageProps = {
+  selectedPet?: 'golden-puppy' | 'wise-owl' | 'patience-turtle';
+};
+
 const scienceCards = [
   { emoji: '💜', chem: 'Oxytocin', desc: '"Love hormone" - released when your pet greets you, nuzzles, or responds to your care.', trigger: 'Trigger: Pet greetings, nurturing' },
   { emoji: '☀️', chem: 'Serotonin', desc: '"Happy chemical" - boosted by daily routines, care rituals, and watching your pet thrive.', trigger: 'Trigger: Daily check-ins, growth' },
@@ -22,6 +29,12 @@ export default function DigitalPetsHubPage() {
     const el = document.getElementById(id);
     if (el) el.scrollIntoView({ behavior: 'smooth' });
   };
+
+  useEffect(() => {
+    if (!selectedPet) return;
+    const card = document.querySelector(`[data-pet="${selectedPet}"]`) as HTMLElement | null;
+    if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+  }, [selectedPet]);
 
   return (
     <div className="pet360-root min-h-screen">
@@ -105,7 +118,6 @@ export default function DigitalPetsHubPage() {
           .pet360-root .path-grid,.pet360-root .loop-grid,.pet360-root .pricing-grid{grid-template-columns:1fr;}
           .pet360-root .pets-row{grid-template-columns:1fr 1fr;}
         }
-        @media(max-width:480px){ .pet360-root .pets-row{grid-template-columns:1fr;} }
       `}</style>
 
       <div className="nav">
@@ -177,41 +189,118 @@ export default function DigitalPetsHubPage() {
           <p style={{ textAlign: 'center', fontSize: 13, color: '#64748B', maxWidth: 500, margin: '0 auto 24px' }}>Each species is designed for a specific therapeutic purpose. Your pet isn&apos;t just cute - it&apos;s medicine.</p>
 
           <div className="tier-section">
-            <div className="tier-header"><h2>Tier 1 - Ambient Companions</h2><span className="badge free">FREE</span></div>
+            <div className="tier-header"><h2>Tier 1 - Ambient Companions</h2></div>
             <div className="pets-row">
-              <div className="pet-card"><div className="pet-visual" style={{ background: 'linear-gradient(135deg,#DBEAFE,#BFDBFE)' }}><span className="pet-price free">FREE</span>🐟</div><div className="pet-body"><div className="pet-name">Koi Fish</div><div className="pet-env">🌊 Zen Pond</div><span className="pet-benefit calm">Anxiety</span><span className="pet-benefit calm">Stress Relief</span></div></div>
-              <div className="pet-card"><div className="pet-visual" style={{ background: 'linear-gradient(135deg,#D1FAE5,#A7F3D0)' }}><span className="pet-price free">FREE</span>🐱</div><div className="pet-body"><div className="pet-name">Lotus Cat</div><div className="pet-env">🏯 Garden Temple</div><span className="pet-benefit calm">Grounding</span><span className="pet-benefit mind">Mindfulness</span></div></div>
-              <div className="pet-card"><div className="pet-visual" style={{ background: 'linear-gradient(135deg,#E0E7FF,#C7D2FE)' }}><span className="pet-price free">FREE</span>✨</div><div className="pet-body"><div className="pet-name">Cloud Sprite</div><div className="pet-env">☁️ Sky Realm</div><span className="pet-benefit calm">Lightness</span><span className="pet-benefit growth">Letting Go</span></div></div>
+              <div className="pet-card"><div className="pet-visual" style={{ background: 'linear-gradient(135deg,#DBEAFE,#BFDBFE)' }}>🐟</div><div className="pet-body"><div className="pet-name">Koi Fish</div><div className="pet-env">🌊 Zen Pond</div><span className="pet-benefit calm">Anxiety</span><span className="pet-benefit calm">Stress Relief</span></div></div>
+              <div className="pet-card"><div className="pet-visual" style={{ background: 'linear-gradient(135deg,#D1FAE5,#A7F3D0)' }}>🐱</div><div className="pet-body"><div className="pet-name">Lotus Cat</div><div className="pet-env">🏯 Garden Temple</div><span className="pet-benefit calm">Grounding</span><span className="pet-benefit mind">Mindfulness</span></div></div>
+              <div className="pet-card"><div className="pet-visual" style={{ background: 'linear-gradient(135deg,#E0E7FF,#C7D2FE)' }}>✨</div><div className="pet-body"><div className="pet-name">Cloud Sprite</div><div className="pet-env">☁️ Sky Realm</div><span className="pet-benefit calm">Lightness</span><span className="pet-benefit growth">Letting Go</span></div></div>
             </div>
           </div>
 
           <div className="tier-section">
-            <div className="tier-header"><h2>Tier 2 - Interactive Companions</h2><span className="badge paid">₹99/mo or ₹199 OWN</span></div>
+            <div className="tier-header"><h2>Tier 2 - Interactive Companions</h2></div>
             <div className="pets-row">
-              <Link to="/golden-puppy" style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
-                <div className="pet-card"><div className="pet-visual" style={{ background: 'linear-gradient(135deg,#FEF3C7,#FDE68A)' }}><span className="pet-price paid">₹99/mo</span>🐕</div><div className="pet-body"><div className="pet-name">Golden Puppy</div><div className="pet-env">🌻 Sunny Meadow</div><span className="pet-benefit joy">Joy</span><span className="pet-benefit joy">Routine Building</span></div></div>
+              <Link to="/chintu" style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
+                <div className={`pet-card ${selectedPet === 'wise-owl' ? 'pet-focus' : ''}`} data-pet="wise-owl"><div className="pet-visual" style={{ background: 'linear-gradient(135deg,#FFE4CC,#FFD1AA)' }}>🦊</div><div className="pet-body"><div className="pet-name">Chintu - The Clever Fox</div><div className="pet-env">🔥 Dopamine Engine</div><span className="pet-benefit joy">Dopamine Boost</span><span className="pet-benefit joy">Rewards &amp; Play</span></div></div>
               </Link>
-              <Link to="/wise-owl" style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
-                <div className="pet-card"><div className="pet-visual" style={{ background: 'linear-gradient(135deg,#E0F2FE,#BAE6FD)' }}><span className="pet-price paid">₹99/mo</span>🦉</div><div className="pet-body"><div className="pet-name">Wise Owl</div><div className="pet-env">📚 Forest Library</div><span className="pet-benefit mind">Cognitive</span><span className="pet-benefit mind">Quiz Games</span></div></div>
+              <Link to="/dino" style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
+                <div className={`pet-card ${selectedPet === 'golden-puppy' ? 'pet-focus' : ''}`} data-pet="golden-puppy"><div className="pet-visual" style={{ background: 'linear-gradient(135deg,#D1FAE5,#A7F3D0)' }}>🦕</div><div className="pet-body"><div className="pet-name">Baby Dino</div><div className="pet-env">🌿 Love Nest</div><span className="pet-benefit calm">Oxytocin Bond</span><span className="pet-benefit growth">Nurturing Care</span></div></div>
               </Link>
               <Link to="/elephant" style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
-                <div className="pet-card"><div className="pet-visual" style={{ background: 'linear-gradient(135deg,#D1FAE5,#6EE7B7)' }}><span className="pet-price paid">₹99/mo</span>🐘</div><div className="pet-body"><div className="pet-name">Healing Elephant</div><div className="pet-env">🌳 Sacred Grove</div><span className="pet-benefit strength">Emotional Strength</span><span className="pet-benefit mind">Memory</span></div></div>
+                <div className="pet-card"><div className="pet-visual" style={{ background: 'linear-gradient(135deg,#D1FAE5,#6EE7B7)' }}>🐘</div><div className="pet-body"><div className="pet-name">Appu - Healing Elephant</div><div className="pet-env">🌳 Sacred Grove</div><span className="pet-benefit strength">Emotional Strength</span><span className="pet-benefit mind">Memory</span></div></div>
               </Link>
-              <Link to="/patience-turtle" style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
-                <div className="pet-card"><div className="pet-visual" style={{ background: 'linear-gradient(135deg,#FED7AA,#FDBA74)' }}><span className="pet-price paid">₹99/mo</span>🐒</div><div className="pet-body"><div className="pet-name">Patience Turtle</div><div className="pet-env">🏖️ Quiet Beach</div><span className="pet-benefit growth">Patience</span><span className="pet-benefit calm">Slow Living</span></div></div>
+              <Link to="/goldenPup" style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
+                <div className={`pet-card ${selectedPet === 'patience-turtle' ? 'pet-focus' : ''}`} data-pet="patience-turtle"><div className="pet-visual" style={{ background: 'linear-gradient(135deg,#FFE4CC,#FFD1AA)' }}>🐕</div><div className="pet-body"><div className="pet-name">Golden Pup</div><div className="pet-env">🏡 Home Base</div><span className="pet-benefit calm">Loyalty</span><span className="pet-benefit joy">Playfulness</span></div></div>
               </Link>
+            </div>
+          </div>
+
+          <div className="tier-section">
+            <div className="tier-header">
+              <h2>Tier 3 - AI Companions</h2>
+              <span className="badge" style={{ background: '#FEF3C7', color: '#D97706' }}>Coming Soon</span>
+            </div>
+            <div className="pets-row">
+              <div className="pet-card" style={{ opacity: 0.85 }}>
+                <div className="pet-visual" style={{ background: 'linear-gradient(135deg,#FCE7F3,#FBCFE8)' }}>🦋</div>
+                <div className="pet-body">
+                  <div className="pet-name">Phoenix Friend</div>
+                  <div className="pet-env">🔥 Rebirth Temple</div>
+                  <span className="pet-benefit strength">Transformation</span><span className="pet-benefit growth">Crisis Support</span>
+                  <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: '#D97706' }}>Coming Soon</div>
+                </div>
+              </div>
+              <div className="pet-card" style={{ opacity: 0.85 }}>
+                <div className="pet-visual" style={{ background: 'linear-gradient(135deg,#EDE9FE,#DDD6FE)' }}>🐉</div>
+                <div className="pet-body">
+                  <div className="pet-name">Guardian Dragon</div>
+                  <div className="pet-env">⛰️ Crystal Cave</div>
+                  <span className="pet-benefit strength">Protection</span><span className="pet-benefit mind">Voice Chat</span>
+                  <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: '#D97706' }}>Coming Soon</div>
+                </div>
+              </div>
+              <div className="pet-card" style={{ opacity: 0.85 }}>
+                <div className="pet-visual" style={{ background: 'linear-gradient(135deg,#FEF9EB,#FEF3C7)' }}>🦚</div>
+                <div className="pet-body">
+                  <div className="pet-name">Wisdom Peacock</div>
+                  <div className="pet-env">🕉️ Lotus Garden</div>
+                  <span className="pet-benefit mind">Vedic Wisdom</span><span className="pet-benefit growth">Self-Discovery</span>
+                  <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: '#D97706' }}>Coming Soon</div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="monetization" id="pricing">
+      <div className="addons" id="addons">
         <div className="shell">
-          <h2 style={{ textAlign: 'center', marginBottom: 8, fontSize: 24 }}>💰 Pricing Architecture - Hybrid Model</h2>
-          <div className="pricing-grid">
-            <div className="price-card"><div style={{ fontSize: 28 }}>🌱</div><h3>Starter</h3><div className="pc-price">₹0 <span style={{ fontSize: 13, color: '#94A3B8', fontWeight: 500 }}>/forever</span></div><button type="button" className="pc-cta secondary">Get Started - Free</button></div>
-            <div className="price-card recommended"><div style={{ fontSize: 28 }}>🐾</div><h3>Per Pet</h3><div className="pc-price">₹99-299 <span style={{ fontSize: 13, color: '#94A3B8', fontWeight: 500 }}>/mo per pet</span></div><button type="button" className="pc-cta primary">Choose Your Pet {'->'}</button></div>
-            <div className="price-card"><div style={{ fontSize: 28 }}>👑</div><h3>Pet Paradise</h3><div className="pc-price">₹299 <span style={{ fontSize: 13, color: '#94A3B8', fontWeight: 500 }}>/month</span></div><button type="button" className="pc-cta secondary">Upgrade to Paradise</button></div>
+          <h2 style={{ textAlign: 'center', marginBottom: 8, fontSize: 22 }}>Add-On Features (À la Carte)</h2>
+          <div className="addons-card">
+            <div style={{ overflowX: 'auto' }}>
+              <table className="addons-table">
+                <thead>
+                  <tr>
+                    <th>Feature</th>
+                    <th>1 Hour</th>
+                    <th>3 Hours ⭐</th>
+                    <th>5 Hours</th>
+                    <th>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>🤖 AnytimeBuddy</td>
+                    <td>₹399</td>
+                    <td>₹999</td>
+                    <td>₹1,699</td>
+                    <td>On-demand emotional support chat (24/7 AI companion)</td>
+                  </tr>
+                  <tr>
+                    <td>🐾 Digital Pet Hub</td>
+                    <td colSpan={3}>Free starter + Premium unlock via subscription</td>
+                    <td>Neurotransmitter companions (Chintu, Bholu, Mithi, Dheeraj)</td>
+                  </tr>
+                  <tr>
+                    <td>📞 IVR Therapy</td>
+                    <td colSpan={3}>Pay-per-session (same as standard fees)</td>
+                    <td>Voice-based therapy + PHQ screening via phone call</td>
+                  </tr>
+                  <tr>
+                    <td>💬 VentBuddy</td>
+                    <td colSpan={3}>3 free/day, Premium unlimited</td>
+                    <td>Anonymous venting with trained AI listener</td>
+                  </tr>
+                  <tr>
+                    <td>🎵 Sound Therapy</td>
+                    <td>₹30/track</td>
+                    <td>₹250/bundle (10 tracks)</td>
+                    <td></td>
+                    <td>Own forever, unlimited play + download</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -219,6 +308,7 @@ export default function DigitalPetsHubPage() {
       <div className="schedule" id="schedule">
         <div className="shell">
           <h2 style={{ textAlign: 'center', marginBottom: 8, fontSize: 22 }}>⏰ A Day With Your Digital Pet - The Oxytocin Schedule</h2>
+          <p style={{ textAlign: 'center', fontSize: 13, color: '#64748B', maxWidth: 520, margin: '0 auto 20px' }}>Each touchpoint is designed to trigger specific neurochemicals. This is prescribable wellness.</p>
           <div className="sched-timeline">
             {schedule.map((item) => (
               <div className="sched-item" key={item.title + item.time}>
@@ -235,37 +325,10 @@ export default function DigitalPetsHubPage() {
         </div>
       </div>
 
-      <div className="loops">
-        <div className="shell">
-          <h2 style={{ textAlign: 'center', marginBottom: 18, fontSize: 22 }}>🔄 Retention Loops - Why They Keep Coming Back</h2>
-          <div className="loop-grid">
-            <div className="loop-card"><div style={{ fontSize: 24 }}>🪴</div><h3 style={{ fontSize: 14 }}>Pet Growth = User Growth</h3><p style={{ fontSize: 12, color: '#64748B' }}>Your pet visually evolves as YOU complete wellness activities. Skip a week? Pet looks sad, smaller. Consistent care? Pet glows, unlocks new abilities. Mirror of your own healing.</p></div>
-            <div className="loop-card"><div style={{ fontSize: 24 }}>🏆</div><h3 style={{ fontSize: 14 }}>Achievement System</h3><p style={{ fontSize: 12, color: '#64748B' }}>&quot;7-Day Streak&quot;, &quot;First Breathing Exercise&quot;, &quot;Pet reached Level 5&quot;. Each badge releases dopamine.</p></div>
-            <div className="loop-card"><div style={{ fontSize: 24 }}>👫</div><h3 style={{ fontSize: 14 }}>Social Pet Playdates</h3><p style={{ fontSize: 12, color: '#64748B' }}>Premium feature: Let your pet visit a friend&apos;s pet. Shared environments, cooperative mini-games.</p></div>
-            <div className="loop-card"><div style={{ fontSize: 24 }}>🎄</div><h3 style={{ fontSize: 14 }}>Seasonal + Festival Events</h3><p style={{ fontSize: 12, color: '#64748B' }}>Limited-time content creates urgency and return visits.</p></div>
-          </div>
-        </div>
-      </div>
-
-      <div className="revenue">
-        <div className="shell">
-          <h2 style={{ textAlign: 'center', marginBottom: 18, fontSize: 22 }}>📊 Revenue Projection - Year 1</h2>
-          <table className="rev-table">
-            <thead><tr><th>Segment</th><th>Users (Mo 12)</th><th>ARPU</th><th>Annual Revenue</th><th>Notes</th></tr></thead>
-            <tbody>
-              <tr><td><strong>Free Tier</strong> (ambient pets)</td><td>25,000</td><td>₹0</td><td>₹0 (funnel)</td><td>Gateway. 40% of total users.</td></tr>
-              <tr><td><strong>À la carte</strong> (₹99-299/pet)</td><td>4,500</td><td>₹140/mo avg</td><td>₹75.6 Lakh</td><td>7.2% conversion.</td></tr>
-              <tr><td><strong>Pet Paradise</strong> (₹299/mo)</td><td>2,200</td><td>₹299/mo</td><td>₹78.9 Lakh</td><td>3.5% conversion.</td></tr>
-              <tr className="total"><td>TOTAL YEAR 1</td><td>36,500 users</td><td>-</td><td>₹1.95 Crore</td><td>62% margin</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
       <div style={{ padding: '24px 0', borderTop: '1px solid #E2E8F0', textAlign: 'center' }}>
         <div className="shell">
           <p style={{ fontFamily: 'Fraunces, serif', fontSize: 16, fontWeight: 700, color: '#064E5C' }}>MANAS<em style={{ color: '#C6930A', fontStyle: 'normal' }}>360</em></p>
-          <p style={{ fontSize: 11, color: '#94A3B8', marginTop: 4 }}>Digital Pet Hub - PT06 Strategy & Product Architecture</p>
+          <p style={{ fontSize: 11, color: '#94A3B8', marginTop: 4 }}>Digital Pet Hub - PT06</p>
         </div>
       </div>
     </div>

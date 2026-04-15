@@ -3,9 +3,10 @@ import { Activity, ClipboardList, FileSignature, Loader2, Pill, Stethoscope, Vid
 import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useNavigate, useParams } from 'react-router-dom';
-import { assignPatientItem, scheduleNextSession } from '../../../../api/provider';
+import { assignPatientItem, scheduleNextSession, type AssignPatientItemPayload } from '../../../../api/provider';
 import { useAuth } from '../../../../context/AuthContext';
 import { usePatientOverview } from '../../../../hooks/usePatientOverview';
+import { CLINICAL_ASSESSMENT_TEMPLATE_KEYS } from '../../../../utils/clinicalAssessments';
 
 type ProviderKind = 'THERAPIST' | 'PSYCHIATRIST' | 'COACH' | 'PSYCHOLOGIST';
 
@@ -18,6 +19,38 @@ type ContextItem = {
   title: string;
   subtitle: string;
 };
+
+type AssessmentChoice = {
+  key: 'PHQ-9' | 'GAD-7' | 'BOTH';
+  label: string;
+  title: string;
+  templateId: string;
+  estimatedMinutes: number;
+};
+
+const ASSESSMENT_CHOICES: AssessmentChoice[] = [
+  {
+    key: 'PHQ-9',
+    label: 'Require PHQ-9 before next session',
+    title: 'PHQ-9 Assessment',
+    templateId: CLINICAL_ASSESSMENT_TEMPLATE_KEYS['PHQ-9'],
+    estimatedMinutes: 5,
+  },
+  {
+    key: 'GAD-7',
+    label: 'Require GAD-7 before next session',
+    title: 'GAD-7 Assessment',
+    templateId: CLINICAL_ASSESSMENT_TEMPLATE_KEYS['GAD-7'],
+    estimatedMinutes: 4,
+  },
+  {
+    key: 'BOTH',
+    label: 'Require both PHQ-9 and GAD-7',
+    title: 'Clinical Assessment',
+    templateId: '',
+    estimatedMinutes: 10,
+  },
+];
 
 const psychiatristContext: ContextItem[] = [
   { title: 'Sertraline 50 mg', subtitle: 'Daily morning dose • adherence stable for 4 weeks' },
@@ -108,9 +141,12 @@ export default function ChartOverview() {
   const providerRole = useMemo(() => normalizeRole(user?.role), [user?.role]);
   const { data: overview, isLoading, isError } = usePatientOverview(patientId);
 
-  const { mutate: assignAssessment, isPending: isAssigning } = useMutation({
-    mutationFn: () => assignPatientItem(patientId!, { assignmentType: 'ASSESSMENT', title: 'PHQ-9 Assessment' }),
-    onSuccess: () => toast.success('PHQ-9 assessment assigned successfully.'),
+  const { mutateAsync: assignAssessment, isPending: isAssigning } = useMutation({
+    mutationFn: async (payload: AssignPatientItemPayload) => {
+      if (!patientId) throw new Error('Patient id is required');
+      return assignPatientItem(patientId, payload);
+    },
+    onSuccess: (_response, variables) => toast.success(`${variables.title} assigned successfully.`),
     onError: () => toast.error('Failed to assign assessment. Please try again.'),
   });
 
@@ -161,6 +197,37 @@ export default function ChartOverview() {
       : providerRole === 'COACH'
         ? coachContext
         : therapyContext;
+
+  const assignSelectedAssessment = async (choice: AssessmentChoice) => {
+    if (choice.key === 'BOTH') {
+      await assignAssessment({
+        assignmentType: 'ASSESSMENT',
+        title: 'PHQ-9 Assessment',
+        templateId: CLINICAL_ASSESSMENT_TEMPLATE_KEYS['PHQ-9'],
+        referenceId: 'before-next-session',
+        estimatedMinutes: 5,
+        frequency: 'ONE_TIME',
+      });
+      await assignAssessment({
+        assignmentType: 'ASSESSMENT',
+        title: 'GAD-7 Assessment',
+        templateId: CLINICAL_ASSESSMENT_TEMPLATE_KEYS['GAD-7'],
+        referenceId: 'before-next-session',
+        estimatedMinutes: 4,
+        frequency: 'ONE_TIME',
+      });
+      return;
+    }
+
+    await assignAssessment({
+      assignmentType: 'ASSESSMENT',
+      title: choice.title,
+      templateId: choice.templateId,
+      referenceId: 'before-next-session',
+      estimatedMinutes: choice.estimatedMinutes,
+      frequency: 'ONE_TIME',
+    });
+  };
 
   if (isLoading) {
     return <SkeletonGrid />;
@@ -315,15 +382,23 @@ export default function ChartOverview() {
               <FileSignature className="h-4 w-4" />
               Write Session Note
             </button>
-            <button
-              type="button"
-              onClick={() => assignAssessment()}
-              disabled={isAssigning}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[#E5E5E5] bg-white px-4 py-3 text-sm font-semibold text-[#2D4128] transition hover:bg-[#FAFAF8] disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isAssigning ? <Loader2 className="h-4 w-4 animate-spin" /> : <ClipboardList className="h-4 w-4" />}
-              {isAssigning ? 'Assigning...' : 'Assign Assessment'}
-            </button>
+            <div className="rounded-xl border border-[#E5E5E5] bg-[#FAFAF8] p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Required screening before next session</p>
+              <div className="mt-3 space-y-2">
+                {ASSESSMENT_CHOICES.map((choice) => (
+                  <button
+                    key={choice.key}
+                    type="button"
+                    onClick={() => void assignSelectedAssessment(choice)}
+                    disabled={isAssigning}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[#E5E5E5] bg-white px-4 py-3 text-sm font-semibold text-[#2D4128] transition hover:bg-[#FAFAF8] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isAssigning ? <Loader2 className="h-4 w-4 animate-spin" /> : <ClipboardList className="h-4 w-4" />}
+                    {isAssigning ? 'Assigning...' : choice.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </section>
 

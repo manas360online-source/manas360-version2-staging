@@ -32,7 +32,7 @@ const mainNavItems = [
 
 const clinicalNavItems = [
   { to: '/patient/sessions', label: 'Attend Assessment', icon: Brain, badge: 'Required' },
-  { to: '/patient/progress', label: 'Assessment History', icon: BarChart3 },
+  { to: '/patient/progress', label: 'Clinical Reports', icon: BarChart3 },
 ];
 
 const selfCareNavItems = [
