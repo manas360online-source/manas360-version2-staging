@@ -31,131 +31,6 @@ export default function LoginPage() {
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
-	const inspirationalQuotes = useMemo(
-		() => [
-			{
-				text: 'Everything has beauty, but not everyone sees it.',
-				author: 'Confucius',
-			},
-			{
-				text: 'My mission in life is not merely to survive, but to thrive; and to do so with some passion, some compassion, some humor, and some style.',
-				author: 'Maya Angelou',
-			},
-			{
-				text: 'Whoever is happy will make others happy too.',
-				author: 'Anne Frank',
-			},
-			{
-				text: 'The best time to plant a tree was 20 years ago. The second best time is now.',
-				author: 'Chinese Proverb',
-			},
-			{
-				text: 'Success is not final, failure is not fatal: it is the courage to continue that counts.',
-				author: 'Winston Churchill',
-			},
-			{
-				text: 'Do what you can, with what you have, where you are.',
-				author: 'Theodore Roosevelt',
-			},
-			{
-				text: 'You miss 100% of the shots you do not take.',
-				author: 'Wayne Gretzky',
-			},
-			{
-				text: 'Believe you can and you are halfway there.',
-				author: 'Theodore Roosevelt',
-			},
-			{
-				text: 'Happiness depends upon ourselves.',
-				author: 'Aristotle',
-			},
-			{
-				text: 'Act as if what you do makes a difference. It does.',
-				author: 'William James',
-			},
-			{
-				text: 'Turn your wounds into wisdom.',
-				author: 'Oprah Winfrey',
-			},
-			{
-				text: 'If you can dream it, you can do it.',
-				author: 'Walt Disney',
-			},
-			{
-				text: 'Difficulties in life are intended to make us better, not bitter.',
-				author: 'Dan Reeves',
-			},
-			{
-				text: 'In the middle of every difficulty lies opportunity.',
-				author: 'Albert Einstein',
-			},
-			{
-				text: 'A journey of a thousand miles begins with a single step.',
-				author: 'Lao Tzu',
-			},
-			{
-				text: 'The secret of getting ahead is getting started.',
-				author: 'Mark Twain',
-			},
-			{
-				text: 'Start where you are. Use what you have. Do what you can.',
-				author: 'Arthur Ashe',
-			},
-			{
-				text: 'The future depends on what you do today.',
-				author: 'Mahatma Gandhi',
-			},
-			{
-				text: 'It always seems impossible until it is done.',
-				author: 'Nelson Mandela',
-			},
-			{
-				text: 'What lies behind us and what lies before us are tiny matters compared to what lies within us.',
-				author: 'Ralph Waldo Emerson',
-			},
-			{
-				text: 'Do not wait. The time will never be just right.',
-				author: 'Napoleon Hill',
-			},
-			{
-				text: 'You become what you believe.',
-				author: 'Oprah Winfrey',
-			},
-			{
-				text: 'Hardships often prepare ordinary people for an extraordinary destiny.',
-				author: 'C. S. Lewis',
-			},
-			{
-				text: 'The only way to do great work is to love what you do.',
-				author: 'Steve Jobs',
-			},
-			{
-				text: 'Your present circumstances do not determine where you can go; they merely determine where you start.',
-				author: 'Nido Qubein',
-			},
-			{
-				text: 'Keep your face always toward the sunshine and shadows will fall behind you.',
-				author: 'Walt Whitman',
-			},
-			{
-				text: 'No matter how you feel, get up, dress up, show up, and never give up.',
-				author: 'Regina Brett',
-			},
-			{
-				text: 'Well done is better than well said.',
-				author: 'Benjamin Franklin',
-			},
-			{
-				text: 'Be yourself; everyone else is already taken.',
-				author: 'Oscar Wilde',
-			},
-		],
-		[],
-	);
-	const selectedQuote = useMemo(() => {
-		const index = Math.floor(Math.random() * inspirationalQuotes.length);
-		return inspirationalQuotes[index] || inspirationalQuotes[0];
-	}, [inspirationalQuotes]);
 	const loginBackgroundUrl = useMemo(() => {
 		const backgroundImages = [
 			'/bg_img/anastasiya-romanova-zyLQdpu4XHk-unsplash.webp',
@@ -328,10 +203,13 @@ export default function LoginPage() {
 				<div className="grid w-full items-stretch gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:gap-12">
 					<section className="hidden lg:flex lg:flex-col lg:justify-center lg:animate-fadeIn">
 						<div>
-							<blockquote className="max-w-2xl text-3xl font-semibold leading-tight text-white">
-								"{selectedQuote.text}"
+							<blockquote className="max-w-2xl font-serif text-4xl font-light leading-[1.15] text-white sm:text-5xl lg:text-6xl">
+								You&rsquo;re <span className="font-semibold text-gentle-blue">not alone</span>.
+								<br />
+								<span className="mt-2 inline-block">
+									Let&rsquo;s take this <span className="font-semibold text-calm-sage">together</span>.
+								</span>
 							</blockquote>
-							<p className="mt-4 text-lg text-white/90">{selectedQuote.author}</p>
 						</div>
 						<p className="mt-8 max-w-sm text-base italic text-white/90 animate-fadeInUp">Choose growth, one step at a time.</p>
 					</section>
@@ -343,12 +221,7 @@ export default function LoginPage() {
 							</Link>
 						</div>
 
-						<div className="mb-3 inline-flex items-center gap-2 rounded-full border border-calm-sage/20 bg-white/75 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-wellness-muted lg:hidden">
-							<span className="h-2 w-2 rounded-full bg-calm-sage" />
-							{selectedQuote.author}
-						</div>
-						<p className="mb-3 text-sm italic text-wellness-muted lg:hidden">"{selectedQuote.text}"</p>
-						<h1 className="text-2xl font-semibold text-wellness-text sm:text-3xl">Welcome back</h1>
+						<h1 className="font-serif text-3xl font-light leading-tight text-wellness-text sm:text-4xl">Welcome back</h1>
 						<p className="mt-2 text-sm text-wellness-muted sm:text-base">Continue your wellness journey</p>
 
 						<div className="mt-6 space-y-4">

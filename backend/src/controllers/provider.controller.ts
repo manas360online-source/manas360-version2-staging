@@ -2321,6 +2321,14 @@ export const assignPatientItem = async (req: Request, res: Response): Promise<vo
 		throw new AppError('assignmentType must be ASSESSMENT or GOAL', 400);
 	}
 
+	const normalizedTemplateId = String(templateId || '').trim();
+	const normalizedReferenceId = String(referenceId || normalizedTemplateId || '').trim() || null;
+	const clinicalAssessmentTitle = normalizedTemplateId.toLowerCase().includes('gad')
+		? 'GAD-7 Assessment'
+		: normalizedTemplateId.toLowerCase().includes('phq')
+			? 'PHQ-9 Assessment'
+			: 'Clinical Assessment';
+
 	const { patientProfileId } = await ensureProviderPatientAccess(providerId, patientId);
 
 	let plan = await prisma.therapyPlan.findFirst({
@@ -2355,10 +2363,10 @@ export const assignPatientItem = async (req: Request, res: Response): Promise<vo
 	const activity = await prisma.therapyPlanActivity.create({
 		data: {
 			planId: plan.id,
-			title: String(title || (normalizedType === 'ASSESSMENT' ? 'New Assessment' : 'New Goal')).trim(),
+			title: String(title || (normalizedType === 'ASSESSMENT' ? clinicalAssessmentTitle : 'New Goal')).trim(),
 			frequency: frequency || 'ONE_TIME',
 			activityType: normalizedType === 'ASSESSMENT' ? 'CLINICAL_ASSESSMENT' : 'EXERCISE',
-			referenceId: referenceId ? String(referenceId) : null,
+			referenceId: normalizedReferenceId,
 			estimatedMinutes: Number.isFinite(Number(estimatedMinutes)) ? Number(estimatedMinutes) : 10,
 			status: 'PENDING',
 		},

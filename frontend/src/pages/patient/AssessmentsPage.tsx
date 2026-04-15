@@ -4,6 +4,7 @@ import { parseJourneyPayload, type JourneyPayload } from '../../utils/journey';
 import { theme } from '../../theme/theme';
 import { TrendingUp } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { CLINICAL_ASSESSMENT_TEMPLATE_KEYS } from '../../utils/clinicalAssessments';
 
 type AssessmentMode = 'daily' | 'clinical';
 type ClinicalAssessmentKey = 'PHQ-9' | 'GAD-7';
@@ -18,11 +19,9 @@ type AssessmentHistoryEntry = {
   createdAt?: string;
 };
 
-const PHQ9_TEMPLATE_KEY = 'phq-9-paid-assessment-v1';
-const GAD7_TEMPLATE_KEY = 'gad-7-paid-assessment-v1';
 const structuredTemplateKeys: Record<'PHQ-9' | 'GAD-7', string> = {
-  'PHQ-9': PHQ9_TEMPLATE_KEY,
-  'GAD-7': GAD7_TEMPLATE_KEY,
+  'PHQ-9': CLINICAL_ASSESSMENT_TEMPLATE_KEYS['PHQ-9'],
+  'GAD-7': CLINICAL_ASSESSMENT_TEMPLATE_KEYS['GAD-7'],
 };
 
 const dailyCheckQuestions = [

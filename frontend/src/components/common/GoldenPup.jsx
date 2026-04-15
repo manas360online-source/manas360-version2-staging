@@ -58,6 +58,23 @@ const GOLD_PALETTE   = ['#FFD700','#FFC107','#FFECB3','#fff8e1','#ffe082','#fff'
 const WARM_PALETTE   = ['#FFD700','#FF8F00','#FFF9C4','#FFECB3','#fff'];
 const SUNSET_PALETTE = ['#FF7043','#FFB300','#FF8F00','#FFF3E0','#FFD180','#fff'];
 
+const hexToRgba = (hex, alpha) => {
+  const normalized = String(hex || '').replace('#', '');
+  const full = normalized.length === 3
+    ? normalized.split('').map((character) => character + character).join('')
+    : normalized;
+
+  if (full.length !== 6) {
+    return hex;
+  }
+
+  const value = Number.parseInt(full, 16);
+  const red = (value >> 16) & 255;
+  const green = (value >> 8) & 255;
+  const blue = value & 255;
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+};
+
 /* ─────────────────────────────────────────────────────────────
    CSS
 ───────────────────────────────────────────────────────────── */
@@ -737,7 +754,7 @@ export default function GoldenPup() {
       sunParRef.current.forEach(p => {
         p.x += p.vx; p.y -= p.speed; p.speed += .04; p.alpha -= .01; p.size *= .98;
         const g = ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.size);
-        g.addColorStop(0, p.color); g.addColorStop(.5, p.color+'88'); g.addColorStop(1,'transparent');
+        g.addColorStop(0, p.color); g.addColorStop(.5, hexToRgba(p.color, 0.53)); g.addColorStop(1,'transparent');
         ctx.save(); ctx.globalAlpha = p.alpha; ctx.fillStyle = g; ctx.shadowBlur = 14; ctx.shadowColor = p.color;
         ctx.beginPath(); ctx.arc(p.x,p.y,p.size,0,Math.PI*2); ctx.fill(); ctx.restore();
       });

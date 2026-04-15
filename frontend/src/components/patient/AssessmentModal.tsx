@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { patientApi } from '../../api/patient';
 import { CheckCircle, AlertTriangle, ArrowRight, ShieldAlert, Phone } from 'lucide-react';
+import { CLINICAL_ASSESSMENT_OPTIONS, CLINICAL_QUESTION_BANK } from '../../utils/clinicalAssessments';
 
 interface AssessmentModalProps {
   isOpen: boolean;
@@ -8,24 +9,8 @@ interface AssessmentModalProps {
   onComplete: () => void;
 }
 
-const PHQ9_QUESTIONS = [
-  "Little interest or pleasure in doing things?",
-  "Feeling down, depressed, or hopeless?",
-  "Trouble falling or staying asleep, or sleeping too much?",
-  "Feeling tired or having little energy?",
-  "Poor appetite or overeating?",
-  "Feeling bad about yourself — or that you are a failure or have let yourself or your family down?",
-  "Trouble concentrating on things, such as reading the newspaper or watching television?",
-  "Moving or speaking so slowly that other people could have noticed? Or the opposite — being so fidgety or restless that you have been moving around a lot more than usual?",
-  "Thoughts that you would be better off dead, or of hurting yourself in some way?"
-];
-
-const PHQ9_OPTIONS = [
-  { label: 'Not at all', value: 0 },
-  { label: 'Several days', value: 1 },
-  { label: 'More than half the days', value: 2 },
-  { label: 'Nearly every day', value: 3 },
-];
+const PHQ9_QUESTIONS = CLINICAL_QUESTION_BANK['PHQ-9'];
+const PHQ9_OPTIONS = CLINICAL_ASSESSMENT_OPTIONS.map((option) => ({ label: option.label, value: option.points }));
 
 export default function AssessmentModal({ isOpen, onClose, onComplete }: AssessmentModalProps) {
   const [step, setStep] = useState(0); // 0 = warmup, 1-9 = questions, 10 = completion

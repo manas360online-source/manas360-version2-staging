@@ -15,40 +15,18 @@ import {
   type MdcProgressApiError,
   type PatientProgressItem,
 } from '../../api/mdcProgress.api';
+import { CLINICAL_ASSESSMENT_OPTIONS, CLINICAL_QUESTION_BANK, severityFromClinicalScore } from '../../utils/clinicalAssessments';
+import type { ClinicalAssessmentKey } from '../../types/patient';
 
 type Question = {
   id: string;
   text: string;
 };
 
-const PHQ9_QUESTIONS: Question[] = [
-  { id: 'phq_q1', text: 'Little interest or pleasure in doing things' },
-  { id: 'phq_q2', text: 'Feeling down, depressed, or hopeless' },
-  { id: 'phq_q3', text: 'Trouble falling/staying asleep, or sleeping too much' },
-  { id: 'phq_q4', text: 'Feeling tired or having little energy' },
-  { id: 'phq_q5', text: 'Poor appetite or overeating' },
-  { id: 'phq_q6', text: 'Feeling bad about yourself' },
-  { id: 'phq_q7', text: 'Trouble concentrating on things' },
-  { id: 'phq_q8', text: 'Moving or speaking slowly or being fidgety/restless' },
-  { id: 'phq_q9', text: 'Thoughts that you would be better off dead or self-harm' },
-];
+const PHQ9_QUESTIONS: Question[] = CLINICAL_QUESTION_BANK['PHQ-9'].map((text, index) => ({ id: `phq_q${index + 1}`, text }));
+const GAD7_QUESTIONS: Question[] = CLINICAL_QUESTION_BANK['GAD-7'].map((text, index) => ({ id: `gad_q${index + 1}`, text }));
 
-const GAD7_QUESTIONS: Question[] = [
-  { id: 'gad_q1', text: 'Feeling nervous, anxious, or on edge' },
-  { id: 'gad_q2', text: 'Not being able to stop or control worrying' },
-  { id: 'gad_q3', text: 'Worrying too much about different things' },
-  { id: 'gad_q4', text: 'Trouble relaxing' },
-  { id: 'gad_q5', text: 'Being so restless that it is hard to sit still' },
-  { id: 'gad_q6', text: 'Becoming easily annoyed or irritable' },
-  { id: 'gad_q7', text: 'Feeling afraid as if something awful might happen' },
-];
-
-const ANSWER_OPTIONS = [
-  { value: 0, label: 'Not at all' },
-  { value: 1, label: 'Several days' },
-  { value: 2, label: 'More than half the days' },
-  { value: 3, label: 'Nearly every day' },
-] as const;
+const ANSWER_OPTIONS = CLINICAL_ASSESSMENT_OPTIONS.map((option) => ({ value: option.points, label: option.label }));
 
 const getErrorMessage = (error: unknown): string => {
   const apiError = error as MdcProgressApiError;
@@ -56,18 +34,11 @@ const getErrorMessage = (error: unknown): string => {
 };
 
 const getSeverity = (type: AssessmentType, score: number): string => {
-  if (type === 'PHQ-9') {
-    if (score <= 4) return 'Minimal';
-    if (score <= 9) return 'Mild';
-    if (score <= 14) return 'Moderate';
-    if (score <= 19) return 'Moderately Severe';
-    return 'Severe';
-  }
-
-  if (score <= 4) return 'Minimal';
-  if (score <= 9) return 'Mild';
-  if (score <= 14) return 'Moderate';
-  return 'Severe';
+  const severity = severityFromClinicalScore(type as ClinicalAssessmentKey, score);
+  return severity
+    .split('-')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
 };
 
 const formatDate = (isoDate: string): string => {

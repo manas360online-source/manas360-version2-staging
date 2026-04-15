@@ -2152,6 +2152,7 @@ export const submitAssessment = async (userId: string, input: { type: string; sc
 	const computedScore = typeof input.score === 'number' ? Math.max(0, Math.floor(input.score)) : (input.answers || []).reduce((a, b) => a + Number(b || 0), 0);
 	const answers = Array.isArray(input.answers) && input.answers.length > 0 ? input.answers.map((v) => Number(v || 0)) : [computedScore];
 	const severity = mapSeverity(computedScore);
+	const normalizedType = String(input.type || '').toUpperCase();
 	const journey = buildJourneyRecommendation({ type: input.type, score: computedScore, answers });
 	const created = await db.patientAssessment.create({
 		data: {
@@ -2162,6 +2163,34 @@ export const submitAssessment = async (userId: string, input: { type: string; sc
 			severityLevel: severity,
 		},
 	});
+
+	if (normalizedType === 'PHQ-9') {
+		const scored = scorePHQ9(answers);
+		await db.pHQ9Assessment.create({
+			data: {
+				userId: patientProfile.userId,
+				answers,
+				totalScore: scored.total,
+				q9Score: scored.q9Score,
+				severity: scored.severity,
+				riskWeight: scored.riskWeight,
+				q9CrisisFlag: scored.q9CrisisFlag,
+			},
+		}).catch(() => null);
+	}
+
+	if (normalizedType === 'GAD-7') {
+		const scored = scoreGAD7(answers);
+		await db.gAD7Assessment.create({
+			data: {
+				userId: patientProfile.userId,
+				answers,
+				totalScore: scored.total,
+				severity: scored.severity,
+				riskWeight: scored.riskWeight,
+			},
+		}).catch(() => null);
+	}
 
 	await db.notification.create({
 		data: {
