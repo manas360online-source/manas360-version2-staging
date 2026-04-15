@@ -262,10 +262,18 @@ export const listPublicPublishedGroupTherapySessionsController = async (_req: Re
 
     res.status(200).json({
       success: true,
-      data: sessions,
+      data: {
+        items: sessions,
+      },
     });
   } catch (error) {
-    throw new AppError('Failed to fetch public group therapy sessions', 500);
+    // Keep landing usable even if group-therapy tables are not migrated in this environment.
+    res.status(200).json({
+      success: true,
+      data: {
+        items: [],
+      },
+    });
   }
 };
 

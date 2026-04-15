@@ -1,11 +1,12 @@
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/error.middleware';
 import { User, UserRole } from '@prisma/client';
-import type { TherapistProfile } from '@prisma/client';
 import { isSubscriptionValidForMatching } from './subscription.helper';
 import { env } from '../config/env';
 import { initiatePhonePePayment, checkPhonePeStatus } from './phonepe.service';
 import { assertPatientHasCompletedBothPHQandGAD7 } from './patient-v1.service';
+import { hasAcceptedNriTerms } from './legal-compliance.service';
+import { hasNriProviderCapability, scoreProviderMatch } from './provider-match.engine';
 
 const REQUEST_EXPIRY_HOURS = 24;
 const SESSION_QUOTE = {
@@ -185,6 +186,7 @@ export const findMatchingProviders = async (
   const requestedConcerns = (criteria?.concerns || []).map(normalizeToken).filter(Boolean);
   const requestedLanguages = (criteria?.languages || []).map(normalizeToken).filter(Boolean);
   const requestedModes = (criteria?.modes || []).map(normalizeToken).filter(Boolean);
+  const isNriUser = criteria?.patientUserId ? await hasAcceptedNriTerms(criteria.patientUserId).catch(() => false) : false;
   const weekStart = getWeekStartMonday();
 
   const eligibleProviderSubscriptions = await prisma.providerSubscription.findMany({
@@ -286,118 +288,46 @@ export const findMatchingProviders = async (
     .filter((t) => {
       if (!eligibleProviderIds.has(String(t.userId))) return false;
 
-      // Check if therapist has availability JSON
+      if (isNriUser && !hasNriProviderCapability(t)) return false;
+
       if (!t.availability) return false;
 
       try {
         const slots = t.availability as any;
         if (!Array.isArray(slots)) return false;
 
-        // Check if any of the requested days/times overlap with therapist's availability
         return hasSmartMatchAvailabilityOverlap(availabilityPrefs, slots as AvailabilitySlot[]);
       } catch {
         return false;
       }
     })
     .map((t) => {
-      const specs = (t.specializations || []).map((s) => normalizeToken(String(s)));
-      const certs = (t.certifications || []).map((c) => normalizeToken(String(c))).filter(Boolean);
-      const langs = (t.languages || []).map((l) => normalizeToken(String(l)));
-
-      const concernOverlap = requestedConcerns.length
-        ? requestedConcerns.filter((c) => specs.some((s) => s.includes(c) || c.includes(s))).length
-        : 1;
-      if (requestedConcerns.length > 0 && concernOverlap === 0) return null;
-
-      let specializationScore = 0;
-      if (concernOverlap >= 4) specializationScore = 30;
-      else if (concernOverlap >= 3) specializationScore = 25;
-      else if (concernOverlap >= 2) specializationScore = 18;
-      else if (concernOverlap >= 1) specializationScore = 12;
-
-      let certScore = 0;
-      if (certs.length >= 2) certScore = 10;
-      else if (certs.length >= 1) certScore = 7;
-
-      const leadBoostScore = typeof (t as any).leadBoostScore === 'number' ? (t as any).leadBoostScore : 0;
-      certScore += leadBoostScore;
-
-      const expertise = Math.min(40, specializationScore + certScore);
-
-      const languageOverlap = requestedLanguages.length
-        ? requestedLanguages.filter((l) => langs.some((pl) => pl.includes(l) || l.includes(pl))).length
-        : 1;
-      if (requestedLanguages.length > 0 && languageOverlap === 0) return null;
-
-      let languageScore = 0;
-      if (languageOverlap >= 3) languageScore = 20;
-      else if (languageOverlap >= 2) languageScore = 16;
-      else if (languageOverlap >= 1) languageScore = 12;
-
-      const availabilitySlots = (t.availability as any[]) || [];
-      const overlappingTimeSlots = availabilityPrefs.timeSlots.filter((slot) =>
-        availabilityPrefs.daysOfWeek.some((day) =>
-          availabilitySlots.some((entry: AvailabilitySlot) =>
-            entry.dayOfWeek === day
-            && (entry.isAvailable ?? true)
-            && isTimeOverlap(slot.startMinute, slot.endMinute, entry.startMinute, entry.endMinute),
-          ),
-        ),
-      ).length;
-
-      let availabilityScore = 0;
-      if (overlappingTimeSlots >= 3) availabilityScore = 10;
-      else if (overlappingTimeSlots >= 2) availabilityScore = 8;
-      else if (overlappingTimeSlots >= 1) availabilityScore = 6;
-
-      const supportedModes = ['video', 'phone', 'chat'];
-      const modeOverlap = requestedModes.length
-        ? requestedModes.filter((mode) => supportedModes.includes(mode)).length
-        : 1;
-      let modeScore = 0;
-      if (modeOverlap >= 2) modeScore = 5;
-      else if (modeOverlap >= 1) modeScore = 3;
-
-      const communication = Math.min(35, languageScore + availabilityScore + modeScore);
-
       const qualityStats = qualityMap.get(String(t.userId)) || { total: 0, completed: 0, cancelled: 0 };
-      const totalSessions = Math.max(qualityStats.total, 1);
-      const retentionRate = qualityStats.completed / totalSessions;
-      const noShowRate = qualityStats.cancelled / totalSessions;
-
-      let healthScore = 0;
-      const rating = Number(t.averageRating || 0);
-      if (rating >= 4.5) healthScore += 5;
-      else if (rating >= 4.0) healthScore += 3;
-      else if (rating > 0) healthScore += 1;
-
-      if (retentionRate >= 0.7) healthScore += 4;
-      else if (retentionRate >= 0.5) healthScore += 2;
-      else if (retentionRate >= 0.3) healthScore += 1;
-
-      if (noShowRate < 0.03) healthScore += 3;
-      else if (noShowRate < 0.05) healthScore += 2;
-      else if (noShowRate < 0.1) healthScore += 1;
-
-      healthScore += 3;
-
       const continuitySessions = Number(continuityMap.get(String(t.userId)) || 0);
-      let continuityScore = 0;
-      if (continuitySessions >= 5) continuityScore = 10;
-      else if (continuitySessions >= 3) continuityScore = 8;
-      else if (continuitySessions >= 1) continuityScore = 5;
+      const match = scoreProviderMatch({
+        providerId: String(t.userId),
+        profile: {
+          specializations: t.specializations || [],
+          clinicalCategories: t.clinicalCategories || [],
+          certifications: t.certifications || [],
+          languages: t.languages || [],
+          shiftPreferences: t.shiftPreferences || [],
+          availability: (t.availability as any) || [],
+          bio: t.bio || '',
+          averageRating: t.averageRating || 0,
+        },
+        context,
+        requestedConcerns,
+        requestedLanguages,
+        requestedModes,
+        availabilityPrefs,
+        qualityStats,
+        continuitySessions,
+        isNriUser,
+      });
 
-      const quality = Math.min(25, healthScore + continuityScore);
+      if (!match) return null;
 
-      const total = Math.round(
-        expertise * contextMultiplier.expertise
-        + communication * contextMultiplier.communication
-        + quality * contextMultiplier.quality,
-      );
-
-      const tier = mapTierFromScore(total);
-      const matchBand = mapBandFromScore(total);
-      const matchChancePct = Math.max(25, Math.min(95, Math.round(total * 0.8)));
       const providerSubscription = subscriptionByProviderId.get(String(t.userId));
       const providerWeekStart = providerSubscription?.weekStartsAt ? new Date(providerSubscription.weekStartsAt) : null;
       const usedThisWeek = providerWeekStart && providerWeekStart.getTime() >= weekStart.getTime()
@@ -417,14 +347,14 @@ export const findMatchingProviders = async (
         consultationFee: t.consultationFee || 0,
         specializations: t.specializations || [],
         averageRating: t.averageRating || 0,
-        score: total,
-        tier,
-        matchBand,
-        matchChancePct,
+        score: match.score,
+        tier: match.tier,
+        matchBand: match.matchBand,
+        matchChancePct: match.matchChancePct,
         breakdown: {
-          expertise,
-          communication,
-          quality,
+          expertise: match.breakdown.expertise,
+          communication: match.breakdown.communication,
+          quality: match.breakdown.quality,
         },
         providerSubscriptionStatus: String(providerSubscription?.status || ''),
         providerSubscriptionGraceEndDate: providerGraceEndDate,

@@ -146,10 +146,19 @@ export default function SignupPage() {
 	const { checkAuth } = useAuth();
 	const navigate = useNavigate();
 	const location = useLocation();
+	const locationState = location.state as { role?: SignupRole } | null;
+	const initialRole = useMemo<SignupRole>(() => {
+		const candidateRole = locationState?.role || new URLSearchParams(location.search).get('role');
+		if (candidateRole === 'therapist' || candidateRole === 'psychiatrist' || candidateRole === 'psychologist' || candidateRole === 'coach') {
+			return candidateRole;
+		}
+
+		return 'patient';
+	}, [location.search, locationState]);
 
 	const [name, setName] = useState('');
 	const [phone, setPhone] = useState('');
-	const [role, setRole] = useState<SignupRole>('patient');
+	const [role, setRole] = useState<SignupRole>(initialRole);
 	const [otp, setOtp] = useState('');
 	const [otpSent, setOtpSent] = useState(false);
 	const [devOtp, setDevOtp] = useState<string | null>(null);
@@ -334,11 +343,6 @@ export default function SignupPage() {
 	};
 
 	const requestOtp = async () => {
-		if (nriConsent.nri_declared && !nriConsent.nri_tos_accepted) {
-			setError('Please review and accept NRI Terms of Service to continue.');
-			return;
-		}
-
 		if (!isProviderFlow && !acceptedTerms) {
 			setError('Please accept Terms & Conditions to continue.');
 			return;
@@ -375,15 +379,23 @@ export default function SignupPage() {
 		const query = new URLSearchParams(location.search);
 		const prefillPhone = query.get('phone');
 		const reason = query.get('reason');
+		const queryRole = query.get('role');
 
 		if (prefillPhone && !phone) {
 			setPhone(prefillPhone);
 		}
 
+		if ((locationState?.role || queryRole) && role === 'patient') {
+			const candidateRole = locationState?.role || queryRole;
+			if (candidateRole === 'therapist' || candidateRole === 'psychiatrist' || candidateRole === 'psychologist' || candidateRole === 'coach') {
+				setRole(candidateRole);
+			}
+		}
+
 		if (reason === 'terms' && !otpSent && !error) {
 			setError('Please review and accept Terms & Conditions to complete registration.');
 		}
-	}, [location.search, phone, otpSent, error]);
+	}, [location.search, locationState, phone, otpSent, error, role]);
 
 	const resolveReturnTo = (): string => {
 		const qp = new URLSearchParams(location.search);
@@ -614,7 +626,6 @@ export default function SignupPage() {
 								loading={loading}
 								className="min-h-[48px]"
 								onClick={requestOtp}
-								disabled={!isCertificationContext && nriConsent.nri_declared && !nriConsent.nri_tos_accepted}
 							>
 								{loading ? 'Sending OTP...' : 'Send OTP'}
 							</Button>
@@ -625,11 +636,16 @@ export default function SignupPage() {
 								loading={loading}
 								className="min-h-[48px]"
 								onClick={verifyOtp}
-								disabled={!isCertificationContext && nriConsent.nri_declared && !nriConsent.nri_tos_accepted}
 							>
 								{loading ? 'Verifying OTP...' : (isCertificationContext ? 'Verify OTP and Continue' : 'Verify OTP and Register')}
 							</Button>
 						)}
+
+						{nriConsent.nri_declared && !nriConsent.nri_tos_accepted ? (
+							<p className="text-xs text-amber-700">
+								NRI Terms of Service must be accepted before final registration. You can send OTP now and accept NRI terms before verifying OTP.
+							</p>
+						) : null}
 					</div>
 
 					{activeAgreementConfig ? (

@@ -46,12 +46,6 @@ interface PatientMoodHistoryQuery {
 	toDate?: Date;
 }
 
-interface TherapistMatchQuery {
-	languagePreference?: string;
-	specializationPreference?: string;
-	nextHours: number;
-}
-
 interface BookSessionPayload {
 	therapistId: string;
 	dateTime: Date;
@@ -172,7 +166,6 @@ declare global {
 			validatedPatientAssessment?: PatientAssessmentPayload;
 			validatedPatientAssessmentHistoryQuery?: PatientAssessmentHistoryQuery;
 			validatedPatientMoodHistoryQuery?: PatientMoodHistoryQuery;
-			validatedTherapistMatchQuery?: TherapistMatchQuery;
 			validatedBookSessionPayload?: BookSessionPayload;
 			validatedPatientSessionHistoryQuery?: PatientSessionHistoryQuery;
 			validatedTherapistProfilePayload?: TherapistProfilePayload;
