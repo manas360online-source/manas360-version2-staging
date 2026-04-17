@@ -89,10 +89,7 @@ const LandingPage: React.FC = () => {
   };
 
   const handleScrollToAssess = () => {
-    const assessSection = document.getElementById("assessSection");
-    if (assessSection) {
-      assessSection.scrollIntoView({ behavior: "smooth" });
-    }
+    navigate("/assessment");
   };
 
   const handleQuickNavMegaItemClick = (menuLabel: string) => {
@@ -141,6 +138,31 @@ const LandingPage: React.FC = () => {
     if (menuLabel === "Digital Pets4Happy Hormones") {
       setActiveQuickNav(null);
       navigate("/pet");
+    }
+  };
+
+  const footerQuickLinkRoutes: Record<string, string> = {
+    "About Us": "/landing",
+    "How It Works": "/how-it-works",
+    "Specialized Care": "/specialized-care",
+    "For Providers": "/my-digital-clinic",
+    MyDigitalClinic: "/my-digital-clinic",
+    Careers: "/corporate-landing"
+  };
+
+  const footerLegalRoutes: Record<string, string> = {
+    "Privacy Policy": "/privacy",
+    "Terms of Service": "/terms",
+    "Cookie Policy": "/cookie-policy",
+    "DPDPA Compliance": "/privacy",
+    "Refund Policy": "/refunds",
+    Disclaimer: "/terms"
+  };
+
+  const handleFooterRoute = (routeMap: Record<string, string>, label: string) => {
+    const path = routeMap[label];
+    if (path) {
+      navigate(path);
     }
   };
 
@@ -1680,21 +1702,69 @@ const LandingPage: React.FC = () => {
             <div>
               <div style={{ fontSize: "13px", fontWeight: 900, color: "#C7D2FE", marginBottom: "10px" }}>Quick Links</div>
               {["About Us", "How It Works", "Specialized Care", "For Providers", "MyDigitalClinic", "Careers"].map((t) => (
-                <div key={t} style={{ fontSize: "12px", opacity: 0.85, marginBottom: "8px", fontWeight: 700 }}>{t}</div>
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => handleFooterRoute(footerQuickLinkRoutes, t)}
+                  style={{
+                    fontSize: "12px",
+                    opacity: 0.85,
+                    marginBottom: "8px",
+                    fontWeight: 700,
+                    display: "block",
+                    border: "none",
+                    background: "transparent",
+                    color: "inherit",
+                    padding: 0,
+                    cursor: "pointer",
+                    textAlign: "left"
+                  }}
+                >
+                  {t}
+                </button>
               ))}
             </div>
 
             <div>
               <div style={{ fontSize: "13px", fontWeight: 900, color: "#C7D2FE", marginBottom: "10px" }}>Legal</div>
               {["Privacy Policy", "Terms of Service", "Cookie Policy", "DPDPA Compliance", "Refund Policy", "Disclaimer"].map((t) => (
-                <div key={t} style={{ fontSize: "12px", opacity: 0.85, marginBottom: "8px", fontWeight: 700 }}>{t}</div>
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => handleFooterRoute(footerLegalRoutes, t)}
+                  style={{
+                    fontSize: "12px",
+                    opacity: 0.85,
+                    marginBottom: "8px",
+                    fontWeight: 700,
+                    display: "block",
+                    border: "none",
+                    background: "transparent",
+                    color: "inherit",
+                    padding: 0,
+                    cursor: "pointer",
+                    textAlign: "left"
+                  }}
+                >
+                  {t}
+                </button>
               ))}
             </div>
 
             <div>
               <div style={{ fontSize: "13px", fontWeight: 900, color: "#C7D2FE", marginBottom: "10px" }}>Get in Touch</div>
-              <div style={{ fontSize: "12px", opacity: 0.9, marginBottom: "8px", fontWeight: 800 }}>&#9993; support@manas360.com</div>
-              <div style={{ fontSize: "12px", opacity: 0.9, marginBottom: "8px", fontWeight: 800 }}>&#9742; +91-XXXXXXXXXX</div>
+              <a
+                href="mailto:support@manas360.com"
+                style={{ fontSize: "12px", opacity: 0.9, marginBottom: "8px", fontWeight: 800, display: "block", color: "inherit", textDecoration: "none" }}
+              >
+                &#9993; support@manas360.com
+              </a>
+              <a
+                href="tel:+918867736009"
+                style={{ fontSize: "12px", opacity: 0.9, marginBottom: "8px", fontWeight: 800, display: "block", color: "inherit", textDecoration: "none" }}
+              >
+                &#9742; +91-8867736009
+              </a>
               <div style={{ fontSize: "12px", opacity: 0.9, marginBottom: "14px", fontWeight: 800 }}>&#128172; WhatsApp Support</div>
               <div style={{ display: "flex", gap: "10px", opacity: 0.85 }}>{["wa", "ig", "in", "x"].map((s) => (
                 <div key={s} style={{ width: "28px", height: "28px", borderRadius: "8px", background: "rgba(255,255,255,0.14)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: 900 }}>{s}</div>
