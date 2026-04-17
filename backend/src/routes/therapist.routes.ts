@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
 	createTherapistProfileController,
 	getMyTherapistProfileController,
+	patchMyTherapistNriPoolController,
 	uploadMyTherapistDocumentController,
 } from '../controllers/therapist.controller';
 import { requireAuth } from '../middleware/auth.middleware';
@@ -82,6 +83,7 @@ const router = Router();
 
 router.post('/profile', requireAuth, requireTherapistRole, ...validateCreateTherapistProfileRequest, asyncHandler(createTherapistProfileController));
 router.get('/me/profile', requireAuth, requireTherapistRole, asyncHandler(getMyTherapistProfileController));
+router.patch('/me/nri-pool', requireAuth, requireTherapistRole, asyncHandler(patchMyTherapistNriPoolController));
 router.get('/me/leads', requireAuth, requireTherapistRole, ...validateTherapistLeadsQuery, asyncHandler(getMyTherapistLeadsController));
 router.post('/me/leads/:id/purchase', requireAuth, requireTherapistRole, ...validateSessionIdParam, asyncHandler(purchaseMyTherapistLeadController));
 router.get('/me/earnings', requireAuth, requireTherapistRole, ...validateTherapistEarningsQuery, asyncHandler(getMyTherapistEarningsController));

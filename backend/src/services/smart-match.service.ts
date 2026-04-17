@@ -6,12 +6,15 @@ import { isSubscriptionValidForMatching } from './subscription.helper';
 import { env } from '../config/env';
 import { initiatePhonePePayment, checkPhonePeStatus } from './phonepe.service';
 import { assertPatientHasCompletedBothPHQandGAD7 } from './patient-v1.service';
+import { getPricingConfig } from './pricing.service';
 
 const REQUEST_EXPIRY_HOURS = 24;
-const SESSION_QUOTE = {
-  THERAPIST: 699 * 100, // ₹699 in minor units
-  PSYCHOLOGIST: 999 * 100, // ₹999 in minor units
-  PSYCHIATRIST: 1499 * 100, // ₹1499 in minor units
+
+// Default fallback session prices (in minor units, e.g., 699 * 100 = ₹699.00)
+const DEFAULT_SESSION_QUOTE = {
+  THERAPIST: 699 * 100,
+  PSYCHOLOGIST: 999 * 100,
+  PSYCHIATRIST: 1499 * 100,
 };
 
 interface AvailabilityPrefs {
@@ -69,7 +72,81 @@ interface SmartMatchCriteria {
   modes?: string[];
   context?: MatchContext;
   patientUserId?: string;
+  presetEntryType?: string;
+  timezoneRegion?: string;
+  sourceFunnel?: string;
+  // Hard filters applied before scoring
+  providerTypeFilter?: string;
+  specializationRequired?: string[];
+  credentialFilter?: string[];
+  sessionTypeFilter?: string[];
 }
+
+type NriPresetEntryType = 'nri_psychologist' | 'nri_psychiatrist' | 'nri_therapist';
+
+const NRI_PROVIDER_TYPE_BY_ENTRY: Record<NriPresetEntryType, string> = {
+  nri_psychologist: 'psychologist',
+  nri_psychiatrist: 'psychiatrist',
+  nri_therapist: 'therapist',
+};
+
+const NRI_TIMEZONE_TO_SHIFT: Record<string, string> = {
+  US_EST: 'shift_a_us_east',
+  US_PST: 'shift_b_us_west',
+  UK: 'shift_c_uk',
+  AU: 'shift_d_au_sg',
+  SG: 'shift_d_au_sg',
+  UAE: 'shift_e_uae',
+  OTHER: 'shift_a_us_east',
+};
+
+const isNriPresetEntryType = (value?: string | null): value is NriPresetEntryType =>
+  value === 'nri_psychologist' || value === 'nri_psychiatrist' || value === 'nri_therapist';
+
+/**
+ * Resolves the session quote (in minor units) by looking up the pricing config.
+ * For NRI entry types, looks up prices by NRI provider type (e.g., 'nri_psychologist').
+ * Falls back to provider type pricing, then default pricing.
+ */
+const resolveSessionQuoteMinor = async (
+  providerType?: string | null,
+  presetEntryType?: string | null,
+): Promise<number> => {
+  const pricingConfig = await getPricingConfig();
+  const sessionPricing = pricingConfig.sessionPricing || [];
+
+  // If NRI entry type, look up pricing by NRI provider type
+  if (isNriPresetEntryType(presetEntryType)) {
+    const nriProviderType = NRI_PROVIDER_TYPE_BY_ENTRY[presetEntryType];
+    const nriPrice = sessionPricing.find((s) => {
+      const configuredType = String(s.providerType || '').toLowerCase();
+      return configuredType === String(presetEntryType || '').toLowerCase()
+        || configuredType === String(nriProviderType || '').toLowerCase();
+    });
+    if (nriPrice && Number.isFinite(nriPrice.price) && nriPrice.price > 0) {
+      return nriPrice.price * 100;
+    }
+  }
+
+  // Look up by provider type
+  if (providerType) {
+    const price = sessionPricing.find(
+      (s) => String(s.providerType || '').toLowerCase() === String(providerType || '').toLowerCase(),
+    );
+    if (price && Number.isFinite(price.price) && price.price > 0) {
+      return price.price * 100;
+    }
+  }
+
+  // Fallback to default prices by provider type
+  const normalized = String(providerType || 'THERAPIST').toUpperCase();
+  return DEFAULT_SESSION_QUOTE[normalized as keyof typeof DEFAULT_SESSION_QUOTE] || DEFAULT_SESSION_QUOTE.THERAPIST;
+};
+
+const normalizeSourceFunnel = (value?: string | null): string | null => {
+  const normalized = String(value || '').trim().toLowerCase().replace(/[^a-z0-9_\-]/g, '_').slice(0, 30);
+  return normalized || null;
+};
 
 type AvailabilitySlot = {
   dayOfWeek: number;
@@ -181,6 +258,12 @@ export const findMatchingProviders = async (
   }
 
   const context = criteria?.context || 'Standard';
+  const isNriPresetFlow = isNriPresetEntryType(criteria?.presetEntryType);
+  const nriProviderType = isNriPresetFlow ? NRI_PROVIDER_TYPE_BY_ENTRY[criteria!.presetEntryType as NriPresetEntryType] : null;
+  const timezoneRegion = String(criteria?.timezoneRegion || '').trim().toUpperCase();
+  const requiredNriShift = isNriPresetFlow && timezoneRegion
+    ? NRI_TIMEZONE_TO_SHIFT[timezoneRegion] || NRI_TIMEZONE_TO_SHIFT.OTHER
+    : null;
   const contextMultiplier = CONTEXT_MULTIPLIERS[context] || CONTEXT_MULTIPLIERS.Standard;
   const requestedConcerns = (criteria?.concerns || []).map(normalizeToken).filter(Boolean);
   const requestedLanguages = (criteria?.languages || []).map(normalizeToken).filter(Boolean);
@@ -254,6 +337,24 @@ export const findMatchingProviders = async (
   });
 
   const providerIds = therapists.map((t) => String(t.userId));
+  const nriEligibilityByProviderId = new Map<string, { certified: boolean; shifts: string[] }>();
+
+  if (isNriPresetFlow && providerIds.length > 0) {
+    const nriRows = await prisma.$queryRawUnsafe(
+      `SELECT "userId", "nri_pool_certified", "nri_timezone_shifts"
+       FROM "therapist_profiles"
+       WHERE "userId" = ANY($1::uuid[])`,
+      providerIds,
+    ) as Array<{ userId: string; nri_pool_certified: boolean; nri_timezone_shifts: string[] | null }>;
+
+    for (const row of nriRows || []) {
+      nriEligibilityByProviderId.set(String(row.userId), {
+        certified: Boolean(row.nri_pool_certified),
+        shifts: Array.isArray(row.nri_timezone_shifts) ? row.nri_timezone_shifts.map((s) => String(s || '').trim()).filter(Boolean) : [],
+      });
+    }
+  }
+
   const providerSessions = providerIds.length
     ? await prisma.therapySession.findMany({
         where: { therapistProfileId: { in: providerIds } },
@@ -285,6 +386,58 @@ export const findMatchingProviders = async (
   const matches: ProviderMatch[] = therapists
     .filter((t) => {
       if (!eligibleProviderIds.has(String(t.userId))) return false;
+
+      // Apply hard filters before scoring
+      if (criteria?.providerTypeFilter) {
+        const expectedType = normalizeToken(criteria.providerTypeFilter);
+        const actualType = normalizeToken(t.user.providerType || '');
+        if (!actualType.includes(expectedType) && !expectedType.includes(actualType)) {
+          return false;
+        }
+      }
+
+      if (nriProviderType) {
+        const expectedType = normalizeToken(nriProviderType);
+        const actualType = normalizeToken(t.user.providerType || '');
+        if (!actualType.includes(expectedType) && !expectedType.includes(actualType)) {
+          return false;
+        }
+      }
+
+      if (isNriPresetFlow) {
+        const nriEligibility = nriEligibilityByProviderId.get(String(t.userId));
+        if (!nriEligibility?.certified) {
+          return false;
+        }
+
+        if (requiredNriShift && !nriEligibility.shifts.some((shift) => normalizeToken(shift) === normalizeToken(requiredNriShift))) {
+          return false;
+        }
+      }
+
+      if (criteria?.credentialFilter && criteria.credentialFilter.length > 0) {
+        const requiredCreds = criteria.credentialFilter.map(normalizeToken);
+        const actualCerts = (t.certifications || []).map((c) => normalizeToken(String(c))).filter(Boolean);
+        const hasCred = requiredCreds.some((req) => actualCerts.some((cert) => cert.includes(req) || req.includes(cert)));
+        if (!hasCred) return false;
+      }
+
+      if (criteria?.specializationRequired && criteria.specializationRequired.length > 0) {
+        const requiredSpecs = criteria.specializationRequired.map(normalizeToken);
+        const actualSpecs = (t.specializations || []).map((s) => normalizeToken(String(s)));
+        const hasSpec = requiredSpecs.some((req) => actualSpecs.some((spec) => spec.includes(req) || req.includes(spec)));
+        if (!hasSpec) return false;
+      }
+
+      if (criteria?.sessionTypeFilter && criteria.sessionTypeFilter.length > 0) {
+        // Session type is typically contained in the therapist's profile modes/availability
+        // For now, we assume all therapists support standard session types
+        // Extended implementation could check specific session types from therapist profile
+        const supportedModes = ['video', 'phone', 'chat'];
+        const requestedSessionTypes = criteria.sessionTypeFilter.map(normalizeToken);
+        const hasType = requestedSessionTypes.some((type) => supportedModes.some((mode) => mode.includes(type) || type.includes(mode)));
+        if (!hasType) return false;
+      }
 
       // Check if therapist has availability JSON
       if (!t.availability) return false;
@@ -389,11 +542,14 @@ export const findMatchingProviders = async (
 
       const quality = Math.min(25, healthScore + continuityScore);
 
+      const nriTimezoneScore = isNriPresetFlow && requiredNriShift ? 15 : 0;
+      const nriPoolBonus = isNriPresetFlow ? 10 : 0;
+
       const total = Math.round(
         expertise * contextMultiplier.expertise
         + communication * contextMultiplier.communication
         + quality * contextMultiplier.quality,
-      );
+      ) + nriTimezoneScore + nriPoolBonus;
 
       const tier = mapTierFromScore(total);
       const matchBand = mapBandFromScore(total);
@@ -465,6 +621,9 @@ interface CreateAppointmentRequestInput {
   patientId: string;
   availabilityPrefs: AvailabilityPrefs;
   providerIds: string[]; // up to 3 provider IDs
+  sourceFunnel?: string;
+  presetEntryType?: string;
+  timezoneRegion?: string;
   preferredSpecialization?: string;
   durationMinutes?: number;
   context?: MatchContext;
@@ -516,6 +675,7 @@ export const createAppointmentRequest = async (
 
   const patientSubscriptionSnapshot = await assertPatientSmartMatchEligibility(input.patientId);
   const contextMultiplier = CONTEXT_MULTIPLIERS[input.context || 'Standard'] || CONTEXT_MULTIPLIERS.Standard;
+  const sourceFunnel = normalizeSourceFunnel(input.sourceFunnel);
 
   // Validate patient exists
   const patient = await prisma.patientProfile.findUnique({
@@ -537,10 +697,12 @@ export const createAppointmentRequest = async (
     throw new AppError('One or more providers not found or inactive', 404);
   }
 
-  const amountMinor = providers.reduce((max, provider) => {
-    const quoted = SESSION_QUOTE[String(provider.providerType || 'THERAPIST') as keyof typeof SESSION_QUOTE] || SESSION_QUOTE.THERAPIST;
-    return Math.max(max, quoted);
-  }, SESSION_QUOTE.THERAPIST);
+  // Resolve session quote (amount) by checking all provider types and taking the maximum
+  const quotes = await Promise.all(
+    providers.map((provider) => resolveSessionQuoteMinor(provider.providerType, input.presetEntryType)),
+  );
+  const defaultQuote = await resolveSessionQuoteMinor('THERAPIST', input.presetEntryType);
+  const amountMinor = Math.max(...quotes, defaultQuote);
 
   const merchantTransactionId = String(input.payment?.merchantTransactionId || '').trim();
   if (!merchantTransactionId) {
@@ -634,6 +796,7 @@ export const createAppointmentRequest = async (
     data: {
       patientId: input.patientId,
       availabilityPrefs: input.availabilityPrefs as any,
+      sourceFunnel,
       providers: providers.map((p) => ({
         providerId: p.id,
         name: `${p.firstName} ${p.lastName}`.trim(),
@@ -648,7 +811,7 @@ export const createAppointmentRequest = async (
       amountMinor: BigInt(amountMinor),
       currency: 'INR',
       expiresAt: new Date(Date.now() + REQUEST_EXPIRY_HOURS * 60 * 60 * 1000),
-    },
+    } as any,
   });
 
   const rankedMap = new Map(
@@ -1062,6 +1225,7 @@ export const getPatientPendingRequests = async (patientId: string) => {
   return requests.map((req) => ({
     id: req.id,
     status: req.status,
+    sourceFunnel: (req as any).sourceFunnel || null,
     providers: req.providers,
     expiresAt: req.expiresAt,
   }));

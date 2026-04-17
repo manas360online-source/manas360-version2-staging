@@ -10,6 +10,7 @@ const LandingPage = lazy(() => import('./pages/LandingPage'));
 import { AuthProvider, getPostLoginRoute, useAuth } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 import { Assessment } from './pages/Assessment'
+import { PresetAssessmentEntry } from './components/patient/PresetAssessmentEntry'
 import { ResultsPage } from './pages/Results'
 import { CrisisPage } from './pages/Crisis'
 import { OnboardingName } from './pages/OnboardingName'
@@ -44,6 +45,7 @@ const SleepTherapyPage = lazy(() => import('./pages/patient/SleepTherapyPage'));
 const WellnessLibraryPage = lazy(() => import('./pages/patient/WellnessLibraryPage'));
 const BuddyChatPage = lazy(() => import('./pages/patient/BuddyChatPage'));
 const ProviderMessagesPage = lazy(() => import('./pages/patient/ProviderMessagesPage'));
+const ProviderSelectionPage = lazy(() => import('./pages/patient/ProviderSelectionPage'));
 const PatientOnboardingPage = lazy(() => import('./pages/patient/PatientOnboardingPage'));
 const DailyCheckInPage = lazy(() => import('./pages/patient/DailyCheckInPage'));
 const HitASixerGamePage = lazy(() => import('./pages/patient/HitASixerGamePage'));
@@ -148,6 +150,7 @@ const PatientChartLayout = lazy(() => import('./components/layout/PatientChartLa
 const ChartOverview = lazy(() => import('./pages/provider/Patients/Tabs/ChartOverview'));
 const SessionNotes = lazy(() => import('./pages/provider/Patients/Tabs/SessionNotes'));
 const Assessments = lazy(() => import('./pages/provider/Patients/Tabs/Assessments'));
+const CareTeamTab = lazy(() => import('./pages/provider/Patients/Tabs/CareTeamTab'));
 const PlanStudio = lazy(() => import('./pages/provider/Patients/Tabs/PlanStudio'));
 const Prescriptions = lazy(() => import('./pages/provider/PrescriptionGateway'));
 const LabOrders = lazy(() => import('./pages/provider/Patients/Tabs/LabOrders'));
@@ -246,6 +249,7 @@ function App() {
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/assessment" element={<Assessment onSubmit={handleAssessmentSubmit} />} />
+            <Route path="/assessment-preset" element={<PresetAssessmentEntry />} />
             <Route path="/eap/:companyKey/screen" element={<EapScreeningPage />} />
 
             {/* ── Certification Sub-App ── */}
@@ -318,6 +322,7 @@ function App() {
                 <Route path="notes" element={<SessionNotes />} />
                 <Route path="session-notes" element={<Navigate to="../notes" replace />} />
                 <Route path="assessments" element={<Assessments />} />
+                <Route path="care-team" element={<CareTeamTab />} />
                 <Route path="plan-builder" element={<PlanStudio />} />
                 <Route path="goals" element={<GoalsAndHabits />} />
                 <Route path="prescriptions" element={<Prescriptions />} />
@@ -326,11 +331,11 @@ function App() {
                 <Route path="clinical-notes" element={<SessionNotes />} />
               </Route>
               <Route path="calendar" element={<ProviderCalendarPage />} />
-              <Route path="notes" element={<Navigate to="patient/123/notes" replace />} />
-              <Route path="assessments" element={<Navigate to="patient/123/assessments" replace />} />
-              <Route path="prescriptions" element={<Navigate to="patient/123/prescriptions" replace />} />
-              <Route path="labs" element={<Navigate to="patient/123/labs" replace />} />
-              <Route path="goals" element={<Navigate to="patient/123/goals" replace />} />
+              <Route path="notes" element={<Navigate to="/provider/patients" replace />} />
+              <Route path="assessments" element={<Navigate to="/provider/patients" replace />} />
+              <Route path="prescriptions" element={<Navigate to="/provider/patients" replace />} />
+              <Route path="labs" element={<Navigate to="/provider/patients" replace />} />
+              <Route path="goals" element={<Navigate to="/provider/patients" replace />} />
               <Route path="earnings" element={<ProviderEarningsPage />} />
               <Route path="appointments" element={<AppointmentRequestsPage />} />
               <Route path="certifications" element={<CertificationLandingPage />} />
@@ -338,12 +343,54 @@ function App() {
               <Route path="certification/enroll/:slug" element={<EnrollmentRegistrationPage />} />
               <Route path="checkout/:slug" element={<CheckoutPage />} />
               <Route path="my-certifications" element={<MyCertificationsPage />} />
-              <Route path="subscription" element={<ProviderSubscriptionPage />} />
-              <Route path="platform-payment" element={<Navigate to="/provider/subscription" replace />} />
-              <Route path="plans" element={<ProviderSubscriptionPage />} />
-              <Route path="plans/addons" element={<ProviderSubscriptionAddonsPage />} />
-              <Route path="checkout" element={<UniversalCheckoutPage />} />
-              <Route path="confirmation" element={<UniversalPaymentSuccessPage />} />
+              <Route
+                path="subscription"
+                element={
+                  <ProtectedRoute allowedRoles={['therapist', 'psychiatrist', 'psychologist', 'coach']}>
+                    <ProviderSubscriptionPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="platform-payment"
+                element={
+                  <ProtectedRoute allowedRoles={['therapist', 'psychiatrist', 'psychologist', 'coach']}>
+                    <Navigate to="/provider/subscription" replace />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="plans"
+                element={
+                  <ProtectedRoute allowedRoles={['therapist', 'psychiatrist', 'psychologist', 'coach']}>
+                    <ProviderSubscriptionPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="plans/addons"
+                element={
+                  <ProtectedRoute allowedRoles={['therapist', 'psychiatrist', 'psychologist', 'coach']}>
+                    <ProviderSubscriptionAddonsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="checkout"
+                element={
+                  <ProtectedRoute allowedRoles={['therapist', 'psychiatrist', 'psychologist', 'coach']}>
+                    <UniversalCheckoutPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="confirmation"
+                element={
+                  <ProtectedRoute allowedRoles={['therapist', 'psychiatrist', 'psychologist', 'coach']}>
+                    <UniversalPaymentSuccessPage />
+                  </ProtectedRoute>
+                }
+              />
               <Route path="messages" element={<ProviderInboxPage />} />
 
               <Route path="settings" element={<ProviderSettingsPage />} />
@@ -358,46 +405,6 @@ function App() {
               }
             />
             <Route path="/provider/onboarding" element={<Navigate to="/onboarding/provider-setup" replace />} />
-            <Route
-              path="/provider/platform-payment"
-              element={
-                <ProtectedRoute allowedRoles={['therapist', 'psychiatrist', 'psychologist', 'coach']}>
-                  <Navigate to="/provider/subscription" replace />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/provider/plans"
-              element={
-                <ProtectedRoute allowedRoles={['therapist', 'psychiatrist', 'psychologist', 'coach']}>
-                  <ProviderSubscriptionPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/provider/plans/addons"
-              element={
-                <ProtectedRoute allowedRoles={['therapist', 'psychiatrist', 'psychologist', 'coach']}>
-                  <ProviderSubscriptionAddonsPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/provider/checkout"
-              element={
-                <ProtectedRoute allowedRoles={['therapist', 'psychiatrist', 'psychologist', 'coach']}>
-                  <UniversalCheckoutPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/provider/confirmation"
-              element={
-                <ProtectedRoute allowedRoles={['therapist', 'psychiatrist', 'psychologist', 'coach']}>
-                  <UniversalPaymentSuccessPage />
-                </ProtectedRoute>
-              }
-            />
             <Route
               path="/provider/verification-pending"
               element={
@@ -636,6 +643,7 @@ function App() {
               <Route path="providers/:id" element={<Navigate to="/patient/sessions" replace />} />
               <Route path="book/:providerId" element={<BookSessionPage />} />
               <Route path="sessions" element={<SessionsPage />} />
+              <Route path="provider-selection" element={<ProviderSelectionPage />} />
               <Route path="sessions/:id" element={<PatientSessionDetailPage />} />
               <Route path="exercises" element={<Navigate to="/patient/check-in?tab=daily-mood" replace />} />
               <Route path="sessions/:id/live" element={<LiveSessionPage />} />

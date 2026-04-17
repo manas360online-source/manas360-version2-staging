@@ -39,6 +39,7 @@ import {
 	acceptAppointmentRequest,
 	rejectAppointmentRequest,
 	getPatientDocuments,
+	getPatientCareTeam,
     createAddendum,
 } from '../controllers/provider.controller';
 import {
@@ -119,6 +120,9 @@ router.post('/patient/:patientId/notes/:noteId/addendum', requireAuth, requireRo
 
 // Documents aggregation
 router.get('/patient/:patientId/documents', requireAuth, requireRole(providerRoles), asyncHandler(getPatientDocuments));
+
+// Patient-specific care team (providers assigned to this patient)
+router.get('/patient/:patientId/care-team', requireAuth, requireRole(providerRoles), asyncHandler(getPatientCareTeam));
 
 // Care-team management
 router.get('/care-team', requireAuth, requireRole(providerRoles), asyncHandler(getProviderCareTeam));

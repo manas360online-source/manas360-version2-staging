@@ -380,7 +380,7 @@ function TemboModal({ onClose }: { onClose: () => void }) {
         <div id="loader-status">Connecting to Sketchfab…</div>
       </div>
 
-      <iframe id="elephant-frame" title="Jungle Animal: Cartoon Elephant" frameborder="0" allowfullscreen mozallowfullscreen="true" webkitallowfullscreen="true" allow="autoplay; fullscreen; xr-spatial-tracking"
+      <iframe id="elephant-frame" title="Jungle Animal: Cartoon Elephant" frameborder="0" allow="autoplay; fullscreen; xr-spatial-tracking"
         src="https://sketchfab.com/models/52401c7067f54ff3813da84df073b5f6/embed?api_version=1.0.0&autostart=1&camera=0&preload=1&transparent=1&ui_hint=0&dnt=1&ui_controls=0&ui_infos=0&ui_stop=0&ui_inspector=0&ui_watermark=0&ui_ar=0&ui_vr=0&ui_help=0&ui_settings=0&ui_annotations=0">
       </iframe>
       <div class="now-playing" id="now-playing">
@@ -785,24 +785,56 @@ export default function DigitalPetHubPage() {
               <span className="text-sm text-slate-600">Watch, breathe, be present</span>
             </div>
             <div className="grid grid-cols-3 gap-4">
-              {[
-                { emoji: '🐠', name: 'Koi Fish', env: '🌊 Zen Pond', tags: ['Anxiety', 'Stress Relief'] },
-                { emoji: '🐱', name: 'Lotus Cat', env: '🏯 Garden Temple', tags: ['Grounding', 'Mindfulness'] },
-                { emoji: '✨', name: 'Cloud Sprite', env: '☁️ Sky Realm', tags: ['Lightness', 'Letting Go'] },
-              ].map((pet, i) => (
-                <div key={i} className="bg-gradient-to-br from-slate-50 to-white border border-slate-200 rounded-2xl overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all">
-                  <div className="h-32 flex items-center justify-center text-6xl bg-gradient-to-b from-blue-50 to-slate-50">{pet.emoji}</div>
-                  <div className="p-4">
-                    <div className="font-bold text-slate-900 mb-0.5">{pet.name}</div>
-                    <div className="text-xs text-slate-600 mb-3">{pet.env}</div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {pet.tags.map((tag, j) => (
-                        <span key={j} className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 text-blue-700">{tag}</span>
-                      ))}
-                    </div>
-                  </div>
+              <div className="bg-gradient-to-br from-slate-50 to-white border border-slate-200 rounded-2xl overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all">
+                <div style={{ padding: '177.78% 0 0 0', position: 'relative' }}>
+                  <iframe
+                    src="https://player.vimeo.com/video/1184033995?title=0&byline=0&portrait=0&badge=0&autopause=0&player_id=0&app_id=58479"
+                    frameBorder="0"
+                    allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    title="MANAS360 MentalWellness Intro_1080p_caption"
+                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+                    
+                  />
                 </div>
-              ))}
+                <div className="p-4">
+                  <div className="font-bold text-slate-900 mb-0.5">1 Ponda</div>
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-br from-slate-50 to-white border border-slate-200 rounded-2xl overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all">
+                <div style={{ padding: '56.25% 0 0 0', position: 'relative' }}>
+                  <iframe
+                    src="https://player.vimeo.com/video/1184033994?title=0&byline=0&portrait=0&badge=0&autopause=0&player_id=0&app_id=58479"
+                    frameBorder="0"
+                    allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    title="FindingStillness"
+                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+                    
+                  />
+                </div>
+                <div className="p-4">
+                  <div className="font-bold text-slate-900 mb-0.5">2 ClownFish</div>
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-br from-slate-50 to-white border border-slate-200 rounded-2xl overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all">
+                <div style={{ padding: '177.78% 0 0 0', position: 'relative' }}>
+                  <iframe
+                    src="https://player.vimeo.com/video/1184033993?title=0&byline=0&portrait=0&badge=0&autopause=0&player_id=0&app_id=58479"
+                    frameBorder="0"
+                    allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    title="3 NavilCheerful"
+                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+                    
+                  />
+                </div>
+                <div className="p-4">
+                  <div className="font-bold text-slate-900 mb-0.5">3 NavilCheerful</div>
+                </div>
+              </div>
             </div>
           </div>
 

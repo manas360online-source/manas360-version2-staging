@@ -1037,7 +1037,7 @@ export default function ProgressPage() {
             <>
               <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <MetricCard label="Exercises Completed" value={habitsStats.exercisesCompleted} helper="Completed CBT and wellness actions" />
-                <MetricCard label="Audio Minutes Listened" value={`${habitsStats.audioMinutesListened} mins`} helper="From Wellness Library audio sessions" />
+                <MetricCard label="Audio Minutes Listened" value={`${habitsStats.audioMinutesListened} mins`} helper="From Premium Library audio sessions" />
                 <MetricCard label="Sessions Attended" value={habitsStats.sessionsAttended} helper="Completed therapist sessions" />
               </section>
 

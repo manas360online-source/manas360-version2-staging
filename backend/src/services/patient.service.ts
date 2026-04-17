@@ -1,6 +1,7 @@
 import prisma from '../config/db';
 import { AppError } from '../middleware/error.middleware';
 import { buildPaginationMeta, normalizePagination } from '../utils/pagination';
+import { calculateClinicalAssessmentScore } from '../utils/clinicalAssessments';
 
 interface PatientProfileInput {
 	age: number;
@@ -114,47 +115,11 @@ export const getMyPatientProfile = async (userId: string) => {
 };
 
 const calculateAssessmentScore = (type: 'PHQ-9' | 'GAD-7', answers: number[]) => {
-	const expectedLength = type === 'PHQ-9' ? 9 : 7;
-
-	if (answers.length !== expectedLength) {
-		throw new AppError(`answers must contain exactly ${expectedLength} values for ${type}`, 422);
+	try {
+		return calculateClinicalAssessmentScore(type, answers);
+	} catch (error) {
+		throw new AppError(`${(error as Error).message} for ${type}`, 422);
 	}
-
-	const totalScore = answers.reduce((sum, value) => sum + value, 0);
-
-	if (type === 'PHQ-9') {
-		if (totalScore <= 4) {
-			return { totalScore, severityLevel: 'minimal' };
-		}
-
-		if (totalScore <= 9) {
-			return { totalScore, severityLevel: 'mild' };
-		}
-
-		if (totalScore <= 14) {
-			return { totalScore, severityLevel: 'moderate' };
-		}
-
-		if (totalScore <= 19) {
-			return { totalScore, severityLevel: 'moderately_severe' };
-		}
-
-		return { totalScore, severityLevel: 'severe' };
-	}
-
-	if (totalScore <= 4) {
-		return { totalScore, severityLevel: 'minimal' };
-	}
-
-	if (totalScore <= 9) {
-		return { totalScore, severityLevel: 'mild' };
-	}
-
-	if (totalScore <= 14) {
-		return { totalScore, severityLevel: 'moderate' };
-	}
-
-	return { totalScore, severityLevel: 'severe' };
 };
 
 export const createPatientAssessment = async (userId: string, input: PatientAssessmentInput) => {

@@ -5,6 +5,7 @@
 
 import { Router, Request, Response } from 'express';
 import { requireAuth } from '../middleware/auth.middleware';
+import { requireRole, type UserRole } from '../middleware/rbac.middleware';
 import { prisma } from '../config/db';
 import {
   getProviderMetrics,
@@ -13,13 +14,14 @@ import {
 import { PLAN_CONFIG } from '../config/plans';
 
 const router = Router();
+const providerDashboardRoles: UserRole[] = ['therapist', 'psychologist', 'psychiatrist', 'coach', 'learner'];
 
 /**
  * GET /api/provider/dashboard/metrics
  * Main dashboard metrics for a provider (therapist)
  * Returns: subscription info, quota, conversion rate, ROI, earnings
  */
-router.get('/provider/dashboard/metrics', requireAuth, async (req: Request, res: Response) => {
+router.get('/provider/dashboard/metrics', requireAuth, requireRole(providerDashboardRoles), async (req: Request, res: Response) => {
   try {
     const therapistId = (req as any).auth?.userId as string;
 
@@ -48,7 +50,7 @@ router.get('/provider/dashboard/metrics', requireAuth, async (req: Request, res:
  * List all assigned leads with their status
  * Query params: page, limit, status, sortBy
  */
-router.get('/provider/dashboard/leads', requireAuth, async (req: Request, res: Response) => {
+router.get('/provider/dashboard/leads', requireAuth, requireRole(providerDashboardRoles), async (req: Request, res: Response) => {
   try {
     const therapistId = (req as any).auth?.userId as string;
     const page = parseInt((req.query.page as string) || '1');
@@ -117,7 +119,7 @@ router.get('/provider/dashboard/leads', requireAuth, async (req: Request, res: R
  * Weekly performance stats for charts
  * Returns: last 4 weeks of lead/response/conversion data
  */
-router.get('/provider/dashboard/weekly-stats', requireAuth, async (req: Request, res: Response) => {
+router.get('/provider/dashboard/weekly-stats', requireAuth, requireRole(providerDashboardRoles), async (req: Request, res: Response) => {
   try {
     const therapistId = (req as any).auth?.userId as string;
     const weeks = parseInt((req.query.weeks as string) || '4');
@@ -145,7 +147,7 @@ router.get('/provider/dashboard/weekly-stats', requireAuth, async (req: Request,
  * GET /api/provider/dashboard/summary
  * Quick summary for dashboard cards
  */
-router.get('/provider/dashboard/summary', requireAuth, async (req: Request, res: Response) => {
+router.get('/provider/dashboard/summary', requireAuth, requireRole(providerDashboardRoles), async (req: Request, res: Response) => {
   try {
     const therapistId = (req as any).auth?.userId as string;
 
@@ -199,7 +201,7 @@ router.get('/provider/dashboard/summary', requireAuth, async (req: Request, res:
  * GET /api/provider/dashboard/subscription-plans
  * List available subscription plans (for plan selection/upgrade)
  */
-router.get('/provider/dashboard/subscription-plans', requireAuth, async (req: Request, res: Response) => {
+router.get('/provider/dashboard/subscription-plans', requireAuth, requireRole(providerDashboardRoles), async (req: Request, res: Response) => {
   try {
     const therapistId = (req as any).auth?.userId as string;
 

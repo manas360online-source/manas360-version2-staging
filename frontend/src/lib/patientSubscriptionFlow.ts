@@ -1,10 +1,7 @@
 export type PatientPlanId = 'free' | 'monthly' | 'quarterly' | 'premium_monthly';
 
 export interface PatientAddonSelection {
-  anytimeBuddyPack: 'none' | '1h' | '3h' | '5h';
-  digitalPetHubUnlock: boolean;
-  soundTrackCount: number;
-  soundBundleCount: number;
+  premiumLibraryPack: 'none' | '1h' | '3h' | '5h';
 }
 
 export interface PatientSubscriptionCart {
@@ -74,7 +71,7 @@ export const PATIENT_PLANS: Array<{
   },
   {
     id: 'premium_monthly',
-    name: 'Premium',
+    name: 'Premium Library',
     displayPrice: 'INR 299 / month',
     gatewayPlanKey: 'premium_monthly',
     trialDays: 21,
@@ -82,30 +79,23 @@ export const PATIENT_PLANS: Array<{
     amountMinor: 29900,
     features: [
       'Everything in Quarterly',
-      'Unlimited streaming',
-      'Offline downloads',
+      'Premium library access packs',
+      'Screen-time based library usage',
       'Advanced mood analytics',
     ],
   },
 ];
 
 export const DEFAULT_ADDONS: PatientAddonSelection = {
-  anytimeBuddyPack: 'none',
-  digitalPetHubUnlock: false,
-  soundTrackCount: 0,
-  soundBundleCount: 0,
+  premiumLibraryPack: 'none',
 };
 
-const ANYTIME_BUDDY_PRICING: Record<PatientAddonSelection['anytimeBuddyPack'], number> = {
+const PREMIUM_LIBRARY_PACK_PRICING: Record<PatientAddonSelection['premiumLibraryPack'], number> = {
   none: 0,
   '1h': 39900,
   '3h': 99900,
   '5h': 169900,
 };
-
-const DIGITAL_PET_HUB_UNLOCK_MINOR = 9900;
-const SOUND_TRACK_MINOR = 3000;
-const SOUND_BUNDLE_MINOR = 25000;
 
 export const formatInr = (minor: number): string => {
   const major = minor / 100;
@@ -117,15 +107,9 @@ export const getPlanById = (id: PatientPlanId) => PATIENT_PLANS.find((plan) => p
 export const getPlanAmountMinor = (id: PatientPlanId): number => getPlanById(id).amountMinor;
 
 export const getAddonSubtotalMinor = (cart: PatientSubscriptionCart): number => {
-  const { addons, planId } = cart;
-  const petHubMinor = planId === 'premium_monthly' ? 0 : (addons.digitalPetHubUnlock ? DIGITAL_PET_HUB_UNLOCK_MINOR : 0);
-
-  return (
-    ANYTIME_BUDDY_PRICING[addons.anytimeBuddyPack]
-    + petHubMinor
-    + Math.max(0, Math.round(addons.soundTrackCount || 0)) * SOUND_TRACK_MINOR
-    + Math.max(0, Math.round(addons.soundBundleCount || 0)) * SOUND_BUNDLE_MINOR
-  );
+  const { addons } = cart;
+  const pack = addons?.premiumLibraryPack || 'none';
+  return PREMIUM_LIBRARY_PACK_PRICING[pack] || 0;
 };
 
 export const getCheckoutSummaryMinor = (cart: PatientSubscriptionCart) => {
@@ -145,9 +129,20 @@ export const loadCart = (): PatientSubscriptionCart | null => {
   try {
     const raw = localStorage.getItem(PATIENT_CART_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as PatientSubscriptionCart;
+    const parsed = JSON.parse(raw) as any;
     if (!parsed || !parsed.planId || !parsed.addons) return null;
-    return parsed;
+
+    const premiumLibraryPack = parsed?.addons?.premiumLibraryPack || parsed?.addons?.anytimeBuddyPack || 'none';
+
+    return {
+      planId: parsed.planId,
+      addons: {
+        premiumLibraryPack: premiumLibraryPack === '1h' || premiumLibraryPack === '3h' || premiumLibraryPack === '5h'
+          ? premiumLibraryPack
+          : 'none',
+      },
+      updatedAt: String(parsed.updatedAt || new Date().toISOString()),
+    };
   } catch {
     return null;
   }

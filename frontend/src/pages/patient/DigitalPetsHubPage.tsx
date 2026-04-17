@@ -130,12 +130,12 @@ export default function DigitalPetsHubPage({ selectedPet }: DigitalPetsHubPagePr
           <div className="hero-top">
             <div className="video-frame">
               <iframe
-                src="https://player.vimeo.com/video/1166597087?badge=0&autopause=0&player_id=0&app_id=58479"
+                src="https://player.vimeo.com/video/1166597087?title=0&byline=0&portrait=0&badge=0&autopause=0&player_id=0&app_id=58479"
+                frameBorder="0"
                 allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
                 referrerPolicy="strict-origin-when-cross-origin"
                 title="DragonPitch-DigitalPet"
               />
-              <div className="video-label">🎬 Avatar Pitch - "Your Digital Companion"</div>
             </div>
             <div className="hero-text">
               <div className="badge" style={{ background: '#EDE9FE', color: '#7C3AED', marginBottom: 12 }}>🐾 PT06 - Digital Pet Hub</div>
@@ -195,9 +195,50 @@ export default function DigitalPetsHubPage({ selectedPet }: DigitalPetsHubPagePr
           <div className="tier-section">
             <div className="tier-header"><h2>Tier 1 - Ambient Companions</h2></div>
             <div className="pets-row">
-              <div className="pet-card"><div className="pet-visual" style={{ background: 'linear-gradient(135deg,#DBEAFE,#BFDBFE)' }}>🐟</div><div className="pet-body"><div className="pet-name">Koi Fish</div><div className="pet-env">🌊 Zen Pond</div><span className="pet-benefit calm">Anxiety</span><span className="pet-benefit calm">Stress Relief</span></div></div>
-              <div className="pet-card"><div className="pet-visual" style={{ background: 'linear-gradient(135deg,#D1FAE5,#A7F3D0)' }}>🐱</div><div className="pet-body"><div className="pet-name">Lotus Cat</div><div className="pet-env">🏯 Garden Temple</div><span className="pet-benefit calm">Grounding</span><span className="pet-benefit mind">Mindfulness</span></div></div>
-              <div className="pet-card"><div className="pet-visual" style={{ background: 'linear-gradient(135deg,#E0E7FF,#C7D2FE)' }}>✨</div><div className="pet-body"><div className="pet-name">Cloud Sprite</div><div className="pet-env">☁️ Sky Realm</div><span className="pet-benefit calm">Lightness</span><span className="pet-benefit growth">Letting Go</span></div></div>
+              <div className="pet-card">
+                <div style={{ padding: '177.78% 0 0 0', position: 'relative' }}>
+                  <iframe
+                    src="https://player.vimeo.com/video/1184033995?title=0&amp;byline=0&amp;portrait=0&amp;badge=0&amp;autopause=0&amp;player_id=0&amp;app_id=58479"
+                    frameBorder="0"
+                    allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    title="MANAS360 MentalWellness Intro_1080p_caption"
+                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+                    
+                  />
+                </div>
+                <div className="pet-body"><div className="pet-name">1 Ponda</div></div>
+              </div>
+
+              <div className="pet-card">
+                <div style={{ padding: '56.25% 0 0 0', position: 'relative' }}>
+                  <iframe
+                    src="https://player.vimeo.com/video/1184033994?title=0&amp;byline=0&amp;portrait=0&amp;badge=0&amp;autopause=0&amp;player_id=0&amp;app_id=58479"
+                    frameBorder="0"
+                    allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    title="FindingStillness"
+                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+                    
+                  />
+                </div>
+                <div className="pet-body"><div className="pet-name">2 ClownFish</div></div>
+              </div>
+
+              <div className="pet-card">
+                <div style={{ padding: '177.78% 0 0 0', position: 'relative' }}>
+                  <iframe
+                    src="https://player.vimeo.com/video/1184033993?title=0&amp;byline=0&amp;portrait=0&amp;badge=0&amp;autopause=0&amp;player_id=0&amp;app_id=58479"
+                    frameBorder="0"
+                    allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    title="3 NavilCheerful"
+                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+                    
+                  />
+                </div>
+                <div className="pet-body"><div className="pet-name">3 NavilCheerful</div></div>
+              </div>
             </div>
           </div>
 

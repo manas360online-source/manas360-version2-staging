@@ -65,6 +65,9 @@ export const getAvailableProvidersController = async (req: Request, res: Respons
   const concerns = parseQueryList(req.query.concerns);
   const languages = parseQueryList(req.query.languages);
   const modes = parseQueryList(req.query.modes);
+  const presetEntryType = String(req.query.entryType || '').trim() || undefined;
+  const timezoneRegion = String(req.query.timezoneRegion || '').trim() || undefined;
+  const sourceFunnel = String(req.query.sourceFunnel || '').trim() || undefined;
   const rawContext = String(req.query.context || 'Standard').trim();
   const context = (['Standard', 'Corporate', 'Night', 'Buddy', 'Crisis'].includes(rawContext) ? rawContext : 'Standard') as
     | 'Standard'
@@ -94,6 +97,9 @@ export const getAvailableProvidersController = async (req: Request, res: Respons
       languages,
       modes,
       context,
+      presetEntryType,
+      timezoneRegion,
+      sourceFunnel,
       patientUserId: patientId,
     },
   );
@@ -124,6 +130,9 @@ export const createAppointmentRequestController = async (req: Request, res: Resp
     modes,
     rankedProviders,
     payment,
+    sourceFunnel,
+    presetEntryType,
+    timezoneRegion,
   } = req.body;
 
   if (!availabilityPrefs || !providerIds) {
@@ -158,6 +167,9 @@ export const createAppointmentRequestController = async (req: Request, res: Resp
     modes,
     rankedProviders,
     payment,
+    sourceFunnel,
+    presetEntryType,
+    timezoneRegion,
   });
 
   const statusCode = result.paymentRequired ? 202 : 201;

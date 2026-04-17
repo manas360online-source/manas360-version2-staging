@@ -35,6 +35,16 @@ const db = prisma as any;
 
 const asMinor = (value: number): number => Math.max(0, Math.round(value));
 
+const isPlaceholderSecret = (value: string): boolean => {
+	const normalized = String(value || '').trim().toLowerCase();
+	if (!normalized) return true;
+	return normalized.startsWith('change-')
+		|| normalized.includes('replace-me')
+		|| normalized.includes('your-')
+		|| normalized === 'dummy'
+		|| normalized === 'test';
+};
+
 const sha256 = (input: string): string => crypto.createHash('sha256').update(input).digest('hex');
 
 const DEFAULT_COMMISSION = {
@@ -123,8 +133,8 @@ export const createSessionPayment = async (input: CreateFinancialSessionInput) =
 	}
 
 	const transactionId = `SESS_${Date.now()}_${idempotencyKey.slice(0, 8)}`;
-	const hasPhonePeOAuth = Boolean(String(process.env.PHONEPE_CLIENT_ID || '').trim())
-		&& Boolean(String(process.env.PHONEPE_CLIENT_SECRET || '').trim());
+	const hasPhonePeOAuth = !isPlaceholderSecret(String(process.env.PHONEPE_CLIENT_ID || ''))
+		&& !isPlaceholderSecret(String(process.env.PHONEPE_CLIENT_SECRET || ''));
 	const shouldBypass = env.allowDevPaymentBypass && env.nodeEnv === 'development' && !hasPhonePeOAuth;
 	const frontendBaseUrl = env.frontendUrl;
 	const paymentStatusBase = `${frontendBaseUrl}/#/payment/status`;

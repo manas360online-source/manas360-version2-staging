@@ -17,6 +17,7 @@ interface SlideOverBookingDrawerProps {
   onClose: () => void;
   provider: Provider | null;
   onBookingSuccess: () => void;
+  sourceFunnel?: string;
 }
 
 type ProviderTimeSlot = {
@@ -44,6 +45,7 @@ export default function SlideOverBookingDrawer({
   onClose,
   provider,
   onBookingSuccess,
+  sourceFunnel,
 }: SlideOverBookingDrawerProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -156,6 +158,7 @@ export default function SlideOverBookingDrawer({
         providerId: provider.id,
         scheduledAt: scheduledAt.toISOString(),
         durationMinutes: 50,
+        sourceFunnel,
       });
 
       const bookingId = bookingResp?.sessionId || bookingResp?.data?.sessionId;

@@ -59,6 +59,7 @@ import {
 	verifyPaymentController,
 	getMyActiveCbtAssignmentsController,
 	getMyAssessmentsController,
+	submitPresetAssessmentController,
 } from '../controllers/patient-v1.controller';
 import {
 	getAvailableProvidersController,
@@ -117,6 +118,9 @@ router.get('/sessions/:id', requireAuth, requireRole('patient'), asyncHandler(se
 router.post('/payments/verify', requireAuth, requireRole('patient'), asyncHandler(verifyPaymentController));
 
 router.get('/assessments/journey-recommendation', requireAuth, requireRole('patient'), asyncHandler(getJourneyRecommendationController));
+
+// Preset entry point assessment submission (gated by feature flag in service layer)
+router.post('/assessments/preset-submit', requireAuth, requireRole('patient'), asyncHandler(submitPresetAssessmentController));
 
 // Patient assessment history for current user
 router.get('/patient/me/assessments', requireAuth, requireRole('patient'), asyncHandler(getMyAssessmentsController));
