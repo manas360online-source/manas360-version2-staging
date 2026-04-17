@@ -7,6 +7,12 @@ import CookieConsentBanner from './components/common/CookieConsentBanner';
 import { GlobalAudioProvider } from './context/GlobalAudioContext';
 import GlobalAudioPlayerConsole from './components/audio/GlobalAudioPlayerConsole';
 const LandingPage = lazy(() => import('./pages/LandingPage'));
+const HelpingHandLandingPage = lazy(() => import('./pages/HelpingHandLandingPage'));
+const AiPowerHubLandingPage = lazy(() => import('./pages/AiPowerHubLandingPage'));
+const FindSparkLandingPage = lazy(() => import('./pages/FindSparkLandingPage'));
+const SelfHelpLandingPage = lazy(() => import('./pages/SelfHelpLandingPage'));
+const CorporateLandingPage = lazy(() => import('./pages/CorporateLandingPage'));
+const PremiumTheraphyLandingPage = lazy(() => import('./pages/PremiumTheraphyLandingPage'));
 import { AuthProvider, getPostLoginRoute, useAuth } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 import { Assessment } from './pages/Assessment'
@@ -248,6 +254,12 @@ function App() {
           <ScrollToTop />
           <Routes>
             <Route path="/" element={<LandingPage />} />
+            <Route path="/helping-hand" element={<HelpingHandLandingPage />} />
+            <Route path="/ai-power-hub" element={<AiPowerHubLandingPage />} />
+            <Route path="/find-spark" element={<FindSparkLandingPage />} />
+            <Route path="/self-help" element={<SelfHelpLandingPage />} />
+            <Route path="/corporate-landing" element={<CorporateLandingPage />} />
+            <Route path="/premium-theraphy" element={<PremiumTheraphyLandingPage />} />
             <Route path="/assessment" element={<Assessment onSubmit={handleAssessmentSubmit} />} />
             <Route path="/assessment-preset" element={<PresetAssessmentEntry />} />
             <Route path="/eap/:companyKey/screen" element={<EapScreeningPage />} />
