@@ -3,6 +3,9 @@ import { requireAuth } from '../middleware/auth.middleware';
 import { requireRole } from '../middleware/rbac.middleware';
 import { asyncHandler, validateCreateDailyCheckInRequest } from '../middleware/validate.middleware';
 import {
+  getAvailableProvidersController,
+} from '../controllers/smart-match.controller';
+import {
   cancelPatientSubscriptionController,
   completePatientExerciseController,
   createMoodController,
@@ -28,7 +31,6 @@ import {
   getPatientSubscriptionController,
   getMyCareTeamController,
   logWellnessLibraryActivityController,
-  listAvailableProvidersController,
   reactivatePatientSubscriptionController,
   createPatientSupportTicketController,
   togglePatientSubscriptionAutoRenewController,
@@ -66,7 +68,20 @@ router.get('/records/:id/url', requireAuth, requireRole('patient'), asyncHandler
 router.post('/records/:id/share', requireAuth, requireRole('patient'), asyncHandler(createPatientRecordShareLinkController));
 router.get('/records/shared/:token', asyncHandler(streamSharedPatientRecordController));
 router.get('/care-team', requireAuth, requireRole('patient'), asyncHandler(getMyCareTeamController));
-router.get('/providers/available', requireAuth, requireRole('patient'), asyncHandler(listAvailableProvidersController));
+router.get('/providers/smart-match', requireAuth, requireRole('patient'), asyncHandler(getAvailableProvidersController));
+router.get('/providers/available', requireAuth, requireRole('patient'), asyncHandler(async (req, res) => {
+  const query = req.query as Record<string, any>;
+  (req as any).query = {
+    ...query,
+    daysOfWeek: query.daysOfWeek || [0, 1, 2, 3, 4, 5, 6],
+    timeSlots: query.timeSlots || ['0-1439'],
+    providerType: query.providerType || query.role,
+    concerns: query.concerns || (query.specialization ? [String(query.specialization)] : undefined),
+    languages: query.languages || (query.language ? [String(query.language)] : undefined),
+  };
+  res.setHeader('X-Endpoint-Deprecated', 'Use /v1/patient/providers/smart-match');
+  await getAvailableProvidersController(req, res);
+}));
 
 router.get('/settings', requireAuth, requireRole('patient'), asyncHandler(getPatientSettingsController));
 router.put('/settings', requireAuth, requireRole('patient'), asyncHandler(updatePatientSettingsController));

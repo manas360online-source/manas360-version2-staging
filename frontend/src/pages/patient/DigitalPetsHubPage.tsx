@@ -21,7 +21,10 @@ const schedule = [
   { time: 'Weekly', emoji: '📊', title: 'Wellness Report -> Therapist Dashboard', text: 'Mood trends, engagement time, breathing frequency, game scores sent to therapist. Therapist sees: "Patient engaged 6/7 days. Mood improved 2 points. Recommend continuing."', chem: '📋 Therapeutic Integration - Rx Loop Closed' },
 ];
 
-export default function DigitalPetsHubPage({ selectedPet }: DigitalPetsHubPageProps) {
+import { Link } from 'react-router-dom';
+import Pt06HeroVideoFrame from '../../components/common/Pt06HeroVideoFrame';
+
+export default function DigitalPetsHubPage() {
   const scrollToId = (id: string) => {
     const el = document.getElementById(id);
     if (el) el.scrollIntoView({ behavior: 'smooth' });
@@ -38,81 +41,82 @@ export default function DigitalPetsHubPage({ selectedPet }: DigitalPetsHubPagePr
       <style>{`
         .pet360-root { font-family: 'Outfit', sans-serif; background: #fff; color: #1E293B; line-height: 1.6; }
         .pet360-root h1,.pet360-root h2,.pet360-root h3 { font-family: 'Fraunces', serif; }
-        .pet360-root .shell { max-width: 1060px; margin: 0 auto; padding: 0 20px; }
-        .pet360-root .badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 16px; font-size: 10px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; }
-        .pet360-root .nav { padding: 12px 0; border-bottom: 1px solid #E2E8F0; position: sticky; top: 0; z-index: 20; background: rgba(255,255,255,.92); backdrop-filter: blur(14px); }
-        .pet360-root .nav-inner { display: flex; align-items: center; justify-content: space-between; }
-        .pet360-root .logo { font-family: 'Fraunces', serif; font-size: 20px; font-weight: 700; color: #064E5C; }
-        .pet360-root .logo em { font-style: normal; color: #C6930A; }
-        .pet360-root .nav-crumb { font-size: 12px; color: #94A3B8; display: flex; align-items: center; gap: 6px; }
-
-        .pet360-root .hero { background: linear-gradient(175deg,#F5F0FF 0%,#EDE9FE 40%,#FFF 100%); padding: 48px 0 36px; text-align: center; }
-        .pet360-root .hero-top { display: flex; align-items: center; justify-content: center; gap: 24px; flex-wrap: wrap; margin-bottom: 28px; }
-        .pet360-root .video-frame { width: 220px; height: 390px; border-radius: 20px; overflow: hidden; box-shadow: 0 12px 40px rgba(124,58,237,.15); border: 3px solid rgba(124,58,237,.2); background: #000; position: relative; }
-        .pet360-root .video-frame iframe { width: 100%; height: 100%; border: 0; display: block; }
-        .pet360-root .video-label { position: absolute; bottom: 10px; left: 10px; right: 10px; text-align: center; background: rgba(0,0,0,.6); border-radius: 10px; padding: 6px 10px; font-size: 10px; color: white; font-weight: 600; }
-        .pet360-root .hero-text { text-align: left; max-width: 440px; }
-        .pet360-root .hero-text h1 { font-size: clamp(28px,4.5vw,38px); font-weight: 700; line-height: 1.18; margin-bottom: 10px; color: #1E293B; }
-        .pet360-root .hero-text .accent { color: #7C3AED; }
-        .pet360-root .hero-text .sub { font-size: 14.5px; color: #475569; line-height: 1.65; margin-bottom: 16px; }
-        .pet360-root .hero-ctas { display: flex; gap: 10px; flex-wrap: wrap; }
-        .pet360-root .btn { padding: 10px 22px; border-radius: 24px; font-size: 13px; font-weight: 700; cursor: pointer; border: none; }
-        .pet360-root .btn-primary { background: #7C3AED; color: #fff; }
-        .pet360-root .btn-outline { background: #fff; color: #7C3AED; border: 1.5px solid #7C3AED; }
-
-        .pet360-root .science, .pet360-root .catalog, .pet360-root .loops, .pet360-root .addons, .pet360-root .schedule { padding: 32px 0; }
-        .pet360-root .science { border-bottom: 1px solid #E2E8F0; }
-        .pet360-root .sci-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; }
-        .pet360-root .sci-card { text-align: center; padding: 18px 12px; border-radius: 14px; border: 1px solid #E2E8F0; }
-        .pet360-root .sci-emoji { font-size: 32px; display: block; margin-bottom: 6px; }
-        .pet360-root .sci-chem { font-size: 14px; font-weight: 700; color: #7C3AED; }
-        .pet360-root .sci-desc { font-size: 11.5px; color: #64748B; line-height: 1.5; }
-        .pet360-root .sci-trigger { font-size: 10px; font-weight: 600; color: #059669; margin-top: 6px; background: #D1FAE5; display: inline-block; padding: 2px 8px; border-radius: 10px; }
-
-        .pet360-root .pathways { padding: 32px 0; background: #F8FAFC; }
-        .pet360-root .path-grid, .pet360-root .loop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-        .pet360-root .path-card, .pet360-root .loop-card { background: #fff; border-radius: 14px; border: 1px solid #E2E8F0; padding: 20px; }
-        .pet360-root .path-flow { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
-        .pet360-root .path-step { font-size: 10px; font-weight: 600; padding: 3px 9px; border-radius: 12px; background: #EDE9FE; color: #7C3AED; }
-        .pet360-root .path-step.arrow { background: transparent; color: #94A3B8; padding: 3px 2px; }
-
-        .pet360-root .tier-section { margin-bottom: 24px; }
-        .pet360-root .tier-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
-        .pet360-root .pets-row { display: grid; grid-template-columns: repeat(auto-fill,minmax(200px,1fr)); gap: 12px; }
-        .pet360-root .pet-card { background: #fff; border: 1px solid #E2E8F0; border-radius: 14px; overflow: hidden; }
-        .pet360-root .pet-card.pet-focus { border-color: #7C3AED; box-shadow: 0 0 0 3px rgba(124,58,237,.22), 0 16px 38px rgba(124,58,237,.18); }
-        .pet360-root .pet-visual { height: 100px; display: flex; align-items: center; justify-content: center; font-size: 48px; }
-        .pet360-root .pet-body { padding: 10px 14px 14px; }
-        .pet360-root .pet-name { font-size: 13px; font-weight: 700; }
-        .pet360-root .pet-env { font-size: 10.5px; color: #94A3B8; margin-bottom: 6px; }
-        .pet360-root .pet-benefit { font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 10px; display: inline-block; margin-right: 3px; margin-bottom: 3px; }
-        .pet360-root .calm { background:#DBEAFE; color:#1D4ED8; }
-        .pet360-root .joy { background:#FEF3C7; color:#92400E; }
-        .pet360-root .mind { background:#E0E7FF; color:#4338CA; }
-        .pet360-root .growth { background:#D1FAE5; color:#059669; }
-        .pet360-root .strength { background:#FCE7F3; color:#9D174D; }
-
-        .pet360-root .addons-card { background: #fff; border: 1px solid #E2E8F0; border-radius: 14px; padding: 16px; }
-        .pet360-root .addons-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-        .pet360-root .addons-table th, .pet360-root .addons-table td { padding: 8px 10px; border-top: 1px solid #E2E8F0; text-align: left; vertical-align: top; }
-        .pet360-root .addons-table thead th { border-top: none; font-weight: 700; color: #334155; background: #F8FAFC; }
-
-        .pet360-root .sched-timeline { display: flex; flex-direction: column; gap: 12px; max-width: 700px; margin: 0 auto; }
-        .pet360-root .sched-item { display: flex; align-items: flex-start; gap: 14px; padding: 14px 18px; background: #fff; border: 1px solid #E2E8F0; border-radius: 14px; }
-        .pet360-root .sched-time { font-size: 12px; font-weight: 700; color: #7C3AED; min-width: 60px; padding-top: 2px; }
-        .pet360-root .sched-emoji { font-size: 24px; }
-        .pet360-root .chem { font-size: 10px; font-weight: 600; color: #059669; background: #D1FAE5; padding: 2px 8px; border-radius: 8px; display: inline-block; margin-top: 4px; }
-
-        @media(max-width:768px) {
-          .pet360-root .hero-top { flex-direction: column; }
-          .pet360-root .hero-text { text-align: center; }
-          .pet360-root .hero-ctas { justify-content: center; }
-          .pet360-root .sci-grid { grid-template-columns: 1fr 1fr; }
-          .pet360-root .path-grid, .pet360-root .loop-grid { grid-template-columns: 1fr; }
-          .pet360-root .pets-row { grid-template-columns: 1fr 1fr; }
-        }
-        @media(max-width:480px) {
-          .pet360-root .pets-row { grid-template-columns: 1fr; }
+        .pet360-root .shell{max-width:1060px;margin:0 auto;padding:0 20px;}
+        .pet360-root .badge{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:16px;font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;}
+        .pet360-root .nav{padding:12px 0;border-bottom:1px solid #E2E8F0;position:sticky;top:0;z-index:20;background:rgba(255,255,255,.92);backdrop-filter:blur(14px);}
+        .pet360-root .nav-inner{display:flex;align-items:center;justify-content:space-between;}
+        .pet360-root .logo{font-family:'Fraunces',serif;font-size:20px;font-weight:700;color:#064E5C;}
+        .pet360-root .logo em{font-style:normal;color:#C6930A;}
+        .pet360-root .nav-crumb{font-size:12px;color:#94A3B8;display:flex;align-items:center;gap:6px;}
+        .pet360-root .hero{background:linear-gradient(175deg,#F5F0FF 0%,#EDE9FE 40%,#FFF 100%);padding:48px 0 36px;text-align:center;position:relative;overflow:hidden;}
+        .pet360-root .hero-top{display:flex;align-items:center;justify-content:center;gap:24px;flex-wrap:wrap;margin-bottom:28px;}
+        .pet360-root .video-frame{width:220px;height:390px;border-radius:20px;overflow:hidden;box-shadow:0 12px 40px rgba(124,58,237,.15);border:3px solid rgba(124,58,237,.2);background:#000;position:relative;}
+        .pet360-root .hero-text{text-align:left;max-width:440px;}
+        .pet360-root .hero-text h1{font-size:clamp(28px,4.5vw,38px);font-weight:700;line-height:1.18;margin-bottom:10px;color:#1E293B;}
+        .pet360-root .hero-text .accent{color:#7C3AED;}
+        .pet360-root .hero-text .sub{font-size:14.5px;color:#475569;line-height:1.65;margin-bottom:16px;}
+        .pet360-root .hero-ctas{display:flex;gap:10px;flex-wrap:wrap;}
+        .pet360-root .btn{padding:10px 22px;border-radius:24px;font-size:13px;font-weight:700;cursor:pointer;border:none;}
+        .pet360-root .btn-primary{background:#7C3AED;color:#fff;}
+        .pet360-root .btn-outline{background:#fff;color:#7C3AED;border:1.5px solid #7C3AED;}
+        .pet360-root .science,.pet360-root .catalog,.pet360-root .loops,.pet360-root .schedule{padding:32px 0;}
+        .pet360-root .science{border-bottom:1px solid #E2E8F0;}
+        .pet360-root .sci-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;}
+        .pet360-root .sci-card{text-align:center;padding:18px 12px;border-radius:14px;border:1px solid #E2E8F0;}
+        .pet360-root .sci-emoji{font-size:32px;display:block;margin-bottom:6px;}
+        .pet360-root .sci-chem{font-size:14px;font-weight:700;color:#7C3AED;}
+        .pet360-root .sci-desc{font-size:11.5px;color:#64748B;line-height:1.5;}
+        .pet360-root .sci-trigger{font-size:10px;font-weight:600;color:#059669;margin-top:6px;background:#D1FAE5;display:inline-block;padding:2px 8px;border-radius:10px;}
+        .pet360-root .pathways,.pet360-root .monetization,.pet360-root .revenue{padding:32px 0;background:#F8FAFC;}
+        .pet360-root .path-grid,.pet360-root .loop-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+        .pet360-root .path-card,.pet360-root .loop-card{background:#fff;border-radius:14px;border:1px solid #E2E8F0;padding:20px;}
+        .pet360-root .path-flow{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px;}
+        .pet360-root .path-step{font-size:10px;font-weight:600;padding:3px 9px;border-radius:12px;background:#EDE9FE;color:#7C3AED;}
+        .pet360-root .path-step.arrow{background:transparent;color:#94A3B8;padding:3px 2px;}
+        .pet360-root .tier-section{margin-bottom:24px;}
+        .pet360-root .tier-header{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+        .pet360-root .pets-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;}
+        .pet360-root .pet-card{background:#fff;border:1px solid #E2E8F0;border-radius:14px;overflow:hidden;position:relative;}
+        .pet360-root .pet-visual{height:100px;display:flex;align-items:center;justify-content:center;font-size:48px;}
+        .pet360-root .pet-body{padding:10px 14px 14px;}
+        .pet360-root .pet-name{font-size:13px;font-weight:700;}
+        .pet360-root .pet-env{font-size:10.5px;color:#94A3B8;margin-bottom:6px;}
+        .pet360-root .pet-benefit{font-size:10px;font-weight:600;padding:3px 8px;border-radius:10px;display:inline-block;margin-right:3px;margin-bottom:3px;}
+        .pet360-root .calm{background:#DBEAFE;color:#1D4ED8;}
+        .pet360-root .joy{background:#FEF3C7;color:#92400E;}
+        .pet360-root .mind{background:#E0E7FF;color:#4338CA;}
+        .pet360-root .growth{background:#D1FAE5;color:#059669;}
+        .pet360-root .strength{background:#FCE7F3;color:#9D174D;}
+        .pet360-root .pet-price{position:absolute;top:8px;right:8px;font-size:9px;font-weight:700;padding:3px 8px;border-radius:10px;}
+        .pet360-root .free{background:#D1FAE5;color:#059669;}
+        .pet360-root .paid{background:#EDE9FE;color:#7C3AED;}
+        .pet360-root .premium{background:#FEF9EB;color:#C6930A;}
+        .pet360-root .pricing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;}
+        .pet360-root .price-card{background:#fff;border-radius:16px;padding:24px;border:1.5px solid #E2E8F0;position:relative;}
+        .pet360-root .price-card.recommended{border-color:#7C3AED;}
+        .pet360-root .price-card.recommended::before{content:'BEST VALUE';position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:#7C3AED;color:#fff;font-size:9px;font-weight:700;letter-spacing:1px;padding:3px 12px;border-radius:10px;}
+        .pet360-root .pc-price{font-size:28px;font-weight:800;color:#7C3AED;}
+        .pet360-root .pc-list{list-style:none;padding:0;margin-top:8px;}
+        .pet360-root .pc-list li{font-size:12px;color:#475569;padding:4px 0;}
+        .pet360-root .pc-cta{margin-top:14px;width:100%;padding:10px;border-radius:20px;font-size:12px;font-weight:700;border:none;}
+        .pet360-root .pc-cta.primary{background:#7C3AED;color:#fff;}
+        .pet360-root .pc-cta.secondary{background:#fff;color:#7C3AED;border:1.5px solid #7C3AED;}
+        .pet360-root .sched-timeline{display:flex;flex-direction:column;gap:12px;max-width:700px;margin:0 auto;}
+        .pet360-root .sched-item{display:flex;align-items:flex-start;gap:14px;padding:14px 18px;background:#fff;border:1px solid #E2E8F0;border-radius:14px;}
+        .pet360-root .sched-time{font-size:12px;font-weight:700;color:#7C3AED;min-width:60px;padding-top:2px;}
+        .pet360-root .sched-emoji{font-size:24px;}
+        .pet360-root .chem{font-size:10px;font-weight:600;color:#059669;background:#D1FAE5;padding:2px 8px;border-radius:8px;display:inline-block;margin-top:4px;}
+        .pet360-root .rev-table{width:100%;border-collapse:separate;border-spacing:0;border-radius:14px;overflow:hidden;border:1px solid #E2E8F0;background:#fff;}
+        .pet360-root .rev-table th{background:#EDE9FE;color:#7C3AED;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:10px 14px;text-align:left;}
+        .pet360-root .rev-table td{padding:10px 14px;font-size:12.5px;color:#475569;border-top:1px solid #E2E8F0;}
+        .pet360-root .total td{font-weight:700;color:#7C3AED;background:#EDE9FE;font-size:13px;}
+        @media(max-width:768px){
+          .pet360-root .hero-top{flex-direction:column;}
+          .pet360-root .hero-text{text-align:center;}
+          .pet360-root .hero-ctas{justify-content:center;}
+          .pet360-root .sci-grid{grid-template-columns:1fr 1fr;}
+          .pet360-root .path-grid,.pet360-root .loop-grid,.pet360-root .pricing-grid{grid-template-columns:1fr;}
+          .pet360-root .pets-row{grid-template-columns:1fr 1fr;}
         }
       `}</style>
 
@@ -120,7 +124,7 @@ export default function DigitalPetsHubPage({ selectedPet }: DigitalPetsHubPagePr
         <div className="shell">
           <div className="nav-inner">
             <div className="logo">MANAS<em>360</em></div>
-            <div className="nav-crumb"><span>PT01 Hub</span> {'->'} <span>PT06</span> {'->'} <span style={{ color: '#475569', fontWeight: 600 }}>Digital Pet Hub</span></div>
+            <div className="nav-crumb"><span>PT01</span> {'->'} <span>PT06</span> {'->'} <span style={{ color: '#475569', fontWeight: 600 }}>Digital Pet</span></div>
           </div>
         </div>
       </div>
@@ -128,15 +132,7 @@ export default function DigitalPetsHubPage({ selectedPet }: DigitalPetsHubPagePr
       <div className="hero">
         <div className="shell">
           <div className="hero-top">
-            <div className="video-frame">
-              <iframe
-                src="https://player.vimeo.com/video/1166597087?title=0&byline=0&portrait=0&badge=0&autopause=0&player_id=0&app_id=58479"
-                frameBorder="0"
-                allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
-                referrerPolicy="strict-origin-when-cross-origin"
-                title="DragonPitch-DigitalPet"
-              />
-            </div>
+            <Pt06HeroVideoFrame className="video-frame" />
             <div className="hero-text">
               <div className="badge" style={{ background: '#EDE9FE', color: '#7C3AED', marginBottom: 12 }}>🐾 PT06 - Digital Pet Hub</div>
               <h1>Your <span className="accent">Oxytocin</span> Engine - A Companion Who&apos;s Always Happy to See You</h1>

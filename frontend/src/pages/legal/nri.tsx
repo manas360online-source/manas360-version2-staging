@@ -180,12 +180,24 @@ export default function NriPatch({ onChange, blockSubmitButtons = true }: NriPat
           id="nriReviewBtn"
           onClick={openTos}
         >
-          {nriTosAccepted ? 'NRI Terms Accepted - Review Again' : 'Review NRI Terms of Service (required before proceeding)'}
+          {nriTosAccepted ? 'NRI Terms Accepted - Review Again' : 'Review NRI Terms of Service (required before registration completes)'}
         </button>
+
+        {nriDeclared ? (
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginTop: '10px', fontSize: '12px', color: '#374151' }}>
+            <input
+              type="checkbox"
+              checked={nriTosAccepted}
+              onChange={(e) => acceptTos(e.target.checked)}
+              style={{ marginTop: '2px', accentColor: '#E65100' }}
+            />
+            <span>I accept the NRI Terms of Service for registration.</span>
+          </label>
+        ) : null}
 
         {nriDeclared && !nriTosAccepted ? (
           <div className="nri-status wait" id="nriStatusWait" style={{ display: 'flex' }}>
-            NRI Terms of Service review required before you can proceed
+            NRI Terms of Service review required before registration can complete
           </div>
         ) : null}
 
@@ -210,7 +222,7 @@ export default function NriPatch({ onChange, blockSubmitButtons = true }: NriPat
           </div>
 
           <div className={`nri-scroll-hint ${scrolledToEnd ? '' : 'show'}`} id="nriScrollHint">
-            Please scroll to the end to enable acceptance
+            Please review the terms below, then tick the acceptance checkbox
           </div>
 
           <div className="nri-mb" id="nriTosBody" ref={tosBodyRef} onScroll={handleTosScroll}>
@@ -327,11 +339,10 @@ export default function NriPatch({ onChange, blockSubmitButtons = true }: NriPat
             <input
               type="checkbox"
               id="nriAcceptCheck"
-              disabled={!scrolledToEnd}
               checked={nriTosAccepted}
               onChange={(e) => acceptTos(e.target.checked)}
             />
-            <label htmlFor="nriAcceptCheck" id="nriAcceptLabel" className={scrolledToEnd ? '' : 'disabled'}>
+            <label htmlFor="nriAcceptCheck" id="nriAcceptLabel">
               I have read the NRI Terms of Service and accept all conditions including Indian jurisdiction, INR
               payments, and Indian data residency.
             </label>
