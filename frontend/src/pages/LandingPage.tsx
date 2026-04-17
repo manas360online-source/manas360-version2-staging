@@ -89,10 +89,7 @@ const LandingPage: React.FC = () => {
   };
 
   const handleScrollToAssess = () => {
-    const assessSection = document.getElementById("assessSection");
-    if (assessSection) {
-      assessSection.scrollIntoView({ behavior: "smooth" });
-    }
+    navigate("/assessment");
   };
 
   const handleQuickNavMegaItemClick = (menuLabel: string) => {
@@ -141,6 +138,31 @@ const LandingPage: React.FC = () => {
     if (menuLabel === "Digital Pets4Happy Hormones") {
       setActiveQuickNav(null);
       navigate("/pet");
+    }
+  };
+
+  const footerQuickLinkRoutes: Record<string, string> = {
+    "About Us": "/landing",
+    "How It Works": "/how-it-works",
+    "Specialized Care": "/specialized-care",
+    "For Providers": "/my-digital-clinic",
+    MyDigitalClinic: "/my-digital-clinic",
+    Careers: "/corporate-landing"
+  };
+
+  const footerLegalRoutes: Record<string, string> = {
+    "Privacy Policy": "/privacy",
+    "Terms of Service": "/terms",
+    "Cookie Policy": "/cookie-policy",
+    "DPDPA Compliance": "/privacy",
+    "Refund Policy": "/refunds",
+    Disclaimer: "/terms"
+  };
+
+  const handleFooterRoute = (routeMap: Record<string, string>, label: string) => {
+    const path = routeMap[label];
+    if (path) {
+      navigate(path);
     }
   };
 
@@ -400,12 +422,24 @@ const LandingPage: React.FC = () => {
     []
   );
 
+  const languageLabelMap: Record<Language, string> = {
+    English: "English",
+    Hindi: "हिन्दी",
+    Tamil: "தமிழ்",
+    Telugu: "తెలుగు",
+    Kannada: "ಕನ್ನಡ"
+  };
+
   return (
     <div
       style={{
         minHeight: "100vh",
         position: "relative",
-        background: "linear-gradient(180deg, #F7FBFF 0%, #EEF3F9 55%, #FFFFFF 100%)"
+        backgroundImage: 'url("/You%20renot%20alone-Beach.jpeg")',
+        backgroundPosition: "center",
+        backgroundSize: "cover",
+        backgroundAttachment: "fixed",
+        backgroundRepeat: "no-repeat"
       }}
     >
       {showTopPromo && !isScrolled && (
@@ -481,7 +515,7 @@ const LandingPage: React.FC = () => {
         style={{
           position: "absolute",
           left: "8px",
-          top: "64px",
+          top: "56px",
           zIndex: 95,
           display: "inline-flex",
           alignItems: "center",
@@ -528,14 +562,24 @@ const LandingPage: React.FC = () => {
             width: "56px"
           }}
         >
-          {["\u26A1", "\uD83D\uDCAC", "\uD83E\uDDF0", "divider-1", "\uD83D\uDCC5", "\uD83D\uDCAC", "divider-2", "\uD83D\uDD0E", "\u2728"].map((item) => {
-            if (item.startsWith("divider")) {
-              return <div key={item} style={{ height: "1px", background: "#D7DEE8", margin: "8px 6px" }} />;
+          {[
+            { id: "bot", icon: "🤖", bg: "linear-gradient(180deg, #EFE7FF, #E6EEFF)", dot: true },
+            { id: "pets", icon: "🐾", bg: "linear-gradient(180deg, #EFE7FF, #ECE9FF)" },
+            { id: "sound", icon: "🎵", bg: "linear-gradient(180deg, #DDF3EC, #E3F0FF)" },
+            { id: "divider-1", divider: true },
+            { id: "schedule", icon: "🗓️", bg: "linear-gradient(180deg, #DDF3EC, #E3F0FF)" },
+            { id: "chat-mid", icon: "💬", bg: "linear-gradient(180deg, #DDF3EC, #E6EDF8)" },
+            { id: "divider-2", divider: true },
+            { id: "notes", icon: "📋", bg: "linear-gradient(180deg, #E6F0FF, #E9EEF8)" },
+            { id: "brain", icon: "🧠", bg: "linear-gradient(180deg, #FDE7EF, #F4E8FF)" }
+          ].map((item) => {
+            if (item.divider) {
+              return <div key={item.id} style={{ height: "1px", background: "#D7DEE8", margin: "8px 6px" }} />;
             }
 
             return (
               <button
-                key={item}
+                key={item.id}
                 type="button"
                 style={{
                   width: "36px",
@@ -547,12 +591,28 @@ const LandingPage: React.FC = () => {
                   justifyContent: "center",
                   cursor: "pointer",
                   margin: "4px 2px",
-                  background: "linear-gradient(180deg, #F0F7F4, #E7EEF5)",
-                  fontSize: "18px"
+                  background: item.bg,
+                  fontSize: "18px",
+                  position: "relative"
                 }}
                 aria-label="Quick item"
               >
-                {item}
+                <span>{item.icon}</span>
+                {item.dot ? (
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: "2px",
+                      right: "2px",
+                      width: "7px",
+                      height: "7px",
+                      borderRadius: "999px",
+                      background: "#22C55E",
+                      border: "1.5px solid #FFFFFF"
+                    }}
+                    aria-hidden
+                  />
+                ) : null}
               </button>
             );
           })}
@@ -640,7 +700,7 @@ const LandingPage: React.FC = () => {
         style={{
           position: "fixed",
           right: "18px",
-          top: "92px",
+          top: "168px",
           zIndex: 160,
           display: "flex",
           flexDirection: "column",
@@ -650,8 +710,7 @@ const LandingPage: React.FC = () => {
         {[
           { bg: "#FFF", image: "/AnytimeBUDDY.jpeg", label: "Doctor" },
           { bg: "#111827", image: "/HitASixer.jpeg", label: "Cricket" },
-          { bg: "#FFF", label: "\uD83E\uDD16" },
-          { bg: "#FFF", label: "\u2728" }
+          { bg: "#03163A", image: "/Digital-Pet-Hub.png", label: "Digital Pet", href: "/pet" }
         ].map((item, idx) => (
           <div
             key={idx}
@@ -665,7 +724,21 @@ const LandingPage: React.FC = () => {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
+              cursor: item.href ? "pointer" : "default",
               animation: `avatarFloat 3.8s ease-in-out ${idx * 0.35}s infinite`
+            }}
+            role={item.href ? "button" : undefined}
+            tabIndex={item.href ? 0 : undefined}
+            onClick={() => {
+              if (item.href) {
+                navigate(item.href);
+              }
+            }}
+            onKeyDown={(e) => {
+              if (item.href && (e.key === "Enter" || e.key === " ")) {
+                e.preventDefault();
+                navigate(item.href);
+              }
             }}
             aria-hidden
           >
@@ -699,19 +772,20 @@ const LandingPage: React.FC = () => {
             borderRadius: "999px",
             border: "none",
             cursor: "pointer",
-            background: "linear-gradient(135deg, #7C3AED, #2563EB)",
+            background: "linear-gradient(135deg, #7C3AED, #5B21B6)",
             boxShadow: "0 16px 36px rgba(0,0,0,0.22)",
             color: "white",
-            position: "relative"
+            position: "relative",
+            animation: "chatFloat 3.2s ease-in-out infinite"
           }}
           aria-label="Chat"
         >
-          <span style={{ fontSize: "26px" }}>&#128172;</span>
+          <span style={{ fontSize: "30px", display: "inline-block", transform: "rotate(0deg)", animation: "chatTilt 3s ease-in-out infinite" }}>&#129302;</span>
           <span
             style={{
               position: "absolute",
-              top: "2px",
-              right: "3px",
+              top: "-8px",
+              left: "-7px",
               width: "18px",
               height: "18px",
               borderRadius: "999px",
@@ -727,6 +801,19 @@ const LandingPage: React.FC = () => {
           >
             3
           </span>
+          <span
+            style={{
+              position: "absolute",
+              top: "4px",
+              right: "4px",
+              width: "14px",
+              height: "14px",
+              borderRadius: "999px",
+              background: "#22C55E",
+              border: "2px solid rgba(255,255,255,0.95)"
+            }}
+            aria-hidden
+          />
         </button>
       </div>
 
@@ -752,13 +839,13 @@ const LandingPage: React.FC = () => {
                       cursor: "pointer"
                     }}
                   >
-                    {lang}
+                    {languageLabelMap[lang]}
                   </button>
                 );
               })}
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <button
                 type="button"
                 onClick={() => setShowSearch(true)}
@@ -766,27 +853,27 @@ const LandingPage: React.FC = () => {
                   display: "flex",
                   alignItems: "center",
                   gap: "8px",
-                  padding: "7px 14px",
-                  borderRadius: "16px",
-                  border: "1px solid #E8EDF2",
+                  padding: "8px 14px",
+                  borderRadius: "18px",
+                  border: "1px solid #D5DEE9",
                   cursor: "pointer",
-                  background: "#FAFCFF",
-                  minWidth: "220px"
+                  background: "#F8FBFF",
+                  minWidth: "214px"
                 }}
               >
-                <span style={{ fontSize: "14px" }}>&#128270;</span>
-                <span style={{ fontSize: "11px", color: "#666680", flex: 1, textAlign: "left" }}>Search or ask...</span>
+                <span style={{ fontSize: "14px", color: "#2563EB" }}>&#128269;</span>
+                <span style={{ fontSize: "11px", color: "#64748B", flex: 1, textAlign: "left", fontWeight: 700 }}>Search or ask...</span>
                 <span
                   style={{
                     fontSize: "10px",
-                    color: "#666680",
-                    background: "#EEF2FF",
-                    border: "1px solid #E8EDF2",
-                    padding: "2px 8px",
+                    color: "#64748B",
+                    background: "#FFFFFF",
+                    border: "1px solid #DDE5EF",
+                    padding: "2px 7px",
                     borderRadius: "8px"
                   }}
                 >
-                  ?K
+                  ⌘ K
                 </span>
               </button>
 
@@ -795,9 +882,9 @@ const LandingPage: React.FC = () => {
                 style={{
                   background: "#0B2D5E",
                   color: "white",
-                  padding: "8px 16px",
-                  borderRadius: "16px",
-                  fontSize: "11px",
+                  padding: "9px 20px",
+                  borderRadius: "18px",
+                  fontSize: "12px",
                   fontWeight: 900,
                   cursor: "pointer",
                   border: "none",
@@ -814,12 +901,12 @@ const LandingPage: React.FC = () => {
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: "6px",
-                    padding: "8px 14px",
-                    borderRadius: "16px",
-                    border: "1px solid #E8EDF2",
+                    gap: "0px",
+                    padding: "9px 18px",
+                    borderRadius: "18px",
+                    border: "1px solid #D5DEE9",
                     cursor: "pointer",
-                    fontSize: "11px",
+                    fontSize: "12px",
                     fontWeight: 800,
                     color: "#1A1A2E",
                     background: "white",
@@ -827,15 +914,6 @@ const LandingPage: React.FC = () => {
                   }}
                 >
                   Log In
-                  <span
-                    style={{
-                      fontSize: "10px",
-                      transition: "transform 0.2s",
-                      transform: loginDropdownOpen ? "rotate(180deg)" : "rotate(0deg)"
-                    }}
-                  >
-                    ?
-                  </span>
                 </button>
 
                 {loginDropdownOpen && (
@@ -884,26 +962,31 @@ const LandingPage: React.FC = () => {
                 )}
               </div>
 
-              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginLeft: "2px" }}>
-                {["wa", "ig", "in"].map((s) => (
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginLeft: "6px" }}>
+                {[
+                  { key: "wa", label: "◔" },
+                  { key: "ig", label: "◌" },
+                  { key: "yt", label: "▶" },
+                  { key: "in", label: "in" }
+                ].map((s) => (
                   <div
-                    key={s}
+                    key={s.key}
                     style={{
-                      width: "28px",
-                      height: "28px",
-                      borderRadius: "999px",
-                      background: "#F7FBFF",
-                      border: "1px solid #E8EDF2",
+                      width: "24px",
+                      height: "24px",
+                      borderRadius: "7px",
+                      background: "transparent",
+                      border: "none",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      fontSize: "clamp(9px, 0.85vw, 11px)",
+                      fontSize: "13px",
                       fontWeight: 900,
-                      color: "#0B2D5E"
+                      color: "#66708A"
                     }}
                     aria-hidden
                   >
-                    {s}
+                    {s.label}
                   </div>
                 ))}
               </div>
@@ -1116,7 +1199,7 @@ const LandingPage: React.FC = () => {
 
 
 
-      <div style={{ textAlign: "center", padding: "24px 16px 72px 16px", maxWidth: "980px", margin: "0 auto" }}>
+      <div style={{ textAlign: "center", padding: "24px 16px 72px 16px", maxWidth: "980px", margin: "48px auto 0" }}>
         <h1
           style={{
             fontSize: "56px",
@@ -1181,7 +1264,8 @@ const LandingPage: React.FC = () => {
         aria-label="For Mental Health Professionals"
         style={{
           background: "linear-gradient(180deg, rgba(207, 224, 235, 0.95) 0%, rgba(231, 243, 245, 0.9) 55%, rgba(255,255,255,0.95) 100%)",
-          padding: "28px 16px 18px 16px"
+          marginTop: "180px",
+          padding: "42px 16px 18px 16px"
         }}
       >
         <div style={{ maxWidth: "1200px", margin: "0 auto", textAlign: "center" }}>
@@ -1455,7 +1539,25 @@ const LandingPage: React.FC = () => {
       <section aria-label="Feature cards" style={{ padding: "0 16px 18px 16px" }}>
         <div style={{ maxWidth: "1260px", margin: "0 auto" }}>
           <div className="triple-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "16px" }}>
-            <div style={{ borderRadius: "18px", border: "2px solid rgba(245, 158, 11, 0.9)", background: "linear-gradient(135deg, rgba(255, 237, 213, 0.98), rgba(255, 247, 237, 0.9))", padding: "18px", boxShadow: "0 16px 40px rgba(0,0,0,0.08)" }}>
+            <div
+              style={{
+                borderRadius: "18px",
+                border: "2px solid rgba(245, 158, 11, 0.9)",
+                background: "linear-gradient(135deg, rgba(255, 237, 213, 0.98), rgba(255, 247, 237, 0.9))",
+                padding: "18px",
+                boxShadow: "0 16px 40px rgba(0,0,0,0.08)",
+                cursor: "pointer"
+              }}
+              role="button"
+              tabIndex={0}
+              onClick={() => navigate("/nri-landing")}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  navigate("/nri-landing");
+                }
+              }}
+            >
               <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "11px", fontWeight: 900, letterSpacing: "2px", textTransform: "uppercase", color: "#F97316" }}>
                 <span style={{ width: "8px", height: "8px", borderRadius: "999px", background: "#38BDF8" }} />
                 FOR NRIS & GLOBAL INDIANS
@@ -1483,7 +1585,7 @@ const LandingPage: React.FC = () => {
                   SAVE 35%
                 </span>
               </div>
-              <button type="button" style={{ marginTop: "12px", width: "100%", border: "none", cursor: "pointer", borderRadius: "14px", padding: "12px 14px", background: "linear-gradient(135deg, #C2410C, #EA580C)", color: "white", fontWeight: 900, fontSize: "12px", boxShadow: "0 18px 40px rgba(0,0,0,0.12)" }}>
+              <button type="button" onClick={() => navigate("/nri-landing")} style={{ marginTop: "12px", width: "100%", border: "none", cursor: "pointer", borderRadius: "14px", padding: "12px 14px", background: "linear-gradient(135deg, #C2410C, #EA580C)", color: "white", fontWeight: 900, fontSize: "12px", boxShadow: "0 18px 40px rgba(0,0,0,0.12)" }}>
                 IN Connect to Home &mdash; Start Free &rarr;
               </button>
             </div>
@@ -1508,7 +1610,7 @@ const LandingPage: React.FC = () => {
                 <span style={{ fontSize: "10px", fontWeight: 900, color: "white", background: "rgba(21, 128, 61, 0.9)", padding: "5px 10px", borderRadius: "999px" }}>21 DAYS FREE</span>
                 <span style={{ fontSize: "12px", fontWeight: 900, color: "#166534" }}>Pick only modules you need &mdash; from &#8377;99/mo</span>
               </div>
-              <button type="button" style={{ marginTop: "12px", width: "100%", border: "none", cursor: "pointer", borderRadius: "14px", padding: "12px 14px", background: "linear-gradient(135deg, #14532D, #1F7A3D)", color: "white", fontWeight: 900, fontSize: "12px", boxShadow: "0 18px 40px rgba(0,0,0,0.12)" }}>
+              <button type="button" onClick={() => navigate("/my-digital-clinic")} style={{ marginTop: "12px", width: "100%", border: "none", cursor: "pointer", borderRadius: "14px", padding: "12px 14px", background: "linear-gradient(135deg, #14532D, #1F7A3D)", color: "white", fontWeight: 900, fontSize: "12px", boxShadow: "0 18px 40px rgba(0,0,0,0.12)" }}>
                 Configure My Clinic &rarr;
               </button>
             </div>
@@ -1536,7 +1638,7 @@ const LandingPage: React.FC = () => {
                 ))}
               </div>
               <div style={{ fontSize: "11px", fontWeight: 800, color: "#6D28D9", marginTop: "10px" }}>&bull; Oxytocin (love) &bull; Serotonin (happy) &bull; Dopamine (reward) &bull; Endorphins (energy)</div>
-              <button type="button" style={{ marginTop: "12px", width: "100%", border: "none", cursor: "pointer", borderRadius: "14px", padding: "12px 14px", background: "linear-gradient(135deg, #6D28D9, #7C3AED)", color: "white", fontWeight: 900, fontSize: "12px", boxShadow: "0 18px 40px rgba(0,0,0,0.12)" }}>Name Your Pet &mdash; Adopt FREE</button>
+              <button type="button" onClick={() => navigate("/pet")} style={{ marginTop: "12px", width: "100%", border: "none", cursor: "pointer", borderRadius: "14px", padding: "12px 14px", background: "linear-gradient(135deg, #6D28D9, #7C3AED)", color: "white", fontWeight: 900, fontSize: "12px", boxShadow: "0 18px 40px rgba(0,0,0,0.12)" }}>Name Your Pet &mdash; Adopt FREE</button>
             </div>
           </div>
         </div>
@@ -1600,21 +1702,69 @@ const LandingPage: React.FC = () => {
             <div>
               <div style={{ fontSize: "13px", fontWeight: 900, color: "#C7D2FE", marginBottom: "10px" }}>Quick Links</div>
               {["About Us", "How It Works", "Specialized Care", "For Providers", "MyDigitalClinic", "Careers"].map((t) => (
-                <div key={t} style={{ fontSize: "12px", opacity: 0.85, marginBottom: "8px", fontWeight: 700 }}>{t}</div>
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => handleFooterRoute(footerQuickLinkRoutes, t)}
+                  style={{
+                    fontSize: "12px",
+                    opacity: 0.85,
+                    marginBottom: "8px",
+                    fontWeight: 700,
+                    display: "block",
+                    border: "none",
+                    background: "transparent",
+                    color: "inherit",
+                    padding: 0,
+                    cursor: "pointer",
+                    textAlign: "left"
+                  }}
+                >
+                  {t}
+                </button>
               ))}
             </div>
 
             <div>
               <div style={{ fontSize: "13px", fontWeight: 900, color: "#C7D2FE", marginBottom: "10px" }}>Legal</div>
               {["Privacy Policy", "Terms of Service", "Cookie Policy", "DPDPA Compliance", "Refund Policy", "Disclaimer"].map((t) => (
-                <div key={t} style={{ fontSize: "12px", opacity: 0.85, marginBottom: "8px", fontWeight: 700 }}>{t}</div>
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => handleFooterRoute(footerLegalRoutes, t)}
+                  style={{
+                    fontSize: "12px",
+                    opacity: 0.85,
+                    marginBottom: "8px",
+                    fontWeight: 700,
+                    display: "block",
+                    border: "none",
+                    background: "transparent",
+                    color: "inherit",
+                    padding: 0,
+                    cursor: "pointer",
+                    textAlign: "left"
+                  }}
+                >
+                  {t}
+                </button>
               ))}
             </div>
 
             <div>
               <div style={{ fontSize: "13px", fontWeight: 900, color: "#C7D2FE", marginBottom: "10px" }}>Get in Touch</div>
-              <div style={{ fontSize: "12px", opacity: 0.9, marginBottom: "8px", fontWeight: 800 }}>&#9993; support@manas360.com</div>
-              <div style={{ fontSize: "12px", opacity: 0.9, marginBottom: "8px", fontWeight: 800 }}>&#9742; +91-XXXXXXXXXX</div>
+              <a
+                href="mailto:support@manas360.com"
+                style={{ fontSize: "12px", opacity: 0.9, marginBottom: "8px", fontWeight: 800, display: "block", color: "inherit", textDecoration: "none" }}
+              >
+                &#9993; support@manas360.com
+              </a>
+              <a
+                href="tel:+918867736009"
+                style={{ fontSize: "12px", opacity: 0.9, marginBottom: "8px", fontWeight: 800, display: "block", color: "inherit", textDecoration: "none" }}
+              >
+                &#9742; +91-8867736009
+              </a>
               <div style={{ fontSize: "12px", opacity: 0.9, marginBottom: "14px", fontWeight: 800 }}>&#128172; WhatsApp Support</div>
               <div style={{ display: "flex", gap: "10px", opacity: 0.85 }}>{["wa", "ig", "in", "x"].map((s) => (
                 <div key={s} style={{ width: "28px", height: "28px", borderRadius: "8px", background: "rgba(255,255,255,0.14)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: 900 }}>{s}</div>
@@ -1759,6 +1909,18 @@ const LandingPage: React.FC = () => {
                   0% { transform: translateY(0px); }
                   50% { transform: translateY(-7px); }
                   100% { transform: translateY(0px); }
+                }
+                @keyframes chatFloat {
+                  0% { transform: translateY(0px); }
+                  50% { transform: translateY(-10px); }
+                  100% { transform: translateY(0px); }
+                }
+                @keyframes chatTilt {
+                  0% { transform: rotate(0deg); }
+                  72% { transform: rotate(0deg); }
+                  82% { transform: rotate(-10deg); }
+                  92% { transform: rotate(10deg); }
+                  100% { transform: rotate(0deg); }
                 }
                 .quick-nav {
                   flex-wrap: nowrap;

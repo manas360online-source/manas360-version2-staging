@@ -1,13 +1,13 @@
 .premium-theraphy-page {
   min-height: 100vh;
-  background: #f3f6fb;
-  color: #23324a;
+  background: #f1f4f8;
+  color: #2a3850;
   font-family: "Poppins", "Segoe UI", sans-serif;
   border-top: 3px solid #3f365f;
 }
 
 .premium-shell {
-  width: min(1060px, calc(100% - 40px));
+  width: min(1080px, calc(100% - 40px));
   margin: 0 auto;
 }
 
@@ -25,7 +25,7 @@
 }
 
 .premium-logo {
-  font-size: 40px;
+  font-size: 22px;
   font-weight: 900;
   line-height: 1;
   color: #0e5d69;
@@ -44,11 +44,11 @@
 .premium-nav-actions button {
   border: 1px solid #d6dce8;
   background: #ffffff;
-  color: #4a5870;
+  color: #5b6a83;
   border-radius: 999px;
   padding: 8px 16px;
   font-weight: 700;
-  font-size: 14px;
+  font-size: 12px;
   cursor: pointer;
 }
 
@@ -60,7 +60,7 @@
 
 .premium-hero {
   background: linear-gradient(180deg, #edf5f9 0%, #f5f8fb 100%);
-  padding: 56px 0 40px;
+  padding: 48px 0 32px;
 }
 
 .premium-center {
@@ -73,24 +73,25 @@
   color: #0d7588;
   border-radius: 999px;
   display: inline-flex;
-  padding: 8px 20px;
-  font-size: 12px;
+  padding: 6px 18px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 1px;
 }
 
 .premium-hero h1 {
-  margin: 18px 0 12px;
-  font-size: clamp(32px, 3.4vw, 56px);
+  margin: 16px 0 10px;
+  font-size: clamp(40px, 3.4vw, 60px);
   line-height: 1.1;
-  color: #1c2941;
+  color: #1f2d47;
+  font-family: Georgia, "Times New Roman", serif;
 }
 
 .premium-hero p {
   max-width: 760px;
   margin: 0 auto;
-  font-size: 20px;
-  color: #47607f;
+  font-size: 14px;
+  color: #51637f;
   line-height: 1.45;
 }
 
@@ -108,9 +109,9 @@
   background: #ffffff;
   color: #3f516e;
   border-radius: 16px;
-  padding: 12px 24px;
+  padding: 10px 22px;
   font-weight: 700;
-  font-size: 16px;
+  font-size: 13px;
   cursor: pointer;
 }
 
@@ -130,7 +131,7 @@
   background: #d9e9f3;
   border: 1px solid #c7dcea;
   border-radius: 16px;
-  padding: 16px;
+  padding: 14px;
   display: grid;
   grid-template-columns: 40px 1fr;
   gap: 12px;
@@ -144,14 +145,14 @@
 
 .premium-info-card p {
   margin: 0;
-  font-size: 14px;
+  font-size: 12px;
   color: #37506d;
 }
 
 .hub-intro {
-  margin-top: 28px;
+  margin-top: 24px;
   border-radius: 18px;
-  padding: 24px;
+  padding: 22px;
   display: grid;
   grid-template-columns: 72px 1fr;
   gap: 16px;
@@ -160,20 +161,21 @@
 }
 
 .hub-icon {
-  font-size: 56px;
+  font-size: 52px;
   line-height: 1;
 }
 
 .hub-intro h2 {
   margin: 0;
-  font-size: 46px;
+  font-size: 48px;
   color: #1f2a41;
+  font-family: Georgia, "Times New Roman", serif;
 }
 
 .hub-intro p {
   margin: 8px 0 0;
   color: #4c607a;
-  font-size: 17px;
+  font-size: 15px;
 }
 
 .chips {
@@ -188,7 +190,7 @@
   padding: 6px 12px;
   background: #dff1ee;
   color: #128d84;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 800;
 }
 
@@ -202,16 +204,17 @@
 
 .section-head h3 {
   margin: 0;
-  font-size: 46px;
+  font-size: 40px;
   color: #1b2942;
+  font-family: Georgia, "Times New Roman", serif;
 }
 
 .section-head h3 span {
   margin-left: 10px;
-  font-size: 16px;
+  font-size: 13px;
   background: #bfeedd;
   color: #0c8f6a;
-  padding: 6px 12px;
+  padding: 5px 12px;
   border-radius: 999px;
   vertical-align: middle;
 }
@@ -224,6 +227,7 @@
 .section-head p {
   margin: 0;
   color: #8ca0ba;
+  font-size: 14px;
   font-weight: 700;
 }
 
@@ -269,7 +273,7 @@
 
 .tool-card h4 {
   margin: 4px 0 0;
-  font-size: 34px;
+  font-size: 20px;
   color: #223049;
 }
 
@@ -295,7 +299,7 @@
   margin: 0;
   padding: 0 16px;
   color: #556a86;
-  font-size: 15px;
+  font-size: 13px;
   line-height: 1.45;
 }
 
@@ -346,30 +350,36 @@
 
 .sitemap h3 {
   margin: 0;
-  font-size: 46px;
+  font-size: 42px;
   color: #1d2b46;
+  font-family: Georgia, "Times New Roman", serif;
 }
 
 .sitemap p {
   margin: 8px 0 0;
-  font-size: 15px;
+  font-size: 13px;
   color: #7b8ea7;
 }
 
 .premium-page-footer {
-  padding: 16px 0 30px;
+  padding: 22px 0 30px;
   text-align: center;
 }
 
-.back-home {
-  border: none;
-  background: #ffffff;
-  border: 1px solid #d8e1ec;
-  border-radius: 999px;
-  padding: 10px 18px;
-  color: #435973;
-  font-weight: 700;
-  cursor: pointer;
+.premium-footer-brand {
+  font-size: 22px;
+  font-weight: 900;
+  color: #0e5d69;
+}
+
+.premium-footer-brand span {
+  color: #ca9d1e;
+}
+
+.premium-footer-copy {
+  margin: 8px 0 0;
+  color: #93a3ba;
+  font-size: 14px;
 }
 
 @media (max-width: 1200px) {
@@ -392,7 +402,7 @@
   }
 
   .premium-logo {
-    font-size: 30px;
+    font-size: 24px;
   }
 
   .premium-nav-actions {
@@ -426,7 +436,7 @@
   .section-head h3,
   .tool-card h4,
   .sitemap h3 {
-    font-size: 32px;
+    font-size: 30px;
   }
 
   .section-head {
