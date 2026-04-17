@@ -18,6 +18,19 @@ interface TherapistProfileInput {
 	}>;
 }
 
+interface TherapistNriPoolInput {
+	nriPoolCertified: boolean;
+	nriTimezoneShifts: string[];
+}
+
+const ALLOWED_NRI_SHIFTS = new Set([
+	'shift_a_us_east',
+	'shift_b_us_west',
+	'shift_c_uk',
+	'shift_d_au_sg',
+	'shift_e_uae',
+]);
+
 const normalizeArray = (values: string[]): string[] => {
 	const normalized = values
 		.map((value) => value.trim())
@@ -67,6 +80,9 @@ const toSafeProfile = (profile: {
 		isAvailable: boolean;
 	}>; 
 	averageRating: number;
+	nriPoolCertified?: boolean | null;
+	nriPoolCertifiedAt?: Date | null;
+	nriTimezoneShifts?: string[];
 	createdAt: Date;
 	updatedAt: Date;
 }) => ({
@@ -84,6 +100,9 @@ const toSafeProfile = (profile: {
 		isAvailable: slot.isAvailable,
 	})),
 	averageRating: profile.averageRating || 0,
+	nriPoolCertified: Boolean(profile.nriPoolCertified),
+	nriPoolCertifiedAt: profile.nriPoolCertifiedAt ?? null,
+	nriTimezoneShifts: Array.isArray(profile.nriTimezoneShifts) ? profile.nriTimezoneShifts : [],
 	createdAt: profile.createdAt,
 	updatedAt: profile.updatedAt,
 });
@@ -155,6 +174,9 @@ export const getMyTherapistProfile = async (userId: string) => {
 				consultationFee: true,
 				availability: true,
 				averageRating: true,
+				nriPoolCertified: true,
+				nriPoolCertifiedAt: true,
+				nriTimezoneShifts: true,
 				createdAt: true,
 				updatedAt: true,
 			},
@@ -181,6 +203,9 @@ export const getMyTherapistProfile = async (userId: string) => {
 			consultationFee: 0,
 			availability: [],
 			averageRating: 0,
+			nriPoolCertified: false,
+			nriPoolCertifiedAt: null,
+			nriTimezoneShifts: [],
 			createdAt: user.createdAt,
 			updatedAt: user.updatedAt,
 		} as any;
@@ -189,6 +214,48 @@ export const getMyTherapistProfile = async (userId: string) => {
 	}
 
 	return toSafeProfile(profile as any);
+};
+
+export const updateMyTherapistNriPool = async (userId: string, input: TherapistNriPoolInput) => {
+	await assertTherapistUser(userId);
+
+	const normalizedShifts = Array.from(
+		new Set(
+			(input.nriTimezoneShifts || [])
+				.map((value) => String(value || '').trim().toLowerCase())
+				.filter((value) => value.length > 0),
+		),
+	);
+
+	for (const shift of normalizedShifts) {
+		if (!ALLOWED_NRI_SHIFTS.has(shift)) {
+			throw new AppError(`Invalid NRI timezone shift: ${shift}`, 422);
+		}
+	}
+
+	if (input.nriPoolCertified && normalizedShifts.length === 0) {
+		throw new AppError('At least one NRI timezone shift is required when enabling NRI pool', 422);
+	}
+
+	const rows = await db.$queryRawUnsafe(
+		`UPDATE "therapist_profiles"
+		 SET "nri_pool_certified" = $2,
+		     "nri_pool_certified_at" = CASE WHEN $2 THEN NOW() ELSE NULL END,
+		     "nri_timezone_shifts" = $3::text[],
+		     "updatedAt" = NOW()
+		 WHERE "userId" = $1
+		 RETURNING "id", "displayName", "bio", "specializations", "languages", "yearsOfExperience", "consultationFee", "availability", "averageRating", "nri_pool_certified" AS "nriPoolCertified", "nri_pool_certified_at" AS "nriPoolCertifiedAt", "nri_timezone_shifts" AS "nriTimezoneShifts", "createdAt", "updatedAt"`,
+		String(userId),
+		Boolean(input.nriPoolCertified),
+		normalizedShifts,
+	);
+
+	const updated = Array.isArray(rows) ? rows[0] : null;
+	if (!updated) {
+		throw new AppError('Therapist profile not found', 404);
+	}
+
+	return toSafeProfile(updated as any);
 };
 
 export const uploadMyTherapistDocument = async (

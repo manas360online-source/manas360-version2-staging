@@ -4,6 +4,7 @@ import { sendSuccess } from '../utils/response';
 import {
 	createTherapistProfile,
 	getMyTherapistProfile,
+	updateMyTherapistNriPool,
 	uploadMyTherapistDocument,
 } from '../services/therapist.service';
 
@@ -58,4 +59,19 @@ export const uploadMyTherapistDocumentController = async (req: Request, res: Res
 	);
 
 	sendSuccess(res, result, 'Therapist document uploaded', 201);
+};
+
+export const patchMyTherapistNriPoolController = async (req: Request, res: Response): Promise<void> => {
+	const userId = getAuthUserId(req);
+	const nriPoolCertified = Boolean(req.body?.nriPoolCertified);
+	const nriTimezoneShifts = Array.isArray(req.body?.nriTimezoneShifts)
+		? req.body.nriTimezoneShifts.map((value: unknown) => String(value || '').trim()).filter(Boolean)
+		: [];
+
+	const profile = await updateMyTherapistNriPool(userId, {
+		nriPoolCertified,
+		nriTimezoneShifts,
+	});
+
+	sendSuccess(res, profile, 'Therapist NRI pool settings updated');
 };

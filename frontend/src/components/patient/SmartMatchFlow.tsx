@@ -13,6 +13,9 @@ interface SmartMatchFlowProps {
   onSuccess: () => void;
   initialProviderType?: 'ALL' | 'THERAPIST' | 'PSYCHOLOGIST' | 'PSYCHIATRIST' | 'COACH';
   lockProviderType?: boolean;
+  presetEntryType?: string;
+  sourceFunnel?: string;
+  timezoneRegion?: string;
 }
 
 type FlowStep = 'calendar' | 'domain-selection' | 'provider-selection' | 'pre-payment' | 'pending';
@@ -37,13 +40,24 @@ interface SelectedProvider {
   };
 }
 
+const getNriFixedFeeMinor = (entryType?: string): number | null => {
+  if (entryType === 'nri_psychologist') return 2999 * 100;
+  if (entryType === 'nri_psychiatrist') return 3499 * 100;
+  if (entryType === 'nri_therapist') return 3599 * 100;
+  return null;
+};
+
 export default function SmartMatchFlow({
   isOpen,
   onClose,
   onSuccess,
   initialProviderType = 'ALL',
   lockProviderType = false,
+  presetEntryType,
+  sourceFunnel,
+  timezoneRegion,
 }: SmartMatchFlowProps) {
+  const nriFixedFeeMinor = getNriFixedFeeMinor(presetEntryType);
   const navigate = useNavigate();
   const [step, setStep] = useState<FlowStep>('calendar');
   const [calendarSelection, setCalendarSelection] = useState<CalendarSelection | null>(null);
@@ -293,13 +307,16 @@ export default function SmartMatchFlow({
               <ProviderSelectionStep
                 availabilityPrefs={getAvailabilityPrefs()!}
                 providerType={selectedProviderType}
+                presetEntryType={presetEntryType}
+                sourceFunnel={sourceFunnel}
+                timezoneRegion={timezoneRegion}
                  onSuccess={(providers: any) => {
                    // Convert ProviderMatch to SelectedProvider format
                    const selectedProviders = providers.map((p: any) => ({
                      id: p.id,
                      name: p.name || p.displayName || 'Provider',
                      type: p.providerType || 'Therapist',
-                     fee: p.consultationFee || 69900,
+                     fee: nriFixedFeeMinor || p.consultationFee || 69900,
                      score: p.score,
                      tier: p.tier,
                      matchBand: p.matchBand,
@@ -323,6 +340,9 @@ export default function SmartMatchFlow({
               <PreBookingPaymentStep
                 selectedProviders={selectedProviders}
                 selectedDateTime={calendarSelection}
+                presetEntryType={presetEntryType}
+                sourceFunnel={sourceFunnel}
+                timezoneRegion={timezoneRegion}
                 onBack={() => setStep('provider-selection')}
                 onCancel={handleClose}
               />

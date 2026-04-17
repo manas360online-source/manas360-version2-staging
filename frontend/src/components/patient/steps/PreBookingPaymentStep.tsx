@@ -8,26 +8,47 @@ interface PreBookingPaymentStepProps {
     name: string;
     type: string;
     fee: number;
+    score?: number;
+    tier?: 'HOT' | 'WARM' | 'COLD';
+    breakdown?: {
+      expertise: number;
+      communication: number;
+      quality: number;
+    };
   }>;
   selectedDateTime: {
     date: Date;
     time: string;
   };
+  presetEntryType?: string;
+  sourceFunnel?: string;
+  timezoneRegion?: string;
   onBack: () => void;
   onCancel: () => void;
 }
 
+const getNriFixedFeeMinor = (entryType?: string): number | null => {
+  if (entryType === 'nri_psychologist') return 2999 * 100;
+  if (entryType === 'nri_psychiatrist') return 3499 * 100;
+  if (entryType === 'nri_therapist') return 3599 * 100;
+  return null;
+};
+
 export default function PreBookingPaymentStep({
   selectedProviders,
   selectedDateTime,
+  presetEntryType,
+  sourceFunnel,
+  timezoneRegion,
   onBack,
   onCancel,
 }: PreBookingPaymentStepProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Calculate fee (use highest provider fee)
-  const fee = Math.max(...selectedProviders.map((p) => p.fee), 69900);
+  const nriFixedFeeMinor = getNriFixedFeeMinor(presetEntryType);
+  // Calculate fee (NRI fixed fee when preset flow, otherwise highest provider fee)
+  const fee = nriFixedFeeMinor || Math.max(...selectedProviders.map((p) => p.fee), 69900);
   const feeInRupees = fee / 100;
 
   const handlePhonePePayment = async () => {
@@ -35,22 +56,57 @@ export default function PreBookingPaymentStep({
       setLoading(true);
       setError(null);
 
-      const primaryProviderId = selectedProviders[0]?.id;
-      if (!primaryProviderId) {
+      if (!selectedProviders.length) {
         setError('No provider selected for payment.');
         return;
       }
 
-      const payment = await patientApi.createSessionPayment({
-        providerId: primaryProviderId,
-        amountMinor: fee,
-        currency: 'INR',
-      });
+      const [hourRaw, minuteRaw] = selectedDateTime.time.split(':');
+      const startHour = Number(hourRaw);
+      const startMinute = Number(minuteRaw || 0);
+      const startMinuteOfDay = startHour * 60 + startMinute;
 
-      const redirectUrl = String((payment as any)?.redirectUrl || '').trim();
-      if (!redirectUrl) {
-        throw new Error('PhonePe redirect URL missing from payment response.');
+      const availabilityPrefs = {
+        daysOfWeek: [selectedDateTime.date.getDay()],
+        timeSlots: [{ startMinute: startMinuteOfDay, endMinute: startMinuteOfDay + 30 }],
+      };
+
+      const appointmentPayload = {
+        availabilityPrefs,
+        providerIds: selectedProviders.map((provider) => provider.id),
+        preferredSpecialization: selectedProviders[0]?.type,
+        durationMinutes: presetEntryType === 'nri_psychiatrist' ? 30 : 50,
+        sourceFunnel,
+        presetEntryType,
+        timezoneRegion,
+        rankedProviders: selectedProviders.map((provider) => ({
+          providerId: provider.id,
+          score: provider.score,
+          tier: provider.tier,
+          breakdown: provider.breakdown,
+        })),
+      };
+
+      const response: any = await patientApi.createAppointmentRequest(appointmentPayload as any);
+      const payload = response?.data ?? response;
+
+      const paymentRequired = Boolean(payload?.paymentRequired);
+      const merchantTransactionId = String(payload?.payment?.merchantTransactionId || '').trim();
+      const redirectUrl = String(payload?.payment?.redirectUrl || '').trim();
+
+      if (!paymentRequired || !merchantTransactionId || !redirectUrl) {
+        setError('Unable to start payment for this booking request. Please try again.');
+        return;
       }
+
+      // Store pending smart-match context so PaymentStatus can finalize request post-payment.
+      localStorage.setItem(
+        `manas360.smartmatch.pending.${merchantTransactionId}`,
+        JSON.stringify({
+          ...appointmentPayload,
+          payment: { merchantTransactionId },
+        }),
+      );
 
       // Redirect to PhonePe checkout page.
       window.location.href = redirectUrl;
@@ -122,6 +178,11 @@ export default function PreBookingPaymentStep({
             <p className="text-xs text-charcoal/60 mt-2">
               Booking will be sent to your selected providers after payment confirmation. The first provider to accept will deliver your session.
             </p>
+            {nriFixedFeeMinor ? (
+              <p className="text-xs text-blue-700 mt-2">
+                Indian provider terms: fixed per-session price is applied for this consultation flow.
+              </p>
+            ) : null}
           </div>
       </div>
 

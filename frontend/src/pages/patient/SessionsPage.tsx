@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   patientApi,
   type StructuredAssessmentQuestion,
@@ -30,7 +30,6 @@ import {
   TrendingUp,
   Calendar,
   ArrowLeft,
-  X,
 } from 'lucide-react';
 
 type AssessmentHistoryEntry = {
@@ -44,6 +43,13 @@ type AssessmentHistoryEntry = {
 
 type ClinicalFlowPhase = 'intro' | 'question' | 'loading-next' | 'next-phase' | 'provider-list';
 type SmartMatchProviderType = 'ALL' | 'THERAPIST' | 'PSYCHOLOGIST' | 'PSYCHIATRIST' | 'COACH';
+type AdPresetEntryType =
+  | 'therapist'
+  | 'psychiatrist'
+  | 'couples'
+  | 'nri_psychologist'
+  | 'nri_psychiatrist'
+  | 'nri_therapist';
 
 const structuredTemplateKeys: Record<ClinicalAssessmentKey, string> = {
   'PHQ-9': CLINICAL_ASSESSMENT_TEMPLATE_KEYS['PHQ-9'],
@@ -96,6 +102,7 @@ type AssessmentDraft = {
 
 export default function SessionsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const userId = user?.id || undefined;
   const ASSESSMENT_DRAFT_STORAGE_KEY = draftStorageKey(userId);
@@ -108,7 +115,6 @@ export default function SessionsPage() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<any | null>(null);
   const [isSmartMatchOpen, setIsSmartMatchOpen] = useState(false);
-  const [isPreviousProvidersOpen, setIsPreviousProvidersOpen] = useState(false);
   const [hasCompletedCheckin, setHasCompletedCheckin] = useState(false);
   const [assessmentHistory, setAssessmentHistory] = useState<AssessmentHistoryEntry[]>([]);
   const [assessmentHistoryLoading, setAssessmentHistoryLoading] = useState(true);
@@ -145,6 +151,51 @@ export default function SessionsPage() {
     initialProviderType: 'ALL',
     lockProviderType: false,
   });
+
+  const adPresetEntry = useMemo<AdPresetEntryType | null>(() => {
+    const raw = new URLSearchParams(location.search).get('adEntry');
+    if (
+      raw === 'therapist'
+      || raw === 'psychiatrist'
+      || raw === 'couples'
+      || raw === 'nri_psychologist'
+      || raw === 'nri_psychiatrist'
+      || raw === 'nri_therapist'
+    ) {
+      return raw;
+    }
+    return null;
+  }, [location.search]);
+
+  const adPresetProviderType = useMemo<SmartMatchProviderType | null>(() => {
+    if (adPresetEntry === 'therapist') return 'THERAPIST';
+    if (adPresetEntry === 'psychiatrist') return 'PSYCHIATRIST';
+    if (adPresetEntry === 'couples') return 'THERAPIST';
+    if (adPresetEntry === 'nri_psychologist') return 'PSYCHOLOGIST';
+    if (adPresetEntry === 'nri_psychiatrist') return 'PSYCHIATRIST';
+    if (adPresetEntry === 'nri_therapist') return 'THERAPIST';
+    return null;
+  }, [adPresetEntry]);
+
+  const adPresetLabel = useMemo<string>(() => {
+    if (adPresetEntry === 'therapist') return 'Therapist';
+    if (adPresetEntry === 'psychiatrist') return 'Psychiatrist';
+    if (adPresetEntry === 'couples') return 'Couples Therapist';
+    if (adPresetEntry === 'nri_psychologist') return 'NRI Psychologist';
+    if (adPresetEntry === 'nri_psychiatrist') return 'NRI Psychiatrist';
+    if (adPresetEntry === 'nri_therapist') return 'NRI Therapist';
+    return 'Provider';
+  }, [adPresetEntry]);
+
+  const isAdPresetFlow = Boolean(adPresetEntry);
+  const sourceFunnel = adPresetEntry || undefined;
+  const adPresetTimezoneRegion = useMemo<string | undefined>(() => {
+    const raw = String(new URLSearchParams(location.search).get('timezoneRegion') || '').trim().toUpperCase();
+    if (!raw) return undefined;
+
+    const allowed = new Set(['US_EST', 'US_PST', 'UK', 'AU', 'SG', 'UAE', 'OTHER']);
+    return allowed.has(raw) ? raw : undefined;
+  }, [location.search]);
 
   const fetchData = async () => {
     try {
@@ -499,6 +550,24 @@ export default function SessionsPage() {
     setIsSmartMatchOpen(true);
   };
 
+  const startAdPresetPath = () => {
+    if (!adPresetProviderType) return;
+
+    setActiveCarePathLabel(`🎯 ${adPresetLabel} Matches`);
+    setBookingContext({
+      fromAssessment: true,
+      carePath: 'direct',
+      preferredSpecialization: adPresetProviderType,
+    });
+    setSmartMatchPreferences({
+      initialProviderType: adPresetProviderType,
+      lockProviderType: true,
+    });
+    setIsClinicalAssessmentOpen(false);
+    setClinicalFlowPhase('intro');
+    setIsSmartMatchOpen(true);
+  };
+
   useEffect(() => {
     if (!isClinicalAssessmentOpen || clinicalFlowPhase === 'intro') return;
     saveAssessmentDraft();
@@ -520,6 +589,25 @@ export default function SessionsPage() {
     void loadAssessmentHistory();
     setAssessmentDraft(loadAssessmentDraft());
   }, []);
+
+  // Auto-navigate to provider selection when both PHQ-9 and GAD-7 are completed
+  useEffect(() => {
+    if (isClinicalAssessmentOpen && clinicalFlowPhase === 'next-phase' && clinicalResults.length >= 2) {
+      const hasPhq = clinicalResults.some((r) => r.type === 'PHQ-9');
+      const hasGad = clinicalResults.some((r) => r.type === 'GAD-7');
+      
+      if (hasPhq && hasGad) {
+        // Both assessments are completed - navigate to provider-selection page
+        setIsClinicalAssessmentOpen(false);
+        navigate('/patient/provider-selection', {
+          state: {
+            fromAssessment: true,
+            assessmentResults: clinicalResults,
+          },
+        });
+      }
+    }
+  }, [isClinicalAssessmentOpen, clinicalFlowPhase, clinicalResults, navigate]);
 
   useEffect(() => {
     const refreshSessions = () => {
@@ -551,7 +639,7 @@ export default function SessionsPage() {
   }, [assessmentHistory]);
 
   const hasPendingProviderAssessment = pendingProviderAssessmentTitles.length > 0;
-  const isAssessmentComplete = (hasCompletedCheckin || hasAttendedAssessment) && !hasPendingProviderAssessment;
+  const isAssessmentComplete = isAdPresetFlow || ((hasCompletedCheckin || hasAttendedAssessment) && !hasPendingProviderAssessment);
 
   // Auto-open assessment from hash
   useEffect(() => {
@@ -567,6 +655,7 @@ export default function SessionsPage() {
   }, [myProviders.length, history.length]);
 
   const assessmentGateCopy = useMemo(() => {
+    if (isAdPresetFlow) return null;
     if (isAssessmentComplete) return null;
 
     if (hasPendingProviderAssessment) {
@@ -590,7 +679,7 @@ export default function SessionsPage() {
       detail: 'Finish PHQ-9 and GAD-7 to unlock provider connection and session booking.',
       button: 'Start Assessment',
     };
-  }, [assessmentDraft, hasPendingProviderAssessment, isAssessmentComplete, pendingProviderAssessmentTitles]);
+  }, [assessmentDraft, hasPendingProviderAssessment, isAdPresetFlow, isAssessmentComplete, pendingProviderAssessmentTitles]);
 
   const assessmentPrimaryCtaLabel = hasAttendedAssessment
     ? 'View Result'
@@ -752,6 +841,11 @@ export default function SessionsPage() {
   const handlePrimaryBookSession = () => {
     setBookingFallbackError(null);
 
+    if (adPresetProviderType) {
+      startAdPresetPath();
+      return;
+    }
+
     if (!isAssessmentComplete) {
       setBookingFallbackError('Please complete PHQ-9 and GAD-7 assessment first. After that, booking will be unlocked.');
       openClinicalAssessmentFlow();
@@ -759,24 +853,49 @@ export default function SessionsPage() {
     }
 
     if (isConsultingPatient) {
-      setSmartMatchPreferences({
-        initialProviderType: 'ALL',
-        lockProviderType: false,
-      });
+      setSmartMatchPreferences(adPresetProviderType
+        ? {
+            initialProviderType: adPresetProviderType,
+            lockProviderType: true,
+          }
+        : {
+            initialProviderType: 'ALL',
+            lockProviderType: false,
+          });
       setIsSmartMatchOpen(true);
       return;
     }
 
-    // User has connected providers, show them for booking
-    setIsPreviousProvidersOpen(true);
+    // Open smart match to browse providers
+    setSmartMatchPreferences(adPresetProviderType
+      ? {
+          initialProviderType: adPresetProviderType,
+          lockProviderType: true,
+        }
+      : {
+          initialProviderType: 'ALL',
+          lockProviderType: false,
+        });
+    setIsSmartMatchOpen(true);
   };
 
   const handleBrowseSpecialists = () => {
     setBookingFallbackError(null);
-    setSmartMatchPreferences({
-      initialProviderType: 'ALL',
-      lockProviderType: false,
-    });
+
+    if (adPresetProviderType) {
+      startAdPresetPath();
+      return;
+    }
+
+    setSmartMatchPreferences(adPresetProviderType
+      ? {
+          initialProviderType: adPresetProviderType,
+          lockProviderType: true,
+        }
+      : {
+          initialProviderType: 'ALL',
+          lockProviderType: false,
+        });
     setIsSmartMatchOpen(true);
   };
 
@@ -916,29 +1035,42 @@ export default function SessionsPage() {
                 ) : null}
               </div>
 
-              <div className="grid gap-2 sm:grid-cols-3">
-                <button
-                  type="button"
-                  onClick={() => void startCarePath('recommended')}
-                  className="rounded-xl border border-calm-sage/25 bg-white p-3 text-left hover:border-calm-sage/45"
-                >
-                  <p className="text-xs font-semibold uppercase tracking-wide text-teal-700">Recommended</p>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void startCarePath('direct')}
-                  className="rounded-xl border border-calm-sage/25 bg-white p-3 text-left hover:border-calm-sage/45"
-                >
-                  <p className="text-xs font-semibold uppercase tracking-wide text-teal-700">🎯 Choose Provider</p>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void startCarePath('urgent')}
-                  className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-left hover:border-rose-300"
-                >
-                  <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">Urgent Care</p>
-                </button>
-              </div>
+              {adPresetProviderType ? (
+                <div className="grid gap-2">
+                  <button
+                    type="button"
+                    onClick={startAdPresetPath}
+                    className="rounded-xl border border-calm-sage/25 bg-white p-3 text-left hover:border-calm-sage/45"
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-wide text-teal-700">Ad Priority Route</p>
+                    <p className="mt-1 text-sm text-charcoal">Continue with {adPresetLabel} providers</p>
+                  </button>
+                </div>
+              ) : (
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <button
+                    type="button"
+                    onClick={() => void startCarePath('recommended')}
+                    className="rounded-xl border border-calm-sage/25 bg-white p-3 text-left hover:border-calm-sage/45"
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-wide text-teal-700">Recommended</p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void startCarePath('direct')}
+                    className="rounded-xl border border-calm-sage/25 bg-white p-3 text-left hover:border-calm-sage/45"
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-wide text-teal-700">🎯 Choose Provider</p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void startCarePath('urgent')}
+                    className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-left hover:border-rose-300"
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">Urgent Care</p>
+                  </button>
+                </div>
+              )}
             </div>
           ) : null}
 
@@ -1402,93 +1534,11 @@ export default function SessionsPage() {
         </>
       )}
 
-      {isPreviousProvidersOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-charcoal/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-2xl rounded-2xl border border-calm-sage/20 bg-white p-5 shadow-2xl">
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <div>
-                <h3 className="text-lg font-bold text-charcoal">Book a session</h3>
-                <p className="mt-1 text-sm text-charcoal/65">
-                  Choose a previous provider below, or browse the directory if you want a different specialist.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsPreviousProvidersOpen(false)}
-                className="rounded-full p-2 text-charcoal/45 transition hover:bg-calm-sage/10 hover:text-charcoal"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="max-h-[50vh] space-y-3 overflow-y-auto pr-1">
-              {previousConsultedProviders.map((provider) => (
-                <div
-                  key={provider.id}
-                  className="rounded-xl border border-calm-sage/20 bg-white p-4"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-charcoal">{provider.name}</p>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-teal-700/80">
-                        {provider.role || 'Therapist'}
-                      </p>
-                      <p className="mt-1 text-xs text-charcoal/55">
-                        {provider.lastConnectedAt
-                          ? `Last connected: ${new Date(provider.lastConnectedAt).toLocaleDateString('en-IN', {
-                              day: 'numeric',
-                              month: 'short',
-                              year: 'numeric',
-                            })}`
-                          : 'Last connected: Not available'}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsPreviousProvidersOpen(false);
-                        handleOpenBookingDrawer(provider);
-                      }}
-                      className="inline-flex items-center rounded-lg bg-teal-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-teal-700"
-                    >
-                      Book with this provider
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-4 flex gap-3">
-              <button
-                type="button"
-                onClick={() => setIsPreviousProvidersOpen(false)}
-                className="flex-1 rounded-lg border border-calm-sage/20 px-4 py-2 text-sm font-medium text-charcoal transition hover:bg-calm-sage/5"
-              >
-                Close
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsPreviousProvidersOpen(false);
-                  setSmartMatchPreferences({
-                    initialProviderType: 'ALL',
-                    lockProviderType: false,
-                  });
-                  setIsSmartMatchOpen(true);
-                }}
-                className="flex-1 rounded-lg bg-charcoal px-4 py-2 text-sm font-semibold text-white transition hover:bg-charcoal/90"
-              >
-                Book with new specialist
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <SlideOverBookingDrawer
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
         provider={selectedProvider}
+        sourceFunnel={sourceFunnel}
         onBookingSuccess={() => {
           void fetchData();
           if (bookingContext?.fromAssessment) {
@@ -1507,6 +1557,9 @@ export default function SessionsPage() {
         isOpen={isSmartMatchOpen}
         initialProviderType={smartMatchPreferences.initialProviderType}
         lockProviderType={smartMatchPreferences.lockProviderType}
+        presetEntryType={adPresetEntry || undefined}
+        timezoneRegion={adPresetTimezoneRegion}
+        sourceFunnel={sourceFunnel}
         onClose={() => {
           setIsSmartMatchOpen(false);
           setSmartMatchPreferences({

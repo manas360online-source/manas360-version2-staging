@@ -201,6 +201,7 @@ export const patientApi = {
     providerType?: string;
     preferredTime?: boolean;
     preferredWindow?: string;
+    sourceFunnel?: string;
   }) =>
     (await http.post('/v1/sessions/book', payload)).data,
   verifyPayment: async (payload: { merchantTransactionId: string; transactionId: string; signature: string }) =>
@@ -226,6 +227,26 @@ export const patientApi = {
     (await http.post('/v1/patient-journey/quick-screening', payload)).data,
   submitClinicalJourney: async (payload: JourneyClinicalRequest): Promise<JourneyRecommendationResponse> =>
     (await http.post('/v1/patient-journey/clinical-assessment', payload)).data,
+  submitPresetAssessment: async (payload: {
+    entryType: string;
+    responses: number[];
+    source?: {
+      entryType?: string;
+      landingPage?: string;
+      utmCampaign?: string;
+      utmMedium?: string;
+      utmSource?: string;
+      timezoneRegion?: string;
+      primaryConcerns?: string[];
+      languagePreference?: string;
+    };
+  }) => {
+    return (await http.post('/v1/assessments/preset-submit', {
+      entryType: payload.entryType,
+      responses: payload.responses,
+      source: payload.source,
+    })).data;
+  },
   startStructuredAssessment: async (payload: { templateKey: string }): Promise<StructuredAssessmentStartResponse> => {
     const type = inferClinicalAssessmentType(payload.templateKey);
     const questions = CLINICAL_QUESTION_BANK[type].map((prompt: string, index: number) => ({
@@ -483,6 +504,14 @@ export const patientApi = {
     const response = (await http.post('/v1/patient/subscription/checkout', payload)).data;
     return unwrapPayload(response);
   },
+  getPremiumLibraryUsage: async () => {
+    const response = (await http.get('/v1/patient/subscription/premium-library')).data;
+    return unwrapPayload(response);
+  },
+  consumePremiumLibraryUsage: async (payload: { secondsSpent: number; source?: string }) => {
+    const response = (await http.post('/v1/patient/subscription/premium-library/consume', payload)).data;
+    return unwrapPayload(response);
+  },
   downgradeSubscription: async () => {
     const response = (await http.patch('/v1/patient/subscription/downgrade')).data;
     return unwrapPayload(response);
@@ -643,6 +672,9 @@ export const patientApi = {
       languages?: string[];
       modes?: string[];
       context?: 'Standard' | 'Corporate' | 'Night' | 'Buddy' | 'Crisis';
+      presetEntryType?: string;
+      timezoneRegion?: string;
+      sourceFunnel?: string;
     },
   ): Promise<SmartMatchProvidersResult> => {
     const query = new URLSearchParams();
@@ -659,6 +691,9 @@ export const patientApi = {
     (options?.languages || []).forEach((language) => query.append('languages', language));
     (options?.modes || []).forEach((mode) => query.append('modes', mode));
     if (options?.context) query.append('context', options.context);
+    if (options?.presetEntryType) query.append('entryType', options.presetEntryType);
+    if (options?.timezoneRegion) query.append('timezoneRegion', options.timezoneRegion);
+    if (options?.sourceFunnel) query.append('sourceFunnel', options.sourceFunnel);
     try {
       const response = (await http.get(`/v1/patient/providers/smart-match?${query}`)).data;
       const payload = response?.data ?? response;
@@ -684,6 +719,21 @@ export const patientApi = {
     providerIds: string[];
     preferredSpecialization?: string;
     durationMinutes?: number;
+    sourceFunnel?: string;
+    presetEntryType?: string;
+    timezoneRegion?: string;
+    concerns?: string[];
+    languages?: string[];
+    modes?: string[];
+    rankedProviders?: Array<{
+      providerId: string;
+      score?: number;
+      tier?: 'HOT' | 'WARM' | 'COLD';
+      breakdown?: { expertise: number; communication: number; quality: number };
+    }>;
+    payment?: {
+      merchantTransactionId?: string;
+    };
   }) => (await http.post('/v1/patient/appointments/smart-match', payload)).data,
 
   getPendingAppointmentRequests: async () =>

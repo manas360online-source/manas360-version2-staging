@@ -153,6 +153,7 @@ export interface EnvConfig {
 	nmcApiKey?: string;
 	verificationTimeoutMs: number;
 	smcApiMap: Record<string, string>;
+	presetEntryPointsEnabled: boolean;
 }
 
 const parsedCorsOrigins = parseCorsOrigins(process.env.CORS_ORIGIN);
@@ -230,6 +231,7 @@ export const env: EnvConfig = Object.freeze({
 			}, {} as Record<string,string>);
 		}
 	})(),
+	presetEntryPointsEnabled: parseBoolean(process.env.PRESET_ENTRY_POINTS_ENABLED, false),
 });
 
 if (

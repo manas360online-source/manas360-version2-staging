@@ -35,6 +35,8 @@ import {
   createPatientSupportTicketController,
   togglePatientSubscriptionAutoRenewController,
   updatePatientSettingsController,
+  getPatientPremiumLibraryUsageController,
+  consumePatientPremiumLibraryUsageController,
   updatePatientPaymentMethodController,
   upgradePatientSubscriptionController,
   checkoutPatientSubscriptionController,
@@ -88,6 +90,8 @@ router.get('/support', requireAuth, requireRole('patient'), asyncHandler(getPati
 router.post('/support/tickets', requireAuth, requireRole('patient'), asyncHandler(createPatientSupportTicketController));
 
 router.get('/subscription', requireAuth, requireRole('patient'), asyncHandler(getPatientSubscriptionController));
+router.get('/subscription/premium-library', requireAuth, requireRole('patient'), asyncHandler(getPatientPremiumLibraryUsageController));
+router.post('/subscription/premium-library/consume', requireAuth, requireRole('patient'), asyncHandler(consumePatientPremiumLibraryUsageController));
 router.patch('/subscription/upgrade', requireAuth, requireRole('patient'), asyncHandler(upgradePatientSubscriptionController));
 router.post('/subscription/checkout', requireAuth, requireRole('patient'), asyncHandler(checkoutPatientSubscriptionController));
 router.patch('/subscription/downgrade', requireAuth, requireRole('patient'), asyncHandler(downgradePatientSubscriptionController));

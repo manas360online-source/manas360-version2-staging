@@ -14,6 +14,11 @@ import { applyThemePreference, getStoredThemePreference } from './lib/themePrefe
 const initialPreference = getStoredThemePreference()
 applyThemePreference(initialPreference)
 
+if (typeof window !== 'undefined' && window.location.hash === '' && window.location.pathname !== '/') {
+  const hashTarget = `#${window.location.pathname}${window.location.search}${window.location.hash || ''}`
+  window.location.replace(`${window.location.origin}/${hashTarget}`)
+}
+
 if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
   const darkModeQuery = window.matchMedia('(prefers-color-scheme: dark)')
   const handleSystemThemeChange = () => {
@@ -29,25 +34,27 @@ if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
   }
 }
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <HelmetProvider>
-    <QueryClientProvider client={new QueryClient()}>
-      <Provider store={store}>
-        <ErrorProvider>
-          <ErrorBoundary>
-            <VideoSessionProvider>
-              <RouterProvider
-                  router={createHashRouter([
-                    // Parent route must accept nested routes — use a trailing /*
-                    { path: '/*', element: <App /> },
-                  ])}
-                  // Opt into v7 behavior to avoid future warnings
-                  future={{ v7_startTransition: true }}
-                />
-              </VideoSessionProvider>
+if (!(typeof window !== 'undefined' && window.location.hash === '' && window.location.pathname !== '/')) {
+  ReactDOM.createRoot(document.getElementById('root')!).render(
+    <HelmetProvider>
+      <QueryClientProvider client={new QueryClient()}>
+        <Provider store={store}>
+          <ErrorProvider>
+            <ErrorBoundary>
+              <VideoSessionProvider>
+                <RouterProvider
+                    router={createHashRouter([
+                      // Parent route must accept nested routes — use a trailing /*
+                      { path: '/*', element: <App /> },
+                    ])}
+                    // Opt into v7 behavior to avoid future warnings
+                    future={{ v7_startTransition: true }}
+                  />
+                </VideoSessionProvider>
             </ErrorBoundary>
           </ErrorProvider>
         </Provider>
       </QueryClientProvider>
     </HelmetProvider>
-);
+  );
+}

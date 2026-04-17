@@ -535,6 +535,9 @@ model TherapistProfile {
   certificationCompletedAt DateTime?
   certificationPaymentId   String?
   leadBoostScore           Int                 @default(0)
+  nriPoolCertified         Boolean             @default(false) @map("nri_pool_certified")
+  nriPoolCertifiedAt       DateTime?           @map("nri_pool_certified_at")
+  nriTimezoneShifts        String[]            @default([]) @map("nri_timezone_shifts")
   user                     User                @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
@@ -556,17 +559,23 @@ model ProviderDocument {
 }
 
 model PatientAssessment {
-  id            String         @id @default(uuid())
-  patientId     String
-  type          String
-  answers       Int[]
-  totalScore    Int
-  severityLevel String
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  patient       PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  id               String         @id @default(uuid())
+  patientId        String
+  type             String
+  answers          Int[]
+  totalScore       Int
+  severityLevel    String
+  entryType        String?
+  sourceMetadata   String?
+  utmCampaign      String?
+  utmMedium        String?
+  utmSource        String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  patient          PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
   @@index([patientId, createdAt(sort: Desc)])
+  @@index([entryType, createdAt(sort: Desc)])
   @@map("patient_assessments")
 }
 
@@ -880,6 +889,7 @@ model TherapySession {
   isLocked                 Boolean               @default(true)
   audioRecordingUrl        String?               @map("audio_recording_url")
   transcript               String?
+  sourceFunnel             String?               @map("source_funnel")
   therapistSessionNote     TherapistSessionNote?
   patientProfile           PatientProfile        @relation(fields: [patientProfileId], references: [id], onDelete: Cascade)
   therapistProfile         User                  @relation(fields: [therapistProfileId], references: [id], onDelete: Cascade)
@@ -1003,6 +1013,7 @@ model SessionBookingIntent {
   durationMinute        Int                 @default(50)
   amountMinor           BigInt
   currency              String              @default("INR")
+  sourceFunnel         String?             @map("source_funnel")
   razorpayPaymentId     String?
   status                BookingIntentStatus @default(PENDING)
   sessionId             String?
@@ -1032,6 +1043,7 @@ model AppointmentRequest {
   razorpayPaymentId       String?                  @map("razorpay_payment_id")
   amountMinor             BigInt?
   currency                String                   @default("INR")
+  sourceFunnel            String?                  @map("source_funnel")
   status                  AppointmentRequestStatus @default(PENDING)
   expiresAt               DateTime?                @map("expires_at")
   cancelledAt             DateTime?                @map("cancelled_at")

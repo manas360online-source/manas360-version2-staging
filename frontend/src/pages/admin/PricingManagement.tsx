@@ -38,6 +38,11 @@ const labelForProviderType = (value: string): string => {
   if (key === 'clinical-psychologist') return 'Clinical Psychologist';
   if (key === 'psychiatrist') return 'Psychiatrist (MD)';
   if (key === 'specialized-therapist') return 'Specialized Therapist';
+  if (key === 'nri_psychologist') return 'NRI Psychologist';
+  if (key === 'nri_psychiatrist') return 'NRI Psychiatrist (MD)';
+  if (key === 'nri_therapist') return 'NRI Therapist';
+  if (key === 'psychologist') return 'Psychologist';
+  if (key === 'therapist') return 'Therapist';
   return value;
 };
 
@@ -547,6 +552,9 @@ export default function AdminPricingManagementPage() {
 
       <div className="rounded-xl border border-ink-100 bg-white p-4">
         <h3 className="font-display text-base font-bold text-ink-800">Session Pricing</h3>
+        <p className="mt-2 text-sm text-ink-600">
+          💡 <strong>NRI Pricing:</strong> To add or modify NRI session prices, add rows with provider types <code className="bg-ink-50 px-1.5 py-0.5 rounded text-xs">nri_psychologist</code>, <code className="bg-ink-50 px-1.5 py-0.5 rounded text-xs">nri_psychiatrist</code>, or <code className="bg-ink-50 px-1.5 py-0.5 rounded text-xs">nri_therapist</code>. These prices will be used for NRI patients who match your entry criteria. Domestic pricing uses standard provider types (therapist, psychologist, psychiatrist).
+        </p>
         <div className="mt-3 overflow-x-auto">
           <table className="min-w-full divide-y divide-ink-100">
             <thead className="bg-ink-50">

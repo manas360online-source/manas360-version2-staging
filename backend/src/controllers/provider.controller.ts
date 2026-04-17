@@ -21,6 +21,12 @@ import {
 	acceptAppointmentRequest as acceptAppointmentRequestService,
 	rejectAppointmentRequest as rejectAppointmentRequestService,
 } from '../services/smart-match.service';
+import {
+	GAD7_QUESTIONS,
+	PHQ9_QUESTIONS,
+	getGAD7SeverityLabel,
+	getPHQ9SeverityLabel,
+} from '../utils/clinicalAssessments';
 
 type ProviderRole = 'THERAPIST' | 'PSYCHOLOGIST' | 'PSYCHIATRIST' | 'COACH';
 type ProviderDashboardRole = ProviderRole | 'LEARNER';
@@ -310,44 +316,7 @@ const parseDurationMinutes = (value: unknown): number => {
 
 const ASSESSMENT_ANSWER_LABELS = ['Not at all', 'Several days', 'More than half the days', 'Nearly every day'];
 
-const PHQ9_QUESTIONS = [
-	'Little interest or pleasure in doing things',
-	'Feeling down, depressed, or hopeless',
-	'Trouble falling or staying asleep, or sleeping too much',
-	'Feeling tired or having little energy',
-	'Poor appetite or overeating',
-	'Feeling bad about yourself, or that you are a failure or have let yourself or your family down',
-	'Trouble concentrating on things, such as reading the newspaper or watching television',
-	'Moving or speaking so slowly that other people could have noticed, or the opposite',
-	'Thoughts that you would be better off dead or of hurting yourself in some way',
-];
-
-const GAD7_QUESTIONS = [
-	'Feeling nervous, anxious, or on edge',
-	'Not being able to stop or control worrying',
-	'Worrying too much about different things',
-	'Trouble relaxing',
-	'Being so restless that it is hard to sit still',
-	'Becoming easily annoyed or irritable',
-	'Feeling afraid, as if something awful might happen',
-];
-
-const getPHQ9Severity = (score: number): string => {
-	if (score <= 4) return 'None';
-	if (score <= 9) return 'Mild';
-	if (score <= 14) return 'Moderate';
-	if (score <= 19) return 'Moderately Severe';
-	return 'Severe';
-};
-
-const getGAD7Severity = (score: number): string => {
-	if (score <= 4) return 'Minimal';
-	if (score <= 9) return 'Mild';
-	if (score <= 14) return 'Moderate';
-	return 'Severe';
-};
-
-const formatAssessmentAnswers = (questions: string[], rawAnswers: number[]): Array<{ prompt: string; answer: string; points: number }> => {
+const formatAssessmentAnswers = (questions: readonly string[], rawAnswers: number[]): Array<{ prompt: string; answer: string; points: number }> => {
 	return questions.map((prompt, index) => {
 		const raw = Number(rawAnswers[index]);
 		const points = Number.isFinite(raw) ? Math.min(3, Math.max(0, raw)) : 0;
@@ -1411,7 +1380,7 @@ export const getPatientAssessments = async (req: Request, res: Response): Promis
 			type: 'PHQ-9' as const,
 			date: item.createdAt,
 			totalScore: item.totalScore,
-			severity: getPHQ9Severity(item.totalScore),
+			severity: getPHQ9SeverityLabel(item.totalScore),
 			answers: formatAssessmentAnswers(PHQ9_QUESTIONS, item.answers),
 		})),
 		...gad7Assessments.map((item) => ({
@@ -1419,7 +1388,7 @@ export const getPatientAssessments = async (req: Request, res: Response): Promis
 			type: 'GAD-7' as const,
 			date: item.createdAt,
 			totalScore: item.totalScore,
-			severity: getGAD7Severity(item.totalScore),
+			severity: getGAD7SeverityLabel(item.totalScore),
 			answers: formatAssessmentAnswers(GAD7_QUESTIONS, item.answers),
 		})),
 	]
@@ -2906,6 +2875,115 @@ export const getProviderCareTeam = async (req: Request, res: Response): Promise<
 	}));
 
 	sendSuccess(res, careTeam, 'Care team fetched');
+};
+
+export const getPatientCareTeam = async (req: Request, res: Response): Promise<void> => {
+	const requesterProviderId = authUserId(req);
+	await getProviderRole(requesterProviderId);
+	const patientId = String(req.params.patientId || '').trim();
+
+	if (!patientId) {
+		throw new AppError('Patient id is required', 400);
+	}
+
+	const patient = await prisma.user.findUnique({
+		where: { id: patientId },
+		select: {
+			id: true,
+			role: true,
+			patientProfile: { select: { id: true } },
+		},
+	});
+
+	if (!patient || String(patient.role || '').toLowerCase() !== 'patient' || !patient.patientProfile) {
+		throw new AppError('Patient not found', 404);
+	}
+
+	const [careTeamAccess, sessionAccess] = await Promise.all([
+		prisma.careTeamAssignment.findFirst({
+			where: {
+				providerId: requesterProviderId,
+				patientId,
+				status: 'ACTIVE',
+			},
+			select: { id: true },
+		}),
+		prisma.therapySession.findFirst({
+			where: {
+				therapistProfileId: requesterProviderId,
+				patientProfile: { userId: patientId },
+			},
+			select: { id: true },
+		}),
+	]);
+
+	if (!careTeamAccess && !sessionAccess) {
+		throw new AppError('Forbidden', 403);
+	}
+
+	const assignments = await prisma.careTeamAssignment.findMany({
+		where: { patientId, status: 'ACTIVE' },
+		include: {
+			provider: {
+				select: {
+					id: true,
+					firstName: true,
+					lastName: true,
+					name: true,
+					email: true,
+					role: true,
+					providerType: true,
+				},
+			},
+		},
+		orderBy: { assignedAt: 'asc' },
+	});
+
+	const members = await Promise.all(assignments.map(async (assignment) => {
+		const [sessionCount, latestSession, latestNote] = await Promise.all([
+			prisma.therapySession.count({
+				where: {
+					therapistProfileId: assignment.providerId,
+					patientProfile: { userId: patientId },
+				},
+			}),
+			prisma.therapySession.findFirst({
+				where: {
+					therapistProfileId: assignment.providerId,
+					patientProfile: { userId: patientId },
+				},
+				orderBy: { dateTime: 'desc' },
+				select: { dateTime: true, status: true },
+			}),
+			prisma.therapistSessionNote.findFirst({
+				where: {
+					therapistId: assignment.providerId,
+					patientId: patient.patientProfile!.id,
+				},
+				orderBy: { updatedAt: 'desc' },
+				select: { plan: true, assessment: true, updatedAt: true },
+			}),
+		]);
+
+		return {
+			assignmentId: assignment.id,
+			providerId: assignment.provider.id,
+			providerName: toPatientName(assignment.provider.firstName, assignment.provider.lastName, assignment.provider.name),
+			providerEmail: assignment.provider.email,
+			providerRole: String(assignment.provider.role || '').toUpperCase(),
+			providerType: assignment.provider.providerType ? String(assignment.provider.providerType).toUpperCase() : null,
+			assignedAt: assignment.assignedAt.toISOString(),
+			accessScope: assignment.accessScope,
+			sessionCount,
+			lastSessionDate: latestSession?.dateTime ? latestSession.dateTime.toISOString() : null,
+			lastSessionStatus: latestSession?.status ? String(latestSession.status).toUpperCase() : null,
+			lastTreatmentPlan: String(latestNote?.plan || '').trim() || null,
+			lastAssessmentSummary: String(latestNote?.assessment || '').trim() || null,
+			lastClinicalUpdateAt: latestNote?.updatedAt ? latestNote.updatedAt.toISOString() : null,
+		};
+	}));
+
+	sendSuccess(res, members, 'Patient care team fetched');
 };
 
 export const assignCareTeam = async (req: Request, res: Response): Promise<void> => {

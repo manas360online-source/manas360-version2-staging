@@ -1,5 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { buildPresetAssessmentLink } from '../../config/presetDefaults';
+import type { PresetEntryType } from '../../config/presetDefaults';
 
 type QuickItem = {
   key: string;
@@ -8,11 +10,36 @@ type QuickItem = {
   subtitle: string;
   ariaLabel: string;
   route?: string;
+  entryType?: PresetEntryType;
   badge?: string;
   tone?: 'purple' | 'rose' | 'teal' | 'orange' | 'blue' | 'green' | 'gold';
 };
 
 const quickGroups: { title: string; items: QuickItem[] }[] = [
+  {
+    title: 'FIND A PROVIDER',
+    items: [
+      {
+        key: 'find-therapist',
+        emoji: '👤',
+        label: 'Find a Therapist',
+        subtitle: 'Mental health support & counseling',
+        ariaLabel: 'Find a therapist quick access',
+        entryType: 'therapist',
+        tone: 'blue',
+      },
+      {
+        key: 'find-psychiatrist',
+        emoji: '👨‍⚕️',
+        label: 'Find a Psychiatrist',
+        subtitle: 'Medication & clinical management',
+        ariaLabel: 'Find a psychiatrist quick access',
+        entryType: 'psychiatrist',
+        badge: 'MD',
+        tone: 'purple',
+      },
+    ],
+  },
   {
     title: 'PREMIUM THERAPY',
     items: [
@@ -49,10 +76,11 @@ const quickGroups: { title: string; items: QuickItem[] }[] = [
     items: [
       {
         key: 'couples-therapy',
-        emoji: '💑',
+        emoji: '👫',
         label: 'Couples Therapy',
         subtitle: 'Reignite your connection together',
         ariaLabel: 'Couples therapy quick access',
+        entryType: 'couples',
         tone: 'rose',
       },
       {
@@ -135,7 +163,17 @@ export const QuickAccessRail: React.FC = () => {
                 key={item.key}
                 type="button"
                 onClick={() => {
-                  if (item.route) navigate(item.route);
+                  if (item.entryType) {
+                    navigate(
+                      buildPresetAssessmentLink(item.entryType, {
+                        utmSource: 'landing',
+                        utmMedium: 'quickrail',
+                        utmCampaign: item.key,
+                      }),
+                    );
+                  } else if (item.route) {
+                    navigate(item.route);
+                  }
                 }}
                 className="relative inline-flex min-h-[42px] w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-charcoal transition duration-200 hover:bg-white/70"
                 aria-label={item.ariaLabel}

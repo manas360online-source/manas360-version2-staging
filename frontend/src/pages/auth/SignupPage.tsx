@@ -189,6 +189,17 @@ export default function SignupPage() {
 	const agreementScrollRef = useRef<HTMLDivElement | null>(null);
 	const patientTermsScrollRef = useRef<HTMLDivElement | null>(null);
 
+	const isPatientLeadFlow = useMemo(() => {
+		const query = new URLSearchParams(location.search);
+		const returnTarget = String(query.get('next') || query.get('returnTo') || '').toLowerCase();
+		return (
+			returnTarget.includes('/assessment-preset')
+			|| returnTarget.includes('/patient/sessions')
+			|| returnTarget.includes('/patient/dashboard')
+			|| returnTarget.includes('/plans')
+		);
+	}, [location.search]);
+
 	const isCertificationContext = useMemo(() => {
 		const query = new URLSearchParams(location.search);
 		const next = String(query.get('next') || query.get('returnTo') || '').toLowerCase();
@@ -200,7 +211,7 @@ export default function SignupPage() {
 		);
 	}, [location.search]);
 
-	const isProviderFlow = !isCertificationContext && role !== 'patient';
+	const isProviderFlow = !isCertificationContext && !isPatientLeadFlow && role !== 'patient';
 	const allProviderAgreementsAccepted = useMemo(
 		() => Object.values(providerAgreementsAccepted).every(Boolean),
 		[providerAgreementsAccepted],
@@ -212,6 +223,10 @@ export default function SignupPage() {
 	);
 
 	useEffect(() => {
+		if (isPatientLeadFlow) {
+			setRole('patient');
+		}
+
 		if (!isProviderFlow) {
 			setAadhaar('');
 			setOtpForAadhaar('');
@@ -228,7 +243,7 @@ export default function SignupPage() {
 			setActiveAgreement(null);
 			setCanAcceptActiveAgreement(false);
 		}
-	}, [isProviderFlow]);
+	}, [isPatientLeadFlow, isProviderFlow]);
 
 	useEffect(() => {
 		if (!showPatientTermsModal) return;
@@ -364,7 +379,9 @@ export default function SignupPage() {
 		try {
 			const result = await signupWithPhone(
 				phone.trim(),
-				isCertificationContext ? { name: name.trim(), role: 'learner' } : { name: name.trim(), role },
+				isCertificationContext
+					? { name: name.trim(), role: 'learner' }
+					: { name: name.trim(), role: isPatientLeadFlow ? 'patient' : role },
 			);
 			setOtpSent(true);
 			setDevOtp(result.devOtp || null);
@@ -486,7 +503,7 @@ export default function SignupPage() {
 							required
 						/>
 
-						{!isCertificationContext ? (
+						{!isCertificationContext && !isPatientLeadFlow ? (
 						<div>
 							<label htmlFor="signup-role" className="mb-2 block text-sm font-medium text-wellness-text">Role</label>
 							<select

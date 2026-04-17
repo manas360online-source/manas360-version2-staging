@@ -62,7 +62,7 @@ export default function SubscriptionAddonsPage() {
         </section>
 
         <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-bold text-slate-900">AnytimeBuddy</h2>
+          <h2 className="text-lg font-bold text-slate-900">Premium Library Packs</h2>
           <div className="grid gap-2 sm:grid-cols-4">
             {[
               { key: 'none', label: 'None' },
@@ -73,31 +73,17 @@ export default function SubscriptionAddonsPage() {
               <button
                 key={opt.key}
                 type="button"
-                onClick={() => setAddons((prev) => ({ ...prev, anytimeBuddyPack: opt.key as PatientAddonSelection['anytimeBuddyPack'] }))}
-                className={`rounded-lg border px-3 py-2 text-sm ${addons.anytimeBuddyPack === opt.key ? 'border-[#4a6741] bg-[#e8f0e5]' : 'border-slate-200 bg-white'}`}
+                onClick={() => setAddons((prev) => ({ ...prev, premiumLibraryPack: opt.key as PatientAddonSelection['premiumLibraryPack'] }))}
+                className={`rounded-lg border px-3 py-2 text-sm ${addons.premiumLibraryPack === opt.key ? 'border-[#4a6741] bg-[#e8f0e5]' : 'border-slate-200 bg-white'}`}
               >
                 {opt.label}
               </button>
             ))}
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm">
-              <span>Digital Pet Hub Unlock {planId === 'premium_monthly' ? '(Included)' : '(INR 99)'}</span>
-              <input type="checkbox" checked={addons.digitalPetHubUnlock} onChange={(e) => setAddons((prev) => ({ ...prev, digitalPetHubUnlock: e.target.checked }))} disabled={planId === 'premium_monthly'} />
-            </label>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="text-sm text-slate-700">
-              Sound tracks count (INR 30 each)
-              <input type="number" min={0} value={addons.soundTrackCount} onChange={(e) => setAddons((prev) => ({ ...prev, soundTrackCount: Number(e.target.value || 0) }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" />
-            </label>
-            <label className="text-sm text-slate-700">
-              Sound bundles count (INR 250 each)
-              <input type="number" min={0} value={addons.soundBundleCount} onChange={(e) => setAddons((prev) => ({ ...prev, soundBundleCount: Number(e.target.value || 0) }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" />
-            </label>
-          </div>
+          <p className="text-sm text-slate-600">
+            Premium Library pack time is consumed by your actual screen time in Premium Library.
+          </p>
 
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 space-y-1">
             <p>
