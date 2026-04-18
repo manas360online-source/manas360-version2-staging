@@ -49,6 +49,28 @@ type CommissionSplit = {
 	platformPercent: number;
 };
 
+type PricingMode = 'domestic' | 'nri';
+
+const NRI_PLATFORM_PLANS = [
+	{ key: 'saathi', name: 'Saathi', price: 4100, billingCycle: 'monthly', description: 'NRI group-only support plan' },
+	{ key: 'bandham', name: 'Bandham', price: 8300, billingCycle: 'monthly', description: 'NRI individual + group support plan' },
+	{ key: 'kutumbam', name: 'Kutumbam', price: 15000, billingCycle: 'monthly', description: 'NRI family support plan' },
+];
+
+const NRI_SESSION_PRICING = [
+	{ providerType: 'nri-therapist', durationMinutes: 50, price: 3599, providerShare: 2159, platformShare: 1440, active: true },
+	{ providerType: 'nri-psychologist', durationMinutes: 50, price: 2999, providerShare: 1799, platformShare: 1200, active: true },
+	{ providerType: 'nri-psychiatrist', durationMinutes: 30, price: 3499, providerShare: 2099, platformShare: 1400, active: true },
+	{ providerType: 'nri-coach', durationMinutes: 50, price: 2999, providerShare: 1799, platformShare: 1200, active: true },
+];
+
+const NRI_BASE_PRICE_FALLBACK: Record<string, number> = {
+	'nri-coach': 2999,
+	'nri-psychologist': 2999,
+	'nri-psychiatrist': 3499,
+	'nri-therapist': 3599,
+};
+
 const toIso = (value: any): string | null => {
 	if (!value) return null;
 	const date = new Date(value);
@@ -266,6 +288,58 @@ const normalizeCommissionSplit = (input: any): CommissionSplit | null => {
 	return { providerPercent, platformPercent };
 };
 
+const buildNriPricingPayload = () => ({
+	mode: 'nri',
+	pricingMode: 'nri',
+	platformFee: NRI_PLATFORM_PLANS.find((plan) => plan.key === 'bandham') ?? null,
+	plans: NRI_PLATFORM_PLANS.map((plan) => ({
+		id: plan.key,
+		key: plan.key,
+		name: plan.name,
+		price: plan.price,
+		billingCycle: plan.billingCycle,
+		active: true,
+		description: plan.description,
+	})),
+	platformPlans: NRI_PLATFORM_PLANS.map((plan) => ({
+		id: plan.key,
+		planKey: plan.key,
+		planName: plan.name,
+		price: plan.price,
+		billingCycle: plan.billingCycle,
+		description: plan.description,
+		active: true,
+	})),
+	sessionPricing: NRI_SESSION_PRICING.map((row) => ({
+		providerType: row.providerType,
+		durationMinutes: row.durationMinutes,
+		price: row.price,
+		providerShare: row.providerShare,
+		platformShare: row.platformShare,
+		active: row.active,
+	})),
+	premiumBundles: [
+		{ bundleName: 'Family Care Gift Session', minutes: 60, price: 1999, active: true },
+		{ bundleName: 'Timezone Priority Scheduling', minutes: 0, price: 999, active: true },
+	],
+	specialtyServices: [
+		{ key: 'nri_coach', title: 'NRI Coach', standardPrice: 2999, videoPrice: 3299, durationMinutes: 50 },
+		{ key: 'nri_psychologist', title: 'NRI - Psychologist', standardPrice: 2999, videoPrice: 3299, durationMinutes: 50 },
+		{ key: 'nri_psychiatrist', title: 'NRI - Psychiatrist', standardPrice: 3499, videoPrice: 3849, durationMinutes: 30 },
+		{ key: 'nri_therapist', title: 'NRI - Therapist', standardPrice: 3599, videoPrice: 3959, durationMinutes: 50 },
+	],
+	videoSurchargePercent: 10,
+	surchargePercent: 0,
+	timezoneWindows: {
+		US_EST: { local: '18:00-21:00', ist: '03:30-06:30' },
+		US_PST: { local: '18:00-21:00', ist: '06:30-09:30' },
+		UK_GMT: { local: '18:00-21:00', ist: '23:30-02:30' },
+		AU_AEST: { local: '18:00-21:00', ist: '12:30-15:30' },
+		SG_SGT: { local: '19:00-22:00', ist: '16:30-19:30' },
+		UAE_GST: { local: '19:00-22:00', ist: '20:30-23:30' },
+	},
+});
+
 const getDefaultCommissionSplit = async (): Promise<CommissionSplit | null> => {
 	const config = await getPlatformConfig('commission', { allowMissing: true });
 	if (!config?.value || typeof config.value !== 'object') {
@@ -276,13 +350,23 @@ const getDefaultCommissionSplit = async (): Promise<CommissionSplit | null> => {
 	return normalizeCommissionSplit(value.default || value.base || value);
 };
 
-export const getPricingConfig = async () => {
-	const platformConfig = await getPlatformConfig('pricing', { allowMissing: true });
-	if (platformConfig?.value && typeof platformConfig.value === 'object') {
-		return normalizePricingPayload(platformConfig.value as any);
+export const getPricingConfig = async (input?: { mode?: PricingMode }) => {
+	if (String(input?.mode || '').toLowerCase() === 'nri') {
+		return buildNriPricingPayload();
 	}
 
-	return getPricingConfigFromTables();
+	const platformConfig = await getPlatformConfig('pricing', { allowMissing: true });
+	if (platformConfig?.value && typeof platformConfig.value === 'object') {
+		return {
+			...normalizePricingPayload(platformConfig.value as any),
+			pricingMode: 'domestic',
+		};
+	}
+
+	return {
+		...(await getPricingConfigFromTables()),
+		pricingMode: 'domestic',
+	};
 };
 
 const toAddonKey = (bundleName: string): string => {
@@ -461,7 +545,8 @@ export const getSessionQuote = async (input: { providerType?: string; durationMi
 	const type = normalizeProviderType(input.providerType || 'therapist');
 	const duration = input.durationMinutes || 45;
 	const row = (await db.$queryRawUnsafe(`SELECT price FROM session_pricing WHERE provider_type = $1 AND duration_minutes = $2 AND active = TRUE`, type, duration)) as any[];
-	const basePrice = row?.[0]?.price || (type.includes('psychiatrist') ? 999 : 500);
+	const nriFallbackPrice = NRI_BASE_PRICE_FALLBACK[type];
+	const basePrice = row?.[0]?.price || nriFallbackPrice || (type.includes('psychiatrist') ? 999 : 500);
 	const settingRows = (await db.$queryRawUnsafe(`SELECT value FROM system_settings WHERE key = 'preferred_time_surcharge'`)) as any[];
 	const surchargePercent = Number(settingRows?.[0]?.value || 20);
 	const finalPrice = input.preferredTime ? Math.round(basePrice * (1 + surchargePercent / 100)) : basePrice;
