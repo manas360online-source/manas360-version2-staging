@@ -1,5 +1,6 @@
 import request from 'supertest';
 import app from '../../src/app';
+import prisma from '../../src/config/db';
 
 describe('Guest game signup flow (e2e)', () => {
   jest.setTimeout(30000);
@@ -34,5 +35,15 @@ describe('Guest game signup flow (e2e)', () => {
     expect(user.phone).toBe(phone);
     // phoneVerified flag may be present on server-side; if available assert true
     expect(user.phoneVerified === true || user.phoneVerified === undefined).toBeTruthy();
+
+    // DB side-effects: dailyGamePlay record and wallet credit
+    const play = await prisma.dailyGamePlay.findFirst({ where: { userId: String(user.id) } });
+    expect(play).not.toBeNull();
+
+    const wallet = await prisma.userWallet.findUnique({ where: { userId: String(user.id) } });
+    expect(wallet).not.toBeNull();
+
+    const txn = await prisma.userWalletTransaction.findFirst({ where: { walletId: wallet?.id, transactionType: 'CREDIT' } });
+    expect(txn).not.toBeNull();
   });
 });
