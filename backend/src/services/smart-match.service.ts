@@ -112,7 +112,7 @@ const resolveSessionQuoteMinor = async (
   providerType?: string | null,
   presetEntryType?: string | null,
 ): Promise<number> => {
-  const pricingConfig = await getPricingConfig();
+  const pricingConfig = await (await import('./pricing.service')).getPricingConfig();
   const sessionPricing = pricingConfig.sessionPricing || [];
 
   // If NRI entry type, look up pricing by NRI provider type

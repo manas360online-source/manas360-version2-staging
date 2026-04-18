@@ -4,6 +4,7 @@ import { sendSuccess } from '../utils/response';
 import prisma from '../config/db';
 import { checkEligibility, playGame, generateOutcome } from '../services/game-engine.service';
 import jwt from 'jsonwebtoken';
+import client from 'prom-client';
 import { env } from '../config/env';
 const db = prisma as any;
 
@@ -48,7 +49,25 @@ export const publicRollController = async (req: Request, res: Response): Promise
   
   // Sign the outcome securely with a 24-hour expiry
   const token = jwt.sign({ outcome, creditAmount }, env.jwtSecret, { expiresIn: '24h' });
-  
+
+  // Lightweight audit log for public-roll token issuance
+  try {
+    // eslint-disable-next-line no-console
+    console.info('[GAME] Issued public-roll token', { ip: req.ip || null, userAgent: req.headers['user-agent'] || null, outcome, creditAmount });
+  } catch (e) {
+    // ignore logging errors
+  }
+
+  try {
+    const c = new client.Counter({
+      name: 'manas360_game_public_roll_issued_total',
+      help: 'Total public game tokens issued',
+    });
+    c.inc();
+  } catch (e) {
+    // ignore metrics errors
+  }
+
   sendSuccess(res, {
     outcome,
     credit: creditAmount,
