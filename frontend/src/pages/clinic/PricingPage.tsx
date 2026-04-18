@@ -128,7 +128,7 @@ export default function PricingPage() {
   };
 
   const handleStartTrial = () => {
-    alert('Starting 21-day free trial with your selected features!');
+    navigate('/universal/checkout?type=provider&planId=lead-free&trialAuth=1&trialDays=21&postTrialCycle=monthly');
   };
 
   const handleContinue = () => {

@@ -22,6 +22,7 @@ const lead_response_routes_1 = __importDefault(require("./lead-response.routes")
 const patient_v1_routes_1 = __importDefault(require("./patient-v1.routes"));
 const patient_self_routes_1 = __importDefault(require("./patient-self.routes"));
 const certification_routes_1 = __importDefault(require("./certification.routes"));
+const enrollment_routes_1 = __importDefault(require("./enrollment.routes"));
 const landing_routes_1 = __importDefault(require("./landing.routes"));
 const chat_routes_1 = __importDefault(require("./chat.routes"));
 const riskAnalytics_routes_1 = __importDefault(require("./riskAnalytics.routes"));
@@ -98,6 +99,8 @@ router.use('/v1/patient-journey', patient_journey_routes_1.default);
 router.use('/v1/leads', lead_routes_1.default);
 router.use('/v1', lead_response_routes_1.default);
 router.use('/v1', provider_dashboard_routes_1.default);
+router.use('/enrollment', enrollment_routes_1.default);
+router.use('/v1/enrollment', enrollment_routes_1.default);
 router.use('/certifications', certification_routes_1.default);
 router.use('/v1/certifications', certification_routes_1.default);
 router.use('/landing', landing_routes_1.default);

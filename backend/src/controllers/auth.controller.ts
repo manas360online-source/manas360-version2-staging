@@ -29,6 +29,7 @@ import { AppError } from '../middleware/error.middleware';
 import { generateNumericOtp, hashOtp, hashPassword, verifyOtp } from '../utils/hash';
 import {
 	getActiveLegalDocuments,
+	hasAcceptedNriTerms,
 	getPendingLegalDocumentsForUser,
 	recordUserAcceptances,
 } from '../services/legal-compliance.service';
@@ -348,6 +349,7 @@ export const meController = async (req: Request, res: Response): Promise<void> =
 	}
 
 	const legalStatus = await getPendingLegalDocumentsForUser(String(user.id));
+	const nriTermsAccepted = await hasAcceptedNriTerms(String(user.id)).catch(() => false);
 
 	sendSuccess(
 		res,
@@ -379,6 +381,7 @@ export const meController = async (req: Request, res: Response): Promise<void> =
 			adminPolicies: ADMIN_POLICIES,
 			adminPolicyVersion: POLICY_VERSION,
 			legalAcceptanceRequired: legalStatus.pendingCount > 0,
+			nriTermsAccepted,
 			pendingLegalDocuments: legalStatus.pending.map((doc: any) => ({
 				id: doc.id,
 				type: doc.type,
