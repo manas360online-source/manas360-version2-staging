@@ -34,6 +34,7 @@ import { sendWhatsAppMessage } from './whatsapp.service';
 import type { WhatsAppUserType } from './whatsapp.service';
 import { addCredit } from './wallet.service';
 import jwt from 'jsonwebtoken';
+import client from 'prom-client';
 import type {
 	GoogleLoginInput,
 	LoginInput,
@@ -615,9 +616,11 @@ export const verifyPhoneOtp = async (input: VerifyPhoneOtpInput, meta: RequestMe
 		select: { id: true },
 	});
 
-	if (isFirstPhoneVerification && input.guestGameToken) {
+	const guestGameToken = (input as any).guestGameToken;
+
+	if (isFirstPhoneVerification && guestGameToken) {
 		try {
-			const decoded = jwt.verify(input.guestGameToken, env.jwtSecret) as { outcome: string, creditAmount: number };
+			const decoded = jwt.verify(guestGameToken, env.jwtSecret) as { outcome: string, creditAmount: number };
 
 			// Audit log for guestGameToken usage during signup
 			try {
@@ -630,7 +633,7 @@ export const verifyPhoneOtp = async (input: VerifyPhoneOtpInput, meta: RequestMe
 			// Only apply if user hasn't played before (strictly a signup bonus)
 			const existingPlay = await db.dailyGamePlay.findFirst({ where: { userId: String(user.id) } }).catch(() => null);
 			if (!existingPlay) {
-				const gamePlay = await db.dailyGamePlay.create({
+					const gamePlay = await db.dailyGamePlay.create({
 					data: {
 						userId: String(user.id),
 						date: new Date(),
@@ -641,13 +644,31 @@ export const verifyPhoneOtp = async (input: VerifyPhoneOtpInput, meta: RequestMe
 						lastPlayedAt: new Date()
 					}
 				});
-				await addCredit({
-					userId: String(user.id),
-					amount: decoded.creditAmount,
-					source: 'GAME_WIN',
-					sourceId: gamePlay.id,
-					expiresInDays: 30
-				}).catch(e => logger.error('[Auth] Failed to add game credit to wallet', e));
+				// eslint-disable-next-line no-console
+				console.info('[AUTH] Created dailyGamePlay record', { userId: String(user.id), gamePlayId: gamePlay.id });
+					try {
+						const creditResult = await addCredit({
+							userId: String(user.id),
+							amount: decoded.creditAmount,
+							source: 'GAME_WIN',
+							sourceId: gamePlay.id,
+							expiresInDays: 30
+						});
+
+						try {
+							const c1 = new client.Counter({ name: 'manas360_game_guest_token_consumed_total', help: 'Total guest game tokens consumed during signup' });
+							c1.inc();
+						} catch (e) {}
+
+						if (creditResult) {
+							try {
+								const c2 = new client.Counter({ name: 'manas360_game_guest_credit_given_total', help: 'Total credits given to users from guest game' });
+								c2.inc(Number(decoded.creditAmount) || 0);
+							} catch (e) {}
+						}
+					} catch (e) {
+						logger.error('[Auth] Failed to add game credit to wallet', e);
+					}
 			}
 		} catch(err) {
 			logger.warn('[Auth] Invalid or expired guest game token during signup', { user: user.id });
