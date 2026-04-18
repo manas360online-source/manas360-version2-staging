@@ -1,8 +1,9 @@
-import { useEffect } from 'react';
-import { Link } from 'react-router-dom';
+
+import React, { useEffect } from "react";
+import { Link } from "react-router-dom";
 
 type DigitalPetsHubPageProps = {
-  selectedPet?: 'golden-puppy' | 'wise-owl' | 'patience-turtle';
+  selectedPet?: "golden-puppy" | "wise-owl" | "patience-turtle";
 };
 
 const scienceCards = [
@@ -21,7 +22,7 @@ const schedule = [
   { time: 'Weekly', emoji: '📊', title: 'Wellness Report -> Therapist Dashboard', text: 'Mood trends, engagement time, breathing frequency, game scores sent to therapist. Therapist sees: "Patient engaged 6/7 days. Mood improved 2 points. Recommend continuing."', chem: '📋 Therapeutic Integration - Rx Loop Closed' },
 ];
 
-export default function DigitalPetsHubPage({ selectedPet }: DigitalPetsHubPageProps) {
+const DigitalPetsHubPage: React.FC<DigitalPetsHubPageProps> = ({ selectedPet }) => {
   const scrollToId = (id: string) => {
     const el = document.getElementById(id);
     if (el) el.scrollIntoView({ behavior: 'smooth' });
@@ -379,3 +380,5 @@ export default function DigitalPetsHubPage({ selectedPet }: DigitalPetsHubPagePr
     </div>
   );
 }
+
+export default DigitalPetsHubPage;
