@@ -1,12 +1,12 @@
 import React from 'react';
-import DigitalPetsHubPage from '../../pages/patient/DigitalPetsHubPage';
+import DigitalPetHubPage from '../../pages/patient/DigitalPetHubPage';
 
 type DigitalPetHubProps = {
   selectedPet?: 'golden-puppy' | 'wise-owl' | 'patience-turtle';
 };
 
-const DigitalPetHub: React.FC<DigitalPetHubProps> = ({ selectedPet }) => {
-  return <DigitalPetsHubPage selectedPet={selectedPet} />;
+const DigitalPetHub: React.FC<DigitalPetHubProps> = ({ selectedPet: _selectedPet }) => {
+  return <DigitalPetHubPage />;
 };
 
 export default DigitalPetHub;
