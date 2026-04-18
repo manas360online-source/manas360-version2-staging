@@ -1,9 +1,16 @@
 import { prisma } from '../config/db';
+import { redis } from '../config/redis';
 import { AppError } from '../middleware/error.middleware';
 
 const db = prisma as any;
 
 const MAX_PAGE_SIZE = 100;
+const ADMIN_ANALYTICS_CACHE_TTL = {
+	summary: 60,
+	list: 60,
+	cards: 120,
+	health: 30,
+} as const;
 
 export interface AdminAnalyticsRange {
 	from: string;
@@ -38,8 +45,33 @@ function normalizeLimit(limit?: number): number {
 	return Math.min(limit, MAX_PAGE_SIZE);
 }
 
+const buildCacheKey = (scope: string, payload: unknown): string =>
+	`admin:analytics:${scope}:${JSON.stringify(payload)}`;
+
+const readJsonCache = async <T>(key: string): Promise<T | null> => {
+	try {
+		const cached = await redis.get(key);
+		if (!cached) return null;
+		return JSON.parse(cached) as T;
+	} catch {
+		return null;
+	}
+};
+
+const writeJsonCache = async (key: string, payload: unknown, ttl: number): Promise<void> => {
+	try {
+		await redis.set(key, JSON.stringify(payload), ttl);
+	} catch {
+		// Best-effort cache write.
+	}
+};
+
 export class AdminAnalyticsService {
 	async getSummary(range: AdminAnalyticsRange, therapistId?: string) {
+		const cacheKey = buildCacheKey('summary', { range, therapistId });
+		const cached = await readJsonCache<any>(cacheKey);
+		if (cached) return cached;
+
 		const startKey = toDateKey(range.from);
 		const endKey = toDateKey(range.to);
 
@@ -88,7 +120,7 @@ export class AdminAnalyticsService {
 		const completion = completionRows[0];
 		const engagement = engagementRows[0];
 
-		return {
+		const payload = {
 			totalSessionsConducted: Number(totals?.total_sessions ?? 0),
 			startedSessions: Number(completion?.started_sessions ?? 0),
 			completedSessions: Number(completion?.completed_sessions ?? 0),
@@ -96,6 +128,9 @@ export class AdminAnalyticsService {
 			averageCompletionSeconds: Number(completion?.avg_completion_seconds ?? 0),
 			patientEngagementScore: Number(engagement?.engagement_score ?? 0),
 		};
+
+		await writeJsonCache(cacheKey, payload, ADMIN_ANALYTICS_CACHE_TTL.summary);
+		return payload;
 	}
 
 	async getMostUsedTemplates(
@@ -103,6 +138,10 @@ export class AdminAnalyticsService {
 		limit?: number,
 		cursor?: TemplateCursor,
 	) {
+		const cacheKey = buildCacheKey('most-used-templates', { range, limit, cursor });
+		const cached = await readJsonCache<any>(cacheKey);
+		if (cached) return cached;
+
 		const pageSize = normalizeLimit(limit);
 		const hasCursor = typeof cursor?.lastSessionsCount === 'number' && typeof cursor?.lastTemplateKey === 'number';
 
@@ -171,7 +210,7 @@ export class AdminAnalyticsService {
 			}
 			: null;
 
-		return {
+		const payload = {
 			items: rows.map((row) => ({
 				templateKey: Number(row.template_key),
 				templateId: row.template_id,
@@ -181,6 +220,9 @@ export class AdminAnalyticsService {
 			})),
 			nextCursor: next,
 		};
+
+		await writeJsonCache(cacheKey, payload, ADMIN_ANALYTICS_CACHE_TTL.list);
+		return payload;
 	}
 
 	async getTherapistUtilization(
@@ -188,6 +230,10 @@ export class AdminAnalyticsService {
 		limit?: number,
 		cursor?: UtilizationCursor,
 	) {
+		const cacheKey = buildCacheKey('therapist-utilization', { range, limit, cursor });
+		const cached = await readJsonCache<any>(cacheKey);
+		if (cached) return cached;
+
 		const pageSize = normalizeLimit(limit);
 		const hasCursor = Boolean(cursor?.lastWeekStartDate) && typeof cursor?.lastTherapistKey === 'number';
 
@@ -246,7 +292,7 @@ export class AdminAnalyticsService {
 			}
 			: null;
 
-		return {
+		const payload = {
 			items: rows.map((row) => ({
 				weekStartDate: row.week_start_date.toISOString().slice(0, 10),
 				therapistKey: Number(row.therapist_key),
@@ -254,8 +300,15 @@ export class AdminAnalyticsService {
 			})),
 			nextCursor: next,
 		};
+
+		await writeJsonCache(cacheKey, payload, ADMIN_ANALYTICS_CACHE_TTL.list);
+		return payload;
 	}
 	async getRevenueAnalytics() {
+		const cacheKey = buildCacheKey('revenue', {});
+		const cached = await readJsonCache<any>(cacheKey);
+		if (cached) return cached;
+
 		try {
 			// Active Patient Subscriptions MRR (billingCycle is the cycle field, planName is the tier)
 			const patientSubs = await prisma.patientSubscription.findMany({
@@ -300,7 +353,7 @@ export class AdminAnalyticsService {
 			const total = patientMrr + providerMrr + marketplaceSales + sessionCommissions;
 			const mrr = patientMrr + providerMrr;
 
-			return {
+			const payload = {
 				patientSubscriptions: patientMrr,
 				providerSubscriptions: providerMrr,
 				marketplaceSales,
@@ -308,6 +361,8 @@ export class AdminAnalyticsService {
 				total,
 				mrr,
 			};
+			await writeJsonCache(cacheKey, payload, ADMIN_ANALYTICS_CACHE_TTL.cards);
+			return payload;
 		} catch {
 			// Return zeroed data on error so dashboard renders
 			return { patientSubscriptions: 0, providerSubscriptions: 0, marketplaceSales: 0, sessionCommissions: 0, total: 0, mrr: 0 };
@@ -315,22 +370,32 @@ export class AdminAnalyticsService {
 	}
 
 	async getUserMetrics() {
+		const cacheKey = buildCacheKey('users', {});
+		const cached = await readJsonCache<any>(cacheKey);
+		if (cached) return cached;
+
 		try {
 			// UserRole enum values: PATIENT, THERAPIST, ADMIN, etc.
 			const totalPatients = await prisma.user.count({ where: { role: 'PATIENT', isDeleted: false } });
 			const activeSubscribers = await prisma.patientSubscription.count({ where: { status: 'active' } });
 
-			return {
+			const payload = {
 				totalPatients,
 				activeSubscribers,
 				freeVsPaidRatio: totalPatients > 0 ? (activeSubscribers / totalPatients) * 100 : 0,
 			};
+			await writeJsonCache(cacheKey, payload, ADMIN_ANALYTICS_CACHE_TTL.cards);
+			return payload;
 		} catch {
 			return { totalPatients: 0, activeSubscribers: 0, freeVsPaidRatio: 0 };
 		}
 	}
 
 	async getProviderMetrics() {
+		const cacheKey = buildCacheKey('providers', {});
+		const cached = await readJsonCache<any>(cacheKey);
+		if (cached) return cached;
+
 		try {
 			// UserRole enum: THERAPIST, PSYCHOLOGIST, PSYCHIATRIST, COACH are all providers
 			const totalProviders = await prisma.user.count({
@@ -349,30 +414,42 @@ export class AdminAnalyticsService {
 				value: p._count
 			}));
 
-			return {
+			const payload = {
 				totalProviders,
 				activeSubscriptions,
 				planDistribution,
 			};
+			await writeJsonCache(cacheKey, payload, ADMIN_ANALYTICS_CACHE_TTL.cards);
+			return payload;
 		} catch {
 			return { totalProviders: 0, activeSubscriptions: 0, planDistribution: [] };
 		}
 	}
 
 	async getMarketplaceMetrics() {
+		const cacheKey = buildCacheKey('marketplace', {});
+		const cached = await readJsonCache<any>(cacheKey);
+		if (cached) return cached;
+
 		const totalGenerated = await prisma.lead.count();
 		const totalAssigned = await prisma.lead.count({ where: { providerId: { not: null } } });
 		const purchased = await prisma.leadPurchase.count({ where: { status: 'success' } });
 
-		return {
+		const payload = {
 			generated: totalGenerated,
 			assigned: totalAssigned,
 			purchased,
 			conversionRate: totalGenerated > 0 ? (purchased / totalGenerated) * 100 : 0,
 		};
+		await writeJsonCache(cacheKey, payload, ADMIN_ANALYTICS_CACHE_TTL.cards);
+		return payload;
 	}
 
 	async getSystemHealthMetrics() {
+		const cacheKey = buildCacheKey('system-health', {});
+		const cached = await readJsonCache<any>(cacheKey);
+		if (cached) return cached;
+
 		const startedAt = Date.now();
 		const warnings: string[] = [];
 
@@ -453,7 +530,7 @@ export class AdminAnalyticsService {
 				? 'Degraded'
 				: 'Healthy';
 
-		return {
+		const payload = {
 			overall,
 			latencyMs,
 			uptimePercent: 0,
@@ -479,6 +556,9 @@ export class AdminAnalyticsService {
 				warnings,
 			},
 		};
+
+		await writeJsonCache(cacheKey, payload, ADMIN_ANALYTICS_CACHE_TTL.health);
+		return payload;
 	}
 
 	async getPaymentReliabilityMetrics(days = 30) {

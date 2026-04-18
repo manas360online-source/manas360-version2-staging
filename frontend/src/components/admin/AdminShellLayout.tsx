@@ -92,6 +92,7 @@ const ADMIN_DOMAINS: AdminDomain[] = [
 		items: [
 			{ to: '/admin/system/settings', label: 'Settings', shortLabel: 'Set' },
 			{ to: '/admin/system/platform-config', label: 'Platform Config', shortLabel: 'Cfg' },
+			{ to: '/admin/system/aws-cost-triage', label: 'AWS Cost Triage', shortLabel: 'Aws' },
 		],
 	},
 ];

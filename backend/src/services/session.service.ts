@@ -9,7 +9,7 @@ import { decryptSessionNote, encryptSessionNote } from '../utils/encryption';
 import { analyticsService } from './analytics.service';
 import { transcribeSession } from './aiService';
 import { recordQrConversion } from './qr-conversion.service';
-import { createClient } from 'redis';
+import { createClient, type RedisClientType } from 'redis';
 import { env } from '../config/env';
 import PDFDocument from 'pdfkit';
 import path from 'path';
@@ -19,6 +19,32 @@ import { PutObjectCommand, ServerSideEncryption } from '@aws-sdk/client-s3';
 import { assertPatientHasCompletedBothPHQandGAD7 } from './patient-v1.service';
 
 const db = prisma as any;
+const REDIS_URL = process.env.REDIS_URL || env.redisUrl || 'redis://127.0.0.1:6379';
+let presenceRedisClient: RedisClientType | null = null;
+
+const getPresenceRedisClient = async (): Promise<RedisClientType | null> => {
+	try {
+		if (!presenceRedisClient) {
+			presenceRedisClient = createClient({
+				url: REDIS_URL,
+				socket: {
+					reconnectStrategy: () => false,
+				},
+			});
+			presenceRedisClient.on('error', () => {
+				// Presence cache is optional.
+			});
+		}
+
+		if (!presenceRedisClient.isOpen) {
+			await presenceRedisClient.connect();
+		}
+
+		return presenceRedisClient;
+	} catch {
+		return null;
+	}
+};
 
 interface BookSessionInput {
 	therapistId: string;
@@ -561,22 +587,12 @@ export const getMyTherapistSessions = async (userId: string, query: TherapistSes
 
 	// Merge presence info (best-effort) from Redis for sessions and patients in this page
 	try {
-		const REDIS_URL = process.env.REDIS_URL || env.redisUrl || 'redis://127.0.0.1:6379';
-		const r = createClient({
-			url: REDIS_URL,
-			socket: {
-				reconnectStrategy: () => false,
-			},
-		});
-		r.on('error', () => {
-			// Presence cache is optional.
-		});
-		await r.connect();
+		const r = await getPresenceRedisClient();
+		if (!r) throw new Error('presence redis unavailable');
 		const sessionKeys = sessions.map((s) => `session:presence:${String(s.id)}`);
 		const patientKeys = patientIds.map((p) => `user:presence:${String(p)}`);
 		const pipelineKeys = [...sessionKeys, ...patientKeys];
 		const results = await r.mGet(pipelineKeys);
-		await r.disconnect();
 
 		const sessionPresenceMap = new Map<string, boolean>();
 		const patientPresenceMap = new Map<string, boolean>();

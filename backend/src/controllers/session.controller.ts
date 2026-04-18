@@ -19,6 +19,7 @@ import {
 } from '../services/session.service';
 import { prisma } from '../config/db';
 import { exportQueue } from '../jobs/export.worker';
+import { invalidateTherapistDashboardCache } from '../services/therapist-dashboard-cache.service';
 
 const getAuthUserId = (req: Request): string => {
 	const userId = req.auth?.userId;
@@ -77,6 +78,8 @@ export const patchMyTherapistSessionController = async (req: Request, res: Respo
 		req.validatedTherapistSessionStatusPayload,
 	);
 
+	await invalidateTherapistDashboardCache(userId);
+
 	sendSuccess(res, updatedSession, 'Therapist session updated');
 };
 
@@ -93,6 +96,8 @@ export const postMyTherapistSessionNoteController = async (req: Request, res: Re
 		req.validatedTherapistSessionNotePayload,
 	);
 
+	await invalidateTherapistDashboardCache(userId);
+
 	sendSuccess(res, result, 'Session note saved');
 };
 
@@ -102,6 +107,7 @@ export const postMyTherapistResponseNoteController = async (req: Request, res: R
 	if (!content || typeof content !== 'string' || !content.trim()) throw new AppError('Invalid note content', 400);
 
 	const result = await addResponseNote(userId, String(req.params.id), String(req.params.responseId), content.trim());
+	await invalidateTherapistDashboardCache(userId);
 	sendSuccess(res, result, 'Response note added', 201);
 };
 
@@ -123,12 +129,14 @@ export const putMyTherapistResponseNoteController = async (req: Request, res: Re
 	if (!content || typeof content !== 'string' || !content.trim()) throw new AppError('Invalid note content', 400);
 
 	const result = await updateResponseNote(userId, String(req.params.noteId), content.trim());
+	await invalidateTherapistDashboardCache(userId);
 	sendSuccess(res, result, 'Response note updated');
 };
 
 export const deleteMyTherapistResponseNoteController = async (req: Request, res: Response): Promise<void> => {
 	const userId = getAuthUserId(req);
 	const result = await deleteResponseNote(userId, String(req.params.noteId));
+	await invalidateTherapistDashboardCache(userId);
 	sendSuccess(res, result, 'Response note deleted');
 };
 

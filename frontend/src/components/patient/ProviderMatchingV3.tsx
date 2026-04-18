@@ -50,7 +50,8 @@ const TIME_OPTIONS = ['Morning', 'Evening', 'Night'];
 const MODE_OPTIONS = ['Video', 'Phone', 'Chat', 'In-person'];
 const CONTEXT_OPTIONS: MatchContext[] = ['Standard', 'Corporate', 'Night', 'Buddy', 'Crisis'];
 
-const getTierColor = (tier?: 'HOT' | 'WARM' | 'COLD'): string => {
+const getTierColor = (tier?: 'HOT' | 'WARM' | 'COLD' | 'PLATINUM'): string => {
+  if (tier === 'PLATINUM') return 'text-amber-700 bg-amber-50 border-amber-300';
   if (tier === 'HOT') return 'text-orange-600 bg-orange-50 border-orange-200';
   if (tier === 'WARM') return 'text-amber-600 bg-amber-50 border-amber-200';
   return 'text-slate-600 bg-slate-50 border-slate-200';

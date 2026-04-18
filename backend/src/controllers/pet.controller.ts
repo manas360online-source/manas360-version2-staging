@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import { prisma } from '../config/db';
+import { redis } from '../config/redis';
 import { AppError } from '../middleware/error.middleware';
 import { sendSuccess } from '../utils/response';
 
@@ -7,6 +8,9 @@ type PetType = 'koi' | 'pup' | 'owl';
 type CompanionMood = 'CALMING' | 'PLAYFUL' | 'FOCUSED';
 
 const DEFAULT_SELECTED_PET: PetType = 'koi';
+const PET_STATE_CACHE_TTL_SECONDS = 120;
+
+const buildPetStateCacheKey = (userId: string): string => `pet:state:${userId}`;
 
 const getAuthUserId = (req: Request): string => {
   const userId = req.auth?.userId;
@@ -53,6 +57,26 @@ const deriveCompanionMood = (
 
 export const getMyPetStateController = async (req: Request, res: Response): Promise<void> => {
   const userId = getAuthUserId(req);
+  const cacheKey = buildPetStateCacheKey(userId);
+
+  try {
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      const parsed = JSON.parse(cached) as {
+        selectedPet: PetType;
+        vitality: number;
+        unlockedItems: string[];
+        isPremium: boolean;
+        companionMood: CompanionMood;
+        nudges: Array<{ key: string; label: string; done: boolean }>;
+      };
+
+      sendSuccess(res, parsed, 'Pet state fetched');
+      return;
+    }
+  } catch {
+    // Continue with DB query when cache read/parse fails.
+  }
 
   const [petRowsRaw, todayCheckInsRaw, moodRowsRaw] = await Promise.all([
     prisma.$queryRawUnsafe('SELECT selected_pet AS "selectedPet", vitality, unlocked_items AS "unlockedItems", is_premium AS "isPremium", companion_mood AS "companionMood" FROM user_pets WHERE user_id = $1 LIMIT 1', userId),
@@ -84,26 +108,31 @@ export const getMyPetStateController = async (req: Request, res: Response): Prom
     }),
   );
 
-  sendSuccess(
-    res,
-    {
-      selectedPet,
-      vitality,
-      unlockedItems,
-      isPremium,
-      companionMood,
-      nudges: [
-        { key: 'mood', label: 'Mood Check-in', done: todayCheckIns.some((row) => row.mood !== null) },
-        { key: 'sleep', label: 'Sleep Check-in', done: todayCheckIns.some((row) => row.sleep !== null) },
-        { key: 'meds', label: 'Meds Check-in', done: medsDone },
-      ],
-    },
-    'Pet state fetched',
-  );
+  const payload = {
+    selectedPet,
+    vitality,
+    unlockedItems,
+    isPremium,
+    companionMood,
+    nudges: [
+      { key: 'mood', label: 'Mood Check-in', done: todayCheckIns.some((row) => row.mood !== null) },
+      { key: 'sleep', label: 'Sleep Check-in', done: todayCheckIns.some((row) => row.sleep !== null) },
+      { key: 'meds', label: 'Meds Check-in', done: medsDone },
+    ],
+  };
+
+  try {
+    await redis.set(cacheKey, JSON.stringify(payload), PET_STATE_CACHE_TTL_SECONDS);
+  } catch {
+    // Best-effort cache write; response should not fail.
+  }
+
+  sendSuccess(res, payload, 'Pet state fetched');
 };
 
 export const upsertMyPetStateController = async (req: Request, res: Response): Promise<void> => {
   const userId = getAuthUserId(req);
+  const cacheKey = buildPetStateCacheKey(userId);
   const selectedPet = normalizePetType(req.body?.selectedPet);
   const vitality = clampVitality(req.body?.vitality);
   const unlockedItems = normalizeUnlockedItems(req.body?.unlockedItems);
@@ -129,6 +158,12 @@ export const upsertMyPetStateController = async (req: Request, res: Response): P
     isPremium,
     null,
   );
+
+  try {
+    await redis.del(cacheKey);
+  } catch {
+    // Best-effort invalidation only.
+  }
 
   sendSuccess(
     res,

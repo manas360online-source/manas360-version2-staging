@@ -92,6 +92,10 @@ const LandingPage: React.FC = () => {
     navigate("/assessment");
   };
 
+  const handleHitASixerPromo = () => {
+    navigate("/hit-a-sixer");
+  };
+
   const handleQuickNavMegaItemClick = (menuLabel: string) => {
     if (menuLabel === "I Need a Helping Hand") {
       setActiveQuickNav(null);
@@ -132,6 +136,12 @@ const LandingPage: React.FC = () => {
     if (menuLabel === "MyDigitalClinic") {
       setActiveQuickNav(null);
       navigate("/my-digital-clinic");
+      return;
+    }
+
+    if (menuLabel === "Certify2EarnMore") {
+      setActiveQuickNav(null);
+      navigate("/certifications");
       return;
     }
 
@@ -460,6 +470,15 @@ const LandingPage: React.FC = () => {
               alignItems: "center",
               gap: "14px"
             }}
+            role="button"
+            tabIndex={0}
+            onClick={handleHitASixerPromo}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                handleHitASixerPromo();
+              }
+            }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, minWidth: 0 }}>
               <span style={{ opacity: 0.95 }}>&#127951;</span>
@@ -471,6 +490,7 @@ const LandingPage: React.FC = () => {
 
             <button
               type="button"
+              onClick={handleHitASixerPromo}
               style={{
                 border: "none",
                 cursor: "pointer",
@@ -492,7 +512,10 @@ const LandingPage: React.FC = () => {
 
             <button
               type="button"
-              onClick={() => setShowTopPromo(false)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowTopPromo(false);
+              }}
               aria-label="Close"
               style={{
                 border: "none",
@@ -709,7 +732,7 @@ const LandingPage: React.FC = () => {
       >
         {[
           { bg: "#FFF", image: "/AnytimeBUDDY.jpeg", label: "Doctor" },
-          { bg: "#111827", image: "/HitASixer.jpeg", label: "Cricket" },
+          { bg: "#111827", image: "/HitASixer.jpeg", label: "Cricket", href: "/hit-a-sixer" },
           { bg: "#03163A", image: "/Digital-Pet-Hub.png", label: "Digital Pet", href: "/pet" }
         ].map((item, idx) => (
           <div
@@ -1088,6 +1111,7 @@ const LandingPage: React.FC = () => {
                                 activeQuickNav === "For Corporates / Edu / Healthcare" ||
                                 activeQuickNav === "Premium Therapy Hub" ||
                                 activeQuickNav === "MyDigitalClinic" ||
+                                activeQuickNav === "Certify2EarnMore" ||
                                 activeQuickNav === "Digital Pets4Happy Hormones"
                                   ? "pointer"
                                   : "default"
@@ -1100,6 +1124,7 @@ const LandingPage: React.FC = () => {
                               activeQuickNav === "For Corporates / Edu / Healthcare" ||
                               activeQuickNav === "Premium Therapy Hub" ||
                               activeQuickNav === "MyDigitalClinic" ||
+                              activeQuickNav === "Certify2EarnMore" ||
                               activeQuickNav === "Digital Pets4Happy Hormones"
                                 ? "button"
                                 : undefined
@@ -1112,6 +1137,7 @@ const LandingPage: React.FC = () => {
                               activeQuickNav === "For Corporates / Edu / Healthcare" ||
                               activeQuickNav === "Premium Therapy Hub" ||
                               activeQuickNav === "MyDigitalClinic" ||
+                              activeQuickNav === "Certify2EarnMore" ||
                               activeQuickNav === "Digital Pets4Happy Hormones"
                                 ? 0
                                 : undefined
@@ -1126,6 +1152,7 @@ const LandingPage: React.FC = () => {
                                   activeQuickNav === "For Corporates / Edu / Healthcare" ||
                                   activeQuickNav === "Premium Therapy Hub" ||
                                   activeQuickNav === "MyDigitalClinic" ||
+                                  activeQuickNav === "Certify2EarnMore" ||
                                   activeQuickNav === "Digital Pets4Happy Hormones") &&
                                 (e.key === "Enter" || e.key === " ")
                               ) {

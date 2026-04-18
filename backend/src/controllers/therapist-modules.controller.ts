@@ -21,6 +21,7 @@ import {
   updateTherapistCareTeamMember,
   deleteTherapistCareTeamMember,
 } from '../services/therapist-modules.service';
+import { invalidateTherapistDashboardCache } from '../services/therapist-dashboard-cache.service';
 
 const authUserId = (req: Request): string => {
   const userId = req.auth?.userId;
@@ -37,7 +38,9 @@ export const putMyTherapistStructuredSessionNoteController = async (req: Request
   const sessionId = String(req.params.sessionId || '').trim();
   if (!sessionId) throw new AppError('sessionId is required', 400);
 
-  const data = await upsertTherapistStructuredSessionNote(authUserId(req), sessionId, req.body || {});
+  const userId = authUserId(req);
+  const data = await upsertTherapistStructuredSessionNote(userId, sessionId, req.body || {});
+  await invalidateTherapistDashboardCache(userId);
   sendSuccess(res, data, 'Therapist structured session note saved');
 };
 
@@ -45,7 +48,9 @@ export const postGenerateAiSessionNoteController = async (req: Request, res: Res
   const sessionId = String(req.params.sessionId || req.params.id || '').trim();
   if (!sessionId) throw new AppError('sessionId is required', 400);
 
-  const data = await generateTherapistAiSessionNote(authUserId(req), sessionId);
+  const userId = authUserId(req);
+  const data = await generateTherapistAiSessionNote(userId, sessionId);
+  await invalidateTherapistDashboardCache(userId);
   sendSuccess(res, data, 'AI clinical note generated');
 };
 

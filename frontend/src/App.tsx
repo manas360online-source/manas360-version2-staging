@@ -85,6 +85,7 @@ const AdminPendingProvidersPage = lazy(() => import('./pages/admin/PendingProvid
 const AdminRevenuePage = lazy(() => import('./pages/admin/Revenue'));
 const AdminSettingsPage = lazy(() => import('./pages/admin/Settings'));
 const PlatformConfigPage = lazy(() => import('./pages/admin/PlatformConfig'));
+const AdminAwsCostTriagePage = lazy(() => import('./pages/admin/AwsCostTriageDashboard'));
 const ClinicalAssistantPage = lazy(() => import('./pages/admin/ClinicalAssistantPage'));
 const AdminSectionPage = lazy(() => import('./pages/admin/AdminSectionPage'));
 const AdminPayoutsPage = lazy(() => import('./pages/admin/Payouts'));
@@ -570,6 +571,7 @@ function App() {
 
                 <Route path="system/settings" element={<AdminSettingsPage />} />
                 <Route path="system/platform-config" element={<PlatformConfigPage />} />
+                <Route path="system/aws-cost-triage" element={<AdminAwsCostTriagePage />} />
 
                 {/* Legacy path redirects */}
                 <Route path="dashboard" element={<Navigate to="/admin/control/dashboard" replace />} />
@@ -606,6 +608,7 @@ function App() {
                 <Route path="compliance" element={<Navigate to="/admin/governance/compliance" replace />} />
                 <Route path="compliance-status" element={<Navigate to="/admin/governance/compliance" replace />} />
                 <Route path="settings" element={<Navigate to="/admin/system/settings" replace />} />
+                <Route path="aws-cost-triage" element={<Navigate to="/admin/system/aws-cost-triage" replace />} />
 
                 {/* Kept mounted but intentionally outside sidebar until full workflows are shipped */}
                 <Route path="all-users" element={<AllUsers />} />

@@ -1,7 +1,34 @@
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/error.middleware';
+import { redis } from '../config/redis';
+import { getTherapistDashboardCacheKey } from './therapist-dashboard-cache.service';
 
 const db = prisma as any;
+const THERAPIST_DASHBOARD_CACHE_TTL = {
+	dashboard: 45,
+	patients: 60,
+	notes: 45,
+	messages: 20,
+	payouts: 60,
+} as const;
+
+const readJsonCache = async <T>(key: string): Promise<T | null> => {
+	try {
+		const cached = await redis.get(key);
+		if (!cached) return null;
+		return JSON.parse(cached) as T;
+	} catch {
+		return null;
+	}
+};
+
+const writeJsonCache = async (key: string, payload: unknown, ttl: number): Promise<void> => {
+	try {
+		await redis.set(key, JSON.stringify(payload), ttl);
+	} catch {
+		// Best-effort cache write.
+	}
+};
 
 const getMonthKey = (date: Date): string => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 
@@ -70,6 +97,10 @@ const assertTherapist = async (userId: string): Promise<any> => {
 };
 
 export const getTherapistDashboardData = async (userId: string) => {
+	const cacheKey = await getTherapistDashboardCacheKey('overview', userId);
+	const cached = await readJsonCache<any>(cacheKey);
+	if (cached) return cached;
+
 	const therapist = await assertTherapist(userId);
 	const now = new Date();
 	const todayStart = startOfDay(now);
@@ -276,7 +307,7 @@ export const getTherapistDashboardData = async (userId: string) => {
 	const utilizationOpen = Math.max(0, utilizationTotal - utilizationBooked);
 	const utilizationPercent = utilizationTotal > 0 ? Math.round((utilizationBooked / utilizationTotal) * 100) : 0;
 
-	return {
+	const payload = {
 		therapist: {
 			id: therapist.id,
 			name: resolveUserName(therapist),
@@ -302,9 +333,16 @@ export const getTherapistDashboardData = async (userId: string) => {
 			open: utilizationOpen,
 		},
 	};
+
+	await writeJsonCache(cacheKey, payload, THERAPIST_DASHBOARD_CACHE_TTL.dashboard);
+	return payload;
 };
 
 export const listTherapistPatientsData = async (userId: string, status?: string, search?: string) => {
+	const cacheKey = await getTherapistDashboardCacheKey('patients', userId, { status, search });
+	const cached = await readJsonCache<any>(cacheKey);
+	if (cached) return cached;
+
 	await assertTherapist(userId);
 	const sessions = await db.therapySession.findMany({
 		where: { therapistProfileId: userId },
@@ -389,10 +427,16 @@ export const listTherapistPatientsData = async (userId: string, status?: string,
 		});
 	}
 
-	return { items };
+	const payload = { items };
+	await writeJsonCache(cacheKey, payload, THERAPIST_DASHBOARD_CACHE_TTL.patients);
+	return payload;
 };
 
 export const listTherapistSessionNotesData = async (userId: string) => {
+	const cacheKey = await getTherapistDashboardCacheKey('session-notes', userId);
+	const cached = await readJsonCache<any>(cacheKey);
+	if (cached) return cached;
+
 	await assertTherapist(userId);
 	const sessions = await db.therapySession.findMany({
 		where: { therapistProfileId: userId },
@@ -430,10 +474,16 @@ export const listTherapistSessionNotesData = async (userId: string) => {
 		noteUpdatedAt: row.noteUpdatedAt,
 	}));
 
-	return { items };
+	const payload = { items };
+	await writeJsonCache(cacheKey, payload, THERAPIST_DASHBOARD_CACHE_TTL.notes);
+	return payload;
 };
 
 export const listTherapistMessagesData = async (userId: string) => {
+	const cacheKey = await getTherapistDashboardCacheKey('messages', userId);
+	const cached = await readJsonCache<any>(cacheKey);
+	if (cached) return cached;
+
 	await assertTherapist(userId);
 	const notifications = await db.notification.findMany({
 		where: { userId },
@@ -449,7 +499,7 @@ export const listTherapistMessagesData = async (userId: string) => {
 		},
 	}).catch(() => []);
 
-	return {
+	const payload = {
 		items: notifications.map((row: any) => ({
 			id: String(row.id),
 			title: row.title,
@@ -460,9 +510,16 @@ export const listTherapistMessagesData = async (userId: string) => {
 		})),
 		unreadCount: notifications.filter((row: any) => !row.isRead).length,
 	};
+
+	await writeJsonCache(cacheKey, payload, THERAPIST_DASHBOARD_CACHE_TTL.messages);
+	return payload;
 };
 
 export const listTherapistPayoutHistoryData = async (userId: string) => {
+	const cacheKey = await getTherapistDashboardCacheKey('payout-history', userId);
+	const cached = await readJsonCache<any>(cacheKey);
+	if (cached) return cached;
+
 	await assertTherapist(userId);
 	const paidSessions = await db.therapySession.findMany({
 		where: {
@@ -482,5 +539,7 @@ export const listTherapistPayoutHistoryData = async (userId: string) => {
 		status: 'processed',
 	}));
 
-	return { items };
+	const payload = { items };
+	await writeJsonCache(cacheKey, payload, THERAPIST_DASHBOARD_CACHE_TTL.payouts);
+	return payload;
 };
