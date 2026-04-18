@@ -577,6 +577,14 @@ export const verifyPhoneOtp = async (input: VerifyPhoneOtpInput, meta: RequestMe
 	if (isFirstPhoneVerification && input.guestGameToken) {
 		try {
 			const decoded = jwt.verify(input.guestGameToken, env.jwtSecret) as { outcome: string, creditAmount: number };
+
+			// Audit log for guestGameToken usage during signup
+			try {
+				// eslint-disable-next-line no-console
+				console.info('[AUTH] guestGameToken used during signup', { userId: String(user.id), ip: meta.ipAddress || null, userAgent: meta.userAgent || null, outcome: decoded.outcome, creditAmount: decoded.creditAmount });
+			} catch (e) {
+				// ignore logging errors
+			}
 			
 			// Only apply if user hasn't played before (strictly a signup bonus)
 			const existingPlay = await db.dailyGamePlay.findFirst({ where: { userId: String(user.id) } }).catch(() => null);

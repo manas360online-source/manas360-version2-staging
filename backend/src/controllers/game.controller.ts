@@ -48,7 +48,15 @@ export const publicRollController = async (req: Request, res: Response): Promise
   
   // Sign the outcome securely with a 24-hour expiry
   const token = jwt.sign({ outcome, creditAmount }, env.jwtSecret, { expiresIn: '24h' });
-  
+
+  // Lightweight audit log for public-roll token issuance
+  try {
+    // eslint-disable-next-line no-console
+    console.info('[GAME] Issued public-roll token', { ip: req.ip || null, userAgent: req.headers['user-agent'] || null, outcome, creditAmount });
+  } catch (e) {
+    // ignore logging errors
+  }
+
   sendSuccess(res, {
     outcome,
     credit: creditAmount,
