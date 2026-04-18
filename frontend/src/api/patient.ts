@@ -318,6 +318,17 @@ export const patientApi = {
   },
   getPatientAssessmentHistory: async (params?: { page?: number; limit?: number; type?: string }) =>
     (await http.get('/v1/patient/me/assessments', { params })).data,
+  getPatientAssessmentStatus: async (): Promise<{ phq9Complete: boolean; gad7Complete: boolean }> => {
+    const response = await http.get('/v1/patient/me/assessments', { params: { page: 1, limit: 50 } });
+    const payload = response.data?.data ?? response.data;
+    const items = Array.isArray(payload?.items) ? payload.items : Array.isArray(payload) ? payload : [];
+    const normalizedTypes = items.map((entry: any) => String(entry?.type || '').toUpperCase());
+
+    return {
+      phq9Complete: normalizedTypes.some((type: string) => type.includes('PHQ-9') || type.includes('PHQ9')),
+      gad7Complete: normalizedTypes.some((type: string) => type.includes('GAD-7') || type.includes('GAD7')),
+    };
+  },
   getJourneyRecommendation: async (): Promise<JourneyRecommendationResponse> =>
     (await http.get('/v1/patient-journey/recommendation')).data,
   selectJourneyPathway: async (payload: JourneySelectPathwayRequest): Promise<JourneySelectPathwayResponse> =>

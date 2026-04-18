@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { env } from '../config/env';
 import { prisma } from '../config/db';
+import { redis } from '../config/redis';
 import { AppError } from '../middleware/error.middleware';
 import { decryptSessionNote } from '../utils/encryption';
 import { createSessionPayment } from './payment.service';
@@ -26,6 +27,29 @@ import { hasNriProviderCapability } from './provider-match.engine';
 
 const db = prisma as any;
 const SUBSCRIPTION_LOCK_TIMEOUT_MS = 5 * 60 * 1000;
+const PATIENT_V1_READ_CACHE_TTL = {
+	dashboard: 30,
+	insights: 45,
+	reports: 60,
+} as const;
+
+const readJsonCache = async <T>(key: string): Promise<T | null> => {
+	try {
+		const cached = await redis.get(key);
+		if (!cached) return null;
+		return JSON.parse(cached) as T;
+	} catch {
+		return null;
+	}
+};
+
+const writeJsonCache = async (key: string, payload: unknown, ttl: number): Promise<void> => {
+	try {
+		await redis.set(key, JSON.stringify(payload), ttl);
+	} catch {
+		// Best-effort cache write.
+	}
+};
 
 const isSchemaUnavailableError = (error: unknown): boolean => {
 	const message = String((error as any)?.message || '').toLowerCase();
@@ -588,6 +612,10 @@ const toProviderListItem = async (user: any) => {
 };
 
 export const getPatientDashboard = async (userId: string) => {
+	const cacheKey = `patient:v1:dashboard:${userId}`;
+	const cached = await readJsonCache<any>(cacheKey);
+	if (cached) return cached;
+
 	const patientProfile = await getPatientProfile(userId);
 	const now = new Date();
 
@@ -836,7 +864,7 @@ export const getPatientDashboard = async (userId: string) => {
 			phqCurrent: lastAssessment?.totalScore ?? null,
 		};
 
-	return {
+	const payload = {
 		user: {
 			id: user?.id,
 			name: userName,
@@ -880,6 +908,9 @@ export const getPatientDashboard = async (userId: string) => {
 			})),
 		],
 	};
+
+	await writeJsonCache(cacheKey, payload, PATIENT_V1_READ_CACHE_TTL.dashboard);
+	return payload;
 };
 
 const ensureSubscriptionRecord = async (userId: string) => {
@@ -2954,6 +2985,10 @@ export const getPatientProgressAnalytics = async (userId: string) => {
 };
 
 export const getPatientInsights = async (userId: string) => {
+	const cacheKey = `patient:v1:insights:${userId}`;
+	const cached = await readJsonCache<any>(cacheKey);
+	if (cached) return cached;
+
 	const analytics = await getPatientProgressAnalytics(userId);
 	const assessmentRows = Array.isArray(analytics.assessmentTrend) ? analytics.assessmentTrend : [];
 	const moodRows = Array.isArray(analytics.moodTrend) ? analytics.moodTrend : [];
@@ -2978,7 +3013,7 @@ export const getPatientInsights = async (userId: string) => {
 	if (anxietyReduction < 10 && gad7Rows.length >= 2) recommendations.push('Discuss anxiety coping strategies with your therapist in the next session.');
 	if (!recommendations.length) recommendations.push('Great momentum. Continue your current therapy plan and mood check-ins.');
 
-	return {
+	const payload = {
 		moodImprovement: Math.max(0, Math.min(100, Math.round((Number(moodRows[moodRows.length - 1]?.averageMood || 0) / 5) * 100))),
 		sessionAttendance: Number(analytics.summary.sessionCompletionRate || 0),
 		exerciseCompletion: Number(analytics.summary.exerciseCompletionRate || 0),
@@ -2987,12 +3022,19 @@ export const getPatientInsights = async (userId: string) => {
 		assessmentTrend: [...assessmentTrendMap.values()].sort((a, b) => a.date.localeCompare(b.date)),
 		recommendations,
 	};
+
+	await writeJsonCache(cacheKey, payload, PATIENT_V1_READ_CACHE_TTL.insights);
+	return payload;
 };
 
 export const getPatientReports = async (userId: string) => {
+	const cacheKey = `patient:v1:reports:${userId}`;
+	const cached = await readJsonCache<any>(cacheKey);
+	if (cached) return cached;
+
 	const patientProfile = await getPatientProfile(userId);
 
-	const [legacyAssessments, phqAssessments, gadAssessments, sessions] = await Promise.all([
+	const [legacyAssessments, phqAssessments, gadAssessments, sessions, sharedReports] = await Promise.all([
 		db.patientAssessment.findMany({
 			where: { patientId: patientProfile.id },
 			orderBy: { createdAt: 'desc' },
@@ -3021,6 +3063,15 @@ export const getPatientReports = async (userId: string) => {
 				therapistProfile: { select: { firstName: true, lastName: true, name: true, role: true } },
 			},
 		}).catch(() => []),
+		db.$queryRawUnsafe(
+			`SELECT r.id, r.title, r.status, r.shared_timestamp, r.updated_at, r.expires_at, u.firstName, u.lastName, u.name, u.role
+			 FROM psychologist_patient_reports r
+			 LEFT JOIN users u ON u.id = r.psychologist_id
+			 WHERE r.patient_id = $1 AND LOWER(r.status) = 'shared'
+			 ORDER BY r.updated_at DESC
+			 LIMIT 12`,
+			patientProfile.id,
+		).catch(() => []),
 	]);
 
 	const assessments = [
@@ -3064,9 +3115,25 @@ export const getPatientReports = async (userId: string) => {
 			providerRole: 'psychiatrist',
 		}));
 
-	return [...officialLetters, ...assessmentReports, ...sessionReports]
+	const sharedReportEntries = (sharedReports as any[]).map((report: any) => ({
+		id: `shared-report-${report.id}`,
+		type: 'shared_report',
+		bucket: 'patient_shared_reports',
+		title: String(report.title || 'Shared Clinical Report'),
+		createdAt: report.shared_timestamp || report.updated_at || new Date(),
+		summary: 'A report shared with you by your provider.',
+		providerName: String(report.name || `${report.firstName || ''} ${report.lastName || ''}`.trim() || 'Provider'),
+		providerRole: String(report.role || '').toLowerCase() || undefined,
+		sharedReportId: String(report.id),
+		status: String(report.status || '').toLowerCase(),
+	}));
+
+	const payload = [...officialLetters, ...sharedReportEntries, ...assessmentReports, ...sessionReports]
 		.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 		.slice(0, 24);
+
+	await writeJsonCache(cacheKey, payload, PATIENT_V1_READ_CACHE_TTL.reports);
+	return payload;
 };
 
 type RecordAccessPayload = {

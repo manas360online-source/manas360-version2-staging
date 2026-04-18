@@ -38,7 +38,6 @@ const ProviderSelectionPage: React.FC = () => {
   const [assessmentComplete, setAssessmentComplete] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedProviders, setSelectedProviders] = useState<ProviderMatch[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Parse URL params for availability
@@ -98,7 +97,6 @@ const ProviderSelectionPage: React.FC = () => {
   }, [navigate, locationState?.fromAssessment]);
 
   const handleMultipleProvidersSelected = async (providers: ProviderMatch[]) => {
-    setSelectedProviders(providers);
     setIsSubmitting(true);
 
     try {

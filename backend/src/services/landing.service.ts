@@ -1,5 +1,9 @@
 import { UserRole } from '@prisma/client';
 import { prisma } from '../config/db';
+import { redis } from '../config/redis';
+
+const LANDING_METRICS_CACHE_KEY = 'landing:metrics:v1';
+const LANDING_METRICS_CACHE_TTL_SECONDS = 300;
 
 const formatCompact = (value: number): string => {
 	if (value === 0) return '0';
@@ -65,8 +69,16 @@ export const getLandingMetrics = async () => {
 		displayValue: formatCompact(item.value),
 	}));
 
-	return {
+	const payload = {
 		metrics,
 		updatedAt: new Date().toISOString(),
 	};
+
+  try {
+    await redis.set(LANDING_METRICS_CACHE_KEY, JSON.stringify(payload), LANDING_METRICS_CACHE_TTL_SECONDS);
+  } catch {
+    // Best-effort cache write.
+  }
+
+	return payload;
 };

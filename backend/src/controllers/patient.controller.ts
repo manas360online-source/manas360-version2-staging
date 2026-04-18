@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import { prisma } from '../config/db';
+import { redis } from '../config/redis';
 import { AppError } from '../middleware/error.middleware';
 import { sendSuccess } from '../utils/response';
 import { s3Client } from '../services/s3.service';
@@ -12,6 +13,51 @@ import {
 	getMyMoodHistory,
 } from '../services/patient.service';
 import { env } from '../config/env';
+
+const PATIENT_CACHE_TTL_SECONDS = {
+	therapyPlan: 60,
+	documents: 60,
+	prescriptions: 45,
+} as const;
+
+const patientCacheKey = {
+	therapyPlan: (userId: string, day?: number) => `patient:therapy-plan:${userId}:${day ?? 'current'}`,
+	documents: (userId: string) => `patient:documents:${userId}`,
+	prescriptions: (userId: string) => `patient:prescriptions:${userId}`,
+};
+
+const readJsonCache = async <T>(key: string): Promise<T | null> => {
+	try {
+		const cached = await redis.get(key);
+		if (!cached) return null;
+		return JSON.parse(cached) as T;
+	} catch {
+		return null;
+	}
+};
+
+const writeJsonCache = async (key: string, payload: unknown, ttl: number): Promise<void> => {
+	try {
+		await redis.set(key, JSON.stringify(payload), ttl);
+	} catch {
+		// Best-effort cache write.
+	}
+};
+
+const invalidatePatientReadCaches = async (userId: string): Promise<void> => {
+	const keys = [
+		patientCacheKey.therapyPlan(userId),
+		patientCacheKey.documents(userId),
+		patientCacheKey.prescriptions(userId),
+	];
+	for (const key of keys) {
+		try {
+			await redis.del(key);
+		} catch {
+			// Best-effort cache invalidation.
+		}
+	}
+};
 
 const cleanFeedbackText = (value: string | null | undefined): string => String(value || '').replace(/\s+/g, ' ').trim();
 
@@ -150,9 +196,16 @@ export const getMyTherapyPlanController = async (req: Request, res: Response): P
 	const userId = getAuthUserId(req);
 	const dayQueryRaw = req.query.day;
 	const dayQuery = dayQueryRaw !== undefined ? Number(dayQueryRaw) : undefined;
+	const cacheKey = patientCacheKey.therapyPlan(userId, dayQuery);
 
 	if (dayQueryRaw !== undefined && (!Number.isInteger(dayQuery) || Number(dayQuery) <= 0)) {
 		throw new AppError('day must be a positive integer', 422);
+	}
+
+	const cached = await readJsonCache<any>(cacheKey);
+	if (cached) {
+		sendSuccess(res, cached, 'Therapy plan fetched');
+		return;
 	}
 
 	const patientProfile = await prisma.patientProfile.findUnique({
@@ -305,9 +358,7 @@ export const getMyTherapyPlanController = async (req: Request, res: Response): P
 	const maxAssignedDay = goalActivities.reduce((maxDay, activity) => Math.max(maxDay, Number(activity.dayNumber || 1)), 1);
 	const totalDays = Math.max(maxAssignedDay, currentDay);
 
-	sendSuccess(
-		res,
-		{
+	const payload = {
 			dailyTasks,
 			goals,
 			cbtExercises,
@@ -317,9 +368,10 @@ export const getMyTherapyPlanController = async (req: Request, res: Response): P
 				currentDay,
 				totalDays,
 			},
-		},
-		'Therapy plan fetched',
-	);
+		};
+
+		await writeJsonCache(cacheKey, payload, PATIENT_CACHE_TTL_SECONDS.therapyPlan);
+		sendSuccess(res, payload, 'Therapy plan fetched');
 	} catch (error) {
 		console.error('Error in getMyTherapyPlanController:', error);
 		throw error;
@@ -375,12 +427,20 @@ export const addDailyCheckInController = async (req: Request, res: Response): Pr
 		console.warn('Failed to mark mood check-in task complete:', err);
 	}
 
+	await invalidatePatientReadCaches(userId);
+
 	sendSuccess(res, dailyCheckIn, 'Daily check-in recorded', 201);
 };
 
 // ── Get my documents ─────────────────────────────────────
 export const getMyDocumentsController = async (req: Request, res: Response): Promise<void> => {
 	const userId = getAuthUserId(req);
+	const cacheKey = patientCacheKey.documents(userId);
+	const cached = await readJsonCache<any[]>(cacheKey);
+	if (cached) {
+		sendSuccess(res, cached, 'Patient documents fetched');
+		return;
+	}
 
 	try {
 	const [notes, prescriptions, assessments, phqAssessments, gadAssessments] = await Promise.all([
@@ -511,6 +571,7 @@ export const getMyDocumentsController = async (req: Request, res: Response): Pro
 	];
 
 	documents.sort((a, b) => b.date.localeCompare(a.date));
+	await writeJsonCache(cacheKey, documents, PATIENT_CACHE_TTL_SECONDS.documents);
 
 	sendSuccess(res, documents, 'Patient documents fetched');
 	} catch (error) {
@@ -521,6 +582,12 @@ export const getMyDocumentsController = async (req: Request, res: Response): Pro
 // ── Get my prescriptions ─────────────────────────────────────
 export const getMyPrescriptionsController = async (req: Request, res: Response): Promise<void> => {
 	const userId = getAuthUserId(req);
+	const cacheKey = patientCacheKey.prescriptions(userId);
+	const cached = await readJsonCache<any[]>(cacheKey);
+	if (cached) {
+		sendSuccess(res, cached, 'Patient prescriptions fetched');
+		return;
+	}
 
 	const prescriptions = await prisma.prescription.findMany({
 		where: { patientId: userId },
@@ -548,6 +615,8 @@ export const getMyPrescriptionsController = async (req: Request, res: Response):
 			? `${item.provider.firstName || ''} ${item.provider.lastName || ''}`.trim()
 			: 'Provider',
 	}));
+
+	await writeJsonCache(cacheKey, responseData, PATIENT_CACHE_TTL_SECONDS.prescriptions);
 
 	sendSuccess(res, responseData, 'Patient prescriptions fetched');
 };
@@ -617,6 +686,8 @@ export const uploadPatientDocument = async (req: Request, res: Response): Promis
 	} catch (e) {
 		console.warn('Provider notify failed', e);
 	}
+
+	await invalidatePatientReadCaches(userId);
 
   sendSuccess(res, doc, 'Document uploaded', 201);
 };

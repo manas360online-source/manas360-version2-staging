@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { AppError } from '../middleware/error.middleware';
 import { sendSuccess } from '../utils/response';
 import { prisma } from '../config/db';
+import { redis } from '../config/redis';
 import { logger } from '../utils/logger';
 
 /**
@@ -10,6 +11,28 @@ import { logger } from '../utils/logger';
  * Endpoints shared across multiple features
  * Plans, pricing, public data, etc.
  */
+
+const PLAN_CACHE_TTL_SECONDS = 300;
+const singlePlanCacheKey = (type: string, planId: string) => `plans:${type}:${planId}`;
+const allPlansCacheKey = (type: string) => `plans:${type}:all`;
+
+const readJsonCache = async <T>(key: string): Promise<T | null> => {
+	try {
+		const cached = await redis.get(key);
+		if (!cached) return null;
+		return JSON.parse(cached) as T;
+	} catch {
+		return null;
+	}
+};
+
+const writeJsonCache = async (key: string, payload: unknown): Promise<void> => {
+	try {
+		await redis.set(key, JSON.stringify(payload), PLAN_CACHE_TTL_SECONDS);
+	} catch {
+		// Best-effort cache write.
+	}
+};
 
 export const getPlanController = async (req: Request, res: Response): Promise<void> => {
 	const type = String(req.params.type ?? '').trim().toLowerCase();
@@ -21,6 +44,13 @@ export const getPlanController = async (req: Request, res: Response): Promise<vo
 
 	if (!planId) {
 		throw new AppError('planId is required', 422);
+	}
+
+	const planCacheKey = singlePlanCacheKey(type, planId);
+	const cachedPlan = await readJsonCache<any>(planCacheKey);
+	if (cachedPlan) {
+		sendSuccess(res, { plan: cachedPlan }, 'Plan details retrieved', 200);
+		return;
 	}
 
 	try {
@@ -37,6 +67,8 @@ export const getPlanController = async (req: Request, res: Response): Promise<vo
 		if (!plan) {
 			throw new AppError('Plan not found', 404);
 		}
+
+		await writeJsonCache(planCacheKey, plan);
 
 		sendSuccess(res, { plan }, 'Plan details retrieved', 200);
 	} catch (error: any) {
@@ -100,6 +132,13 @@ export const getAllPlansController = async (req: Request, res: Response): Promis
 		throw new AppError('Invalid type. Must be "provider" or "patient"', 422);
 	}
 
+	const plansCacheKey = allPlansCacheKey(type);
+	const cachedPlans = await readJsonCache<any[]>(plansCacheKey);
+	if (cachedPlans) {
+		sendSuccess(res, { plans: cachedPlans }, 'Plans retrieved', 200);
+		return;
+	}
+
 	try {
 		let plans: any[];
 
@@ -111,6 +150,7 @@ export const getAllPlansController = async (req: Request, res: Response): Promis
 			plans = [];
 		}
 
+		await writeJsonCache(plansCacheKey, plans);
 		sendSuccess(res, { plans }, 'Plans retrieved', 200);
 	} catch (error: any) {
 		if (error instanceof AppError) throw error;

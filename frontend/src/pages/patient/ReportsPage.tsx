@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { FileText, Download, Eye, Share2, ClipboardList, Activity, Pill, TrendingUp } from 'lucide-react';
 import { patientApi } from '../../api/patient';
 import toast from 'react-hot-toast';
@@ -7,10 +7,11 @@ import toast from 'react-hot-toast';
 type ReportItem = {
   id: string;
   title: string;
-  type: 'session_summary' | 'treatment_progress' | 'medication_summary' | 'therapy_outcome' | 'mood_report' | 'assessment';
+  type: 'session_summary' | 'treatment_progress' | 'medication_summary' | 'therapy_outcome' | 'mood_report' | 'assessment' | 'shared_report';
   summary?: string;
   providerName?: string;
   createdAt: string;
+  sharedReportId?: string;
 };
 
 const typeConfig: Record<string, { icon: typeof FileText; color: string; label: string }> = {
@@ -20,6 +21,7 @@ const typeConfig: Record<string, { icon: typeof FileText; color: string; label: 
   therapy_outcome: { icon: Activity, color: 'text-teal-600 bg-teal-50 border-teal-200', label: 'Therapy Outcome' },
   mood_report: { icon: Activity, color: 'text-amber-600 bg-amber-50 border-amber-200', label: 'Mood Report' },
   assessment: { icon: FileText, color: 'text-rose-600 bg-rose-50 border-rose-200', label: 'Assessment Report' },
+  shared_report: { icon: FileText, color: 'text-indigo-600 bg-indigo-50 border-indigo-200', label: 'Shared Provider Report' },
 };
 
 const fallbackReports: ReportItem[] = [
@@ -47,6 +49,7 @@ const fallbackReports: ReportItem[] = [
 ];
 
 export default function ReportsPage() {
+  const navigate = useNavigate();
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
@@ -85,6 +88,31 @@ export default function ReportsPage() {
       return;
     }
     try {
+      if (report.type === 'shared_report') {
+        const sharedId = report.sharedReportId || report.id.replace(/^shared-report-/, '');
+        if (action === 'share') {
+          toast.error('Patient-facing reports are shared by your provider.');
+          return;
+        }
+
+        if (action === 'download') {
+          const blob = await patientApi.downloadSharedReport(sharedId);
+          const fileName = `${String(report.title || 'patient-report').replace(/\s+/g, '-').toLowerCase()}.pdf`;
+          const objectUrl = window.URL.createObjectURL(blob as Blob);
+          const anchor = document.createElement('a');
+          anchor.href = objectUrl;
+          anchor.download = fileName;
+          document.body.appendChild(anchor);
+          anchor.click();
+          anchor.remove();
+          window.URL.revokeObjectURL(objectUrl);
+          return;
+        }
+
+        navigate(`/patient/reports/shared/${encodeURIComponent(sharedId)}`);
+        return;
+      }
+
       if (action === 'share') {
         const res = await patientApi.createRecordShareLink(report.id);
         const data = (res as any)?.data ?? res;
@@ -249,14 +277,25 @@ export default function ReportsPage() {
                     <Download className="h-3.5 w-3.5" />
                     Download
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleAction(report, 'share')}
-                    className="inline-flex min-h-[34px] items-center gap-1.5 rounded-xl border border-calm-sage/25 px-3 text-xs font-medium text-charcoal/70 transition hover:bg-calm-sage/10"
-                  >
-                    <Share2 className="h-3.5 w-3.5" />
-                    Share
-                  </button>
+                  {report.type === 'shared_report' ? (
+                    <button
+                      type="button"
+                      onClick={() => handleAction(report, 'view')}
+                      className="inline-flex min-h-[34px] items-center gap-1.5 rounded-xl border border-indigo-200 px-3 text-xs font-medium text-indigo-700 transition hover:bg-indigo-50"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      Open Shared
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleAction(report, 'share')}
+                      className="inline-flex min-h-[34px] items-center gap-1.5 rounded-xl border border-calm-sage/25 px-3 text-xs font-medium text-charcoal/70 transition hover:bg-calm-sage/10"
+                    >
+                      <Share2 className="h-3.5 w-3.5" />
+                      Share
+                    </button>
+                  )}
                 </div>
               </div>
             </article>

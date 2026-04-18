@@ -1,5 +1,11 @@
 import { prisma } from '../config/db';
+import { redis } from '../config/redis';
 import { AppError } from '../middleware/error.middleware';
+
+const CERT_LIST_CACHE_KEY = 'certifications:list:active:v1';
+const CERT_CACHE_TTL_SECONDS = 600;
+
+const certificationByIdCacheKey = (idOrSlug: string) => `certifications:item:${idOrSlug.toLowerCase()}`;
 
 const baseSelect = {
 	id: true,
@@ -31,22 +37,49 @@ const baseSelect = {
 };
 
 export const listCertifications = async () => {
+	try {
+		const cached = await redis.get(CERT_LIST_CACHE_KEY);
+		if (cached) {
+			return JSON.parse(cached);
+		}
+	} catch {
+		// Best-effort cache read.
+	}
+
 	const items = await prisma.certification.findMany({
 		where: { isActive: true },
 		orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
 		select: baseSelect,
 	});
 
-	return {
+	const payload = {
 		items,
 		total: items.length,
 	};
+
+	try {
+		await redis.set(CERT_LIST_CACHE_KEY, JSON.stringify(payload), CERT_CACHE_TTL_SECONDS);
+	} catch {
+		// Best-effort cache write.
+	}
+
+	return payload;
 };
 
 export const getCertificationById = async (idOrSlug: string) => {
 	const normalized = idOrSlug.trim();
 	if (!normalized) {
 		throw new AppError('Certification id is required', 400);
+	}
+
+	const cacheKey = certificationByIdCacheKey(normalized);
+	try {
+		const cached = await redis.get(cacheKey);
+		if (cached) {
+			return JSON.parse(cached);
+		}
+	} catch {
+		// Best-effort cache read.
 	}
 
 	const certification = await prisma.certification.findFirst({
@@ -59,6 +92,12 @@ export const getCertificationById = async (idOrSlug: string) => {
 
 	if (!certification) {
 		throw new AppError('Certification not found', 404, { id: normalized });
+	}
+
+	try {
+		await redis.set(cacheKey, JSON.stringify(certification), CERT_CACHE_TTL_SECONDS);
+	} catch {
+		// Best-effort cache write.
 	}
 
 	return certification;
