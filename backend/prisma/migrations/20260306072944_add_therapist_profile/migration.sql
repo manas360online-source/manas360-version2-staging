@@ -101,7 +101,7 @@ ALTER TABLE IF EXISTS "therapist_resources" ALTER COLUMN "updated_at" DROP DEFAU
 ALTER TABLE IF EXISTS "therapist_session_notes" ALTER COLUMN "updated_at" DROP DEFAULT;
 
 -- CreateTable
-CREATE TABLE "therapist_profiles" (
+CREATE TABLE IF NOT EXISTS "therapist_profiles" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "displayName" TEXT NOT NULL,
@@ -120,35 +120,25 @@ CREATE TABLE "therapist_profiles" (
     CONSTRAINT "therapist_profiles_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
-CREATE TABLE "chat_messages" (
-    "message_id" TEXT NOT NULL,
-    "user_id" TEXT NOT NULL,
-    "role" TEXT NOT NULL,
-    "content" TEXT NOT NULL,
-    "timestamp" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "bot_type" TEXT NOT NULL,
-
-    CONSTRAINT "chat_messages_pkey" PRIMARY KEY ("message_id")
-);
+-- CreateIndex
+CREATE UNIQUE INDEX IF NOT EXISTS "therapist_profiles_userId_key" ON "therapist_profiles"("userId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "therapist_profiles_userId_key" ON "therapist_profiles"("userId");
-
--- CreateIndex
-CREATE INDEX "therapist_profiles_userId_idx" ON "therapist_profiles"("userId");
-
--- CreateIndex
-CREATE INDEX "chat_messages_user_bot_ts_idx" ON "chat_messages"("user_id", "bot_type", "timestamp" DESC);
-
--- CreateIndex
-CREATE INDEX "chat_messages_user_ts_idx" ON "chat_messages"("user_id", "timestamp" DESC);
+CREATE INDEX IF NOT EXISTS "therapist_profiles_userId_idx" ON "therapist_profiles"("userId");
 
 -- AddForeignKey
-ALTER TABLE "therapist_profiles" ADD CONSTRAINT "therapist_profiles_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "chat_messages" ADD CONSTRAINT "chat_messages_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'therapist_profiles_userId_fkey'
+    ) THEN
+        ALTER TABLE "therapist_profiles"
+            ADD CONSTRAINT "therapist_profiles_userId_fkey"
+            FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+END $$;
 
 -- AddForeignKey
 ALTER TABLE "phq9_assessments" ADD CONSTRAINT "phq9_assessments_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
