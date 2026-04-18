@@ -17,8 +17,15 @@ type CacheEntry = {
   expiresAt: number;
 };
 
+type ListCacheEntry = {
+  payload: PlatformConfigRecord[];
+  expiresAt: number;
+};
+
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const MEMORY_CACHE = new Map<string, CacheEntry>();
+const LIST_MEMORY_CACHE = new Map<string, ListCacheEntry>();
+const LIST_CACHE_KEY = 'platform_config:list:all';
 
 let redisClient: RedisClientType | null = null;
 let redisReady = false;
@@ -98,6 +105,69 @@ const getRedisCache = async (key: string): Promise<PlatformConfigRecord | null> 
 const setCache = async (key: string, payload: PlatformConfigRecord): Promise<void> => {
   setMemoryCache(key, payload);
   await setRedisCache(key, payload);
+};
+
+const listCachePayloadToRecords = (value: unknown): PlatformConfigRecord[] | null => {
+  if (!Array.isArray(value)) return null;
+  return value
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null;
+      const record = item as PlatformConfigRecord;
+      if (!record.key) return null;
+      return {
+        ...record,
+        createdAt: new Date(record.createdAt),
+        updatedAt: new Date(record.updatedAt),
+      };
+    })
+    .filter((item): item is PlatformConfigRecord => item !== null);
+};
+
+const getListCache = async (): Promise<PlatformConfigRecord[] | null> => {
+  const memoryEntry = LIST_MEMORY_CACHE.get(LIST_CACHE_KEY);
+  if (memoryEntry) {
+    if (Date.now() <= memoryEntry.expiresAt) return memoryEntry.payload;
+    LIST_MEMORY_CACHE.delete(LIST_CACHE_KEY);
+  }
+
+  await initRedis();
+  if (redisReady && redisClient) {
+    try {
+      const raw = await redisClient.get(LIST_CACHE_KEY);
+      if (!raw) return null;
+      return listCachePayloadToRecords(JSON.parse(raw));
+    } catch (err) {
+      console.warn('[PlatformConfig] Redis list cache read failed:', err);
+    }
+  }
+
+  return null;
+};
+
+const setListCache = async (payload: PlatformConfigRecord[]): Promise<void> => {
+  LIST_MEMORY_CACHE.set(LIST_CACHE_KEY, {
+    payload,
+    expiresAt: Date.now() + CACHE_TTL_MS,
+  });
+
+  await initRedis();
+  if (!redisReady || !redisClient) return;
+  try {
+    await redisClient.set(LIST_CACHE_KEY, JSON.stringify(payload), { PX: CACHE_TTL_MS });
+  } catch (err) {
+    console.warn('[PlatformConfig] Redis list cache write failed:', err);
+  }
+};
+
+const clearListCache = async (): Promise<void> => {
+  LIST_MEMORY_CACHE.delete(LIST_CACHE_KEY);
+  await initRedis();
+  if (!redisReady || !redisClient) return;
+  try {
+    await redisClient.del(LIST_CACHE_KEY);
+  } catch (err) {
+    console.warn('[PlatformConfig] Redis list cache delete failed:', err);
+  }
 };
 
 const clearCache = async (key: string): Promise<void> => {
@@ -191,10 +261,22 @@ export const getPlatformConfig = async (key: string, options?: { allowMissing?: 
 
 export const listPlatformConfigs = async (keys?: string[]): Promise<PlatformConfigRecord[]> => {
   const normalizedKeys = (keys ?? []).map((k) => k.trim()).filter(Boolean);
+
+  if (!normalizedKeys.length) {
+    const cached = await getListCache();
+    if (cached) return cached;
+  }
+
   const rows = await prisma.platformConfig.findMany({
     where: normalizedKeys.length ? { key: { in: normalizedKeys } } : undefined,
     orderBy: { key: 'asc' },
   });
+
+  if (!normalizedKeys.length) {
+    const payload = rows.map((row) => normalizeRecord(row));
+    await setListCache(payload);
+    return payload;
+  }
 
   return rows.map((row) => normalizeRecord(row));
 };
@@ -241,6 +323,7 @@ export const upsertPlatformConfig = async (input: {
 
   const payload = normalizeRecord(updated);
   await setCache(trimmedKey, payload);
+  await clearListCache();
 
   await recordHistorySnapshot({
     key: trimmedKey,
@@ -302,6 +385,7 @@ export const rollbackPlatformConfig = async (input: {
 
   const payload = normalizeRecord(updated);
   await setCache(trimmedKey, payload);
+  await clearListCache();
 
   await recordHistorySnapshot({
     key: trimmedKey,
@@ -316,4 +400,5 @@ export const rollbackPlatformConfig = async (input: {
 
 export const invalidatePlatformConfig = async (key: string): Promise<void> => {
   await clearCache(key);
+  await clearListCache();
 };

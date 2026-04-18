@@ -127,17 +127,15 @@ describe('Provider onboarding and communication integration', () => {
 
 		const providerUser = await prisma.user.findUnique({
 			where: { email: providerEmail },
-			include: {
-				therapistProfile: {
-					include: {
-						documents: true,
-					},
-				},
-			},
+			select: { id: true, onboardingStatus: true },
 		});
 		expect(providerUser).toBeTruthy();
 		expect(providerUser?.onboardingStatus).toBe('PENDING');
-		expect(providerUser?.therapistProfile?.documents).toHaveLength(3);
+
+		const providerDocuments = await prisma.providerDocument.findMany({
+			where: { userId: providerUser!.id },
+		});
+		expect(providerDocuments).toHaveLength(3);
 
 		const admin = await prisma.user.create({
 			data: {

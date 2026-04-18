@@ -1,21 +1,6 @@
 import { prisma } from '../config/db';
-import { createClient } from 'redis';
-import { env } from '../config/env';
-
-const REDIS_URL = process.env.REDIS_URL || env.redisUrl || 'redis://127.0.0.1:6379';
-
-function createSafeRedisClient() {
-  const r = createClient({
-    url: REDIS_URL,
-    socket: {
-      reconnectStrategy: () => false,
-    },
-  });
-  r.on('error', () => {
-    // Presence cache is optional for dashboard responses.
-  });
-  return r;
-}
+import { redis } from '../config/redis';
+import { getTherapistDashboardCacheKey } from './therapist-dashboard-cache.service';
 
 type ListOpts = {
   therapistUserId: string;
@@ -25,6 +10,29 @@ type ListOpts = {
   from?: string;
   to?: string;
   q?: string;
+};
+
+const DASHBOARD_SESSION_CACHE_TTL = {
+  list: 20,
+  detail: 20,
+} as const;
+
+const readJsonCache = async <T>(key: string): Promise<T | null> => {
+  try {
+    const raw = await redis.get(key);
+    if (!raw) return null;
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+};
+
+const writeJsonCache = async (key: string, payload: unknown, ttl: number): Promise<void> => {
+  try {
+    await redis.set(key, JSON.stringify(payload), ttl);
+  } catch {
+    // Best-effort cache write.
+  }
 };
 
 function decodeCursor(cursor?: string): { date: Date; id: string } | null {
@@ -39,6 +47,17 @@ function decodeCursor(cursor?: string): { date: Date; id: string } | null {
 }
 
 export async function listTherapistSessions(opts: ListOpts) {
+  const cacheKey = await getTherapistDashboardCacheKey('legacy-session-list', opts.therapistUserId, {
+    limit: opts.limit,
+    cursor: opts.cursor,
+    status: opts.status,
+    from: opts.from,
+    to: opts.to,
+    q: opts.q,
+  });
+  const cached = await readJsonCache<any>(cacheKey);
+  if (cached) return cached;
+
   const limit = Math.min(opts.limit ?? 20, 100);
 
   const therapist = await prisma.user.findUnique({
@@ -125,16 +144,15 @@ export async function listTherapistSessions(opts: ListOpts) {
 
   // presence merge (best-effort)
   try {
-    const r = createSafeRedisClient();
-    await r.connect();
-    const sessionKeys = page.map((s: any) => `session:presence:${String(s.id)}`);
-    const patientKeys = page.map((s: any) => `user:presence:${String(s.patientProfileId)}`);
-    const results = await r.mGet([...sessionKeys, ...patientKeys]);
-    await r.disconnect();
     const sessionPresence = new Map<string, boolean>();
     const patientPresence = new Map<string, boolean>();
-    for (let i = 0; i < page.length; i++) sessionPresence.set(String(page[i].id), !!results[i]);
-    for (let i = 0; i < page.length; i++) patientPresence.set(String(page[i].patientProfileId), !!results[page.length + i]);
+    const [sessionResults, patientResults] = await Promise.all([
+      Promise.all(page.map((s: any) => redis.get(`session:presence:${String(s.id)}`))),
+      Promise.all(page.map((s: any) => redis.get(`user:presence:${String(s.patientProfileId)}`))),
+    ]);
+
+    for (let i = 0; i < page.length; i++) sessionPresence.set(String(page[i].id), !!sessionResults[i]);
+    for (let i = 0; i < page.length; i++) patientPresence.set(String(page[i].patientProfileId), !!patientResults[i]);
     items.forEach((it: any) => {
       it.presence = { patientOnline: !!patientPresence.get(it.patient.id), sessionActive: !!sessionPresence.get(it.sessionId) };
     });
@@ -143,11 +161,16 @@ export async function listTherapistSessions(opts: ListOpts) {
   }
 
   const nextCursor = hasNext ? Buffer.from(`${page[page.length - 1].dateTime.toISOString()}|${String(page[page.length - 1].id)}`).toString('base64') : null;
-
-  return { items, nextCursor };
+  const payload = { items, nextCursor };
+  await writeJsonCache(cacheKey, payload, DASHBOARD_SESSION_CACHE_TTL.list);
+  return payload;
 }
 
 export async function getTherapistSessionDetail(therapistUserId: string, sessionId: string) {
+  const cacheKey = await getTherapistDashboardCacheKey('legacy-session-detail', therapistUserId, { sessionId });
+  const cached = await readJsonCache<any>(cacheKey);
+  if (cached) return cached;
+
   const therapist = await prisma.user.findUnique({
     where: { id: therapistUserId },
     select: { id: true, role: true },
@@ -197,15 +220,14 @@ export async function getTherapistSessionDetail(therapistUserId: string, session
   // presence
   let presence = { patientOnline: false, sessionActive: false };
   try {
-    const r = createSafeRedisClient();
-    await r.connect();
-    const sessionVal = await r.get(`session:presence:${sessionId}`);
-    const patientVal = await r.get(`user:presence:${String(session.patientProfileId)}`);
-    await r.disconnect();
+    const [sessionVal, patientVal] = await Promise.all([
+      redis.get(`session:presence:${sessionId}`),
+      redis.get(`user:presence:${String(session.patientProfileId)}`),
+    ]);
     presence = { patientOnline: !!patientVal, sessionActive: !!sessionVal };
   } catch (e) {}
 
-  return {
+  const payload = {
     session: {
       id: String(session.id),
       scheduledAt: session.dateTime,
@@ -222,4 +244,7 @@ export async function getTherapistSessionDetail(therapistUserId: string, session
     })),
     presence,
   };
+
+  await writeJsonCache(cacheKey, payload, DASHBOARD_SESSION_CACHE_TTL.detail);
+  return payload;
 }

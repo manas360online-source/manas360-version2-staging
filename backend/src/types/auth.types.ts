@@ -4,7 +4,7 @@ export interface RequestMeta {
 	device?: string;
 }
 
-export type PublicUserRole = 'patient' | 'therapist' | 'psychiatrist' | 'psychologist' | 'coach';
+export type PublicUserRole = 'patient' | 'learner' | 'therapist' | 'psychiatrist' | 'psychologist' | 'coach';
 
 export interface RegisterPhoneInput {
 	phone: string;

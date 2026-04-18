@@ -103,6 +103,7 @@ export interface EnvConfig {
 	databaseUrl?: string;
 	jwtAccessSecret: string;
 	jwtRefreshSecret: string;
+	jwtSecret: string;
 	jwtAccessExpiresIn: string;
 	jwtRefreshExpiresIn: string;
 	cookieDomain?: string;
@@ -152,6 +153,7 @@ export interface EnvConfig {
 	nmcApiKey?: string;
 	verificationTimeoutMs: number;
 	smcApiMap: Record<string, string>;
+	presetEntryPointsEnabled: boolean;
 }
 
 const parsedCorsOrigins = parseCorsOrigins(process.env.CORS_ORIGIN);
@@ -167,6 +169,7 @@ export const env: EnvConfig = Object.freeze({
 	databaseUrl: process.env.DATABASE_URL,
 	jwtAccessSecret: process.env.JWT_ACCESS_SECRET ?? JWT_ACCESS_FALLBACK,
 	jwtRefreshSecret: process.env.JWT_REFRESH_SECRET ?? JWT_REFRESH_FALLBACK,
+	jwtSecret: process.env.JWT_SECRET ?? JWT_ACCESS_FALLBACK,
 	jwtAccessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN ?? '15m',
 	jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '7d',
 	cookieDomain: process.env.COOKIE_DOMAIN,
@@ -228,6 +231,7 @@ export const env: EnvConfig = Object.freeze({
 			}, {} as Record<string,string>);
 		}
 	})(),
+	presetEntryPointsEnabled: parseBoolean(process.env.PRESET_ENTRY_POINTS_ENABLED, false),
 });
 
 if (

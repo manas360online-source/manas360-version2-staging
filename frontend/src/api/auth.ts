@@ -19,7 +19,7 @@ export interface AuthUser {
 	id: string;
 	email: string | null;
 	phone: string | null;
-	role: 'patient' | 'therapist' | 'psychiatrist' | 'psychologist' | 'coach' | 'admin' | string;
+	role: 'patient' | 'learner' | 'therapist' | 'psychiatrist' | 'psychologist' | 'coach' | 'admin' | string;
 	companyKey?: string | null;
 	company_key?: string | null;
 	isCompanyAdmin?: boolean | null;
@@ -131,7 +131,7 @@ export const googleLogin = async (idToken: string): Promise<AuthUser> => {
 
 export const signupWithPhone = async (
 	phone: string,
-	profile?: { name?: string; role?: 'patient' | 'therapist' | 'psychiatrist' | 'psychologist' | 'coach' },
+	profile?: { name?: string; role?: 'patient' | 'learner' | 'therapist' | 'psychiatrist' | 'psychologist' | 'coach' },
 ): Promise<{ userId: string; phone: string; message: string; devOtp?: string }> => {
 	const normalizedPhone = normalizePhoneForAuth(phone);
 	const response = await http.post<ApiEnvelope<{ userId: string; phone: string; message: string; devOtp?: string }>>('/v1/auth/signup/phone', {
@@ -145,12 +145,14 @@ export const verifyPhoneSignupOtp = async (
 	phone: string,
 	otp: string,
 	consent?: SignupConsentPayload,
+	guestGameToken?: string,
 ): Promise<{ user: AuthUser; sessionId: string }> => {
 	const normalizedPhone = normalizePhoneForAuth(phone);
 	const response = await http.post<ApiEnvelope<{ user: AuthUser; sessionId: string }>>('/v1/auth/verify/phone-otp', {
 		phone: normalizedPhone,
 		otp,
 		...(consent || {}),
+		guestGameToken,
 	});
 	return response.data.data;
 };

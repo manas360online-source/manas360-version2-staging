@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   Bell,
-  Brain,
   CalendarDays,
   ClipboardList,
   FileText,
@@ -31,15 +30,13 @@ const mainNavItems = [
 ];
 
 const clinicalNavItems = [
-  { to: '/patient/sessions', label: 'Attend Assessment', icon: Brain, badge: 'Required' },
-  { to: '/patient/progress', label: 'Assessment History', icon: BarChart3 },
+  { to: '/patient/progress', label: 'Clinical Reports', icon: BarChart3 },
 ];
 
 const selfCareNavItems = [
   { to: '/patient/messages', label: 'Anytime Buddy (AI)', icon: MessageSquare, badge: 'AI' },
   { to: '/patient/check-in', label: 'Daily Check-in', icon: HeartPulse },
-  { to: '/patient/hit-a-sixer', label: 'Hit a Sixer', icon: Sparkles },
-  { to: '/patient/wellness-library', label: 'Wellness Library', icon: Sparkles },
+  { to: '/patient/wellness-library', label: 'Premium Library', icon: Sparkles },
 ];
 
 const progressNavItems = [
@@ -126,7 +123,7 @@ export default function PatientDashboardLayout() {
     '/patient/support': 'Help Center',
     '/patient/settings': 'Settings',
     '/patient/profile': 'Profile',
-    '/patient/wellness-library': 'Wellness Library',
+    '/patient/wellness-library': 'Premium Library',
     '/patient/digital-pets': 'Digital Pets Hub',
     '/patient/sleep-therapy': 'Sleep Therapy',
     '/patient/sound-therapy': 'Sound Therapy',

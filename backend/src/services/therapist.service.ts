@@ -1,5 +1,6 @@
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/error.middleware';
+import { randomUUID } from 'crypto';
 
 const db = prisma as any;
 
@@ -16,6 +17,19 @@ interface TherapistProfileInput {
 		isAvailable: boolean;
 	}>;
 }
+
+interface TherapistNriPoolInput {
+	nriPoolCertified: boolean;
+	nriTimezoneShifts: string[];
+}
+
+const ALLOWED_NRI_SHIFTS = new Set([
+	'shift_a_us_east',
+	'shift_b_us_west',
+	'shift_c_uk',
+	'shift_d_au_sg',
+	'shift_e_uae',
+]);
 
 const normalizeArray = (values: string[]): string[] => {
 	const normalized = values
@@ -66,6 +80,9 @@ const toSafeProfile = (profile: {
 		isAvailable: boolean;
 	}>; 
 	averageRating: number;
+	nriPoolCertified?: boolean | null;
+	nriPoolCertifiedAt?: Date | null;
+	nriTimezoneShifts?: string[];
 	createdAt: Date;
 	updatedAt: Date;
 }) => ({
@@ -83,6 +100,9 @@ const toSafeProfile = (profile: {
 		isAvailable: slot.isAvailable,
 	})),
 	averageRating: profile.averageRating || 0,
+	nriPoolCertified: Boolean(profile.nriPoolCertified),
+	nriPoolCertifiedAt: profile.nriPoolCertifiedAt ?? null,
+	nriTimezoneShifts: Array.isArray(profile.nriTimezoneShifts) ? profile.nriTimezoneShifts : [],
 	createdAt: profile.createdAt,
 	updatedAt: profile.updatedAt,
 });
@@ -106,11 +126,35 @@ export const createTherapistProfile = async (userId: string, input: TherapistPro
 		averageRating: 0,
 	} as any;
 
-	const profile = await db.therapistProfile.upsert({
-		where: { userId: user.id },
-		update: data,
-		create: data,
-	});
+	const profileRows = await db.$queryRawUnsafe(
+		`INSERT INTO "therapist_profiles"
+			("id", "userId", "displayName", "bio", "specializations", "languages", "yearsOfExperience", "consultationFee", "availability", "averageRating", "isDeleted", "createdAt", "updatedAt")
+		 VALUES
+			($1, $2, $3, $4, $5::text[], $6::text[], $7, $8, $9::jsonb, $10, false, NOW(), NOW())
+		 ON CONFLICT ("userId") DO UPDATE SET
+			"displayName" = EXCLUDED."displayName",
+			"bio" = EXCLUDED."bio",
+			"specializations" = EXCLUDED."specializations",
+			"languages" = EXCLUDED."languages",
+			"yearsOfExperience" = EXCLUDED."yearsOfExperience",
+			"consultationFee" = EXCLUDED."consultationFee",
+			"availability" = EXCLUDED."availability",
+			"updatedAt" = NOW()
+		 RETURNING "id", "displayName", "bio", "specializations", "languages", "yearsOfExperience", "consultationFee", "availability", "averageRating", "createdAt", "updatedAt"`,
+		randomUUID(),
+		String(user.id),
+		String(displayName),
+		data.bio,
+		Array.isArray(data.specializations) ? data.specializations : [],
+		Array.isArray(data.languages) ? data.languages : [],
+		Number(data.yearsOfExperience || 0),
+		Number(data.consultationFee || 0),
+		JSON.stringify(Array.isArray(data.availability) ? data.availability : []),
+		0,
+	);
+
+	const profile = Array.isArray(profileRows) ? profileRows[0] : null;
+	if (!profile) throw new AppError('Unable to persist therapist profile', 500);
 
 	return toSafeProfile(profile as any);
 };
@@ -120,7 +164,22 @@ export const getMyTherapistProfile = async (userId: string) => {
 	let profile: any = null;
 	try {
 		profile = await db.therapistProfile.findUnique({ where: { userId },
-			include: { user: { select: { createdAt: true, updatedAt: true } } },
+			select: {
+				id: true,
+				displayName: true,
+				bio: true,
+				specializations: true,
+				languages: true,
+				yearsOfExperience: true,
+				consultationFee: true,
+				availability: true,
+				averageRating: true,
+				nriPoolCertified: true,
+				nriPoolCertifiedAt: true,
+				nriTimezoneShifts: true,
+				createdAt: true,
+				updatedAt: true,
+			},
 		});
 	} catch {
 		// Older environments may miss optional columns; fall back to composed profile.
@@ -144,6 +203,9 @@ export const getMyTherapistProfile = async (userId: string) => {
 			consultationFee: 0,
 			availability: [],
 			averageRating: 0,
+			nriPoolCertified: false,
+			nriPoolCertifiedAt: null,
+			nriTimezoneShifts: [],
 			createdAt: user.createdAt,
 			updatedAt: user.updatedAt,
 		} as any;
@@ -152,6 +214,48 @@ export const getMyTherapistProfile = async (userId: string) => {
 	}
 
 	return toSafeProfile(profile as any);
+};
+
+export const updateMyTherapistNriPool = async (userId: string, input: TherapistNriPoolInput) => {
+	await assertTherapistUser(userId);
+
+	const normalizedShifts = Array.from(
+		new Set(
+			(input.nriTimezoneShifts || [])
+				.map((value) => String(value || '').trim().toLowerCase())
+				.filter((value) => value.length > 0),
+		),
+	);
+
+	for (const shift of normalizedShifts) {
+		if (!ALLOWED_NRI_SHIFTS.has(shift)) {
+			throw new AppError(`Invalid NRI timezone shift: ${shift}`, 422);
+		}
+	}
+
+	if (input.nriPoolCertified && normalizedShifts.length === 0) {
+		throw new AppError('At least one NRI timezone shift is required when enabling NRI pool', 422);
+	}
+
+	const rows = await db.$queryRawUnsafe(
+		`UPDATE "therapist_profiles"
+		 SET "nri_pool_certified" = $2,
+		     "nri_pool_certified_at" = CASE WHEN $2 THEN NOW() ELSE NULL END,
+		     "nri_timezone_shifts" = $3::text[],
+		     "updatedAt" = NOW()
+		 WHERE "userId" = $1
+		 RETURNING "id", "displayName", "bio", "specializations", "languages", "yearsOfExperience", "consultationFee", "availability", "averageRating", "nri_pool_certified" AS "nriPoolCertified", "nri_pool_certified_at" AS "nriPoolCertifiedAt", "nri_timezone_shifts" AS "nriTimezoneShifts", "createdAt", "updatedAt"`,
+		String(userId),
+		Boolean(input.nriPoolCertified),
+		normalizedShifts,
+	);
+
+	const updated = Array.isArray(rows) ? rows[0] : null;
+	if (!updated) {
+		throw new AppError('Therapist profile not found', 404);
+	}
+
+	return toSafeProfile(updated as any);
 };
 
 export const uploadMyTherapistDocument = async (

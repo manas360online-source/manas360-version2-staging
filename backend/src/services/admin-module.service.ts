@@ -1,4 +1,5 @@
 import { prisma } from '../config/db';
+import { redis } from '../config/redis';
 
 type AdminSummaryStat = {
   label: string;
@@ -20,6 +21,27 @@ export type AdminModuleSummary = {
 };
 
 const db = prisma as any;
+const ADMIN_MODULE_CACHE_TTL_SECONDS = 45;
+
+const buildCacheKey = (module: string): string => `admin:module-summary:${module.toLowerCase()}`;
+
+const readJsonCache = async <T>(key: string): Promise<T | null> => {
+  try {
+    const cached = await redis.get(key);
+    if (!cached) return null;
+    return JSON.parse(cached) as T;
+  } catch {
+    return null;
+  }
+};
+
+const writeJsonCache = async (key: string, payload: unknown): Promise<void> => {
+  try {
+    await redis.set(key, JSON.stringify(payload), ADMIN_MODULE_CACHE_TTL_SECONDS);
+  } catch {
+    // Best-effort cache write.
+  }
+};
 
 const formatCurrencyINR = (amount: number): string =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount);
@@ -35,6 +57,9 @@ const titleFromModule = (module: string): string =>
 
 export const getAdminModuleSummary = async (module: string): Promise<AdminModuleSummary> => {
   const moduleKey = module.toLowerCase();
+  const cacheKey = buildCacheKey(moduleKey);
+  const cached = await readJsonCache<AdminModuleSummary>(cacheKey);
+  if (cached) return cached;
 
   try {
     const now = new Date();
@@ -114,14 +139,17 @@ export const getAdminModuleSummary = async (module: string): Promise<AdminModule
         ? userItems
         : [...userItems.slice(0, 3), ...subscriptionItems.slice(0, 2)];
 
-    return {
+    const payload = {
       module: titleFromModule(moduleKey),
       stats: baseStats,
       items,
       refreshedAt: now.toISOString(),
     };
+
+    await writeJsonCache(cacheKey, payload);
+    return payload;
   } catch {
-    return {
+    const payload = {
       module: titleFromModule(moduleKey),
       stats: [
         { label: 'Users', value: '0', note: 'Backend summary unavailable' },
@@ -139,5 +167,8 @@ export const getAdminModuleSummary = async (module: string): Promise<AdminModule
       ],
       refreshedAt: new Date().toISOString(),
     };
+
+    await writeJsonCache(cacheKey, payload);
+    return payload;
   }
 };

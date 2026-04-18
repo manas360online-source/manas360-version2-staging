@@ -26,6 +26,7 @@ import {
 	resolveClinicalRecord,
 	verifySecureRecordToken,
 	getPatientSubscription,
+	getPatientPremiumLibraryUsage,
 	logWellnessLibraryActivity,
 	getProviderById,
 	getSessionDocumentPayload,
@@ -38,6 +39,7 @@ import {
 	listProviders,
 	markNotificationRead,
 	requestAppointmentWithPreferredProviders,
+	consumePatientPremiumLibraryUsage,
 	patientConfirmProposedAppointmentSlot,
 	therapistProposeAppointmentSlot,
 	getPatientSettings,
@@ -48,6 +50,7 @@ import {
 	setPatientSubscriptionAutoRenew,
 	submitAssessment,
 	submitPHQ9Assessment,
+	submitPresetAssessment,
 	updatePatientPaymentMethod,
 	updatePatientSubscriptionPlan,
 	verifySessionPaymentAndCreateSession,
@@ -100,30 +103,56 @@ export const getMyAssessmentsController = async (req: Request, res: Response): P
 		// Log for debugging
 		console.log(`[ClinicalAssessment] Fetching history for user: ${userId}`);
 
+		const patientProfile = await prisma.patientProfile.findUnique({ where: { userId }, select: { id: true } });
+		if (!patientProfile) {
+			sendSuccess(res, { items: [] }, 'Patient assessments fetched');
+			return;
+		}
+
 		// Defensive check: ensure prisma models exist on the client to avoid crash if client is out of sync
 		const phq9Model = (prisma as any).pHQ9Assessment;
 		const gad7Model = (prisma as any).gAD7Assessment;
+		const patientAssessmentModel = (prisma as any).patientAssessment;
 
-		if (!phq9Model || !gad7Model) {
-			console.warn(`[ClinicalAssessment] Warning: One or more assessment models missing from Prisma client.`);
+		if (!patientAssessmentModel && !phq9Model && !gad7Model) {
+			console.warn(`[ClinicalAssessment] Warning: Assessment models missing from Prisma client.`);
 			sendSuccess(res, { items: [] }, 'Patient assessments (partial/unavailable)');
 			return;
 		}
 
-		const [phq9Assessments, gad7Assessments] = await Promise.all([
-			phq9Model.findMany({
-				where: { userId },
-				orderBy: { createdAt: 'desc' },
-				select: { id: true, totalScore: true, answers: true, createdAt: true },
-			}),
-			gad7Model.findMany({
-				where: { userId },
-				orderBy: { createdAt: 'desc' },
-				select: { id: true, totalScore: true, answers: true, createdAt: true },
-			}),
+		const [patientAssessments, phq9Assessments, gad7Assessments] = await Promise.all([
+			patientAssessmentModel
+				? patientAssessmentModel.findMany({
+					where: { patientId: patientProfile.id },
+					orderBy: { createdAt: 'desc' },
+					select: { id: true, type: true, totalScore: true, severityLevel: true, createdAt: true },
+				})
+				: Promise.resolve([]),
+			phq9Model
+				? phq9Model.findMany({
+					where: { userId },
+					orderBy: { createdAt: 'desc' },
+					select: { id: true, totalScore: true, answers: true, createdAt: true },
+				})
+				: Promise.resolve([]),
+			gad7Model
+				? gad7Model.findMany({
+					where: { userId },
+					orderBy: { createdAt: 'desc' },
+					select: { id: true, totalScore: true, answers: true, createdAt: true },
+				})
+				: Promise.resolve([]),
 		]);
 
-		const normalized = [
+		const canonicalRows = (patientAssessments || []).map((item: any) => ({
+			id: item.id,
+			type: String(item.type || 'Assessment'),
+			createdAt: item.createdAt instanceof Date ? item.createdAt : new Date(item.createdAt || Date.now()),
+			score: Number(item.totalScore || 0),
+			severityLevel: String(item.severityLevel || 'mild'),
+		}));
+
+		const legacyRows = [
 			...(phq9Assessments || []).map((item: any) => ({
 				id: item.id,
 				type: 'PHQ-9' as const,
@@ -138,7 +167,9 @@ export const getMyAssessmentsController = async (req: Request, res: Response): P
 				score: Number(item.totalScore || 0),
 				severityLevel: null,
 			})),
-		]
+		];
+
+		const normalized = (canonicalRows.length ? canonicalRows : legacyRows)
 			.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
 			.map((item) => ({
 				id: item.id,
@@ -154,6 +185,29 @@ export const getMyAssessmentsController = async (req: Request, res: Response): P
 		// Return empty items instead of 500 to keep the frontend functional
 		sendSuccess(res, { items: [], error: error.message }, 'Unable to fetch assessment history at this time');
 	}
+};
+
+export const submitPresetAssessmentController = async (req: Request, res: Response): Promise<void> => {
+	const userId = authUserId(req);
+	const { entryType, responses, source, overrides } = req.body;
+
+	// Validate required fields
+	if (!entryType) {
+		throw new AppError('entryType is required', 422);
+	}
+
+	if (!Array.isArray(responses) || responses.length === 0) {
+		throw new AppError('responses must be a non-empty array', 422);
+	}
+
+	const result = await submitPresetAssessment(userId, {
+		entryType,
+		responses,
+		source,
+		overrides,
+	});
+
+	sendSuccess(res, result, 'Preset assessment submitted successfully', 201);
 };
 
 export const listProvidersController = async (req: Request, res: Response): Promise<void> => {
@@ -365,6 +419,7 @@ export const bookSessionController = async (req: Request, res: Response): Promis
 		providerType: req.body.providerType ? String(req.body.providerType) : undefined,
 		preferredTime: req.body.preferredTime !== undefined ? Boolean(req.body.preferredTime) : undefined,
 		preferredWindow: req.body.preferredWindow ? String(req.body.preferredWindow) : undefined,
+		sourceFunnel: req.body.sourceFunnel ? String(req.body.sourceFunnel) : undefined,
 	});
 
 	sendSuccess(res, result, 'Booking initiated', 201);
@@ -663,6 +718,25 @@ export const createPatientSupportTicketController = async (req: Request, res: Re
 export const getPatientSubscriptionController = async (req: Request, res: Response): Promise<void> => {
 	const data = await getPatientSubscription(authUserId(req));
 	sendSuccess(res, data, 'Subscription fetched');
+};
+
+export const getPatientPremiumLibraryUsageController = async (req: Request, res: Response): Promise<void> => {
+	const data = await getPatientPremiumLibraryUsage(authUserId(req));
+	sendSuccess(res, data, 'Premium Library usage fetched');
+};
+
+export const consumePatientPremiumLibraryUsageController = async (req: Request, res: Response): Promise<void> => {
+	const secondsSpent = Math.round(Number(req.body?.secondsSpent || 0));
+	if (!Number.isFinite(secondsSpent) || secondsSpent <= 0) {
+		throw new AppError('secondsSpent must be a positive number', 422);
+	}
+
+	const data = await consumePatientPremiumLibraryUsage(authUserId(req), {
+		secondsSpent,
+		source: req.body?.source ? String(req.body.source) : undefined,
+	});
+
+	sendSuccess(res, data, 'Premium Library usage updated');
 };
 
 export const upgradePatientSubscriptionController = async (req: Request, res: Response): Promise<void> => {

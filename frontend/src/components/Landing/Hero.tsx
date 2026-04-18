@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, ChevronDown, ShieldCheck, Heart, Zap } from 'lucide-react';
+import { buildPresetAssessmentLink } from '../../config/presetDefaults';
 
 export const Hero: React.FC = () => {
   const navigate = useNavigate();
@@ -86,6 +87,30 @@ export const Hero: React.FC = () => {
             Start Your 60-Second Check
             <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
           </button>
+
+          <div className="flex flex-col items-center gap-3 sm:flex-row sm:flex-wrap sm:justify-center">
+            <button
+              type="button"
+              onClick={() => navigate(buildPresetAssessmentLink('therapist', { utmSource: 'landing', utmMedium: 'hero', utmCampaign: 'find-therapist' }))}
+              className="inline-flex min-h-[44px] items-center rounded-full border border-white/25 bg-white/10 px-5 py-2.5 text-sm font-semibold text-cream transition-colors duration-200 hover:bg-white/20"
+            >
+              Find a Therapist
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate(buildPresetAssessmentLink('psychiatrist', { utmSource: 'landing', utmMedium: 'hero', utmCampaign: 'see-psychiatrist' }))}
+              className="inline-flex min-h-[44px] items-center rounded-full border border-white/25 bg-white/10 px-5 py-2.5 text-sm font-semibold text-cream transition-colors duration-200 hover:bg-white/20"
+            >
+              See a Psychiatrist
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate(buildPresetAssessmentLink('couples', { utmSource: 'landing', utmMedium: 'hero', utmCampaign: 'couples-therapy' }))}
+              className="inline-flex min-h-[44px] items-center rounded-full border border-white/25 bg-white/10 px-5 py-2.5 text-sm font-semibold text-cream transition-colors duration-200 hover:bg-white/20"
+            >
+              Couples Therapy
+            </button>
+          </div>
 
           {/* Trust signals */}
           <div className="flex flex-wrap items-center justify-center gap-4 text-sm font-medium text-cream/80 sm:gap-6">

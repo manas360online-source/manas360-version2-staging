@@ -8,6 +8,7 @@ import { prisma } from '../config/db';
 import { requireAuth } from '../middleware/auth.middleware';
 import { requireProviderSubscription } from '../middleware/subscription.middleware';
 import { LEAD_ASSIGNMENT_STATUS } from '../config/plans';
+import { invalidateProviderDashboardCache } from '../services/provider-dashboard-cache.service';
 
 const router = Router();
 
@@ -69,6 +70,8 @@ router.put('/leads/:leadId/respond', requireAuth, requireProviderSubscription, a
         status: LEAD_ASSIGNMENT_STATUS.RESPONDED,
       },
     });
+
+    await invalidateProviderDashboardCache(therapistId);
 
     res.json({
       message: 'Lead response recorded',
@@ -137,6 +140,8 @@ router.put('/leads/:leadId/convert', requireAuth, requireProviderSubscription, a
         },
       });
     }
+
+    await invalidateProviderDashboardCache(therapistId);
 
     res.json({
       message: 'Conversion recorded',

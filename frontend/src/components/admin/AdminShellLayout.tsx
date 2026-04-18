@@ -43,6 +43,7 @@ const ADMIN_DOMAINS: AdminDomain[] = [
 			{ to: '/admin/billing/pricing', label: 'Pricing', shortLabel: 'Prc' },
 			{ to: '/admin/billing/offers', label: 'Offer Marquee', shortLabel: 'Off' },
 			{ to: '/admin/billing/payouts', label: 'Payouts', shortLabel: 'Pay' },
+			{ to: '/admin/billing/wallets', label: 'Wallet Management', shortLabel: 'Wal' },
 		],
 	},
 	{
@@ -53,6 +54,7 @@ const ADMIN_DOMAINS: AdminDomain[] = [
 			{ to: '/admin/operations/groups', label: 'Group Therapy', shortLabel: 'Grp' },
 			{ to: '/admin/operations/qr', label: 'QR Codes', shortLabel: 'QR' },
 			{ to: '/admin/operations/crisis', label: 'Crisis Console', shortLabel: 'Crs' },
+			{ to: '/admin/operations/agreements', label: 'Agreements', shortLabel: 'Agr' },
 		],
 	},
 	{
@@ -90,6 +92,7 @@ const ADMIN_DOMAINS: AdminDomain[] = [
 		items: [
 			{ to: '/admin/system/settings', label: 'Settings', shortLabel: 'Set' },
 			{ to: '/admin/system/platform-config', label: 'Platform Config', shortLabel: 'Cfg' },
+			{ to: '/admin/system/aws-cost-triage', label: 'AWS Cost Triage', shortLabel: 'Aws' },
 		],
 	},
 ];

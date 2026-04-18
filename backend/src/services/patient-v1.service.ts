@@ -1,10 +1,13 @@
 import crypto from 'crypto';
 import { env } from '../config/env';
 import { prisma } from '../config/db';
+import { redis } from '../config/redis';
 import { AppError } from '../middleware/error.middleware';
 import { decryptSessionNote } from '../utils/encryption';
 import { createSessionPayment } from './payment.service';
 import { processChatMessage } from './chat.service';
+import { PRESET_DEFAULTS, getPresetDefaults, isValidPresetEntryType } from '../config/presetDefaults';
+import type { PresetAssessmentSubmitRequest, PresetAssessmentSubmitResponse } from '../types/preset';
 import {
 	buildDailyCheckInInsights,
 	buildDailyCheckInNote,
@@ -16,6 +19,7 @@ import { syncTreatmentPlanFromAssessment } from './treatment-plan.service';
 import { getSessionQuote } from './pricing.service';
 import { getActivePlatformPlan, getPricingConfigVersion } from './pricing.service';
 import { scoreGAD7, scorePHQ9 } from './riskScoring';
+import { calculateClinicalAssessmentScore } from '../utils/clinicalAssessments';
 import { sendSubscriptionActivationEmail } from './email.service';
 import { calculateGraceEndDate } from './subscription.helper';
 import { hasAcceptedNriTerms } from './legal-compliance.service';
@@ -23,6 +27,29 @@ import { hasNriProviderCapability } from './provider-match.engine';
 
 const db = prisma as any;
 const SUBSCRIPTION_LOCK_TIMEOUT_MS = 5 * 60 * 1000;
+const PATIENT_V1_READ_CACHE_TTL = {
+	dashboard: 30,
+	insights: 45,
+	reports: 60,
+} as const;
+
+const readJsonCache = async <T>(key: string): Promise<T | null> => {
+	try {
+		const cached = await redis.get(key);
+		if (!cached) return null;
+		return JSON.parse(cached) as T;
+	} catch {
+		return null;
+	}
+};
+
+const writeJsonCache = async (key: string, payload: unknown, ttl: number): Promise<void> => {
+	try {
+		await redis.set(key, JSON.stringify(payload), ttl);
+	} catch {
+		// Best-effort cache write.
+	}
+};
 
 const isSchemaUnavailableError = (error: unknown): boolean => {
 	const message = String((error as any)?.message || '').toLowerCase();
@@ -385,10 +412,44 @@ const assertPaymentDeadlineWindow = (scheduledAt: Date): void => {
 	}
 };
 
-const mapSeverity = (score: number): 'Mild' | 'Moderate' | 'Severe' => {
-	if (score <= 9) return 'Mild';
-	if (score <= 19) return 'Moderate';
-	return 'Severe';
+const toLegacySeverityBucket = (severityLevel: string): 'Mild' | 'Moderate' | 'Severe' => {
+	const normalized = String(severityLevel || '').toLowerCase();
+	if (normalized === 'severe') return 'Severe';
+	if (normalized === 'moderate' || normalized === 'moderately_severe') return 'Moderate';
+	return 'Mild';
+};
+
+const deriveAssessmentScoreAndSeverity = (
+	type: string,
+	inputScore: number | undefined,
+	inputAnswers: number[] | undefined,
+): { computedScore: number; answers: number[]; severity: 'Mild' | 'Moderate' | 'Severe' } => {
+	const computedScore = typeof inputScore === 'number'
+		? Math.max(0, Math.floor(inputScore))
+		: (inputAnswers || []).reduce((a, b) => a + Number(b || 0), 0);
+	const answers = Array.isArray(inputAnswers) && inputAnswers.length > 0
+		? inputAnswers.map((v) => Number(v || 0))
+		: [computedScore];
+
+	const normalizedType = String(type || '').toUpperCase();
+	const isClinicalType = normalizedType === 'PHQ-9' || normalizedType === 'GAD-7';
+
+	if (isClinicalType) {
+		try {
+			const clinical = calculateClinicalAssessmentScore(normalizedType as 'PHQ-9' | 'GAD-7', answers);
+			return {
+				computedScore: clinical.totalScore,
+				answers,
+				severity: toLegacySeverityBucket(clinical.severityLevel),
+			};
+		} catch {
+			// Keep legacy fallback behavior when callers submit score-only or non-standard answer payloads.
+		}
+	}
+
+	if (computedScore <= 9) return { computedScore, answers, severity: 'Mild' };
+	if (computedScore <= 19) return { computedScore, answers, severity: 'Moderate' };
+	return { computedScore, answers, severity: 'Severe' };
 };
 
 type JourneyPathway = 'SELF_CARE' | 'THERAPIST' | 'PSYCHIATRIST' | 'CRISIS_SUPPORT';
@@ -551,6 +612,10 @@ const toProviderListItem = async (user: any) => {
 };
 
 export const getPatientDashboard = async (userId: string) => {
+	const cacheKey = `patient:v1:dashboard:${userId}`;
+	const cached = await readJsonCache<any>(cacheKey);
+	if (cached) return cached;
+
 	const patientProfile = await getPatientProfile(userId);
 	const now = new Date();
 
@@ -773,7 +838,7 @@ export const getPatientDashboard = async (userId: string) => {
 			.map((exercise: any) => ({
 				id: `wellness-${exercise.id}`,
 				type: 'wellness',
-				title: 'Wellness library session completed',
+				title: 'Premium Library session completed',
 				description: `${String(exercise.title || 'Self-care activity')} • +10 Wellness Points`,
 				date: exercise.createdAt,
 			})),
@@ -799,7 +864,7 @@ export const getPatientDashboard = async (userId: string) => {
 			phqCurrent: lastAssessment?.totalScore ?? null,
 		};
 
-	return {
+	const payload = {
 		user: {
 			id: user?.id,
 			name: userName,
@@ -843,6 +908,9 @@ export const getPatientDashboard = async (userId: string) => {
 			})),
 		],
 	};
+
+	await writeJsonCache(cacheKey, payload, PATIENT_V1_READ_CACHE_TTL.dashboard);
+	return payload;
 };
 
 const ensureSubscriptionRecord = async (userId: string) => {
@@ -1440,6 +1508,153 @@ export const logWellnessLibraryActivity = async (
 	};
 };
 
+const PREMIUM_LIBRARY_PACK_MINUTES: Record<string, number> = {
+	none: 0,
+	'1h': 60,
+	'3h': 180,
+	'5h': 300,
+};
+
+const normalizeSubscriptionMetadata = (value: any): Record<string, any> =>
+	value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+
+const isPremiumLibraryEligiblePlan = (planName: string): boolean => {
+	const normalized = String(planName || '').toLowerCase();
+	return normalized.includes('premium') || normalized.includes('pro') || normalized.includes('library');
+};
+
+const resolvePremiumLibraryPack = (rawPack: unknown): keyof typeof PREMIUM_LIBRARY_PACK_MINUTES => {
+	const normalized = String(rawPack || 'none').trim().toLowerCase();
+	if (normalized === '1h' || normalized === '3h' || normalized === '5h') return normalized;
+	return 'none';
+};
+
+const getLatestPatientSubscriptionCheckoutAddons = async (userId: string): Promise<Record<string, unknown>> => {
+	const latestPayment = await db.financialPayment.findFirst({
+		where: {
+			patientId: userId,
+			status: { in: ['CAPTURED', 'COMPLETED'] },
+			metadata: {
+				path: ['type'],
+				equals: 'patient_subscription',
+			},
+		},
+		orderBy: { createdAt: 'desc' },
+		select: { metadata: true },
+	}).catch(() => null);
+
+	const checkoutAddons = latestPayment?.metadata?.checkout?.addons;
+	if (checkoutAddons && typeof checkoutAddons === 'object' && !Array.isArray(checkoutAddons)) {
+		return checkoutAddons as Record<string, unknown>;
+	}
+
+	const addons = latestPayment?.metadata?.addons;
+	if (addons && typeof addons === 'object' && !Array.isArray(addons)) {
+		return addons as Record<string, unknown>;
+	}
+
+	return {};
+};
+
+export const getPatientPremiumLibraryUsage = async (userId: string) => {
+	const subscription = await ensureSubscriptionRecord(userId);
+	if (!subscription) throw new AppError('Subscription data unavailable', 500);
+
+	const status = String(subscription.status || '').toLowerCase();
+	const isActiveLike = ['active', 'trial', 'trialing', 'grace'].includes(status);
+	const isPremiumPlan = isPremiumLibraryEligiblePlan(String(subscription.planName || ''));
+
+	const metadata = normalizeSubscriptionMetadata(subscription.metadata);
+	let totalSeconds = Math.max(0, Math.round(Number(metadata.premiumLibraryTotalSeconds || 0)));
+	let consumedSeconds = Math.max(0, Math.round(Number(metadata.premiumLibraryConsumedSeconds || 0)));
+
+	if (totalSeconds <= 0 && isActiveLike && isPremiumPlan) {
+		const addons = await getLatestPatientSubscriptionCheckoutAddons(userId);
+		const pack = resolvePremiumLibraryPack(addons.premiumLibraryPack ?? addons.anytimeBuddyPack);
+		const allocatedMinutes = PREMIUM_LIBRARY_PACK_MINUTES[pack];
+		totalSeconds = allocatedMinutes * 60;
+
+		if (totalSeconds > 0) {
+			const patchedMetadata = {
+				...metadata,
+				premiumLibraryPack: pack,
+				premiumLibraryTotalSeconds: totalSeconds,
+				premiumLibraryConsumedSeconds: 0,
+				premiumLibraryInitializedAt: new Date().toISOString(),
+			};
+
+			await db.patientSubscription.update({
+				where: { userId },
+				data: { metadata: patchedMetadata },
+			}).catch(() => null);
+			consumedSeconds = 0;
+		}
+	}
+
+	consumedSeconds = Math.min(consumedSeconds, totalSeconds);
+	const remainingSeconds = Math.max(0, totalSeconds - consumedSeconds);
+
+	return {
+		hasPremiumLibraryAccess: Boolean(isActiveLike && isPremiumPlan && totalSeconds > 0),
+		pack: String(metadata.premiumLibraryPack || 'none'),
+		totalSeconds,
+		consumedSeconds,
+		remainingSeconds,
+		totalMinutes: Math.floor(totalSeconds / 60),
+		consumedMinutes: Math.floor(consumedSeconds / 60),
+		remainingMinutes: Math.ceil(remainingSeconds / 60),
+	};
+};
+
+export const consumePatientPremiumLibraryUsage = async (
+	userId: string,
+	input: { secondsSpent: number; source?: string },
+) => {
+	const secondsSpent = Math.max(1, Math.min(4 * 60 * 60, Math.round(Number(input.secondsSpent || 0))));
+	if (!Number.isFinite(secondsSpent) || secondsSpent <= 0) {
+		throw new AppError('secondsSpent must be a positive number', 422);
+	}
+
+	const usage = await getPatientPremiumLibraryUsage(userId);
+	if (!usage.hasPremiumLibraryAccess) {
+		throw new AppError('Premium Library pack required', 403);
+	}
+
+	if (usage.remainingSeconds <= 0) {
+		throw new AppError('Premium Library time exhausted', 403);
+	}
+
+	const consumeNow = Math.min(secondsSpent, usage.remainingSeconds);
+	const nextConsumedSeconds = usage.consumedSeconds + consumeNow;
+	const nextRemainingSeconds = Math.max(0, usage.totalSeconds - nextConsumedSeconds);
+
+	const subscription = await ensureSubscriptionRecord(userId);
+	if (!subscription) throw new AppError('Subscription data unavailable', 500);
+
+	const metadata = normalizeSubscriptionMetadata(subscription.metadata);
+	await db.patientSubscription.update({
+		where: { userId },
+		data: {
+			metadata: {
+				...metadata,
+				premiumLibraryTotalSeconds: usage.totalSeconds,
+				premiumLibraryConsumedSeconds: nextConsumedSeconds,
+				premiumLibraryLastTrackedAt: new Date().toISOString(),
+				premiumLibraryLastSource: String(input.source || 'wellness-library').slice(0, 60),
+			},
+		},
+	});
+
+	return {
+		...usage,
+		consumedNowSeconds: consumeNow,
+		consumedSeconds: nextConsumedSeconds,
+		remainingSeconds: nextRemainingSeconds,
+		consumedMinutes: Math.floor(nextConsumedSeconds / 60),
+		remainingMinutes: Math.ceil(nextRemainingSeconds / 60),
+	};
+};
+
 export const listProviders = async (filters: ProviderFilters) => {
 	const { page, limit, skip } = normalizePagination(filters.page, filters.limit);
 	const requestedRole = normalizeProviderRole(filters.role);
@@ -1585,6 +1800,7 @@ export const initiateSessionBooking = async (
 		providerType?: string;
 		preferredTime?: boolean;
 		preferredWindow?: string;
+		sourceFunnel?: string;
 	},
 ) => {
 	await getPatientProfile(userId);
@@ -1644,6 +1860,7 @@ export const initiateSessionBooking = async (
 			durationMinute: duration,
 			amountMinor,
 			currency: 'INR',
+			sourceFunnel: String(input.sourceFunnel || '').trim() || null,
 			merchantTransactionId: payment.transactionId,
 			status: 'PENDING',
 		},
@@ -1731,6 +1948,7 @@ export const verifySessionPaymentAndCreateSession = async (
 				durationMinutes: intent.durationMinute,
 				sessionFeeMinor: intent.amountMinor,
 				paymentStatus: 'PAID',
+				sourceFunnel: String((intent as any).sourceFunnel || '').trim() || null,
 				status: 'CONFIRMED',
 			},
 		});
@@ -2180,9 +2398,8 @@ export const getSessionDocumentPayload = async (userId: string, sessionId: strin
 
 export const submitAssessment = async (userId: string, input: { type: string; score?: number; answers?: number[] }) => {
 	const patientProfile = await getPatientProfile(userId);
-	const computedScore = typeof input.score === 'number' ? Math.max(0, Math.floor(input.score)) : (input.answers || []).reduce((a, b) => a + Number(b || 0), 0);
-	const answers = Array.isArray(input.answers) && input.answers.length > 0 ? input.answers.map((v) => Number(v || 0)) : [computedScore];
-	const severity = mapSeverity(computedScore);
+	const { computedScore, answers, severity } = deriveAssessmentScoreAndSeverity(input.type, input.score, input.answers);
+	const normalizedType = String(input.type || '').toUpperCase();
 	const journey = buildJourneyRecommendation({ type: input.type, score: computedScore, answers });
 	const created = await db.patientAssessment.create({
 		data: {
@@ -2193,6 +2410,34 @@ export const submitAssessment = async (userId: string, input: { type: string; sc
 			severityLevel: severity,
 		},
 	});
+
+	if (normalizedType === 'PHQ-9') {
+		const scored = scorePHQ9(answers);
+		await db.pHQ9Assessment.create({
+			data: {
+				userId: patientProfile.userId,
+				answers,
+				totalScore: scored.total,
+				q9Score: scored.q9Score,
+				severity: scored.severity,
+				riskWeight: scored.riskWeight,
+				q9CrisisFlag: scored.q9CrisisFlag,
+			},
+		}).catch(() => null);
+	}
+
+	if (normalizedType === 'GAD-7') {
+		const scored = scoreGAD7(answers);
+		await db.gAD7Assessment.create({
+			data: {
+				userId: patientProfile.userId,
+				answers,
+				totalScore: scored.total,
+				severity: scored.severity,
+				riskWeight: scored.riskWeight,
+			},
+		}).catch(() => null);
+	}
 
 	await db.notification.create({
 		data: {
@@ -2298,6 +2543,120 @@ export const getLatestJourneyRecommendation = async (userId: string) => {
 			score,
 			answers,
 		}),
+	};
+};
+
+export const submitPresetAssessment = async (userId: string, input: PresetAssessmentSubmitRequest): Promise<PresetAssessmentSubmitResponse> => {
+	// Validate entry type
+	if (!isValidPresetEntryType(input.entryType)) {
+		const supportedTypes = Object.keys(PRESET_DEFAULTS).join(', ');
+		throw new AppError(`Invalid preset entry type: ${input.entryType}. Must be one of: ${supportedTypes}`, 422);
+	}
+
+	// Get preset defaults
+	const presetDefaults = getPresetDefaults(input.entryType);
+	if (!presetDefaults) {
+		throw new AppError(`Preset entry type not configured: ${input.entryType}`, 500);
+	}
+
+	// Validate responses
+	if (!Array.isArray(input.responses) || input.responses.length === 0) {
+		throw new AppError('Assessment responses are required and must be a non-empty array', 422);
+	}
+
+	// Determine assessment type
+	const assessmentType = input.overrides?.assessmentType || presetDefaults.assessmentType;
+	if (!assessmentType) {
+		throw new AppError('Could not determine assessment type for preset', 500);
+	}
+
+	// Submit through existing assessment flow with preset defaults
+	const submitInput = {
+		type: assessmentType,
+		score: undefined,
+		answers: input.responses,
+	};
+
+	const assessmentResult = await submitAssessment(userId, submitInput);
+
+	// Get the assessment that was just created
+	const patientProfile = await getPatientProfile(userId);
+	const recentAssessment = await db.patientAssessment.findFirst({
+		where: { patientId: patientProfile.id },
+		orderBy: { createdAt: 'desc' },
+		select: {
+			id: true,
+			type: true,
+			totalScore: true,
+			severityLevel: true,
+			createdAt: true,
+		},
+	});
+
+	if (!recentAssessment) {
+		throw new AppError('Failed to retrieve created assessment', 500);
+	}
+
+	// Track source metadata if provided
+	if (input.source) {
+		try {
+			const normalizedPrimaryConcerns = Array.isArray(input.source.primaryConcerns)
+				? input.source.primaryConcerns.map((item) => String(item || '').trim()).filter(Boolean).slice(0, 5)
+				: [];
+			const normalizedTimezoneRegion = String(input.source.timezoneRegion || '').trim().toUpperCase() || undefined;
+			const normalizedLanguagePreference = String(input.source.languagePreference || '').trim() || undefined;
+
+			const sourceMetadata = {
+				entryType: input.source.entryType || input.entryType,
+				landingPage: input.source.landingPage,
+				utmCampaign: input.source.utmCampaign,
+				utmMedium: input.source.utmMedium,
+				utmSource: input.source.utmSource,
+				experimentId: input.source.experimentId,
+				timezoneRegion: normalizedTimezoneRegion,
+				primaryConcerns: normalizedPrimaryConcerns,
+				languagePreference: normalizedLanguagePreference,
+			};
+
+			// Update assessment with source tracking if the schema supports it
+			try {
+				await db.patientAssessment.update({
+					where: { id: recentAssessment.id },
+					data: {
+						entryType: input.entryType,
+						sourceMetadata: JSON.stringify(sourceMetadata),
+						utmCampaign: input.source.utmCampaign || undefined,
+						utmMedium: input.source.utmMedium || undefined,
+						utmSource: input.source.utmSource || undefined,
+					},
+				}).catch(() => null); // Gracefully handle if field doesn't exist yet
+			} catch (e) {
+				// Log but don't fail if source tracking fails
+				console.log('[PresetAssessment] Source metadata update failed, continuing:', e);
+			}
+		} catch (e) {
+			console.log('[PresetAssessment] Failed to process source metadata:', e);
+		}
+	} else {
+		// Even if no source object, track the entry type
+		try {
+			await db.patientAssessment.update({
+				where: { id: recentAssessment.id },
+				data: { entryType: input.entryType },
+			}).catch(() => null);
+		} catch (e) {
+			console.log('[PresetAssessment] Failed to update entry type:', e);
+		}
+	}
+
+	return {
+		assessmentId: recentAssessment.id,
+		entryType: input.entryType,
+		score: recentAssessment.totalScore,
+		severity: recentAssessment.severityLevel,
+		type: recentAssessment.type,
+		createdAt: recentAssessment.createdAt,
+		journey: (assessmentResult as any)?.journey,
 	};
 };
 
@@ -2626,6 +2985,10 @@ export const getPatientProgressAnalytics = async (userId: string) => {
 };
 
 export const getPatientInsights = async (userId: string) => {
+	const cacheKey = `patient:v1:insights:${userId}`;
+	const cached = await readJsonCache<any>(cacheKey);
+	if (cached) return cached;
+
 	const analytics = await getPatientProgressAnalytics(userId);
 	const assessmentRows = Array.isArray(analytics.assessmentTrend) ? analytics.assessmentTrend : [];
 	const moodRows = Array.isArray(analytics.moodTrend) ? analytics.moodTrend : [];
@@ -2650,7 +3013,7 @@ export const getPatientInsights = async (userId: string) => {
 	if (anxietyReduction < 10 && gad7Rows.length >= 2) recommendations.push('Discuss anxiety coping strategies with your therapist in the next session.');
 	if (!recommendations.length) recommendations.push('Great momentum. Continue your current therapy plan and mood check-ins.');
 
-	return {
+	const payload = {
 		moodImprovement: Math.max(0, Math.min(100, Math.round((Number(moodRows[moodRows.length - 1]?.averageMood || 0) / 5) * 100))),
 		sessionAttendance: Number(analytics.summary.sessionCompletionRate || 0),
 		exerciseCompletion: Number(analytics.summary.exerciseCompletionRate || 0),
@@ -2659,12 +3022,19 @@ export const getPatientInsights = async (userId: string) => {
 		assessmentTrend: [...assessmentTrendMap.values()].sort((a, b) => a.date.localeCompare(b.date)),
 		recommendations,
 	};
+
+	await writeJsonCache(cacheKey, payload, PATIENT_V1_READ_CACHE_TTL.insights);
+	return payload;
 };
 
 export const getPatientReports = async (userId: string) => {
+	const cacheKey = `patient:v1:reports:${userId}`;
+	const cached = await readJsonCache<any>(cacheKey);
+	if (cached) return cached;
+
 	const patientProfile = await getPatientProfile(userId);
 
-	const [legacyAssessments, phqAssessments, gadAssessments, sessions] = await Promise.all([
+	const [legacyAssessments, phqAssessments, gadAssessments, sessions, sharedReports] = await Promise.all([
 		db.patientAssessment.findMany({
 			where: { patientId: patientProfile.id },
 			orderBy: { createdAt: 'desc' },
@@ -2693,6 +3063,15 @@ export const getPatientReports = async (userId: string) => {
 				therapistProfile: { select: { firstName: true, lastName: true, name: true, role: true } },
 			},
 		}).catch(() => []),
+		db.$queryRawUnsafe(
+			`SELECT r.id, r.title, r.status, r.shared_timestamp, r.updated_at, r.expires_at, u.firstName, u.lastName, u.name, u.role
+			 FROM psychologist_patient_reports r
+			 LEFT JOIN users u ON u.id = r.psychologist_id
+			 WHERE r.patient_id = $1 AND LOWER(r.status) = 'shared'
+			 ORDER BY r.updated_at DESC
+			 LIMIT 12`,
+			patientProfile.id,
+		).catch(() => []),
 	]);
 
 	const assessments = [
@@ -2736,9 +3115,25 @@ export const getPatientReports = async (userId: string) => {
 			providerRole: 'psychiatrist',
 		}));
 
-	return [...officialLetters, ...assessmentReports, ...sessionReports]
+	const sharedReportEntries = (sharedReports as any[]).map((report: any) => ({
+		id: `shared-report-${report.id}`,
+		type: 'shared_report',
+		bucket: 'patient_shared_reports',
+		title: String(report.title || 'Shared Clinical Report'),
+		createdAt: report.shared_timestamp || report.updated_at || new Date(),
+		summary: 'A report shared with you by your provider.',
+		providerName: String(report.name || `${report.firstName || ''} ${report.lastName || ''}`.trim() || 'Provider'),
+		providerRole: String(report.role || '').toLowerCase() || undefined,
+		sharedReportId: String(report.id),
+		status: String(report.status || '').toLowerCase(),
+	}));
+
+	const payload = [...officialLetters, ...sharedReportEntries, ...assessmentReports, ...sessionReports]
 		.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 		.slice(0, 24);
+
+	await writeJsonCache(cacheKey, payload, PATIENT_V1_READ_CACHE_TTL.reports);
+	return payload;
 };
 
 type RecordAccessPayload = {

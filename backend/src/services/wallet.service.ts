@@ -31,6 +31,8 @@ const isAllowedCreditSource = (source: string): boolean => {
   const normalized = String(source || '').toLowerCase();
   if (normalized.startsWith('game')) return true;
   if (normalized.startsWith('subscription')) return true;
+  if (normalized === 'admin_adjustment') return true;
+  if (normalized === 'refund') return true;
   return false;
 };
 

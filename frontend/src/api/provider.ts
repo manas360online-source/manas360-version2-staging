@@ -686,6 +686,28 @@ export const fetchProviderCareTeam = async (): Promise<CareTeamAssignment[]> => 
   return unwrap<CareTeamAssignment[]>(response.data);
 };
 
+export interface PatientCareTeamMember {
+  assignmentId: string;
+  providerId: string;
+  providerName: string;
+  providerEmail: string | null;
+  providerRole: string;
+  providerType: string | null;
+  assignedAt: string;
+  accessScope: Record<string, boolean>;
+  sessionCount: number;
+  lastSessionDate: string | null;
+  lastSessionStatus: string | null;
+  lastTreatmentPlan: string | null;
+  lastAssessmentSummary: string | null;
+  lastClinicalUpdateAt: string | null;
+}
+
+export const fetchPatientCareTeam = async (patientId: string): Promise<PatientCareTeamMember[]> => {
+  const response = await http.get<Envelope<PatientCareTeamMember[]>>(`/v1/provider/patient/${patientId}/care-team`);
+  return unwrap<PatientCareTeamMember[]>(response.data);
+};
+
 export const assignPatientToCareTeam = async (
   patientId: string,
   accessScope?: Record<string, boolean>,

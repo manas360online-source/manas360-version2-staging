@@ -77,7 +77,11 @@ describe('Phase 5 - E2E Validation: Payment Webhook Transitions', () => {
                         expect(providerSubscriptionService.activateProviderSubscription).toHaveBeenCalledWith(
                                 providerId,
                                 'STARTER',
-                                mockTxId
+                                                mockTxId,
+                                                expect.objectContaining({
+                                                        planVersion: expect.any(Number),
+                                                        priceLocked: true,
+                                                })
                         );
 
                         // Database state check
@@ -113,7 +117,7 @@ describe('Phase 5 - E2E Validation: Payment Webhook Transitions', () => {
 
                         await expect(processPhonePeWebhook(webhookPayload))
                                 .rejects
-                                .toThrow('Provider payment not verified or not completed');
+                                                .toThrow('Payment failed');
                         
                         expect(providerSubscriptionService.activateProviderSubscription).not.toHaveBeenCalled();
                 });

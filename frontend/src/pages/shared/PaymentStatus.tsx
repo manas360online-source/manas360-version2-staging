@@ -107,6 +107,23 @@ export default function PaymentStatusPage() {
 		const timer = window.setTimeout(() => {
 			void checkAuth({ force: true }).finally(async () => {
 				if (!isProviderTransaction) {
+					// Finalize pending smart-match request, if this transaction belongs to that flow.
+					if (transactionId && transactionId.startsWith('SMREQ_')) {
+						const pendingKey = `manas360.smartmatch.pending.${transactionId}`;
+						const pendingRaw = localStorage.getItem(pendingKey);
+						if (pendingRaw) {
+							try {
+								const pendingPayload = JSON.parse(pendingRaw);
+								await axios.post('/api/v1/patient/appointments/smart-match', pendingPayload, { withCredentials: true });
+								localStorage.removeItem(pendingKey);
+								navigate('/patient/sessions', { replace: true });
+								return;
+							} catch (err) {
+								console.warn('Failed to finalize smart-match appointment request after payment', err);
+							}
+						}
+					}
+
 					let redirectUrl = '';
 					try {
 						if (transactionId) {
@@ -154,7 +171,7 @@ export default function PaymentStatusPage() {
 						</div>
 						<h1 className="mt-6 text-center text-2xl font-bold text-slate-900">Payment Successful!</h1>
 						<p className="mt-2 text-center text-sm text-slate-500">
-							Your subscription has been activated. You now have full access to your plan features.
+							Payment received successfully. We are now confirming your booking.
 						</p>
 						{transactionId && (
 							<p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-center text-xs font-mono text-slate-500">

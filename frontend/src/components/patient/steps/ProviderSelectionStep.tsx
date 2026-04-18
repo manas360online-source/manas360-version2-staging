@@ -33,6 +33,9 @@ interface ProviderSelectionStepProps {
     timeSlots: Array<{ startMinute: number; endMinute: number }>;
   };
   providerType?: string;
+  presetEntryType?: string;
+  sourceFunnel?: string;
+  timezoneRegion?: string;
   onSuccess: (providers: ProviderMatch[]) => void;
   onBack: () => void;
   onCancel: () => void;
@@ -59,6 +62,13 @@ const getProviderTypeLabel = (type: string): string => {
 
 const formatPrice = (minor: number): string => {
   return `₹${(minor / 100).toFixed(0)}`;
+};
+
+const getNriFixedFeeMinor = (entryType?: string): number | null => {
+  if (entryType === 'nri_psychologist') return 2999 * 100;
+  if (entryType === 'nri_psychiatrist') return 3499 * 100;
+  if (entryType === 'nri_therapist') return 3599 * 100;
+  return null;
 };
 
 const barWidth = (value: number, max: number): string => {
@@ -116,11 +126,15 @@ const getEstimatedMatchChance = (provider: ProviderMatch): number => {
 export default function ProviderSelectionStep({
   availabilityPrefs,
   providerType,
+  presetEntryType,
+  sourceFunnel,
+  timezoneRegion,
   onSuccess,
   onBack,
   onCancel,
   onBrowseDirectory,
 }: ProviderSelectionStepProps) {
+  const nriFixedFeeMinor = getNriFixedFeeMinor(presetEntryType);
   const [providers, setProviders] = useState<ProviderMatch[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -150,6 +164,9 @@ export default function ProviderSelectionStep({
             languages: preferredLanguage ? [preferredLanguage] : [],
             modes: preferredMode ? [preferredMode] : [],
             context: matchContext,
+            presetEntryType,
+            sourceFunnel,
+            timezoneRegion,
           },
         );
         const nextProviders = Array.isArray(result?.providers) ? result.providers : [];
@@ -163,7 +180,7 @@ export default function ProviderSelectionStep({
     };
 
     fetchProviders();
-  }, [availabilityPrefs, providerType, concernsInput, preferredLanguage, preferredMode, matchContext]);
+  }, [availabilityPrefs, providerType, concernsInput, preferredLanguage, preferredMode, matchContext, presetEntryType, sourceFunnel, timezoneRegion]);
 
   const toggleProvider = (providerId: string) => {
     setSelectedIds((prev) => {
@@ -376,9 +393,10 @@ export default function ProviderSelectionStep({
                       </div>
                     </div>
                   )}
-                  {provider.consultationFee && (
+                  {(nriFixedFeeMinor || provider.consultationFee) && (
                     <p className="text-sm font-semibold text-teal-600 mt-2">
-                      {formatPrice(provider.consultationFee)}
+                      {formatPrice(nriFixedFeeMinor || Number(provider.consultationFee || 0))}
+                      {nriFixedFeeMinor ? ' • NRI fixed session rate' : ''}
                     </p>
                   )}
                 </div>

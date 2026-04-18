@@ -1,29 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { theme } from '../theme/theme';
+import {
+  CLINICAL_ASSESSMENT_OPTIONS,
+  CLINICAL_QUESTION_BANK,
+  severityFromClinicalScore,
+} from '../utils/clinicalAssessments';
 
 interface AssessmentProps {
   onSubmit: (data: any, isCritical: boolean) => void;
 }
 
-const PHQ9_QUESTIONS: string[] = [
-  'Little interest or pleasure in doing things',
-  'Feeling down, depressed, or hopeless',
-  'Trouble falling or staying asleep, or sleeping too much',
-  'Feeling tired or having little energy',
-  'Poor appetite or overeating',
-  'Feeling bad about yourself - or that you are a failure',
-  'Trouble concentrating on things, such as reading or watching television',
-  'Moving or speaking so slowly that other people could have noticed, or the opposite',
-  'Thoughts that you would be better off dead, or of hurting yourself in some way',
-];
-
-const PHQ9_OPTIONS: Array<{ label: string; value: number }> = [
-  { label: 'Not at all', value: 0 },
-  { label: 'Several days', value: 1 },
-  { label: 'More than half the days', value: 2 },
-  { label: 'Nearly every day', value: 3 },
-];
+const PHQ9_QUESTIONS: string[] = CLINICAL_QUESTION_BANK['PHQ-9'];
+const PHQ9_OPTIONS = CLINICAL_ASSESSMENT_OPTIONS.map((option) => ({ label: option.label, value: option.points }));
 
 export const Assessment: React.FC<AssessmentProps> = ({ onSubmit }) => {
   const navigate = useNavigate();
@@ -93,7 +82,7 @@ export const Assessment: React.FC<AssessmentProps> = ({ onSubmit }) => {
     setError('');
     try {
       const totalScore = answersPayload.reduce((sum, item) => sum + Number(item.optionIndex || 0), 0);
-      const severityLevel = totalScore >= 20 ? 'severe' : totalScore >= 15 ? 'moderately-severe' : totalScore >= 10 ? 'moderate' : totalScore >= 5 ? 'mild' : 'minimal';
+      const severityLevel = severityFromClinicalScore('PHQ-9', totalScore);
       const result = {
         attemptId: `PHQ-9-${Date.now()}`,
         templateKey: 'PHQ-9',

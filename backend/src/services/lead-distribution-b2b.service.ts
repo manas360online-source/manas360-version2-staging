@@ -21,6 +21,7 @@ import {
   LEAD_DISTRIBUTION_CONFIG,
   LEAD_ASSIGNMENT_STATUS,
 } from '../config/plans';
+import { invalidateProviderDashboardCache } from './provider-dashboard-cache.service';
 import { calculateLeadQualityScore } from '../utils/lead-quality-score';
 
 type SubscriptionTier = 'STARTER' | 'GROWTH' | 'SCALE';
@@ -249,6 +250,8 @@ const assignLeadToTherapists = async (
           totalLeadsReceived: (therapist.subscription.totalLeadsReceived || 0) + 1,
         },
       });
+
+      await invalidateProviderDashboardCache(String(therapist.id));
 
       console.log(
         `[B2B-LED] ✓ Assigned to ${therapist.id} (${tier}) - Quota: ${newLeads}/${therapist.subscription.leadsPerWeek}`

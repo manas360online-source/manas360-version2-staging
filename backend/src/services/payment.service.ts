@@ -35,6 +35,16 @@ const db = prisma as any;
 
 const asMinor = (value: number): number => Math.max(0, Math.round(value));
 
+const isPlaceholderSecret = (value: string): boolean => {
+	const normalized = String(value || '').trim().toLowerCase();
+	if (!normalized) return true;
+	return normalized.startsWith('change-')
+		|| normalized.includes('replace-me')
+		|| normalized.includes('your-')
+		|| normalized === 'dummy'
+		|| normalized === 'test';
+};
+
 const sha256 = (input: string): string => crypto.createHash('sha256').update(input).digest('hex');
 
 const DEFAULT_COMMISSION = {
@@ -123,8 +133,8 @@ export const createSessionPayment = async (input: CreateFinancialSessionInput) =
 	}
 
 	const transactionId = `SESS_${Date.now()}_${idempotencyKey.slice(0, 8)}`;
-	const hasPhonePeOAuth = Boolean(String(process.env.PHONEPE_CLIENT_ID || '').trim())
-		&& Boolean(String(process.env.PHONEPE_CLIENT_SECRET || '').trim());
+	const hasPhonePeOAuth = !isPlaceholderSecret(String(process.env.PHONEPE_CLIENT_ID || ''))
+		&& !isPlaceholderSecret(String(process.env.PHONEPE_CLIENT_SECRET || ''));
 	const shouldBypass = env.allowDevPaymentBypass && env.nodeEnv === 'development' && !hasPhonePeOAuth;
 	const frontendBaseUrl = env.frontendUrl;
 	const paymentStatusBase = `${frontendBaseUrl}/#/payment/status`;
@@ -655,6 +665,72 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 				pendingComponentsActivated: pendingActivation.totalActivated,
 			});
 			return { handled: true, message: 'PhonePe provider subscription payment processed (with atomic pending activation)' };
+		}
+
+		// ================================================================
+		// CERT_ — Certification Enrollment Payment
+		// ================================================================
+		if (merchantTransactionId.startsWith('CERT_')) {
+			const verify = await checkPhonePeStatus(merchantTransactionId);
+			const verifyCode = String(verify?.code || '').toUpperCase();
+			const verifyState = String(verify?.data?.state || '').toUpperCase();
+			const isVerifiedByStatus = Boolean(verify) && (
+				verifyCode === 'PAYMENT_SUCCESS' || verifyState === 'COMPLETED'
+			);
+
+			if (!isVerifiedByStatus) {
+				logger.warn('[PaymentService] Certification payment not verified', { merchantTransactionId, verifyCode, verifyState });
+				throw new AppError('Certification payment verification failed', 400);
+			}
+
+			// Extract certSlug and userId from metadata
+			const certSlug = String(data?.metadata?.certSlug || '');
+			const userId = String(data?.metadata?.userId || data?.metaInfo?.udf1 || '');
+
+			if (!userId) {
+				throw new AppError('Unable to resolve userId from certification payment', 422);
+			}
+
+			// Provision or update TherapistProfile
+			const existingProfile = await db.therapistProfile.findUnique({ where: { userId } });
+			const mergedCertifications = Array.from(new Set([
+				...((existingProfile?.certifications as string[] | undefined) || []),
+				...(certSlug ? [certSlug] : []),
+			]));
+
+			if (existingProfile) {
+				// Update existing profile with certification info
+				await db.therapistProfile.update({
+					where: { userId },
+					data: {
+						certificationStatus: 'ENROLLED',
+						certificationPaymentId: merchantTransactionId,
+						leadBoostScore: 30,
+						certifications: mergedCertifications,
+					},
+				});
+				logger.info('[PaymentService] Updated existing TherapistProfile with certification', { userId, certSlug });
+			} else {
+				// Fetch user info for display name
+				const user = await db.user.findUnique({ where: { id: userId }, select: { name: true } });
+
+				await db.therapistProfile.create({
+					data: {
+						userId,
+						displayName: user?.name || 'Provider',
+						certificationStatus: 'ENROLLED',
+						certificationPaymentId: merchantTransactionId,
+						leadBoostScore: 30,
+						certifications: certSlug ? [certSlug] : [],
+						onboardingCompleted: false,
+						isVerified: false,
+					},
+				});
+				logger.info('[PaymentService] Created new TherapistProfile for certification', { userId, certSlug });
+			}
+
+			logger.info('[PaymentService] Certification payment processed', { merchantTransactionId, userId, certSlug });
+			return { handled: true, message: 'Certification enrollment payment processed' };
 		}
 	}
 

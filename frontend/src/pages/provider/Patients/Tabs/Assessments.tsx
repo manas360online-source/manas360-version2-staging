@@ -6,6 +6,7 @@ import { useMutation } from '@tanstack/react-query';
 import { type AssessmentData } from '../../../../api/provider';
 import { assignPatientItem } from '../../../../api/provider';
 import { usePatientAssessments } from '../../../../hooks/usePatientAssessments';
+import { CLINICAL_ASSESSMENT_TEMPLATE_KEYS } from '../../../../utils/clinicalAssessments';
 
 const formatAssessmentDate = (value: string): string => {
   return new Intl.DateTimeFormat('en-US', {
@@ -71,17 +72,19 @@ export default function Assessments() {
   const { patientId } = useParams();
   const { data: assessments = [], isLoading } = usePatientAssessments(patientId);
   const assignAssessmentMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (payload: { title: string; templateId?: string; estimatedMinutes?: number }) => {
       if (!patientId) throw new Error('Patient id is required');
       return assignPatientItem(patientId, {
         assignmentType: 'ASSESSMENT',
-        title: 'Assigned Clinical Assessment',
+        title: payload.title,
+        templateId: payload.templateId,
+        referenceId: 'before-next-session',
         frequency: 'ONE_TIME',
-        estimatedMinutes: 10,
+        estimatedMinutes: payload.estimatedMinutes ?? 10,
       });
     },
-    onSuccess: () => {
-      toast.success('Assessment assigned to patient');
+    onSuccess: (_response, variables) => {
+      toast.success(`${variables.title} assigned to patient`);
     },
     onError: (error: any) => {
       toast.error(String(error?.response?.data?.message || error?.message || 'Failed to assign assessment'));
@@ -115,6 +118,28 @@ export default function Assessments() {
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
   }, [assessments, selectedAssessment]);
 
+  const assignBeforeNextSession = async (type: 'PHQ-9' | 'GAD-7' | 'BOTH') => {
+    if (type === 'BOTH') {
+      await assignAssessmentMutation.mutateAsync({
+        title: 'PHQ-9 Assessment',
+        templateId: CLINICAL_ASSESSMENT_TEMPLATE_KEYS['PHQ-9'],
+        estimatedMinutes: 5,
+      });
+      await assignAssessmentMutation.mutateAsync({
+        title: 'GAD-7 Assessment',
+        templateId: CLINICAL_ASSESSMENT_TEMPLATE_KEYS['GAD-7'],
+        estimatedMinutes: 4,
+      });
+      return;
+    }
+
+    await assignAssessmentMutation.mutateAsync({
+      title: type === 'PHQ-9' ? 'PHQ-9 Assessment' : 'GAD-7 Assessment',
+      templateId: type === 'PHQ-9' ? CLINICAL_ASSESSMENT_TEMPLATE_KEYS['PHQ-9'] : CLINICAL_ASSESSMENT_TEMPLATE_KEYS['GAD-7'],
+      estimatedMinutes: type === 'PHQ-9' ? 5 : 4,
+    });
+  };
+
   return (
     <div className="space-y-4" style={{ fontFamily: 'DM Sans, sans-serif' }}>
       <header className="flex flex-col gap-3 rounded-xl border border-[#E5E5E5] bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
@@ -122,17 +147,35 @@ export default function Assessments() {
           <h2 className="font-display text-2xl font-semibold text-[#2D4128]">Clinical Assessments</h2>
           <p className="mt-1 text-sm text-slate-500">Review score trends and question-level responses for patient ID {patientId || '123'}.</p>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            void assignAssessmentMutation.mutateAsync();
-          }}
-          disabled={assignAssessmentMutation.isPending}
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#4A6741] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#2D4128]"
-        >
-          <Send className="h-4 w-4" />
-          {assignAssessmentMutation.isPending ? 'Assigning...' : 'Assign New Assessment'}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => void assignBeforeNextSession('PHQ-9')}
+            disabled={assignAssessmentMutation.isPending}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#4A6741] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#2D4128]"
+          >
+            <Send className="h-4 w-4" />
+            PHQ-9 Before Next Session
+          </button>
+          <button
+            type="button"
+            onClick={() => void assignBeforeNextSession('GAD-7')}
+            disabled={assignAssessmentMutation.isPending}
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#E5E5E5] bg-white px-4 py-2.5 text-sm font-semibold text-[#2D4128] transition hover:bg-[#FAFAF8]"
+          >
+            <Send className="h-4 w-4" />
+            GAD-7 Before Next Session
+          </button>
+          <button
+            type="button"
+            onClick={() => void assignBeforeNextSession('BOTH')}
+            disabled={assignAssessmentMutation.isPending}
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#E5E5E5] bg-white px-4 py-2.5 text-sm font-semibold text-[#2D4128] transition hover:bg-[#FAFAF8]"
+          >
+            <Send className="h-4 w-4" />
+            Both Before Next Session
+          </button>
+        </div>
       </header>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">

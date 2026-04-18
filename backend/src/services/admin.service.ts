@@ -7,8 +7,67 @@ import type { PaginationMeta } from '../utils/pagination';
 import { hashPassword } from '../utils/hash';
 import { sendPlatformAdminInviteEmail } from './email.service';
 import { env } from '../config/env';
+import { redis } from '../config/redis';
 
 const db = prisma as any;
+const ADMIN_CACHE_VERSION_TTL_SECONDS = 60 * 60 * 24 * 30;
+const ADMIN_CACHE_TTL = {
+	user: 30,
+	users: 60,
+	subscriptions: 60,
+	metrics: 30,
+	liveSessions: 15,
+	feedback: 45,
+	roles: 600,
+	roleInventory: 300,
+	effectivePolicies: 60,
+	search: 15,
+	userApprovals: 45,
+} as const;
+
+const ADMIN_CACHE_VERSION_KEY = 'admin:cache:version:global';
+
+const getAdminCacheVersion = async (): Promise<number> => {
+	try {
+		const raw = await redis.get(ADMIN_CACHE_VERSION_KEY);
+		const parsed = Number(raw);
+		return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+	} catch {
+		return 1;
+	}
+};
+
+const adminCacheKey = async (scope: string, payload: unknown = ''): Promise<string> => {
+	const version = await getAdminCacheVersion();
+	return `admin:v${version}:${scope}:${JSON.stringify(payload)}`;
+};
+
+const readJsonCache = async <T>(key: string): Promise<T | null> => {
+	try {
+		const cached = await redis.get(key);
+		if (!cached) return null;
+		return JSON.parse(cached) as T;
+	} catch {
+		return null;
+	}
+};
+
+const writeJsonCache = async (key: string, payload: unknown, ttl: number): Promise<void> => {
+	try {
+		await redis.set(key, JSON.stringify(payload), ttl);
+	} catch {
+		// Best-effort cache write.
+	}
+};
+
+const invalidateAdminCache = async (): Promise<void> => {
+	try {
+		const version = await getAdminCacheVersion();
+		await redis.set(ADMIN_CACHE_VERSION_KEY, String(version + 1), ADMIN_CACHE_VERSION_TTL_SECONDS);
+	} catch {
+		// Best-effort invalidation.
+	}
+};
 
 type PlatformAdminRole = 'admin' | 'superadmin' | 'clinicaldirector' | 'financemanager' | 'complianceofficer';
 
@@ -204,6 +263,10 @@ export const listUsers = async (
 		sortOrder?: 'asc' | 'desc';
 	} = {},
 ): Promise<AdminListUsersResponse> => {
+	const cacheKey = await adminCacheKey('users', { page, limit, role, status, sortBy, sortOrder });
+	const cached = await readJsonCache<AdminListUsersResponse>(cacheKey);
+	if (cached) return cached;
+
 	if (status && !['active', 'deleted'].includes(status.toLowerCase())) {
 		throw new AppError('Invalid status filter', 400);
 	}
@@ -251,7 +314,7 @@ export const listUsers = async (
 		db.user.count({ where: roleFilter ? { role: roleFilter } : undefined }),
 	]);
 
-	return {
+	const payload = {
 		data: users.map((user: any) => ({
 			id: user.id,
 			email: user.email,
@@ -267,6 +330,9 @@ export const listUsers = async (
 		})),
 		meta: buildPaginationMeta(totalItems, normalized),
 	};
+
+	await writeJsonCache(cacheKey, payload, ADMIN_CACHE_TTL.users);
+	return payload;
 };
 
 /**
@@ -287,6 +353,10 @@ export const getUserById = async (userId: string): Promise<{
 	createdAt: Date;
 	updatedAt: Date;
 }> => {
+	const cacheKey = await adminCacheKey('user', { userId });
+	const cached = await readJsonCache<any>(cacheKey);
+	if (cached) return cached;
+
 	const user = await db.user.findUnique({
 		where: { id: userId },
 		select: {
@@ -307,13 +377,16 @@ export const getUserById = async (userId: string): Promise<{
 		throw new AppError('User not found', 404);
 	}
 
-	return {
+	const payload = {
 		...user,
 		isTherapistVerified: Boolean(user.isTherapistVerified),
 		therapistVerifiedAt: user.therapistVerifiedAt ?? null,
 		therapistVerifiedByUserId: user.therapistVerifiedByUserId ?? null,
 		role: String(user.role).toLowerCase(),
 	} as any;
+
+	await writeJsonCache(cacheKey, payload, ADMIN_CACHE_TTL.user);
+	return payload;
 };
 
 /**
@@ -385,6 +458,8 @@ export const verifyTherapist = async (
 		},
 	});
 
+		await invalidateAdminCache();
+
 	return {
 		_id: updated.id,
 		displayName: `${updated.firstName ?? ''} ${updated.lastName ?? ''}`.trim() || 'Therapist',
@@ -410,7 +485,7 @@ export const verifyProvider = async (
 		throw new AppError('Admin user not found', 404);
 	}
 
-	return db.$transaction(async (tx: any) => {
+	const result = await db.$transaction(async (tx: any) => {
 		const providerUser = await tx.user.findUnique({
 			where: { id: providerUserId },
 			select: { id: true, role: true },
@@ -473,6 +548,9 @@ export const verifyProvider = async (
 			updatedAt: updatedProfile.updatedAt,
 		};
 	});
+
+	await invalidateAdminCache();
+	return result;
 };
 
 /**
@@ -498,7 +576,7 @@ export const approveProvider = async (
 		throw new AppError('Admin user not found', 404);
 	}
 
-	return db.$transaction(async (tx: any) => {
+	const result = await db.$transaction(async (tx: any) => {
 		const providerUser = await tx.user.findUnique({
 			where: { id: providerUserId },
 			select: { id: true, role: true, onboardingStatus: true },
@@ -567,6 +645,9 @@ export const approveProvider = async (
 			updatedAt: updatedProfile.updatedAt,
 		};
 	});
+
+	await invalidateAdminCache();
+	return result;
 };
 
 /**
@@ -580,6 +661,10 @@ export const getMetrics = async (): Promise<{
 	totalRevenue: number;
 	activeSubscriptions: number;
 }> => {
+	const cacheKey = await adminCacheKey('metrics');
+	const cached = await readJsonCache<any>(cacheKey);
+	if (cached) return cached;
+
 	const [
 		totalUsersResult,
 		totalTherapistsResult,
@@ -598,7 +683,7 @@ export const getMetrics = async (): Promise<{
 
 	const grossMinor = BigInt(revenueAgg?._sum?.grossAmountMinor ?? 0);
 	const totalRevenue = Number(grossMinor) / 100;
-	return {
+	const payload = {
 		totalUsers: totalUsersResult,
 		totalTherapists: totalTherapistsResult,
 		verifiedTherapists: verifiedTherapistsResult,
@@ -606,6 +691,9 @@ export const getMetrics = async (): Promise<{
 		totalRevenue: Math.round(totalRevenue * 100) / 100, // Round to 2 decimal places
 		activeSubscriptions: activeSubscriptionsResult,
 	};
+
+	await writeJsonCache(cacheKey, payload, ADMIN_CACHE_TTL.metrics);
+	return payload;
 };
 
 /**
@@ -655,6 +743,10 @@ export const listSubscriptions = async (
 		status?: string;
 	} = {},
 ): Promise<AdminListSubscriptionsResponse> => {
+	const cacheKey = await adminCacheKey('subscriptions', { page, limit, planType, status });
+	const cached = await readJsonCache<AdminListSubscriptionsResponse>(cacheKey);
+	if (cached) return cached;
+
 	const mappedPlan = mapPlanTypeToEnum(planType);
 	const mappedStatus = mapSubscriptionStatusToEnum(status) ?? 'ACTIVE';
 
@@ -719,16 +811,23 @@ export const listSubscriptions = async (
 		};
 	});
 
-	return {
+	const payload = {
 		data,
 		meta: buildPaginationMeta(totalItems, normalized),
 	};
+
+	await writeJsonCache(cacheKey, payload, ADMIN_CACHE_TTL.subscriptions);
+	return payload;
 };
 
 /**
  * Get all users pending onboarding approval
  */
 export const getUserApprovals = async (): Promise<any[]> => {
+	const cacheKey = await adminCacheKey('user-approvals');
+	const cached = await readJsonCache<any[]>(cacheKey);
+	if (cached) return cached;
+
 	const users = await db.user.findMany({
 		where: {
 			onboardingStatus: 'PENDING',
@@ -756,7 +855,7 @@ export const getUserApprovals = async (): Promise<any[]> => {
 		where: { userId: { in: userIds } }
 	});
 
-	return users.map((u: any) => {
+	const payload = users.map((u: any) => {
 		const userDocs = docs.filter(d => d.userId === u.id);
 		const documentUrl = userDocs.length > 0 ? userDocs[0].url : null;
 		
@@ -771,6 +870,9 @@ export const getUserApprovals = async (): Promise<any[]> => {
 			documentUrl: documentUrl,
 		};
 	});
+
+	await writeJsonCache(cacheKey, payload, ADMIN_CACHE_TTL.userApprovals);
+	return payload;
 };
 
 /**
@@ -790,6 +892,8 @@ export const updateUserApprovalStatus = async (
 			...(action === 'approve' ? { isTherapistVerified: true, therapistVerifiedAt: new Date() } : {}),
 		},
 	});
+
+	await invalidateAdminCache();
 	
 	// Implementation note: In a real system, we would also send an email/notification here
 	// and potentially log the rejection reason.
@@ -799,6 +903,10 @@ export const updateUserApprovalStatus = async (
  * List currently active sessions (Live Monitor)
  */
 export const listLiveSessions = async (): Promise<any[]> => {
+	const cacheKey = await adminCacheKey('live-sessions');
+	const cached = await readJsonCache<any[]>(cacheKey);
+	if (cached) return cached;
+
 	// Find session IDs with at least one ONLINE participant
 	const activePresences = await prisma.sessionPresence.findMany({
 		where: { status: 'ONLINE' },
@@ -829,13 +937,16 @@ export const listLiveSessions = async (): Promise<any[]> => {
 		},
 	});
 
-	return sessions.map((s: any) => ({
+	const payload = sessions.map((s: any) => ({
 		id: s.id,
 		therapistName: `${s.therapistProfile?.firstName ?? ''} ${s.therapistProfile?.lastName ?? ''}`.trim() || 'Therapist',
 		patientName: `${s.patientProfile?.user?.firstName ?? ''} ${s.patientProfile?.user?.lastName ?? ''}`.trim() || 'Patient',
 		startTime: s.dateTime.toISOString(),
 		status: 'in-progress', // Since they have active presence
 	}));
+
+	await writeJsonCache(cacheKey, payload, ADMIN_CACHE_TTL.liveSessions);
+	return payload;
 };
 
 /**
@@ -843,6 +954,10 @@ export const listLiveSessions = async (): Promise<any[]> => {
  */
 export const getFeedback = async (): Promise<any[]> => {
 	try {
+		const cacheKey = await adminCacheKey('feedback');
+		const cached = await readJsonCache<any[]>(cacheKey);
+		if (cached) return cached;
+
 		if (!db.userFeedback) return [];
 
 		const feedback = await db.userFeedback.findMany({
@@ -859,7 +974,7 @@ export const getFeedback = async (): Promise<any[]> => {
 
 		if (!feedback) return [];
 
-		return feedback.map((f: any) => ({
+		const payload = feedback.map((f: any) => ({
 			id: f.id,
 			userName: `${f.user?.firstName ?? ''} ${f.user?.lastName ?? ''}`.trim() || 'Anonymous',
 			rating: f.rating,
@@ -868,6 +983,9 @@ export const getFeedback = async (): Promise<any[]> => {
 			createdAt: f.createdAt.toISOString(),
 			resolved: f.resolved,
 		}));
+
+		await writeJsonCache(cacheKey, payload, ADMIN_CACHE_TTL.feedback);
+		return payload;
 	} catch (err: any) {
 		// UserFeedback model may not exist yet or table is missing – return empty list
 		return [];
@@ -887,6 +1005,8 @@ export const resolveFeedback = async (feedbackId: string): Promise<void> => {
 		where: { id: feedbackId },
 		data: { resolved: true },
 	});
+
+	await invalidateAdminCache();
 };
 
 /**
@@ -907,6 +1027,8 @@ export const updateUserStatus = async (userId: string, status: string, _reason?:
 		where: { id: userId },
 		data: { status: normalizedStatus as any },
 	});
+
+	await invalidateAdminCache();
 };
 
 export const updateUsersBulkStatus = async (
@@ -983,6 +1105,8 @@ export const updateUsersBulkStatus = async (
 		// keep bulk operation successful even if audit write fails
 	}
 
+	await invalidateAdminCache();
+
 	return {
 		requestedCount: dedupedUserIds.length,
 		successCount,
@@ -997,11 +1121,18 @@ export const updateUsersBulkStatus = async (
  * Get all roles and permissions
  */
 export const getRoles = async (): Promise<any[]> => {
+	const cacheKey = await adminCacheKey('roles');
+	const cached = await readJsonCache<any[]>(cacheKey);
+	if (cached) return cached;
+
 	await seedPlatformRoleRecords();
 	try {
-	return await db.role.findMany({
+		const payload = await db.role.findMany({
 		orderBy: { name: 'asc' },
 	});
+
+		await writeJsonCache(cacheKey, payload, ADMIN_CACHE_TTL.roles);
+		return payload;
 	} catch {
 		return PLATFORM_ADMIN_ROLES.map((role) => ({
 			id: role,
@@ -1023,10 +1154,16 @@ export const updateRolePermissions = async (roleName: string, permissions: strin
 		where: { name: roleName },
 		data: { permissions },
 	});
+
+	await invalidateAdminCache();
 	return role;
 };
 
 export const getPlatformAdminRoleInventory = async (): Promise<PlatformAdminRoleInventoryItem[]> => {
+	const cacheKey = await adminCacheKey('role-inventory');
+	const cached = await readJsonCache<PlatformAdminRoleInventoryItem[]>(cacheKey);
+	if (cached) return cached;
+
 	await seedPlatformRoleRecords();
 	const items: PlatformAdminRoleInventoryItem[] = [];
 
@@ -1055,6 +1192,7 @@ export const getPlatformAdminRoleInventory = async (): Promise<PlatformAdminRole
 		});
 	}
 
+	await writeJsonCache(cacheKey, items, ADMIN_CACHE_TTL.roleInventory);
 	return items;
 };
 
@@ -1082,6 +1220,10 @@ export const getEffectiveAdminPolicies = async (userId: string): Promise<{
 	allowedPolicies: string[];
 	deniedPolicies: string[];
 }> => {
+	const cacheKey = await adminCacheKey('effective-policies', { userId });
+	const cached = await readJsonCache<any>(cacheKey);
+	if (cached) return cached;
+
 	const user = await db.user.findUnique({
 		where: { id: userId },
 		select: { id: true, role: true, isDeleted: true },
@@ -1106,7 +1248,7 @@ export const getEffectiveAdminPolicies = async (userId: string): Promise<{
 		.filter((policyKey) => !allowedPolicies.includes(policyKey))
 		.sort((a, b) => a.localeCompare(b));
 
-	return {
+	const payload = {
 		userId,
 		role,
 		permissions: [...permissions].sort((a, b) => a.localeCompare(b)),
@@ -1114,6 +1256,9 @@ export const getEffectiveAdminPolicies = async (userId: string): Promise<{
 		allowedPolicies,
 		deniedPolicies,
 	};
+
+	await writeJsonCache(cacheKey, payload, ADMIN_CACHE_TTL.effectivePolicies);
+	return payload;
 };
 
 export const createPlatformAdminAccount = async (
@@ -1204,6 +1349,8 @@ export const createPlatformAdminAccount = async (
 		temporaryPassword,
 	});
 
+	await invalidateAdminCache();
+
 	return {
 		user: {
 			id: user.id,
@@ -1225,9 +1372,15 @@ export const searchAdminEntities = async (
 	payments: Array<{ id: string; status: string; amountMinor: number; currency: string }>;
 	sessions: Array<{ id: string; status: string; scheduledAt: string | null }>;
 }> => {
+	const cacheKey = await adminCacheKey('search', { q, limit });
+	const cached = await readJsonCache<any>(cacheKey);
+	if (cached) return cached;
+
 	const query = String(q || '').trim();
 	if (query.length < 2) {
-		return { users: [], payments: [], sessions: [] };
+		const empty = { users: [], payments: [], sessions: [] };
+		await writeJsonCache(cacheKey, empty, ADMIN_CACHE_TTL.search);
+		return empty;
 	}
 
 	const safeLimit = Math.max(1, Math.min(limit, 20));
@@ -1275,7 +1428,7 @@ export const searchAdminEntities = async (
 			.catch(() => []),
 	]);
 
-	return {
+	const payload = {
 		users: users.map((user: any) => ({
 			id: user.id,
 			name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unnamed User',
@@ -1294,4 +1447,7 @@ export const searchAdminEntities = async (
 			scheduledAt: session.dateTime ? new Date(session.dateTime).toISOString() : null,
 		})),
 	};
+
+	await writeJsonCache(cacheKey, payload, ADMIN_CACHE_TTL.search);
+	return payload;
 };

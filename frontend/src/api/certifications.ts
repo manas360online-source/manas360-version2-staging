@@ -47,6 +47,22 @@ export interface Certification {
 	updatedAt: string;
 }
 
+export interface MyCertificationState {
+	userId: string;
+	certificationStatus: 'NONE' | 'ENROLLED' | 'COMPLETED' | 'VERIFIED' | string;
+	certificationCompletedAt: string | null;
+	certificationPaymentId: string | null;
+	leadBoostScore: number;
+	certifications: Array<{
+		id: string;
+		slug: string;
+		code: string;
+		title: string;
+		level: string;
+		isActive: boolean;
+	}>;
+}
+
 export const getCertificationsErrorMessage = (error: unknown, fallback = 'Request failed'): string => {
 	const axiosError = error as AxiosError<{ message?: string }>;
 	return axiosError.response?.data?.message ?? fallback;
@@ -59,5 +75,10 @@ export const getCertifications = async (): Promise<{ items: Certification[]; tot
 
 export const getCertificationById = async (id: string): Promise<Certification> => {
 	const response = await http.get<ApiEnvelope<Certification>>(`/v1/certifications/${encodeURIComponent(id)}`);
+	return response.data.data;
+};
+
+export const getMyCertificationState = async (): Promise<MyCertificationState> => {
+	const response = await http.get<ApiEnvelope<MyCertificationState>>('/v1/certifications/me');
 	return response.data.data;
 };

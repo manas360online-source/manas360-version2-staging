@@ -5,7 +5,10 @@
 
 import { Router, Request, Response } from 'express';
 import { requireAuth } from '../middleware/auth.middleware';
+import { requireRole, type UserRole } from '../middleware/rbac.middleware';
 import { prisma } from '../config/db';
+import { redis } from '../config/redis';
+import { getProviderDashboardCacheKey } from '../services/provider-dashboard-cache.service';
 import {
   getProviderMetrics,
   getConversionTrend,
@@ -13,18 +16,52 @@ import {
 import { PLAN_CONFIG } from '../config/plans';
 
 const router = Router();
+const providerDashboardRoles: UserRole[] = ['therapist', 'psychologist', 'psychiatrist', 'coach', 'learner'];
+
+const DASHBOARD_CACHE_TTL = {
+  metrics: 45,
+  leads: 20,
+  weekly: 60,
+  summary: 45,
+  plans: 300,
+  breakdown: 60,
+} as const;
+
+const readJsonCache = async <T>(key: string): Promise<T | null> => {
+  try {
+    const cached = await redis.get(key);
+    if (!cached) return null;
+    return JSON.parse(cached) as T;
+  } catch {
+    return null;
+  }
+};
+
+const writeJsonCache = async (key: string, payload: unknown, ttl: number): Promise<void> => {
+  try {
+    await redis.set(key, JSON.stringify(payload), ttl);
+  } catch {
+    // Best-effort cache write.
+  }
+};
 
 /**
  * GET /api/provider/dashboard/metrics
  * Main dashboard metrics for a provider (therapist)
  * Returns: subscription info, quota, conversion rate, ROI, earnings
  */
-router.get('/provider/dashboard/metrics', requireAuth, async (req: Request, res: Response) => {
+router.get('/provider/dashboard/metrics', requireAuth, requireRole(providerDashboardRoles), async (req: Request, res: Response) => {
   try {
     const therapistId = (req as any).auth?.userId as string;
 
     if (!therapistId) {
       return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const cacheKey = await getProviderDashboardCacheKey('metrics', therapistId);
+    const cached = await readJsonCache<any>(cacheKey);
+    if (cached) {
+      return res.json(cached);
     }
 
     const metrics = await getProviderMetrics(therapistId);
@@ -33,10 +70,12 @@ router.get('/provider/dashboard/metrics', requireAuth, async (req: Request, res:
       return res.status(404).json({ error: 'No active subscription found' });
     }
 
-    res.json({
+    const payload = {
       success: true,
       data: metrics,
-    });
+    };
+    await writeJsonCache(cacheKey, payload, DASHBOARD_CACHE_TTL.metrics);
+    res.json(payload);
   } catch (error) {
     console.error('[Dashboard] Error fetching metrics:', error);
     res.status(500).json({ error: 'Failed to fetch metrics' });
@@ -48,7 +87,7 @@ router.get('/provider/dashboard/metrics', requireAuth, async (req: Request, res:
  * List all assigned leads with their status
  * Query params: page, limit, status, sortBy
  */
-router.get('/provider/dashboard/leads', requireAuth, async (req: Request, res: Response) => {
+router.get('/provider/dashboard/leads', requireAuth, requireRole(providerDashboardRoles), async (req: Request, res: Response) => {
   try {
     const therapistId = (req as any).auth?.userId as string;
     const page = parseInt((req.query.page as string) || '1');
@@ -57,6 +96,12 @@ router.get('/provider/dashboard/leads', requireAuth, async (req: Request, res: R
 
     if (!therapistId) {
       return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const cacheKey = await getProviderDashboardCacheKey('leads', therapistId, req.query);
+    const cached = await readJsonCache<any>(cacheKey);
+    if (cached) {
+      return res.json(cached);
     }
 
     const pageNum = Math.max(1, page || 1);
@@ -96,7 +141,7 @@ router.get('/provider/dashboard/leads', requireAuth, async (req: Request, res: R
       isExpired: a.lead.expiresAt ? new Date() > a.lead.expiresAt : false,
     }));
 
-    res.json({
+    const payload = {
       success: true,
       pagination: {
         page: pageNum,
@@ -105,7 +150,9 @@ router.get('/provider/dashboard/leads', requireAuth, async (req: Request, res: R
         totalPages: Math.ceil(total / limitNum),
       },
       leads,
-    });
+    };
+    await writeJsonCache(cacheKey, payload, DASHBOARD_CACHE_TTL.leads);
+    res.json(payload);
   } catch (error) {
     console.error('[Dashboard] Error fetching leads:', error);
     res.status(500).json({ error: 'Failed to fetch leads' });
@@ -117,7 +164,7 @@ router.get('/provider/dashboard/leads', requireAuth, async (req: Request, res: R
  * Weekly performance stats for charts
  * Returns: last 4 weeks of lead/response/conversion data
  */
-router.get('/provider/dashboard/weekly-stats', requireAuth, async (req: Request, res: Response) => {
+router.get('/provider/dashboard/weekly-stats', requireAuth, requireRole(providerDashboardRoles), async (req: Request, res: Response) => {
   try {
     const therapistId = (req as any).auth?.userId as string;
     const weeks = parseInt((req.query.weeks as string) || '4');
@@ -126,15 +173,23 @@ router.get('/provider/dashboard/weekly-stats', requireAuth, async (req: Request,
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
+    const cacheKey = await getProviderDashboardCacheKey('weekly-stats', therapistId, req.query);
+    const cached = await readJsonCache<any>(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
+
     const weekCount = Math.min(12, Math.max(1, weeks || 4));
 
     const trend = await getConversionTrend(therapistId, weekCount);
 
-    res.json({
+    const payload = {
       success: true,
       weeks: weekCount,
       data: trend,
-    });
+    };
+    await writeJsonCache(cacheKey, payload, DASHBOARD_CACHE_TTL.weekly);
+    res.json(payload);
   } catch (error) {
     console.error('[Dashboard] Error fetching weekly stats:', error);
     res.status(500).json({ error: 'Failed to fetch weekly stats' });
@@ -145,12 +200,18 @@ router.get('/provider/dashboard/weekly-stats', requireAuth, async (req: Request,
  * GET /api/provider/dashboard/summary
  * Quick summary for dashboard cards
  */
-router.get('/provider/dashboard/summary', requireAuth, async (req: Request, res: Response) => {
+router.get('/provider/dashboard/summary', requireAuth, requireRole(providerDashboardRoles), async (req: Request, res: Response) => {
   try {
     const therapistId = (req as any).auth?.userId as string;
 
     if (!therapistId) {
       return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const cacheKey = await getProviderDashboardCacheKey('summary', therapistId);
+    const cached = await readJsonCache<any>(cacheKey);
+    if (cached) {
+      return res.json(cached);
     }
 
     const metrics = await getProviderMetrics(therapistId);
@@ -185,10 +246,12 @@ router.get('/provider/dashboard/summary', requireAuth, async (req: Request, res:
       },
     };
 
-    res.json({
+    const payload = {
       success: true,
       data: summary,
-    });
+    };
+    await writeJsonCache(cacheKey, payload, DASHBOARD_CACHE_TTL.summary);
+    res.json(payload);
   } catch (error) {
     console.error('[Dashboard] Error fetching summary:', error);
     res.status(500).json({ error: 'Failed to fetch summary' });
@@ -199,12 +262,18 @@ router.get('/provider/dashboard/summary', requireAuth, async (req: Request, res:
  * GET /api/provider/dashboard/subscription-plans
  * List available subscription plans (for plan selection/upgrade)
  */
-router.get('/provider/dashboard/subscription-plans', requireAuth, async (req: Request, res: Response) => {
+router.get('/provider/dashboard/subscription-plans', requireAuth, requireRole(providerDashboardRoles), async (req: Request, res: Response) => {
   try {
     const therapistId = (req as any).auth?.userId as string;
 
     if (!therapistId) {
       return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const cacheKey = await getProviderDashboardCacheKey('subscription-plans', therapistId);
+    const cached = await readJsonCache<any>(cacheKey);
+    if (cached) {
+      return res.json(cached);
     }
 
     // Get current subscription
@@ -227,11 +296,13 @@ router.get('/provider/dashboard/subscription-plans', requireAuth, async (req: Re
       current: current?.tier === key,
     }));
 
-    res.json({
+    const payload = {
       success: true,
       currentTier: current?.tier || null,
       plans,
-    });
+    };
+    await writeJsonCache(cacheKey, payload, DASHBOARD_CACHE_TTL.plans);
+    res.json(payload);
   } catch (error) {
     console.error('[Dashboard] Error fetching plans:', error);
     res.status(500).json({ error: 'Failed to fetch plans' });
@@ -248,6 +319,12 @@ router.get('/provider/dashboard/performance-breakdown', requireAuth, async (req:
 
     if (!therapistId) {
       return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const cacheKey = await getProviderDashboardCacheKey('performance-breakdown', therapistId);
+    const cached = await readJsonCache<any>(cacheKey);
+    if (cached) {
+      return res.json(cached);
     }
 
     // Get assignments grouped by lead quality
@@ -292,10 +369,12 @@ router.get('/provider/dashboard/performance-breakdown', requireAuth, async (req:
       conversionRate: data.assigned > 0 ? ((data.converted / data.assigned) * 100).toFixed(1) : '0',
     }));
 
-    res.json({
+    const payload = {
       success: true,
       data: result,
-    });
+    };
+    await writeJsonCache(cacheKey, payload, DASHBOARD_CACHE_TTL.breakdown);
+    res.json(payload);
   } catch (error) {
     console.error('[Dashboard] Error fetching breakdown:', error);
     res.status(500).json({ error: 'Failed to fetch performance breakdown' });

@@ -22,7 +22,10 @@ const admin_audit_controller_1 = require("../controllers/admin-audit.controller"
 const admin_groups_controller_1 = require("../controllers/admin-groups.controller");
 const admin_qr_controller_1 = require("../controllers/admin-qr.controller");
 const platform_config_controller_1 = require("../controllers/platform-config.controller");
+const admin_agreement_controller_1 = require("../controllers/admin-agreement.controller");
 const router = (0, express_1.Router)();
+router.post('/users/wallet/credit', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin', 'financemanager']), (0, rbac_middleware_1.requireAdminPolicy)('payments.manage'), (0, validate_middleware_1.asyncHandler)(admin_controller_1.creditUserWalletController));
+router.get('/ping', (req, res) => res.json({ message: 'pong' }));
 /**
  * GET /api/v1/admin/users
  * List all users with pagination and filters
@@ -107,6 +110,13 @@ router.get('/platform-config/:key', auth_middleware_1.requireAuth, (0, rbac_midd
 router.put('/platform-config/:key', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('superadmin'), (0, rbac_middleware_1.requireAdminPolicy)('config.manage'), (0, validate_middleware_1.asyncHandler)(platform_config_controller_1.upsertPlatformConfigController));
 router.patch('/platform-config/:key', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('superadmin'), (0, rbac_middleware_1.requireAdminPolicy)('config.manage'), (0, validate_middleware_1.asyncHandler)(platform_config_controller_1.upsertPlatformConfigController));
 router.post('/platform-config/:key/rollback', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('superadmin'), (0, rbac_middleware_1.requireAdminPolicy)('config.manage'), (0, validate_middleware_1.asyncHandler)(platform_config_controller_1.rollbackPlatformConfigController));
+// === ADMIN AGREEMENTS (COMPAT ROUTES) ===
+router.get('/agreements', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin', 'clinicaldirector', 'financemanager']), (0, validate_middleware_1.asyncHandler)(admin_agreement_controller_1.listAdminAgreementsController));
+router.post('/agreements', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin', 'clinicaldirector', 'financemanager']), (0, validate_middleware_1.asyncHandler)(admin_agreement_controller_1.createAdminAgreementController));
+router.get('/agreements/:agreementId', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin', 'clinicaldirector', 'financemanager']), (0, validate_middleware_1.asyncHandler)(admin_agreement_controller_1.getAdminAgreementByIdController));
+router.patch('/agreements/:agreementId/status', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin', 'clinicaldirector', 'financemanager']), (0, validate_middleware_1.asyncHandler)(admin_agreement_controller_1.updateAdminAgreementStatusController));
+router.patch('/agreements/:agreementId/approve', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin', 'clinicaldirector', 'financemanager']), (0, validate_middleware_1.asyncHandler)(admin_agreement_controller_1.approveAdminAgreementController));
+router.patch('/agreements/:agreementId/reject', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin', 'clinicaldirector', 'financemanager']), (0, validate_middleware_1.asyncHandler)(admin_agreement_controller_1.rejectAdminAgreementController));
 /**
  * GET /api/v1/admin/modules/:module/summary
  * Generic real-time summary for admin module pages.

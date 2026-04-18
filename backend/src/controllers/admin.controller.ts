@@ -4,6 +4,7 @@ import { listUsers, getUserById, verifyTherapist, verifyProvider, approveProvide
 import { prisma } from '../config/db';
 import { sendSuccess } from '../utils/response';
 import { REQUIRED_LEGAL_TYPES, ensureCanonicalLegalDocuments } from '../services/legal-compliance.service';
+import { addCredit } from '../services/wallet.service';
 
 /**
  * GET /api/v1/admin/users
@@ -525,4 +526,31 @@ export const downloadLegalDocumentController = async (req: Request, res: Respons
 	} catch (_err) {
 		res.status(500).json({ error: 'Failed to download legal document' });
 	}
+};
+
+/**
+ * POST /api/v1/admin/wallet/credit
+ * Manually credit a user's wallet
+ * Admin role required
+ */
+export const creditUserWalletController = async (req: Request, res: Response): Promise<void> => {
+	const { userId, amount, reason, expiresInDays } = req.body;
+
+	if (!userId) {
+		throw new AppError('User ID is required', 400);
+	}
+
+	if (!amount || Number(amount) <= 0) {
+		throw new AppError('A positive amount is required', 400);
+	}
+
+	const result = await addCredit({
+		userId,
+		amount: Number(amount),
+		source: 'ADMIN_ADJUSTMENT',
+		sourceId: reason || 'Manual Admin Adjustment',
+		expiresInDays: expiresInDays ? Number(expiresInDays) : 365, // Default to 1 year for admin adjustments
+	});
+
+	sendSuccess(res, result, 'Wallet credited successfully');
 };

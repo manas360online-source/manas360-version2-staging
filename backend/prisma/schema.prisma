@@ -513,12 +513,19 @@ model TherapistProfile {
   isVerified          Boolean           @default(false)
   verifiedAt          DateTime?
   verifiedByUserId    String?
-  certifications      String[]          @default([])
-  baseLatitude        Float?            @map("base_latitude")
-  baseLongitude       Float?            @map("base_longitude")
-  commissionOverride  Int?              @map("commission_override")
-  rejectionReason     String?           @map("rejection_reason")
-  user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  certifications           String[]            @default([])
+  baseLatitude             Float?              @map("base_latitude")
+  baseLongitude            Float?              @map("base_longitude")
+  commissionOverride       Int?                @map("commission_override")
+  rejectionReason          String?             @map("rejection_reason")
+  certificationStatus      CertificationStatus @default(NONE)
+  certificationCompletedAt DateTime?
+  certificationPaymentId   String?
+  leadBoostScore           Int                 @default(0)
+  nriPoolCertified         Boolean             @default(false) @map("nri_pool_certified")
+  nriPoolCertifiedAt       DateTime?           @map("nri_pool_certified_at")
+  nriTimezoneShifts        String[]            @default([]) @map("nri_timezone_shifts")
+  user                     User                @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("therapist_profiles")
@@ -539,17 +546,23 @@ model ProviderDocument {
 }
 
 model PatientAssessment {
-  id            String         @id @default(uuid())
-  patientId     String
-  type          String
-  answers       Int[]
-  totalScore    Int
-  severityLevel String
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  patient       PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  id               String         @id @default(uuid())
+  patientId        String
+  type             String
+  answers          Int[]
+  totalScore       Int
+  severityLevel    String
+  entryType        String?
+  sourceMetadata   String?
+  utmCampaign      String?
+  utmMedium        String?
+  utmSource        String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  patient          PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
   @@index([patientId, createdAt(sort: Desc)])
+  @@index([entryType, createdAt(sort: Desc)])
   @@map("patient_assessments")
 }
 
@@ -863,6 +876,7 @@ model TherapySession {
   isLocked                 Boolean               @default(true)
   audioRecordingUrl        String?               @map("audio_recording_url")
   transcript               String?
+  sourceFunnel             String?               @map("source_funnel")
   therapistSessionNote     TherapistSessionNote?
   patientProfile           PatientProfile        @relation(fields: [patientProfileId], references: [id], onDelete: Cascade)
   therapistProfile         User                  @relation(fields: [therapistProfileId], references: [id], onDelete: Cascade)
@@ -986,6 +1000,7 @@ model SessionBookingIntent {
   durationMinute        Int                 @default(50)
   amountMinor           BigInt
   currency              String              @default("INR")
+  sourceFunnel         String?             @map("source_funnel")
   razorpayPaymentId     String?
   status                BookingIntentStatus @default(PENDING)
   sessionId             String?
@@ -1015,6 +1030,7 @@ model AppointmentRequest {
   razorpayPaymentId       String?                  @map("razorpay_payment_id")
   amountMinor             BigInt?
   currency                String                   @default("INR")
+  sourceFunnel            String?                  @map("source_funnel")
   status                  AppointmentRequestStatus @default(PENDING)
   expiresAt               DateTime?                @map("expires_at")
   cancelledAt             DateTime?                @map("cancelled_at")
@@ -1744,8 +1760,8 @@ model InvoiceEvent {
   actor          User?    @relation("InvoiceEventsActor", fields: [actorUserId], references: [id], onDelete: SetNull)
   invoice        Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
-  @@index([invoiceId])
-  @@index([idempotencyKey])
+  @@index([invoiceId], map: "idx_invoice_events_invoice_id")
+  @@index([idempotencyKey], map: "idx_invoice_events_idempotency_key")
   @@map("invoice_events")
 }
 
@@ -2820,6 +2836,7 @@ model InstitutionalAgreement {
   id                    Int                     @id @default(autoincrement())
   agreement_number      String                  @unique
   template_id           Int
+  entity_id             String?
   agreement_type        String
   partner_name          String
   partner_type          String
@@ -2837,12 +2854,44 @@ model InstitutionalAgreement {
   status                String                  @default("draft")
   created_at            DateTime                @default(now())
   template              AgreementTemplate       @relation(fields: [template_id], references: [id], onDelete: Restrict)
+  entity                Entity?                 @relation(fields: [entity_id], references: [id], onDelete: SetNull)
   signature_logs        AgreementSignatureLog[]
 
   @@index([template_id])
+  @@index([entity_id])
   @@index([status])
   @@index([signature_status])
   @@map("institutional_agreements")
+}
+
+model Entity {
+  id          String                   @id @default(uuid())
+  entity_name String
+  entity_type String
+  admin_name  String?
+  admin_email String                   @unique
+  created_at  DateTime                 @default(now())
+
+  contracts   Contract[]
+  agreements  InstitutionalAgreement[]
+}
+
+model Contract {
+  id                String   @id @default(uuid())
+  entityId          String
+  entity            Entity   @relation(fields: [entityId], references: [id])
+
+  contract_number   String   @unique
+  pricing_model     String
+  price_per_member  Float?
+  max_members       Int?
+
+  start_date        DateTime
+  end_date          DateTime
+
+  created_at        DateTime @default(now())
+
+  @@index([entityId])
 }
 
 model AgreementSignatureLog {
@@ -2861,6 +2910,7 @@ model AgreementSignatureLog {
 }
 
 enum UserRole {
+  LEARNER
   PATIENT
   THERAPIST
   ADMIN
@@ -3180,4 +3230,11 @@ enum PayoutStatus {
 enum PayoutMethod {
   BANK
   UPI
+}
+
+enum CertificationStatus {
+  NONE
+  ENROLLED
+  COMPLETED
+  EXPIRED
 }

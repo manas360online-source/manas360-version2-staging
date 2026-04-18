@@ -145,6 +145,7 @@ const PATIENT_TERMS_SECTIONS: string[] = [
 export default function SignupPage() {
 	const { checkAuth } = useAuth();
 	const navigate = useNavigate();
+	const location = useLocation();
 
 	const [name, setName] = useState('');
 	const [phone, setPhone] = useState('');
@@ -179,7 +180,29 @@ export default function SignupPage() {
 	const agreementScrollRef = useRef<HTMLDivElement | null>(null);
 	const patientTermsScrollRef = useRef<HTMLDivElement | null>(null);
 
-	const isProviderFlow = role !== 'patient';
+	const isPatientLeadFlow = useMemo(() => {
+		const query = new URLSearchParams(location.search);
+		const returnTarget = String(query.get('next') || query.get('returnTo') || '').toLowerCase();
+		return (
+			returnTarget.includes('/assessment-preset')
+			|| returnTarget.includes('/patient/sessions')
+			|| returnTarget.includes('/patient/dashboard')
+			|| returnTarget.includes('/plans')
+		);
+	}, [location.search]);
+
+	const isCertificationContext = useMemo(() => {
+		const query = new URLSearchParams(location.search);
+		const next = String(query.get('next') || query.get('returnTo') || '').toLowerCase();
+		return (
+			next.includes('/certifications')
+			|| next.includes('/certification/enroll')
+			|| next.includes('/provider/certifications')
+			|| next.includes('/provider/certification/enroll')
+		);
+	}, [location.search]);
+
+	const isProviderFlow = !isCertificationContext && !isPatientLeadFlow && role !== 'patient';
 	const allProviderAgreementsAccepted = useMemo(
 		() => Object.values(providerAgreementsAccepted).every(Boolean),
 		[providerAgreementsAccepted],
@@ -191,6 +214,10 @@ export default function SignupPage() {
 	);
 
 	useEffect(() => {
+		if (isPatientLeadFlow) {
+			setRole('patient');
+		}
+
 		if (!isProviderFlow) {
 			setAadhaar('');
 			setOtpForAadhaar('');
@@ -207,7 +234,7 @@ export default function SignupPage() {
 			setActiveAgreement(null);
 			setCanAcceptActiveAgreement(false);
 		}
-	}, [isProviderFlow]);
+	}, [isPatientLeadFlow, isProviderFlow]);
 
 	useEffect(() => {
 		if (!showPatientTermsModal) return;
@@ -341,7 +368,12 @@ export default function SignupPage() {
 		setLoading(true);
 		setDevOtp(null);
 		try {
-			const result = await signupWithPhone(phone.trim(), { name: name.trim(), role });
+			const result = await signupWithPhone(
+				phone.trim(),
+				isCertificationContext
+					? { name: name.trim(), role: 'learner' }
+					: { name: name.trim(), role: isPatientLeadFlow ? 'patient' : role },
+			);
 			setOtpSent(true);
 			setDevOtp(result.devOtp || null);
 		} catch (err) {
@@ -350,8 +382,6 @@ export default function SignupPage() {
 			setLoading(false);
 		}
 	};
-
-	const location = useLocation();
 
 	useEffect(() => {
 		const query = new URLSearchParams(location.search);
@@ -373,7 +403,7 @@ export default function SignupPage() {
 	};
 
 	const verifyOtp = async () => {
-		if (nriConsent.nri_declared && !nriConsent.nri_tos_accepted) {
+		if (!isCertificationContext && nriConsent.nri_declared && !nriConsent.nri_tos_accepted) {
 			setError('Please review and accept NRI Terms of Service to complete registration.');
 			return;
 		}
@@ -387,17 +417,26 @@ export default function SignupPage() {
 		setError(null);
 		setLoading(true);
 		try {
+			const guestGameToken = localStorage.getItem('guest_game_token') || undefined;
 			const result = await verifyPhoneSignupOtp(phone.trim(), otp.trim(), {
 				acceptedTerms: isProviderFlow ? allProviderAgreementsAccepted : acceptedTerms,
 				acceptedDocuments,
 				nri_declared: nriConsent.nri_declared,
 				nri_tos_accepted: nriConsent.nri_tos_accepted,
 				nri_tos_accepted_at: nriConsent.nri_tos_accepted_at || undefined,
-			});
+			}, guestGameToken);
+
+			if (guestGameToken) {
+				localStorage.removeItem('guest_game_token');
+			}
 			await checkAuth({ force: true });
+			const returnTo = resolveReturnTo();
+			if (isCertificationContext) {
+				navigate(returnTo || '/certifications', { replace: true });
+				return;
+			}
 			// If backend indicates patient requires a subscription, send to plans page
 			if ((result.user as any)?.requiresSubscription) {
-				const returnTo = resolveReturnTo();
 				navigate(`/plans?returnTo=${encodeURIComponent(returnTo)}`, { replace: true });
 				return;
 			}
@@ -420,7 +459,11 @@ export default function SignupPage() {
 						</Link>
 					</div>
 					<h1 className="text-2xl font-semibold text-wellness-text sm:text-3xl">Create your account</h1>
-					<p className="mt-2 text-sm text-wellness-muted sm:text-base">Register using phone number and OTP.</p>
+					<p className="mt-2 text-sm text-wellness-muted sm:text-base">
+						{isCertificationContext
+							? 'Register for certification using phone number and OTP.'
+							: 'Register using phone number and OTP.'}
+					</p>
 
 					<div className="mt-6 space-y-4">
 						<Input
@@ -443,6 +486,7 @@ export default function SignupPage() {
 							required
 						/>
 
+						{!isCertificationContext && !isPatientLeadFlow ? (
 						<div>
 							<label htmlFor="signup-role" className="mb-2 block text-sm font-medium text-wellness-text">Role</label>
 							<select
@@ -458,6 +502,7 @@ export default function SignupPage() {
 								<option value="coach">Coach</option>
 							</select>
 						</div>
+						) : null}
 
 						{!isProviderFlow ? (
 							<label className="flex items-start gap-2 text-sm text-wellness-text">
@@ -476,7 +521,9 @@ export default function SignupPage() {
 							</label>
 						) : null}
 
-						<NriPatch onChange={setNriConsent} blockSubmitButtons={false} />
+						{!isCertificationContext ? (
+							<NriPatch onChange={setNriConsent} blockSubmitButtons={false} />
+						) : null}
 
 						{isProviderFlow ? (
 							<div className="rounded-2xl border border-calm-sage/30 bg-white p-4">
@@ -590,7 +637,7 @@ export default function SignupPage() {
 								className="min-h-[48px]"
 								onClick={verifyOtp}
 							>
-								{loading ? 'Verifying OTP...' : 'Verify OTP and Register'}
+								{loading ? 'Verifying OTP...' : (isCertificationContext ? 'Verify OTP and Continue' : 'Verify OTP and Register')}
 							</Button>
 						)}
 

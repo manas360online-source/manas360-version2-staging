@@ -1,4 +1,10 @@
 import { http } from '../lib/http';
+import {
+  CLINICAL_ASSESSMENT_OPTIONS,
+  CLINICAL_QUESTION_BANK,
+  inferClinicalAssessmentType,
+  severityFromClinicalScore,
+} from '../utils/clinicalAssessments';
 
 export type JourneyPathway = 'stepped-care' | 'direct-provider' | 'urgent-care';
 
@@ -171,57 +177,6 @@ export const isOnboardingRequiredError = (error: any): boolean => {
   return status === 404 && isOnboardingMessage(message);
 };
 
-const STRUCTURED_OPTIONS = [
-  { optionIndex: 0, label: 'Not at all', points: 0 },
-  { optionIndex: 1, label: 'Several days', points: 1 },
-  { optionIndex: 2, label: 'More than half the days', points: 2 },
-  { optionIndex: 3, label: 'Nearly every day', points: 3 },
-];
-
-const STRUCTURED_QUESTION_BANK: Record<'PHQ-9' | 'GAD-7', string[]> = {
-  'PHQ-9': [
-    'Little interest or pleasure in doing things',
-    'Feeling down, depressed, or hopeless',
-    'Trouble falling or staying asleep, or sleeping too much',
-    'Feeling tired or having little energy',
-    'Poor appetite or overeating',
-    'Feeling bad about yourself - or that you are a failure',
-    'Trouble concentrating on things, such as reading or watching television',
-    'Moving or speaking so slowly that other people could have noticed, or the opposite',
-    'Thoughts that you would be better off dead, or of hurting yourself',
-  ],
-  'GAD-7': [
-    'Feeling nervous, anxious, or on edge',
-    'Not being able to stop or control worrying',
-    'Worrying too much about different things',
-    'Trouble relaxing',
-    'Being so restless that it is hard to sit still',
-    'Becoming easily annoyed or irritable',
-    'Feeling afraid as if something awful might happen',
-  ],
-};
-
-const inferAssessmentType = (value: string): 'PHQ-9' | 'GAD-7' => {
-  const normalized = String(value || '').toUpperCase();
-  if (normalized.includes('GAD-7') || normalized.includes('GAD7')) return 'GAD-7';
-  return 'PHQ-9';
-};
-
-const severityFromScore = (type: 'PHQ-9' | 'GAD-7', score: number): string => {
-  if (type === 'PHQ-9') {
-    if (score >= 20) return 'severe';
-    if (score >= 15) return 'moderately-severe';
-    if (score >= 10) return 'moderate';
-    if (score >= 5) return 'mild';
-    return 'minimal';
-  }
-
-  if (score >= 15) return 'severe';
-  if (score >= 10) return 'moderate';
-  if (score >= 5) return 'mild';
-  return 'minimal';
-};
-
 export const patientApi = {
   getDashboard: async () => (await http.get('/v1/patient/dashboard')).data,
   getDashboardV2: async () => (await http.get('/v1/patient/dashboard')).data,
@@ -246,6 +201,7 @@ export const patientApi = {
     providerType?: string;
     preferredTime?: boolean;
     preferredWindow?: string;
+    sourceFunnel?: string;
   }) =>
     (await http.post('/v1/sessions/book', payload)).data,
   verifyPayment: async (payload: { merchantTransactionId: string; transactionId: string; signature: string }) =>
@@ -258,7 +214,7 @@ export const patientApi = {
   downloadInvoicePdf: async (id: string) =>
     (await http.get(`/v1/sessions/${encodeURIComponent(id)}/documents/invoice`, { responseType: 'blob' })).data,
   submitAssessment: async (payload: { type: string; score?: number; answers?: number[] }) => {
-    const normalizedType = inferAssessmentType(payload.type);
+    const normalizedType = inferClinicalAssessmentType(payload.type);
     return (await http.post('/v1/patient-journey/clinical-assessment', {
       type: normalizedType,
       score: payload.score,
@@ -271,14 +227,34 @@ export const patientApi = {
     (await http.post('/v1/patient-journey/quick-screening', payload)).data,
   submitClinicalJourney: async (payload: JourneyClinicalRequest): Promise<JourneyRecommendationResponse> =>
     (await http.post('/v1/patient-journey/clinical-assessment', payload)).data,
+  submitPresetAssessment: async (payload: {
+    entryType: string;
+    responses: number[];
+    source?: {
+      entryType?: string;
+      landingPage?: string;
+      utmCampaign?: string;
+      utmMedium?: string;
+      utmSource?: string;
+      timezoneRegion?: string;
+      primaryConcerns?: string[];
+      languagePreference?: string;
+    };
+  }) => {
+    return (await http.post('/v1/assessments/preset-submit', {
+      entryType: payload.entryType,
+      responses: payload.responses,
+      source: payload.source,
+    })).data;
+  },
   startStructuredAssessment: async (payload: { templateKey: string }): Promise<StructuredAssessmentStartResponse> => {
-    const type = inferAssessmentType(payload.templateKey);
-    const questions = STRUCTURED_QUESTION_BANK[type].map((prompt, index) => ({
+    const type = inferClinicalAssessmentType(payload.templateKey);
+    const questions = CLINICAL_QUESTION_BANK[type].map((prompt: string, index: number) => ({
       questionId: `${type}-${index + 1}`,
       position: index + 1,
       prompt,
       sectionKey: type,
-      options: STRUCTURED_OPTIONS,
+      options: CLINICAL_ASSESSMENT_OPTIONS,
     }));
 
     return {
@@ -297,7 +273,7 @@ export const patientApi = {
     attemptId: string,
     payload: { answers: Array<{ questionId: string; optionIndex: number }> },
   ): Promise<StructuredAssessmentSubmitResponse> => {
-    const type = inferAssessmentType(attemptId);
+    const type = inferClinicalAssessmentType(attemptId);
     const numericAnswers = (payload.answers || []).map((item) => Number(item.optionIndex || 0));
     const totalScore = numericAnswers.reduce((sum, score) => sum + score, 0);
 
@@ -310,7 +286,7 @@ export const patientApi = {
       attemptId,
       templateKey: type,
       totalScore,
-      severityLevel: severityFromScore(type, totalScore),
+      severityLevel: severityFromClinicalScore(type, totalScore),
       interpretation: `${type} submitted successfully`,
       recommendation: 'Continue with the recommended care pathway.',
       action: 'Continue',
@@ -342,6 +318,17 @@ export const patientApi = {
   },
   getPatientAssessmentHistory: async (params?: { page?: number; limit?: number; type?: string }) =>
     (await http.get('/v1/patient/me/assessments', { params })).data,
+  getPatientAssessmentStatus: async (): Promise<{ phq9Complete: boolean; gad7Complete: boolean }> => {
+    const response = await http.get('/v1/patient/me/assessments', { params: { page: 1, limit: 50 } });
+    const payload = response.data?.data ?? response.data;
+    const items = Array.isArray(payload?.items) ? payload.items : Array.isArray(payload) ? payload : [];
+    const normalizedTypes = items.map((entry: any) => String(entry?.type || '').toUpperCase());
+
+    return {
+      phq9Complete: normalizedTypes.some((type: string) => type.includes('PHQ-9') || type.includes('PHQ9')),
+      gad7Complete: normalizedTypes.some((type: string) => type.includes('GAD-7') || type.includes('GAD7')),
+    };
+  },
   getJourneyRecommendation: async (): Promise<JourneyRecommendationResponse> =>
     (await http.get('/v1/patient-journey/recommendation')).data,
   selectJourneyPathway: async (payload: JourneySelectPathwayRequest): Promise<JourneySelectPathwayResponse> =>
@@ -463,6 +450,10 @@ export const patientApi = {
     const response = (await http.get('/v1/patient/subscription')).data;
     return unwrapPayload(response);
   },
+  getPublicGameRoll: async () => {
+    const response = (await http.get('/v1/game/public-roll')).data;
+    return unwrapPayload(response);
+  },
   getGameEligibility: async () => {
     const response = (await http.get('/v1/game/eligibility')).data;
     const raw = unwrapPayload(response);
@@ -522,6 +513,14 @@ export const patientApi = {
     idempotencyKey?: string;
   }) => {
     const response = (await http.post('/v1/patient/subscription/checkout', payload)).data;
+    return unwrapPayload(response);
+  },
+  getPremiumLibraryUsage: async () => {
+    const response = (await http.get('/v1/patient/subscription/premium-library')).data;
+    return unwrapPayload(response);
+  },
+  consumePremiumLibraryUsage: async (payload: { secondsSpent: number; source?: string }) => {
+    const response = (await http.post('/v1/patient/subscription/premium-library/consume', payload)).data;
     return unwrapPayload(response);
   },
   downgradeSubscription: async () => {
@@ -684,6 +683,9 @@ export const patientApi = {
       languages?: string[];
       modes?: string[];
       context?: 'Standard' | 'Corporate' | 'Night' | 'Buddy' | 'Crisis';
+      presetEntryType?: string;
+      timezoneRegion?: string;
+      sourceFunnel?: string;
     },
   ): Promise<SmartMatchProvidersResult> => {
     const query = new URLSearchParams();
@@ -700,6 +702,9 @@ export const patientApi = {
     (options?.languages || []).forEach((language) => query.append('languages', language));
     (options?.modes || []).forEach((mode) => query.append('modes', mode));
     if (options?.context) query.append('context', options.context);
+    if (options?.presetEntryType) query.append('entryType', options.presetEntryType);
+    if (options?.timezoneRegion) query.append('timezoneRegion', options.timezoneRegion);
+    if (options?.sourceFunnel) query.append('sourceFunnel', options.sourceFunnel);
     try {
       const response = (await http.get(`/v1/patient/providers/smart-match?${query}`)).data;
       const payload = response?.data ?? response;
@@ -725,6 +730,21 @@ export const patientApi = {
     providerIds: string[];
     preferredSpecialization?: string;
     durationMinutes?: number;
+    sourceFunnel?: string;
+    presetEntryType?: string;
+    timezoneRegion?: string;
+    concerns?: string[];
+    languages?: string[];
+    modes?: string[];
+    rankedProviders?: Array<{
+      providerId: string;
+      score?: number;
+      tier?: 'HOT' | 'WARM' | 'COLD';
+      breakdown?: { expertise: number; communication: number; quality: number };
+    }>;
+    payment?: {
+      merchantTransactionId?: string;
+    };
   }) => (await http.post('/v1/patient/appointments/smart-match', payload)).data,
 
   getPendingAppointmentRequests: async () =>

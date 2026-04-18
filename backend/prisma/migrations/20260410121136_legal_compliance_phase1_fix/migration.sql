@@ -356,7 +356,7 @@ BEGIN
 END $$;
 
 -- AlterTable
-ALTER TABLE "qr_codes" ALTER COLUMN "updated_at" DROP DEFAULT;
+ALTER TABLE IF EXISTS "qr_codes" ALTER COLUMN "updated_at" DROP DEFAULT;
 
 -- AlterTable
 ALTER TABLE "session_booking_intents" DROP COLUMN "razorpayOrderId",

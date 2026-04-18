@@ -17,6 +17,7 @@ import {
   YAxis,
 } from 'recharts';
 import { patientApi } from '../../api/patient';
+import { getClinicalAssessmentSummary, inferClinicalAssessmentType } from '../../utils/clinicalAssessments';
 
 type ProgressTab = 'mood' | 'clinical' | 'habits';
 type ClinicalFilter = 'all' | 'phq' | 'gad';
@@ -164,18 +165,30 @@ export default function ProgressPage() {
         patientApi.getInsights().catch(() => null),
         patientApi.getProgress().catch(() => null),
       ]);
+
+      const structuredPayload = asPayload<any>(historyRes) || {};
+      const structuredItems = Array.isArray(structuredPayload)
+        ? structuredPayload
+        : Array.isArray(structuredPayload?.items)
+          ? structuredPayload.items
+          : [];
+
       try {
         console.log('[ProgressPage] fetched clinical data', { historyRes, insightsRes, progressRes });
       } catch (e) {
         /* ignore logging errors */
       }
       return {
-        structured: asPayload<any[]>(historyRes) || [],
+        structured: structuredItems,
         insights: asPayload<any>(insightsRes) || {},
         progress: asPayload<any>(progressRes) || {},
       };
     },
-    { enabled: activeTab === 'clinical' },
+    {
+      enabled: activeTab === 'clinical',
+      refetchOnMount: 'always',
+      refetchOnWindowFocus: 'always',
+    },
   );
 
   const habitsQuery = useQuery(
@@ -516,8 +529,7 @@ export default function ProgressPage() {
 
     const structuredRows = structured
       .map((item: any) => {
-        const key = String(item?.templateKey || item?.template?.key || '').toLowerCase();
-        const type = item?.type || (key.includes('phq') ? 'PHQ-9' : key.includes('gad') ? 'GAD-7' : String(item?.templateTitle || 'Assessment'));
+        const type = item?.type || inferClinicalAssessmentType(String(item?.templateKey || item?.template?.key || item?.templateTitle || 'PHQ-9'));
         const date = parseDate(item?.submittedAt || item?.createdAt);
         if (!date) return null;
         return {
@@ -564,7 +576,18 @@ export default function ProgressPage() {
           return rows;
         });
 
-    return [...structuredRows, ...trendRows].filter(Boolean) as ClinicalRow[];
+    const combinedRows = [...structuredRows, ...trendRows].filter(Boolean) as ClinicalRow[];
+    const dedupedRows: ClinicalRow[] = [];
+    const seenRows = new Set<string>();
+
+    for (const row of combinedRows) {
+      const rowKey = `${row.type}|${row.date.toISOString()}|${row.score}|${row.severity}`;
+      if (seenRows.has(rowKey)) continue;
+      seenRows.add(rowKey);
+      dedupedRows.push(row);
+    }
+
+    return dedupedRows;
   }, [clinicalQuery.data?.structured, clinicalQuery.data?.insights?.assessmentTrend, clinicalQuery.data?.progress?.assessmentTrend]);
 
   const filteredClinicalRows = useMemo(() => {
@@ -585,6 +608,18 @@ export default function ProgressPage() {
       })
       .sort((a, b) => a.date.getTime() - b.date.getTime());
   }, [clinicalRows, clinicalFilter, timeRange]);
+
+  const clinicalSummary = useMemo(() => {
+    const history = Array.isArray(clinicalRows) ? clinicalRows : [];
+    return getClinicalAssessmentSummary(
+      history.map((item: any) => ({
+        type: item?.type,
+        score: Number(item?.score || item?.totalScore || 0),
+        level: String(item?.severity || item?.severityLevel || item?.level || 'mild'),
+        createdAt: item?.date ? item.date.toISOString() : item?.submittedAt || item?.createdAt,
+      })),
+    );
+  }, [clinicalRows]);
 
   const clinicalChartData = useMemo(() => {
     const byDate: Record<string, { label: string; phq9?: number; gad7?: number }> = {};
@@ -857,6 +892,38 @@ export default function ProgressPage() {
 
           {!clinicalQuery.isLoading && !clinicalQuery.error && (
             <>
+              <section className={`rounded-2xl border p-5 shadow-soft-sm ${clinicalSummary.isComplete ? 'border-calm-sage/25 bg-gradient-to-r from-[#edf4f1] to-[#f8f5ee]' : 'border-ink-100 bg-white'}`}>
+                <p className={`text-xs font-semibold uppercase tracking-[0.16em] ${clinicalSummary.isComplete ? 'text-calm-sage' : 'text-charcoal/45'}`}>
+                  Clinical Report
+                </p>
+                <h2 className="mt-2 text-lg font-semibold text-charcoal">
+                  {clinicalSummary.isComplete ? 'Your PHQ-9 and GAD-7 report is ready here.' : 'Complete PHQ-9 and GAD-7 to generate your report here.'}
+                </h2>
+                <p className="mt-2 text-sm text-charcoal/72">
+                  {clinicalSummary.isComplete
+                    ? 'This page keeps your latest assessments, scores, and provider-ready report history in one place.'
+                    : 'Once both assessments are submitted, your score history and report summary will appear on this page.'}
+                </p>
+              </section>
+
+              <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <MetricCard
+                  label="PHQ-9 Status"
+                  value={clinicalSummary.hasPhq9 ? 'Completed' : 'Pending'}
+                  helper={clinicalSummary.hasPhq9 ? 'Latest PHQ-9 report saved here' : 'Required before provider connection'}
+                />
+                <MetricCard
+                  label="GAD-7 Status"
+                  value={clinicalSummary.hasGad7 ? 'Completed' : 'Pending'}
+                  helper={clinicalSummary.hasGad7 ? 'Latest GAD-7 report saved here' : 'Required before provider connection'}
+                />
+                <MetricCard
+                  label="Provider Unlock"
+                  value={clinicalSummary.isComplete ? 'Unlocked' : 'Locked'}
+                  helper={clinicalSummary.isComplete ? 'Clinical report ready for provider review' : 'Finish both assessments first'}
+                />
+              </section>
+
               <section className="rounded-2xl border border-ink-100 bg-white p-5 shadow-soft-sm">
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
@@ -912,7 +979,7 @@ export default function ProgressPage() {
 
               <section className="rounded-2xl border border-ink-100 bg-white p-5 shadow-soft-sm">
                 <h2 className="text-lg font-semibold text-charcoal">PHQ-9 & GAD-7 Score Timeline</h2>
-                <p className="mt-1 text-sm text-charcoal/62">Severity zones are shaded so score interpretation is instant.</p>
+                <p className="mt-1 text-sm text-charcoal/62">Severity zones are shaded so your latest assessment report is easy to read at a glance.</p>
                 <div className="mt-5 h-80">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={clinicalChartData} margin={{ top: 12, right: 16, left: 0, bottom: 0 }}>
@@ -949,7 +1016,11 @@ export default function ProgressPage() {
                       </Link>
                     </div>
                   ))}
-                  {!recentClinicalRows.length && <p className="text-sm text-charcoal/60">No clinical score history available for the selected filters.</p>}
+                  {!recentClinicalRows.length && (
+                    <p className="text-sm text-charcoal/60">
+                      No clinical score history available for the selected filters. Submit PHQ-9 and GAD-7 to generate your report here.
+                    </p>
+                  )}
                 </div>
               </section>
             </>
@@ -966,7 +1037,7 @@ export default function ProgressPage() {
             <>
               <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <MetricCard label="Exercises Completed" value={habitsStats.exercisesCompleted} helper="Completed CBT and wellness actions" />
-                <MetricCard label="Audio Minutes Listened" value={`${habitsStats.audioMinutesListened} mins`} helper="From Wellness Library audio sessions" />
+                <MetricCard label="Audio Minutes Listened" value={`${habitsStats.audioMinutesListened} mins`} helper="From Premium Library audio sessions" />
                 <MetricCard label="Sessions Attended" value={habitsStats.sessionsAttended} helper="Completed therapist sessions" />
               </section>
 

@@ -1,5 +1,5 @@
 import React, { Suspense, useEffect } from 'react';
-import { MemoryRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { MemoryRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { Layout } from './components/CertificationLayout';
 import { CardSkeleton } from './components/CertificationSkeleton';
 import JourneyWireframePage from './pages/JourneyWireframePage';
@@ -10,8 +10,6 @@ import { CertificationQuizPage } from "./pages/CertificationQuizPage";
 
 const LandingPage = React.lazy(() => import('./pages/CertificationLandingPage').then(module => ({ default: module.CertificationLandingPage })));
 const CertificationDetailsPage = React.lazy(() => import('./pages/CertificationDetailsPage').then(module => ({ default: module.CertificationDetailsPage })));
-const LeadBoostDashboard = React.lazy(() => import('./pages/CertificationLeadBoostDashboard').then(module => ({ default: module.LeadBoostDashboard })));
-const AdminDashboard = React.lazy(() => import('./pages/CertificationAdminDashboard').then(module => ({ default: module.AdminDashboard })));
 const CheckoutPage = React.lazy(() => import('./pages/CertificationCheckoutPage').then(module => ({ default: module.CheckoutPage })));
 const PaymentSuccessPage = React.lazy(() => import('./pages/CertificationPaymentSuccessPage').then(module => ({ default: module.PaymentSuccessPage })));
 const PaymentFailedPage = React.lazy(() => import('./pages/CertificationPaymentFailedPage').then(module => ({ default: module.PaymentFailedPage })));
@@ -47,14 +45,15 @@ const LayoutRoutes: React.FC = () => (
         <Route path="/" element={<LandingPage />} />
         <Route path="/cert/:slug" element={<CertificationDetailsPage />} />
         <Route path="/checkout/:slug" element={<CheckoutPage />} />
+        <Route path="/certification/enroll/:slug" element={<EnrollmentRegistrationPage />} />
         <Route path="/enrollment-registration" element={<EnrollmentRegistrationPage />} />
         <Route path="/enrollment-confirmed" element={<EnrollmentConfirmedPage />} />
         <Route path="/payment-landing" element={<PaymentLandingRedirect />} />
         <Route path="/payment-success" element={<PaymentSuccessPage />} />
         <Route path="/payment-failed" element={<PaymentFailedPage />} />
         <Route path="/my-certifications" element={<MyCertificationsPage />} />
-        <Route path="/dashboard" element={<LeadBoostDashboard />} />
-        <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/dashboard" element={<Navigate to="/" replace />} />
+        <Route path="/admin" element={<Navigate to="/" replace />} />
         <Route path="/certification/modules/:enrollmentId" element={<CertificationModulesPage />} />
         <Route path="/certification/lessons/:moduleId" element={<CertificationLessonPage />} />
         <Route path="/certification/assignment/:lessonId" element={<CertificationAssignmentPage />} />

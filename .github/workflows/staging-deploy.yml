@@ -136,8 +136,8 @@ jobs:
 
             echo "Using compose command: ${DC}"
 
-            echo "Stopping containers cleanly (staging project)..."
-            ${DC} -p manas360-version2-staging down -v --remove-orphans || true
+            echo "Stopping containers cleanly (staging project) without dropping volumes..."
+            ${DC} -p manas360-version2-staging down --remove-orphans || true
 
             echo "Force remove stale service containers if still exist..."
             docker rm -f manas360-version2-staging_backend_1 manas360-version2-staging_redis_1 manas360-version2-staging_db_1 || true
@@ -147,7 +147,6 @@ jobs:
 
             echo "Cleaning leftover containers..."
             docker system prune -af || true
-            docker volume prune -f || true
 
             echo "Starting fresh containers..."
             ${DC} -p manas360-version2-staging up -d --build --no-cache
@@ -161,9 +160,9 @@ jobs:
               exit 1
             fi
 
-            echo "Waiting for backend health..."
-            until curl -f http://localhost:5000/health > /dev/null 2>&1; do
-              echo "  Waiting for backend..."
+            echo "Waiting for backend readiness (DB reachable)..."
+            until curl -f http://localhost:5000/ready > /dev/null 2>&1; do
+              echo "  Waiting for backend readiness..."
               sleep 2
             done
 

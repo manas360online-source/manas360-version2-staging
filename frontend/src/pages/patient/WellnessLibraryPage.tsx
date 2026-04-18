@@ -1,5 +1,8 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useEffect, useRef, useState } from 'react';
+import { Sparkles } from 'lucide-react';
+import { patientApi } from '../../api/patient';
 
 type ModuleCard = {
   id: string;
@@ -12,7 +15,7 @@ type ModuleCard = {
   cta: string;
   to: string;
   themeClass: string;
-  badge: 'FREE CONTENT' | 'ACTIVE' | 'PREMIUM';
+  badge: 'FREE CONTENT' | 'ACTIVE' | 'PREMIUM LIBRARY';
 };
 
 const modules: ModuleCard[] = [
@@ -53,7 +56,7 @@ const modules: ModuleCard[] = [
     cta: 'Meet Your Pet →',
     to: '/patient/digital-pets',
     themeClass: 'from-[#0e5558]/85 via-[#146a6f]/80 to-[#1f7f86]/75',
-    badge: 'PREMIUM',
+    badge: 'PREMIUM LIBRARY',
   },
   {
     id: 'vr-companion-sanctuary',
@@ -66,7 +69,7 @@ const modules: ModuleCard[] = [
     cta: 'Enter VR Sanctuary →',
     to: '/patient/vr-sanctuary',
     themeClass: 'from-[#29304f]/90 via-[#3a4670]/85 to-[#5166a1]/80',
-    badge: 'PREMIUM',
+    badge: 'PREMIUM LIBRARY',
   },
 ];
 
@@ -76,7 +79,118 @@ const badgeClass = (badge: ModuleCard['badge']) => {
   return 'bg-[#f3e5bf] text-[#7a5b1a] border-[#e4cc8f]';
 };
 
+type PremiumLibraryUsage = {
+  hasPremiumLibraryAccess: boolean;
+  totalSeconds: number;
+  consumedSeconds: number;
+  remainingSeconds: number;
+  totalMinutes: number;
+  consumedMinutes: number;
+  remainingMinutes: number;
+};
+
+const formatMinutes = (seconds: number): string => {
+  const mins = Math.max(0, Math.ceil(seconds / 60));
+  if (mins >= 60) {
+    const hours = Math.floor(mins / 60);
+    const rem = mins % 60;
+    return rem > 0 ? `${hours}h ${rem}m` : `${hours}h`;
+  }
+  return `${mins}m`;
+};
+
 export default function WellnessLibraryPage() {
+  const [usage, setUsage] = useState<PremiumLibraryUsage | null>(null);
+  const [usageLoading, setUsageLoading] = useState(true);
+  const [usageError, setUsageError] = useState<string>('');
+  const visibleSinceRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadUsage = async () => {
+      setUsageLoading(true);
+      try {
+        const data = await patientApi.getPremiumLibraryUsage();
+        if (!mounted) return;
+        setUsage(data);
+        setUsageError('');
+      } catch (error: any) {
+        if (!mounted) return;
+        setUsage(null);
+        setUsageError(String(error?.response?.data?.message || error?.message || 'Unable to load usage'));
+      } finally {
+        if (mounted) setUsageLoading(false);
+      }
+    };
+
+    void loadUsage();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const shouldTrack = Boolean(usage?.hasPremiumLibraryAccess);
+    if (!shouldTrack) {
+      visibleSinceRef.current = null;
+      return;
+    }
+
+    visibleSinceRef.current = Date.now();
+
+    const flushUsage = async (source: string) => {
+      if (!usage?.hasPremiumLibraryAccess) return;
+      const startedAt = visibleSinceRef.current;
+      if (!startedAt) return;
+
+      const now = Date.now();
+      const elapsedSeconds = Math.floor((now - startedAt) / 1000);
+      if (elapsedSeconds < 5) {
+        visibleSinceRef.current = now;
+        return;
+      }
+
+      visibleSinceRef.current = now;
+      try {
+        const updated = await patientApi.consumePremiumLibraryUsage({
+          secondsSpent: elapsedSeconds,
+          source: `wellness-library:${source}`,
+        });
+        setUsage(updated);
+      } catch {
+        // Silent fail; next visible segment will retry consumption.
+      }
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        void flushUsage('hidden');
+      } else {
+        visibleSinceRef.current = Date.now();
+      }
+    };
+
+    const handleBeforeUnload = () => {
+      void flushUsage('unload');
+    };
+
+    const heartbeat = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void flushUsage('heartbeat');
+      }
+    }, 60000);
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.clearInterval(heartbeat);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      void flushUsage('unmount');
+    };
+  }, [usage?.hasPremiumLibraryAccess]);
+
   return (
     <section className="mx-auto w-full max-w-[1380px] pb-8" style={{ fontFamily: 'DM Sans, sans-serif' }}>
       <div className="relative overflow-hidden rounded-[28px] border border-white/50 bg-gradient-to-br from-[#e8f4f0] via-[#edf4f7] to-[#f7efe7] p-6 shadow-[0_18px_42px_rgba(20,44,68,0.08)] sm:p-7 lg:p-8">
@@ -85,11 +199,33 @@ export default function WellnessLibraryPage() {
           Wellness Command Center
         </p>
         <h1 className="mt-3 text-2xl font-bold text-charcoal sm:text-3xl" style={{ fontFamily: 'DM Sans, sans-serif' }}>
-          Premium wellness modules for daily regulation and resilience
+          Premium Library modules for daily regulation and resilience
         </h1>
         <p className="mt-2 max-w-3xl text-sm text-charcoal/70">
           Lifestyle-first care hub with focused modules for sleep, sound, and AI companionship.
         </p>
+
+        <div className="mt-4 rounded-2xl border border-white/60 bg-white/65 p-4">
+          <div className="flex items-center gap-2 text-sm font-semibold text-charcoal">
+            <Sparkles className="h-[19px] w-[19px] text-wellness-sky" aria-hidden="true" />
+            <span>Premium Library Screen-Time Meter</span>
+          </div>
+          {usageLoading ? (
+            <p className="mt-2 text-xs text-charcoal/65">Loading Premium Library usage...</p>
+          ) : usage ? (
+            <div className="mt-2 text-xs text-charcoal/80">
+              <p>
+                Remaining time: <strong>{formatMinutes(usage.remainingSeconds)}</strong> of{' '}
+                <strong>{formatMinutes(usage.totalSeconds)}</strong>
+              </p>
+              <p className="mt-1 text-charcoal/60">
+                Time is automatically consumed while this page is open and visible.
+              </p>
+            </div>
+          ) : (
+            <p className="mt-2 text-xs text-rose-700">{usageError || 'Premium Library usage unavailable.'}</p>
+          )}
+        </div>
       </div>
 
       <motion.div

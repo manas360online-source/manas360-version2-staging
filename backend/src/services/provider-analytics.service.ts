@@ -102,13 +102,15 @@ export const getConversionMetrics = async (
 export const getROIMetrics = async (
   therapistId: string,
   tier: string,
-  periodDays: number = 30
+  periodDays: number = 30,
+  precomputedConversionMetrics?: ConversionMetrics,
 ): Promise<ROIMetrics> => {
   try {
     const planConfig = PLAN_CONFIG[tier as keyof typeof PLAN_CONFIG];
     if (!planConfig) throw new Error(`Invalid tier: ${tier}`);
 
-    const conversionMetrics = await getConversionMetrics(therapistId, periodDays);
+    const conversionMetrics = precomputedConversionMetrics
+      ?? await getConversionMetrics(therapistId, periodDays);
 
     // Business model assumptions (adjust per business needs)
     const AVG_CONSULTATION_FEE = 50000; // ₹500 in paise
@@ -176,7 +178,7 @@ export const getProviderMetrics = async (therapistId: string): Promise<ProviderM
 
     // Get conversion and ROI metrics
     const conversionMetrics = await getConversionMetrics(therapistId);
-    const roiMetrics = await getROIMetrics(therapistId, tier);
+    const roiMetrics = await getROIMetrics(therapistId, tier, 30, conversionMetrics);
 
     return {
       providerId: therapistId,
@@ -213,6 +215,23 @@ export const getConversionTrend = async (
   }>
 > => {
   try {
+    const start = new Date(Date.now() - (weeks - 1) * 7 * 24 * 60 * 60 * 1000);
+    const end = new Date();
+    const assignments = await prisma.leadAssignment.findMany({
+      where: {
+        therapistId,
+        assignedAt: {
+          gte: start,
+          lt: end,
+        },
+      },
+      select: {
+        assignedAt: true,
+        respondedAt: true,
+        convertedAt: true,
+      },
+    });
+
     const trends: Array<{
       week: number;
       date: Date;
@@ -227,27 +246,18 @@ export const getConversionTrend = async (
       const weekStart = new Date(Date.now() - i * 7 * 24 * 60 * 60 * 1000);
       const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-      const assignments = await prisma.leadAssignment.findMany({
-        where: {
-          therapistId,
-          assignedAt: {
-            gte: weekStart,
-            lt: weekEnd,
-          },
-        },
-      });
-
-      const responded = assignments.filter((a) => a.respondedAt).length;
-      const converted = assignments.filter((a) => a.convertedAt).length;
+      const weeklyAssignments = assignments.filter((a) => a.assignedAt >= weekStart && a.assignedAt < weekEnd);
+      const responded = weeklyAssignments.filter((a) => a.respondedAt).length;
+      const converted = weeklyAssignments.filter((a) => a.convertedAt).length;
 
       trends.push({
         week: weeks - i,
         date: weekStart,
-        leadsAssigned: assignments.length,
+        leadsAssigned: weeklyAssignments.length,
         leadsResponded: responded,
         leadsConverted: converted,
-        responseRate: assignments.length > 0 ? (responded / assignments.length) * 100 : 0,
-        conversionRate: assignments.length > 0 ? (converted / assignments.length) * 100 : 0,
+        responseRate: weeklyAssignments.length > 0 ? (responded / weeklyAssignments.length) * 100 : 0,
+        conversionRate: weeklyAssignments.length > 0 ? (converted / weeklyAssignments.length) * 100 : 0,
       });
     }
 

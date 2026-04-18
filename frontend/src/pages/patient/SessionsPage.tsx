@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   patientApi,
   type StructuredAssessmentQuestion,
@@ -9,6 +9,16 @@ import { useAuth } from '../../context/AuthContext';
 import { parseJourneyPayload, type JourneyPayload } from '../../utils/journey';
 import SlideOverBookingDrawer from '../../components/patient/SlideOverBookingDrawer';
 import SmartMatchFlow from '../../components/patient/SmartMatchFlow';
+import {
+  CLINICAL_ASSESSMENT_KEYS,
+  CLINICAL_ASSESSMENT_OPTIONS,
+  CLINICAL_ASSESSMENT_TEMPLATE_KEYS,
+  CLINICAL_QUESTION_BANK,
+  getClinicalAssessmentMaxScore,
+  getClinicalAssessmentSummary,
+  severityFromClinicalScore,
+} from '../../utils/clinicalAssessments';
+import type { ClinicalAssessmentKey } from '../../types/patient';
 import {
   Video,
   Download,
@@ -20,7 +30,6 @@ import {
   TrendingUp,
   Calendar,
   ArrowLeft,
-  X,
 } from 'lucide-react';
 
 type AssessmentHistoryEntry = {
@@ -32,60 +41,19 @@ type AssessmentHistoryEntry = {
   createdAt?: string;
 };
 
-type ClinicalAssessmentKey = 'PHQ-9' | 'GAD-7';
 type ClinicalFlowPhase = 'intro' | 'question' | 'loading-next' | 'next-phase' | 'provider-list';
 type SmartMatchProviderType = 'ALL' | 'THERAPIST' | 'PSYCHOLOGIST' | 'PSYCHIATRIST' | 'COACH';
+type AdPresetEntryType =
+  | 'therapist'
+  | 'psychiatrist'
+  | 'couples'
+  | 'nri_psychologist'
+  | 'nri_psychiatrist'
+  | 'nri_therapist';
 
-const PHQ9_TEMPLATE_KEY = 'phq-9-paid-assessment-v1';
-const GAD7_TEMPLATE_KEY = 'gad-7-paid-assessment-v1';
 const structuredTemplateKeys: Record<ClinicalAssessmentKey, string> = {
-  'PHQ-9': PHQ9_TEMPLATE_KEY,
-  'GAD-7': GAD7_TEMPLATE_KEY,
-};
-
-const STANDARD_OPTIONS = [
-  { optionIndex: 0, label: 'Not at all', points: 0 },
-  { optionIndex: 1, label: 'Several days', points: 1 },
-  { optionIndex: 2, label: 'More than half the days', points: 2 },
-  { optionIndex: 3, label: 'Nearly every day', points: 3 },
-];
-
-const ASSESSMENT_QUESTION_BANK: Record<ClinicalAssessmentKey, string[]> = {
-  'PHQ-9': [
-    'Little interest or pleasure in doing things',
-    'Feeling down, depressed, or hopeless',
-    'Trouble falling or staying asleep, or sleeping too much',
-    'Feeling tired or having little energy',
-    'Poor appetite or overeating',
-    'Feeling bad about yourself - or that you are a failure',
-    'Trouble concentrating on things, such as reading or watching television',
-    'Moving or speaking so slowly that other people could have noticed, or the opposite',
-    'Thoughts that you would be better off dead, or of hurting yourself',
-  ],
-  'GAD-7': [
-    'Feeling nervous, anxious, or on edge',
-    'Not being able to stop or control worrying',
-    'Worrying too much about different things',
-    'Trouble relaxing',
-    'Being so restless that it is hard to sit still',
-    'Becoming easily annoyed or irritable',
-    'Feeling afraid as if something awful might happen',
-  ],
-};
-
-const severityFromScore = (type: ClinicalAssessmentKey, score: number): string => {
-  if (type === 'PHQ-9') {
-    if (score >= 20) return 'severe';
-    if (score >= 15) return 'moderately-severe';
-    if (score >= 10) return 'moderate';
-    if (score >= 5) return 'mild';
-    return 'minimal';
-  }
-
-  if (score >= 15) return 'severe';
-  if (score >= 10) return 'moderate';
-  if (score >= 5) return 'mild';
-  return 'minimal';
+  'PHQ-9': CLINICAL_ASSESSMENT_TEMPLATE_KEYS['PHQ-9'],
+  'GAD-7': CLINICAL_ASSESSMENT_TEMPLATE_KEYS['GAD-7'],
 };
 
 const toLocalDateKey = (value: Date = new Date()): string => {
@@ -134,6 +102,7 @@ type AssessmentDraft = {
 
 export default function SessionsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const userId = user?.id || undefined;
   const ASSESSMENT_DRAFT_STORAGE_KEY = draftStorageKey(userId);
@@ -146,17 +115,17 @@ export default function SessionsPage() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<any | null>(null);
   const [isSmartMatchOpen, setIsSmartMatchOpen] = useState(false);
-  const [isPreviousProvidersOpen, setIsPreviousProvidersOpen] = useState(false);
   const [hasCompletedCheckin, setHasCompletedCheckin] = useState(false);
   const [assessmentHistory, setAssessmentHistory] = useState<AssessmentHistoryEntry[]>([]);
   const [assessmentHistoryLoading, setAssessmentHistoryLoading] = useState(true);
   const [assessmentDraft, setAssessmentDraft] = useState<AssessmentDraft | null>(null);
   const [todaysAssessmentResults, setTodaysAssessmentResults] = useState<Array<{ type: string; score: number; severity: string }>>([]);
+  const [pendingProviderAssessmentTitles, setPendingProviderAssessmentTitles] = useState<string[]>([]);
 
   const [isClinicalAssessmentOpen, setIsClinicalAssessmentOpen] = useState(false);
   const [clinicalFlowPhase, setClinicalFlowPhase] = useState<ClinicalFlowPhase>('intro');
   const [clinicalStartWith, setClinicalStartWith] = useState<ClinicalAssessmentKey>('PHQ-9');
-  const [assessmentOrder, setAssessmentOrder] = useState<ClinicalAssessmentKey[]>(['PHQ-9', 'GAD-7']);
+  const [assessmentOrder, setAssessmentOrder] = useState<ClinicalAssessmentKey[]>(CLINICAL_ASSESSMENT_KEYS);
   const [activeAssessmentIndex, setActiveAssessmentIndex] = useState(0);
   const [structuredAttempt, setStructuredAttempt] = useState<StructuredAssessmentStartResponse | null>(null);
   const [structuredAnswers, setStructuredAnswers] = useState<Record<string, number>>({});
@@ -183,6 +152,51 @@ export default function SessionsPage() {
     lockProviderType: false,
   });
 
+  const adPresetEntry = useMemo<AdPresetEntryType | null>(() => {
+    const raw = new URLSearchParams(location.search).get('adEntry');
+    if (
+      raw === 'therapist'
+      || raw === 'psychiatrist'
+      || raw === 'couples'
+      || raw === 'nri_psychologist'
+      || raw === 'nri_psychiatrist'
+      || raw === 'nri_therapist'
+    ) {
+      return raw;
+    }
+    return null;
+  }, [location.search]);
+
+  const adPresetProviderType = useMemo<SmartMatchProviderType | null>(() => {
+    if (adPresetEntry === 'therapist') return 'THERAPIST';
+    if (adPresetEntry === 'psychiatrist') return 'PSYCHIATRIST';
+    if (adPresetEntry === 'couples') return 'THERAPIST';
+    if (adPresetEntry === 'nri_psychologist') return 'PSYCHOLOGIST';
+    if (adPresetEntry === 'nri_psychiatrist') return 'PSYCHIATRIST';
+    if (adPresetEntry === 'nri_therapist') return 'THERAPIST';
+    return null;
+  }, [adPresetEntry]);
+
+  const adPresetLabel = useMemo<string>(() => {
+    if (adPresetEntry === 'therapist') return 'Therapist';
+    if (adPresetEntry === 'psychiatrist') return 'Psychiatrist';
+    if (adPresetEntry === 'couples') return 'Couples Therapist';
+    if (adPresetEntry === 'nri_psychologist') return 'NRI Psychologist';
+    if (adPresetEntry === 'nri_psychiatrist') return 'NRI Psychiatrist';
+    if (adPresetEntry === 'nri_therapist') return 'NRI Therapist';
+    return 'Provider';
+  }, [adPresetEntry]);
+
+  const isAdPresetFlow = Boolean(adPresetEntry);
+  const sourceFunnel = adPresetEntry || undefined;
+  const adPresetTimezoneRegion = useMemo<string | undefined>(() => {
+    const raw = String(new URLSearchParams(location.search).get('timezoneRegion') || '').trim().toUpperCase();
+    if (!raw) return undefined;
+
+    const allowed = new Set(['US_EST', 'US_PST', 'UK', 'AU', 'SG', 'UAE', 'OTHER']);
+    return allowed.has(raw) ? raw : undefined;
+  }, [location.search]);
+
   const fetchData = async () => {
     try {
       setError(null);
@@ -195,6 +209,19 @@ export default function SessionsPage() {
       setUpcoming(Array.isArray((uRes as any)?.data) ? (uRes as any).data : Array.isArray(uRes) ? uRes : []);
       setHistory(Array.isArray((hRes as any)?.data) ? (hRes as any).data : Array.isArray(hRes) ? hRes : []);
       setMyProviders(Array.isArray((pRes as any)?.data) ? (pRes as any).data : Array.isArray(pRes) ? pRes : []);
+
+      const therapyPlanResponse = await patientApi.getTherapyPlan().catch(() => null);
+      const therapyPlanPayload = (therapyPlanResponse as any)?.data ?? therapyPlanResponse ?? {};
+      const dailyTasks = Array.isArray(therapyPlanPayload?.dailyTasks) ? therapyPlanPayload.dailyTasks : [];
+      const pendingClinicalTasks = dailyTasks.filter((task: any) => {
+        const activityType = String(task?.type || task?.activityType || '').toUpperCase();
+        const title = String(task?.title || '').toUpperCase();
+        const isClinical = activityType.includes('CLINICAL_ASSESSMENT') || title.includes('PHQ-9') || title.includes('GAD-7');
+        const statusValue = task?.completed ?? task?.status ?? '';
+        const isPending = !String(statusValue).toUpperCase().includes('COMPLETED');
+        return isClinical && isPending;
+      });
+      setPendingProviderAssessmentTitles(pendingClinicalTasks.map((task: any) => String(task?.title || 'Clinical Assessment')));
     } catch {
       setError('Unable to load your care summary at this time.');
     } finally {
@@ -207,13 +234,23 @@ export default function SessionsPage() {
     try {
       const response = await patientApi.getPatientAssessmentHistory({ page: 1, limit: 50 }).catch(() => null);
       const items = asArray((response as any)?.data?.items ?? (response as any)?.items ?? response);
+      const summary = getClinicalAssessmentSummary(
+        items.map((entry: any) => ({
+          type: entry.type,
+          score: Number(entry.score || 0),
+          level: String(entry.severityLevel || 'mild'),
+          createdAt: entry.createdAt,
+        })),
+      );
 
       const merged = items
         .map((entry: any) => ({
           id: entry.id,
           type: entry.type || 'Assessment',
           score: Number(entry.score || 0),
-          maxScore: String(entry.type || '').toLowerCase().includes('gad-7') ? 21 : 27,
+          maxScore: getClinicalAssessmentMaxScore(
+            String(entry.type || '').toLowerCase().includes('gad-7') ? 'GAD-7' : 'PHQ-9',
+          ),
           level: String(entry.severityLevel || 'mild').toLowerCase(),
           createdAt: entry.createdAt,
         }))
@@ -223,36 +260,16 @@ export default function SessionsPage() {
       setAssessmentHistory(merged);
 
       // First-time requirement: once both are completed in history, do not require again for booking.
-      const hasCompletedPHQ9 = merged.some(entry =>
-        String(entry.type).toLowerCase().includes('phq-9') ||
-        String(entry.type).toLowerCase().includes('phq9')
+      setHasCompletedCheckin(summary.isComplete);
+      setTodaysAssessmentResults(
+        Object.entries(summary.latestByType)
+          .filter(([, entry]) => Boolean(entry))
+          .map(([type, entry]) => ({
+            type,
+            score: Number(entry?.score || 0),
+            severity: String(entry?.level || 'mild'),
+          })),
       );
-      const hasCompletedGAD7 = merged.some(entry =>
-        String(entry.type).toLowerCase().includes('gad-7') ||
-        String(entry.type).toLowerCase().includes('gad7')
-      );
-
-      setHasCompletedCheckin(hasCompletedPHQ9 && hasCompletedGAD7);
-
-      // Show latest PHQ-9/GAD-7 results.
-      if (hasCompletedPHQ9 && hasCompletedGAD7) {
-        const results = merged
-          .filter(entry =>
-            String(entry.type).toLowerCase().includes('phq-9') ||
-            String(entry.type).toLowerCase().includes('phq9') ||
-            String(entry.type).toLowerCase().includes('gad-7') ||
-            String(entry.type).toLowerCase().includes('gad7')
-          )
-          .slice(0, 2)
-          .map(entry => ({
-            type: String(entry.type).toLowerCase().includes('phq-9') || String(entry.type).toLowerCase().includes('phq9') ? 'PHQ-9' : 'GAD-7',
-            score: entry.score,
-            severity: entry.level
-          }));
-        setTodaysAssessmentResults(results);
-      } else {
-        setTodaysAssessmentResults([]);
-      }
     } finally {
       setAssessmentHistoryLoading(false);
     }
@@ -317,7 +334,7 @@ export default function SessionsPage() {
   const resetClinicalAssessmentState = () => {
     setClinicalFlowPhase('intro');
     setClinicalStartWith('PHQ-9');
-    setAssessmentOrder(['PHQ-9', 'GAD-7']);
+    setAssessmentOrder(CLINICAL_ASSESSMENT_KEYS);
     setActiveAssessmentIndex(0);
     setStructuredAttempt(null);
     setStructuredAnswers({});
@@ -366,12 +383,12 @@ export default function SessionsPage() {
   };
 
   const loadStructuredAssessment = async (assessmentType: ClinicalAssessmentKey) => {
-    const questions = ASSESSMENT_QUESTION_BANK[assessmentType].map((prompt, index) => ({
+      const questions = CLINICAL_QUESTION_BANK[assessmentType].map((prompt, index) => ({
       questionId: `${assessmentType}-${index + 1}`,
       position: index + 1,
       prompt,
       sectionKey: assessmentType,
-      options: STANDARD_OPTIONS,
+        options: CLINICAL_ASSESSMENT_OPTIONS,
     }));
 
     const response: StructuredAssessmentStartResponse = {
@@ -443,7 +460,7 @@ export default function SessionsPage() {
         {
           type: activeType,
           score: totalScore,
-          severity: severityFromScore(activeType, totalScore),
+          severity: severityFromClinicalScore(activeType, totalScore),
         },
       ]);
 
@@ -533,6 +550,24 @@ export default function SessionsPage() {
     setIsSmartMatchOpen(true);
   };
 
+  const startAdPresetPath = () => {
+    if (!adPresetProviderType) return;
+
+    setActiveCarePathLabel(`🎯 ${adPresetLabel} Matches`);
+    setBookingContext({
+      fromAssessment: true,
+      carePath: 'direct',
+      preferredSpecialization: adPresetProviderType,
+    });
+    setSmartMatchPreferences({
+      initialProviderType: adPresetProviderType,
+      lockProviderType: true,
+    });
+    setIsClinicalAssessmentOpen(false);
+    setClinicalFlowPhase('intro');
+    setIsSmartMatchOpen(true);
+  };
+
   useEffect(() => {
     if (!isClinicalAssessmentOpen || clinicalFlowPhase === 'intro') return;
     saveAssessmentDraft();
@@ -554,6 +589,25 @@ export default function SessionsPage() {
     void loadAssessmentHistory();
     setAssessmentDraft(loadAssessmentDraft());
   }, []);
+
+  // Auto-navigate to provider selection when both PHQ-9 and GAD-7 are completed
+  useEffect(() => {
+    if (isClinicalAssessmentOpen && clinicalFlowPhase === 'next-phase' && clinicalResults.length >= 2) {
+      const hasPhq = clinicalResults.some((r) => r.type === 'PHQ-9');
+      const hasGad = clinicalResults.some((r) => r.type === 'GAD-7');
+      
+      if (hasPhq && hasGad) {
+        // Both assessments are completed - navigate to provider-selection page
+        setIsClinicalAssessmentOpen(false);
+        navigate('/patient/provider-selection', {
+          state: {
+            fromAssessment: true,
+            assessmentResults: clinicalResults,
+          },
+        });
+      }
+    }
+  }, [isClinicalAssessmentOpen, clinicalFlowPhase, clinicalResults, navigate]);
 
   useEffect(() => {
     const refreshSessions = () => {
@@ -584,7 +638,8 @@ export default function SessionsPage() {
     });
   }, [assessmentHistory]);
 
-  const isAssessmentComplete = hasCompletedCheckin || hasAttendedAssessment;
+  const hasPendingProviderAssessment = pendingProviderAssessmentTitles.length > 0;
+  const isAssessmentComplete = isAdPresetFlow || ((hasCompletedCheckin || hasAttendedAssessment) && !hasPendingProviderAssessment);
 
   // Auto-open assessment from hash
   useEffect(() => {
@@ -600,7 +655,16 @@ export default function SessionsPage() {
   }, [myProviders.length, history.length]);
 
   const assessmentGateCopy = useMemo(() => {
+    if (isAdPresetFlow) return null;
     if (isAssessmentComplete) return null;
+
+    if (hasPendingProviderAssessment) {
+      return {
+        title: 'Provider-requested assessment pending',
+        detail: `Please complete ${pendingProviderAssessmentTitles.join(' and ')} before booking the next session.`,
+        button: 'Complete Assessment',
+      };
+    }
 
     if (assessmentDraft) {
       return {
@@ -615,7 +679,7 @@ export default function SessionsPage() {
       detail: 'Finish PHQ-9 and GAD-7 to unlock provider connection and session booking.',
       button: 'Start Assessment',
     };
-  }, [assessmentDraft, isAssessmentComplete]);
+  }, [assessmentDraft, hasPendingProviderAssessment, isAdPresetFlow, isAssessmentComplete, pendingProviderAssessmentTitles]);
 
   const assessmentPrimaryCtaLabel = hasAttendedAssessment
     ? 'View Result'
@@ -777,6 +841,11 @@ export default function SessionsPage() {
   const handlePrimaryBookSession = () => {
     setBookingFallbackError(null);
 
+    if (adPresetProviderType) {
+      startAdPresetPath();
+      return;
+    }
+
     if (!isAssessmentComplete) {
       setBookingFallbackError('Please complete PHQ-9 and GAD-7 assessment first. After that, booking will be unlocked.');
       openClinicalAssessmentFlow();
@@ -784,24 +853,49 @@ export default function SessionsPage() {
     }
 
     if (isConsultingPatient) {
-      setSmartMatchPreferences({
-        initialProviderType: 'ALL',
-        lockProviderType: false,
-      });
+      setSmartMatchPreferences(adPresetProviderType
+        ? {
+            initialProviderType: adPresetProviderType,
+            lockProviderType: true,
+          }
+        : {
+            initialProviderType: 'ALL',
+            lockProviderType: false,
+          });
       setIsSmartMatchOpen(true);
       return;
     }
 
-    // User has connected providers, show them for booking
-    setIsPreviousProvidersOpen(true);
+    // Open smart match to browse providers
+    setSmartMatchPreferences(adPresetProviderType
+      ? {
+          initialProviderType: adPresetProviderType,
+          lockProviderType: true,
+        }
+      : {
+          initialProviderType: 'ALL',
+          lockProviderType: false,
+        });
+    setIsSmartMatchOpen(true);
   };
 
   const handleBrowseSpecialists = () => {
     setBookingFallbackError(null);
-    setSmartMatchPreferences({
-      initialProviderType: 'ALL',
-      lockProviderType: false,
-    });
+
+    if (adPresetProviderType) {
+      startAdPresetPath();
+      return;
+    }
+
+    setSmartMatchPreferences(adPresetProviderType
+      ? {
+          initialProviderType: adPresetProviderType,
+          lockProviderType: true,
+        }
+      : {
+          initialProviderType: 'ALL',
+          lockProviderType: false,
+        });
     setIsSmartMatchOpen(true);
   };
 
@@ -850,7 +944,7 @@ export default function SessionsPage() {
                 This check-in updates your care team and triages your next phase automatically. You can start with PHQ-9 or GAD-7.
               </p>
               <div className="grid gap-2 sm:grid-cols-2">
-                {(['PHQ-9', 'GAD-7'] as ClinicalAssessmentKey[]).map((key) => (
+                {CLINICAL_ASSESSMENT_KEYS.map((key) => (
                   <button
                     key={key}
                     type="button"
@@ -941,29 +1035,42 @@ export default function SessionsPage() {
                 ) : null}
               </div>
 
-              <div className="grid gap-2 sm:grid-cols-3">
-                <button
-                  type="button"
-                  onClick={() => void startCarePath('recommended')}
-                  className="rounded-xl border border-calm-sage/25 bg-white p-3 text-left hover:border-calm-sage/45"
-                >
-                  <p className="text-xs font-semibold uppercase tracking-wide text-teal-700">Recommended</p>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void startCarePath('direct')}
-                  className="rounded-xl border border-calm-sage/25 bg-white p-3 text-left hover:border-calm-sage/45"
-                >
-                  <p className="text-xs font-semibold uppercase tracking-wide text-teal-700">🎯 Choose Provider</p>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void startCarePath('urgent')}
-                  className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-left hover:border-rose-300"
-                >
-                  <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">Urgent Care</p>
-                </button>
-              </div>
+              {adPresetProviderType ? (
+                <div className="grid gap-2">
+                  <button
+                    type="button"
+                    onClick={startAdPresetPath}
+                    className="rounded-xl border border-calm-sage/25 bg-white p-3 text-left hover:border-calm-sage/45"
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-wide text-teal-700">Ad Priority Route</p>
+                    <p className="mt-1 text-sm text-charcoal">Continue with {adPresetLabel} providers</p>
+                  </button>
+                </div>
+              ) : (
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <button
+                    type="button"
+                    onClick={() => void startCarePath('recommended')}
+                    className="rounded-xl border border-calm-sage/25 bg-white p-3 text-left hover:border-calm-sage/45"
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-wide text-teal-700">Recommended</p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void startCarePath('direct')}
+                    className="rounded-xl border border-calm-sage/25 bg-white p-3 text-left hover:border-calm-sage/45"
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-wide text-teal-700">🎯 Choose Provider</p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void startCarePath('urgent')}
+                    className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-left hover:border-rose-300"
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">Urgent Care</p>
+                  </button>
+                </div>
+              )}
             </div>
           ) : null}
 
@@ -1282,7 +1389,7 @@ export default function SessionsPage() {
               <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-calm-sage/30 bg-white/50 p-6 text-center transition-colors hover:bg-white/80">
                 <Users className="mb-3 h-8 w-8 text-calm-sage/40" />
                 <p className="text-sm font-semibold text-charcoal">Need a different specialist?</p>
-                <p className="mt-1 max-w-[200px] text-xs text-charcoal/60">Browse our directory to add a psychiatrist or coach to your care team.</p>
+                <p className="mt-1 max-w-[240px] text-xs text-charcoal/60">Use the directory to add a psychiatrist, coach, or another provider to your care team.</p>
                 <button
                   type="button"
                   onClick={handleBrowseSpecialists}
@@ -1427,93 +1534,11 @@ export default function SessionsPage() {
         </>
       )}
 
-      {isPreviousProvidersOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-charcoal/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-2xl rounded-2xl border border-calm-sage/20 bg-white p-5 shadow-2xl">
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <div>
-                <h3 className="text-lg font-bold text-charcoal">Book with your previous provider</h3>
-                <p className="mt-1 text-sm text-charcoal/65">
-                  Select your earlier consulted provider, or choose a new specialist.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsPreviousProvidersOpen(false)}
-                className="rounded-full p-2 text-charcoal/45 transition hover:bg-calm-sage/10 hover:text-charcoal"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="max-h-[50vh] space-y-3 overflow-y-auto pr-1">
-              {previousConsultedProviders.map((provider) => (
-                <div
-                  key={provider.id}
-                  className="rounded-xl border border-calm-sage/20 bg-white p-4"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-charcoal">{provider.name}</p>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-teal-700/80">
-                        {provider.role || 'Therapist'}
-                      </p>
-                      <p className="mt-1 text-xs text-charcoal/55">
-                        {provider.lastConnectedAt
-                          ? `Last connected: ${new Date(provider.lastConnectedAt).toLocaleDateString('en-IN', {
-                              day: 'numeric',
-                              month: 'short',
-                              year: 'numeric',
-                            })}`
-                          : 'Last connected: Not available'}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsPreviousProvidersOpen(false);
-                        handleOpenBookingDrawer(provider);
-                      }}
-                      className="inline-flex items-center rounded-lg bg-teal-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-teal-700"
-                    >
-                      Book with this provider
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-4 flex gap-3">
-              <button
-                type="button"
-                onClick={() => setIsPreviousProvidersOpen(false)}
-                className="flex-1 rounded-lg border border-calm-sage/20 px-4 py-2 text-sm font-medium text-charcoal transition hover:bg-calm-sage/5"
-              >
-                Close
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsPreviousProvidersOpen(false);
-                  setSmartMatchPreferences({
-                    initialProviderType: 'ALL',
-                    lockProviderType: false,
-                  });
-                  setIsSmartMatchOpen(true);
-                }}
-                className="flex-1 rounded-lg bg-charcoal px-4 py-2 text-sm font-semibold text-white transition hover:bg-charcoal/90"
-              >
-                Book with new specialist
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <SlideOverBookingDrawer
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
         provider={selectedProvider}
+        sourceFunnel={sourceFunnel}
         onBookingSuccess={() => {
           void fetchData();
           if (bookingContext?.fromAssessment) {
@@ -1532,6 +1557,9 @@ export default function SessionsPage() {
         isOpen={isSmartMatchOpen}
         initialProviderType={smartMatchPreferences.initialProviderType}
         lockProviderType={smartMatchPreferences.lockProviderType}
+        presetEntryType={adPresetEntry || undefined}
+        timezoneRegion={adPresetTimezoneRegion}
+        sourceFunnel={sourceFunnel}
         onClose={() => {
           setIsSmartMatchOpen(false);
           setSmartMatchPreferences({

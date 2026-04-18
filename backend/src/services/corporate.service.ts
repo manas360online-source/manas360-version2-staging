@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../config/db';
+import { redis } from '../config/redis';
 import { AppError } from '../middleware/error.middleware';
 import { hashPassword, generateNumericOtp, hashOtp, verifyOtp } from '../utils/hash';
 import { env } from '../config/env';
@@ -111,8 +112,65 @@ type CorporateEapQrCreateInput = {
 };
 
 const DEFAULT_COMPANY_KEY = 'techcorp-india';
+const CORPORATE_CACHE_VERSION_TTL_SECONDS = 60 * 60 * 24 * 30;
+const CORPORATE_CACHE_TTL = {
+  dashboard: 45,
+  settings: 120,
+  reports: 90,
+  programs: 90,
+  workshops: 60,
+  campaigns: 90,
+  employees: 45,
+  sessionAllocations: 60,
+  roi: 300,
+} as const;
 // See note in psychiatrist.service.ts — use typeof prisma for compatibility
 type DbClient = typeof prisma;
+
+const corporateDashboardVersionKey = (companyKey: string) => `corporate:dashboard:version:${companyKey}`;
+
+const getCorporateDashboardVersion = async (companyKey: string): Promise<number> => {
+  try {
+    const raw = await redis.get(corporateDashboardVersionKey(companyKey));
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+  } catch {
+    return 1;
+  }
+};
+
+const getCorporateDashboardCacheKey = async (scope: string, companyKey: string, query: unknown = ''): Promise<string> => {
+  const version = await getCorporateDashboardVersion(companyKey);
+  return `corporate:dashboard:v${version}:${scope}:${companyKey}:${JSON.stringify(query)}`;
+};
+
+const readCache = async <T>(key: string): Promise<T | null> => {
+  try {
+    const raw = await redis.get(key);
+    if (!raw) return null;
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+};
+
+const writeCache = async (key: string, value: unknown, ttl: number): Promise<void> => {
+  try {
+    await redis.set(key, JSON.stringify(value), ttl);
+  } catch {
+    // Best-effort cache write.
+  }
+};
+
+const invalidateCorporateDashboardCache = async (companyKey?: string): Promise<void> => {
+  const resolvedCompanyKey = String(companyKey || DEFAULT_COMPANY_KEY).trim() || DEFAULT_COMPANY_KEY;
+  try {
+    const version = await getCorporateDashboardVersion(resolvedCompanyKey);
+    await redis.set(corporateDashboardVersionKey(resolvedCompanyKey), String(version + 1), CORPORATE_CACHE_VERSION_TTL_SECONDS);
+  } catch {
+    // Best-effort invalidation.
+  }
+};
 
 const toInt = (value: unknown, fallback = 0): number => {
   const n = Number(value);
@@ -470,6 +528,11 @@ const resolveCompany = async (companyKey?: string, db: DbClient = prisma): Promi
 };
 
 export const getCorporateDashboard = async (companyKey?: string) => {
+  const cacheCompanyKey = String(companyKey || DEFAULT_COMPANY_KEY).trim() || DEFAULT_COMPANY_KEY;
+  const cacheKey = await getCorporateDashboardCacheKey('overview', cacheCompanyKey);
+  const cached = await readCache<any>(cacheKey);
+  if (cached) return cached;
+
   const { companyId, companyName, companyKey: resolvedCompanyKey } = await resolveCompany(companyKey);
 
   const [
@@ -601,7 +664,7 @@ export const getCorporateDashboard = async (companyKey?: string) => {
   const productivityGain = 2140000;
   const roiMultiple = Number((productivityGain / Math.max(programCost, 1)).toFixed(1));
 
-  return {
+  const payload = {
     company: {
       id: companyId,
       companyKey: resolvedCompanyKey,
@@ -708,6 +771,9 @@ export const getCorporateDashboard = async (companyKey?: string) => {
       averageCompletionRate: avgProgramCompletion,
     },
   };
+
+  await writeCache(cacheKey, payload, CORPORATE_CACHE_TTL.dashboard);
+  return payload;
 };
 
 export const getCorporateCompanies = async () => {
@@ -719,6 +785,11 @@ export const getCorporateCompanies = async () => {
 };
 
 export const getCorporateSettings = async (companyKey?: string) => {
+  const cacheCompanyKey = String(companyKey || DEFAULT_COMPANY_KEY).trim() || DEFAULT_COMPANY_KEY;
+  const cacheKey = await getCorporateDashboardCacheKey('settings', cacheCompanyKey);
+  const cached = await readCache<any>(cacheKey);
+  if (cached) return cached;
+
   const { companyId, companyName, companyKey: resolvedCompanyKey } = await resolveCompany(companyKey);
   const rows = await prisma.$queryRaw<Array<{
     employeeLimit: number;
@@ -742,7 +813,7 @@ export const getCorporateSettings = async (companyKey?: string) => {
     supportPhone: '+91-80-4000-3600',
     supportSla: 'Priority support within 4 business hours.',
   };
-  return {
+  const payload = {
     companyId,
     companyKey: resolvedCompanyKey,
     companyName,
@@ -754,6 +825,9 @@ export const getCorporateSettings = async (companyKey?: string) => {
     supportPhone: row.supportPhone,
     supportSla: row.supportSla,
   };
+
+  await writeCache(cacheKey, payload, CORPORATE_CACHE_TTL.settings);
+  return payload;
 };
 
 export const updateCorporateSettings = async (payload: CorporateSettingsUpdate, companyKey?: string) => {
@@ -782,6 +856,8 @@ export const updateCorporateSettings = async (payload: CorporateSettingsUpdate, 
          "supportSla" = ${next.supportSla},
          "updatedAt" = NOW()
      WHERE "id" = ${companyId}`;
+
+  await invalidateCorporateDashboardCache(companyKey);
 
   return getCorporateSettings(companyKey);
 };
@@ -847,7 +923,7 @@ export const bulkUploadCorporateEmployees = async (rows: BulkEmployeeRow[], comp
     }
   });
 
-  return {
+  const payload = {
     requested: rows.length,
     imported: created,
     updated,
@@ -855,16 +931,24 @@ export const bulkUploadCorporateEmployees = async (rows: BulkEmployeeRow[], comp
     errors,
     message: `${created} employees imported successfully${updated ? `, ${updated} updated` : ''}`,
   };
+
+  await invalidateCorporateDashboardCache(companyKey);
+  return payload;
 };
 
 export const getCorporateReports = async (companyKey?: string) => {
+  const cacheCompanyKey = String(companyKey || DEFAULT_COMPANY_KEY).trim() || DEFAULT_COMPANY_KEY;
+  const cacheKey = await getCorporateDashboardCacheKey('reports', cacheCompanyKey);
+  const cached = await readCache<any>(cacheKey);
+  if (cached) return cached;
+
   const { companyId } = await resolveCompany(companyKey);
   const rows = await prisma.$queryRaw<Array<{ id: string; reportType: string; quarter: string; format: string; downloadUrl: string; generatedAt: Date }>>`SELECT "id", "reportType", "quarter", "format", "downloadUrl", "generatedAt"
      FROM "corporate_reports"
      WHERE "companyId" = ${companyId}
      ORDER BY "generatedAt" DESC`;
 
-  return rows.map((row) => ({
+  const payload = rows.map((row) => ({
     id: row.id,
     type: row.reportType,
     quarter: row.quarter,
@@ -872,38 +956,61 @@ export const getCorporateReports = async (companyKey?: string) => {
     downloadUrl: row.downloadUrl,
     generatedAt: row.generatedAt,
   }));
+
+  await writeCache(cacheKey, payload, CORPORATE_CACHE_TTL.reports);
+  return payload;
 };
 
 export const getCorporatePrograms = async (companyKey?: string) => {
+  const cacheCompanyKey = String(companyKey || DEFAULT_COMPANY_KEY).trim() || DEFAULT_COMPANY_KEY;
+  const cacheKey = await getCorporateDashboardCacheKey('programs', cacheCompanyKey);
+  const cached = await readCache<any>(cacheKey);
+  if (cached) return cached;
+
   const { companyId } = await resolveCompany(companyKey);
   const rows = await prisma.$queryRaw<Array<{ id: string; title: string; durationWeeks: number; employeesEnrolled: number; completionRate: number; status: string }>>`SELECT "id", "title", "durationWeeks", "employeesEnrolled", "completionRate", "status"
      FROM "corporate_programs"
      WHERE "companyId" = ${companyId}
      ORDER BY "createdAt" DESC`;
 
+  await writeCache(cacheKey, rows, CORPORATE_CACHE_TTL.programs);
   return rows;
 };
 
 export const getCorporateWorkshops = async (companyKey?: string) => {
+  const cacheCompanyKey = String(companyKey || DEFAULT_COMPANY_KEY).trim() || DEFAULT_COMPANY_KEY;
+  const cacheKey = await getCorporateDashboardCacheKey('workshops', cacheCompanyKey);
+  const cached = await readCache<any>(cacheKey);
+  if (cached) return cached;
+
   const { companyId } = await resolveCompany(companyKey);
   const rows = await prisma.$queryRaw<Array<{ id: string; title: string; provider: string; department: string; workshopDate: Date; attendees: number; status: string }>>`SELECT "id", "title", "provider", "department", "workshopDate", "attendees", "status"
      FROM "corporate_workshops"
      WHERE "companyId" = ${companyId}
      ORDER BY "workshopDate" ASC`;
 
-  return rows.map((row) => ({
+  const payload = rows.map((row) => ({
     ...row,
     date: row.workshopDate,
   }));
+
+  await writeCache(cacheKey, payload, CORPORATE_CACHE_TTL.workshops);
+  return payload;
 };
 
 export const getCorporateCampaigns = async (companyKey?: string) => {
+  const cacheCompanyKey = String(companyKey || DEFAULT_COMPANY_KEY).trim() || DEFAULT_COMPANY_KEY;
+  const cacheKey = await getCorporateDashboardCacheKey('campaigns', cacheCompanyKey);
+  const cached = await readCache<any>(cacheKey);
+  if (cached) return cached;
+
   const { companyId } = await resolveCompany(companyKey);
   const rows = await prisma.$queryRaw<Array<{ id: string; title: string; audience: string; startDate: Date; endDate: Date; reachCount: number; engagementRate: number; status: string }>>`SELECT "id", "title", "audience", "startDate", "endDate", "reachCount", "engagementRate", "status"
      FROM "corporate_campaigns"
      WHERE "companyId" = ${companyId}
      ORDER BY "startDate" DESC`;
 
+  await writeCache(cacheKey, rows, CORPORATE_CACHE_TTL.campaigns);
   return rows;
 };
 
@@ -911,6 +1018,11 @@ export const getCorporateEmployees = async (
   companyKey?: string,
   filters?: { department?: string; query?: string; limit?: number; offset?: number },
 ) => {
+  const cacheCompanyKey = String(companyKey || DEFAULT_COMPANY_KEY).trim() || DEFAULT_COMPANY_KEY;
+  const cacheKey = await getCorporateDashboardCacheKey('employees', cacheCompanyKey, filters || {});
+  const cached = await readCache<any>(cacheKey);
+  if (cached) return cached;
+
   const { companyId } = await resolveCompany(companyKey);
   const limit = Math.min(200, Math.max(1, toInt(filters?.limit, 100)));
   const offset = Math.max(0, toInt(filters?.offset, 0));
@@ -962,15 +1074,23 @@ export const getCorporateEmployees = async (
        AND (${query ? `%${query}%` : ''}::text = '' OR LOWER(e."name") LIKE LOWER(${query ? `%${query}%` : ''}) OR LOWER(e."email") LIKE LOWER(${query ? `%${query}%` : ''}) OR LOWER(COALESCE(e."employeeCode", '')) LIKE LOWER(${query ? `%${query}%` : ''}))
        AND (${department}::text = '' OR d."name" = ${department})`;
 
-  return {
+  const payload = {
     total: toInt(totalRows[0]?.total, 0),
     limit,
     offset,
     rows,
   };
+
+  await writeCache(cacheKey, payload, CORPORATE_CACHE_TTL.employees);
+  return payload;
 };
 
 export const getCorporateSessionAllocations = async (companyKey?: string) => {
+  const cacheCompanyKey = String(companyKey || DEFAULT_COMPANY_KEY).trim() || DEFAULT_COMPANY_KEY;
+  const cacheKey = await getCorporateDashboardCacheKey('session-allocations', cacheCompanyKey);
+  const cached = await readCache<any>(cacheKey);
+  if (cached) return cached;
+
   const { companyId } = await resolveCompany(companyKey);
   const rows = await prisma.$queryRaw<Array<{ department: string; allocatedSessions: number; usedSessions: number }>>`SELECT d."name" as department, a."allocatedSessions", a."usedSessions"
      FROM "company_session_allocations" a
@@ -987,11 +1107,14 @@ export const getCorporateSessionAllocations = async (companyKey?: string) => {
     { allocated: 0, used: 0 },
   );
 
-  return {
+  const payload = {
     totals,
     utilizationRate: toPct(totals.used, totals.allocated),
     rows,
   };
+
+  await writeCache(cacheKey, payload, CORPORATE_CACHE_TTL.sessionAllocations);
+  return payload;
 };
 
 export const updateCorporateSessionAllocations = async (allocations: SessionAllocationUpdate[], companyKey?: string) => {
@@ -1014,6 +1137,8 @@ export const updateCorporateSessionAllocations = async (allocations: SessionAllo
     }
   });
 
+  await invalidateCorporateDashboardCache(companyKey);
+
   return getCorporateSessionAllocations(companyKey);
 };
 
@@ -1026,6 +1151,8 @@ export const createCorporateProgram = async (payload: ProgramCreateInput, compan
 
   await prisma.$executeRaw`INSERT INTO "corporate_programs" ("id","companyId","title","durationWeeks","employeesEnrolled","completionRate","status","createdAt","updatedAt")
      VALUES (${randomUUID()},${companyId},${title},${Math.max(1, toInt(payload.durationWeeks, 4))},${Math.max(0, toInt(payload.employeesEnrolled, 0))},${Math.max(0, Math.min(100, toInt(payload.completionRate, 0)))},${String(payload.status || 'ACTIVE').trim().toUpperCase() || 'ACTIVE'},NOW(),NOW())`;
+
+  await invalidateCorporateDashboardCache(companyKey);
 
   return getCorporatePrograms(companyKey);
 };
@@ -1040,6 +1167,8 @@ export const createCorporateWorkshop = async (payload: WorkshopCreateInput, comp
   await prisma.$executeRaw`INSERT INTO "corporate_workshops" ("id","companyId","title","provider","department","workshopDate","attendees","status","createdAt","updatedAt")
      VALUES (${randomUUID()},${companyId},${title},${String(payload.provider || 'Internal Wellness Team').trim()},${String(payload.department || 'General').trim()},${String(payload.date || new Date().toISOString().slice(0, 10))}::date,${Math.max(0, toInt(payload.attendees, 0))},${String(payload.status || 'SCHEDULED').trim().toUpperCase() || 'SCHEDULED'},NOW(),NOW())`;
 
+  await invalidateCorporateDashboardCache(companyKey);
+
   return getCorporateWorkshops(companyKey);
 };
 
@@ -1053,23 +1182,33 @@ export const createCorporateCampaign = async (payload: CampaignCreateInput, comp
   await prisma.$executeRaw`INSERT INTO "corporate_campaigns" ("id","companyId","title","audience","startDate","endDate","reachCount","engagementRate","status","createdAt","updatedAt")
      VALUES (${randomUUID()},${companyId},${title},${String(payload.audience || 'All Employees').trim()},${String(payload.startDate || new Date().toISOString().slice(0, 10))}::date,${String(payload.endDate || new Date().toISOString().slice(0, 10))}::date,${Math.max(0, toInt(payload.reachCount, 0))},${Math.max(0, Math.min(100, toInt(payload.engagementRate, 0)))},${String(payload.status || 'ACTIVE').trim().toUpperCase() || 'ACTIVE'},NOW(),NOW())`;
 
+  await invalidateCorporateDashboardCache(companyKey);
+
   return getCorporateCampaigns(companyKey);
 };
 
 export const getCorporateRoi = async (companyKey?: string) => {
+  const cacheCompanyKey = String(companyKey || DEFAULT_COMPANY_KEY).trim() || DEFAULT_COMPANY_KEY;
+  const cacheKey = await getCorporateDashboardCacheKey('roi', cacheCompanyKey);
+  const cached = await readCache<any>(cacheKey);
+  if (cached) return cached;
+
   await resolveCompany(companyKey);
   const programCost = 890000;
   const productivityGain = 2140000;
   const retentionGain = 560000;
   const healthcareSavings = 280000;
 
-  return {
+  const payload = {
     programCost,
     productivityGain,
     retentionGain,
     healthcareSavings,
     roiMultiple: Number(((productivityGain + retentionGain + healthcareSavings) / Math.max(programCost, 1)).toFixed(1)),
   };
+
+  await writeCache(cacheKey, payload, CORPORATE_CACHE_TTL.roi);
+  return payload;
 };
 
 export const getCorporateInvoices = async (companyKey?: string) => {
@@ -1159,6 +1298,8 @@ export const createCorporatePaymentMethod = async (payload: PaymentMethodCreateI
     ) VALUES (${randomUUID()},${companyId},${methodType},${label},${details},${isPrimary},true,NOW(),NOW())`;
   });
 
+  await invalidateCorporateDashboardCache(companyKey);
+
   return getCorporatePaymentMethods(companyKey);
 };
 
@@ -1199,6 +1340,8 @@ export const updateCorporatePaymentMethod = async (
          "updatedAt" = NOW()
      WHERE "id" = ${methodId} AND "companyId" = ${companyId}`;
   });
+
+  await invalidateCorporateDashboardCache(companyKey);
 
   return getCorporatePaymentMethods(companyKey);
 };

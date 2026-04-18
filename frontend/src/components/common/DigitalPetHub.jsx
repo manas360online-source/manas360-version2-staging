@@ -503,29 +503,5 @@ const Footer = () => (
 
 /* ─── ROOT ─── */
 export default function DigitalPetHub() {
-  return (
-    <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,700;0,9..144,800;1,9..144,400&family=Outfit:wght@300;400;500;600;700&display=swap');
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        @keyframes glow {
-          0%,100% { box-shadow: 0 0 15px rgba(124,58,237,.15); }
-          50% { box-shadow: 0 0 30px rgba(124,58,237,.25); }
-        }
-      `}</style>
-      <div style={{ fontFamily: "'Outfit', sans-serif", background: "#fff", color: tokens.slate, lineHeight: 1.6 }}>
-        <Nav />
-        <Hero />
-        <ScienceStrip />
-        <Pathways />
-        <PetCatalog />
-        <Monetization />
-        <Schedule />
-        <Loops />
-        <Revenue />
-        <Architecture />
-        <Footer />
-      </div>
-    </>
-  );
+  return <DigitalPetsHubPage />;
 }
