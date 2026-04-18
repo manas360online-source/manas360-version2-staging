@@ -53,7 +53,7 @@ const providerLabel = (value: string): string => {
 
 export default function SubscribePage() {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [pricing, setPricing] = useState<PricingConfig | null>(null);
   const [loadingPricing, setLoadingPricing] = useState(true);
   const [pricingError, setPricingError] = useState<string | null>(null);
@@ -67,7 +67,7 @@ export default function SubscribePage() {
       setLoadingPricing(true);
       setPricingError(null);
       try {
-        const response = await patientApi.getPricing();
+        const response = await patientApi.getPricing({ mode: user?.nriTermsAccepted ? 'nri' : 'domestic' });
         const data = response?.data ?? response;
         setPricing(data as PricingConfig);
       } catch (error: any) {
@@ -79,7 +79,7 @@ export default function SubscribePage() {
     };
 
     void loadPricing();
-  }, []);
+  }, [user?.nriTermsAccepted]);
 
   const sessionPricing = useMemo(() => {
     return [...(pricing?.sessionPricing || [])]

@@ -8,11 +8,11 @@ import { logger } from '../utils/logger';
  */
 export const calculateLiveMetrics = async () => {
   const [
-    activeUsers,
-    todayRevenue,
-    openTickets,
-    pendingCrisis
-  ] = await Promise.all([
+    activeUsersResult,
+    todayRevenueResult,
+    openTicketsResult,
+    pendingCrisisResult
+  ] = await Promise.allSettled([
     db.user.count({ where: { status: 'ACTIVE', isDeleted: false } }),
     db.financialPayment.aggregate({
       where: { 
@@ -24,6 +24,26 @@ export const calculateLiveMetrics = async () => {
     db.marqueeOffer.count({ where: { isActive: true, isDeleted: false } }), // Using marquee as proxy if tickets not in DB yet
     db.crisisAlert.count({ where: { status: 'pending' } })
   ]);
+
+  const activeUsers = activeUsersResult.status === 'fulfilled' ? activeUsersResult.value : 0;
+  const todayRevenue = todayRevenueResult.status === 'fulfilled'
+    ? todayRevenueResult.value
+    : { _sum: { amountMinor: null } };
+  const openTickets = openTicketsResult.status === 'fulfilled' ? openTicketsResult.value : 0;
+  const pendingCrisis = pendingCrisisResult.status === 'fulfilled' ? pendingCrisisResult.value : 0;
+
+  if (activeUsersResult.status === 'rejected') {
+    logger.warn('[Metrics] Falling back to zero active users', { error: String(activeUsersResult.reason) });
+  }
+  if (todayRevenueResult.status === 'rejected') {
+    logger.warn('[Metrics] Falling back to zero revenue', { error: String(todayRevenueResult.reason) });
+  }
+  if (openTicketsResult.status === 'rejected') {
+    logger.warn('[Metrics] Falling back to zero open tickets', { error: String(openTicketsResult.reason) });
+  }
+  if (pendingCrisisResult.status === 'rejected') {
+    logger.warn('[Metrics] Falling back to zero pending crisis alerts', { error: String(pendingCrisisResult.reason) });
+  }
 
   return {
     activeUsers,
