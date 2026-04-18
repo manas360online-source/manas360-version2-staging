@@ -37,6 +37,7 @@ export interface AuthUser {
 	requiresPlatformPayment?: boolean;
 	platformAccessActive?: boolean;
 	legalAcceptanceRequired?: boolean;
+	nriTermsAccepted?: boolean;
 	pendingLegalDocuments?: LegalDocument[];
 	permissions?: string[];
 	adminPolicies?: Record<string, string[]>;
@@ -60,7 +61,9 @@ export interface ProviderRegisterPayload {
 	clinicalCategories: string[];
 	specializations: string[];
 	languages: string[];
+	certifications?: string[];
 	corporateReady: boolean;
+	nriSessionEnabled: boolean;
 	shiftPreferences: string[];
 	consultationFee: number;
 	bankDetails: {

@@ -1,19 +1,60 @@
-// Public pricing controller for landing page
-export const getLivePricingController = async (req: Request, res: Response): Promise<void> => {
-	const { category } = req.params;
-	const data = await getPricingConfig();
-	// Optionally filter by category if needed
-	const results = category ? (data as any)[category as string] || {} : data;
-	sendSuccess(res, results, 'Live pricing fetched');
-};
 import type { Request, Response } from 'express';
 import { AppError } from '../middleware/error.middleware';
 import { sendSuccess } from '../utils/response';
 import { getPricingConfig, getAdminPricingConfigWithImpact, updatePricingConfig } from '../services/pricing.service';
 import { recordAdminAuditEvent } from '../services/admin-audit.service';
 
+// Public pricing controller for landing page
+export const getLivePricingController = async (req: Request, res: Response): Promise<void> => {
+	const { category } = req.params;
+	const rawMode = String(req.query.mode || req.query.pricingMode || '').trim().toLowerCase();
+	let mode: 'domestic' | 'nri' = rawMode === 'nri' ? 'nri' : 'domestic';
+
+	if (mode !== 'nri') {
+		const token = (req as Request & { cookies?: Record<string, string> }).cookies?.access_token
+			|| (typeof req.headers.authorization === 'string' && req.headers.authorization.startsWith('Bearer ') ? req.headers.authorization.slice(7) : null);
+		if (token) {
+			try {
+				const { verifyAccessToken } = await import('../utils/jwt');
+				const { hasAcceptedNriTerms } = await import('../services/legal-compliance.service');
+				const payload = verifyAccessToken(token);
+				if (await hasAcceptedNriTerms(payload.sub)) {
+					mode = 'nri';
+				}
+			} catch {
+				// keep domestic pricing if auth lookup fails
+			}
+		}
+	}
+
+	const data = await getPricingConfig({ mode });
+	const results = category ? (data as any)[category as string] || {} : data;
+	sendSuccess(res, results, 'Live pricing fetched');
+};
+
 export const getPricingConfigController = async (_req: Request, res: Response): Promise<void> => {
-	const data = await getPricingConfig();
+	const req = _req;
+	const rawMode = String(req.query.mode || req.query.pricingMode || '').trim().toLowerCase();
+	let mode: 'domestic' | 'nri' = rawMode === 'nri' ? 'nri' : 'domestic';
+
+	if (mode !== 'nri') {
+		const token = (req as Request & { cookies?: Record<string, string> }).cookies?.access_token
+			|| (typeof req.headers.authorization === 'string' && req.headers.authorization.startsWith('Bearer ') ? req.headers.authorization.slice(7) : null);
+		if (token) {
+			try {
+				const { verifyAccessToken } = await import('../utils/jwt');
+				const { hasAcceptedNriTerms } = await import('../services/legal-compliance.service');
+				const payload = verifyAccessToken(token);
+				if (await hasAcceptedNriTerms(payload.sub)) {
+					mode = 'nri';
+				}
+			} catch {
+				// keep domestic pricing if auth lookup fails
+			}
+		}
+	}
+
+	const data = await getPricingConfig({ mode });
 	sendSuccess(res, data, 'Pricing configuration fetched');
 };
 
