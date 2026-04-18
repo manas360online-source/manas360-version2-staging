@@ -7,7 +7,7 @@ set -e
 
 echo "Waiting for database to be ready..."
 RETRIES=30
-until npx prisma migrate status > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do
+until echo "SELECT 1;" | npx prisma db execute --stdin --url "$DATABASE_URL" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do
   echo "Waiting for database connection... ($RETRIES attempts left)"
   RETRIES=$((RETRIES - 1))
   sleep 2
