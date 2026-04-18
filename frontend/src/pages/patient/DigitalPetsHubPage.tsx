@@ -1,8 +1,9 @@
-import { useEffect } from 'react';
-import { Link } from 'react-router-dom';
+
+import React, { useEffect } from "react";
+import { Link } from "react-router-dom";
 
 type DigitalPetsHubPageProps = {
-  selectedPet?: 'golden-puppy' | 'wise-owl' | 'patience-turtle';
+  selectedPet?: "golden-puppy" | "wise-owl" | "patience-turtle";
 };
 
 const scienceCards = [
@@ -375,3 +376,5 @@ export default function DigitalPetsHubPage() {
     </div>
   );
 }
+
+export default DigitalPetsHubPage;

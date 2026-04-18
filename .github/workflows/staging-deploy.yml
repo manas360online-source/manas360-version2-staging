@@ -28,10 +28,10 @@ jobs:
       - name: Validate required staging secrets and vars
         id: validate
         env:
-          EC2_HOST: ${{ secrets.EC2_HOST }}
-          EC2_USER: ${{ secrets.EC2_USER }}
-          EC2_KEY: ${{ secrets.EC2_KEY }}
-          STAGING_APP_DIR: ${{ vars.STAGING_APP_DIR }}
+          EC2_HOST: ${{ secrets['EC2_HOST'] }}
+          EC2_USER: ${{ secrets['EC2_USER'] }}
+          EC2_KEY: ${{ secrets['EC2_KEY'] }}
+          STAGING_APP_DIR: ${{ vars['STAGING_APP_DIR'] }}
         run: |
           set -euo pipefail
 
@@ -75,10 +75,10 @@ jobs:
     needs: preflight
     runs-on: ubuntu-latest
     env:
-      EC2_HOST: ${{ secrets.EC2_HOST }}
-      EC2_USER: ${{ secrets.EC2_USER }}
-      EC2_KEY: ${{ secrets.EC2_KEY }}
-      STAGING_APP_DIR: ${{ vars.STAGING_APP_DIR }}
+      EC2_HOST: ${{ secrets['EC2_HOST'] }}
+      EC2_USER: ${{ secrets['EC2_USER'] }}
+      EC2_KEY: ${{ secrets['EC2_KEY'] }}
+      STAGING_APP_DIR: ${{ vars['STAGING_APP_DIR'] }}
 
     steps:
       - name: Checkout
