@@ -83,7 +83,10 @@ export default defineConfig({
           if (id.includes('/src/pages/psychiatrist/')) return 'pages-psychiatrist'
           if (id.includes('/src/pages/admin/')) return 'pages-admin'
           if (id.includes('/src/components/')) return 'components-core'
-          if (id.includes('/src/api/')) return 'api-core'
+          // Keep API utilities in the main vendor bundle to avoid circular
+          // chunk references (api-core <-> vendor) that can cause runtime
+          // initialization order errors in minified builds.
+          if (id.includes('/src/api/')) return 'vendor'
         },
       },
     },
