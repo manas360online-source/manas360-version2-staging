@@ -5,6 +5,7 @@ import {
   updateGroupCategory, 
   type GroupCategory 
 } from '../../api/admin.api';
+import { groupTherapyApi } from '../../api/groupTherapy';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
@@ -12,8 +13,11 @@ import toast from 'react-hot-toast';
 
 export default function GroupManagement() {
   const [groups, setGroups] = useState<GroupCategory[]>([]);
+  const [sessionQueue, setSessionQueue] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [queueLoading, setQueueLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
+  const [workingRequestId, setWorkingRequestId] = useState<string | null>(null);
   const [newGroup, setNewGroup] = useState<Partial<GroupCategory>>({
     name: '',
     type: 'therapy_group',
@@ -35,9 +39,24 @@ export default function GroupManagement() {
     }
   }, []);
 
+  const fetchSessionQueue = useCallback(async () => {
+    setQueueLoading(true);
+    try {
+      const res = await groupTherapyApi.listAdminQueue();
+      setSessionQueue(Array.isArray(res.items) ? res.items : []);
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to load group therapy review queue');
+      setSessionQueue([]);
+    } finally {
+      setQueueLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchGroups();
-  }, [fetchGroups]);
+    fetchSessionQueue();
+  }, [fetchGroups, fetchSessionQueue]);
 
   const handleCreateGroup = async () => {
     if (!newGroup.name || !newGroup.type) {
@@ -71,6 +90,65 @@ export default function GroupManagement() {
       fetchGroups();
     } catch (err) {
       toast.error('Update failed');
+    }
+  };
+
+  const handleApprove = async (requestRow: any) => {
+    const defaultPrice = Number(requestRow?.priceMinor || 0) > 0 ? Number(requestRow.priceMinor) : 49900;
+    setWorkingRequestId(String(requestRow.id));
+    try {
+      await groupTherapyApi.reviewRequest(String(requestRow.id), {
+        decision: 'approve',
+        priceMinor: defaultPrice,
+        title: String(requestRow?.title || 'Group Therapy Session').trim(),
+        topic: String(requestRow?.topic || 'Group Support').trim(),
+        scheduledAt: String(requestRow?.scheduledAt || new Date().toISOString()),
+        durationMinutes: Number(requestRow?.durationMinutes || 60),
+        maxMembers: Number(requestRow?.maxMembers || 10),
+        allowGuestJoin: requestRow?.allowGuestJoin !== false,
+        requiresPayment: requestRow?.requiresPayment !== false,
+      });
+      toast.success('Request approved. Publish to make it public online.');
+      await fetchSessionQueue();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || error?.message || 'Unable to approve request');
+    } finally {
+      setWorkingRequestId(null);
+    }
+  };
+
+  const handleReject = async (requestRow: any) => {
+    const rejectionReason = window.prompt('Enter rejection reason for provider:') || '';
+    if (!rejectionReason.trim()) {
+      toast.error('Rejection reason is required');
+      return;
+    }
+
+    setWorkingRequestId(String(requestRow.id));
+    try {
+      await groupTherapyApi.reviewRequest(String(requestRow.id), {
+        decision: 'reject',
+        rejectionReason: rejectionReason.trim(),
+      });
+      toast.success('Request rejected');
+      await fetchSessionQueue();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || error?.message || 'Unable to reject request');
+    } finally {
+      setWorkingRequestId(null);
+    }
+  };
+
+  const handlePublish = async (requestRow: any) => {
+    setWorkingRequestId(String(requestRow.id));
+    try {
+      await groupTherapyApi.publishRequest(String(requestRow.id));
+      toast.success('Session published and now visible on landing/group pages');
+      await fetchSessionQueue();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || error?.message || 'Unable to publish request');
+    } finally {
+      setWorkingRequestId(null);
     }
   };
 
@@ -147,6 +225,91 @@ export default function GroupManagement() {
              {isCreating ? 'Deploying...' : 'Deploy Group Module'}
            </Button>
         </div>
+      </div>
+
+      <div className="mb-10 overflow-hidden rounded-2xl border border-indigo-100 bg-white shadow-soft-sm">
+        <div className="flex items-center justify-between border-b border-indigo-100 bg-indigo-50/50 px-6 py-4">
+          <div>
+            <h3 className="text-base font-bold text-indigo-900">Group Therapy Session Governance</h3>
+            <p className="text-xs font-medium text-indigo-700">Provider requests require admin approval and publish before going online.</p>
+          </div>
+          <Button variant="secondary" size="sm" onClick={fetchSessionQueue}>Refresh Queue</Button>
+        </div>
+
+        {queueLoading ? (
+          <div className="p-6 text-sm text-gray-500">Loading governance queue...</div>
+        ) : sessionQueue.length === 0 ? (
+          <div className="p-6 text-sm text-gray-500">No pending/approved/published group therapy requests in queue.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-50/70 text-[11px] font-bold uppercase tracking-wide text-gray-500">
+                  <th className="px-6 py-3">Session</th>
+                  <th className="px-6 py-3">Host Therapist</th>
+                  <th className="px-6 py-3">Schedule</th>
+                  <th className="px-6 py-3 text-center">Seats</th>
+                  <th className="px-6 py-3 text-right">Price</th>
+                  <th className="px-6 py-3 text-center">Status</th>
+                  <th className="px-6 py-3 text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50 text-sm">
+                {sessionQueue.map((row) => {
+                  const status = String(row?.status || '').toUpperCase();
+                  const isWorking = workingRequestId === String(row?.id);
+                  const hostName = [row?.hostTherapist?.firstName, row?.hostTherapist?.lastName].filter(Boolean).join(' ').trim() || 'Unassigned';
+
+                  return (
+                    <tr key={row.id} className="align-top">
+                      <td className="px-6 py-4">
+                        <p className="font-bold text-gray-900">{row.title}</p>
+                        <p className="mt-1 text-xs text-gray-500">{row.topic || 'General support'}</p>
+                        <p className="mt-1 text-[11px] text-gray-400">Mode: {String(row?.sessionMode || 'PUBLIC')}</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="font-medium text-gray-700">{hostName}</p>
+                        <p className="text-xs text-gray-500">{row?.hostTherapist?.email || '-'}</p>
+                      </td>
+                      <td className="px-6 py-4 text-gray-700">
+                        <p>{new Date(String(row?.scheduledAt || '')).toLocaleString()}</p>
+                        <p className="text-xs text-gray-500">{Number(row?.durationMinutes || 60)} mins</p>
+                      </td>
+                      <td className="px-6 py-4 text-center font-semibold text-gray-700">{Number(row?.maxMembers || 0)}</td>
+                      <td className="px-6 py-4 text-right font-semibold text-gray-700">₹{Math.round(Number(row?.priceMinor || 0) / 100)}</td>
+                      <td className="px-6 py-4 text-center">
+                        <span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-black uppercase ${
+                          status === 'PENDING_APPROVAL' ? 'bg-amber-100 text-amber-700' :
+                          status === 'APPROVED' ? 'bg-blue-100 text-blue-700' :
+                          status === 'PUBLISHED' || status === 'LIVE' ? 'bg-emerald-100 text-emerald-700' :
+                          'bg-gray-100 text-gray-600'
+                        }`}>
+                          {status || '-'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-wrap justify-center gap-2">
+                          {status === 'PENDING_APPROVAL' && (
+                            <>
+                              <Button size="sm" className="h-8 bg-blue-600 px-3 text-[10px] font-bold uppercase" disabled={isWorking} onClick={() => void handleApprove(row)}>Approve</Button>
+                              <Button size="sm" variant="secondary" className="h-8 px-3 text-[10px] font-bold uppercase text-rose-600" disabled={isWorking} onClick={() => void handleReject(row)}>Reject</Button>
+                            </>
+                          )}
+                          {status === 'APPROVED' && (
+                            <Button size="sm" className="h-8 bg-emerald-600 px-3 text-[10px] font-bold uppercase" disabled={isWorking} onClick={() => void handlePublish(row)}>Publish</Button>
+                          )}
+                          {(status === 'PUBLISHED' || status === 'LIVE') && (
+                            <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-bold uppercase text-emerald-700">Online</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Groups Inventory */}

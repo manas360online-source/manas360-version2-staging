@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MANAS360 · Group Therapy Sessions</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'DM Sans',sans-serif;background:#0F1724;color:#E8EDF2;overflow-x:hidden;-webkit-font-smoothing:antialiased;}
+
+/* ── NAV ── */
+.nav{background:rgba(15,23,36,.96);backdrop-filter:blur(14px);border-bottom:1px solid #1A2538;padding:12px 20px;position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;max-width:100%;}
+.nav-brand{font-family:'Outfit',sans-serif;font-size:18px;font-weight:800;color:#E8EDF2;letter-spacing:-.3px;}
+.nav-brand em{font-style:normal;color:#B8D44F;}
+.nav-right{display:flex;gap:8px;align-items:center;}
+.nav-pill{padding:6px 14px;border-radius:18px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid #2A3548;background:transparent;color:#8899AA;transition:all .2s;}
+.nav-pill:hover{border-color:#4A90D9;color:#E8EDF2;}
+.nav-pill.cta{background:linear-gradient(135deg,#002365,#001A4D);color:#fff;border-color:#002365;}
+.nav-pill.cta:hover{transform:scale(1.04);}
+
+/* ── HERO STRIP ── */
+.hero-strip{background:linear-gradient(135deg,#001A4D 0%,#002365 50%,#0A3A8F 100%);padding:32px 20px 28px;text-align:center;position:relative;overflow:hidden;}
+.hero-strip::before{content:'';position:absolute;top:-80px;right:-80px;width:240px;height:240px;border-radius:50%;background:rgba(184,212,79,.06);}
+.hero-strip::after{content:'';position:absolute;bottom:-60px;left:-60px;width:180px;height:180px;border-radius:50%;background:rgba(74,144,217,.08);}
+.hero-strip h1{font-family:'Outfit',sans-serif;font-size:clamp(22px,4vw,36px);font-weight:800;line-height:1.15;margin-bottom:8px;position:relative;z-index:2;}
+.hero-strip h1 span{color:#B8D44F;}
+.hero-sub{font-size:14px;color:rgba(255,255,255,.7);max-width:440px;margin:0 auto 16px;line-height:1.5;position:relative;z-index:2;}
+.hero-stats{display:flex;gap:20px;justify-content:center;flex-wrap:wrap;position:relative;z-index:2;}
+.hero-stat{text-align:center;}
+.hero-stat .num{font-family:'Outfit',sans-serif;font-size:22px;font-weight:800;color:#B8D44F;}
+.hero-stat .label{font-size:10px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.8px;}
+
+/* ── FILTER BAR ── */
+.filter-bar{display:flex;gap:6px;padding:14px 16px;overflow-x:auto;scrollbar-width:none;background:#0F1724;border-bottom:1px solid #1A2538;position:sticky;top:52px;z-index:90;}
+.filter-bar::-webkit-scrollbar{display:none;}
+.filter-chip{padding:7px 16px;border-radius:20px;border:1px solid #2A3548;font-size:11px;font-weight:600;cursor:pointer;background:transparent;color:#8899AA;white-space:nowrap;transition:all .2s;flex-shrink:0;}
+.filter-chip:hover{border-color:#4A90D9;color:#E8EDF2;}
+.filter-chip.active{background:#002365;color:#fff;border-color:#002365;}
+
+/* ── LIVE NOW BANNER ── */
+.live-banner{margin:16px 16px 0;padding:14px 18px;background:linear-gradient(135deg,rgba(239,68,68,.12),rgba(239,68,68,.04));border:1px solid rgba(239,68,68,.25);border-radius:14px;display:flex;align-items:center;gap:12px;animation:livePulse 3s infinite;}
+@keyframes livePulse{0%,100%{border-color:rgba(239,68,68,.25)}50%{border-color:rgba(239,68,68,.6)}}
+.live-dot-big{width:10px;height:10px;background:#EF4444;border-radius:50%;animation:blink 1s infinite;flex-shrink:0;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
+.live-banner-text{flex:1;}
+.live-banner-text .title{font-size:13px;font-weight:700;color:#F87171;}
+.live-banner-text .detail{font-size:11px;color:#8899AA;margin-top:2px;}
+.live-join{padding:8px 18px;background:#EF4444;border-radius:10px;font-size:11px;font-weight:700;color:#fff;cursor:pointer;border:none;transition:all .2s;white-space:nowrap;}
+.live-join:hover{background:#DC2626;transform:scale(1.04);}
+
+/* ── SESSION GRID ── */
+.grid-section{padding:20px 16px;}
+.grid-label{font-family:'Outfit',sans-serif;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:#4A90D9;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.grid-label::after{content:'';flex:1;height:1px;background:#1A2538;}
+.session-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;}
+
+/* ── SESSION TILE ── */
+.tile{background:#1A2538;border-radius:14px;border:1px solid #2A3548;overflow:hidden;cursor:pointer;transition:all .25s;position:relative;}
+.tile:hover{transform:translateY(-4px);box-shadow:0 12px 32px rgba(0,0,0,.4);border-color:var(--tc,#4A90D9);}
+.tile-accent{height:3px;background:var(--tc,#4A90D9);}
+.tile-body{padding:16px;}
+.tile-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;}
+.tile-emoji{font-size:32px;line-height:1;}
+.tile-badge{padding:3px 10px;border-radius:10px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;}
+.badge-live{background:rgba(239,68,68,.2);color:#F87171;animation:livePulse 2s infinite;}
+.badge-next{background:rgba(251,191,36,.15);color:#FBBF24;}
+.badge-soon{background:rgba(74,144,217,.15);color:#4A90D9;}
+.badge-full{background:rgba(102,102,128,.15);color:#666680;}
+.tile-title{font-family:'Outfit',sans-serif;font-size:16px;font-weight:700;line-height:1.25;margin-bottom:4px;}
+.tile-tagline{font-size:12px;color:#8899AA;line-height:1.4;margin-bottom:12px;}
+.tile-meta{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px;}
+.tile-meta-item{font-size:10px;color:#666680;display:flex;align-items:center;gap:4px;}
+.tile-meta-item .icon{font-size:12px;}
+.tile-seats{margin-bottom:14px;}
+.tile-seats-label{display:flex;justify-content:space-between;font-size:10px;color:#666680;margin-bottom:4px;}
+.tile-seats-bar{height:4px;background:#0F1724;border-radius:2px;overflow:hidden;}
+.tile-seats-fill{height:100%;border-radius:2px;background:var(--tc,#4A90D9);transition:width .6s ease;}
+.tile-cta{width:100%;padding:10px;border:none;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;letter-spacing:.3px;}
+.cta-join{background:var(--tc,#4A90D9);color:#fff;}
+.cta-join:hover{filter:brightness(1.15);transform:scale(1.02);}
+.cta-notify{background:rgba(74,144,217,.12);color:#4A90D9;border:1px solid rgba(74,144,217,.25);}
+.cta-notify:hover{background:rgba(74,144,217,.2);}
+.cta-full{background:#1A2538;color:#666680;border:1px solid #2A3548;cursor:default;}
+.tile-therapist{display:flex;align-items:center;gap:8px;margin-bottom:12px;padding:8px 10px;background:#0F1724;border-radius:10px;}
+.tile-therapist-avatar{width:28px;height:28px;border-radius:50%;background:var(--tc,#4A90D9);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;}
+.tile-therapist-info .name{font-size:11px;font-weight:600;}
+.tile-therapist-info .cred{font-size:9px;color:#666680;}
+
+/* ── PRICING STRIP ── */
+.pricing-strip{margin:8px 16px 20px;padding:16px 20px;background:linear-gradient(135deg,#1A2538,#0F1F2E);border-radius:14px;border:1px solid #2A3548;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+.pricing-left .eyebrow{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:#B8D44F;font-weight:700;}
+.pricing-left .price{font-family:'Outfit',sans-serif;font-size:22px;font-weight:800;margin-top:2px;}
+.pricing-left .price span{font-size:13px;font-weight:500;color:#666680;}
+.pricing-left .note{font-size:10px;color:#666680;margin-top:2px;}
+.pricing-right{display:flex;gap:8px;align-items:center;}
+.pricing-wa{display:flex;align-items:center;gap:6px;padding:8px 16px;background:#25D366;border-radius:10px;font-size:11px;font-weight:700;color:#fff;cursor:pointer;border:none;text-decoration:none;transition:all .2s;}
+.pricing-wa:hover{filter:brightness(1.1);transform:scale(1.03);}
+
+/* ── BOTTOM INFO ── */
+.info-strip{padding:16px 20px;text-align:center;border-top:1px solid #1A2538;}
+.info-strip p{font-size:11px;color:#666680;line-height:1.5;max-width:480px;margin:0 auto;}
+.info-strip a{color:#4A90D9;text-decoration:none;}
+.info-strip a:hover{text-decoration:underline;}
+
+/* ── RESPONSIVE ── */
+@media(max-width:600px){
+  .session-grid{grid-template-columns:1fr;}
+  .hero-strip h1{font-size:22px;}
+  .pricing-strip{flex-direction:column;text-align:center;}
+  .live-banner{flex-direction:column;text-align:center;}
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-brand">MANAS<em>360</em></div>
+  <div class="nav-right">
+    <button class="nav-pill">Login</button>
+    <button class="nav-pill cta">Join Free</button>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero-strip">
+  <h1>Group Therapy <span>Sessions</span></h1>
+  <p class="hero-sub">Healing happens in community. Join therapist-led group sessions on topics that matter to you. Safe, anonymous, affordable.</p>
+  <div class="hero-stats">
+    <div class="hero-stat"><div class="num">10</div><div class="label">Weekly Topics</div></div>
+    <div class="hero-stat"><div class="num">6–10</div><div class="label">Per Group</div></div>
+    <div class="hero-stat"><div class="num">₹299</div><div class="label">Per Session</div></div>
+  </div>
+</div>
+
+<!-- FILTERS -->
+<div class="filter-bar">
+  <button class="filter-chip active" onclick="filterSessions('all')">All Sessions</button>
+  <button class="filter-chip" onclick="filterSessions('live')">🔴 Live Now</button>
+  <button class="filter-chip" onclick="filterSessions('today')">Today</button>
+  <button class="filter-chip" onclick="filterSessions('anxiety')">Anxiety</button>
+  <button class="filter-chip" onclick="filterSessions('depression')">Depression</button>
+  <button class="filter-chip" onclick="filterSessions('couples')">Couples</button>
+  <button class="filter-chip" onclick="filterSessions('workplace')">Workplace</button>
+  <button class="filter-chip" onclick="filterSessions('students')">Students</button>
+  <button class="filter-chip" onclick="filterSessions('addiction')">Addiction</button>
+  <button class="filter-chip" onclick="filterSessions('trauma')">Trauma</button>
+</div>
+
+<!-- LIVE NOW BANNER -->
+<div class="live-banner" id="liveBanner">
+  <div class="live-dot-big"></div>
+  <div class="live-banner-text">
+    <div class="title">LIVE NOW — Anxiety: Quick Fixes That Actually Work</div>
+    <div class="detail">Dr. Meera · 6/10 seats · Started 12 min ago</div>
+  </div>
+  <button class="live-join" onclick="joinSession('anxiety-live')">JOIN NOW</button>
+</div>
+
+<!-- SESSION TILES -->
+<div class="grid-section">
+  <div class="grid-label">Today's Sessions</div>
+  <div class="session-grid" id="sessionGrid">
+
+    <!-- TILE 1: Anxiety — LIVE -->
+    <div class="tile" data-topic="anxiety" data-status="live" style="--tc:#3B82F6">
+      <div class="tile-accent"></div>
+      <div class="tile-body">
+        <div class="tile-top">
+          <div class="tile-emoji">😰</div>
+          <div class="tile-badge badge-live">● LIVE</div>
+        </div>
+        <div class="tile-title">Anxiety: Quick Fixes That Actually Work</div>
+        <div class="tile-tagline">5-4-3-2-1 grounding, box breathing, and cognitive tools you can use tonight.</div>
+        <div class="tile-therapist">
+          <div class="tile-therapist-avatar">M</div>
+          <div class="tile-therapist-info">
+            <div class="name">Dr. Meera Krishnan</div>
+            <div class="cred">M.Phil Clinical Psychology · NIMHANS</div>
+          </div>
+        </div>
+        <div class="tile-meta">
+          <div class="tile-meta-item"><span class="icon">🕐</span> 60 min</div>
+          <div class="tile-meta-item"><span class="icon">🌐</span> English + Kannada</div>
+          <div class="tile-meta-item"><span class="icon">🔒</span> Anonymous</div>
+        </div>
+        <div class="tile-seats">
+          <div class="tile-seats-label"><span>6/10 joined</span><span>4 seats left</span></div>
+          <div class="tile-seats-bar"><div class="tile-seats-fill" style="width:60%"></div></div>
+        </div>
+        <button class="tile-cta cta-join" onclick="joinSession('anxiety-live')">JOIN NOW — ₹299</button>
+      </div>
+    </div>
+
+    <!-- TILE 2: Depression — NEXT -->
+    <div class="tile" data-topic="depression" data-status="next" style="--tc:#D4A017">
+      <div class="tile-accent"></div>
+      <div class="tile-body">
+        <div class="tile-top">
+          <div class="tile-emoji">🌧️</div>
+          <div class="tile-badge badge-next">NEXT · 4:30 PM</div>
+        </div>
+        <div class="tile-title">Depression: The Silent Weight</div>
+        <div class="tile-tagline">Understanding the fog, naming the pain, and 5 things you can do today.</div>
+        <div class="tile-therapist">
+          <div class="tile-therapist-avatar">S</div>
+          <div class="tile-therapist-info">
+            <div class="name">Dr. Srinivas Rao</div>
+            <div class="cred">Psychiatrist · RCI Registered</div>
+          </div>
+        </div>
+        <div class="tile-meta">
+          <div class="tile-meta-item"><span class="icon">🕐</span> 60 min</div>
+          <div class="tile-meta-item"><span class="icon">🌐</span> Hindi + English</div>
+          <div class="tile-meta-item"><span class="icon">🔒</span> Anonymous</div>
+        </div>
+        <div class="tile-seats">
+          <div class="tile-seats-label"><span>3/10 joined</span><span>7 seats left</span></div>
+          <div class="tile-seats-bar"><div class="tile-seats-fill" style="width:30%"></div></div>
+        </div>
+        <button class="tile-cta cta-join" onclick="joinSession('depression-next')">RESERVE SEAT — ₹299</button>
+      </div>
+    </div>
+
+    <!-- TILE 3: Toxic Workplace — TODAY -->
+    <div class="tile" data-topic="workplace" data-status="today" style="--tc:#EA580C">
+      <div class="tile-accent"></div>
+      <div class="tile-body">
+        <div class="tile-top">
+          <div class="tile-emoji">🏢</div>
+          <div class="tile-badge badge-next">TODAY · 7:00 PM</div>
+        </div>
+        <div class="tile-title">Toxic Workplace: Thrive, Not Buckle</div>
+        <div class="tile-tagline">Sunday Evening Test, setting boundaries, and protecting your mental health at work.</div>
+        <div class="tile-therapist">
+          <div class="tile-therapist-avatar">A</div>
+          <div class="tile-therapist-info">
+            <div class="name">Anika Desai</div>
+            <div class="cred">Organizational Psychologist · IIM-B</div>
+          </div>
+        </div>
+        <div class="tile-meta">
+          <div class="tile-meta-item"><span class="icon">🕐</span> 75 min</div>
+          <div class="tile-meta-item"><span class="icon">🌐</span> English</div>
+          <div class="tile-meta-item"><span class="icon">🔒</span> Anonymous</div>
+        </div>
+        <div class="tile-seats">
+          <div class="tile-seats-label"><span>8/10 joined</span><span>2 seats left</span></div>
+          <div class="tile-seats-bar"><div class="tile-seats-fill" style="width:80%"></div></div>
+        </div>
+        <button class="tile-cta cta-join" onclick="joinSession('workplace')">RESERVE SEAT — ₹299</button>
+      </div>
+    </div>
+
+    <!-- TILE 4: Couples Spark Lost — TOMORROW -->
+    <div class="tile" data-topic="couples" data-status="soon" style="--tc:#E53E6B">
+      <div class="tile-accent"></div>
+      <div class="tile-body">
+        <div class="tile-top">
+          <div class="tile-emoji">💔</div>
+          <div class="tile-badge badge-soon">TUE · 6:00 PM</div>
+        </div>
+        <div class="tile-title">Couples: The Spark Lost</div>
+        <div class="tile-tagline">When romance became routine. Rebuilding connection one conversation at a time.</div>
+        <div class="tile-therapist">
+          <div class="tile-therapist-avatar">P</div>
+          <div class="tile-therapist-info">
+            <div class="name">Dr. Priya Menon</div>
+            <div class="cred">Couples Therapist · Gottman Certified</div>
+          </div>
+        </div>
+        <div class="tile-meta">
+          <div class="tile-meta-item"><span class="icon">🕐</span> 90 min</div>
+          <div class="tile-meta-item"><span class="icon">🌐</span> English + Hindi</div>
+          <div class="tile-meta-item"><span class="icon">👫</span> Couples welcome</div>
+        </div>
+        <div class="tile-seats">
+          <div class="tile-seats-label"><span>5/8 joined</span><span>3 seats left</span></div>
+          <div class="tile-seats-bar"><div class="tile-seats-fill" style="width:62%"></div></div>
+        </div>
+        <button class="tile-cta cta-notify" onclick="notifyMe('couples')">🔔 NOTIFY ME</button>
+      </div>
+    </div>
+
+    <!-- TILE 5: Competitive Exams / Students — UPCOMING -->
+    <div class="tile" data-topic="students" data-status="soon" style="--tc:#06B6D4">
+      <div class="tile-accent"></div>
+      <div class="tile-body">
+        <div class="tile-top">
+          <div class="tile-emoji">📚</div>
+          <div class="tile-badge badge-soon">WED · 5:00 PM</div>
+        </div>
+        <div class="tile-title">Exam Stress: Battle Half Won</div>
+        <div class="tile-tagline">Visualization, cognitive reframing, and overthinking positive — for JEE/NEET/CUET aspirants.</div>
+        <div class="tile-therapist">
+          <div class="tile-therapist-avatar">R</div>
+          <div class="tile-therapist-info">
+            <div class="name">Rahul Sharma</div>
+            <div class="cred">Educational Psychologist · M.Ed</div>
+          </div>
+        </div>
+        <div class="tile-meta">
+          <div class="tile-meta-item"><span class="icon">🕐</span> 60 min</div>
+          <div class="tile-meta-item"><span class="icon">🌐</span> Hindi + English</div>
+          <div class="tile-meta-item"><span class="icon">🎓</span> Students only</div>
+        </div>
+        <div class="tile-seats">
+          <div class="tile-seats-label"><span>2/10 joined</span><span>8 seats left</span></div>
+          <div class="tile-seats-bar"><div class="tile-seats-fill" style="width:20%"></div></div>
+        </div>
+        <button class="tile-cta cta-notify" onclick="notifyMe('students')">🔔 NOTIFY ME</button>
+      </div>
+    </div>
+
+    <!-- TILE 6: IVF & Fertility — UPCOMING -->
+    <div class="tile" data-topic="couples" data-status="soon" style="--tc:#0D9488">
+      <div class="tile-accent"></div>
+      <div class="tile-body">
+        <div class="tile-top">
+          <div class="tile-emoji">🌱</div>
+          <div class="tile-badge badge-soon">THU · 7:30 PM</div>
+        </div>
+        <div class="tile-title">IVF Journey: You Are More Than Fertility</div>
+        <div class="tile-tagline">The menstrual cycle of hope and despair. Worth is not measured by a pregnancy test.</div>
+        <div class="tile-therapist">
+          <div class="tile-therapist-avatar">N</div>
+          <div class="tile-therapist-info">
+            <div class="name">Dr. Nandini Iyer</div>
+            <div class="cred">Perinatal Psychologist · NIMHANS</div>
+          </div>
+        </div>
+        <div class="tile-meta">
+          <div class="tile-meta-item"><span class="icon">🕐</span> 75 min</div>
+          <div class="tile-meta-item"><span class="icon">🌐</span> English + Kannada</div>
+          <div class="tile-meta-item"><span class="icon">👫</span> Couples welcome</div>
+        </div>
+        <div class="tile-seats">
+          <div class="tile-seats-label"><span>4/8 joined</span><span>4 seats left</span></div>
+          <div class="tile-seats-bar"><div class="tile-seats-fill" style="width:50%"></div></div>
+        </div>
+        <button class="tile-cta cta-notify" onclick="notifyMe('ivf')">🔔 NOTIFY ME</button>
+      </div>
+    </div>
+
+    <!-- TILE 7: Trauma & PTSD — UPCOMING -->
+    <div class="tile" data-topic="trauma" data-status="soon" style="--tc:#7C3AED">
+      <div class="tile-accent"></div>
+      <div class="tile-body">
+        <div class="tile-top">
+          <div class="tile-emoji">🕊️</div>
+          <div class="tile-badge badge-soon">FRI · 6:00 PM</div>
+        </div>
+        <div class="tile-title">Trauma & PTSD: Your Body Remembers</div>
+        <div class="tile-tagline">Flashback grounding, body-based healing, and the window of tolerance.</div>
+        <div class="tile-therapist">
+          <div class="tile-therapist-avatar">K</div>
+          <div class="tile-therapist-info">
+            <div class="name">Dr. Kavitha Raj</div>
+            <div class="cred">Trauma Specialist · EMDR Certified</div>
+          </div>
+        </div>
+        <div class="tile-meta">
+          <div class="tile-meta-item"><span class="icon">🕐</span> 75 min</div>
+          <div class="tile-meta-item"><span class="icon">🌐</span> English</div>
+          <div class="tile-meta-item"><span class="icon">🔒</span> Screened entry</div>
+        </div>
+        <div class="tile-seats">
+          <div class="tile-seats-label"><span>6/8 joined</span><span>2 seats left</span></div>
+          <div class="tile-seats-bar"><div class="tile-seats-fill" style="width:75%"></div></div>
+        </div>
+        <button class="tile-cta cta-notify" onclick="notifyMe('trauma')">🔔 NOTIFY ME</button>
+      </div>
+    </div>
+
+    <!-- TILE 8: Eating Disorders — UPCOMING -->
+    <div class="tile" data-topic="addiction" data-status="soon" style="--tc:#F43F5E">
+      <div class="tile-accent"></div>
+      <div class="tile-body">
+        <div class="tile-top">
+          <div class="tile-emoji">🍽️</div>
+          <div class="tile-badge badge-soon">SAT · 11:00 AM</div>
+        </div>
+        <div class="tile-title">Eating Disorders: Food ≠ Love</div>
+        <div class="tile-tagline">Breaking the Indian family pattern where every emotion is fed, not felt.</div>
+        <div class="tile-therapist">
+          <div class="tile-therapist-avatar">D</div>
+          <div class="tile-therapist-info">
+            <div class="name">Deepa Narayan</div>
+            <div class="cred">Clinical Psychologist · Eating Disorder Specialist</div>
+          </div>
+        </div>
+        <div class="tile-meta">
+          <div class="tile-meta-item"><span class="icon">🕐</span> 60 min</div>
+          <div class="tile-meta-item"><span class="icon">🌐</span> English + Hindi</div>
+          <div class="tile-meta-item"><span class="icon">🔒</span> Women only</div>
+        </div>
+        <div class="tile-seats">
+          <div class="tile-seats-label"><span>7/8 joined</span><span>1 seat left</span></div>
+          <div class="tile-seats-bar"><div class="tile-seats-fill" style="width:88%"></div></div>
+        </div>
+        <button class="tile-cta cta-join" onclick="joinSession('eating')">LAST SEAT — ₹299</button>
+      </div>
+    </div>
+
+    <!-- TILE 9: Digital Addiction — UPCOMING -->
+    <div class="tile" data-topic="addiction" data-status="soon" style="--tc:#EF4444">
+      <div class="tile-accent"></div>
+      <div class="tile-body">
+        <div class="tile-top">
+          <div class="tile-emoji">📱</div>
+          <div class="tile-badge badge-soon">SAT · 4:00 PM</div>
+        </div>
+        <div class="tile-title">Digital Addiction: Peaceful ≠ Healthy</div>
+        <div class="tile-tagline">When the screen is a babysitter. For parents & young adults reclaiming real life.</div>
+        <div class="tile-therapist">
+          <div class="tile-therapist-avatar">V</div>
+          <div class="tile-therapist-info">
+            <div class="name">Dr. Vikram Patel</div>
+            <div class="cred">Addiction Specialist · De-addiction Counselor</div>
+          </div>
+        </div>
+        <div class="tile-meta">
+          <div class="tile-meta-item"><span class="icon">🕐</span> 60 min</div>
+          <div class="tile-meta-item"><span class="icon">🌐</span> Hindi + English</div>
+          <div class="tile-meta-item"><span class="icon">👨‍👩‍👧</span> Parents welcome</div>
+        </div>
+        <div class="tile-seats">
+          <div class="tile-seats-label"><span>3/10 joined</span><span>7 seats left</span></div>
+          <div class="tile-seats-bar"><div class="tile-seats-fill" style="width:30%"></div></div>
+        </div>
+        <button class="tile-cta cta-notify" onclick="notifyMe('digital')">🔔 NOTIFY ME</button>
+      </div>
+    </div>
+
+    <!-- TILE 10: Bipolar — UPCOMING -->
+    <div class="tile" data-topic="depression" data-status="soon" style="--tc:#D4A017">
+      <div class="tile-accent"></div>
+      <div class="tile-body">
+        <div class="tile-top">
+          <div class="tile-emoji">🎭</div>
+          <div class="tile-badge badge-soon">SUN · 11:00 AM</div>
+        </div>
+        <div class="tile-title">Bipolar: The Medication Trap</div>
+        <div class="tile-tagline">Understanding mania vs depression, why "I feel great" can be dangerous, and caregiver support.</div>
+        <div class="tile-therapist">
+          <div class="tile-therapist-avatar">S</div>
+          <div class="tile-therapist-info">
+            <div class="name">Dr. Srinivas Rao</div>
+            <div class="cred">Psychiatrist · RCI Registered</div>
+          </div>
+        </div>
+        <div class="tile-meta">
+          <div class="tile-meta-item"><span class="icon">🕐</span> 75 min</div>
+          <div class="tile-meta-item"><span class="icon">🌐</span> Kannada + English</div>
+          <div class="tile-meta-item"><span class="icon">👥</span> Caregivers welcome</div>
+        </div>
+        <div class="tile-seats">
+          <div class="tile-seats-label"><span>1/10 joined</span><span>9 seats left</span></div>
+          <div class="tile-seats-bar"><div class="tile-seats-fill" style="width:10%"></div></div>
+        </div>
+        <button class="tile-cta cta-notify" onclick="notifyMe('bipolar')">🔔 NOTIFY ME</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- PRICING STRIP -->
+<div class="pricing-strip">
+  <div class="pricing-left">
+    <div class="eyebrow">Group Session Pricing</div>
+    <div class="price">₹299 <span>/ session</span></div>
+    <div class="note">First session FREE · No video required · 100% anonymous</div>
+  </div>
+  <div class="pricing-right">
+    <a class="pricing-wa" href="https://wa.me/918867736009?text=Hi%20MANAS360%2C%20I%20want%20to%20join%20a%20group%20therapy%20session" target="_blank">💬 WhatsApp to Book</a>
+  </div>
+</div>
+
+<!-- BOTTOM INFO -->
+<div class="info-strip">
+  <p>All sessions are therapist-led, anonymous, and use secure audio-only channels. No video required.<br>
+  Crisis? Call <strong>Tele-MANAS 14416</strong> · NIMHANS <strong>080-46110007</strong><br>
+  <a href="https://manas360.com">manas360.com</a> · WhatsApp <a href="https://wa.me/918867736009">+91 8867736009</a></p>
+</div>
+
+<script>
+/* ── Filter Sessions ── */
+function filterSessions(topic) {
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+  event.target.classList.add('active');
+  
+  document.querySelectorAll('.tile').forEach(t => {
+    if (topic === 'all') { t.style.display = ''; return; }
+    if (topic === 'live') { t.style.display = t.dataset.status === 'live' ? '' : 'none'; return; }
+    if (topic === 'today') { t.style.display = ['live','next','today'].includes(t.dataset.status) ? '' : 'none'; return; }
+    t.style.display = t.dataset.topic === topic ? '' : 'none';
+  });
+}
+
+/* ── Join Session → WhatsApp deep link ── */
+function joinSession(id) {
+  const msg = encodeURIComponent('Hi MANAS360, I want to join the group session: ' + id + ' · Source: GroupTherapyLanding');
+  window.open('https://wa.me/918867736009?text=' + msg, '_blank');
+}
+
+/* ── Notify Me → WhatsApp deep link ── */
+function notifyMe(id) {
+  const msg = encodeURIComponent('Hi MANAS360, please notify me when the ' + id + ' group session is available · Source: GroupTherapyLanding');
+  window.open('https://wa.me/918867736009?text=' + msg, '_blank');
+}
+</script>
+</body>
+</html>

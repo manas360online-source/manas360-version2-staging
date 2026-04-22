@@ -155,6 +155,7 @@ jobs:
             BACKEND_ID="$(${DC} -p manas360-version2-staging ps -q backend)"
             if [ -n "${BACKEND_ID}" ]; then
               docker exec "${BACKEND_ID}" sh -lc 'npx prisma migrate deploy'
+              docker exec "${BACKEND_ID}" sh -lc 'npx prisma generate'
             else
               echo "Backend container not found; cannot apply schema"
               exit 1
@@ -168,5 +169,6 @@ jobs:
 
             echo "Running post-deploy endpoint smoke checks..."
             curl -f http://localhost:5000/api/v1/group-therapy/public/sessions > /dev/null
+            curl -f http://localhost:5000/api/v1/shared/plans/patient/patient-3month > /dev/null
 
             echo "✅ Deployment complete"

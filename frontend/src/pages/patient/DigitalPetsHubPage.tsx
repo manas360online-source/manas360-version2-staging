@@ -1,25 +1,42 @@
 
-import React, { useEffect } from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 
+type PetKey = "baby-dino" | "golden-retriever" | "healing-elephant" | "chintu-fox";
+
 type DigitalPetsHubPageProps = {
-  selectedPet?: "golden-puppy" | "wise-owl" | "patience-turtle";
+  selectedPet?: PetKey;
 };
 
-const scienceCards = [
-  { emoji: '💜', chem: 'Oxytocin', desc: '"Love hormone" - released when your pet greets you, nuzzles, or responds to your care.', trigger: 'Trigger: Pet greetings, nurturing' },
-  { emoji: '☀️', chem: 'Serotonin', desc: '"Happy chemical" - boosted by daily routines, care rituals, and watching your pet thrive.', trigger: 'Trigger: Daily check-ins, growth' },
-  { emoji: '⚡', chem: 'Dopamine', desc: '"Reward chemical" - released when you unlock milestones, win mini-games, level up your pet.', trigger: 'Trigger: Achievements, games' },
-  { emoji: '🧘', chem: 'Endorphins', desc: '"Natural painkiller" - released during breathing exercises, meditation, and laughter with your pet.', trigger: 'Trigger: Breathwork, play' },
-];
-
-const schedule = [
-  { time: '7:00 AM', emoji: '☀️', title: 'Morning Greeting', text: 'Pet wakes up with you. Happy animation + "Good morning! How did you sleep?" Mood check-in (1-10 scale).', chem: '💜 Oxytocin + ☀️ Serotonin' },
-  { time: '7:15 AM', emoji: '🫁', title: 'Breathing Exercise Together', text: "Pet breathes with you. 4-7-8 breathing animation. Pet's belly rises and falls in sync.", chem: '🧘 Endorphins + 💜 Oxytocin' },
-  { time: '12:30 PM', emoji: '🐾', title: 'Midday Check-in', text: 'Push notification: "Your puppy misses you! 🐕" Open app -> pet does happy dance -> micro-game (2 min). Stress break.', chem: '⚡ Dopamine + ☀️ Serotonin' },
-  { time: '5:00 PM', emoji: '🎮', title: 'Mini-Game Session', text: '5-minute therapeutic game with your pet. Cognitive challenges (Owl), fetch (Puppy), or meditation (Cat). Progress unlocks new environments.', chem: '⚡ Dopamine + 🧘 Endorphins' },
-  { time: '9:30 PM', emoji: '🌙', title: 'Bedtime Wind-Down', text: 'Pet yawns, curls up. Guided gratitude: "What made you smile today?" Pet falls asleep with you. Ambient sounds fade in.', chem: '💜 Oxytocin + ☀️ Serotonin + 🧘 Endorphins' },
-  { time: 'Weekly', emoji: '📊', title: 'Wellness Report -> Therapist Dashboard', text: 'Mood trends, engagement time, breathing frequency, game scores sent to therapist. Therapist sees: "Patient engaged 6/7 days. Mood improved 2 points. Recommend continuing."', chem: '📋 Therapeutic Integration - Rx Loop Closed' },
+const PETS = [
+  {
+    key: "baby-dino",
+    name: "Baby Dinosaur",
+    emoji: "🦕",
+    hormone: "Love",
+    hormoneDesc: "Oxytocin — nurture, bond, feel loved"
+  },
+  {
+    key: "golden-retriever",
+    name: "Golden Retriever",
+    emoji: "🐕",
+    hormone: "Happy",
+    hormoneDesc: "Serotonin — daily routines, calm, stability"
+  },
+  {
+    key: "healing-elephant",
+    name: "Healing Elephant",
+    emoji: "🐘",
+    hormone: "Reward",
+    hormoneDesc: "Dopamine — achievements, games, milestones"
+  },
+  {
+    key: "chintu-fox",
+    name: "Chintu Fox",
+    emoji: "🦊",
+    hormone: "Energy",
+    hormoneDesc: "Endorphins — breathwork, play, laughter"
+  }
 ];
 
 import { Link } from 'react-router-dom';
@@ -163,218 +180,45 @@ export default function DigitalPetsHubPage() {
           </div>
         </div>
       </div>
-
-      <div className="pathways">
-        <div className="shell">
-          <h2 style={{ textAlign: 'center', marginBottom: 18, fontSize: 22 }}>🔀 Two Ways to Begin</h2>
-          <div className="path-grid">
-            <div className="path-card">
-              <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
-              <h3 style={{ fontSize: 16, fontWeight: 700 }}>Prescribed by Therapist / Psychiatrist</h3>
-              <p style={{ fontSize: 12.5, color: '#64748B' }}>After a coaching session, your therapist prescribes a specific pet type based on your needs - loneliness, anxiety, habit building, or engagement therapy.</p>
-              <div className="path-flow"><span className="path-step">Therapy Session</span><span className="path-step arrow">{'->'}</span><span className="path-step">Rx: Digital Pet</span><span className="path-step arrow">{'->'}</span><span className="path-step">Therapist picks species</span><span className="path-step arrow">{'->'}</span><span className="path-step">Unlocked in your Hub</span></div>
-            </div>
-            <div className="path-card">
-              <div style={{ fontSize: 32, marginBottom: 8 }}>🧭</div>
-              <h3 style={{ fontSize: 16, fontWeight: 700 }}>Explore Independently</h3>
-              <p style={{ fontSize: 12.5, color: '#64748B' }}>Browse the full pet catalog. Start free with an ambient companion, then upgrade to interactive or AI-powered pets as your journey deepens.</p>
-              <div className="path-flow"><span className="path-step">PT06 Hub Landing</span><span className="path-step arrow">{'->'}</span><span className="path-step">Watch Avatar Pitch</span><span className="path-step arrow">{'->'}</span><span className="path-step">Choose Free Pet</span><span className="path-step arrow">{'->'}</span><span className="path-step">Upgrade when ready</span></div>
-            </div>
+      {selectedPet && (
+        <div style={{ textAlign: "center", marginBottom: 24, padding: 16, background: "#f3f4f6", borderRadius: 12 }}>
+          <div style={{ fontSize: 40, marginBottom: 8 }}>
+            {PETS.find((p) => p.key === selectedPet)?.emoji}
+          </div>
+          <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 4 }}>
+            {PETS.find((p) => p.key === selectedPet)?.name}
+          </div>
+          <div style={{ color: "#7c3aed", fontWeight: 600, marginBottom: 2 }}>
+            {PETS.find((p) => p.key === selectedPet)?.hormone}
+          </div>
+          <div style={{ fontSize: 13, color: "#475569", marginBottom: 4 }}>
+            {PETS.find((p) => p.key === selectedPet)?.hormoneDesc}
           </div>
         </div>
+      )}
+      <div style={{ textAlign: "center", marginBottom: 24 }}>
+        <button
+          style={{
+            background: "#f472b6",
+            color: "#fff",
+            border: "none",
+            borderRadius: 12,
+            padding: "14px 28px",
+            fontWeight: 700,
+            fontSize: 16,
+            cursor: "pointer",
+            marginBottom: 8
+          }}
+        >
+          💝 Name Your Pet — Adopt
+        </button>
+        <div style={{ color: "#475569", fontSize: 13, marginTop: 4 }}>Free — Choose, name, and start your journey</div>
       </div>
-
-      <div className="catalog" id="catalog">
-        <div className="shell">
-          <h2 style={{ textAlign: 'center', marginBottom: 8, fontSize: 24 }}>🐾 Pet Companion Catalog</h2>
-          <p style={{ textAlign: 'center', fontSize: 13, color: '#64748B', maxWidth: 500, margin: '0 auto 24px' }}>Each species is designed for a specific therapeutic purpose. Your pet isn&apos;t just cute - it&apos;s medicine.</p>
-
-          <div className="tier-section">
-            <div className="tier-header"><h2>Tier 1 - Ambient Companions</h2></div>
-            <div className="pets-row">
-              <div className="pet-card">
-                <div style={{ padding: '177.78% 0 0 0', position: 'relative' }}>
-                  <iframe
-                    src="https://player.vimeo.com/video/1184033995?title=0&amp;byline=0&amp;portrait=0&amp;badge=0&amp;autopause=0&amp;player_id=0&amp;app_id=58479"
-                    frameBorder="0"
-                    allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
-                    referrerPolicy="strict-origin-when-cross-origin"
-                    title="MANAS360 MentalWellness Intro_1080p_caption"
-                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
-                    
-                  />
-                </div>
-                <div className="pet-body"><div className="pet-name">1 Ponda</div></div>
-              </div>
-
-              <div className="pet-card">
-                <div style={{ padding: '56.25% 0 0 0', position: 'relative' }}>
-                  <iframe
-                    src="https://player.vimeo.com/video/1184033994?title=0&amp;byline=0&amp;portrait=0&amp;badge=0&amp;autopause=0&amp;player_id=0&amp;app_id=58479"
-                    frameBorder="0"
-                    allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
-                    referrerPolicy="strict-origin-when-cross-origin"
-                    title="FindingStillness"
-                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
-                    
-                  />
-                </div>
-                <div className="pet-body"><div className="pet-name">2 ClownFish</div></div>
-              </div>
-
-              <div className="pet-card">
-                <div style={{ padding: '177.78% 0 0 0', position: 'relative' }}>
-                  <iframe
-                    src="https://player.vimeo.com/video/1184033993?title=0&amp;byline=0&amp;portrait=0&amp;badge=0&amp;autopause=0&amp;player_id=0&amp;app_id=58479"
-                    frameBorder="0"
-                    allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
-                    referrerPolicy="strict-origin-when-cross-origin"
-                    title="3 NavilCheerful"
-                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
-                    
-                  />
-                </div>
-                <div className="pet-body"><div className="pet-name">3 NavilCheerful</div></div>
-              </div>
-            </div>
-          </div>
-
-          <div className="tier-section">
-            <div className="tier-header"><h2>Tier 2 - Interactive Companions</h2></div>
-            <div className="pets-row">
-              <Link to="/chintu" style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
-                <div className={`pet-card ${selectedPet === 'wise-owl' ? 'pet-focus' : ''}`} data-pet="wise-owl"><div className="pet-visual" style={{ background: 'linear-gradient(135deg,#FFE4CC,#FFD1AA)' }}>🦊</div><div className="pet-body"><div className="pet-name">Chintu - The Clever Fox</div><div className="pet-env">🔥 Dopamine Engine</div><span className="pet-benefit joy">Dopamine Boost</span><span className="pet-benefit joy">Rewards &amp; Play</span></div></div>
-              </Link>
-              <Link to="/dino" style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
-                <div className={`pet-card ${selectedPet === 'golden-puppy' ? 'pet-focus' : ''}`} data-pet="golden-puppy"><div className="pet-visual" style={{ background: 'linear-gradient(135deg,#D1FAE5,#A7F3D0)' }}>🦕</div><div className="pet-body"><div className="pet-name">Baby Dino</div><div className="pet-env">🌿 Love Nest</div><span className="pet-benefit calm">Oxytocin Bond</span><span className="pet-benefit growth">Nurturing Care</span></div></div>
-              </Link>
-              <Link to="/elephant" style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
-                <div className="pet-card"><div className="pet-visual" style={{ background: 'linear-gradient(135deg,#D1FAE5,#6EE7B7)' }}>🐘</div><div className="pet-body"><div className="pet-name">Appu - Healing Elephant</div><div className="pet-env">🌳 Sacred Grove</div><span className="pet-benefit strength">Emotional Strength</span><span className="pet-benefit mind">Memory</span></div></div>
-              </Link>
-              <Link to="/goldenPup" style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
-                <div className={`pet-card ${selectedPet === 'patience-turtle' ? 'pet-focus' : ''}`} data-pet="patience-turtle"><div className="pet-visual" style={{ background: 'linear-gradient(135deg,#FFE4CC,#FFD1AA)' }}>🐕</div><div className="pet-body"><div className="pet-name">Golden Pup</div><div className="pet-env">🏡 Home Base</div><span className="pet-benefit calm">Loyalty</span><span className="pet-benefit joy">Playfulness</span></div></div>
-              </Link>
-            </div>
-          </div>
-
-          <div className="tier-section">
-            <div className="tier-header">
-              <h2>Tier 3 - AI Companions</h2>
-              <span className="badge" style={{ background: '#FEF3C7', color: '#D97706' }}>Coming Soon</span>
-            </div>
-            <div className="pets-row">
-              <div className="pet-card" style={{ opacity: 0.85 }}>
-                <div className="pet-visual" style={{ background: 'linear-gradient(135deg,#FCE7F3,#FBCFE8)' }}>🦋</div>
-                <div className="pet-body">
-                  <div className="pet-name">Phoenix Friend</div>
-                  <div className="pet-env">🔥 Rebirth Temple</div>
-                  <span className="pet-benefit strength">Transformation</span><span className="pet-benefit growth">Crisis Support</span>
-                  <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: '#D97706' }}>Coming Soon</div>
-                </div>
-              </div>
-              <div className="pet-card" style={{ opacity: 0.85 }}>
-                <div className="pet-visual" style={{ background: 'linear-gradient(135deg,#EDE9FE,#DDD6FE)' }}>🐉</div>
-                <div className="pet-body">
-                  <div className="pet-name">Guardian Dragon</div>
-                  <div className="pet-env">⛰️ Crystal Cave</div>
-                  <span className="pet-benefit strength">Protection</span><span className="pet-benefit mind">Voice Chat</span>
-                  <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: '#D97706' }}>Coming Soon</div>
-                </div>
-              </div>
-              <div className="pet-card" style={{ opacity: 0.85 }}>
-                <div className="pet-visual" style={{ background: 'linear-gradient(135deg,#FEF9EB,#FEF3C7)' }}>🦚</div>
-                <div className="pet-body">
-                  <div className="pet-name">Wisdom Peacock</div>
-                  <div className="pet-env">🕉️ Lotus Garden</div>
-                  <span className="pet-benefit mind">Vedic Wisdom</span><span className="pet-benefit growth">Self-Discovery</span>
-                  <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: '#D97706' }}>Coming Soon</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="addons" id="addons">
-        <div className="shell">
-          <h2 style={{ textAlign: 'center', marginBottom: 8, fontSize: 22 }}>Add-On Features (À la Carte)</h2>
-          <div className="addons-card">
-            <div style={{ overflowX: 'auto' }}>
-              <table className="addons-table">
-                <thead>
-                  <tr>
-                    <th>Feature</th>
-                    <th>1 Hour</th>
-                    <th>3 Hours ⭐</th>
-                    <th>5 Hours</th>
-                    <th>Description</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>🤖 AnytimeBuddy</td>
-                    <td>₹399</td>
-                    <td>₹999</td>
-                    <td>₹1,699</td>
-                    <td>On-demand emotional support chat (24/7 AI companion)</td>
-                  </tr>
-                  <tr>
-                    <td>🐾 Digital Pet Hub</td>
-                    <td colSpan={3}>Free starter + Premium unlock via subscription</td>
-                    <td>Neurotransmitter companions (Chintu, Bholu, Mithi, Dheeraj)</td>
-                  </tr>
-                  <tr>
-                    <td>📞 IVR Therapy</td>
-                    <td colSpan={3}>Pay-per-session (same as standard fees)</td>
-                    <td>Voice-based therapy + PHQ screening via phone call</td>
-                  </tr>
-                  <tr>
-                    <td>💬 VentBuddy</td>
-                    <td colSpan={3}>3 free/day, Premium unlimited</td>
-                    <td>Anonymous venting with trained AI listener</td>
-                  </tr>
-                  <tr>
-                    <td>🎵 Sound Therapy</td>
-                    <td>₹30/track</td>
-                    <td>₹250/bundle (10 tracks)</td>
-                    <td></td>
-                    <td>Own forever, unlimited play + download</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="schedule" id="schedule">
-        <div className="shell">
-          <h2 style={{ textAlign: 'center', marginBottom: 8, fontSize: 22 }}>⏰ A Day With Your Digital Pet - The Oxytocin Schedule</h2>
-          <p style={{ textAlign: 'center', fontSize: 13, color: '#64748B', maxWidth: 520, margin: '0 auto 20px' }}>Each touchpoint is designed to trigger specific neurochemicals. This is prescribable wellness.</p>
-          <div className="sched-timeline">
-            {schedule.map((item) => (
-              <div className="sched-item" key={item.title + item.time}>
-                <div className="sched-time">{item.time}</div>
-                <div className="sched-emoji">{item.emoji}</div>
-                <div>
-                  <h4 style={{ fontSize: 13, fontWeight: 700 }}>{item.title}</h4>
-                  <p style={{ fontSize: 11.5, color: '#64748B' }}>{item.text}</p>
-                  <span className="chem">{item.chem}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div style={{ padding: '24px 0', borderTop: '1px solid #E2E8F0', textAlign: 'center' }}>
-        <div className="shell">
-          <p style={{ fontFamily: 'Fraunces, serif', fontSize: 16, fontWeight: 700, color: '#064E5C' }}>MANAS<em style={{ color: '#C6930A', fontStyle: 'normal' }}>360</em></p>
-          <p style={{ fontSize: 11, color: '#94A3B8', marginTop: 4 }}>Digital Pet Hub - PT06</p>
-        </div>
+      <div style={{ textAlign: "center" }}>
+        <Link to="/">Go Home</Link>
       </div>
     </div>
   );
-}
+};
 
 export default DigitalPetsHubPage;

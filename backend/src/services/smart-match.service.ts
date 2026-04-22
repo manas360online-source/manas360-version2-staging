@@ -1,4 +1,5 @@
 import { prisma } from '../config/db';
+import crypto from 'crypto';
 import { AppError } from '../middleware/error.middleware';
 import { User, UserRole } from '@prisma/client';
 import { isSubscriptionValidForMatching } from './subscription.helper';
@@ -9,6 +10,18 @@ import { hasAcceptedNriTerms } from './legal-compliance.service';
 import { hasNriProviderCapability, scoreProviderMatch } from './provider-match.engine';
 
 const REQUEST_EXPIRY_HOURS = 24;
+const ACTIVE_SESSION_STATUSES = ['PENDING', 'CONFIRMED'] as const;
+
+const buildSmartMatchBookingReference = () =>
+  `SM-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+
+const getSmartMatchSlotLockKey = (scope: 'provider' | 'patient', id: string, scheduledAt: Date): bigint => {
+  const digest = crypto
+    .createHash('sha256')
+    .update(`${scope}:${id}:${scheduledAt.toISOString()}`)
+    .digest();
+  return digest.readBigInt64BE(0);
+};
 
 // Default fallback session prices (in minor units, e.g., 699 * 100 = ₹699.00)
 const DEFAULT_SESSION_QUOTE = {
@@ -75,6 +88,7 @@ interface SmartMatchCriteria {
   presetEntryType?: string;
   timezoneRegion?: string;
   sourceFunnel?: string;
+  selectedDate?: string;
   // Hard filters applied before scoring
   providerTypeFilter?: string;
   specializationRequired?: string[];
@@ -245,6 +259,15 @@ export const hasSmartMatchAvailabilityOverlap = (
   );
 };
 
+const ACTIVE_BOOKING_STATUSES = ['PENDING', 'CONFIRMED'] as const;
+
+const parseSelectedDate = (value?: string): Date | null => {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+};
+
 // Query providers who match the requested availability
 export const findMatchingProviders = async (
   availabilityPrefs: AvailabilityPrefs,
@@ -338,6 +361,48 @@ export const findMatchingProviders = async (
   });
 
   const providerIds = therapists.map((t) => String(t.userId));
+  const selectedDate = parseSelectedDate(criteria?.selectedDate);
+  const dayStart = selectedDate
+    ? new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 0, 0, 0, 0)
+    : null;
+  const dayEnd = dayStart
+    ? new Date(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate() + 1, 0, 0, 0, 0)
+    : null;
+
+  const providerConflictsById = new Set<string>();
+  if (providerIds.length > 0 && dayStart && dayEnd) {
+    const bookedSessions = await prisma.therapySession.findMany({
+      where: {
+        therapistProfileId: { in: providerIds },
+        status: { in: ACTIVE_BOOKING_STATUSES as any },
+        dateTime: {
+          gte: dayStart,
+          lt: dayEnd,
+        },
+      },
+      select: {
+        therapistProfileId: true,
+        dateTime: true,
+        durationMinutes: true,
+      },
+    });
+
+    for (const session of bookedSessions) {
+      const startsAt = new Date(session.dateTime);
+      const startMinute = startsAt.getHours() * 60 + startsAt.getMinutes();
+      const duration = Math.max(1, Number(session.durationMinutes || 50));
+      const endMinute = startMinute + duration;
+
+      const overlapsRequestedSlot = availabilityPrefs.timeSlots.some((slot) =>
+        isTimeOverlap(slot.startMinute, slot.endMinute, startMinute, endMinute),
+      );
+
+      if (overlapsRequestedSlot) {
+        providerConflictsById.add(String(session.therapistProfileId));
+      }
+    }
+  }
+
   const nriEligibilityByProviderId = new Map<string, { certified: boolean; shifts: string[] }>();
 
   if (isNriPresetFlow && providerIds.length > 0) {
@@ -387,6 +452,7 @@ export const findMatchingProviders = async (
   const matches: ProviderMatch[] = therapists
     .filter((t) => {
       if (!eligibleProviderIds.has(String(t.userId))) return false;
+      if (providerConflictsById.has(String(t.userId))) return false;
 
       if (isNriUser && !hasNriProviderCapability(t)) return false;
 
@@ -821,6 +887,7 @@ export const acceptAppointmentRequest = async (
 ): Promise<{
   status: string;
   appointmentRequestId: string;
+  therapySessionId?: string;
   scheduledAt: string;
   amountMinor: number;
   message: string;
@@ -865,23 +932,109 @@ export const acceptAppointmentRequest = async (
     throw new AppError('Patient payment is not completed. This request cannot be accepted yet.', 409);
   }
 
-  // Update appointment request: mark this provider as accepted, cancel others
-  const updatedProviders = providers.map((p: any) => {
-    if (p.providerId === input.providerId) {
-      return { ...p, status: 'ACCEPTED', acceptedAt: new Date() };
-    }
-    return { ...p, status: 'CANCELLED', cancelledAt: new Date() };
+  const patientProfile = await prisma.patientProfile.findUnique({
+    where: { userId: String(appointmentRequest.patientId) },
+    select: { id: true },
   });
 
-  const updated = await prisma.appointmentRequest.update({
-    where: { id: input.appointmentRequestId },
-    data: {
-      acceptedProviderId: input.providerId,
-      scheduledAt: input.scheduledAt,
-      providers: updatedProviders as any,
-      status: 'CONFIRMED',
-    },
+  if (!patientProfile?.id) {
+    throw new AppError('Patient profile not found for this request', 404);
+  }
+
+  // Update request and create TherapySession in one transaction to avoid split-brain states.
+  const acceptanceResult = await prisma.$transaction(async (tx: any) => {
+    const lockKeys = [
+      getSmartMatchSlotLockKey('provider', String(input.providerId), input.scheduledAt),
+      getSmartMatchSlotLockKey('patient', String(patientProfile.id), input.scheduledAt),
+    ].sort((a, b) => (a < b ? -1 : 1));
+
+    for (const lockKey of lockKeys) {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${lockKey})`;
+    }
+
+    const current = await tx.appointmentRequest.findUnique({
+      where: { id: input.appointmentRequestId },
+    });
+
+    if (!current) {
+      throw new AppError('Appointment request not found', 404);
+    }
+
+    if (current.status !== 'PENDING') {
+      throw new AppError('Appointment request is no longer available', 409);
+    }
+
+    const therapistConflict = await tx.therapySession.findFirst({
+      where: {
+        therapistProfileId: String(input.providerId),
+        dateTime: input.scheduledAt,
+        status: { in: ACTIVE_SESSION_STATUSES as any },
+      },
+      select: { id: true },
+    });
+
+    if (therapistConflict) {
+      throw new AppError('Selected provider is already booked for this slot', 409);
+    }
+
+    const patientConflict = await tx.therapySession.findFirst({
+      where: {
+        patientProfileId: String(patientProfile.id),
+        dateTime: input.scheduledAt,
+        status: { in: ACTIVE_SESSION_STATUSES as any },
+      },
+      select: { id: true },
+    });
+
+    if (patientConflict) {
+      throw new AppError('Patient already has a booking at this selected slot', 409);
+    }
+
+    const updatedProviders = providers.map((p: any) => {
+      if (p.providerId === input.providerId) {
+        return { ...p, status: 'ACCEPTED', acceptedAt: new Date() };
+      }
+      return { ...p, status: 'CANCELLED', cancelledAt: new Date() };
+    });
+
+    const therapySessionId = crypto.randomUUID();
+
+    const updatedRequest = await tx.appointmentRequest.update({
+      where: { id: input.appointmentRequestId },
+      data: {
+        acceptedProviderId: input.providerId,
+        therapySessionId,
+        scheduledAt: input.scheduledAt,
+        providers: updatedProviders as any,
+        status: 'CONFIRMED',
+      },
+    });
+
+    const createdSession = await tx.therapySession.create({
+      data: {
+        id: therapySessionId,
+        bookingReferenceId: buildSmartMatchBookingReference(),
+        patientProfileId: String(patientProfile.id),
+        therapistProfileId: String(input.providerId),
+        dateTime: input.scheduledAt,
+        status: 'CONFIRMED',
+        durationMinutes: Number(updatedRequest.durationMinutes || 50),
+        sessionFeeMinor: amountMinor,
+        paymentStatus: 'CAPTURED',
+        sourceFunnel: updatedRequest.sourceFunnel || 'smart_match',
+        isLocked: true,
+      },
+      select: { id: true },
+    });
+
+    return {
+      updatedRequest,
+      therapySessionId: String(createdSession.id),
+    };
   });
+
+  const updated = acceptanceResult.updatedRequest;
+  const therapySessionId = acceptanceResult.therapySessionId;
 
   const acceptedProviderName = `${providerEntry?.name || ''}`.trim() || 'A provider';
 
@@ -894,6 +1047,7 @@ export const acceptAppointmentRequest = async (
       payload: {
         appointmentRequestId: updated.id,
         providerId: input.providerId,
+        therapySessionId,
         scheduledAt: updated.scheduledAt?.toISOString(),
         amountMinor,
         requestStatus: 'CONFIRMED',
@@ -926,6 +1080,7 @@ export const acceptAppointmentRequest = async (
   return {
     status: updated.status,
     appointmentRequestId: updated.id,
+    therapySessionId,
     scheduledAt: updated.scheduledAt!.toISOString(),
     amountMinor,
     message: `You accepted the appointment request. Payment is already verified for ₹${(amountMinor / 100).toFixed(2)}.`,

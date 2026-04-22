@@ -658,7 +658,8 @@ client.init('52401c7067f54ff3813da84df073b5f6',{
 }
 
 // ── MAIN PAGE ────────────────────────────────────────────────────────────────
-export default function DigitalPetHubPage() {
+export default function DigitalPetHubPage({ returnTo }: DigitalPetHubPageProps) {
+  const navigate = useNavigate();
   const [showTembo, setShowTembo] = useState(false);
 
   return (
@@ -670,13 +671,23 @@ export default function DigitalPetHubPage() {
       <nav className="sticky top-0 z-40 border-b border-slate-200 bg-white">
         <div className="max-w-6xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="text-2xl font-bold text-teal-700">
-              MANAS<span className="text-amber-500">360</span>
+            <div className="flex items-center gap-4">
+              {returnTo && (
+                <button
+                  onClick={() => navigate(returnTo)}
+                  className="text-teal-600 font-semibold hover:text-teal-700 flex items-center gap-1 transition-colors"
+                >
+                  ← Back
+                </button>
+              )}
+              <div className="text-2xl font-bold text-teal-700">
+                MANAS<span className="text-amber-500">360</span>
+              </div>
             </div>
             <div className="text-xs text-slate-600 flex items-center gap-2">
               <a href="/" className="text-teal-600 font-semibold hover:text-teal-700">PT01</a>
               <span>→</span>
-              <a href="/" className="text-teal-600 font-semibold hover:text-teal-700">PT06</a>
+              <a href="/pet" className="text-teal-600 font-semibold hover:text-teal-700">PT06</a>
               <span>→</span>
               <span className="font-semibold text-slate-600">Digital Pet</span>
             </div>
@@ -842,48 +853,38 @@ export default function DigitalPetHubPage() {
             </div>
             <div className="grid grid-cols-4 gap-4">
               {[
-                { emoji: '🐕', name: 'Golden Puppy', env: '☀️ Sunny Meadow', tags: ['Joy', 'Routine Building'], bg: 'from-yellow-50', clickable: false },
-                { emoji: '🦉', name: 'Wise Owl', env: '🌳 Forest Library', tags: ['Cognitive', 'Quiz Games'], bg: 'from-blue-50', clickable: false },
-                { emoji: '🐘', name: 'Healing Elephant', env: '🌴 Sacred Grove', tags: ['Emotional Strength', 'Memory'], bg: 'from-green-50', clickable: true },
-                { emoji: '🐢', name: 'Patience Turtle', env: '🏖️ Quiet Beach', tags: ['Patience', 'Slow Living'], bg: 'from-orange-50', clickable: false },
+                { emoji: '🦕', name: 'Baby Dinosaur', env: '🌅 Cozy Nest', tags: ['Love', 'Nurture'], bg: 'from-yellow-50', hormone: 'Oxytocin', hormoneDesc: 'Oxytocin — nurture, bond, feel loved', route: '/dino' },
+                { emoji: '🐕', name: 'Golden Retriever', env: '☀️ Sunny Meadow', tags: ['Happy', 'Routine'], bg: 'from-yellow-50', hormone: 'Serotonin', hormoneDesc: 'Serotonin — daily routines, calm, stability', route: '/goldenPup' },
+                { emoji: '🐘', name: 'Healing Elephant', env: '🌴 Sacred Grove', tags: ['Reward', 'Memory'], bg: 'from-green-50', hormone: 'Dopamine', hormoneDesc: 'Dopamine — achievements, games, milestones', route: '/elephant' },
+                { emoji: '🦊', name: 'Chintu Fox', env: '🌾 Playfield', tags: ['Energy', 'Play'], bg: 'from-orange-50', hormone: 'Endorphins', hormoneDesc: 'Endorphins — breathwork, play, laughter', route: '/chintu' },
               ].map((pet, i) => (
-                <div
+                <Link
                   key={i}
-                  onClick={pet.clickable ? () => setShowTembo(true) : undefined}
-                  className={`bg-gradient-to-br ${pet.bg} to-white border-2 rounded-2xl overflow-hidden transition-all
-                    ${pet.clickable
-                      ? 'border-violet-400 shadow-lg cursor-pointer hover:shadow-xl hover:-translate-y-2 hover:border-violet-500 ring-2 ring-violet-200'
-                      : 'border-slate-200 hover:shadow-md hover:-translate-y-1 cursor-default'
-                    }`}
+                  to={pet.route}
+                  className={`bg-gradient-to-br ${pet.bg} to-white border-2 rounded-2xl overflow-hidden transition-all block border-slate-200 hover:shadow-xl hover:-translate-y-2 hover:border-violet-500 ring-1 ring-transparent hover:ring-violet-200`}
                 >
                   <div className="h-28 flex items-center justify-center text-5xl relative">
                     {pet.emoji}
-                    {pet.clickable && (
-                      <div className="absolute inset-0 flex items-end justify-center pb-2 opacity-0 hover:opacity-100 transition-opacity">
-                        <span className="text-xs font-bold bg-violet-600 text-white px-3 py-1 rounded-full shadow-lg">
-                          ▶ Meet Tembo
-                        </span>
-                      </div>
-                    )}
+                    <div className="absolute inset-0 flex items-end justify-center pb-2 opacity-0 hover:opacity-100 transition-opacity">
+                      <span className="text-xs font-bold bg-violet-600 text-white px-3 py-1 rounded-full shadow-lg">
+                        ▶ Open Interactive
+                      </span>
+                    </div>
                   </div>
                   <div className="p-4">
-                    <div className="flex items-center gap-1.5 mb-0.5">
-                      <div className="font-bold text-slate-900">{pet.name}</div>
-                      {pet.clickable && <span className="text-xs">✨</span>}
-                    </div>
+                    <div className="font-bold text-slate-900 mb-0.5">{pet.name}</div>
                     <div className="text-xs text-slate-600 mb-3">{pet.env}</div>
+                    <div className="text-xs font-semibold text-violet-700 mb-2">{pet.hormoneDesc}</div>
                     <div className="flex flex-wrap gap-1">
                       {pet.tags.map((tag, j) => (
                         <span key={j} className="text-xs font-semibold px-2 py-1 rounded-full bg-purple-100 text-purple-700">{tag}</span>
                       ))}
                     </div>
-                    {pet.clickable && (
-                      <div className="mt-3 text-xs text-violet-600 font-semibold flex items-center gap-1">
-                        <span>🐘</span> Click to experience →
-                      </div>
-                    )}
+                    <div className="mt-3 text-xs text-violet-600 font-semibold flex items-center gap-1">
+                      <span>{pet.emoji}</span> Click to experience →
+                    </div>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           </div>
@@ -891,6 +892,7 @@ export default function DigitalPetHubPage() {
           <div>
             <div className="flex items-center gap-3 mb-6">
               <h3 className="text-2xl font-bold">Tier 3 — AI Companions</h3>
+              <span className="px-3 py-1 rounded-full text-xs font-bold text-slate-500 bg-slate-100">COMING SOON</span>
               <span className="px-3 py-1 rounded-full text-xs font-bold text-amber-700 bg-amber-100">₹299/MO OR ₹499 OWN</span>
               <span className="text-sm text-slate-600">Talk, remember, evolve, heal</span>
             </div>
@@ -920,33 +922,46 @@ export default function DigitalPetHubPage() {
 
       <div className="py-16 bg-slate-50">
         <div className="max-w-6xl mx-auto px-6">
-          <h2 className="text-center text-4xl font-bold mb-3">💰 Pricing Architecture — Hybrid Model</h2>
-          <p className="text-center text-slate-600 text-sm max-w-2xl mx-auto mb-12">
-            Same proven model as Sound Therapy. Low barrier entry → à la carte exploration → subscription conversion.
-          </p>
-          <div className="grid grid-cols-3 gap-6 mb-8">
-            {[
-              { icon: '🌱', title: 'Starter', price: '₹0', sub: '/forever', tagline: 'Try before you commit', featured: false, features: ['1 ambient pet (Koi, Cat, or Sprite)', '2 environments', 'View-only mode (watch, breathe)', 'Basic mood check-in', '3 breathing exercises', 'Therapist Rx pets always unlocked'], cta: 'Get Started — Free' },
-              { icon: '🐾', title: 'Per Pet', price: '₹99-299', sub: '/mo per pet or ₹199-499 to own forever', featured: true, features: ['Choose any Tier 2 or 3 pet', 'Full interactions + mini-games', "Pet's dedicated environment", 'AR mode (place pet in your room)', 'Progress tracking per pet', 'Therapist dashboard integration', 'Offline mode for owned pets'], cta: 'Choose Your Pet →' },
-              { icon: '👑', title: 'Pet Paradise', price: '₹299', sub: '/month', tagline: 'All 10 pets + all features', featured: false, features: ['All 10 pet species unlocked', 'All environments + seasonal themes', 'AI voice conversation (Tier 3 pets)', 'Unlimited mini-games', 'Pet evolution with wellness journey', 'Family sharing (up to 4 members)', 'Connects to MANAS360 Premium ₹299'], cta: 'Upgrade to Paradise' },
-            ].map((plan, i) => (
-              <div key={i} className={`bg-white rounded-3xl p-8 border transition-all hover:shadow-lg relative ${plan.featured ? 'border-violet-600 shadow-xl' : 'border-slate-200'}`}>
-                {plan.featured && <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-violet-600 text-white text-xs font-bold px-4 py-1 rounded-full">BEST VALUE</div>}
-                <span className="text-4xl block mb-4">{plan.icon}</span>
-                <h3 className="text-2xl font-bold text-slate-900 mb-2">{plan.title}</h3>
-                <div className="text-4xl font-bold text-violet-600 mb-1">{plan.price}</div>
-                <p className="text-xs text-slate-600 mb-6">{plan.sub}</p>
-                {plan.tagline && <p className="text-xs text-slate-600 mb-6">{plan.tagline}</p>}
-                <ul className="space-y-3 mb-8">
-                  {plan.features.map((f, j) => (
-                    <li key={j} className="flex gap-2 items-start text-xs text-slate-700">
-                      <span className="text-purple-600 font-bold">✓</span><span>{f}</span>
-                    </li>
-                  ))}
-                </ul>
-                <button className={`w-full py-3 rounded-full text-sm font-bold transition-all ${plan.featured ? 'bg-violet-600 text-white hover:bg-violet-700' : 'bg-white border-2 border-violet-600 text-violet-600 hover:bg-violet-50'}`}>{plan.cta}</button>
-              </div>
-            ))}
+          <h2 className="text-center text-4xl font-bold mb-8">Add-On Features (A la Carte)</h2>
+
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 overflow-x-auto">
+            <table className="w-full min-w-[720px] text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 text-left text-slate-700">
+                  <th className="py-2 pr-4">Feature</th>
+                  <th className="py-2 pr-4">1 Hour</th>
+                  <th className="py-2 pr-4">3 Hours</th>
+                  <th className="py-2 pr-4">5 Hours</th>
+                  <th className="py-2">Description</th>
+                </tr>
+              </thead>
+              <tbody className="text-slate-600">
+                <tr className="border-b border-slate-100">
+                  <td className="py-3 pr-4 font-semibold">🤖 AnytimeBuddy</td>
+                  <td className="py-3 pr-4">₹399</td>
+                  <td className="py-3 pr-4">₹999</td>
+                  <td className="py-3 pr-4">₹1,699</td>
+                  <td className="py-3">On-demand emotional support chat (24/7 AI companion)</td>
+                </tr>
+                <tr className="border-b border-slate-100">
+                  <td className="py-3 pr-4 font-semibold">🐾 Digital Pet Hub</td>
+                  <td className="py-3 pr-4" colSpan={3}>Free starter + Premium unlock via subscription</td>
+                  <td className="py-3">Neurotransmitter companions (Chintu, Bholu, Mithi, Dheeraj)</td>
+                </tr>
+                <tr className="border-b border-slate-100">
+                  <td className="py-3 pr-4 font-semibold">📞 IVR Therapy</td>
+                  <td className="py-3 pr-4" colSpan={3}>Pay-per-session (same as standard fees)</td>
+                  <td className="py-3">Voice-based therapy + PHQ screening via phone call</td>
+                </tr>
+                <tr>
+                  <td className="py-3 pr-4 font-semibold">🎵 Sound Therapy</td>
+                  <td className="py-3 pr-4">₹30/track</td>
+                  <td className="py-3 pr-4">₹250/bundle</td>
+                  <td className="py-3 pr-4">-</td>
+                  <td className="py-3">Own forever, unlimited play + download</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>

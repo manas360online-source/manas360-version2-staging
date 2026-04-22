@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { patientApi } from '@/api/patient';
+import { useAuth } from '@/context/AuthContext';
 
 export interface WalletBalance {
   total_balance: number;
@@ -14,20 +15,27 @@ export interface WalletBalance {
 
 export const useWallet = (options?: { enabled?: boolean }) => {
   const queryClient = useQueryClient();
-  const enabled = options?.enabled ?? true;
+  const { isAuthenticated, loading, user } = useAuth();
+  const isPatientUser = String(user?.role || '').toLowerCase() === 'patient';
+  const enabled = options?.enabled ?? (!loading && isAuthenticated && isPatientUser);
 
   // Fetch current wallet (used in HitASixerGame, header, etc.)
   // Normalize API response to the expected WalletBalance shape.
-  const { data: balance = null, refetch: refreshWallet } = useQuery({
+  const { data: balance = null, refetch: refreshWallet, isFetching } = useQuery({
     queryKey: ['wallet'],
     queryFn: async () => {
       try {
         const resp = await patientApi.getWalletBalance();
-        return (resp && (resp.data ?? resp)) ?? null;
+        const normalized = (resp && (resp.data ?? resp)) ?? null;
+        // eslint-disable-next-line no-console
+        console.log('[useWallet] Fetched balance:', normalized);
+        return normalized;
       } catch (error: any) {
+        // eslint-disable-next-line no-console
+        console.error('[useWallet] Error fetching balance:', error?.response?.status, error?.message);
         // Provider/admin routes can mount shared UI pieces that reference wallet.
-        // Avoid noisy 403s in console and treat as unavailable wallet data.
-        if (error?.response?.status === 403) {
+        // Avoid noisy 401/403s and treat wallet as unavailable for non-patient contexts.
+        if (error?.response?.status === 401 || error?.response?.status === 403) {
           return null;
         }
         throw error;
@@ -57,6 +65,7 @@ export const useWallet = (options?: { enabled?: boolean }) => {
   return {
     balance,
     refreshWallet,
+    isFetching,
     applyWalletToPayment: applyWalletToPayment.mutateAsync,
     isApplying: applyWalletToPayment.isPending,
   };

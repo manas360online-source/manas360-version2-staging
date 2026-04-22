@@ -16,6 +16,13 @@ const PLAN_CACHE_TTL_SECONDS = 300;
 const singlePlanCacheKey = (type: string, planId: string) => `plans:${type}:${planId}`;
 const allPlansCacheKey = (type: string) => `plans:${type}:all`;
 
+const FALLBACK_PATIENT_PLANS: Record<string, { id: string; name: string; baseAmount: number; gstPercentage: number; active: boolean }> = {
+	'patient-free': { id: 'patient-free', name: 'Free Plan', baseAmount: 0, gstPercentage: 18, active: true },
+	'patient-1month': { id: 'patient-1month', name: '1 Month Plan', baseAmount: 99, gstPercentage: 18, active: true },
+	'patient-3month': { id: 'patient-3month', name: '3 Month Plan', baseAmount: 249, gstPercentage: 18, active: true },
+	'patient-1year': { id: 'patient-1year', name: '1 Year Plan', baseAmount: 799, gstPercentage: 18, active: true },
+};
+
 const readJsonCache = async <T>(key: string): Promise<T | null> => {
 	try {
 		const cached = await redis.get(key);
@@ -119,7 +126,7 @@ async function getPatientPlan(planId: string) {
 		};
 	}
 
-	return null;
+	return FALLBACK_PATIENT_PLANS[planId] || null;
 }
 
 /**
@@ -177,6 +184,10 @@ async function getAllPatientPlans() {
 		where: { active: true },
 		orderBy: { price: 'asc' }
 	});
+
+	if (!configs.length) {
+		return Object.values(FALLBACK_PATIENT_PLANS);
+	}
 
 	return configs.map(c => ({
 		id: c.key,

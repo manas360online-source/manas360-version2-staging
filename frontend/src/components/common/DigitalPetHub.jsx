@@ -503,5 +503,5 @@ const Footer = () => (
 
 /* ─── ROOT ─── */
 export default function DigitalPetHub() {
-  return <DigitalPetsHubPage />;
+  return <DigitalPetHubPage />;
 }
