@@ -60,7 +60,7 @@ export default function CalendarSelection({ onDateTimeSelect, onCancel }: Calend
                 timeSlots: [{ startMinute, endMinute }],
               },
               undefined,
-              { context: 'Standard' },
+              { context: 'Standard', selectedDate: selectedDate.toISOString() },
             );
             if (response?.error && response.status === 403) {
               subscriptionError = true;

@@ -686,6 +686,7 @@ export const patientApi = {
       presetEntryType?: string;
       timezoneRegion?: string;
       sourceFunnel?: string;
+      selectedDate?: string;
     },
   ): Promise<SmartMatchProvidersResult> => {
     const query = new URLSearchParams();
@@ -705,6 +706,7 @@ export const patientApi = {
     if (options?.presetEntryType) query.append('entryType', options.presetEntryType);
     if (options?.timezoneRegion) query.append('timezoneRegion', options.timezoneRegion);
     if (options?.sourceFunnel) query.append('sourceFunnel', options.sourceFunnel);
+    if (options?.selectedDate) query.append('selectedDate', options.selectedDate);
     try {
       const response = (await http.get(`/v1/patient/providers/smart-match?${query}`)).data;
       const payload = response?.data ?? response;

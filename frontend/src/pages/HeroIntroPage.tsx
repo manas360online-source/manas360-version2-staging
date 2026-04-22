@@ -50,7 +50,7 @@ const metricItems = [
 ];
 
 const rotatingHeadlines = ['Healing in Your', 'Transformation', 'Mental Wellness', 'Accessible'];
-const INTRO_ANIMATION_MS = 8600;
+const INTRO_ANIMATION_MS = 1800;
 
 export default function HeroIntroPage() {
   const navigate = useNavigate();
@@ -85,7 +85,7 @@ export default function HeroIntroPage() {
   return (
     <div className="hero-intro-page">
       {showIntroSplash ? (
-        <div className="hero-logo-intro" aria-hidden="true">
+        <div className="hero-logo-intro" aria-hidden="true" onClick={() => navigate('/landing')} role="button" tabIndex={0}>
           <div className="hero-logo-intro-card">
             <img src="/Logo.jpeg" alt="" />
           </div>

@@ -20,6 +20,13 @@ interface SmartMatchFlowProps {
 
 type FlowStep = 'calendar' | 'domain-selection' | 'provider-selection' | 'pre-payment' | 'pending';
 
+type SmartMatchPreferences = {
+  concerns: string[];
+  language: string;
+  mode: string;
+  context: 'Standard' | 'Corporate' | 'Night' | 'Buddy' | 'Crisis';
+};
+
 interface CalendarSelection {
   date: Date;
   time: string;
@@ -71,6 +78,12 @@ export default function SmartMatchFlow({
   const [inGrace, setInGrace] = useState(false);
   const [subscriptionStatus, setSubscriptionStatus] = useState<string>('');
   const [graceEndDate, setGraceEndDate] = useState<string | null>(null);
+  const [matchPreferences, setMatchPreferences] = useState<SmartMatchPreferences>({
+    concerns: [],
+    language: '',
+    mode: '',
+    context: 'Standard',
+  });
 
   const flowSteps: FlowStep[] = lockProviderType
     ? ['calendar', 'provider-selection', 'pre-payment', 'pending']
@@ -306,10 +319,12 @@ export default function SmartMatchFlow({
             {!isCheckingSubscription && !isFreeBlocked && step === 'provider-selection' && calendarSelection && (
               <ProviderSelectionStep
                 availabilityPrefs={getAvailabilityPrefs()!}
+                selectedDate={calendarSelection.date}
                 providerType={selectedProviderType}
                 presetEntryType={presetEntryType}
                 sourceFunnel={sourceFunnel}
                 timezoneRegion={timezoneRegion}
+                onPreferencesChange={setMatchPreferences}
                  onSuccess={(providers: any) => {
                    // Convert ProviderMatch to SelectedProvider format
                    const selectedProviders = providers.map((p: any) => ({
@@ -343,6 +358,7 @@ export default function SmartMatchFlow({
                 presetEntryType={presetEntryType}
                 sourceFunnel={sourceFunnel}
                 timezoneRegion={timezoneRegion}
+                matchPreferences={matchPreferences}
                 onBack={() => setStep('provider-selection')}
                 onCancel={handleClose}
               />

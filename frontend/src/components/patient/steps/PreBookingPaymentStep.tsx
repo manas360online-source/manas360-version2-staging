@@ -23,6 +23,12 @@ interface PreBookingPaymentStepProps {
   presetEntryType?: string;
   sourceFunnel?: string;
   timezoneRegion?: string;
+  matchPreferences?: {
+    concerns: string[];
+    language: string;
+    mode: string;
+    context: 'Standard' | 'Corporate' | 'Night' | 'Buddy' | 'Crisis';
+  };
   onBack: () => void;
   onCancel: () => void;
 }
@@ -40,6 +46,7 @@ export default function PreBookingPaymentStep({
   presetEntryType,
   sourceFunnel,
   timezoneRegion,
+  matchPreferences,
   onBack,
   onCancel,
 }: PreBookingPaymentStepProps) {
@@ -79,6 +86,16 @@ export default function PreBookingPaymentStep({
         sourceFunnel,
         presetEntryType,
         timezoneRegion,
+        smartMatchSummary: {
+          selectedDate: selectedDateTime.date.toISOString(),
+          selectedTime: selectedDateTime.time,
+          preferences: matchPreferences || {
+            concerns: [],
+            language: '',
+            mode: '',
+            context: 'Standard',
+          },
+        },
         rankedProviders: selectedProviders.map((provider) => ({
           providerId: provider.id,
           score: provider.score,

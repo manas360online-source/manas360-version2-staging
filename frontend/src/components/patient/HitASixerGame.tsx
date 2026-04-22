@@ -11,6 +11,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Link } from 'react-router-dom';
 
 const HitASixerGame: React.FC = () => {
+  const GUEST_PLAY_LOCK_KEY = 'manas360_hit_a_sixer_guest_played_v1';
   const queryClient = useQueryClient();
   const { isAuthenticated, user } = useAuth();
   const normalizedRole = String(user?.role || '').toLowerCase().replace(/_/g, '');
@@ -19,6 +20,7 @@ const HitASixerGame: React.FC = () => {
   const total = Number((balance as any)?.total_balance || 0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animFrameRef = useRef<number>(0);
+  const walletRefreshedAfterAuthRef = useRef(false);
 
   const [stage, setStage] = useState<'ready' | 'start' | 'bowling' | 'result'>('ready');
   const [outcome, setOutcome] = useState<'sixer' | 'four' | 'out' | null>(null);
@@ -27,6 +29,22 @@ const HitASixerGame: React.FC = () => {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [guestGamesPlayed, setGuestGamesPlayed] = useState(0);
   const [guestBest, setGuestBest] = useState<'sixer' | 'four' | 'out' | null>(null);
+
+  useEffect(() => {
+    if (canClaimWallet) return;
+    const hasPlayed = localStorage.getItem(GUEST_PLAY_LOCK_KEY) === '1';
+    if (hasPlayed) {
+      setGuestGamesPlayed(1);
+    }
+  }, [canClaimWallet]);
+
+  // Log wallet balance changes for debugging
+  useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.log('[HitASixerGame] Wallet state:', { canClaimWallet, balance, total });
+  }, [balance, canClaimWallet, total]);
+
+  const guestHasPlayed = !canClaimWallet && guestGamesPlayed >= 1;
 
   // Eligibility
   const eligibilityQuery = useQuery({
@@ -39,6 +57,21 @@ const HitASixerGame: React.FC = () => {
   const eligibility = eligibilityQuery.data;
   const eligibilityError = (eligibilityQuery.error as any)?.response?.data?.message || '';
 
+  useEffect(() => {
+    if (!canClaimWallet) {
+      walletRefreshedAfterAuthRef.current = false;
+      return;
+    }
+
+    if (walletRefreshedAfterAuthRef.current) {
+      return;
+    }
+
+    walletRefreshedAfterAuthRef.current = true;
+    void refreshWallet();
+    void queryClient.invalidateQueries({ queryKey: ['wallet'] });
+  }, [canClaimWallet, queryClient, refreshWallet]);
+
   // Play → Backend decides outcome
   const playMutation = useMutation({
     mutationFn: () => patientApi.playGame(),
@@ -48,6 +81,11 @@ const HitASixerGame: React.FC = () => {
       setCredit(earned);
       setStage('start');
       setIsFullScreen(true);
+      // Invalidate and refetch wallet IMMEDIATELY to reflect game credits
+      void (async () => {
+        await queryClient.invalidateQueries({ queryKey: ['wallet'] });
+        await refreshWallet();
+      })();
     },
     onError: (err: any) => toast.error(err.response?.data?.message || 'Cannot play now'),
   });
@@ -258,6 +296,7 @@ const HitASixerGame: React.FC = () => {
         setHitQuality(quality);
         setStage('result');
         if (!canClaimWallet) {
+          localStorage.setItem(GUEST_PLAY_LOCK_KEY, '1');
           setGuestGamesPlayed(prev => prev + 1);
           setGuestBest(prev => {
             const rank = { out: 1, four: 2, sixer: 3 } as const;
@@ -266,8 +305,10 @@ const HitASixerGame: React.FC = () => {
           });
         }
         if (canClaimWallet) {
-          refreshWallet();
-          queryClient.invalidateQueries({ queryKey: ['wallet'] });
+          void (async () => {
+            await refreshWallet();
+            await queryClient.invalidateQueries({ queryKey: ['wallet'] });
+          })();
           toast.success(
             finalOutcome === 'sixer' ? '🏏 SIXER! +₹108'
             : finalOutcome === 'four' ? '🏏 FOUR! +₹50'
@@ -310,6 +351,11 @@ const HitASixerGame: React.FC = () => {
     if (canClaimWallet) {
       if (!eligibility?.eligible) return;
       playMutation.mutate();
+      return;
+    }
+
+    if (guestHasPlayed) {
+      toast.error('Guest play already used on this device. Register and log in to continue.');
       return;
     }
 
@@ -395,14 +441,17 @@ const HitASixerGame: React.FC = () => {
               <span className="font-semibold text-emerald-700">Wallet</span>
               <span className="font-bold text-3xl">₹{total}</span>
               {!canClaimWallet && <span className="text-sm font-medium text-slate-500">(Start earning now)</span>}
+              {total === 0 && balance && (
+                <span className="text-xs text-slate-400 ml-2">(Balance data: {JSON.stringify(balance).slice(0, 50)}...)</span>
+              )}
             </div>
 
             <button
               onClick={handlePlayNow}
-              disabled={(canClaimWallet && !eligibility?.eligible) || stage !== 'ready' || playMutation.isPending}
+              disabled={(canClaimWallet && !eligibility?.eligible) || stage !== 'ready' || playMutation.isPending || guestHasPlayed}
               className="px-10 py-5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 text-white text-2xl font-bold rounded-3xl shadow-xl transition flex items-center gap-3 animate-pulse"
             >
-              {playMutation.isPending ? '⏳ Starting...' : '🎯 Take Your Shot'}
+              {playMutation.isPending ? '⏳ Starting...' : guestHasPlayed ? '✅ Guest Play Used' : '🎯 Take Your Shot'}
             </button>
           </div>
         </div>

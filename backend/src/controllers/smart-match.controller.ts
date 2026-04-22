@@ -68,6 +68,7 @@ export const getAvailableProvidersController = async (req: Request, res: Respons
   const presetEntryType = String(req.query.entryType || '').trim() || undefined;
   const timezoneRegion = String(req.query.timezoneRegion || '').trim() || undefined;
   const sourceFunnel = String(req.query.sourceFunnel || '').trim() || undefined;
+  const selectedDate = String(req.query.selectedDate || '').trim() || undefined;
   const rawContext = String(req.query.context || 'Standard').trim();
   const context = (['Standard', 'Corporate', 'Night', 'Buddy', 'Crisis'].includes(rawContext) ? rawContext : 'Standard') as
     | 'Standard'
@@ -100,6 +101,7 @@ export const getAvailableProvidersController = async (req: Request, res: Respons
       presetEntryType,
       timezoneRegion,
       sourceFunnel,
+      selectedDate,
       patientUserId: patientId,
     },
   );

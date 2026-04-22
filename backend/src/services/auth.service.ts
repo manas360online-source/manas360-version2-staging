@@ -618,7 +618,7 @@ export const verifyPhoneOtp = async (input: VerifyPhoneOtpInput, meta: RequestMe
 
 	const guestGameToken = (input as any).guestGameToken;
 
-	if (isFirstPhoneVerification && guestGameToken) {
+	if (guestGameToken) {
 		try {
 			const decoded = jwt.verify(guestGameToken, env.jwtSecret) as { outcome: string, creditAmount: number };
 
@@ -630,7 +630,7 @@ export const verifyPhoneOtp = async (input: VerifyPhoneOtpInput, meta: RequestMe
 				// ignore logging errors
 			}
 			
-			// Only apply if user hasn't played before (strictly a signup bonus)
+			// Only apply if user hasn't played before (idempotent guest-token claim)
 			const existingPlay = await db.dailyGamePlay.findFirst({ where: { userId: String(user.id) } }).catch(() => null);
 			if (!existingPlay) {
 					const gamePlay = await db.dailyGamePlay.create({

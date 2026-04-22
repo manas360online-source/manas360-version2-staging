@@ -1,5 +1,6 @@
 ﻿import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { groupTherapyApi } from "../api/groupTherapy";
 
 type Language = "English" | "Hindi" | "Kannada" | "Tamil" | "Telugu";
 
@@ -11,6 +12,7 @@ type LoginOption = {
 };
 
 type LiveCard = {
+  id?: string;
   icon: string;
   title: string;
   doctor: string;
@@ -47,6 +49,7 @@ const LandingPage: React.FC = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [leftPanelOpen, setLeftPanelOpen] = useState(false);
   const [activeQuickNav, setActiveQuickNav] = useState<string | null>(null);
+  const [liveCards, setLiveCards] = useState<LiveCard[]>([]);
   const quickNavCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const leftPanelCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -96,7 +99,14 @@ const LandingPage: React.FC = () => {
     navigate("/hit-a-sixer");
   };
 
-  const handleQuickNavMegaItemClick = (menuLabel: string) => {
+  const handleQuickNavMegaItemClick = (menuLabel: string, itemTitle?: string) => {
+    const normalizedItemTitle = String(itemTitle || '').toLowerCase();
+    if (normalizedItemTitle.includes('group therapy') || normalizedItemTitle.includes('group sessions')) {
+      setActiveQuickNav(null);
+      navigate('/group-therapy');
+      return;
+    }
+
     if (menuLabel === "I Need a Helping Hand") {
       setActiveQuickNav(null);
       navigate("/helping-hand");
@@ -129,6 +139,14 @@ const LandingPage: React.FC = () => {
 
     if (menuLabel === "Premium Therapy Hub") {
       setActiveQuickNav(null);
+      if (itemTitle === "Group Therapy") {
+        navigate("/group-therapy");
+        return;
+      }
+      if (itemTitle === "Sound Therapy") {
+        navigate("/patient/sound-therapy");
+        return;
+      }
       navigate("/premium-theraphy");
       return;
     }
@@ -382,9 +400,10 @@ const LandingPage: React.FC = () => {
     }, 120);
   };
 
-  const liveCards: LiveCard[] = useMemo(
+  const defaultLiveCards: LiveCard[] = useMemo(
     () => [
       {
+        id: "mock-anxiety",
         icon: "\uD83E\uDDE0",
         title: "Anxiety Support Circle",
         doctor: "Dr. Priya",
@@ -396,6 +415,7 @@ const LandingPage: React.FC = () => {
         buttonBg: "linear-gradient(135deg, #FF6A00, #FF8A3D)"
       },
       {
+        id: "mock-burnout",
         icon: "\uD83D\uDD25",
         title: "Work Burnout Recovery",
         doctor: "Dr. Meera",
@@ -407,6 +427,7 @@ const LandingPage: React.FC = () => {
         buttonBg: "linear-gradient(135deg, #15803D, #22C55E)"
       },
       {
+        id: "mock-grief",
         icon: "\uD83D\uDD6F\uFE0F",
         title: "Grief & Loss — Safe Space",
         doctor: "Dr. Rajan",
@@ -418,6 +439,7 @@ const LandingPage: React.FC = () => {
         buttonBg: "linear-gradient(135deg, #1D4ED8, #3B82F6)"
       },
       {
+        id: "mock-couples",
         icon: "\uD83D\uDC9E",
         title: "Couples Communication Workshop",
         doctor: "Ms. Ananya",
@@ -431,6 +453,69 @@ const LandingPage: React.FC = () => {
     ],
     []
   );
+
+  useEffect(() => {
+    const toStatusBadge = (scheduledAt: string, durationMinutes: number): string => {
+      const now = Date.now();
+      const start = new Date(scheduledAt).getTime();
+      if (Number.isNaN(start)) return "Upcoming";
+      const end = start + Math.max(30, Number(durationMinutes || 60)) * 60 * 1000;
+      if (now >= start && now <= end) return "LIVE";
+      const diffMin = Math.ceil((start - now) / (60 * 1000));
+      if (diffMin > 0 && diffMin <= 120) return "Starting Soon";
+      if (diffMin > 120) {
+        const hrs = Math.floor(diffMin / 60);
+        const mins = diffMin % 60;
+        return hrs > 0 ? `${hrs}H ${mins}M` : `${mins}M`;
+      }
+      return "Upcoming";
+    };
+
+    const pickIcon = (title: string, topic: string): string => {
+      const key = `${title} ${topic}`.toLowerCase();
+      if (key.includes("anxiety")) return "\uD83E\uDDE0";
+      if (key.includes("burnout")) return "\uD83D\uDD25";
+      if (key.includes("grief") || key.includes("loss")) return "\uD83D\uDD6F\uFE0F";
+      if (key.includes("couple") || key.includes("relationship")) return "\uD83D\uDC9E";
+      return "\uD83D\uDC65";
+    };
+
+    const loadLiveCards = async () => {
+      try {
+        const response = await groupTherapyApi.listPublicSessions();
+        const rows = Array.isArray(response?.items) ? response.items : [];
+
+        const mapped: LiveCard[] = rows
+          .slice(0, 4)
+          .map((row: any) => {
+            const price = Number(row?.priceMinor || 0);
+            const maxMembers = Number(row?.maxMembers || 0);
+            const joinedCount = Number(row?.joinedCount || 0);
+            const seatsLeft = maxMembers > 0 ? Math.max(0, maxMembers - joinedCount) : null;
+            const status = toStatusBadge(String(row?.scheduledAt || ""), Number(row?.durationMinutes || 60));
+
+            return {
+              id: String(row?.id || ""),
+              icon: pickIcon(String(row?.title || ""), String(row?.topic || "")),
+              title: String(row?.title || "Group Therapy Session"),
+              doctor: String(row?.hostName || "MANAS360 Expert"),
+              language: String(row?.language || "English"),
+              seats: seatsLeft !== null ? (seatsLeft <= 3 ? `Only ${seatsLeft} seat${seatsLeft === 1 ? "" : "s"} left!` : `${joinedCount}/${maxMembers} joined`) : "Limited seats",
+              rightBadge: String(row?.status || "").toUpperCase() === "LIVE" ? "LIVE" : status,
+              buttonText: price > 0 ? `JOIN NOW → ₹${Math.round(price / 100)}` : "JOIN NOW → FREE",
+              bg: "linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(248, 250, 252, 0.96))",
+              buttonBg: (String(row?.status || "").toUpperCase() === "LIVE" || status === "LIVE") ? "linear-gradient(135deg, #FF6A00, #FF8A3D)" : "linear-gradient(135deg, #2563EB, #3B82F6)",
+            };
+          });
+
+        setLiveCards(mapped.length > 0 ? mapped : defaultLiveCards);
+      } catch {
+        setLiveCards(defaultLiveCards);
+      }
+    };
+
+    void loadLiveCards();
+  }, [defaultLiveCards]);
 
   const languageLabelMap: Record<Language, string> = {
     English: "English",
@@ -533,8 +618,12 @@ const LandingPage: React.FC = () => {
       )}
 
       <a
-        href="/"
+        href="#/landing"
         aria-label="MANAS360 Home"
+        onClick={(event) => {
+          event.preventDefault();
+          navigate('/landing');
+        }}
         style={{
           position: "absolute",
           left: "8px",
@@ -1142,7 +1231,7 @@ const LandingPage: React.FC = () => {
                                 ? 0
                                 : undefined
                             }
-                            onClick={() => handleQuickNavMegaItemClick(activeQuickNav)}
+                            onClick={() => handleQuickNavMegaItemClick(activeQuickNav, mi.title)}
                             onKeyDown={(e) => {
                               if (
                                 (activeQuickNav === "I Need a Helping Hand" ||
@@ -1157,7 +1246,7 @@ const LandingPage: React.FC = () => {
                                 (e.key === "Enter" || e.key === " ")
                               ) {
                                 e.preventDefault();
-                                handleQuickNavMegaItemClick(activeQuickNav);
+                                handleQuickNavMegaItemClick(activeQuickNav, mi.title);
                               }
                             }}
                             onMouseEnter={(e) => {
@@ -1587,33 +1676,30 @@ const LandingPage: React.FC = () => {
             >
               <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "11px", fontWeight: 900, letterSpacing: "2px", textTransform: "uppercase", color: "#F97316" }}>
                 <span style={{ width: "8px", height: "8px", borderRadius: "999px", background: "#38BDF8" }} />
-                FOR NRIS & GLOBAL INDIANS
+                FOR NRI & GLOBAL INDIAN COMMUNITY
               </div>
               <div style={{ fontSize: "24px", fontWeight: 900, color: "#9A3412", lineHeight: 1.15, marginTop: "10px" }}>
                 Find a <span style={{ fontStyle: "italic", fontFamily: "Georgia, 'Times New Roman', serif" }}>Janmabhoomi</span>
                 <br />
-                Connection &mdash; Heal
+                Connection &mdash; Heal with the Right Care
               </div>
               <div style={{ fontSize: "12px", color: "#7C2D12", lineHeight: 1.6, fontWeight: 700, marginTop: "10px" }}>
-                Therapy in your mother tongue with Indian therapists who understand your desi dilemma &mdash; career pressure abroad, family guilt, identity crisis,
-                relationships across continents.
+                Therapy in your mother tongue with Indian experts who understand NRI realities &mdash; career pressure abroad, family guilt, identity shifts,
+                and relationships across continents.
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "12px" }}>
-                {["IST + Your Timezone", "Hindi · Tamil · Telugu · Kannada", "HIPAA + DPDPA", "USD / GBP / AED / SGD"].map((chip) => (
+                {["IST + Your Local Timezone", "Hindi · Tamil · Telugu · Kannada · English", "DPDPA-aligned care", "USD / GBP / AED / SGD accepted"].map((chip) => (
                   <div key={chip} style={{ fontSize: "10px", fontWeight: 900, color: "#9A3412", background: "rgba(255,255,255,0.65)", border: "1px solid rgba(251, 191, 36, 0.55)", padding: "4px 8px", borderRadius: "999px" }}>
                     {chip}
                   </div>
                 ))}
               </div>
               <div style={{ display: "flex", alignItems: "baseline", gap: "10px", marginTop: "12px" }}>
-                <span style={{ fontSize: "12px", color: "#9CA3AF", textDecoration: "line-through", fontWeight: 800 }}>$45/session</span>
-                <span style={{ fontSize: "22px", fontWeight: 900, color: "#B45309" }}>$29</span>
-                <span style={{ fontSize: "11px", fontWeight: 900, color: "#166534", background: "rgba(187, 247, 208, 0.7)", border: "1px solid #BBF7D0", padding: "4px 10px", borderRadius: "999px" }}>
-                  SAVE 35%
-                </span>
+                <span style={{ fontSize: "12px", color: "#9A3412", fontWeight: 800 }}>NRI session model:</span>
+                <span style={{ fontSize: "18px", fontWeight: 900, color: "#B45309" }}>from ₹2,999/session</span>
               </div>
               <button type="button" onClick={() => navigate("/nri-landing")} style={{ marginTop: "12px", width: "100%", border: "none", cursor: "pointer", borderRadius: "14px", padding: "12px 14px", background: "linear-gradient(135deg, #C2410C, #EA580C)", color: "white", fontWeight: 900, fontSize: "12px", boxShadow: "0 18px 40px rgba(0,0,0,0.12)" }}>
-                IN Connect to Home &mdash; Start Free &rarr;
+                IN Connect to Home &mdash; Book NRI Session &rarr;
               </button>
             </div>
 
@@ -1678,12 +1764,35 @@ const LandingPage: React.FC = () => {
               <span style={{ fontSize: "18px" }}>&#128293;</span>
               <span style={{ fontSize: "16px", fontWeight: 900, color: "#0F172A" }}>Live &amp; Upcoming Group Sessions</span>
             </div>
-            <span style={{ fontSize: "11px", fontWeight: 900, color: "#EF4444", background: "rgba(254, 226, 226, 0.9)", border: "1px solid rgba(239, 68, 68, 0.25)", padding: "4px 8px", borderRadius: "999px" }}>3 LIVE NOW</span>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ fontSize: "11px", fontWeight: 900, color: "#EF4444", background: "rgba(254, 226, 226, 0.9)", border: "1px solid rgba(239, 68, 68, 0.25)", padding: "4px 8px", borderRadius: "999px" }}>
+                {`${liveCards.filter((card) => String(card.rightBadge).includes("LIVE")).length} LIVE NOW`}
+              </span>
+              <button
+                type="button"
+                onClick={() => navigate('/group-therapy')}
+                style={{ border: "1px solid rgba(15, 23, 42, 0.2)", background: "white", color: "#0F172A", fontWeight: 900, fontSize: "11px", padding: "6px 10px", borderRadius: "999px", cursor: "pointer" }}
+              >
+                View More
+              </button>
+            </div>
           </div>
 
           <div className="live-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "12px" }}>
             {liveCards.map((card) => (
-              <div key={card.title} style={{ borderRadius: "18px", border: "1px solid rgba(239, 68, 68, 0.55)", background: "rgba(255, 255, 255, 0.78)", boxShadow: "0 18px 55px rgba(0,0,0,0.10)", overflow: "hidden" }}>
+              <div
+                key={card.id || card.title}
+                role="button"
+                tabIndex={0}
+                onClick={() => navigate('/group-therapy')}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    navigate('/group-therapy');
+                  }
+                }}
+                style={{ borderRadius: "18px", border: "1px solid rgba(239, 68, 68, 0.55)", background: "rgba(255, 255, 255, 0.78)", boxShadow: "0 18px 55px rgba(0,0,0,0.10)", overflow: "hidden", cursor: "pointer" }}
+              >
                 <div style={{ padding: "12px" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -1705,7 +1814,16 @@ const LandingPage: React.FC = () => {
                 </div>
 
                 <div style={{ padding: "12px" }}>
-                  <button type="button" style={{ width: "100%", border: "none", cursor: "pointer", borderRadius: "12px", padding: "10px 12px", background: card.buttonBg, color: "white", fontWeight: 900, fontSize: "12px", boxShadow: "0 14px 30px rgba(0,0,0,0.12)" }}>{card.buttonText}</button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate('/group-therapy');
+                    }}
+                    style={{ width: "100%", border: "none", cursor: "pointer", borderRadius: "12px", padding: "10px 12px", background: card.buttonBg, color: "white", fontWeight: 900, fontSize: "12px", boxShadow: "0 14px 30px rgba(0,0,0,0.12)" }}
+                  >
+                    {card.buttonText}
+                  </button>
                 </div>
               </div>
             ))}

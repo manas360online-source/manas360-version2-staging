@@ -235,7 +235,7 @@ export const publishGroupTherapySessionController = async (req: Request, res: Re
 export const listPublicPublishedGroupTherapySessionsController = async (_req: Request, res: Response): Promise<void> => {
   try {
     const rows = await db.groupTherapySession.findMany({
-      where: { status: 'PUBLISHED' },
+      where: { status: { in: ['PUBLISHED', 'LIVE'] } },
       orderBy: { scheduledAt: 'asc' },
       select: {
         id: true,
@@ -252,12 +252,33 @@ export const listPublicPublishedGroupTherapySessionsController = async (_req: Re
         requiresPayment: true,
         createdAt: true,
         updatedAt: true,
+        hostTherapist: {
+          select: {
+            firstName: true,
+            lastName: true,
+            therapistProfile: {
+              select: {
+                languages: true,
+              },
+            },
+          },
+        },
+        _count: {
+          select: {
+            enrollments: true,
+          },
+        },
       },
     });
 
     const sessions = rows.map((session) => ({
       ...session,
       priceMinor: session.priceMinor.toString(),
+      hostName: `${String(session.hostTherapist?.firstName || '').trim()} ${String(session.hostTherapist?.lastName || '').trim()}`.trim() || 'MANAS360 Expert',
+      language: Array.isArray(session.hostTherapist?.therapistProfile?.languages) && session.hostTherapist?.therapistProfile?.languages?.length
+        ? String(session.hostTherapist.therapistProfile.languages[0])
+        : 'English',
+      joinedCount: Number(session._count?.enrollments || 0),
     }));
 
     res.status(200).json({
@@ -374,7 +395,7 @@ export const confirmPublicJoinController = async (req: Request, res: Response): 
   const payment = await db.financialPayment.findUnique({ where: { merchantTransactionId: transactionId } });
   if (!payment) throw new AppError('Payment transaction not found', 404);
 
-  const isPaid = String(payment.status) === 'CAPTURED' || String(payment.status) === 'INITIATED';
+  const isPaid = String(payment.status) === 'CAPTURED';
   if (!isPaid) throw new AppError('Payment is not completed yet', 422);
 
   const enrollment = await db.groupTherapyEnrollment.findFirst({
@@ -649,7 +670,7 @@ export const confirmPrivateInvitePaymentController = async (req: Request, res: R
   const payment = await db.financialPayment.findUnique({ where: { merchantTransactionId: transactionId } });
   if (!payment) throw new AppError('Payment not found', 404);
 
-  const isPaid = String(payment.status) === 'CAPTURED' || String(payment.status) === 'INITIATED';
+  const isPaid = String(payment.status) === 'CAPTURED';
   if (!isPaid) throw new AppError('Payment is not completed yet', 422);
 
   const updated = await db.groupTherapyInvite.update({

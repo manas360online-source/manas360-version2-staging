@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { getApiErrorMessage, signupWithPhone, verifyPhoneSignupOtp } from '../../api/auth';
 import Button from '../../components/ui/Button';
@@ -144,6 +145,7 @@ const PATIENT_TERMS_SECTIONS: string[] = [
 
 export default function SignupPage() {
 	const { checkAuth } = useAuth();
+	const queryClient = useQueryClient();
 	const navigate = useNavigate();
 	const location = useLocation();
 
@@ -430,6 +432,7 @@ export default function SignupPage() {
 				localStorage.removeItem('guest_game_token');
 			}
 			await checkAuth({ force: true });
+			await queryClient.invalidateQueries({ queryKey: ['wallet'] });
 			const returnTo = resolveReturnTo();
 			if (isCertificationContext) {
 				navigate(returnTo || '/certifications', { replace: true });

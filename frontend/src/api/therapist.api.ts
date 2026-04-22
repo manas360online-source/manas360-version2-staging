@@ -274,15 +274,33 @@ export const therapistApi = {
 		return unwrap<any>(res.data);
 	},
 	getCbtModules: async (): Promise<{ items: TherapistCbtModuleItem[] }> => {
-		const res = await http.get('/v1/therapists/me/cbt-modules');
-		return unwrap<{ items: TherapistCbtModuleItem[] }>(res.data);
+		const res = await http.get('/v1/therapists/me/exercises');
+		const payload = unwrap<{ items?: TherapistExerciseItem[] }>(res.data);
+		const sourceItems = Array.isArray(payload?.items) ? payload.items : [];
+		return {
+			items: sourceItems.map((item) => ({
+				id: item.id,
+				title: item.name,
+				approach: item.category,
+				assignedPatient: item.assignedTo,
+				patientId: item.patientId,
+				status: item.status,
+				updatedAt: item.updatedAt,
+			})),
+		};
 	},
 	createCbtModule: async (payload: Partial<TherapistCbtModuleItem>): Promise<any> => {
-		const res = await http.post('/v1/therapists/me/cbt-modules', payload);
+		const res = await http.post('/v1/therapists/me/exercises', {
+			name: payload.title,
+			category: payload.approach,
+			assignedTo: payload.assignedPatient,
+			patientId: payload.patientId,
+			status: payload.status,
+		});
 		return unwrap<any>(res.data);
 	},
 	deleteCbtModule: async (id: string): Promise<any> => {
-		const res = await http.delete(`/v1/therapists/me/cbt-modules/${encodeURIComponent(id)}`);
+		const res = await http.delete(`/v1/therapists/me/exercises/${encodeURIComponent(id)}`);
 		return unwrap<any>(res.data);
 	},
 	getAssessments: async (): Promise<{ items: TherapistAssessmentItem[] }> => {

@@ -4,6 +4,10 @@ export const requestLogger = (req: Request, res: Response, next: NextFunction): 
 	const start = process.hrtime.bigint();
 
 	res.on('finish', () => {
+		if (req.originalUrl === '/health' || req.originalUrl === '/ready') {
+			return;
+		}
+
 		const end = process.hrtime.bigint();
 		const durationInMs = Number(end - start) / 1_000_000;
 
