@@ -1,5 +1,7 @@
 import client from './client';
 
+const isRouteMissing = (status: number): boolean => status === 404;
+
 export type TherapistSessionsListParams = {
   page?: number;
   limit?: number;
@@ -129,6 +131,11 @@ export const listMyTherapistSessions = async (params: TherapistSessionsListParam
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title }),
     });
-    if (!res.ok) throw new Error('Duplicate failed');
+    if (!res.ok) {
+      if (isRouteMissing(res.status)) {
+        return { success: false, duplicated: false, message: 'Template duplicate endpoint not available' };
+      }
+      throw new Error('Duplicate failed');
+    }
     return res.json();
   };

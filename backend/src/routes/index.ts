@@ -21,7 +21,7 @@ import landingRoutes from './landing.routes';
 import chatRoutes from './chat.routes';
 import riskAnalyticsRoutes from './riskAnalytics.routes';
 import psychiatristRoutes from './psychiatrist.routes';
-// import psychologistRoutes from './psychologist.routes'; // Commented out - not implementing psychologist functionality
+import psychologistRoutes from './psychologist.routes';
 import corporateRoutes from './corporate.routes';
 import ssoRoutes from './sso.routes';
 import pricingRoutes from './pricing.routes';
@@ -41,6 +41,7 @@ import freeScreeningRoutes from './free-screening.routes';
 import freeScreeningProviderRoutes from './free-screening-provider.routes';
 import freeScreeningAdminRoutes from './free-screening-admin.routes';
 import mdcRoutes from './mdc.routes';
+import systemRoutes from './system.routes';
 
 
 const router = Router();
@@ -86,13 +87,15 @@ router.use('/v1/presence', presenceRoutes);
 router.use('/v1/therapist/dashboard', dashboardRoutes);
 router.use('/v1/therapists/dashboard', dashboardRoutes);
 router.use('/v1/psychiatrist', psychiatristRoutes);
-// router.use('/v1/psychologist', psychologistRoutes); // Commented out - not implementing psychologist functionality
+router.use('/v1/psychologist', psychologistRoutes);
 router.use('/v1/provider', providerRoutes);
 // Mount public & patient-facing free-screening routes under /v1
 router.use('/v1', freeScreeningRoutes);
 router.use('/v1/payments', paymentRoutes);
 router.use('/v1/sso', ssoRoutes);
 router.use('/v1/subscriptions', subscriptionRoutes);
+// Backward-compatibility alias for legacy clients still using /api/subscriptions/*.
+router.use('/subscriptions', subscriptionRoutes);
 router.use('/v1/pricing', pricingRoutes);
 router.use('/pricing', pricingRoutes);
 router.use('/v1/patient-journey', patientJourneyRoutes);
@@ -115,6 +118,7 @@ router.use('/v1/game', gameRoutes);
 router.use('/v1/wallet', walletRoutes);
 router.use('/v1/legal', legalRoutes);
 router.use('/v1/mdc', mdcRoutes);
+router.use('/v1/system', systemRoutes);
 // Backward-compatibility: expose legacy public QR mounts so old public URLs work
 // Tests and external links use `/api/q/...` and `/q/...` paths; keep these
 // mounted to avoid 404s and noisy error logs.

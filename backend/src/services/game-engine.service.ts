@@ -64,6 +64,11 @@ const getNextPlayTime = (): string => {
   return next.toISOString();
 };
 
+const getUserLockKey = (userId: string): bigint => {
+  const digest = crypto.createHash('sha256').update(userId).digest();
+  return digest.readBigInt64BE(0);
+};
+
 export const checkEligibility = async (userId: string) => {
   const istNow = getIstNow();
   const gameDate = getIstDate();
@@ -135,6 +140,9 @@ export const generateOutcome = (): { outcome: GameOutcome; creditAmount: number 
 };
 
 export const playGame = async (input: { userId: string; ipAddress?: string | null; userAgent?: string | null }) => {
+  // eslint-disable-next-line no-console
+  console.log(`[GAME] playGame called for user ${input.userId}`);
+  
   const eligibility = await checkEligibility(input.userId);
   if (!eligibility.eligible) {
     return {
@@ -152,48 +160,126 @@ export const playGame = async (input: { userId: string; ipAddress?: string | nul
   const gameDate = getIstDate();
   const playedAt = getIstNow();
 
-  // Insert standard create instead of testing upsert
-  const gamePlay = await db.dailyGamePlay.create({
-    data: {
+  // Use transaction to prevent duplicate plays and ensure wallet credit happens together
+  try {
+    const result = await db.$transaction(async (tx: any) => {
+      // Serialize concurrent game plays per user to prevent duplicate records.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${getUserLockKey(input.userId)})`;
+
+      // Double-check eligibility inside transaction before creation
+      const existingPlay = await tx.dailyGamePlay.findFirst({
+        where: { userId: input.userId },
+      });
+
+      if (existingPlay) {
+        throw new Error('DUPLICATE_PLAY_ATTEMPT');
+      }
+
+      // Create game play record
+      const gamePlay = await tx.dailyGamePlay.create({
+        data: {
+          userId: input.userId,
+          date: gameDate,
+          sixesHit: outcome === 'sixer' ? 1 : 0,
+          ballsPlayed: 1,
+          didWin: outcome !== 'out',
+          prizeAmount: creditAmount,
+          lastPlayedAt: playedAt,
+        },
+      });
+
+      return gamePlay;
+    });
+
+    // Credit added OUTSIDE transaction to allow wallet service to manage its own transaction
+    const walletData = await addCredit({
       userId: input.userId,
-      date: gameDate,
-      sixesHit: outcome === 'sixer' ? 1 : 0,
-      ballsPlayed: 1,
-      didWin: outcome !== 'out',
-      prizeAmount: creditAmount,
-      lastPlayedAt: playedAt,
-    },
-  }).catch((error: unknown) => {
-    if (!isSchemaUnavailableError(error)) throw error;
-    return { id: `fallback-${Date.now()}` };
-  });
-
-  const walletData = await addCredit({
-    userId: input.userId,
-    amount: creditAmount,
-    source: 'GAME_WIN',
-    sourceId: gamePlay.id,
-    expiresInDays: 30,
-  }).catch(() => ({
-    balanceBefore: 0,
-    balanceAfter: creditAmount,
-    expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-  }));
-
-  return {
-    success: true,
-    outcome,
-    prize: {
       amount: creditAmount,
-      description: `INR ${creditAmount} added to wallet`,
-      expires_in_days: 30,
-      expires_at: walletData.expiresAt.toISOString(),
-    },
-    wallet: {
-      previous_balance: walletData.balanceBefore,
-      credit_added: creditAmount,
-      new_balance: walletData.balanceAfter,
-    },
-    message: `INR ${creditAmount} added to your wallet`,
-  };
+      source: 'GAME_WIN',
+      sourceId: result.id,
+      expiresInDays: 30,
+    }).catch((error) => {
+      // eslint-disable-next-line no-console
+      console.error(`[GAME] addCredit failed for user ${input.userId}:`, String((error as any)?.message || ''), error);
+      return {
+        balanceBefore: 0,
+        balanceAfter: creditAmount,
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      };
+    });
+
+    return {
+      success: true,
+      outcome,
+      prize: {
+        amount: creditAmount,
+        description: `INR ${creditAmount} added to wallet`,
+        expires_in_days: 30,
+        expires_at: walletData.expiresAt.toISOString(),
+      },
+      wallet: {
+        previous_balance: walletData.balanceBefore,
+        credit_added: creditAmount,
+        new_balance: walletData.balanceAfter,
+      },
+      message: `INR ${creditAmount} added to your wallet`,
+    };
+  } catch (error: unknown) {
+    const errorMsg = String((error as any)?.message || '');
+    
+    // Log the error for debugging
+    // eslint-disable-next-line no-console
+    console.error(`[GAME] Error in playGame for user ${input.userId}:`, errorMsg, error);
+    
+    // Handle duplicate play attempt
+    if (errorMsg.includes('DUPLICATE_PLAY_ATTEMPT')) {
+      return {
+        success: false,
+        error: 'You have already played Hit a Sixer. Winnings are stored in your wallet!',
+        data: eligibility.timing,
+      };
+    }
+
+    // Handle schema unavailability gracefully
+    if (isSchemaUnavailableError(error)) {
+      // eslint-disable-next-line no-console
+      console.warn(`[GAME] Schema unavailable for user ${input.userId}, attempting fallback wallet credit`);
+      // Schema not available, but still try to credit for game win
+      const walletData = await addCredit({
+        userId: input.userId,
+        amount: creditAmount,
+        source: 'GAME_WIN',
+        sourceId: `fallback-${Date.now()}`,
+        expiresInDays: 30,
+      }).catch((walletError) => {
+        // eslint-disable-next-line no-console
+        console.error(`[GAME] Fallback wallet credit also failed for user ${input.userId}:`, walletError);
+        return {
+          balanceBefore: 0,
+          balanceAfter: creditAmount,
+          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        };
+      });
+
+      return {
+        success: true,
+        outcome,
+        prize: {
+          amount: creditAmount,
+          description: `INR ${creditAmount} added to wallet`,
+          expires_in_days: 30,
+          expires_at: walletData.expiresAt.toISOString(),
+        },
+        wallet: {
+          previous_balance: walletData.balanceBefore,
+          credit_added: creditAmount,
+          new_balance: walletData.balanceAfter,
+        },
+        message: `INR ${creditAmount} added to your wallet`,
+      };
+    }
+
+    // Re-throw other errors
+    throw error;
+  }
 };

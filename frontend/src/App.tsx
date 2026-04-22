@@ -53,7 +53,6 @@ const SleepTherapyPage = lazy(() => import('./pages/patient/SleepTherapyPage'));
 const WellnessLibraryPage = lazy(() => import('./pages/patient/WellnessLibraryPage'));
 const BuddyChatPage = lazy(() => import('./pages/patient/BuddyChatPage'));
 const ProviderMessagesPage = lazy(() => import('./pages/patient/ProviderMessagesPage'));
-const ProviderSelectionPage = lazy(() => import('./pages/patient/ProviderSelectionPage'));
 const PatientOnboardingPage = lazy(() => import('./pages/patient/PatientOnboardingPage'));
 const DailyCheckInPage = lazy(() => import('./pages/patient/DailyCheckInPage'));
 const HitASixerGamePage = lazy(() => import('./pages/patient/HitASixerGamePage'));
@@ -257,7 +256,8 @@ function App() {
         <Suspense fallback={<GlobalFallbackLoader />}>
           <ScrollToTop />
           <Routes>
-            <Route path="/" element={<HeroIntroPage />} />
+            <Route path="/" element={<Navigate to="/landing" replace />} />
+            <Route path="/intro" element={<HeroIntroPage />} />
             <Route path="/landing" element={<LandingPage />} />
             <Route path="/main-landing" element={<Navigate to="/landing" replace />} />
             <Route path="/helping-hand" element={<HelpingHandLandingPage />} />
@@ -267,6 +267,7 @@ function App() {
             <Route path="/corporate-landing" element={<CorporateLandingPage />} />
             <Route path="/premium-theraphy" element={<PremiumTheraphyLandingPage />} />
             <Route path="/nri-landing" element={<NRILandingPage />} />
+            <Route path="/group-therapy" element={<GroupTherapySessionsPage />} />
             <Route path="/assessment" element={<Assessment onSubmit={handleAssessmentSubmit} />} />
             <Route path="/assessment-preset" element={<PresetAssessmentEntry />} />
             <Route path="/eap/:companyKey/screen" element={<EapScreeningPage />} />
@@ -664,7 +665,7 @@ function App() {
               <Route path="providers/:id" element={<Navigate to="/patient/sessions" replace />} />
               <Route path="book/:providerId" element={<BookSessionPage />} />
               <Route path="sessions" element={<SessionsPage />} />
-              <Route path="provider-selection" element={<ProviderSelectionPage />} />
+              <Route path="provider-selection" element={<Navigate to="/patient/sessions" replace />} />
               <Route path="sessions/:id" element={<PatientSessionDetailPage />} />
               <Route path="exercises" element={<Navigate to="/patient/check-in?tab=daily-mood" replace />} />
               <Route path="sessions/:id/live" element={<LiveSessionPage />} />

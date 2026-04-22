@@ -14,6 +14,7 @@ export function useTherapistSocket(opts: { url?: string; token: string | null; s
   const lastEventAt = useRef<number | null>(null);
   const reconnectAttempts = useRef(0);
   const reconnectTimer = useRef<number | null>(null);
+  const eventsEndpointUnavailable = useRef(false);
   const maxRetries = 10;
   const baseDelay = 500;
   const maxDelay = 30000;
@@ -54,9 +55,14 @@ export function useTherapistSocket(opts: { url?: string; token: string | null; s
     }
 
     async function resync() {
+      if (eventsEndpointUnavailable.current) return;
       const since = lastEventAt.current || 0;
       try {
         const res = await fetch(`${url.replace(/\/$/, '')}/v1/cbt-sessions/${sessionId}/events?since=${since}`, { credentials: 'include' });
+        if (res.status === 404) {
+          eventsEndpointUnavailable.current = true;
+          return;
+        }
         if (res.status === 410) {
           isStale.current = true;
           setConnected(false);

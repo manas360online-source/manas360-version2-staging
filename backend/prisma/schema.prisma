@@ -426,6 +426,7 @@ model AuthAuditLog {
 
   @@index([userId, createdAt])
   @@index([event, createdAt])
+  @@map("auth_audit_logs")
 }
 
 model ProviderVerification {
@@ -1022,6 +1023,7 @@ model AppointmentRequest {
   availabilityPrefs       Json
   providers               Json                     @default("[]")
   acceptedProviderId      String?                  @map("accepted_provider_id")
+  therapySessionId        String?                  @unique @map("therapy_session_id")
   scheduledAt             DateTime?                @map("scheduled_at")
   durationMinutes         Int                      @default(50) @map("duration_minutes")
   preferredSpecialization String?                  @map("preferred_specialization")
@@ -1040,6 +1042,7 @@ model AppointmentRequest {
   @@index([patientId, status, createdAt(sort: Desc)])
   @@index([status, expiresAt])
   @@index([acceptedProviderId])
+  @@index([therapySessionId])
   @@map("appointment_requests")
 }
 

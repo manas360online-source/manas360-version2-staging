@@ -844,7 +844,7 @@ export const validateCreateDailyCheckInRequest: RequestHandler[] = [
 	body('intention').optional().isString().trim().isLength({ min: 1, max: 500 }).withMessage('intention must be 1-500 characters'),
 	body('reflectionGood').optional().isString().trim().isLength({ min: 1, max: 500 }).withMessage('reflectionGood must be 1-500 characters'),
 	body('reflectionBad').optional().isString().trim().isLength({ min: 1, max: 500 }).withMessage('reflectionBad must be 1-500 characters'),
-	body('stressLevel').optional().isInt({ min: 1, max: 5 }).withMessage('stressLevel must be an integer between 1 and 5'),
+	body('stressLevel').optional().isInt({ min: 1, max: 10 }).withMessage('stressLevel must be an integer between 1 and 10'),
 	body('gratitude').optional().isString().trim().isLength({ min: 1, max: 500 }).withMessage('gratitude must be 1-500 characters'),
 	body().custom((body) => {
 		const type = String(body.type || '').toUpperCase();

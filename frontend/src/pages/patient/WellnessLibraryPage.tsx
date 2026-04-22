@@ -54,7 +54,7 @@ const modules: ModuleCard[] = [
     highlights: ['Koi, Puppy, and Owl companions', 'Daily habit nudges', 'Progressive care rewards'],
     goal: 'Engagement & Loneliness',
     cta: 'Meet Your Pet →',
-    to: '/patient/digital-pets',
+    to: '/pet',
     themeClass: 'from-[#0e5558]/85 via-[#146a6f]/80 to-[#1f7f86]/75',
     badge: 'PREMIUM LIBRARY',
   },
@@ -265,7 +265,11 @@ export default function WellnessLibraryPage() {
 
               <div className="flex items-center justify-between gap-3">
                 <Link
-                  to={module.to}
+                  to={
+                    module.id === 'digital-pets'
+                      ? `/pet?returnTo=${encodeURIComponent('/patient/wellness-library')}`
+                      : module.to
+                  }
                   className="inline-flex items-center rounded-full bg-charcoal px-4 py-2 text-sm font-semibold text-white transition hover:bg-black"
                 >
                   {module.cta}

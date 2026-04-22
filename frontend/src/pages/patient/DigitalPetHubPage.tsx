@@ -1,5 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+
+// ── TYPES ────────────────────────────────────────────────────────────────────
+type DigitalPetHubPageProps = {
+  returnTo?: string;
+};
 
 // ── TEMBO MODAL ──────────────────────────────────────────────────────────────
 function TemboModal({ onClose }: { onClose: () => void }) {
@@ -658,7 +663,8 @@ client.init('52401c7067f54ff3813da84df073b5f6',{
 }
 
 // ── MAIN PAGE ────────────────────────────────────────────────────────────────
-export default function DigitalPetHubPage() {
+export default function DigitalPetHubPage({ returnTo }: DigitalPetHubPageProps) {
+  const navigate = useNavigate();
   const [showTembo, setShowTembo] = useState(false);
 
   return (
@@ -670,13 +676,23 @@ export default function DigitalPetHubPage() {
       <nav className="sticky top-0 z-40 border-b border-slate-200 bg-white">
         <div className="max-w-6xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="text-2xl font-bold text-teal-700">
-              MANAS<span className="text-amber-500">360</span>
+            <div className="flex items-center gap-4">
+              {returnTo && (
+                <button
+                  onClick={() => navigate(returnTo)}
+                  className="text-teal-600 font-semibold hover:text-teal-700 flex items-center gap-1 transition-colors"
+                >
+                  ← Back
+                </button>
+              )}
+              <div className="text-2xl font-bold text-teal-700">
+                MANAS<span className="text-amber-500">360</span>
+              </div>
             </div>
             <div className="text-xs text-slate-600 flex items-center gap-2">
               <a href="/" className="text-teal-600 font-semibold hover:text-teal-700">PT01 Hub</a>
               <span>→</span>
-              <a href="/" className="text-teal-600 font-semibold hover:text-teal-700">PT06</a>
+              <a href="/pet" className="text-teal-600 font-semibold hover:text-teal-700">PT06</a>
               <span>→</span>
               <span className="font-semibold text-slate-600">Digital Pet Hub</span>
             </div>
