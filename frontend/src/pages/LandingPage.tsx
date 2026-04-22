@@ -1417,7 +1417,18 @@ const LandingPage: React.FC = () => {
           </div>
 
           <div className="pro-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "18px" }}>
-            <div style={{ background: "rgba(255,255,255,0.92)", border: "1px solid rgba(226,232,240,0.95)", borderRadius: "22px", padding: "18px 16px", boxShadow: "0 16px 40px rgba(0,0,0,0.07)" }}>
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => navigate('/provider-landing')}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  navigate('/provider-landing');
+                }
+              }}
+              style={{ background: "rgba(255,255,255,0.92)", border: "1px solid rgba(226,232,240,0.95)", borderRadius: "22px", padding: "18px 16px", boxShadow: "0 16px 40px rgba(0,0,0,0.07)", cursor: 'pointer' }}
+            >
               <div style={{ display: "flex", justifyContent: "flex-end" }}>
                 <span style={{ fontSize: "10px", fontWeight: 900, color: "white", background: "linear-gradient(135deg,#7C3AED,#A78BFA)", padding: "4px 8px", borderRadius: "999px" }}>RCI VERIFIED</span>
               </div>
@@ -1428,13 +1439,24 @@ const LandingPage: React.FC = () => {
               </div>
               <div style={{ marginTop: "14px", fontSize: "16px", fontWeight: 900, color: "#0F172A" }}>Psychologist</div>
               <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#64748B", lineHeight: 1.55 }}>Clinical &amp; counseling psychology. RCI registered. Earn ₹60K&ndash;₹2L/mo</div>
-              <button type="button" style={{ marginTop: "14px", border: "1.5px solid rgba(124,58,237,0.7)", background: "rgba(255,255,255,0.95)", color: "#6D28D9", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
+              <button type="button" onClick={() => navigate('/provider-landing')} style={{ marginTop: "14px", border: "1.5px solid rgba(124,58,237,0.7)", background: "rgba(255,255,255,0.95)", color: "#6D28D9", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
                 &#10022; Join Now
               </button>
               <div style={{ marginTop: "10px", fontSize: "11px", fontWeight: 800, color: "#64748B" }}>Discover &mdash; Plans &mdash; Profile</div>
             </div>
 
-            <div style={{ background: "rgba(255,255,255,0.92)", border: "1px solid rgba(226,232,240,0.95)", borderRadius: "22px", padding: "18px 16px", boxShadow: "0 16px 40px rgba(0,0,0,0.07)" }}>
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => navigate('/provider-landing')}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  navigate('/provider-landing');
+                }
+              }}
+              style={{ background: "rgba(255,255,255,0.92)", border: "1px solid rgba(226,232,240,0.95)", borderRadius: "22px", padding: "18px 16px", boxShadow: "0 16px 40px rgba(0,0,0,0.07)", cursor: 'pointer' }}
+            >
               <div style={{ display: "flex", justifyContent: "flex-end" }}>
                 <span style={{ fontSize: "10px", fontWeight: 900, color: "white", background: "linear-gradient(135deg,#0EA5A6,#22C1C3)", padding: "4px 8px", borderRadius: "999px" }}>NMC VERIFIED</span>
               </div>
@@ -1445,13 +1467,24 @@ const LandingPage: React.FC = () => {
               </div>
               <div style={{ marginTop: "14px", fontSize: "16px", fontWeight: 900, color: "#0F172A" }}>Psychiatrist</div>
               <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#64748B", lineHeight: 1.55 }}>Diagnosis, medication, e-prescriptions. NMC registered MDs</div>
-              <button type="button" style={{ marginTop: "14px", border: "1.5px solid rgba(14,165,166,0.7)", background: "rgba(255,255,255,0.95)", color: "#0F766E", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
+              <button type="button" onClick={() => navigate('/provider-landing')} style={{ marginTop: "14px", border: "1.5px solid rgba(14,165,166,0.7)", background: "rgba(255,255,255,0.95)", color: "#0F766E", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
                 &#10022; Join Now
               </button>
               <div style={{ marginTop: "10px", fontSize: "11px", fontWeight: 800, color: "#64748B" }}>Discover &mdash; Plans &mdash; Profile</div>
             </div>
 
-            <div style={{ background: "rgba(255,255,255,0.92)", border: "1px solid rgba(226,232,240,0.95)", borderRadius: "22px", padding: "18px 16px", boxShadow: "0 16px 40px rgba(0,0,0,0.07)" }}>
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => navigate('/provider-landing')}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  navigate('/provider-landing');
+                }
+              }}
+              style={{ background: "rgba(255,255,255,0.92)", border: "1px solid rgba(226,232,240,0.95)", borderRadius: "22px", padding: "18px 16px", boxShadow: "0 16px 40px rgba(0,0,0,0.07)", cursor: 'pointer' }}
+            >
               <div style={{ display: "flex", justifyContent: "flex-end" }}>
                 <span style={{ fontSize: "10px", fontWeight: 900, color: "white", background: "linear-gradient(135deg,#16A34A,#22C55E)", padding: "4px 8px", borderRadius: "999px" }}>0% FEE &mdash; 3 MO</span>
               </div>
@@ -1462,13 +1495,24 @@ const LandingPage: React.FC = () => {
               </div>
               <div style={{ marginTop: "14px", fontSize: "16px", fontWeight: 900, color: "#0F172A" }}>Therapist</div>
               <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#64748B", lineHeight: 1.55 }}>CBT, DBT, REBT, integrative. Build your practice on your terms</div>
-              <button type="button" style={{ marginTop: "14px", border: "1.5px solid rgba(34,197,94,0.7)", background: "rgba(255,255,255,0.95)", color: "#15803D", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
+              <button type="button" onClick={() => navigate('/provider-landing')} style={{ marginTop: "14px", border: "1.5px solid rgba(34,197,94,0.7)", background: "rgba(255,255,255,0.95)", color: "#15803D", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
                 &#10022; Join Now
               </button>
               <div style={{ marginTop: "10px", fontSize: "11px", fontWeight: 800, color: "#64748B" }}>Discover &mdash; Plans &mdash; Profile</div>
             </div>
 
-            <div style={{ background: "rgba(255,255,255,0.92)", border: "1px solid rgba(226,232,240,0.95)", borderRadius: "22px", padding: "18px 16px", boxShadow: "0 16px 40px rgba(0,0,0,0.07)" }}>
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => navigate('/provider-landing')}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  navigate('/provider-landing');
+                }
+              }}
+              style={{ background: "rgba(255,255,255,0.92)", border: "1px solid rgba(226,232,240,0.95)", borderRadius: "22px", padding: "18px 16px", boxShadow: "0 16px 40px rgba(0,0,0,0.07)", cursor: 'pointer' }}
+            >
               <div style={{ display: "flex", justifyContent: "flex-end" }}>
                 <span style={{ fontSize: "10px", fontWeight: 900, color: "white", background: "linear-gradient(135deg,#D97706,#F59E0B)", padding: "4px 8px", borderRadius: "999px" }}>CERTIFIED</span>
               </div>
@@ -1479,7 +1523,7 @@ const LandingPage: React.FC = () => {
               </div>
               <div style={{ marginTop: "14px", fontSize: "16px", fontWeight: 900, color: "#0F172A" }}>NLP Coach</div>
               <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#64748B", lineHeight: 1.55 }}>Neuro-linguistic programming. Life coaching. Transformation specialists</div>
-              <button type="button" style={{ marginTop: "14px", border: "1.5px solid rgba(245,158,11,0.75)", background: "rgba(255,255,255,0.95)", color: "#B45309", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
+              <button type="button" onClick={() => navigate('/provider-landing')} style={{ marginTop: "14px", border: "1.5px solid rgba(245,158,11,0.75)", background: "rgba(255,255,255,0.95)", color: "#B45309", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
                 &#10022; Join Now
               </button>
               <div style={{ marginTop: "10px", fontSize: "11px", fontWeight: 800, color: "#64748B" }}>Discover &mdash; Plans &mdash; Profile</div>

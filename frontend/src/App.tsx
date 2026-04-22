@@ -143,6 +143,7 @@ const ProviderEarningsPage = lazy(() => import('./pages/provider/Earnings'));
 const ProviderSettingsPage = lazy(() => import('./pages/provider/Settings'));
 const ProviderDashboard = lazy(() => import('./pages/provider/Dashboard/ProviderDashboard'));
 const ProviderPortalPage = lazy(() => import('./pages/provider/ProviderPortalPage'));
+const ProviderLandingPage = lazy(() => import('./pages/provider/ProviderLandingPage'));
 const ProviderSubscriptionPage = lazy(() => import('./pages/provider/ProviderSubscriptionPage'));
 const ProviderSubscriptionAddonsPage = lazy(() => import('./pages/provider/ProviderSubscriptionAddonsPage'));
 const AppointmentRequestsPage = lazy(() => import('./pages/provider/AppointmentRequests'));
@@ -259,6 +260,7 @@ function App() {
             <Route path="/" element={<Navigate to="/landing" replace />} />
             <Route path="/intro" element={<HeroIntroPage />} />
             <Route path="/landing" element={<LandingPage />} />
+            <Route path="/provider-landing" element={<ProviderLandingPage />} />
             <Route path="/main-landing" element={<Navigate to="/landing" replace />} />
             <Route path="/helping-hand" element={<HelpingHandLandingPage />} />
             <Route path="/ai-power-hub" element={<AiPowerHubLandingPage />} />
