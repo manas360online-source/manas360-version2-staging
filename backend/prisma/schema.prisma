@@ -429,6 +429,19 @@ model AuthAuditLog {
   @@map("auth_audit_logs")
 }
 
+model PlatformConfigHistory {
+  id          String   @id @default(uuid())
+  key         String
+  version     Int
+  value       Json
+  changedById String?  @map("changed_by_id")
+  operation   String
+  changedAt   DateTime @default(now()) @map("changed_at")
+
+  @@unique([key, version])
+  @@map("platform_config_history")
+}
+
 model ProviderVerification {
   id          String   @id @default(uuid())
   userId      String
