@@ -671,6 +671,14 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 		// CERT_ — Certification Enrollment Payment
 		// ================================================================
 		if (merchantTransactionId.startsWith('CERT_')) {
+			const payment = await db.financialPayment.findFirst({
+				where: { merchantTransactionId: merchantTransactionId },
+				orderBy: { createdAt: 'desc' },
+			});
+			if (payment?.status === 'CAPTURED') {
+				return { handled: true, message: 'Certification enrollment payment already captured' };
+			}
+
 			const verify = await checkPhonePeStatus(merchantTransactionId);
 			const verifyCode = String(verify?.code || '').toUpperCase();
 			const verifyState = String(verify?.data?.state || '').toUpperCase();
@@ -683,53 +691,89 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 				throw new AppError('Certification payment verification failed', 400);
 			}
 
-			// Extract certSlug and userId from metadata
-			const certSlug = String(data?.metadata?.certSlug || '');
-			const userId = String(data?.metadata?.userId || data?.metaInfo?.udf1 || '');
+			// Extract metadata from either the webhook data or our local payment record
+			const certSlug = String(data?.metadata?.certSlug || payment?.metadata?.certSlug || '');
+			const userId = String(data?.metadata?.userId || payment?.patientId || data?.metaInfo?.udf1 || '');
+			const paymentPlan = String(data?.metadata?.paymentPlan || payment?.metadata?.paymentPlan || 'full').toUpperCase();
+			const totalAmountPaise = Number(data?.amount || payment?.amountMinor || 0);
 
-			if (!userId) {
-				throw new AppError('Unable to resolve userId from certification payment', 422);
+			if (!userId || !certSlug) {
+				logger.error('[PaymentService] Missing required metadata for certification payment', { userId, certSlug, merchantTransactionId });
+				throw new AppError('Unable to resolve enrollment details from certification payment', 422);
 			}
 
-			// Provision or update TherapistProfile
-			const existingProfile = await db.therapistProfile.findUnique({ where: { userId } });
-			const mergedCertifications = Array.from(new Set([
-				...((existingProfile?.certifications as string[] | undefined) || []),
-				...(certSlug ? [certSlug] : []),
-			]));
-
-			if (existingProfile) {
-				// Update existing profile with certification info
-				await db.therapistProfile.update({
-					where: { userId },
-					data: {
-						certificationStatus: 'ENROLLED',
-						certificationPaymentId: merchantTransactionId,
-						leadBoostScore: 30,
-						certifications: mergedCertifications,
-					},
+			await db.$transaction(async (tx: any) => {
+				// 1. Update CertificationEnrollment
+				const enrollment = await tx.certificationEnrollment.findUnique({
+					where: { userId_certificationSlug: { userId, certificationSlug: certSlug } }
 				});
-				logger.info('[PaymentService] Updated existing TherapistProfile with certification', { userId, certSlug });
-			} else {
-				// Fetch user info for display name
-				const user = await db.user.findUnique({ where: { id: userId }, select: { name: true } });
 
-				await db.therapistProfile.create({
+				if (!enrollment) {
+					logger.error('[PaymentService] Enrollment record not found during payment capture', { userId, certSlug });
+					throw new AppError('Enrollment record not found', 404);
+				}
+
+				const isInstallment = paymentPlan === 'INSTALLMENT';
+				const currentPaid = Number(enrollment.installmentsPaidCount || 0);
+				const nextPaid = isInstallment ? currentPaid + 1 : 1;
+				const isFullyPaidNow = !isInstallment || nextPaid >= 3;
+
+				await tx.certificationEnrollment.update({
+					where: { id: enrollment.id },
 					data: {
-						userId,
-						displayName: user?.name || 'Provider',
-						certificationStatus: 'ENROLLED',
-						certificationPaymentId: merchantTransactionId,
-						leadBoostScore: 30,
-						certifications: certSlug ? [certSlug] : [],
-						onboardingCompleted: false,
-						isVerified: false,
-					},
+						status: isFullyPaidNow ? 'PAID' : 'PARTIAL',
+						amountPaid: (enrollment.amountPaid || 0) + totalAmountPaise,
+						installmentsPaidCount: nextPaid,
+						certId: merchantTransactionId,
+					}
 				});
-				logger.info('[PaymentService] Created new TherapistProfile for certification', { userId, certSlug });
-			}
 
-			logger.info('[PaymentService] Certification payment processed', { merchantTransactionId, userId, certSlug });
+				// 2. Provision or update TherapistProfile
+				const existingProfile = await tx.therapistProfile.findUnique({ where: { userId } });
+				const mergedCertifications = Array.from(new Set([
+					...((existingProfile?.certifications as string[] | undefined) || []),
+					certSlug,
+				]));
+
+				if (existingProfile) {
+					await tx.therapistProfile.update({
+						where: { userId },
+						data: {
+							certificationStatus: 'ENROLLED',
+							certificationPaymentId: merchantTransactionId,
+							leadBoostScore: Math.max(30, Number(existingProfile.leadBoostScore || 0)),
+							certifications: mergedCertifications,
+						},
+					});
+				} else {
+					const user = await tx.user.findUnique({ where: { id: userId }, select: { name: true } });
+					await tx.therapistProfile.create({
+						data: {
+							userId,
+							displayName: user?.name || 'Provider',
+							certificationStatus: 'ENROLLED',
+							certificationPaymentId: merchantTransactionId,
+							leadBoostScore: 30,
+							certifications: [certSlug],
+							onboardingCompleted: false,
+							isVerified: false,
+						},
+					});
+				}
+
+				// 3. Update financialPayment record to CAPTURED
+				if (payment?.id) {
+					await tx.financialPayment.update({
+						where: { id: payment.id },
+						data: {
+							status: 'CAPTURED',
+							capturedAt: new Date(),
+						}
+					});
+				}
+			});
+
+			logger.info('[PaymentService] Certification payment processed successfully', { merchantTransactionId, userId, certSlug, paymentPlan });
 			return { handled: true, message: 'Certification enrollment payment processed' };
 		}
 	}

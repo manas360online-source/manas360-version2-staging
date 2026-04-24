@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { getApiErrorMessage, signupWithPhone, verifyPhoneSignupOtp } from '../../api/auth';
+import { getApiErrorMessage, me as fetchMe, signupWithPhone, verifyPhoneSignupOtp } from '../../api/auth';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import { useAuth, getPostLoginRoute } from '../../context/AuthContext';
@@ -389,6 +389,7 @@ export default function SignupPage() {
 		const query = new URLSearchParams(location.search);
 		const prefillPhone = query.get('phone');
 		const reason = query.get('reason');
+		const userType = String(query.get('userType') || '').toLowerCase();
 
 		if (prefillPhone && !phone) {
 			setPhone(prefillPhone);
@@ -397,11 +398,36 @@ export default function SignupPage() {
 		if (reason === 'terms' && !otpSent && !error) {
 			setError('Please review and accept Terms & Conditions to complete registration.');
 		}
-	}, [location.search, phone, otpSent, error]);
+
+		if (!isPatientLeadFlow && !isCertificationContext && !otpSent) {
+			if (userType === 'therapist' || userType === 'psychiatrist' || userType === 'psychologist' || userType === 'coach' || userType === 'patient') {
+				setRole(userType as SignupRole);
+			}
+		}
+	}, [location.search, phone, otpSent, error, isPatientLeadFlow, isCertificationContext]);
 
 	const resolveReturnTo = (): string => {
 		const qp = new URLSearchParams(location.search);
-		return qp.get('returnTo') || qp.get('next') || window.location.pathname || '/';
+		const candidate = qp.get('returnTo') || qp.get('next') || '';
+		if (!candidate) {
+			return '';
+		}
+
+		if (!candidate.startsWith('/')) {
+			return '';
+		}
+
+		if (candidate.startsWith('/auth/')) {
+			return '';
+		}
+
+		return candidate;
+	};
+
+	const hasSessionCookieHint = (): boolean => {
+		if (typeof document === 'undefined') return false;
+		const csrfCookieName = (import.meta.env.VITE_CSRF_COOKIE_NAME || 'csrf_token').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+		return new RegExp(`(?:^|; )${csrfCookieName}=`).test(document.cookie);
 	};
 
 	const verifyOtp = async () => {
@@ -433,17 +459,27 @@ export default function SignupPage() {
 			}
 			await checkAuth({ force: true });
 			await queryClient.invalidateQueries({ queryKey: ['wallet'] });
+
+			let resolvedUser = result.user;
+			if (hasSessionCookieHint()) {
+				try {
+					resolvedUser = await fetchMe();
+				} catch {
+					// Keep OTP response user as fallback.
+				}
+			}
+
 			const returnTo = resolveReturnTo();
 			if (isCertificationContext) {
 				navigate(returnTo || '/certifications', { replace: true });
 				return;
 			}
 			// If backend indicates patient requires a subscription, send to plans page
-			if ((result.user as any)?.requiresSubscription) {
+			if ((resolvedUser as any)?.requiresSubscription) {
 				navigate(`/plans?returnTo=${encodeURIComponent(returnTo)}`, { replace: true });
 				return;
 			}
-			const postLoginRoute = getPostLoginRoute(result.user);
+			const postLoginRoute = getPostLoginRoute(resolvedUser);
 			navigate(postLoginRoute, { replace: true });
 		} catch (err) {
 			setError(getApiErrorMessage(err, 'OTP verification failed'));

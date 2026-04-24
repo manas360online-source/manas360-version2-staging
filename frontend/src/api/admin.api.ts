@@ -1612,3 +1612,45 @@ export const creditUserWallet = async (payload: {
 	return response.data;
 };
 
+// --- Retreat Intents ---
+
+export type RetreatIntentRecord = {
+	id: string;
+	name: string;
+	phone: string;
+	email: string | null;
+	theme: string;
+	preferredDates: string | null;
+	groupSize: string | null;
+	budgetRange: string | null;
+	personalNote: string | null;
+	status: string;
+	consentContact: boolean;
+	assignedAdmin: string | null;
+	adminNotes: string | null;
+	createdAt: string;
+	updatedAt: string;
+};
+
+export const listAdminRetreatIntents = async (params?: {
+	status?: string;
+	theme?: string;
+	page?: number;
+	limit?: number;
+}): Promise<ApiEnvelope<{ items: RetreatIntentRecord[]; total: number }>> => {
+	const query = buildQuery({
+		status: params?.status,
+		theme: params?.theme,
+		page: params?.page,
+		limit: params?.limit,
+	});
+	return (await client.get<ApiEnvelope<{ items: RetreatIntentRecord[]; total: number }>>(`/v1/admin/retreat-intents${query}`)).data;
+};
+
+export const updateAdminRetreatIntentStatus = async (
+	id: string,
+	status: string,
+	adminNotes?: string,
+): Promise<ApiEnvelope<RetreatIntentRecord>> => {
+	return (await client.patch<ApiEnvelope<RetreatIntentRecord>>(`/v1/admin/retreat-intents/${encodeURIComponent(id)}/status`, { status, adminNotes })).data;
+};

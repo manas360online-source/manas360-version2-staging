@@ -6,7 +6,8 @@ import { Skeleton, TextSkeleton } from '../components/CertificationSkeleton';
 import { Check, Clock, Calendar, DollarSign, Award, ChevronDown, ChevronUp, PlayCircle, FileText, Star, ShieldCheck } from 'lucide-react';
 import { SEO } from '../components/CertificationSEO';
 import { useAuth } from '../context/AuthContext';
-import { getMyCertificationState } from '../api/certifications';
+import { useEnrollmentStore } from '../store/CertificationEnrollmentStore';
+import { getCertificationsErrorMessage, getMyCertificationState, registerCertificationEnrollment } from '../api/certifications';
 
 export const CertificationDetailsPage: React.FC = () => {
     const { slug } = useParams<{ slug: string }>();
@@ -17,6 +18,8 @@ export const CertificationDetailsPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [alreadyEnrolled, setAlreadyEnrolled] = useState(false);
     const [stateLoading, setStateLoading] = useState(false);
+    const [enrolling, setEnrolling] = useState(false);
+    const [enrollError, setEnrollError] = useState<string | null>(null);
     const { user } = useAuth();
 
     const cert = CERTIFICATIONS.find(c => c.slug === slug);
@@ -57,23 +60,76 @@ export const CertificationDetailsPage: React.FC = () => {
         };
     }, [user, slug]);
 
-    const handleEnroll = () => {
+    const { addEnrollment, getEnrollmentBySlug } = useEnrollmentStore();
+
+    const handleEnroll = async () => {
         const inProviderShell = location.pathname.startsWith('/provider');
         const myCertPath = inProviderShell ? '/provider/my-certifications' : '/my-certifications';
-        const enrollPath = inProviderShell
-            ? `/provider/certification/enroll/${cert?.slug || ''}`
-            : `/certification/enroll/${cert?.slug || ''}`;
-        if (alreadyEnrolled) {
+        if (!cert) return;
+
+        if (!user) {
+            const next = inProviderShell
+                ? `/provider/certification/enroll/${cert.slug}`
+                : `/certification/enroll/${cert.slug}`;
+            navigate(`/auth/signup?next=${encodeURIComponent(next)}`);
+            return;
+        }
+
+        // If already enrolled (remote or local), navigate to My Certifications
+        if (alreadyEnrolled || getEnrollmentBySlug(cert.slug)) {
             navigate(myCertPath);
             return;
         }
-        navigate(enrollPath, {
-            state: {
-                certName: cert?.name,
-                price: cert?.price_inr === 0 ? 'Free' : `₹${cert?.price_inr.toLocaleString()}`,
-                slug: cert?.slug,
+
+        setEnrollError(null);
+        setEnrolling(true);
+
+        // For paid certifications, redirect to checkout
+        if (cert.price_inr > 0) {
+            navigate(`/checkout/${cert.slug}${inProviderShell ? '?shell=provider' : ''}`);
+            setEnrolling(false);
+            return;
+        }
+
+        try {
+            await registerCertificationEnrollment({
+                certSlug: cert.slug,
+                paymentPlan: 'full',
+                installmentCount: 1,
+                bypassPayment: true,
+            });
+        } catch (error: any) {
+            const status = Number(error?.response?.status || 0);
+            if (status !== 409) {
+                setEnrollError(getCertificationsErrorMessage(error, 'Unable to start enrollment. Please try again.'));
+                setEnrolling(false);
+                return;
             }
-        });
+            // If 409, already enrolled remotely. Navigate to my certifications.
+            navigate(myCertPath);
+            setEnrolling(false);
+            return;
+        }
+
+        const newEnrollment = {
+            id: `ENR-${Date.now()}`,
+            certificationId: cert.id,
+            certificationName: cert.name,
+            slug: cert.slug,
+            badgeColor: cert.badgeColor,
+            enrollmentDate: new Date().toISOString().split('T')[0],
+            paymentStatus: 'Paid' as const,
+            paymentPlan: 'full' as const,
+            amountPaid: cert.price_inr,
+            totalAmount: cert.price_inr,
+            installmentsPaidCount: 1,
+            completionPercentage: 0,
+            modulesCompleted: 0,
+            certId: Math.random().toString(36).substring(2, 8).toUpperCase(),
+        };
+        addEnrollment(newEnrollment as any);
+        navigate(myCertPath);
+        setEnrolling(false);
     };
 
     if (!cert && !loading) return <div className="p-20 text-center">Certification not found</div>;
@@ -174,10 +230,12 @@ export const CertificationDetailsPage: React.FC = () => {
                         </div>
                         <button
                             onClick={handleEnroll}
+                            disabled={enrolling || stateLoading}
                             className="w-full bg-gradient-to-r from-teal-500 to-purple-600 text-white font-bold py-3 rounded-lg shadow-md text-sm"
                         >
-                            {alreadyEnrolled ? 'Continue Learning' : (stateLoading ? 'Checking access...' : 'Enroll Now')}
+                            {alreadyEnrolled ? 'Continue Learning' : (enrolling ? 'Starting...' : (stateLoading ? 'Checking access...' : 'Enroll Now'))}
                         </button>
+                        {enrollError && <p className="mt-2 text-xs text-red-600">{enrollError}</p>}
                     </div>
                 )}
 

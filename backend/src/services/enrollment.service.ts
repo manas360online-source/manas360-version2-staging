@@ -11,6 +11,7 @@ interface EnrollmentInput {
   certSlug: string;
   paymentPlan?: 'full' | 'installment';
   installmentCount?: number;
+  bypassPayment?: boolean;
 }
 
 const FREE_CERT_SLUGS = new Set([
@@ -40,9 +41,11 @@ const ensureLearnerProviderIdentity = async (params: {
   displayName: string;
   certSlug: string;
   markEnrolled: boolean;
+  paymentPlan?: 'full' | 'installment';
+  totalAmount?: number;
   paymentReference?: string | null;
 }) => {
-  const { userId, displayName, certSlug, markEnrolled, paymentReference } = params;
+  const { userId, displayName, certSlug, markEnrolled, paymentReference, paymentPlan, totalAmount } = params;
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -69,6 +72,35 @@ const ensureLearnerProviderIdentity = async (params: {
     throw new AppError('This account type cannot enroll in provider certification', 403);
   }
 
+  // Ensure Enrollment record exists
+  const enrollment = await prisma.certificationEnrollment.findUnique({
+    where: { userId_certificationSlug: { userId, certificationSlug: certSlug } }
+  });
+
+  if (!enrollment) {
+    await prisma.certificationEnrollment.create({
+      data: {
+        userId,
+        certificationSlug: certSlug,
+        status: markEnrolled ? 'ENROLLED' : 'NONE',
+        paymentPlan: (paymentPlan || 'full').toUpperCase() as any,
+        totalAmount: totalAmount || 0,
+        amountPaid: markEnrolled ? totalAmount || 0 : 0,
+        certId: paymentReference || null,
+      }
+    });
+  } else if (markEnrolled) {
+    await prisma.certificationEnrollment.update({
+      where: { id: enrollment.id },
+      data: {
+        status: 'ENROLLED',
+        certId: paymentReference || enrollment.certId,
+        amountPaid: totalAmount || enrollment.amountPaid,
+      }
+    });
+  }
+
+  // Sync with TherapistProfile
   const existingProfile = await prisma.therapistProfile.findUnique({
     where: { userId },
     select: {
@@ -90,6 +122,7 @@ const ensureLearnerProviderIdentity = async (params: {
         displayName: displayName || 'Learner',
         certifications: mergedCertifications,
         leadBoostScore: Math.max(30, Number(existingProfile.leadBoostScore || 0)),
+        // We keep these for legacy compatibility/latest cert tracking
         ...(markEnrolled
           ? {
               certificationStatus: 'ENROLLED',
@@ -188,30 +221,16 @@ export const findOrCreateProviderForCertification = async (input: EnrollmentInpu
     }
   }
 
-  const existingProfile = await prisma.therapistProfile.findUnique({
-    where: { userId: targetUserId as string },
-    select: {
-      certificationStatus: true,
-      certificationPaymentId: true,
-      certifications: true,
-    },
+  const existingEnrollment = await prisma.certificationEnrollment.findUnique({
+    where: { userId_certificationSlug: { userId: targetUserId as string, certificationSlug: certSlug } },
+    select: { status: true }
   });
 
-  const alreadyHasCurrentCertification = Array.isArray(existingProfile?.certifications)
-    ? existingProfile!.certifications.includes(certSlug)
-    : false;
-  const status = String(existingProfile?.certificationStatus || '').toUpperCase();
-
-  if (
-    alreadyHasCurrentCertification
-    || status === 'ENROLLED'
-    || status === 'COMPLETED'
-    || status === 'VERIFIED'
-  ) {
-    throw new AppError('You are already enrolled or certified. Duplicate registration is blocked.', 409, {
+  if (existingEnrollment && (existingEnrollment.status === 'ENROLLED' || existingEnrollment.status === 'PAID' || existingEnrollment.status === 'COMPLETED' || existingEnrollment.status === 'VERIFIED')) {
+    throw new AppError('You are already enrolled or certified in this program.', 409, {
       userId: targetUserId,
       certSlug,
-      certificationStatus: existingProfile?.certificationStatus,
+      status: existingEnrollment.status,
     });
   }
 
@@ -225,16 +244,23 @@ export const findOrCreateProviderForCertification = async (input: EnrollmentInpu
   }
 
   const freeEnrollment = isFreeCertification(certification);
+  const hasPhonePeOAuth = process.env.PHONEPE_CLIENT_ID && process.env.PHONEPE_CLIENT_SECRET && !String(process.env.PHONEPE_CLIENT_ID).includes('change-');
+  const allowBypassPayment = (Boolean(input.bypassPayment) || (env.allowDevPaymentBypass && !hasPhonePeOAuth)) && env.nodeEnv !== 'production' && Boolean(userId);
+  const shouldMarkEnrolledNow = freeEnrollment || allowBypassPayment;
   const amount = freeEnrollment
     ? 0
     : Number((certification.metadata as any)?.priceMinor || 49900); // Default to 499 if not in metadata
+
+  const amountToCharge = paymentPlan === 'installment' ? Math.ceil(amount / 3) : amount;
 
   await ensureLearnerProviderIdentity({
     userId: targetUserId as string,
     displayName: targetName || 'Learner',
     certSlug,
-    markEnrolled: freeEnrollment,
-    paymentReference: freeEnrollment ? `FREE_${certSlug}_${Date.now()}` : null,
+    markEnrolled: shouldMarkEnrolledNow,
+    paymentPlan,
+    totalAmount: amount,
+    paymentReference: shouldMarkEnrolledNow ? `${allowBypassPayment ? 'BYPASS' : 'FREE'}_${certSlug}_${Date.now()}` : null,
   });
 
   if (freeEnrollment) {
@@ -246,29 +272,54 @@ export const findOrCreateProviderForCertification = async (input: EnrollmentInpu
     };
   }
 
+  if (allowBypassPayment) {
+    return {
+      transactionId: `BYPASS_${certSlug.substring(0, 10)}_${Date.now()}`,
+      paymentUrl: null,
+      userId: targetUserId,
+      enrollmentMode: 'bypassed',
+    };
+  }
+
   // 3. Initiate Payment
   const transactionId = `CERT_${certSlug.substring(0, 10)}_${Date.now()}`;
   const baseUrl = env.nodeEnv === 'production' ? 'https://manas360.com' : 'http://localhost:5173';
   
+  const metadata = {
+    userId: targetUserId,
+    certSlug: certSlug,
+    type: 'CERTIFICATION_ENROLLMENT',
+    mobile: targetMobile,
+    paymentPlan,
+    installmentCount,
+  };
+
   const paymentResponse = await initiatePhonePePayment({
     transactionId,
     userId: targetUserId as string,
-    amountInPaise: amount,
-    callbackUrl: `${env.apiUrl}/v1/payments/webhook/phonepe`,
+    amountInPaise: amountToCharge,
+    callbackUrl: `${env.apiUrl}/v1/payments/phonepe/webhook`,
     redirectUrl: `${baseUrl}/#/payment/status?tid=${transactionId}`,
-    metadata: {
-      userId: targetUserId,
-      certSlug: certSlug,
-      type: 'CERTIFICATION_ENROLLMENT',
-      mobile: targetMobile,
-      paymentPlan,
-      installmentCount,
+    metadata,
+  });
+
+  // Mandatory: Create financialPayment record for reconciliation worker and webhook tracking
+  await (prisma as any).financialPayment.create({
+    data: {
+      merchantTransactionId: transactionId,
+      patientId: targetUserId,
+      amountMinor: BigInt(amountToCharge),
+      currency: 'INR',
+      status: 'INITIATED',
+      metadata,
     }
+  }).catch((err: any) => {
+    logger.error('[Enrollment] Failed to create financialPayment record', { transactionId, error: err.message });
   });
 
   return {
     transactionId,
-    paymentUrl: (paymentResponse as any)?.data?.instrumentResponse?.redirectInfo?.url,
+    paymentUrl: paymentResponse, // initiatePhonePePayment returns the URL directly
     userId: targetUserId,
     enrollmentMode: 'paid',
   };

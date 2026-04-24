@@ -1,4 +1,15 @@
 .corporate-landing-page {
+  --ocean: #0c7c8a;
+  --ocean-deep: #075f69;
+  --ocean-light: #f0fbfd;
+  --sky: #1a9eb0;
+  --gold: #d4a017;
+  --green: #059669;
+  --gray-light: #dde3eb;
+  --gray: #6b7280;
+  --dark: #0f172a;
+  --dark-soft: #1f2937;
+  --white: #ffffff;
   min-height: 100vh;
   background: #eef1f5;
   color: #0f172a;
@@ -222,9 +233,131 @@
   color: rgba(190, 210, 243, 0.86);
 }
 
+.section {
+  padding: 50px 0;
+}
+
+.section-title {
+  font-size: clamp(24px, 2vw, 34px);
+  font-weight: 800;
+  text-align: center;
+  margin-bottom: 20px;
+  color: var(--dark);
+}
+
+.pricing-toggle { display: flex; justify-content: center; gap: 8px; margin-bottom: 28px; flex-wrap: wrap; }
+.toggle-btn {
+  padding: 8px 20px; border-radius: 24px; border: 1px solid var(--gray-light);
+  font-size: 13px; font-weight: 600; cursor: pointer; background: var(--white);
+  color: var(--gray); transition: all 0.2s; font-family: 'DM Sans', sans-serif;
+}
+.toggle-btn.active { background: var(--ocean); color: var(--white); border-color: var(--ocean); }
+.toggle-btn:hover:not(.active) { border-color: var(--sky); color: var(--ocean); }
+.discount-badge {
+  display: inline-block; padding: 2px 8px; border-radius: 6px;
+  font-size: 9px; font-weight: 700; margin-left: 4px; vertical-align: middle;
+}
+.discount-10 { background: rgba(12,124,138,0.1); color: #0C7C8A; }
+.discount-25 { background: rgba(5,150,105,0.1); color: #059669; }
+.pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; }
+.price-card {
+  background: var(--white); border: 2px solid var(--gray-light); border-radius: 18px;
+  padding: 28px 22px; text-align: center; position: relative; transition: all 0.25s;
+}
+.price-card:hover { transform: translateY(-4px); box-shadow: 0 12px 32px rgba(0,0,0,0.08); }
+.price-card.featured { border-color: var(--ocean); }
+.price-card.featured::before {
+  content: 'STAR MOST POPULAR'; position: absolute; top: -11px; left: 50%; transform: translateX(-50%);
+  padding: 3px 14px; border-radius: 10px; font-size: 9px; font-weight: 700;
+  background: var(--ocean); color: var(--white); letter-spacing: 0.5px; white-space: nowrap;
+}
+.pc-name { font-family: 'Outfit', sans-serif; font-size: 18px; font-weight: 700; color: var(--dark); margin-bottom: 2px; }
+.pc-size { font-size: 12px; color: var(--gray); margin-bottom: 14px; }
+.pc-price { font-size: 36px; font-weight: 800; color: var(--ocean); margin-bottom: 2px; }
+.pc-price span { font-size: 14px; font-weight: 500; color: var(--gray); }
+.pc-per { font-size: 12px; color: var(--gray); margin-bottom: 4px; }
+.pc-original { font-size: 12px; color: var(--gray); text-decoration: line-through; margin-bottom: 14px; }
+.pc-savings { font-size: 11px; font-weight: 700; color: var(--green); margin-bottom: 14px; }
+.pc-features { text-align: left; margin-bottom: 18px; padding-left: 0; }
+.pc-features li {
+  list-style: none; font-size: 13px; color: var(--dark-soft); padding: 5px 0;
+  border-bottom: 1px solid var(--gray-light); display: flex; align-items: flex-start; gap: 6px;
+}
+.pc-features li:last-child { border-bottom: none; }
+.pc-cta {
+  width: 100%; padding: 11px; border: none; border-radius: 12px;
+  font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 700;
+  cursor: pointer; transition: all 0.2s; text-decoration: none; display: inline-block; text-align: center;
+}
+.pc-cta-primary { background: var(--ocean); color: var(--white); }
+.pc-cta-primary:hover { background: var(--ocean-deep); }
+.pc-cta-outline { background: transparent; color: var(--ocean); border: 1.5px solid var(--gray-light); }
+.pc-cta-outline:hover { border-color: var(--ocean); }
+.pc-cta-gold { background: var(--gold); color: var(--white); }
+.pc-cta-gold:hover { filter: brightness(1.1); }
+.pricing-note { text-align: center; margin-top: 20px; font-size: 12px; color: var(--gray); line-height: 1.6; }
+.pricing-note strong { color: var(--dark-soft); }
+.comparison-wrap { margin-top: 24px; overflow-x: auto; }
+.comparison-table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 600px; }
+.comparison-table th { background: var(--ocean); color: var(--white); padding: 10px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+.comparison-table td { padding: 8px 10px; border-bottom: 1px solid var(--gray-light); }
+.comparison-table tr:hover td { background: var(--ocean-light); }
+.ct-check { color: var(--green); font-weight: 700; }
+.ct-cross { color: var(--gray); }
+
+.badge-section { margin: 28px 0 8px; }
+.badge-section-title {
+  font-family: 'Outfit', sans-serif; font-size: 16px; font-weight: 700;
+  text-align: center; color: var(--dark); margin-bottom: 16px;
+}
+.badge-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.honor-badge {
+  background: var(--white); border: 2px solid var(--gray-light); border-radius: 16px;
+  padding: 20px 16px; text-align: center; position: relative; transition: all 0.3s; overflow: hidden;
+}
+.honor-badge:hover { transform: translateY(-3px); box-shadow: 0 10px 28px rgba(0,0,0,0.08); }
+.honor-badge::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; }
+.honor-badge.badge-bronze::before { background: linear-gradient(90deg, #CD7F32, #E8A849); }
+.honor-badge.badge-silver::before { background: linear-gradient(90deg, #8B95A5, #C0C8D4); }
+.honor-badge.badge-gold::before { background: linear-gradient(90deg, #D4A017, #F0C75E); }
+.honor-badge.badge-bronze { border-color: rgba(205,127,50,0.25); }
+.honor-badge.badge-silver { border-color: rgba(139,149,165,0.25); }
+.honor-badge.badge-gold { border-color: rgba(212,160,23,0.25); }
+.hb-star { font-size: 28px; margin-bottom: 6px; }
+.hb-tier { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+.badge-bronze .hb-tier { color: #CD7F32; }
+.badge-silver .hb-tier { color: #8B95A5; }
+.badge-gold .hb-tier { color: #D4A017; }
+.hb-emps { font-family: 'Outfit', sans-serif; font-size: 22px; font-weight: 800; color: var(--dark); margin-bottom: 2px; }
+.hb-label { font-size: 11px; color: var(--gray); margin-bottom: 12px; }
+.hb-daily {
+  display: inline-block; padding: 6px 16px; border-radius: 20px;
+  font-family: 'Outfit', sans-serif; font-size: 20px; font-weight: 800; margin-bottom: 4px;
+}
+.badge-bronze .hb-daily { background: rgba(205,127,50,0.08); color: #CD7F32; }
+.badge-silver .hb-daily { background: rgba(139,149,165,0.08); color: #6B7A8D; }
+.badge-gold .hb-daily { background: rgba(212,160,23,0.08); color: #B8860B; }
+.hb-daily-label { font-size: 10px; color: var(--gray); margin-bottom: 4px; }
+.hb-daily-compare { font-size: 10px; color: var(--gray); font-style: italic; margin-bottom: 14px; }
+.hb-badges { display: flex; flex-direction: column; gap: 6px; }
+.hb-mini {
+  display: flex; align-items: center; gap: 6px; padding: 6px 10px;
+  border-radius: 8px; font-size: 11px; font-weight: 600;
+}
+.hb-mini-csr { background: rgba(5,150,105,0.06); color: #059669; }
+.hb-mini-compliance { background: rgba(0,35,101,0.06); color: var(--ocean); }
+.hb-mini-icon { font-size: 14px; flex-shrink: 0; }
+.hb-mini-text { text-align: left; line-height: 1.3; }
+.hb-mini-text strong { display: block; font-size: 12px; }
+.hb-mini-text span { font-size: 9px; font-weight: 400; color: var(--gray); }
+
 @media (max-width: 1200px) {
   .corporate-landing-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .badge-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -269,5 +402,13 @@
   .corporate-landing-footer {
     margin-top: 20px;
     padding: 40px 16px;
+  }
+
+  .pricing-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pc-price {
+    font-size: 28px;
   }
 }

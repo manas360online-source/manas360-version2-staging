@@ -284,6 +284,50 @@ export const invalidateAllMySessions = async (userId: string): Promise<{ revoked
 	return { revokedCount: Number(result.count || 0) };
 };
 
+export const becomeProvider = async (userId: string) => {
+	await assertUserIsActive(userId);
+
+	const user = await db.user.findUnique({
+		where: { id: userId },
+		select: { id: true, role: true, name: true, firstName: true, lastName: true },
+	});
+
+	if (!user) {
+		throw new AppError('User not found', 404);
+	}
+
+	const currentRole = String(user.role).toUpperCase();
+	if (currentRole !== 'LEARNER' && currentRole !== 'PATIENT') {
+		throw new AppError('Only learners or patients can switch to a provider role', 400);
+	}
+
+	// Change role to THERAPIST (default provider role)
+	await db.user.update({
+		where: { id: userId },
+		data: { role: 'THERAPIST' },
+	});
+
+	// Ensure TherapistProfile exists
+	const profile = await db.therapistProfile.findUnique({
+		where: { userId },
+		select: { id: true },
+	});
+
+	if (!profile) {
+		const displayName = String(user.name || `${user.firstName} ${user.lastName}`.trim() || 'Therapist').trim();
+		await db.therapistProfile.create({
+			data: {
+				userId,
+				displayName,
+				onboardingCompleted: false,
+				isVerified: false,
+			},
+		});
+	}
+
+	return getMyProfile(userId);
+};
+
 export const restoreDeletedUserAccount = async (userId: string) => {
 	const restored = await db.user.updateMany({
 		where: { id: userId, isDeleted: true },

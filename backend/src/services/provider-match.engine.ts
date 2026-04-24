@@ -11,6 +11,8 @@ type ProviderProfileLike = {
 	specializations?: string[];
 	clinicalCategories?: string[];
 	certifications?: string[];
+	certificationStatus?: string | null;
+	leadBoostScore?: number | null;
 	languages?: string[];
 	shiftPreferences?: string[];
 	availability?: AvailabilitySlot[] | unknown;
@@ -253,12 +255,21 @@ export const scoreProviderMatch = (input: ProviderMatchInput): ProviderMatchResu
 
 	healthScore += 3;
 
+	const certificationStatus = String(profile.certificationStatus || '').toUpperCase();
+	const leadBoostScore = Math.max(0, Number(profile.leadBoostScore || 0));
+	let certificationMomentum = 0;
+	if (certificationStatus === 'VERIFIED') certificationMomentum = 6;
+	else if (certificationStatus === 'COMPLETED') certificationMomentum = 4;
+	else if (certificationStatus === 'ENROLLED') certificationMomentum = 2;
+
+	certificationMomentum += Math.min(4, Math.floor(leadBoostScore / 25));
+
 	let continuityScore = 0;
 	if (Number(input.continuitySessions || 0) >= 5) continuityScore = 10;
 	else if (Number(input.continuitySessions || 0) >= 3) continuityScore = 8;
 	else if (Number(input.continuitySessions || 0) >= 1) continuityScore = 5;
 
-	const quality = Math.min(25, healthScore + continuityScore);
+	const quality = Math.min(25, healthScore + continuityScore + certificationMomentum);
 	const score = Math.round(
 		expertise * contextMultiplier.expertise
 		+ communication * contextMultiplier.communication

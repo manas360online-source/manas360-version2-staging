@@ -8,6 +8,7 @@ import {
 	patchMePasswordController,
 	patchMeController,
 	uploadMePhotoController,
+	becomeProviderController,
 } from '../controllers/user.controller';
 import { requireAuth } from '../middleware/auth.middleware';
 import { userSessionRateLimiter } from '../middleware/rateLimiter.middleware';
@@ -34,6 +35,7 @@ router.delete(
 	...validateSessionIdParam,
 	asyncHandler(deleteMySessionController),
 );
+router.post('/me/become-provider', requireAuth, asyncHandler(becomeProviderController));
 router.delete('/me', requireAuth, asyncHandler(deleteMeController));
 
 export default router;

@@ -5,6 +5,7 @@ import { sendSuccess } from '../utils/response';
 import { env } from '../config/env';
 import { initiatePhonePePayment } from '../services/phonepe.service';
 import { io } from '../socket';
+import { logger } from '../utils/logger';
 
 const db = prisma as any;
 
@@ -271,15 +272,23 @@ export const listPublicPublishedGroupTherapySessionsController = async (_req: Re
       },
     });
 
-    const sessions = rows.map((session) => ({
-      ...session,
-      priceMinor: session.priceMinor.toString(),
-      hostName: `${String(session.hostTherapist?.firstName || '').trim()} ${String(session.hostTherapist?.lastName || '').trim()}`.trim() || 'MANAS360 Expert',
-      language: Array.isArray(session.hostTherapist?.therapistProfile?.languages) && session.hostTherapist?.therapistProfile?.languages?.length
-        ? String(session.hostTherapist.therapistProfile.languages[0])
-        : 'English',
-      joinedCount: Number(session._count?.enrollments || 0),
-    }));
+    logger.info('[GroupTherapy] Found sessions:', { count: rows.length });
+    const sessions = rows.map((session) => {
+      try {
+        return {
+          ...session,
+          priceMinor: session.priceMinor.toString(),
+          hostName: `${String(session.hostTherapist?.firstName || '').trim()} ${String(session.hostTherapist?.lastName || '').trim()}`.trim() || 'MANAS360 Expert',
+          language: Array.isArray(session.hostTherapist?.therapistProfile?.languages) && session.hostTherapist?.therapistProfile?.languages?.length
+            ? String(session.hostTherapist.therapistProfile.languages[0])
+            : 'English',
+          joinedCount: Number(session._count?.enrollments || 0),
+        };
+      } catch (err: any) {
+        logger.error('[GroupTherapy] Failed to format session:', { sessionId: session.id, error: err.message });
+        return null;
+      }
+    }).filter(Boolean);
 
     res.status(200).json({
       success: true,
@@ -287,7 +296,8 @@ export const listPublicPublishedGroupTherapySessionsController = async (_req: Re
         items: sessions,
       },
     });
-  } catch (error) {
+  } catch (error: any) {
+    logger.error('[GroupTherapy] Global list sessions failure:', { error: error.message, stack: error.stack });
     // Keep landing usable even if group-therapy tables are not migrated in this environment.
     res.status(200).json({
       success: true,

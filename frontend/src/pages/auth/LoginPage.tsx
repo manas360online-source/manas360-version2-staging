@@ -77,6 +77,9 @@ export default function LoginPage() {
 		}
 
 		const normalizedRole = String(role || '').toLowerCase();
+		if (normalizedRole === 'learner') {
+			return '/certifications';
+		}
 		const isPricingTarget = candidate.startsWith('/plans');
 		if (normalizedRole !== 'patient' || !isPricingTarget) {
 			return candidate;
@@ -179,7 +182,16 @@ export default function LoginPage() {
 		} catch (err: any) {
 			const message = String(err?.response?.data?.message || '');
 			if (Number(err?.response?.status) === 422 && message.toLowerCase().includes('accept terms')) {
-				navigate(`/auth/signup?phone=${encodeURIComponent(phone.trim())}`, { replace: true });
+				const returnToCandidate = from || afterLogin || next || '/certifications';
+				const params = new URLSearchParams();
+				params.set('phone', phone.trim());
+				params.set('returnTo', returnToCandidate);
+				params.set('reason', 'terms');
+				const requestedUserType = new URLSearchParams(location.search).get('userType');
+				if (requestedUserType) {
+					params.set('userType', requestedUserType);
+				}
+				navigate(`/auth/signup?${params.toString()}`, { replace: true });
 				return;
 			}
 			setError(getApiErrorMessage(err, 'OTP verification failed'));

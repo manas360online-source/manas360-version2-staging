@@ -257,7 +257,7 @@ export const createQrCode = async (payload: UpsertQrCodePayload, createdById?: s
     throw new AppError('Valid redirectUrl or destinationUrl is required', 422);
   }
 
-  const code = payload.code ? normalizeCode(payload.code) : await generateUniqueCode();
+  const initialCode = payload.code ? normalizeCode(payload.code) : await generateUniqueCode();
   const qrType = payload.qrType ? normalizeQrType(payload.qrType) : null;
   const templateId = normalizeTemplateId(payload.templateId);
   const stylePreset = normalizeStylePreset(payload.stylePreset);
@@ -267,7 +267,7 @@ export const createQrCode = async (payload: UpsertQrCodePayload, createdById?: s
   const ownerId = payload.ownerId ? String(payload.ownerId).trim() : null;
   const expiresAt = normalizeOptionalExpiry(payload.expiresAt);
 
-  const exists = await prisma.qrCode.findUnique({ where: { code }, select: { code: true } });
+  const exists = await prisma.qrCode.findUnique({ where: { code: initialCode }, select: { code: true } });
   if (exists) {
     throw new AppError('QR code already exists', 409);
   }
@@ -276,44 +276,71 @@ export const createQrCode = async (payload: UpsertQrCodePayload, createdById?: s
 	throw new AppError('logoUrl must be a valid https/http URL or a data:image/* source', 422);
   }
 
-  try {
-    return await prisma.qrCode.create({
-      data: {
-        code,
-        redirectUrl,
-        qrType,
-        destinationUrl: destinationUrl || redirectUrl,
-        ownerId,
-        isDynamic: payload.isDynamic ?? true,
-        expiresAt,
-        templateId,
-        stylePreset,
-        foregroundColor,
-        backgroundColor,
-        logoUrl,
-        isActive: payload.isActive ?? true,
-        createdById: createdById || null,
-      },
-    });
-  } catch (error) {
-    if (!isMissingQrInfraError(error)) {
-      throw error;
-    }
+  const buildData = (code: string) => ({
+    code,
+    redirectUrl,
+    qrType,
+    destinationUrl: destinationUrl || redirectUrl,
+    ownerId,
+    isDynamic: payload.isDynamic ?? true,
+    expiresAt,
+    templateId,
+    stylePreset,
+    foregroundColor,
+    backgroundColor,
+    logoUrl,
+    isActive: payload.isActive ?? true,
+    createdById: createdById || null,
+  });
 
-    return prisma.qrCode.create({
-      data: {
-        code,
-        redirectUrl,
-        templateId,
-        stylePreset,
-        foregroundColor,
-        backgroundColor,
-        logoUrl,
-        isActive: payload.isActive ?? true,
-        createdById: createdById || null,
-      },
-    });
+  const fallbackData = (code: string) => ({
+    code,
+    redirectUrl,
+    templateId,
+    stylePreset,
+    foregroundColor,
+    backgroundColor,
+    logoUrl,
+    isActive: payload.isActive ?? true,
+    createdById: createdById || null,
+  });
+
+  const maxAttempts = payload.code ? 1 : 5;
+  let code = initialCode;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    try {
+      return await prisma.qrCode.create({ data: buildData(code) as any });
+    } catch (error) {
+      const prismaCode = String((error as any)?.code || '').toUpperCase();
+      const target = String((error as any)?.meta?.target || '').toLowerCase();
+      const isCodeCollision = prismaCode === 'P2002' && target.includes('code');
+
+      if (isCodeCollision && !payload.code && attempt < maxAttempts - 1) {
+        code = await generateUniqueCode();
+        continue;
+      }
+
+      if (!isMissingQrInfraError(error)) {
+        throw error;
+      }
+
+      try {
+        return await prisma.qrCode.create({ data: fallbackData(code) as any });
+      } catch (fallbackError) {
+        const fallbackCode = String((fallbackError as any)?.code || '').toUpperCase();
+        const fallbackTarget = String((fallbackError as any)?.meta?.target || '').toLowerCase();
+        const fallbackCollision = fallbackCode === 'P2002' && fallbackTarget.includes('code');
+        if (fallbackCollision && !payload.code && attempt < maxAttempts - 1) {
+          code = await generateUniqueCode();
+          continue;
+        }
+        throw fallbackError;
+      }
+    }
   }
+
+  throw new AppError('Failed to create QR code after multiple attempts', 500);
 };
 
 export const updateQrCode = async (code: string, payload: UpsertQrCodePayload) => {

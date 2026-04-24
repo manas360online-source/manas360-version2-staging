@@ -9,6 +9,7 @@ import {
 	softDeleteMyAccount,
 	updateMyProfile,
 	uploadMyProfilePhoto,
+	becomeProvider,
 } from '../services/user.service';
 import { sendSuccess } from '../utils/response';
 
@@ -98,3 +99,9 @@ export const deleteMySessionsController = async (req: Request, res: Response): P
 	sendSuccess(res, result, 'All sessions invalidated successfully');
 };
 
+export const becomeProviderController = async (req: Request, res: Response): Promise<void> => {
+	const userId = getAuthUserId(req);
+	const updatedProfile = await becomeProvider(userId);
+
+	sendSuccess(res, updatedProfile, 'Role updated to Provider');
+};

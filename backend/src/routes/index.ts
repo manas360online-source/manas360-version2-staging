@@ -42,6 +42,7 @@ import freeScreeningProviderRoutes from './free-screening-provider.routes';
 import freeScreeningAdminRoutes from './free-screening-admin.routes';
 import mdcRoutes from './mdc.routes';
 import systemRoutes from './system.routes';
+import retreatRoutes from './retreat.routes';
 
 
 const router = Router();
@@ -128,6 +129,7 @@ router.use('/v1/qr', qrRoutes);
 router.use('/v1/invoices', invoiceRoutes);
 router.use('/agreements', institutionalAgreementRoutes);
 router.use('/v1/agreements', institutionalAgreementRoutes);
+router.use('/v1/retreat', retreatRoutes);
 
 export default router;
 

@@ -11,9 +11,7 @@ import SlideOverBookingDrawer from '../../components/patient/SlideOverBookingDra
 import SmartMatchFlow from '../../components/patient/SmartMatchFlow';
 import {
   CLINICAL_ASSESSMENT_KEYS,
-  CLINICAL_ASSESSMENT_OPTIONS,
   CLINICAL_ASSESSMENT_TEMPLATE_KEYS,
-  CLINICAL_QUESTION_BANK,
   getClinicalAssessmentMaxScore,
   getClinicalAssessmentSummary,
   severityFromClinicalScore,
@@ -395,26 +393,9 @@ export default function SessionsPage() {
   };
 
   const loadStructuredAssessment = async (assessmentType: ClinicalAssessmentKey) => {
-      const questions = CLINICAL_QUESTION_BANK[assessmentType].map((prompt, index) => ({
-      questionId: `${assessmentType}-${index + 1}`,
-      position: index + 1,
-      prompt,
-      sectionKey: assessmentType,
-        options: CLINICAL_ASSESSMENT_OPTIONS,
-    }));
-
-    const response: StructuredAssessmentStartResponse = {
-      attemptId: `${assessmentType}-${Date.now()}`,
-      template: {
-        id: assessmentType,
-        key: structuredTemplateKeys[assessmentType],
-        title: assessmentType,
-        description: `${assessmentType} standard assessment`,
-        estimatedMinutes: assessmentType === 'PHQ-9' ? 4 : 3,
-      },
-      questions,
-    };
-
+    const response = await patientApi.startStructuredAssessment({
+      templateKey: structuredTemplateKeys[assessmentType],
+    });
     setStructuredAttempt(response);
     setStructuredAnswers({});
     setCurrentStructuredQuestionIndex(0);

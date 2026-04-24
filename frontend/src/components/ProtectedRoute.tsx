@@ -34,6 +34,10 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
 		return <Navigate to="/auth/login" replace state={{ from: redirectPath }} />;
 	}
 
+	if (userRole === 'learner' && (location.pathname.startsWith('/provider') || location.pathname.startsWith('/onboarding/provider-setup'))) {
+		return <Navigate to="/certifications" replace />;
+	}
+
 	if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(userRole as any)) {
 		const isAdminRole =
 			userRole === 'admin' ||
@@ -44,6 +48,8 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
 
 		const fallback = isAdminRole
 			? '/admin-portal/login'
+			: userRole === 'learner'
+				? '/certifications'
 			: userRole === 'psychologist'
 				? '/provider/dashboard'
 			: userRole === 'psychiatrist'
