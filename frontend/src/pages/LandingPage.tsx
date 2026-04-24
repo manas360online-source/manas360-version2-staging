@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { groupTherapyApi } from "../api/groupTherapy";
 
@@ -28,6 +28,7 @@ type QuickNavMegaItem = {
   title: string;
   subtitle: string;
   badge?: string;
+  route?: string;
 };
 
 type QuickNavMegaMenu = {
@@ -101,6 +102,13 @@ const LandingPage: React.FC = () => {
 
   const handleQuickNavMegaItemClick = (menuLabel: string, itemTitle?: string) => {
     const normalizedItemTitle = String(itemTitle || '').toLowerCase();
+    const itemRoute = quickNavMegaMenus[menuLabel]?.items.find((it) => it.title === itemTitle)?.route;
+    if (itemRoute) {
+      setActiveQuickNav(null);
+      navigate(itemRoute);
+      return;
+    }
+
     if (normalizedItemTitle.includes('group therapy') || normalizedItemTitle.includes('group sessions')) {
       setActiveQuickNav(null);
       navigate('/group-therapy');
@@ -143,12 +151,24 @@ const LandingPage: React.FC = () => {
         navigate("/group-therapy");
         return;
       }
+      if (itemTitle === "Wellness Retreats") {
+        navigate("/retreats");
+        return;
+      }
       if (itemTitle === "Sound Therapy") {
-        navigate("/patient/sound-therapy");
+        navigate("/sound-therapy");
         return;
       }
       navigate("/premium-theraphy");
       return;
+    }
+
+    if (menuLabel === "Self-Help Tools") {
+      setActiveQuickNav(null);
+      if (itemTitle === "Sound Therapy") {
+        navigate("/sound-therapy");
+        return;
+      }
     }
 
     if (menuLabel === "MyDigitalClinic") {
@@ -301,7 +321,9 @@ const LandingPage: React.FC = () => {
           { icon: "\uD83D\uDC91", title: "Couples Therapy", subtitle: "Rebuild your relationship", badge: "\u20B91,499" },
           { icon: "\uD83D\uDC65", title: "Group Therapy", subtitle: "Peer circles from \u20B9149", badge: "\u20B9149" },
           { icon: "\uD83C\uDFB5", title: "Sound Therapy", subtitle: "Raga healing + sleep tracks", badge: "20 Free" },
-          { icon: "\uD83D\uDCBC", title: "Executive Coaching", subtitle: "High-performance wellness", badge: "Pro" }
+          { icon: "\uD83D\uDCBC", title: "Executive Coaching", subtitle: "High-performance wellness", badge: "Pro" },
+          { icon: "\uD83C\uDFD5\uFE0F", title: "Wellness Retreats", subtitle: "Rishikesh, Coorg, Goa", route: "/retreats" },
+          { icon: "\uD83D\uDED2", title: "Wellness Shop", subtitle: "Journals, tools, merch", badge: "Soon" }
         ]
       },
       "Self-Help Tools": {
@@ -311,7 +333,7 @@ const LandingPage: React.FC = () => {
         columns: 5,
         items: [
           { icon: "\uD83D\uDCCA", title: "Mood Tracker", subtitle: "Track emotional trends daily", badge: "Free" },
-          { icon: "\uD83C\uDFB5", title: "Sound Therapy", subtitle: "Calm sound-based relaxation", badge: "Free" },
+          { icon: "\uD83C\uDFB5", title: "Sound Therapy", subtitle: "Calm sound-based relaxation", badge: "Free", route: "/sound-therapy" },
           { icon: "\uD83C\uDF2C\uFE0F", title: "Breathing Exercises", subtitle: "4-7-8 \u2022 Box \u2022 Calm Breath \u2022 Guided sessions", badge: "Free" },
           { icon: "\uD83D\uDCD3", title: "Journaling Prompts", subtitle: "Daily reflection questions" },
           { icon: "\uD83C\uDF19", title: "Sleep Guide", subtitle: "Hygiene checklist + wind-down" },
@@ -348,10 +370,8 @@ const LandingPage: React.FC = () => {
         subtitle: "Certifications, training & shop",
         columns: 4,
         items: [
-          { icon: "\uD83C\uDFC6", title: "Certification Hub", subtitle: "CBT, NLP, 5Whys training", badge: "Pro" },
-          { icon: "\uD83E\uDDD1", title: "Join as Therapist", subtitle: "Earn \u20B950K-2L/month" },
-          { icon: "\uD83C\uDFD5\uFE0F", title: "Wellness Retreats", subtitle: "Rishikesh, Coorg, Goa" },
-          { icon: "\uD83D\uDED2", title: "Wellness Shop", subtitle: "Journals, tools, merch" }
+          { icon: "\uD83C\uDFC6", title: "Certification Hub", subtitle: "CBT, NLP, 5Whys training", badge: "Pro", route: "/certifications" },
+          { icon: "\uD83E\uDDD1", title: "Join as Therapist", subtitle: "Earn \u20B950K-2L/month", route: "/certifications" }
         ]
       },
       MyDigitalClinic: {
@@ -1417,7 +1437,18 @@ const LandingPage: React.FC = () => {
           </div>
 
           <div className="pro-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "18px" }}>
-            <div style={{ background: "rgba(255,255,255,0.92)", border: "1px solid rgba(226,232,240,0.95)", borderRadius: "22px", padding: "18px 16px", boxShadow: "0 16px 40px rgba(0,0,0,0.07)" }}>
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => navigate('/provider-landing')}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  navigate('/provider-landing');
+                }
+              }}
+              style={{ background: "rgba(255,255,255,0.92)", border: "1px solid rgba(226,232,240,0.95)", borderRadius: "22px", padding: "18px 16px", boxShadow: "0 16px 40px rgba(0,0,0,0.07)", cursor: 'pointer' }}
+            >
               <div style={{ display: "flex", justifyContent: "flex-end" }}>
                 <span style={{ fontSize: "10px", fontWeight: 900, color: "white", background: "linear-gradient(135deg,#7C3AED,#A78BFA)", padding: "4px 8px", borderRadius: "999px" }}>RCI VERIFIED</span>
               </div>
@@ -1428,13 +1459,24 @@ const LandingPage: React.FC = () => {
               </div>
               <div style={{ marginTop: "14px", fontSize: "16px", fontWeight: 900, color: "#0F172A" }}>Psychologist</div>
               <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#64748B", lineHeight: 1.55 }}>Clinical &amp; counseling psychology. RCI registered. Earn ₹60K&ndash;₹2L/mo</div>
-              <button type="button" style={{ marginTop: "14px", border: "1.5px solid rgba(124,58,237,0.7)", background: "rgba(255,255,255,0.95)", color: "#6D28D9", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
+              <button type="button" onClick={() => navigate('/provider-landing')} style={{ marginTop: "14px", border: "1.5px solid rgba(124,58,237,0.7)", background: "rgba(255,255,255,0.95)", color: "#6D28D9", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
                 &#10022; Join Now
               </button>
               <div style={{ marginTop: "10px", fontSize: "11px", fontWeight: 800, color: "#64748B" }}>Discover &mdash; Plans &mdash; Profile</div>
             </div>
 
-            <div style={{ background: "rgba(255,255,255,0.92)", border: "1px solid rgba(226,232,240,0.95)", borderRadius: "22px", padding: "18px 16px", boxShadow: "0 16px 40px rgba(0,0,0,0.07)" }}>
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => navigate('/provider-landing')}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  navigate('/provider-landing');
+                }
+              }}
+              style={{ background: "rgba(255,255,255,0.92)", border: "1px solid rgba(226,232,240,0.95)", borderRadius: "22px", padding: "18px 16px", boxShadow: "0 16px 40px rgba(0,0,0,0.07)", cursor: 'pointer' }}
+            >
               <div style={{ display: "flex", justifyContent: "flex-end" }}>
                 <span style={{ fontSize: "10px", fontWeight: 900, color: "white", background: "linear-gradient(135deg,#0EA5A6,#22C1C3)", padding: "4px 8px", borderRadius: "999px" }}>NMC VERIFIED</span>
               </div>
@@ -1445,13 +1487,24 @@ const LandingPage: React.FC = () => {
               </div>
               <div style={{ marginTop: "14px", fontSize: "16px", fontWeight: 900, color: "#0F172A" }}>Psychiatrist</div>
               <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#64748B", lineHeight: 1.55 }}>Diagnosis, medication, e-prescriptions. NMC registered MDs</div>
-              <button type="button" style={{ marginTop: "14px", border: "1.5px solid rgba(14,165,166,0.7)", background: "rgba(255,255,255,0.95)", color: "#0F766E", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
+              <button type="button" onClick={() => navigate('/provider-landing')} style={{ marginTop: "14px", border: "1.5px solid rgba(14,165,166,0.7)", background: "rgba(255,255,255,0.95)", color: "#0F766E", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
                 &#10022; Join Now
               </button>
               <div style={{ marginTop: "10px", fontSize: "11px", fontWeight: 800, color: "#64748B" }}>Discover &mdash; Plans &mdash; Profile</div>
             </div>
 
-            <div style={{ background: "rgba(255,255,255,0.92)", border: "1px solid rgba(226,232,240,0.95)", borderRadius: "22px", padding: "18px 16px", boxShadow: "0 16px 40px rgba(0,0,0,0.07)" }}>
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => navigate('/provider-landing')}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  navigate('/provider-landing');
+                }
+              }}
+              style={{ background: "rgba(255,255,255,0.92)", border: "1px solid rgba(226,232,240,0.95)", borderRadius: "22px", padding: "18px 16px", boxShadow: "0 16px 40px rgba(0,0,0,0.07)", cursor: 'pointer' }}
+            >
               <div style={{ display: "flex", justifyContent: "flex-end" }}>
                 <span style={{ fontSize: "10px", fontWeight: 900, color: "white", background: "linear-gradient(135deg,#16A34A,#22C55E)", padding: "4px 8px", borderRadius: "999px" }}>0% FEE &mdash; 3 MO</span>
               </div>
@@ -1462,13 +1515,24 @@ const LandingPage: React.FC = () => {
               </div>
               <div style={{ marginTop: "14px", fontSize: "16px", fontWeight: 900, color: "#0F172A" }}>Therapist</div>
               <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#64748B", lineHeight: 1.55 }}>CBT, DBT, REBT, integrative. Build your practice on your terms</div>
-              <button type="button" style={{ marginTop: "14px", border: "1.5px solid rgba(34,197,94,0.7)", background: "rgba(255,255,255,0.95)", color: "#15803D", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
+              <button type="button" onClick={() => navigate('/provider-landing')} style={{ marginTop: "14px", border: "1.5px solid rgba(34,197,94,0.7)", background: "rgba(255,255,255,0.95)", color: "#15803D", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
                 &#10022; Join Now
               </button>
               <div style={{ marginTop: "10px", fontSize: "11px", fontWeight: 800, color: "#64748B" }}>Discover &mdash; Plans &mdash; Profile</div>
             </div>
 
-            <div style={{ background: "rgba(255,255,255,0.92)", border: "1px solid rgba(226,232,240,0.95)", borderRadius: "22px", padding: "18px 16px", boxShadow: "0 16px 40px rgba(0,0,0,0.07)" }}>
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => navigate('/provider-landing')}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  navigate('/provider-landing');
+                }
+              }}
+              style={{ background: "rgba(255,255,255,0.92)", border: "1px solid rgba(226,232,240,0.95)", borderRadius: "22px", padding: "18px 16px", boxShadow: "0 16px 40px rgba(0,0,0,0.07)", cursor: 'pointer' }}
+            >
               <div style={{ display: "flex", justifyContent: "flex-end" }}>
                 <span style={{ fontSize: "10px", fontWeight: 900, color: "white", background: "linear-gradient(135deg,#D97706,#F59E0B)", padding: "4px 8px", borderRadius: "999px" }}>CERTIFIED</span>
               </div>
@@ -1479,7 +1543,7 @@ const LandingPage: React.FC = () => {
               </div>
               <div style={{ marginTop: "14px", fontSize: "16px", fontWeight: 900, color: "#0F172A" }}>NLP Coach</div>
               <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#64748B", lineHeight: 1.55 }}>Neuro-linguistic programming. Life coaching. Transformation specialists</div>
-              <button type="button" style={{ marginTop: "14px", border: "1.5px solid rgba(245,158,11,0.75)", background: "rgba(255,255,255,0.95)", color: "#B45309", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
+              <button type="button" onClick={() => navigate('/provider-landing')} style={{ marginTop: "14px", border: "1.5px solid rgba(245,158,11,0.75)", background: "rgba(255,255,255,0.95)", color: "#B45309", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
                 &#10022; Join Now
               </button>
               <div style={{ marginTop: "10px", fontSize: "11px", fontWeight: 800, color: "#64748B" }}>Discover &mdash; Plans &mdash; Profile</div>

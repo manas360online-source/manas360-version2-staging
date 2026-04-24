@@ -127,6 +127,7 @@ const quickGroups: { title: string; items: QuickItem[] }[] = [
         label: 'Wellness Retreats',
         subtitle: 'Rishikesh · Coorg · Goa',
         ariaLabel: 'Wellness retreats quick access',
+        route: '/retreats',
         tone: 'gold',
       },
     ],

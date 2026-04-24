@@ -4,12 +4,15 @@ import { CERTIFICATIONS } from '../CertificationConstants';
 import { ShieldCheck, CheckCircle, Lock, CreditCard, Calendar, AlertCircle } from 'lucide-react';
 import { SEO } from '../components/CertificationSEO';
 import { useWallet } from '../hooks/useWallet';
+import { useEnrollmentStore } from '../store/CertificationEnrollmentStore';
+import { getCertificationsErrorMessage, registerCertificationEnrollment } from '../api/certifications';
 
 export const CheckoutPage: React.FC = () => {
     const { slug } = useParams<{ slug: string }>();
     const navigate = useNavigate();
     const location = useLocation();
     const { balance } = useWallet();
+    const { addEnrollment, getEnrollmentBySlug } = useEnrollmentStore();
     const walletAmount = Number((balance as any)?.total_balance || 0);
 
     const [processing, setProcessing] = useState(false);
@@ -38,6 +41,12 @@ export const CheckoutPage: React.FC = () => {
     const applicableWallet = Math.min(walletAmount, totalToday);
     const finalTotal = totalToday - applicableWallet;
 
+    React.useEffect(() => {
+        if (!cert || getEnrollmentBySlug(cert.slug)) {
+            return;
+        }
+
+        let active = true;
     const handleTransaction = async () => {
         setProcessing(true);
         try {
@@ -64,8 +73,101 @@ export const CheckoutPage: React.FC = () => {
                 }),
             });
 
-            const data = await response.json();
+        const run = async () => {
+            if (cert.price_inr === 0) {
+              try {
+                  await registerCertificationEnrollment({
+                      certSlug: cert.slug,
+                      paymentPlan: 'full',
+                      installmentCount: 1,
+                      bypassPayment: true,
+                  });
+                  
+                  const newEnrollment = {
+                      id: `ENR-${Date.now()}`,
+                      certificationId: cert.id,
+                      certificationName: cert.name,
+                      slug: cert.slug,
+                      badgeColor: cert.badgeColor,
+                      enrollmentDate: new Date().toISOString().split('T')[0],
+                      paymentStatus: 'Sponsoring' as const,
+                      paymentPlan: 'full' as const,
+                      amountPaid: 0,
+                      totalAmount: 0,
+                      installmentsPaidCount: 1,
+                      completionPercentage: 0,
+                      modulesCompleted: 0,
+                      certId: Math.random().toString(36).substring(2, 8).toUpperCase(),
+                  };
 
+                  addEnrollment(newEnrollment as any);
+                  navigate(myCertificationsPath, { replace: true });
+              } catch (error: any) {
+                  const status = Number(error?.response?.status || 0);
+                  if (status !== 409 && active) {
+                      setGeneralError(getCertificationsErrorMessage(error, 'Unable to start enrollment.'));
+                  }
+              }
+            }
+        };
+
+        void run();
+
+        return () => {
+            active = false;
+        };
+    }, [addEnrollment, cert, getEnrollmentBySlug, myCertificationsPath, navigate]);
+
+    const handlePayment = async () => {
+        if (!cert || !slug) return;
+        setProcessing(true);
+        setGeneralError(null);
+
+        const isFree = cert.price_inr === 0;
+
+        try {
+            const result = await registerCertificationEnrollment({
+                certSlug: cert.slug,
+                paymentPlan: plan,
+                installmentCount: plan === 'installment' ? 3 : 1,
+                bypassPayment: isFree,
+            });
+
+            if (result.paymentUrl) {
+                window.location.href = result.paymentUrl;
+                return;
+            }
+
+            if (!getEnrollmentBySlug(cert.slug)) {
+                const newEnrollment = {
+                    id: `ENR-${Date.now()}`,
+                    certificationId: cert.id,
+                    certificationName: cert.name,
+                    slug: cert.slug,
+                    badgeColor: cert.badgeColor,
+                    enrollmentDate: new Date().toISOString().split('T')[0],
+                    paymentStatus: isFree ? ('Sponsoring' as const) : (plan === 'installment' ? ('Partial' as const) : ('Paid' as const)),
+                    paymentPlan: plan,
+                    amountPaid: isFree ? 0 : (plan === 'full' ? cert.price_inr : installmentAmount),
+                    totalAmount: cert.price_inr,
+                    installmentsPaidCount: 1,
+                    completionPercentage: 0,
+                    modulesCompleted: 0,
+                    certId: Math.random().toString(36).substring(2, 8).toUpperCase(),
+                };
+                addEnrollment(newEnrollment as any);
+            }
+
+            navigate(myCertificationsPath, { replace: true });
+        } catch (error: any) {
+            const status = Number(error?.response?.status || 0);
+            if (status !== 409) {
+                setGeneralError(getCertificationsErrorMessage(error, 'Unable to initiate payment.'));
+            } else {
+              navigate(myCertificationsPath, { replace: true });
+            }
+        } finally {
+          setProcessing(false);
             if (response.ok && data.success && data.data.redirectUrl) {
                 // ── Redirect to PhonePe ──────────────────────────────────
                 window.location.href = data.data.redirectUrl;
@@ -172,6 +274,37 @@ export const CheckoutPage: React.FC = () => {
                     </div>
                 </div>
 
+                    <div className="bg-white p-8 rounded-2xl shadow-xl border border-slate-100 h-fit">
+                        <h3 className="text-xl font-bold text-slate-800 mb-6"> {cert.price_inr === 0 ? 'Start Training' : 'Payment Method'}</h3>
+
+                        {cert.price_inr > 0 && (
+                          <div className="space-y-4 mb-8">
+                            <label className="block text-sm font-bold text-slate-700">Choose Payment Frequency</label>
+                            <div className="grid grid-cols-1 gap-3">
+                              <button 
+                                onClick={() => setPlan('full')}
+                                className={`p-4 rounded-xl border-2 text-left transition ${plan === 'full' ? 'border-purple-600 bg-purple-50' : 'border-slate-100'}`}
+                              >
+                                <div className="flex justify-between items-center mb-1">
+                                  <span className="font-bold">Full Payment</span>
+                                  {plan === 'full' && <CheckCircle size={16} className="text-purple-600" />}
+                                </div>
+                                <p className="text-xs text-slate-500">Fastest way to unlock certification</p>
+                              </button>
+                              
+                              <button 
+                                onClick={() => setPlan('installment')}
+                                className={`p-4 rounded-xl border-2 text-left transition ${plan === 'installment' ? 'border-purple-600 bg-purple-50' : 'border-slate-100'}`}
+                              >
+                                <div className="flex justify-between items-center mb-1">
+                                  <span className="font-bold">3 Easy Installments</span>
+                                  {plan === 'installment' && <CheckCircle size={16} className="text-purple-600" />}
+                                </div>
+                                <p className="text-xs text-slate-500">₹{installmentAmount.toLocaleString()} per month</p>
+                              </button>
+                            </div>
+                          </div>
+                        )}
                 <div className="bg-white p-8 rounded-2xl shadow-xl border border-slate-100 h-fit">
                     {cert.price_inr === 0 ? (
                         <div className="text-center py-8">
@@ -185,14 +318,16 @@ export const CheckoutPage: React.FC = () => {
                             </button>
                         </div>
 
-                        <div
-                            onClick={() => setPlan('installment')}
-                            className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${plan === 'installment' ? 'border-purple-600 bg-purple-50 ring-1 ring-purple-600' : 'border-slate-100 hover:border-slate-200'}`}
-                        >
-                            <div className="flex justify-between items-center">
-                                <span className="font-bold text-slate-800">3 Monthly Installments</span>
-                                {plan === 'installment' && <CheckCircle size={20} className="text-purple-600" />}
+                        <div className="bg-slate-50 rounded-xl border border-slate-100 p-4 mb-8">
+                            <div className="flex justify-between items-center text-sm text-slate-600 mb-2">
+                                <span>Access</span>
+                                <span className="font-bold text-slate-800">{cert.price_inr === 0 ? 'Immediate' : 'Once payment verified'}</span>
                             </div>
+                            <div className="flex justify-between items-center text-sm text-slate-600">
+                                <span>Secure</span>
+                                <span className="font-bold text-emerald-600">PhonePe Protected</span>
+                            </div>
+                        </div>
                             <div className="text-2xl font-bold text-slate-900 mt-2">₹{installmentAmount.toLocaleString()} <span className="text-sm font-normal text-slate-500">/mo</span></div>
 
                             {plan === 'installment' && (
@@ -224,25 +359,25 @@ export const CheckoutPage: React.FC = () => {
                                 )}
                             </button>
 
-                    <button
-                        onClick={handlePayment}
-                        disabled={processing}
-                        className="w-full bg-purple-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-purple-700 transition flex items-center justify-center gap-2 disabled:opacity-70 mb-6"
-                    >
-                        {processing ? (
-                            <>Processing...</>
-                        ) : (
-                            <>
-                                <Lock size={18} className="text-purple-200" />
-                                {finalTotal === 0 ? 'Start Learning' : `Pay ₹${finalTotal.toLocaleString()}`}
-                            </>
-                        )}
-                    </button>
+                        <button
+                            onClick={handlePayment}
+                            disabled={processing}
+                            className="w-full bg-purple-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-purple-700 transition flex items-center justify-center gap-2 disabled:opacity-70 mb-6 shadow-lg shadow-purple-100"
+                        >
+                            {processing ? (
+                                <>Processing...</>
+                            ) : (
+                                <>
+                                    <Lock size={18} className="text-purple-200" />
+                                    {cert.price_inr === 0 ? 'Start Learning' : `Proceed to Pay ₹${finalTotal.toLocaleString()}`}
+                                </>
+                            )}
+                        </button>
 
-                    <div className="flex items-center justify-center gap-2 text-slate-300 text-xs mb-2">
-                        <CreditCard size={14} /> Secure PhonePe Payment
+                        <div className="flex items-center justify-center gap-2 text-slate-400 text-xs mb-2">
+                            <CreditCard size={14} /> UPI • Cards • Net Banking
+                        </div>
                     </div>
-                </div>
             </div>
         </div>
     );

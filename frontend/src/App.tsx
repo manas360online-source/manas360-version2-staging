@@ -15,6 +15,8 @@ const SelfHelpLandingPage = lazy(() => import('./pages/SelfHelpLandingPage'));
 const CorporateLandingPage = lazy(() => import('./pages/CorporateLandingPage'));
 const PremiumTheraphyLandingPage = lazy(() => import('./pages/PremiumTheraphyLandingPage'));
 const NRILandingPage = lazy(() => import('./pages/NRILandingPage'));
+const RetreatLandingPageNew = lazy(() => import('./pages/RetreatLandingPageNew'));
+const SoundTherapyLandingPage = lazy(() => import('./pages/SoundTherapyLandingPage'));
 import { AuthProvider, getPostLoginRoute, useAuth } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 import { Assessment } from './pages/Assessment'
@@ -97,6 +99,7 @@ const GroupManagement = lazy(() => import('./pages/admin/GroupManagement'));
 const QrCodeManager = lazy(() => import('./pages/admin/QrCodeManager'));
 const TherapistPerformance = lazy(() => import('./pages/admin/TherapistPerformance'));
 const AgreementsPage = lazy(() => import('./pages/admin/AgreementsPage'));
+const AdminRetreatsPage = lazy(() => import('./pages/admin/AdminRetreatsPage'));
 const AgreementDetailPage = lazy(() => import('./pages/admin/AgreementDetailPage'));
 const ClientAgreementPage = lazy(() => import('./pages/admin/ClientAgreementPage'));
 const SessionAnalytics = lazy(() => import('./pages/admin/SessionAnalytics'));
@@ -143,6 +146,7 @@ const ProviderEarningsPage = lazy(() => import('./pages/provider/Earnings'));
 const ProviderSettingsPage = lazy(() => import('./pages/provider/Settings'));
 const ProviderDashboard = lazy(() => import('./pages/provider/Dashboard/ProviderDashboard'));
 const ProviderPortalPage = lazy(() => import('./pages/provider/ProviderPortalPage'));
+const ProviderLandingPage = lazy(() => import('./pages/provider/ProviderLandingPage'));
 const ProviderSubscriptionPage = lazy(() => import('./pages/provider/ProviderSubscriptionPage'));
 const ProviderSubscriptionAddonsPage = lazy(() => import('./pages/provider/ProviderSubscriptionAddonsPage'));
 const AppointmentRequestsPage = lazy(() => import('./pages/provider/AppointmentRequests'));
@@ -172,12 +176,10 @@ const CheckoutPage = lazy(() => import('./pages/CertificationCheckoutPage').then
 const EnrollmentRegistrationPage = lazy(() => import('./pages/EnrollmentRegistrationPage'));
 const PaymentSuccessPage = lazy(() => import('./pages/PaymentSuccessPage'));
 const PaymentFailedPage = lazy(() => import('./pages/PaymentFailedPage'));
-const JourneyWireframePage = lazy(() => import('./pages/JourneyWireframePage'));
 const EnrollmentConfirmedPage = lazy(() => import('./pages/EnrollmentConfirmedPage'));
 const CertificationDetailsPage = lazy(() => import('./pages/CertificationDetailsPage').then(m => ({ default: m.CertificationDetailsPage })));
 const CertificationModulesPage = lazy(() => import('./pages/CertificationModulesPage').then(m => ({ default: m.CertificationModulesPage })));
 const CertificationLessonPage = lazy(() => import('./pages/CertificationLessonPage').then(m => ({ default: m.CertificationLessonPage })));
-const CertificationAssignmentPage = lazy(() => import('./pages/CertificationAssignmentPage').then(m => ({ default: m.CertificationAssignmentPage })));
 const CertificationQuizPage = lazy(() => import('./pages/CertificationQuizPage').then(m => ({ default: m.CertificationQuizPage })));
 const CertificationCertificatePage = lazy(() => import('./pages/CertificationCertificatePage'));
 const CertificateVerificationPage = lazy(() => import('./pages/CertificateVerificationPage'));
@@ -259,6 +261,7 @@ function App() {
             <Route path="/" element={<Navigate to="/landing" replace />} />
             <Route path="/intro" element={<HeroIntroPage />} />
             <Route path="/landing" element={<LandingPage />} />
+            <Route path="/provider-landing" element={<ProviderLandingPage />} />
             <Route path="/main-landing" element={<Navigate to="/landing" replace />} />
             <Route path="/helping-hand" element={<HelpingHandLandingPage />} />
             <Route path="/ai-power-hub" element={<AiPowerHubLandingPage />} />
@@ -267,16 +270,32 @@ function App() {
             <Route path="/corporate-landing" element={<CorporateLandingPage />} />
             <Route path="/premium-theraphy" element={<PremiumTheraphyLandingPage />} />
             <Route path="/nri-landing" element={<NRILandingPage />} />
+            <Route path="/retreats" element={<RetreatLandingPageNew />} />
+            <Route path="/sound-therapy" element={<SoundTherapyLandingPage />} />
             <Route path="/group-therapy" element={<GroupTherapySessionsPage />} />
             <Route path="/assessment" element={<Assessment onSubmit={handleAssessmentSubmit} />} />
             <Route path="/assessment-preset" element={<PresetAssessmentEntry />} />
             <Route path="/eap/:companyKey/screen" element={<EapScreeningPage />} />
 
-            {/* ── Certification Sub-App ── */}
-            <Route element={<CertificationLayout />}>
+            {/* ── Certification Catalog (Public) ── */}
+            <Route
+              element={
+                <CertificationLayout />
+              }
+            >
               <Route path="/certifications" element={<CertificationLandingPage />} />
               <Route path="/certifications/:slug" element={<CertificationDetailsPage />} />
               <Route path="/certifications/details" element={<CertificationsPage />} />
+            </Route>
+
+            {/* ── Certification Learning (Protected) ── */}
+            <Route
+              element={
+                <ProtectedRoute>
+                  <CertificationLayout />
+                </ProtectedRoute>
+              }
+            >
               <Route path="/my-certifications" element={<MyCertificationsPage />} />
               <Route path="/checkout/:slug" element={<CheckoutPage />} />
               <Route path="/certification/enroll/:slug" element={<EnrollmentRegistrationPage />} />
@@ -284,7 +303,6 @@ function App() {
               <Route path="/enrollment-registration" element={<EnrollmentRegistrationPage />} />
               <Route path="/payment-success" element={<PaymentSuccessPage />} />
               <Route path="/payment-failed" element={<PaymentFailedPage />} />
-              <Route path="/journey" element={<JourneyWireframePage />} />
 
               {/* ── Both /confirmed (legacy) and /enrollment-confirmed point to same page ── */}
               <Route path="/confirmed" element={<EnrollmentConfirmedPage />} />
@@ -292,10 +310,8 @@ function App() {
 
               <Route path="/certifications/modules/:enrollmentId" element={<CertificationModulesPage />} />
               <Route path="/certifications/lessons/:lessonId" element={<CertificationLessonPage />} />
-              <Route path="/certifications/assignments/:assignmentId" element={<CertificationAssignmentPage />} />
               <Route path="/certifications/quiz/:enrollmentId" element={<CertificationQuizPage />} />
               <Route path="/certifications/certificate/:enrollmentId" element={<CertificationCertificatePage />} />
-              <Route path="/dashboard" element={<Navigate to="/certifications" replace />} />
             </Route>
 
             <Route path="/results" element={<ResultsPage data={assessmentData} />} />
@@ -555,6 +571,7 @@ function App() {
                 <Route path="operations/agreements/client" element={<ClientAgreementPage />} />
                 <Route path="operations/agreements/:agreementId" element={<AgreementDetailPage />} />
                 <Route path="operations/agreements/:agreementId/client" element={<ClientAgreementPage />} />
+                <Route path="operations/retreat-requests" element={<AdminRetreatsPage />} />
 
                 <Route path="intelligence/platform-analytics" element={<PlatformAnalytics />} />
                 <Route path="intelligence/user-growth" element={<UserGrowthAnalytics />} />
@@ -631,6 +648,8 @@ function App() {
               }
             />
             <Route path="/corporate" element={<CorporateOnboardingPage />} />
+            <Route path="/corporate/onboarding" element={<CorporateOnboardingPage />} />
+            <Route path="/corporate/landing" element={<CorporateLandingPage />} />
             <Route path="/corporate/analytics" element={<CorporateRoute><CorporateAnalyticsPage /></CorporateRoute>} />
             <Route path="/corporate/employees/directory" element={<CorporateRoute><CorporateEmployeeDirectoryPage /></CorporateRoute>} />
             <Route path="/corporate/employees/enrollment" element={<CorporateRoute><CorporateEnrollmentPage /></CorporateRoute>} />

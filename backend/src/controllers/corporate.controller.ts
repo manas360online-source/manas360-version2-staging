@@ -2,6 +2,8 @@ import type { Request, Response } from 'express';
 import * as XLSX from 'xlsx';
 import { AppError } from '../middleware/error.middleware';
 import { sendSuccess } from '../utils/response';
+import { issueSessionTokens } from '../services/auth.service';
+import { setAuthCookies } from './auth.controller';
 import {
   bulkUploadCorporateEmployees,
   createCorporateCampaign,
@@ -28,6 +30,7 @@ import {
   submitCorporateDemoRequest,
   requestCorporateOtp,
   createCorporateAccount,
+  listCorporateDemoRequests,
 } from '../services/corporate.service';
 
 const resolveCompanyKey = (req: Request): string | undefined => {
@@ -304,6 +307,17 @@ export const requestCorporateOtpController = async (req: Request, res: Response)
 
 export const createCorporateAccountController = async (req: Request, res: Response): Promise<void> => {
   const data = await createCorporateAccount(req.body || {});
+
+  if (data?.corporateMember?.id) {
+    const meta = {
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent'),
+      device: req.get('x-device-id') ?? undefined,
+    };
+    const tokens = await issueSessionTokens(data.corporateMember.id, meta);
+    setAuthCookies(req, res, tokens.accessToken, tokens.refreshToken);
+  }
+
   sendSuccess(res, data, 'Corporate account created successfully', 201);
 };
 
@@ -323,4 +337,11 @@ export const getCorporateEapQrAnalyticsController = async (req: Request, res: Re
   const companyKey = resolveCompanyKey(req);
   const data = await getCorporateEapQrAnalytics(companyKey);
   sendSuccess(res, data, 'Corporate EAP QR analytics retrieved successfully');
+};
+
+export const listCorporateDemoRequestsController = async (req: Request, res: Response): Promise<void> => {
+  const page = Number(req.query.page) || 1;
+  const limit = Number(req.query.limit) || 50;
+  const data = await listCorporateDemoRequests(page, limit);
+  sendSuccess(res, data, 'Corporate demo requests retrieved successfully');
 };

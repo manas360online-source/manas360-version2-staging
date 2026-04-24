@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { CheckCircle2, XCircle, ArrowLeft, Award, RotateCcw } from "lucide-react";
 import { useEnrollmentStore } from "../store/CertificationEnrollmentStore";
 import { getModulesByCertification } from "../utils/certificationLessonUtils";
+import { completeCertification } from "../api/certifications";
 
 /* ──────────────────────────────────────────────────────────
    Quiz Data – one quiz per module, keyed by moduleId
@@ -31,150 +32,107 @@ interface ModuleQuiz {
 }
 
 const QUIZ_DATA: Record<string, ModuleQuiz> = {
-  // ─── PRACTITIONER PATH ───
-  "ATMT-OPENING": {
-    title: "Opening Session Quiz",
-    subtitle: "Test your understanding of the course overview",
-    icon: "🎬",
-    accentColor: "#2d8a4e",
-    accentLight: "#d4f0de",
-    questions: [
-      { id: "q1", text: "What is the primary goal of MANAS360 onboarding?", options: [{ letter: "A", text: "To sell therapy packages" }, { letter: "B", text: "To equip practitioners with empathy-first, evidence-based skills" }, { letter: "C", text: "To complete paperwork quickly" }], correctLetter: "B", explanation: "MANAS360 onboarding focuses on building empathy-first, evidence-based therapeutic skills." },
-      { id: "q2", text: "How many core modules must you complete for certification?", options: [{ letter: "A", text: "3 modules" }, { letter: "B", text: "5 modules" }, { letter: "C", text: "10 modules" }], correctLetter: "B", explanation: "The certification journey consists of 5 core modules covering all essential skills." },
-    ],
-  },
-  "ATMT-1": {
-    title: "5Whys + Empathy Quiz",
-    subtitle: "Root cause inquiry & empathetic engagement",
-    icon: "🔍",
-    accentColor: "#c7943e",
-    accentLight: "#f5e6c8",
-    questions: [
-      { id: "q1", text: "What is the correct sequence for the integrated approach?", options: [{ letter: "A", text: "Diagnose → Treat → Solve → Done" }, { letter: "B", text: "Empathy → Daily Journey → 5Whys → Projecting Questions → Collaborate" }, { letter: "C", text: "Ask questions → Fix problems → Next patient" }], correctLetter: "B", explanation: "The correct order is always: Empathy FIRST → Journey SECOND → 5Whys THIRD. Never skip steps." },
-      { id: "q2", text: "When a patient stops at a surface answer during 5Whys, you should:", options: [{ letter: "A", text: "Push harder — ask \"but WHY really?\"" }, { letter: "B", text: "Try a different entry: \"What do you notice?\" or \"If you had to guess?\"" }, { letter: "C", text: "Move on — they clearly don't want to share" }], correctLetter: "B", explanation: "Try alternative entry points like 'What do you notice?' to gently continue the inquiry without pressure." },
-      { id: "q3", text: "Empathy has 3 layers. What are they in order?", options: [{ letter: "A", text: "Listening → Advising → Fixing" }, { letter: "B", text: "Validation → Perspective-taking → Compassionate action" }, { letter: "C", text: "Sympathy → Pity → Treatment" }], correctLetter: "B", explanation: "Empathy flows through Validation → Perspective-taking → Compassionate action. Never skip to solutions." },
-    ],
-  },
-  "ATMT-2": {
-    title: "Fundamentals of NLP Quiz",
-    subtitle: "Neuro-Linguistic Programming essentials",
+  "5whys": {
+    title: "Certified 5Whys Practitioner",
+    subtitle: "Root cause analysis, empathy framework, and Daily Journey mapping",
     icon: "🧠",
-    accentColor: "#1a8a7d",
-    accentLight: "#d5f0ec",
-    questions: [
-      { id: "q1", text: "NLP should NEVER be used to:", options: [{ letter: "A", text: "Build patient confidence" }, { letter: "B", text: "Manipulate patients or override their autonomy" }, { letter: "C", text: "Help change limiting beliefs" }], correctLetter: "B", explanation: "Ethical NLP practice always respects patient autonomy and never seeks to manipulate." },
-      { id: "q2", text: "Visualization works because:", options: [{ letter: "A", text: "It's relaxing and distracting" }, { letter: "B", text: "The brain activates similar neural pathways as during actual experience" }, { letter: "C", text: "It only works for creative people" }], correctLetter: "B", explanation: "Research shows the brain activates similar neural pathways during vivid visualization as during real experiences." },
-    ],
-  },
-  "ATMT-3": {
-    title: "NRI Mindset Quiz",
-    subtitle: "Understanding Diaspora Cultural Context",
-    icon: "🌏",
-    accentColor: "#7c3aed",
-    accentLight: "#ede5fd",
-    questions: [
-      { id: "q1", text: "When an NRI client describes feeling like \"two different people,\" the therapist should:", options: [{ letter: "A", text: "Diagnose identity disorder" }, { letter: "B", text: "Validate the code-switching and help them integrate both selves" }, { letter: "C", text: "Tell them to choose one identity" }], correctLetter: "B", explanation: "This duality is adaptive, not pathological. Validation and integration are the clinical goal." },
-      { id: "q2", text: "NRI clients who present with \"work stress\" may actually be experiencing:", options: [{ letter: "A", text: "Only work stress — take them at face value" }, { letter: "B", text: "Unprocessed guilt about leaving India, masked as surface-level issues" }, { letter: "C", text: "Homesickness — just suggest they visit India" }], correctLetter: "B", explanation: "The underlying driver is frequently unprocessed family guilt masked as common stress markers." },
-    ],
-  },
-  "ATMT-4": {
-    title: "What Good CBT Looks Like Quiz",
-    subtitle: "Gold standard cognitive therapy",
-    icon: "💭",
-    accentColor: "#4361ee",
-    accentLight: "#dfe6fd",
-    questions: [
-      { id: "q1", text: "When a patient says \"I always fail,\" good CBT practice is to:", options: [{ letter: "A", text: "\"That's just all-or-nothing thinking, a cognitive distortion\"" }, { letter: "B", text: "Validate the feeling first, then collaboratively examine evidence for and against" }, { letter: "C", text: "Assign a thought record worksheet as homework" }], correctLetter: "B", explanation: "Never use CBT to invalidate a patient's feelings. Validate first, then thoughtfully and collaboratively challenge it." },
-      { id: "q2", text: "CBT is NOT appropriate when:", options: [{ letter: "A", text: "Patient is in active crisis or acute trauma — stabilize first" }, { letter: "B", text: "Patient has anxiety" }, { letter: "C", text: "Patient is from a different culture" }], correctLetter: "A", explanation: "Cognitive restructuring is ineffective and potentially harmful during active crisis or acute trauma. Stabilization is priority one." },
-    ],
-  },
-  "ATMT-5": {
-    title: "Dashboard & Tools Quiz",
-    subtitle: "Platform Navigation",
-    icon: "📊",
-    accentColor: "#d97706",
-    accentLight: "#fef0d5",
-    questions: [
-      { id: "q1", text: "When a patient's mood chart shows a sudden spike after weeks of improvement, you should:", options: [{ letter: "A", text: "Check for a crisis event and reach out proactively" }, { letter: "B", text: "Ignore it — regression is normal" }, { letter: "C", text: "Wait for the next scheduled session" }], correctLetter: "A", explanation: "Sudden deviations from a trend map may indicate a triggering event or crisis requiring immediate proactive care." },
-      { id: "q2", text: "The settlement report on your dashboard shows:", options: [{ letter: "A", text: "Only your total earnings" }, { letter: "B", text: "60/40 split breakdown — your 60% share, platform 40%, per session and monthly total" }, { letter: "C", text: "Patient payment history" }], correctLetter: "B", explanation: "The dashboard transparently maps the 60/40 split, showing earnings at both the per-session and monthly levels." },
-    ],
-  },
-  "ATMT-6": {
-    title: "Module 6 Quiz",
-    subtitle: "Session closure & protocols",
-    icon: "📋",
-    accentColor: "#d97706",
-    accentLight: "#fef0d5",
-    questions: [
-      { id: "q1", text: "A good session closure should include:", options: [{ letter: "A", text: "Just saying goodbye" }, { letter: "B", text: "Summary, positive reinforcement, and a takeaway task" }, { letter: "C", text: "Scheduling the next appointment only" }], correctLetter: "B", explanation: "Effective closures include a summary of key insights, positive reinforcement, and a clear takeaway task." },
-      { id: "q2", text: "When a patient's mood trend shows a sudden spike after improvement:", options: [{ letter: "A", text: "Check for a crisis event and reach out proactively" }, { letter: "B", text: "Ignore it — regression is normal" }, { letter: "C", text: "Wait for the next scheduled session" }], correctLetter: "A", explanation: "Sudden spikes require proactive outreach to check for crisis events. Don't wait for the next session." },
-    ],
-  },
-  "ATMT-7": {
-    title: "Module 7 Quiz",
-    subtitle: "Ethics & professional boundaries",
-    icon: "⚖️",
     accentColor: "#2d8a4e",
     accentLight: "#d4f0de",
     questions: [
-      { id: "q1", text: "When should CBT NOT be used?", options: [{ letter: "A", text: "Patient is in active crisis or acute trauma — stabilize first" }, { letter: "B", text: "Patient has anxiety" }, { letter: "C", text: "Patient is from a different culture" }], correctLetter: "A", explanation: "CBT is not appropriate during active crisis or acute trauma. Stabilization must come first." },
-      { id: "q2", text: "MANAS360's non-negotiable rule for CBT is:", options: [{ letter: "A", text: "Always diagnose quickly" }, { letter: "B", text: "Never use CBT to tell patients their feelings are 'wrong'. Validate first, challenge second" }, { letter: "C", text: "Assign homework every session" }], correctLetter: "B", explanation: "Never use CBT as a weapon. Validate first. Challenge second. Always collaborative." },
+      { id: "q1", text: "What is the PRIMARY purpose of the 5Whys technique in a therapeutic context?", options: [{ letter: "A", text: "To diagnose the patient's disorder within 5 questions" }, { letter: "B", text: "To peel through surface symptoms and reach the emotional root cause through empathic inquiry" }, { letter: "C", text: "To challenge the patient's beliefs and prove them wrong" }, { letter: "D", text: "To complete the intake assessment faster" }], correctLetter: "B", explanation: "Correct. 5Whys is about depth and empathy, not just speed or diagnosis." },
+      { id: "q2", text: "A patient says 'I can't sleep.' Using the 5Whys with empathy, what is the BEST first response?", options: [{ letter: "A", text: "'How many hours do you sleep?' (clinical data collection)" }, { letter: "B", text: "'Have you tried melatonin?' (immediate solution)" }, { letter: "C", text: "'That sounds exhausting. Tell me — when you lie down, what shows up in your mind?' (empathy + first why)" }, { letter: "D", text: "'You need better sleep hygiene.' (prescriptive advice)" }], correctLetter: "C", explanation: "Empathy first, then exploratory inquiry." },
+      { id: "q3", text: "What differentiates Daily Journey mapping from a standard symptom checklist?", options: [{ letter: "A", text: "It is shorter and takes less time" }, { letter: "B", text: "It asks 'Walk me through your day' — uncovering triggers, patterns, and coping in context" }, { letter: "C", text: "It replaces the PHQ-9 entirely" }, { letter: "D", text: "It focuses only on sleep and appetite" }], correctLetter: "B", explanation: "Contextual understanding is key to MANAS360's approach." },
+      { id: "q4", text: "What are 'Projecting Questions' designed to do?", options: [{ letter: "A", text: "Project the therapist's opinion onto the patient" }, { letter: "B", text: "Speed up the session by skipping small talk" }, { letter: "C", text: "Invite the patient to examine their own beliefs and wisdom — 'What would you tell a friend?'" }, { letter: "D", text: "Test whether the patient is being honest" }], correctLetter: "C", explanation: "Empowers the patient to use their own wisdom." },
+      { id: "q5", text: "A patient stops at 'I don't know why I feel this way.' What should you do?", options: [{ letter: "A", text: "End the session and try next week" }, { letter: "B", text: "Tell them they're not trying hard enough" }, { letter: "C", text: "Don't force it. Try lateral entry: 'What do you notice in your body right now?'" }, { letter: "D", text: "Move to a completely different topic" }], correctLetter: "C", explanation: "Lateral entry points bypass cognitive blocks." },
+      { id: "q6", text: "What is Layer 1 of the MANAS360 Empathy Framework?", options: [{ letter: "A", text: "Asking diagnostic questions" }, { letter: "B", text: "Giving advice based on your experience" }, { letter: "C", text: "Validation — acknowledging feelings without judgment" }, { letter: "D", text: "Referring to a psychiatrist immediately" }], correctLetter: "C", explanation: "Validation is always the bedrock." },
+      { id: "q7", text: "If building empathy takes longer than the 5Whys inquiry itself, what does that indicate?", options: [{ letter: "A", text: "You're doing it wrong — empathy should be faster" }, { letter: "B", text: "The patient is being difficult" }, { letter: "C", text: "That's exactly right — trust takes time. A patient who feels truly seen will go deeper" }, { letter: "D", text: "You should skip empathy and jump to questions" }], correctLetter: "C", explanation: "Depth requires trust, which requires felt empathy." },
+      { id: "q8", text: "How does the 5Whys approach relate to CBT?", options: [{ letter: "A", text: "5Whys replaces CBT entirely" }, { letter: "B", text: "They are identical methodologies with different names" }, { letter: "C", text: "CBT focuses on thought patterns; 5Whys first maps the full picture. They complement each other." }, { letter: "D", text: "CBT is evidence-based; 5Whys is not" }], correctLetter: "C", explanation: "They are complementary frameworks." },
+      { id: "q9", text: "What is 'compassionate action' in the Empathy Framework?", options: [{ letter: "A", text: "Solving all the patient's problems immediately" }, { letter: "B", text: "Feeling sorry for the patient and lowering your fees" }, { letter: "C", text: "Moving beyond understanding to collaborative, patient-led solutions that honor autonomy" }, { letter: "D", text: "Referring to another therapist because you feel too involved" }], correctLetter: "C", explanation: "Action must honor patient autonomy." },
     ],
   },
-
-  // ─── NLP PATH ───
-  "ATMT-C1.1": { title: "NLP Sensory Acuity Quiz", subtitle: "Understanding representational systems", icon: "👁️", accentColor: "#1a8a7d", accentLight: "#d5f0ec", questions: [{ id: "q1", text: "The three pillars of NLP are:", options: [{ letter: "A", text: "Mind, Body, Spirit" }, { letter: "B", text: "Neuro, Linguistic, Programming" }, { letter: "C", text: "Think, Act, Feel" }], correctLetter: "B", explanation: "NLP stands for Neuro (brain processing), Linguistic (language shaping reality), Programming (changing patterns)." }, { id: "q2", text: "NLP should NEVER be used to:", options: [{ letter: "A", text: "Build patient confidence" }, { letter: "B", text: "Manipulate patients or override their autonomy" }, { letter: "C", text: "Help change limiting beliefs" }], correctLetter: "B", explanation: "NLP must always be used ethically. Manipulating patients or overriding their autonomy is strictly prohibited." }] },
-  "ATMT-C1.2": { title: "Anchoring Quiz", subtitle: "Creating positive state triggers", icon: "⚓", accentColor: "#1a8a7d", accentLight: "#d5f0ec", questions: [{ id: "q1", text: "What is an Anchor in NLP?", options: [{ letter: "A", text: "A permanent emotional fix" }, { letter: "B", text: "A learned trigger that activates a specific desired emotional state" }, { letter: "C", text: "A physical restraint technique" }], correctLetter: "B", explanation: "Anchors are learned triggers — they can be created, used, and changed. They are NOT permanent or magic." }, { id: "q2", text: "How many times should you repeat an anchor to build it?", options: [{ letter: "A", text: "Once is enough" }, { letter: "B", text: "3-5 times" }, { letter: "C", text: "At least 20 times" }], correctLetter: "B", explanation: "Repeat the anchor process 3-5 times to build a reliable association between the trigger and the desired state." }] },
-  "ATMT-C1.3": { title: "Reframing Quiz", subtitle: "Changing meaning & perspective", icon: "🔄", accentColor: "#1a8a7d", accentLight: "#d5f0ec", questions: [{ id: "q1", text: "The correct way to reframe 'I always fail' is:", options: [{ letter: "A", text: "\"Just think positive!\"" }, { letter: "B", text: "Challenge absolute language: \"Always? Can you think of ONE time you succeeded?\"" }, { letter: "C", text: "\"You're right, you do fail a lot\"" }], correctLetter: "B", explanation: "Challenge absolutes gently, then help create a new frame that acknowledges both setbacks and wins." }] },
-  "ATMT-C2.1": { title: "Pacing & Leading Quiz", subtitle: "Communication matching techniques", icon: "🤝", accentColor: "#1a8a7d", accentLight: "#d5f0ec", questions: [{ id: "q1", text: "Pacing in NLP means:", options: [{ letter: "A", text: "Walking at the same speed as your patient" }, { letter: "B", text: "Matching the other person's communication style to build rapport" }, { letter: "C", text: "Speaking faster than your patient" }], correctLetter: "B", explanation: "Pacing means matching breathing, tempo, and communication style to build deep rapport before leading." }] },
-  "ATMT-C2.2": { title: "Milton Model Quiz", subtitle: "Persuasion & language patterns", icon: "🗣️", accentColor: "#1a8a7d", accentLight: "#d5f0ec", questions: [{ id: "q1", text: "Visualization works because:", options: [{ letter: "A", text: "It's relaxing and distracting" }, { letter: "B", text: "The brain activates similar neural pathways as during actual experience" }, { letter: "C", text: "It only works for creative people" }], correctLetter: "B", explanation: "Research shows the brain activates similar neural pathways during vivid visualization as during real experiences." }] },
-  "ATMT-C4": { title: "Timeline Mapping Quiz", subtitle: "Meta-programs & time perception", icon: "⏳", accentColor: "#1a8a7d", accentLight: "#d5f0ec", questions: [{ id: "q1", text: "The key ethical boundary in NLP practice is:", options: [{ letter: "A", text: "Use any technique that gets results" }, { letter: "B", text: "Always respect patient autonomy — never use NLP to manipulate" }, { letter: "C", text: "Ethics don't apply to NLP" }], correctLetter: "B", explanation: "Ethical NLP practice always respects patient autonomy and informed consent." }] },
-  "ATMT-C5.1": { title: "Strategy Elicitation Quiz", subtitle: "Uncovering motivation strategies", icon: "🧭", accentColor: "#1a8a7d", accentLight: "#d5f0ec", questions: [{ id: "q1", text: "When eliciting a motivation strategy, you map the:", options: [{ letter: "A", text: "Patient's medical history only" }, { letter: "B", text: "VAKOG sequence and decision point" }, { letter: "C", text: "Patient's family tree" }], correctLetter: "B", explanation: "Strategy Elicitation maps the Visual, Auditory, Kinesthetic, Olfactory, Gustatory sequence and the decision trigger." }] },
-  "ATMT-C5.2": { title: "NLP Final Mastery Quiz", subtitle: "Integrating all NLP techniques", icon: "🏆", accentColor: "#1a8a7d", accentLight: "#d5f0ec", questions: [{ id: "q1", text: "A complete NLP behavioral change session should combine:", options: [{ letter: "A", text: "Only Anchoring" }, { letter: "B", text: "Anchoring, Reframing, and Strategy Elicitation together" }, { letter: "C", text: "Medication and NLP" }], correctLetter: "B", explanation: "An integrated session combines Anchoring, Reframing, and Strategy Elicitation for comprehensive behavioral change." }, { id: "q2", text: "NLP is NOT appropriate when:", options: [{ letter: "A", text: "Patient has phobias" }, { letter: "B", text: "Patient is in active psychosis or severe psychiatric crisis" }, { letter: "C", text: "Patient is unmotivated" }], correctLetter: "B", explanation: "NLP requires cognitive engagement. Active psychosis or severe psychiatric crisis requires medical intervention first." }] },
-
-  // ─── EXECUTIVE PATH ───
-  "ATMT-E1": { title: "Aatman Engineering Quiz", subtitle: "Organizational culture & consciousness", icon: "🏢", accentColor: "#7c3aed", accentLight: "#ede5fd", questions: [{ id: "q1", text: "The Aatman Engineering framework is primarily about:", options: [{ letter: "A", text: "Software engineering methodologies" }, { letter: "B", text: "Understanding and transforming organizational culture through consciousness" }, { letter: "C", text: "Financial auditing" }], correctLetter: "B", explanation: "Aatman Engineering integrates consciousness awareness into organizational transformation." }] },
-  "ATMT-E2.1": { title: "Executive Performance Quiz", subtitle: "Mental drivers & flow state", icon: "⚡", accentColor: "#7c3aed", accentLight: "#ede5fd", questions: [{ id: "q1", text: "Flow State in executive performance is achieved when:", options: [{ letter: "A", text: "The executive works 16+ hours daily" }, { letter: "B", text: "Challenge level matches skill level with clear goals and immediate feedback" }, { letter: "C", text: "All distractions are eliminated permanently" }], correctLetter: "B", explanation: "Flow requires the right balance of challenge and skill, with clear goals and immediate feedback loops." }] },
-  "ATMT-E2.2": { title: "Leadership Influence Quiz", subtitle: "Mental blocks & team dynamics", icon: "👥", accentColor: "#7c3aed", accentLight: "#ede5fd", questions: [{ id: "q1", text: "Mental blocks in leadership impact teams by:", options: [{ letter: "A", text: "Having no effect on team performance" }, { letter: "B", text: "Cascading anxiety and avoidance patterns down the organizational hierarchy" }, { letter: "C", text: "Only affecting the leader personally" }], correctLetter: "B", explanation: "Leadership mental blocks cascade through the organization, affecting team dynamics, morale, and performance." }] },
-  "ATMT-E4.1": { title: "Corporate Conflict Resolution Quiz", subtitle: "Mediation tools & techniques", icon: "🤝", accentColor: "#7c3aed", accentLight: "#ede5fd", questions: [{ id: "q1", text: "The first step in corporate conflict mediation is:", options: [{ letter: "A", text: "Taking sides with the more senior person" }, { letter: "B", text: "Creating psychological safety for all parties to express their perspective" }, { letter: "C", text: "Immediately proposing a solution" }], correctLetter: "B", explanation: "Psychological safety must be established before any productive conflict resolution can occur." }] },
-  "ATMT-E4.2": { title: "Emotional Intelligence Dashboard Quiz", subtitle: "EQ metrics for executives", icon: "📊", accentColor: "#7c3aed", accentLight: "#ede5fd", questions: [{ id: "q1", text: "Key EQ metrics for executives include:", options: [{ letter: "A", text: "Only revenue and profit numbers" }, { letter: "B", text: "Self-awareness, empathy, social skills, self-regulation, and motivation" }, { letter: "C", text: "Employee attendance only" }], correctLetter: "B", explanation: "EQ encompasses self-awareness, empathy, social skills, self-regulation, and intrinsic motivation." }] },
-  "ATMT-E4.3": { title: "Executive Crisis Simulation Quiz", subtitle: "Crisis response protocols", icon: "🚨", accentColor: "#7c3aed", accentLight: "#ede5fd", questions: [{ id: "q1", text: "During an organizational crisis, the executive therapist should:", options: [{ letter: "A", text: "Wait for things to settle naturally" }, { letter: "B", text: "Provide immediate emotional stabilization before strategic planning" }, { letter: "C", text: "Focus only on business continuity metrics" }], correctLetter: "B", explanation: "Emotional stabilization must precede strategic planning — people cannot think clearly while in crisis mode." }] },
-  "ATMT-E5": { title: "Strategic Therapy Plan Quiz", subtitle: "Organizational therapy roadmaps", icon: "🗺️", accentColor: "#7c3aed", accentLight: "#ede5fd", questions: [{ id: "q1", text: "A 3-month organizational therapy roadmap should:", options: [{ letter: "A", text: "Focus only on the CEO" }, { letter: "B", text: "Address individual, team, and systemic levels progressively" }, { letter: "C", text: "Replace HR entirely" }], correctLetter: "B", explanation: "Effective organizational therapy addresses individual healing, team dynamics, and systemic change progressively." }] },
-  "ATMT-E6": { title: "Executive Final Mastery Quiz", subtitle: "Comprehensive executive therapy assessment", icon: "🏆", accentColor: "#7c3aed", accentLight: "#ede5fd", questions: [{ id: "q1", text: "Mental health is the cornerstone of corporate leadership because:", options: [{ letter: "A", text: "It's a trending HR topic" }, { letter: "B", text: "Leaders' mental states directly determine organizational culture, productivity, and innovation" }, { letter: "C", text: "It's legally required" }], correctLetter: "B", explanation: "A leader's mental wellness cascades through every decision, interaction, and cultural norm in the organization." }, { id: "q2", text: "The integration of Western psychology and Eastern wisdom in executive therapy:", options: [{ letter: "A", text: "Is contradictory and shouldn't be attempted" }, { letter: "B", text: "Creates a holistic framework that addresses both cognitive and spiritual dimensions of leadership" }, { letter: "C", text: "Only works for Indian executives" }], correctLetter: "B", explanation: "Integrating both traditions creates a comprehensive approach addressing cognitive, emotional, and spiritual dimensions." }] },
-
-  // ─── PSYCHOLOGIST PATH ───
-  "ATMT-P5.1": { title: "Clinical Intake Quiz", subtitle: "Patient assessment fundamentals", icon: "📋", accentColor: "#d97706", accentLight: "#fef0d5", questions: [{ id: "q1", text: "The CBT triangle connects:", options: [{ letter: "A", text: "Doctor, Patient, Medicine" }, { letter: "B", text: "Thoughts → Feelings → Behaviors" }, { letter: "C", text: "Past, Present, Future" }], correctLetter: "B", explanation: "The CBT triangle shows how Thoughts trigger Feelings which drive Behaviors — and we intervene at the thought level." }, { id: "q2", text: "In a clinical intake, the priority is to:", options: [{ letter: "A", text: "Diagnose immediately" }, { letter: "B", text: "Build rapport and identify red flags while gathering comprehensive history" }, { letter: "C", text: "Prescribe medication" }], correctLetter: "B", explanation: "Intake requires building trust, identifying safety concerns, and gathering a thorough clinical picture." }] },
-  "ATMT-P5.2": { title: "CBT Thought Records Quiz", subtitle: "Good vs bad CBT practice", icon: "💭", accentColor: "#d97706", accentLight: "#fef0d5", questions: [{ id: "q1", text: "When a patient says 'I feel worthless', bad CBT would be:", options: [{ letter: "A", text: "\"That sounds really painful. When did you start feeling this way?\"" }, { letter: "B", text: "\"Well, that's just a cognitive distortion. Let's challenge it.\"" }, { letter: "C", text: "\"Let's look at evidence together\"" }], correctLetter: "B", explanation: "Immediately labeling a feeling as a 'cognitive distortion' dismisses the patient. Validate first, challenge second." }, { id: "q2", text: "Good CBT thought records are:", options: [{ letter: "A", text: "Homework punishment for patients" }, { letter: "B", text: "Collaborative exploration of evidence for and against thoughts" }, { letter: "C", text: "Only for severe cases" }], correctLetter: "B", explanation: "Thought records should feel collaborative — not like being corrected. Patient feels heard throughout." }] },
-  "ATMT-P5.3": { title: "Therapeutic Bond Quiz", subtitle: "Alliance building & transference", icon: "🤝", accentColor: "#d97706", accentLight: "#fef0d5", questions: [{ id: "q1", text: "When handling transference, the psychologist should:", options: [{ letter: "A", text: "Ignore it completely" }, { letter: "B", text: "Recognize it, explore it therapeutically, and maintain appropriate boundaries" }, { letter: "C", text: "Terminate the relationship immediately" }], correctLetter: "B", explanation: "Transference is a therapeutic tool when handled skillfully — it reveals the patient's relational patterns." }] },
-  "ATMT-P5.4": { title: "Clinical Final Evaluation Quiz", subtitle: "Comprehensive clinical assessment", icon: "🏆", accentColor: "#d97706", accentLight: "#fef0d5", questions: [{ id: "q1", text: "CBT is NOT appropriate when:", options: [{ letter: "A", text: "Patient is in active crisis or acute trauma — stabilize first" }, { letter: "B", text: "Patient has anxiety" }, { letter: "C", text: "Patient is from a different culture" }], correctLetter: "A", explanation: "During active crisis, the priority is stabilization and safety — not cognitive restructuring." }, { id: "q2", text: "Culturally-adapted CBT for Indian patients should consider:", options: [{ letter: "A", text: "Ignoring cultural context entirely" }, { letter: "B", text: "Family dynamics, collectivism, spiritual beliefs, and stigma around mental health" }, { letter: "C", text: "Using only Western frameworks" }], correctLetter: "B", explanation: "Indian cultural context — family systems, collectivism, spirituality — must inform how CBT is delivered." }] },
-
-  // ─── PSYCHIATRIST PATH ───
-  "ATMT-MD1.1": { title: "Psychopharmacology Quiz", subtitle: "Medication mechanisms & classes", icon: "💊", accentColor: "#d64045", accentLight: "#fce4e4", questions: [{ id: "q1", text: "SSRIs primarily work by:", options: [{ letter: "A", text: "Blocking dopamine receptors" }, { letter: "B", text: "Inhibiting serotonin reuptake at the synaptic cleft" }, { letter: "C", text: "Increasing GABA activity" }], correctLetter: "B", explanation: "SSRIs (Selective Serotonin Reuptake Inhibitors) increase serotonin availability by blocking its reuptake." }] },
-  "ATMT-MD1.2": { title: "DSM-5 Diagnosis Quiz", subtitle: "Differential diagnosis skills", icon: "📖", accentColor: "#d64045", accentLight: "#fce4e4", questions: [{ id: "q1", text: "Differential diagnosis requires:", options: [{ letter: "A", text: "Picking the first diagnosis that fits" }, { letter: "B", text: "Systematically considering and ruling out alternative diagnoses" }, { letter: "C", text: "Using only patient self-report" }], correctLetter: "B", explanation: "Differential diagnosis requires careful consideration of all possible conditions, ruling out systematically." }] },
-  "ATMT-MD1.3": { title: "Clinical Documentation Quiz", subtitle: "Chart entries & standards", icon: "📝", accentColor: "#d64045", accentLight: "#fce4e4", questions: [{ id: "q1", text: "A clinical chart entry for Bipolar I must include:", options: [{ letter: "A", text: "Only the diagnosis code" }, { letter: "B", text: "Presenting symptoms, clinical assessment, treatment plan, and risk factors" }, { letter: "C", text: "Just medication prescribed" }], correctLetter: "B", explanation: "Complete documentation requires symptoms, assessment, plan, and risk factors for continuity of care." }] },
-  "ATMT-MD2.1": { title: "Risk Assessment Quiz", subtitle: "SLAP assessment & safety planning", icon: "🚨", accentColor: "#d64045", accentLight: "#fce4e4", questions: [{ id: "q1", text: "SLAP in suicide risk assessment stands for:", options: [{ letter: "A", text: "Sleep, Lifestyle, Activity, Purpose" }, { letter: "B", text: "Specificity, Lethality, Availability, Proximity" }, { letter: "C", text: "Screening, Labeling, Assessing, Planning" }], correctLetter: "B", explanation: "SLAP: Specificity of plan, Lethality of method, Availability of means, Proximity to help/rescue." }] },
-  "ATMT-MD2.2": { title: "Medication Monitoring Quiz", subtitle: "Blood work & therapeutic levels", icon: "🔬", accentColor: "#d64045", accentLight: "#fce4e4", questions: [{ id: "q1", text: "Lithium monitoring requires:", options: [{ letter: "A", text: "No blood work needed" }, { letter: "B", text: "Regular serum levels, renal function, and thyroid function tests" }, { letter: "C", text: "Only checking blood pressure" }], correctLetter: "B", explanation: "Lithium has a narrow therapeutic window — regular monitoring of serum levels, kidney, and thyroid is critical." }] },
-  "ATMT-MD2.3": { title: "Adverse Reactions Quiz", subtitle: "Emergency protocols", icon: "⚠️", accentColor: "#d64045", accentLight: "#fce4e4", questions: [{ id: "q1", text: "Serotonin Syndrome presents with:", options: [{ letter: "A", text: "Only drowsiness" }, { letter: "B", text: "Agitation, hyperthermia, clonus, and autonomic instability" }, { letter: "C", text: "No symptoms — it's asymptomatic" }], correctLetter: "B", explanation: "Serotonin Syndrome is a medical emergency with agitation, high fever, muscle rigidity, and autonomic dysfunction." }] },
-  "ATMT-MD3.1": { title: "Neuropsychiatry Quiz", subtitle: "Inflammation & depression link", icon: "🧬", accentColor: "#d64045", accentLight: "#fce4e4", questions: [{ id: "q1", text: "The link between chronic inflammation and depression suggests:", options: [{ letter: "A", text: "Depression is purely psychological" }, { letter: "B", text: "Inflammatory cytokines can drive neuroinflammation contributing to depressive symptoms" }, { letter: "C", text: "Anti-inflammatory drugs replace antidepressants" }], correctLetter: "B", explanation: "Research shows inflammatory cytokines can cross the blood-brain barrier and contribute to depression pathophysiology." }] },
-  "ATMT-MD3.2": { title: "Geriatric Mental Health Quiz", subtitle: "Treating elderly patients", icon: "👴", accentColor: "#d64045", accentLight: "#fce4e4", questions: [{ id: "q1", text: "Adjusting treatment for elderly patients requires:", options: [{ letter: "A", text: "Using the same doses as younger adults" }, { letter: "B", text: "Lower starting doses, monitoring for drug interactions, and considering comorbidities" }, { letter: "C", text: "Avoiding all medications" }], correctLetter: "B", explanation: "Elderly patients need 'start low, go slow' dosing with careful attention to polypharmacy and comorbidities." }] },
-  "ATMT-MD3.3": { title: "Pediatric Assessment Quiz", subtitle: "ADHD diagnosis in children", icon: "👶", accentColor: "#d64045", accentLight: "#fce4e4", questions: [{ id: "q1", text: "Diagnosing ADHD in children under 6 requires:", options: [{ letter: "A", text: "A single questionnaire" }, { letter: "B", text: "Multiple informant reports, behavioral observation, and careful developmental consideration" }, { letter: "C", text: "Only parental report" }], correctLetter: "B", explanation: "Young children need comprehensive multi-source assessment — developmental norms must be carefully considered." }] },
-  "ATMT-MD4.1": { title: "Integrative Psychiatry Quiz", subtitle: "Lifestyle & complementary approaches", icon: "🌿", accentColor: "#d64045", accentLight: "#fce4e4", questions: [{ id: "q1", text: "Integrative psychiatry combines:", options: [{ letter: "A", text: "Only traditional medicine" }, { letter: "B", text: "Evidence-based pharmacology with diet, exercise, and lifestyle modifications" }, { letter: "C", text: "Only alternative medicine" }], correctLetter: "B", explanation: "Integrative approaches complement medication with evidence-based lifestyle interventions — not replace them." }] },
-  "ATMT-MD4.2": { title: "SUD Treatment Quiz", subtitle: "Opioid use disorder protocols", icon: "💉", accentColor: "#d64045", accentLight: "#fce4e4", questions: [{ id: "q1", text: "A 90-day OUD treatment plan should include:", options: [{ letter: "A", text: "Only detox" }, { letter: "B", text: "Medical detox, maintenance therapy (e.g., buprenorphine), and psychosocial support" }, { letter: "C", text: "Only counseling" }], correctLetter: "B", explanation: "Comprehensive OUD treatment requires medication-assisted treatment plus robust psychosocial rehabilitation." }] },
-  "ATMT-MD4.3": { title: "Forensic Ethics Quiz", subtitle: "Confidentiality vs. public safety", icon: "⚖️", accentColor: "#d64045", accentLight: "#fce4e4", questions: [{ id: "q1", text: "The Tarasoff Rule states that:", options: [{ letter: "A", text: "Patient confidentiality is absolute" }, { letter: "B", text: "Therapists have a duty to warn identifiable potential victims of a patient's serious threats" }, { letter: "C", text: "Only police can break confidentiality" }], correctLetter: "B", explanation: "Tarasoff established the duty to protect — confidentiality must yield when there's a credible threat to an identifiable victim." }] },
-  "ATMT-MD6": { title: "Psychiatrist Final Mastery Quiz", subtitle: "Comprehensive psychiatric assessment", icon: "🏆", accentColor: "#d64045", accentLight: "#fce4e4", questions: [{ id: "q1", text: "Personalized psychiatric medicine means:", options: [{ letter: "A", text: "Every patient gets the same treatment" }, { letter: "B", text: "Treatment tailored to genetics, biomarkers, lifestyle, and individual patient response" }, { letter: "C", text: "Patients choose their own treatment" }], correctLetter: "B", explanation: "Personalized medicine considers genetic, biological, psychological, and social factors for individualized treatment." }, { id: "q2", text: "The future of psychiatry integrates:", options: [{ letter: "A", text: "Only medication" }, { letter: "B", text: "Pharmacogenomics, digital health tools, psychotherapy, and holistic well-being" }, { letter: "C", text: "Only AI-based diagnosis" }], correctLetter: "B", explanation: "Modern psychiatry is evolving toward integration of precision medicine, technology, therapy, and whole-person care." }] },
-
-  // ─── ASHA PATH ───
-  "ATMT-ASHA": {
-    title: "ASHA Training Quiz",
-    subtitle: "Mental Wellness Champion fundamentals",
+  "psychologist": {
+    title: "Certified Psychologist",
+    subtitle: "Clinical assessment, evidence-based therapy, and regulatory context",
+    icon: "🎓",
+    accentColor: "#f59e0b",
+    accentLight: "#fef3c7",
+    questions: [
+      { id: "q1", text: "Under RCI guidelines, what is the minimum qualification required to practice clinical psychology in India?", options: [{ letter: "A", text: "BA Psychology with 1 year experience" }, { letter: "B", text: "MA Clinical Psychology (post NEP 2020) or M.Phil Clinical Psychology (pre-NEP)" }, { letter: "C", text: "Any psychology degree with a private certification" }, { letter: "D", text: "MD Psychiatry" }], correctLetter: "B", explanation: "Follows current Indian regulatory standards." },
+      { id: "q2", text: "A patient scores 18 on the PHQ-9. What does this indicate and what is the appropriate action?", options: [{ letter: "A", text: "Mild depression — reassure and schedule a follow-up in 4 weeks" }, { letter: "B", text: "No clinical significance — no action needed" }, { letter: "C", text: "Moderately severe depression — initiate evidence-based therapy and consider referral" }, { letter: "D", text: "The patient is faking symptoms" }], correctLetter: "C", explanation: "18 indicates moderately severe depression on the PHQ-9 scale." },
+      { id: "q3", text: "When is it ethically MANDATORY to break confidentiality under Indian law?", options: [{ letter: "A", text: "When the patient's family requests information" }, { letter: "B", text: "When you think it would help the patient's recovery" }, { letter: "C", text: "When there is imminent risk of harm to self or others, child abuse, or court order" }, { letter: "D", text: "Whenever a corporate HR department asks for data" }], correctLetter: "C", explanation: "Duty to protect overrides confidentiality in these specific cases." },
+      { id: "q4", text: "What is the difference between CBT and DBT in clinical application?", options: [{ letter: "A", text: "There is no difference" }, { letter: "B", text: "CBT targets dysfunctional thoughts; DBT adds distress tolerance and mindfulness" }, { letter: "C", text: "DBT is only for substance abuse; CBT is for everything else" }, { letter: "D", text: "CBT is evidence-based; DBT is experimental" }], correctLetter: "B", explanation: "DBT is a dialectal expansion of CBT." },
+      { id: "q5", text: "A patient presents with trauma symptoms. What should you assess BEFORE starting trauma-focused therapy?", options: [{ letter: "A", text: "Their income level" }, { letter: "B", text: "Nothing — start EMDR immediately" }, { letter: "C", text: "Safety and stabilization: current suicidality, substance use, and window of tolerance" }, { letter: "D", text: "Whether they have insurance coverage" }], correctLetter: "C", explanation: "Safety first. You cannot process trauma in an unstable patient." },
+      { id: "q6", text: "Under DPDPA 2023, what are a patient's data rights on digital therapy platforms?", options: [{ letter: "A", text: "The platform owns all patient data" }, { letter: "B", text: "Access, correction, erasure, and portability. Consent can be withdrawn." }, { letter: "C", text: "Data rights only apply to government hospitals" }, { letter: "D", text: "Patients have no rights once they accept terms" }], correctLetter: "B", explanation: "Aligned with new Indian data protection regulations." },
+      { id: "q7", text: "What is the therapeutic alliance and why does research show it matters more than technique?", options: [{ letter: "A", text: "It's a legal agreement" }, { letter: "B", text: "The quality of the collaborative bond. Accounts for ~30% of therapy outcomes." }, { letter: "C", text: "It's a marketing term with no evidence" }, { letter: "D", text: "It only matters in psychodynamic therapy" }], correctLetter: "B", explanation: "The relationship is the primary vehicle of change." },
+      { id: "q8", text: "A patient asks you to prescribe medication for anxiety. What is the correct response as a psychologist?", options: [{ letter: "A", text: "Prescribe a low-dose SSRI" }, { letter: "B", text: "Tell them medication is unnecessary" }, { letter: "C", text: "Explain that psychologists cannot prescribe in India and offer to coordinate with a psychiatrist" }, { letter: "D", text: "Refer them to a pharmacy" }], correctLetter: "C", explanation: "Clear professional boundaries in the Indian medical context." },
+      { id: "q9", text: "What does NEP 2020 change for psychology training in India?", options: [{ letter: "A", text: "Nothing" }, { letter: "B", text: "M.Phil Clinical Psychology transitions to integrated MA Clinical Psychology programs" }, { letter: "C", text: "Psychology is removed from university curricula" }, { letter: "D", text: "Only NIMHANS can grant psychology degrees" }], correctLetter: "B", explanation: "The new regulatory path under NEP 2020." },
+    ],
+  },
+  "psychiatrist": {
+    title: "Certified Psychiatrist",
+    subtitle: "Psychopharmacology and collaborative care",
+    icon: "⚕️",
+    accentColor: "#ef4444",
+    accentLight: "#fee2e2",
+    questions: [
+      { id: "q1", text: "Under NMC guidelines, what is required to practice psychiatry and prescribe in India?", options: [{ letter: "A", text: "MBBS with a mental health certificate" }, { letter: "B", text: "MD/DNB Psychiatry with active NMC registration" }, { letter: "C", text: "Any medical degree with 2 years experience" }, { letter: "D", text: "M.Phil Clinical Psychology" }], correctLetter: "B", explanation: "Strict medical qualification requirements." },
+      { id: "q2", text: "A patient on SSRIs for 3 weeks reports no improvement. What is the appropriate clinical decision?", options: [{ letter: "A", text: "Switch class immediately" }, { letter: "B", text: "Wait 4-6 weeks for full effect. Assess side effects and reinforce adherence." }, { letter: "C", text: "Double the dose immediately" }, { letter: "D", text: "Add a benzodiazepine" }], correctLetter: "B", explanation: "Wait for clinical response time." },
+      { id: "q3", text: "What is the key risk when a depressed patient suddenly appears 'much better' shortly after starting antidepressants?", options: [{ letter: "A", text: "No risk" }, { letter: "B", text: "Energy returns before mood lifts, increasing motivation for suicidal ideation" }, { letter: "C", text: "The patient is faking improvement" }, { letter: "D", text: "Indicates a misdiagnosis" }], correctLetter: "B", explanation: "Critical window for suicide risk." },
+      { id: "q4", text: "On a telepsychiatry platform like MANAS360, what is NOT appropriate for remote consultation?", options: [{ letter: "A", text: "Medication review for stable patients" }, { letter: "B", text: "Initial assessment for acute psychosis with immediate safety concerns" }, { letter: "C", text: "Follow-up for depression management" }, { letter: "D", text: "Psychoeducation for family members" }], correctLetter: "B", explanation: "Safety and physical exam requirements." },
+      { id: "q5", text: "A corporate executive presents with chronic insomnia and requests 'something to help me sleep.' What is the BEST approach?", options: [{ letter: "A", text: "Prescribe zolpidem immediately" }, { letter: "B", text: "Rule out underlying conditions, assess sleep hygiene, and consider CBT-I as first line" }, { letter: "C", text: "Recommend OTC melatonin" }, { letter: "D", text: "Tell them it's not a real condition" }], correctLetter: "B", explanation: "Holistic assessment before prescription." },
+      { id: "q6", text: "What is the psychiatrist's role in a collaborative care model with psychologists on MANAS360?", options: [{ letter: "A", text: "Psychiatrists handle everything" }, { letter: "B", text: "Focus on diagnosis and medication, while psychologists handle therapy. Coordinate care." }, { letter: "C", text: "Psychologist decides medication" }, { letter: "D", text: "They should never communicate" }], correctLetter: "B", explanation: "Interdisciplinary collaboration is the gold standard." },
+      { id: "q7", text: "A patient on lithium for bipolar disorder says 'I feel great, I want to stop medication.' What is the response?", options: [{ letter: "A", text: "Agree — medication no longer needed" }, { letter: "B", text: "Explain that feeling great IS the medication working. Abrupt stop risks manic relapse." }, { letter: "C", text: "Double the dose" }, { letter: "D", text: "Switch to an antidepressant" }], correctLetter: "B", explanation: "Maintenance education is vital." },
+      { id: "q8", text: "Under the Mental Healthcare Act 2017 (India), what right does every patient have?", options: [{ letter: "A", text: "Right to free medication from any hospital" }, { letter: "B", text: "Right to access care, make an advance directive, and no cruel treatment." }, { letter: "C", text: "Right to choose their own diagnosis" }, { letter: "D", text: "Right to unlimited hospital stay" }], correctLetter: "B", explanation: "Fundamental rights under the MHCA." },
+      { id: "q9", text: "What is serotonin syndrome and when should a psychiatrist suspect it?", options: [{ letter: "A", text: "Marketing term" }, { letter: "B", text: "Agitation, hyperthermia, clonus — from excessive serotonergic activity/interactions" }, { letter: "C", text: "Common condition that resolves alone" }, { letter: "D", text: "Only with illegal drugs" }], correctLetter: "B", explanation: "Emergency awareness." },
+    ],
+  },
+  "nlp_nac": {
+    title: "Certified NLP-NAC Coach",
+    subtitle: "Neuro-Linguistic Programming and Anchoring",
+    icon: "🧬",
+    accentColor: "#10b981",
+    accentLight: "#d1fae5",
+    questions: [
+      { id: "q1", text: "What does NLP stand for and what is its core premise?", options: [{ letter: "A", text: "Natural Language Processing — AI technology" }, { letter: "B", text: "Neuro-Linguistic Programming — language shapes neurology and drives behavior" }, { letter: "C", text: "Neurological Learning Practice" }, { letter: "D", text: "Non-Linear Psychology" }], correctLetter: "B", explanation: "Core NLP definition." },
+      { id: "q2", text: "What is 'anchoring' in NLP and how would you use it for performance anxiety?", options: [{ letter: "A", text: "Imagine they're on a boat" }, { letter: "B", text: "Associating a physical trigger with a peak confident state" }, { letter: "C", text: "Anchoring them to their desk" }, { letter: "D", text: "A technique for client commitment" }], correctLetter: "B", explanation: "State modulation via triggers." },
+      { id: "q3", text: "In Tony Robbins' Neuro-Associative Conditioning (NAC), what are the two forces driving behavior?", options: [{ letter: "A", text: "Logic and emotion" }, { letter: "B", text: "Desire to gain pleasure and desire to avoid pain" }, { letter: "C", text: "Money and status" }, { letter: "D", text: "Fear and love" }], correctLetter: "B", explanation: "The pain-pleasure principle." },
+      { id: "q4", text: "A client says 'I always fail at everything.' What NLP technique is MOST appropriate?", options: [{ letter: "A", text: "Agree to build rapport" }, { letter: "B", text: "Reframing — challenge the generalization" }, { letter: "C", text: "Ignore it" }, { letter: "D", text: "Repeat positive affirmations" }], correctLetter: "B", explanation: "Breaking limiting language patterns." },
+      { id: "q5", text: "What is a 'pattern interrupt' and when do you use it?", options: [{ letter: "A", text: "Interrupting to assert dominance" }, { letter: "B", text: "Breaking a loop by introducing an unexpected stimulus" }, { letter: "C", text: "A scheduling technique" }, { letter: "D", text: "Way to end sessions early" }], correctLetter: "B", explanation: "Physiological state change." },
+      { id: "q6", text: "What is the NLP 'Meta Model' used for?", options: [{ letter: "A", text: "Business model" }, { letter: "B", text: "Language patterns that challenge deletions, distortions, and generalizations" }, { letter: "C", text: "Social media marketing" }, { letter: "D", text: "Diagnostic tool like DSM" }], correctLetter: "B", explanation: "Linguistic precision tool." },
+      { id: "q7", text: "In NAC, what are the 6 steps to lasting change?", options: [{ letter: "A", text: "Plan, Execute, Review, Repeat" }, { letter: "B", text: "Link pain to not changing, pleasure to change, interrupt old pattern, create new one" }, { letter: "C", text: "Set goals, Track, Reward" }, { letter: "D", text: "Identify, Blame, Accept, Move on" }], correctLetter: "B", explanation: "Sequential NAC methodology." },
+      { id: "q8", text: "What is the ethical boundary between NLP coaching and clinical therapy?", options: [{ letter: "A", text: "No boundary" }, { letter: "B", text: "Coaches work with goals/behavior; Clinical disorders require licensed therapists" }, { letter: "C", text: "NLP has replaced therapy" }, { letter: "D", text: "Difference in pricing" }], correctLetter: "B", explanation: "Critical professional boundaries." },
+      { id: "q9", text: "A client wants to overcome a phobia. Which NLP technique is specifically designed for this?", options: [{ letter: "A", text: "Sticky notes" }, { letter: "B", text: "Fast Phobia Cure (Visual-Kinesthetic Dissociation)" }, { letter: "C", text: "Exposure therapy" }, { letter: "D", text: "Hypnosis" }], correctLetter: "B", explanation: "Specific NLP protocol for phobias." },
+    ],
+  },
+  "executive_nri": {
+    title: "Certified Executive-NRI Therapist",
+    subtitle: "High-performance coaching and cross-cultural therapy",
+    icon: "🌏",
+    accentColor: "#6d28d9",
+    accentLight: "#ede9fe",
+    questions: [
+      { id: "q1", text: "An NRI client in the US contacts MANAS360. What jurisdiction and compliance rules apply?", options: [{ letter: "A", text: "US HIPAA rules" }, { letter: "B", text: "Indian jurisdiction (Bengaluru), DPDPA 2023, INR payments" }, { letter: "C", text: "Strictest of both countries" }, { letter: "D", text: "No rules apply" }], correctLetter: "B", explanation: "Adheres to platform compliance standards." },
+      { id: "q2", text: "What is 'Third Culture Identity Crisis' common among NRI clients?", options: [{ letter: "A", text: "DSM-5 disorder" }, { letter: "B", text: "Tension of belonging fully to neither home nor adopted country" }, { letter: "C", text: "Travel term" }, { letter: "D", text: "Marketing term" }], correctLetter: "B", explanation: "Core diaspora psychological challenge." },
+      { id: "q3", text: "An executive says 'I can't show weakness — my team will lose respect.' What approach is BEST?", options: [{ letter: "A", text: "Agree — show no vulnerability" }, { letter: "B", text: "Explore the belief and reframe vulnerability as leadership strength" }, { letter: "C", text: "Tell them to quit" }, { letter: "D", text: "Prescribe medication" }], correctLetter: "B", explanation: "Executive coaching mindset shift." },
+      { id: "q4", text: "On MANAS360, what does the HR dashboard show for corporate EAP programs?", options: [{ letter: "A", text: "Individual names and notes" }, { letter: "B", text: "Anonymous aggregate data only — total sessions and trends" }, { letter: "C", text: "Real-time video feeds" }, { letter: "D", text: "Attendance records" }], correctLetter: "B", explanation: "Privacy and compliance." },
+      { id: "q5", text: "A Silicon Valley NRI client wants sessions at 11 PM IST. How is this matched?", options: [{ letter: "A", text: "Client must adjust to IST business hours" }, { letter: "B", text: "Region-locked matching to shift-pool therapists (e.g., 9PM-1AM pools)" }, { letter: "C", text: "All sessions 9-6 IST" }, { letter: "D", text: "No support" }], correctLetter: "B", explanation: "Timezone optimized matching." },
+      { id: "q6", text: "What is 'burnout' (ICD-11) and how does it differ from depression?", options: [{ letter: "A", text: "They are the same" }, { letter: "B", text: "Burnout is occupational phenomenon; Depression is clinical disorder affecting all domains" }, { letter: "C", text: "Burnout is more serious" }, { letter: "D", text: "Not recognized" }], correctLetter: "B", explanation: "WHO classification standards." },
+      { id: "q7", text: "An NRI's Indian parent is pressuring about marriage. Client feels guilty. Approach?", options: [{ letter: "A", text: "Ignore parents" }, { letter: "B", text: "Parents are right" }, { letter: "C", text: "Acknowledge cultural weight; help client find their own answer" }, { letter: "D", text: "Refer to family therapist" }], correctLetter: "C", explanation: "Culturally sensitive therapy." },
+      { id: "q8", text: "What session formats/pricing apply to executive-NRI on MANAS360?", options: [{ letter: "A", text: "In-person at ₹5,000" }, { letter: "B", text: "Audio (₹1,499) or Video (₹1,649). 60/40 revenue split." }, { letter: "C", text: "Free unlimited" }, { letter: "D", text: "WhatsApp only" }], correctLetter: "B", explanation: "Platform pricing transparency." },
+      { id: "q9", text: "A corporate partnership for 5,000 employees satisfies which compliances?", options: [{ letter: "A", text: "Only CSR Section 135" }, { letter: "B", text: "DPDPA, NMC/RCI, POSH Act, OSH Act, and CSR Section 135" }, { letter: "C", text: "No compliance" }, { letter: "D", text: "Only DPDPA" }], correctLetter: "B", explanation: "Comprehensive platform compliance." },
+    ],
+  },
+  "asha": {
+    title: "Certified ASHA Mental Wellness Champion",
+    subtitle: "Frontline psychosocial support for community wellness",
     icon: "🌟",
     accentColor: "#f59e0b",
     accentLight: "#fef3c7",
     questions: [
-      { id: "q1", text: "As an ASHA Mental Wellness Champion, your primary role is to:", options: [{ letter: "A", text: "Diagnose and prescribe medication for mental illnesses" }, { letter: "B", text: "Provide psychosocial support, identify early signs of distress, and facilitate referrals" }, { letter: "C", text: "Perform clinical psychotherapy sessions" }], correctLetter: "B", explanation: "ASHA workers act as frontline community support, identifying distress and connecting individuals to professional care when needed." },
-      { id: "q2", text: "When approaching mental wellness in rural communities, the most effective strategy is:", options: [{ letter: "A", text: "Using complex clinical terminology" }, { letter: "B", text: "Integrating awareness into existing community gatherings and using culturally relatable language" }, { letter: "C", text: "Waiting for individuals to come to the clinic" }], correctLetter: "B", explanation: "Community mental health relies on meeting people where they are and using language that resonates with local cultural contexts." },
-    ],
-  },
+      { id: "q1", text: "As an ASHA Mental Wellness Champion, your primary role is to:", options: [{ letter: "A", text: "Diagnose and prescribe medication" }, { letter: "B", text: "Provide psychosocial support and facilitate referrals" }, { letter: "C", text: "Perform clinical psychotherapy" }], correctLetter: "B", explanation: "Support and referral focus." },
+      { id: "q2", text: "When approaching rural communities, the most effective strategy is:", options: [{ letter: "A", text: "Use clinical terminology" }, { letter: "B", text: "Integrate into gatherings using relatable language" }, { letter: "C", text: "Wait for them to come to clinic" }], correctLetter: "B", explanation: "Relatable language is key." },
+    ]
+  }
 };
 
 /* ──────────────────────────────────────────────────────────
@@ -184,7 +142,7 @@ const QUIZ_DATA: Record<string, ModuleQuiz> = {
 export const CertificationQuizPage: React.FC = () => {
   const { enrollmentId } = useParams<{ enrollmentId: string }>();
   const navigate = useNavigate();
-  const { enrollments } = useEnrollmentStore();
+  const { enrollments, updateProgress } = useEnrollmentStore();
 
   const enrollment = useMemo(() =>
     enrollments.find((e: any) => e.id === enrollmentId),
@@ -193,37 +151,32 @@ export const CertificationQuizPage: React.FC = () => {
 
   const certName = enrollment?.certificationName || "Certified Practitioner";
 
-  // Build the combined quiz dynamically based on the certification modules
+  // New logic: Match certification slug to track ID
+  const trackId = useMemo(() => {
+    if (!enrollment?.slug) return "5whys";
+    if (enrollment.slug === "certified-practitioner") return "5whys";
+    if (enrollment.slug === "certified-psychologist") return "psychologist";
+    if (enrollment.slug === "certified-psychiatrist") return "psychiatrist";
+    if (enrollment.slug === "certified-nlp-therapist") return "nlp_nac";
+    if (enrollment.slug === "certified-executive-therapist") return "executive_nri";
+    if (enrollment.slug === "certified-asha-mental-wellness-champion") return "asha";
+    return "5whys";
+  }, [enrollment?.slug]);
+
   const quiz = useMemo(() => {
-    const modules = getModulesByCertification(certName);
-
-    let allQuestions: QuizQuestion[] = [];
-    modules.forEach(m => {
-      const moduleQuiz = QUIZ_DATA[m.id];
-      if (moduleQuiz && moduleQuiz.questions) {
-        allQuestions = [...allQuestions, ...moduleQuiz.questions];
-      }
-    });
-
-    if (allQuestions.length === 0) return null;
-
-    const uniqueQuestions = Array.from(new Map(allQuestions.map(q => [q.text, q])).values());
-    const finalQuestions = uniqueQuestions.map((q, idx) => ({ ...q, id: `q${idx}` }));
-
-    const firstQuiz = QUIZ_DATA[modules[0]?.id] || QUIZ_DATA["ATMT-OPENING"];
+    const trackQuiz = QUIZ_DATA[trackId];
+    if (!trackQuiz) return null;
 
     return {
-      title: `${certName} Final Quiz`,
-      subtitle: "Comprehensive assessment covering all modules for this certification",
-      icon: "🎓",
-      accentColor: firstQuiz?.accentColor || "#4361ee",
-      accentLight: firstQuiz?.accentLight || "#dfe6fd",
-      questions: finalQuestions
+      ...trackQuiz,
+      questions: trackQuiz.questions.map((q, idx) => ({ ...q, id: `q${idx}` }))
     };
-  }, [certName]);
+  }, [trackId]);
 
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
+  const [claimingCertificate, setClaimingCertificate] = useState(false);
+  const [claimError, setClaimError] = useState<string | null>(null);
 
   const questions = quiz?.questions || [];
   const totalQuestions = questions.length;
@@ -234,7 +187,8 @@ export const CertificationQuizPage: React.FC = () => {
   }, [submitted, answers, questions]);
 
   const percentage = totalQuestions > 0 ? Math.round((score / totalQuestions) * 100) : 0;
-  const passed = percentage >= 85;
+  // Rule: 7/9 correct (78%)
+  const passed = totalQuestions === 9 ? score >= 7 : percentage >= 78;
 
   if (!quiz) {
     return (
@@ -242,7 +196,7 @@ export const CertificationQuizPage: React.FC = () => {
         <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-100 text-center max-w-md">
           <div className="text-4xl mb-4">📝</div>
           <h2 className="text-xl font-bold text-slate-900 font-serif mb-2">Quiz Not Available</h2>
-          <p className="text-slate-500 text-sm mb-6">No quiz has been configured for this module yet.</p>
+          <p className="text-slate-500 text-sm mb-6">No quiz has been configured for this certification yet.</p>
           <button
             onClick={() => navigate(-1)}
             className="px-6 py-3 bg-slate-900 text-white font-bold text-sm rounded-full hover:bg-slate-800 transition"
@@ -270,6 +224,24 @@ export const CertificationQuizPage: React.FC = () => {
   const handleRetry = () => {
     setAnswers({});
     setSubmitted(false);
+    setClaimError(null);
+  };
+
+  const handleClaimCertificate = async () => {
+    if (!passed || !enrollmentId || !enrollment?.slug) return;
+
+    setClaimError(null);
+    setClaimingCertificate(true);
+
+    try {
+      await completeCertification(enrollment.slug);
+      updateProgress(enrollmentId, 100);
+      navigate(`/certifications/certificate/${enrollmentId}`);
+    } catch {
+      setClaimError("Unable to finalize certification right now. Please try again.");
+    } finally {
+      setClaimingCertificate(false);
+    }
   };
 
   const getOptionStyle = (q: QuizQuestion, letter: string) => {
@@ -350,8 +322,8 @@ export const CertificationQuizPage: React.FC = () => {
                 <p className="text-sm text-slate-600">
                   You scored <strong>{percentage}%</strong> ({score}/{totalQuestions}).
                   {passed
-                    ? " You've met the 85% passing threshold."
-                    : " You need 85% to pass. Review the explanations below and try again."}
+                    ? " You've met the 78% (7/9) passing threshold."
+                    : " You need 78% (7/9) to pass. Review the explanations below and try again."}
                 </p>
               </div>
             </div>
@@ -367,13 +339,15 @@ export const CertificationQuizPage: React.FC = () => {
               )}
               {passed && (
                 <button
-                  onClick={() => navigate(`/certifications/certificate/${enrollmentId}`)}
+                  onClick={handleClaimCertificate}
+                  disabled={claimingCertificate}
                   className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-full text-sm font-bold hover:from-amber-600 hover:to-amber-700 transition shadow-lg transform hover:scale-[1.02]"
                 >
-                  <Award size={16} /> Get Certificate
+                  <Award size={16} /> {claimingCertificate ? "Finalizing..." : "Get Certificate"}
                 </button>
               )}
             </div>
+            {claimError && <p className="mt-3 text-xs text-red-600 font-medium">{claimError}</p>}
           </div>
         )}
 

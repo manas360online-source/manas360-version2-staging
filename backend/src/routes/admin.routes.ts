@@ -112,6 +112,8 @@ import {
 	rejectAdminAgreementController,
 	updateAdminAgreementStatusController,
 } from '../controllers/admin-agreement.controller';
+import { listCorporateDemoRequestsController } from '../controllers/corporate.controller';
+import { listRetreatIntentsController, updateRetreatIntentStatusController } from '../controllers/retreat.controller';
 
 const router = Router();
 
@@ -511,5 +513,12 @@ router.patch('/roles/:role', requireAuth, requireRole('superadmin'), requireAdmi
 router.get('/rbac/platform-admins', requireAuth, requireRole(['admin', 'superadmin', 'clinicaldirector', 'financemanager', 'complianceofficer']), requireAdminPolicy('users.view'), asyncHandler(getPlatformAdminRoleInventoryController));
 router.post('/rbac/platform-admins', requireAuth, requireRole('superadmin'), requireAdminPolicy('users.moderate'), asyncHandler(createPlatformAdminAccountController));
 router.get('/rbac/effective-policies', requireAuth, requireRole(['admin', 'superadmin', 'clinicaldirector', 'financemanager', 'complianceofficer']), requireAdminPolicy('users.view'), asyncHandler(getEffectiveAdminPoliciesController));
+
+// === CORPORATE DEMO REQUESTS ===
+router.get('/corporate-demo-requests', requireAuth, requireRole(['admin', 'superadmin']), requireAdminPolicy('users.view'), asyncHandler(listCorporateDemoRequestsController));
+
+// === RETREAT INTENTS ===
+router.get('/retreat-intents', requireAuth, requireRole(['admin', 'superadmin']), requireAdminPolicy('users.view'), asyncHandler(listRetreatIntentsController));
+router.patch('/retreat-intents/:id/status', requireAuth, requireRole(['admin', 'superadmin']), requireAdminPolicy('users.moderate'), asyncHandler(updateRetreatIntentStatusController));
 
 export default router;

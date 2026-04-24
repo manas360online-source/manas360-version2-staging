@@ -102,7 +102,7 @@ const buildTokenCookieOptions = (req: Request) => {
 	};
 };
 
-const setAuthCookies = (req: Request, res: Response, accessToken: string, refreshToken: string): void => {
+export const setAuthCookies = (req: Request, res: Response, accessToken: string, refreshToken: string): void => {
 	const tokenCookieOptions = buildTokenCookieOptions(req);
 	res.cookie('access_token', accessToken, {
 		...tokenCookieOptions,
@@ -485,6 +485,7 @@ export const verifyPhoneOtpController = async (req: Request, res: Response): Pro
 		acceptedDocuments: Array.isArray(req.body.acceptedDocuments)
 			? req.body.acceptedDocuments.filter((value: unknown): value is string => typeof value === 'string' && value.trim().length > 0)
 			: undefined,
+		guestGameToken: typeof req.body.guestGameToken === 'string' ? req.body.guestGameToken : undefined,
 	}, getRequestMeta(req));
 
 	setAuthCookies(req, res, result.accessToken, result.refreshToken);

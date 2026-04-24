@@ -476,6 +476,8 @@ export const findMatchingProviders = async (
           specializations: t.specializations || [],
           clinicalCategories: t.clinicalCategories || [],
           certifications: t.certifications || [],
+          certificationStatus: (t as any).certificationStatus || null,
+          leadBoostScore: Number((t as any).leadBoostScore || 0),
           languages: t.languages || [],
           shiftPreferences: t.shiftPreferences || [],
           availability: (t.availability as any) || [],

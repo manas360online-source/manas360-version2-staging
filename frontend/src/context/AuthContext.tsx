@@ -3,6 +3,7 @@ import {
   login as loginApi,
   logout as logoutApi,
   me as meApi,
+  becomeProvider as becomeProviderApi,
   type AuthUser,
 } from '../api/auth';
 
@@ -118,7 +119,7 @@ export const getPostLoginRoute = (user: AuthUser | null | undefined): string => 
 
   if (isProviderRole(user.role)) {
     if (normalizeRole(user.role) === 'learner') {
-      return '/provider/dashboard';
+      return '/certifications';
     }
 
     // Dev/testing bypass only: never allow onboarding skip in production builds.
@@ -151,6 +152,7 @@ type AuthContextValue = {
   login: (identifier: string, password: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
   checkAuth: (options?: { force?: boolean }) => Promise<void>;
+  becomeProvider: () => Promise<void>;
 };
 
 type AuthContextGlobal = typeof globalThis & {
@@ -264,6 +266,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [clearSessionHint]);
 
+  const becomeProvider = useCallback(async () => {
+    const updatedUser = await becomeProviderApi();
+    setUser(updatedUser);
+  }, []);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -273,8 +280,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       login,
       logout,
       checkAuth,
+      becomeProvider,
     }),
-    [user, loading, login, logout, checkAuth],
+    [user, loading, login, logout, checkAuth, becomeProvider],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
