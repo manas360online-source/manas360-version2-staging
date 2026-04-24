@@ -2,6 +2,8 @@ import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Certification, BadgeColor } from '../CertificationTypes';
 import { useAuth } from '../context/AuthContext';
+import { useEnrollmentStore } from '../store/CertificationEnrollmentStore';
+import { getCertificationsErrorMessage, registerCertificationEnrollment } from '../api/certifications';
 
 interface JourneyMapProps {
   certifications: Certification[];
@@ -133,12 +135,85 @@ const CertificationCard: React.FC<{ cert: Certification }> = ({ cert }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const { addEnrollment, getEnrollmentBySlug } = useEnrollmentStore();
+  const [processing, setProcessing] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
   const inProviderShell = location.pathname.startsWith('/provider');
   const detailPath = inProviderShell ? `/provider/certifications/${cert.slug}` : `/certifications/${cert.slug}`;
   const enrollPath = inProviderShell
     ? `/provider/certification/enroll/${cert.slug}`
     : `/certification/enroll/${cert.slug}`;
   const guestAuthPath = `/auth/signup?next=${encodeURIComponent(enrollPath)}`;
+  const myCertificationsPath = inProviderShell ? '/provider/my-certifications' : '/my-certifications';
+
+  const startCertificationNow = async () => {
+    if (!user) {
+      navigate(guestAuthPath);
+      return;
+    }
+
+    if (getEnrollmentBySlug(cert.slug)) {
+      navigate(myCertificationsPath);
+      return;
+    }
+
+    setError(null);
+    setProcessing(true);
+
+    const isFree = cert.price_inr === 0;
+
+    if (!isFree) {
+      navigate(`/checkout/${cert.slug}`);
+      return;
+    }
+
+    try {
+      const result = await registerCertificationEnrollment({
+        certSlug: cert.slug,
+        paymentPlan: 'full',
+        installmentCount: 1,
+        bypassPayment: true,
+      });
+
+      if (result.paymentUrl) {
+        window.location.href = result.paymentUrl;
+        return;
+      }
+    } catch (err: any) {
+      const status = Number(err?.response?.status || 0);
+      if (status !== 409) {
+        setError(getCertificationsErrorMessage(err, 'Unable to start enrollment. Please try again.'));
+        setProcessing(false);
+        return;
+      }
+      
+      // If 409, they are already enrolled remotely. Don't create duplicate, just navigate.
+      navigate(myCertificationsPath);
+      setProcessing(false);
+      return;
+    }
+
+    const newEnrollment = {
+      id: `ENR-${Date.now()}`,
+      certificationId: cert.id,
+      certificationName: cert.name,
+      slug: cert.slug,
+      badgeColor: cert.badgeColor,
+      enrollmentDate: new Date().toISOString().split('T')[0],
+      paymentStatus: 'Paid',
+      paymentPlan: 'full' as const,
+      amountPaid: cert.price_inr,
+      totalAmount: cert.price_inr,
+      installmentsPaidCount: 1,
+      completionPercentage: 0,
+      modulesCompleted: 0,
+      certId: Math.random().toString(36).substring(2, 8).toUpperCase(),
+    };
+
+    addEnrollment(newEnrollment as any);
+    navigate(myCertificationsPath);
+    setProcessing(false);
+  };
 
   return (
     <div 
@@ -204,17 +279,12 @@ const CertificationCard: React.FC<{ cert: Certification }> = ({ cert }) => {
             navigate(guestAuthPath);
             return;
           }
-          navigate(enrollPath, {
-            state: {
-              certName: cert.name,
-              price: cert.price_inr === 0 ? 'Free' : `₹${cert.price_inr.toLocaleString()}`,
-              slug: cert.slug,
-            },
-          });
+          startCertificationNow();
         }}
         className="flex-1 bg-gradient-to-r from-teal-500 to-emerald-600 text-white py-3.5 md:py-4 rounded-xl font-bold text-sm md:text-base shadow-lg shadow-teal-200 hover:shadow-xl hover:shadow-teal-300 hover:scale-[1.03] active:scale-[0.97] transition-all duration-200 flex items-center justify-center gap-2"
+        disabled={processing}
         >
-          {cert.price_inr === 0 ? 'Start Free' : 'Enroll Now'}
+          {processing ? 'Starting...' : (cert.price_inr === 0 ? 'Start Free' : 'Enroll Now')}
           <span className="text-lg">→</span>
           </button>
         <button 
@@ -227,6 +297,8 @@ const CertificationCard: React.FC<{ cert: Certification }> = ({ cert }) => {
           Details
         </button>
       </div>
+
+      {error && <p className="mt-3 text-xs text-red-600">{error}</p>}
 
     </div>
   );

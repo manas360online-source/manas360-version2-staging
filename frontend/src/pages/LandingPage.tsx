@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { groupTherapyApi } from "../api/groupTherapy";
 
@@ -28,6 +28,7 @@ type QuickNavMegaItem = {
   title: string;
   subtitle: string;
   badge?: string;
+  route?: string;
 };
 
 type QuickNavMegaMenu = {
@@ -101,6 +102,13 @@ const LandingPage: React.FC = () => {
 
   const handleQuickNavMegaItemClick = (menuLabel: string, itemTitle?: string) => {
     const normalizedItemTitle = String(itemTitle || '').toLowerCase();
+    const itemRoute = quickNavMegaMenus[menuLabel]?.items.find((it) => it.title === itemTitle)?.route;
+    if (itemRoute) {
+      setActiveQuickNav(null);
+      navigate(itemRoute);
+      return;
+    }
+
     if (normalizedItemTitle.includes('group therapy') || normalizedItemTitle.includes('group sessions')) {
       setActiveQuickNav(null);
       navigate('/group-therapy');
@@ -143,12 +151,24 @@ const LandingPage: React.FC = () => {
         navigate("/group-therapy");
         return;
       }
+      if (itemTitle === "Wellness Retreats") {
+        navigate("/retreats");
+        return;
+      }
       if (itemTitle === "Sound Therapy") {
-        navigate("/patient/sound-therapy");
+        navigate("/sound-therapy");
         return;
       }
       navigate("/premium-theraphy");
       return;
+    }
+
+    if (menuLabel === "Self-Help Tools") {
+      setActiveQuickNav(null);
+      if (itemTitle === "Sound Therapy") {
+        navigate("/sound-therapy");
+        return;
+      }
     }
 
     if (menuLabel === "MyDigitalClinic") {
@@ -301,7 +321,9 @@ const LandingPage: React.FC = () => {
           { icon: "\uD83D\uDC91", title: "Couples Therapy", subtitle: "Rebuild your relationship", badge: "\u20B91,499" },
           { icon: "\uD83D\uDC65", title: "Group Therapy", subtitle: "Peer circles from \u20B9149", badge: "\u20B9149" },
           { icon: "\uD83C\uDFB5", title: "Sound Therapy", subtitle: "Raga healing + sleep tracks", badge: "20 Free" },
-          { icon: "\uD83D\uDCBC", title: "Executive Coaching", subtitle: "High-performance wellness", badge: "Pro" }
+          { icon: "\uD83D\uDCBC", title: "Executive Coaching", subtitle: "High-performance wellness", badge: "Pro" },
+          { icon: "\uD83C\uDFD5\uFE0F", title: "Wellness Retreats", subtitle: "Rishikesh, Coorg, Goa", route: "/retreats" },
+          { icon: "\uD83D\uDED2", title: "Wellness Shop", subtitle: "Journals, tools, merch", badge: "Soon" }
         ]
       },
       "Self-Help Tools": {
@@ -311,7 +333,7 @@ const LandingPage: React.FC = () => {
         columns: 5,
         items: [
           { icon: "\uD83D\uDCCA", title: "Mood Tracker", subtitle: "Track emotional trends daily", badge: "Free" },
-          { icon: "\uD83C\uDFB5", title: "Sound Therapy", subtitle: "Calm sound-based relaxation", badge: "Free" },
+          { icon: "\uD83C\uDFB5", title: "Sound Therapy", subtitle: "Calm sound-based relaxation", badge: "Free", route: "/sound-therapy" },
           { icon: "\uD83C\uDF2C\uFE0F", title: "Breathing Exercises", subtitle: "4-7-8 \u2022 Box \u2022 Calm Breath \u2022 Guided sessions", badge: "Free" },
           { icon: "\uD83D\uDCD3", title: "Journaling Prompts", subtitle: "Daily reflection questions" },
           { icon: "\uD83C\uDF19", title: "Sleep Guide", subtitle: "Hygiene checklist + wind-down" },
@@ -348,10 +370,8 @@ const LandingPage: React.FC = () => {
         subtitle: "Certifications, training & shop",
         columns: 4,
         items: [
-          { icon: "\uD83C\uDFC6", title: "Certification Hub", subtitle: "CBT, NLP, 5Whys training", badge: "Pro" },
-          { icon: "\uD83E\uDDD1", title: "Join as Therapist", subtitle: "Earn \u20B950K-2L/month" },
-          { icon: "\uD83C\uDFD5\uFE0F", title: "Wellness Retreats", subtitle: "Rishikesh, Coorg, Goa" },
-          { icon: "\uD83D\uDED2", title: "Wellness Shop", subtitle: "Journals, tools, merch" }
+          { icon: "\uD83C\uDFC6", title: "Certification Hub", subtitle: "CBT, NLP, 5Whys training", badge: "Pro", route: "/certifications" },
+          { icon: "\uD83E\uDDD1", title: "Join as Therapist", subtitle: "Earn \u20B950K-2L/month", route: "/certifications" }
         ]
       },
       MyDigitalClinic: {

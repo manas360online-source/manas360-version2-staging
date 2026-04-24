@@ -1,24 +1,28 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useEnrollmentStore } from "../store/CertificationEnrollmentStore";
 import { getModulesByCertification, ModuleData } from "../utils/certificationLessonUtils";
 import { useCertificationProgress } from "../store/useCertificationProgress";
 import { ClipboardCheck, Lock } from "lucide-react";
 
-type ModuleStatus = "complete" | "in_progress" | "locked";
+type ModuleStatus = "complete" | "in_progress" | "locked" | "locked_by_payment";
 
 export const CertificationModulesPage: React.FC = () => {
   const { enrollmentId } = useParams<{ enrollmentId: string }>();
   const navigate = useNavigate();
-  const { enrollments } = useEnrollmentStore();
+  const { enrollments, syncEnrollments } = useEnrollmentStore();
   const { isModuleCompleted, isQuizUnlocked } = useCertificationProgress();
+
+  useEffect(() => {
+    void syncEnrollments();
+  }, [syncEnrollments]);
 
   const enrollment = useMemo(() =>
     enrollments.find((e: any) => e.id === enrollmentId),
     [enrollments, enrollmentId]);
 
   const baseModules: ModuleData[] = useMemo(() =>
-    getModulesByCertification(enrollment?.certificationName),
+    getModulesByCertification(enrollment?.certificationName, enrollment?.slug),
     [enrollment]);
 
   /**
@@ -31,9 +35,30 @@ export const CertificationModulesPage: React.FC = () => {
   const modules: ModuleData[] = useMemo(() => {
     if (!enrollmentId) return baseModules;
 
+    // Payment-based locking logic
+    const installmentsPaid = enrollment?.installmentsPaidCount || 0;
+    const isFullPaid = enrollment?.paymentStatus === 'Paid';
+    const isInstallmentPlan = enrollment?.paymentPlan === 'installment';
+
+    let maxUnlockedByPayment = 0;
+    if (isFullPaid) {
+      maxUnlockedByPayment = baseModules.length;
+    } else if (isInstallmentPlan && installmentsPaid > 0) {
+      maxUnlockedByPayment = Math.ceil((baseModules.length / 3) * installmentsPaid);
+    } else {
+      maxUnlockedByPayment = 0;
+    }
+
     return baseModules.map((module, index) => {
+      // Determine if it's locked by payment first
+      const isLockedByPayment = index >= maxUnlockedByPayment;
+
       if (isModuleCompleted(enrollmentId, module.id)) {
         return { ...module, status: "complete", progress: 100 };
+      }
+
+      if (isLockedByPayment) {
+        return { ...module, status: "locked_by_payment" as const, progress: 0 };
       }
 
       // A module is unlocked if it's the first module OR all previous modules are complete
@@ -47,7 +72,7 @@ export const CertificationModulesPage: React.FC = () => {
 
       return { ...module, status: "locked", progress: 0 };
     });
-  }, [baseModules, enrollmentId, isModuleCompleted]);
+  }, [baseModules, enrollment, enrollmentId, isModuleCompleted]);
 
   const quizUnlocked = enrollmentId ? isQuizUnlocked(enrollmentId) : false;
 
@@ -69,6 +94,14 @@ export const CertificationModulesPage: React.FC = () => {
           barTrack: "bg-blue-100",
           badge: "bg-blue-50 border border-blue-200 text-blue-700",
         };
+      case "locked_by_payment":
+        return {
+          wrapper: "border-l-[6px] border-amber-300 opacity-80 bg-amber-50 cursor-not-allowed",
+          icon: "💳 Payment Required",
+          barColor: "bg-transparent",
+          barTrack: "bg-transparent",
+          badge: "bg-amber-100 text-amber-800",
+        };
       case "locked":
       default:
         return {
@@ -82,8 +115,13 @@ export const CertificationModulesPage: React.FC = () => {
   };
 
   const handleModuleClick = (status: ModuleStatus, moduleId: string) => {
+    if (status === "locked_by_payment") {
+      alert("Please pay your next installment to unlock more modules.");
+      navigate('/my-certifications');
+      return;
+    }
     if (status !== "locked") {
-      navigate(`/certifications/lessons/${moduleId}`);
+      navigate(`/certifications/lessons/${moduleId}`, { state: { enrollmentId } });
     }
   };
 
@@ -105,6 +143,11 @@ export const CertificationModulesPage: React.FC = () => {
           <p className="text-slate-500 text-sm">
             Complete your coursework to unlock your certification exam.
           </p>
+          {enrollment?.paymentPlan === 'installment' && enrollment?.paymentStatus !== 'Paid' && (
+            <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs font-medium inline-block">
+              You are on an installment plan. Pay next installment to unlock modules {Math.ceil((baseModules.length / 3) * (enrollment.installmentsPaidCount || 1)) + 1} and beyond.
+            </div>
+          )}
         </div>
 
         {/* Module List */}
@@ -124,7 +167,7 @@ export const CertificationModulesPage: React.FC = () => {
                       {module.title}
                     </h2>
                     <p className="text-sm text-slate-500">
-                      {module.duration} • {styles.icon}
+                      {module.duration || (module.lessons === 1 ? '1 lesson' : `${module.lessons} lessons`)} • {styles.icon}
                     </p>
 
                     {module.status !== "locked" && (

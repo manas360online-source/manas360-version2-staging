@@ -63,6 +63,20 @@ export interface MyCertificationState {
 	}>;
 }
 
+export interface RegisterCertificationEnrollmentPayload {
+	certSlug: string;
+	paymentPlan?: 'full' | 'installment';
+	installmentCount?: number;
+	bypassPayment?: boolean;
+}
+
+export interface RegisterCertificationEnrollmentResult {
+	transactionId: string;
+	paymentUrl: string | null;
+	userId: string;
+	enrollmentMode: 'free' | 'paid' | 'bypassed';
+}
+
 export const getCertificationsErrorMessage = (error: unknown, fallback = 'Request failed'): string => {
 	const axiosError = error as AxiosError<{ message?: string }>;
 	return axiosError.response?.data?.message ?? fallback;
@@ -80,5 +94,22 @@ export const getCertificationById = async (id: string): Promise<Certification> =
 
 export const getMyCertificationState = async (): Promise<MyCertificationState> => {
 	const response = await http.get<ApiEnvelope<MyCertificationState>>('/v1/certifications/me');
+	return response.data.data;
+};
+
+export const registerCertificationEnrollment = async (
+	payload: RegisterCertificationEnrollmentPayload,
+): Promise<RegisterCertificationEnrollmentResult> => {
+	const response = await http.post<ApiEnvelope<RegisterCertificationEnrollmentResult>>('/v1/certifications/register', payload);
+	return response.data.data;
+};
+
+export const completeCertification = async (certSlug: string): Promise<MyCertificationState> => {
+	const response = await http.post<ApiEnvelope<MyCertificationState>>('/v1/certifications/complete', { certSlug });
+	return response.data.data;
+};
+
+export const payCertificationInstallment = async (enrollmentId: string): Promise<any> => {
+	const response = await http.post<ApiEnvelope<any>>('/v1/certifications/pay-installment', { enrollmentId });
 	return response.data.data;
 };

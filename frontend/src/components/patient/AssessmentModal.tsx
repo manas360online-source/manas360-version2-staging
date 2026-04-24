@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { patientApi } from '../../api/patient';
 import { CheckCircle, AlertTriangle, ArrowRight, ShieldAlert, Phone } from 'lucide-react';
-import { CLINICAL_ASSESSMENT_OPTIONS, CLINICAL_QUESTION_BANK } from '../../utils/clinicalAssessments';
+import { CLINICAL_ASSESSMENT_OPTIONS } from '../../utils/clinicalAssessments';
 
 interface AssessmentModalProps {
   isOpen: boolean;
@@ -9,33 +9,48 @@ interface AssessmentModalProps {
   onComplete: () => void;
 }
 
-const PHQ9_QUESTIONS = CLINICAL_QUESTION_BANK['PHQ-9'];
 const PHQ9_OPTIONS = CLINICAL_ASSESSMENT_OPTIONS.map((option) => ({ label: option.label, value: option.points }));
 
 export default function AssessmentModal({ isOpen, onClose, onComplete }: AssessmentModalProps) {
-  const [step, setStep] = useState(0); // 0 = warmup, 1-9 = questions, 10 = completion
+  const [step, setStep] = useState(0); // 0 = warmup, 1-N = questions, completion = final
   const [answers, setAnswers] = useState<number[]>([]);
+  const [questions, setQuestions] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [crisisFlagged, setCrisisFlagged] = useState(false);
+  const completionStep = questions.length > 0 ? questions.length + 1 : 10;
 
   if (!isOpen) return null;
 
-  const handleStart = () => {
-    setStep(1);
+  const handleStart = async () => {
+    setIsSubmitting(true);
+    setStep(0);
     setAnswers([]);
     setCrisisFlagged(false);
+
+    try {
+      const response = await patientApi.startStructuredAssessment({
+        templateKey: 'phq-9-paid-assessment-v1',
+      });
+      setQuestions(response.questions.map((question) => String(question.prompt || '')));
+      setStep(1);
+    } catch (error) {
+      alert('Unable to load the check-in questions right now. Please try again later.');
+      console.error('AssessmentModal load failed:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleAnswer = async (value: number) => {
     const newAnswers = [...answers, value];
     setAnswers(newAnswers);
 
-    // If this is the last question (Q9) and value > 0, trigger crisis flag locally for UI
-    if (step === 9 && value > 0) {
+    // If this is the last question and value > 0, trigger crisis flag locally for UI
+    if (step === questions.length && value > 0) {
       setCrisisFlagged(true);
     }
 
-    if (step < 9) {
+    if (step < questions.length) {
       setStep(step + 1);
     } else {
       await submitAssessment(newAnswers);
@@ -46,10 +61,10 @@ export default function AssessmentModal({ isOpen, onClose, onComplete }: Assessm
     try {
       setIsSubmitting(true);
       await patientApi.submitClinicalJourney({ type: 'PHQ-9', answers: finalAnswers });
-      setStep(10); // Move to completion screen
+      setStep(completionStep); // Move to completion screen
     } catch (_err) {
       alert('Failed to submit assessment. Please try again.');
-      setStep(9); // keep them on the last question to retry
+      setStep(Math.max(1, questions.length)); // keep them on the last question to retry
     } finally {
       setIsSubmitting(false);
     }
@@ -62,14 +77,14 @@ export default function AssessmentModal({ isOpen, onClose, onComplete }: Assessm
     setAnswers([]);
   };
 
-  const progressPercentage = step >= 1 && step <= 9 ? ((step - 1) / 9) * 100 : 0;
+  const progressPercentage = step >= 1 && step <= questions.length ? ((step - 1) / questions.length) * 100 : 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-charcoal/80 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="w-full max-w-xl overflow-hidden rounded-[24px] bg-white shadow-2xl ring-1 ring-charcoal/5">
         
         {/* Progress Bar Header for Questions */}
-        {step >= 1 && step <= 9 && (
+        {step >= 1 && step <= questions.length && (
           <div className="h-1.5 w-full bg-calm-sage/20 relative">
             <div 
               className="absolute left-0 top-0 h-full bg-teal-600 transition-all duration-300 ease-out"
@@ -106,17 +121,17 @@ export default function AssessmentModal({ isOpen, onClose, onComplete }: Assessm
           )}
 
           {/* STEPS 1-9: Questions */}
-          {step >= 1 && step <= 9 && (
+          {step >= 1 && step <= questions.length && (
             <div className="space-y-8 animate-in slide-in-from-right-4 fade-in duration-300">
               <div className="space-y-4 text-center">
                 <p className="text-sm font-medium tracking-wide text-teal-600 uppercase">
-                  Question {step} of 9
+                  Question {step} of {questions.length}
                 </p>
                 <div className="inline-block rounded-full bg-calm-sage/30 px-3 py-1 text-xs font-medium text-teal-800">
                   Over the last 14 days...
                 </div>
                 <h3 className="text-2xl font-semibold leading-tight text-charcoal mt-2">
-                  {PHQ9_QUESTIONS[step - 1]}
+                  {questions[step - 1]}
                 </h3>
               </div>
 
@@ -135,8 +150,8 @@ export default function AssessmentModal({ isOpen, onClose, onComplete }: Assessm
             </div>
           )}
 
-          {/* STEP 10: Completion / Crisis Intercept */}
-          {step === 10 && (
+          {/* Completion / Crisis Intercept */}
+          {step === completionStep && (
             <div className="text-center space-y-6 animate-in zoom-in-95 duration-400">
               
               {!crisisFlagged ? (

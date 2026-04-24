@@ -1,18 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { theme } from '../theme/theme';
-import {
-  CLINICAL_ASSESSMENT_OPTIONS,
-  CLINICAL_QUESTION_BANK,
-  severityFromClinicalScore,
-} from '../utils/clinicalAssessments';
+import { patientApi } from '../api/patient';
 
 interface AssessmentProps {
   onSubmit: (data: any, isCritical: boolean) => void;
 }
 
-const PHQ9_QUESTIONS: string[] = CLINICAL_QUESTION_BANK['PHQ-9'];
-const PHQ9_OPTIONS = CLINICAL_ASSESSMENT_OPTIONS.map((option) => ({ label: option.label, value: option.points }));
+const FREE_SCREENING_TEMPLATE_KEY = 'free-mental-health-screening-v1';
 
 export const Assessment: React.FC<AssessmentProps> = ({ onSubmit }) => {
   const navigate = useNavigate();
@@ -27,18 +22,29 @@ export const Assessment: React.FC<AssessmentProps> = ({ onSubmit }) => {
     options: Array<{ optionIndex: number; label: string }>;
   }>>([]);
   const [answers, setAnswers] = useState<Record<string, number>>({});
+  const [attemptId, setAttemptId] = useState<string>('');
+  const [attemptToken, setAttemptToken] = useState<string>('');
 
   useEffect(() => {
     const loadAssessment = async () => {
       setLoading(true);
       setError('');
       try {
+        const started = await patientApi.startFreeScreening({
+          templateKey: FREE_SCREENING_TEMPLATE_KEY,
+        });
+
+        setAttemptId(String(started.attemptId || ''));
+        setAttemptToken(String(started.attemptToken || ''));
         setQuestions(
-          PHQ9_QUESTIONS.map((prompt, idx) => ({
-            questionId: `PHQ-9-${idx + 1}`,
-            prompt,
-            sectionKey: 'PHQ-9',
-            options: PHQ9_OPTIONS.map((option) => ({ optionIndex: option.value, label: option.label })),
+          (started.questions || []).map((question) => ({
+            questionId: String(question.questionId),
+            prompt: String(question.prompt || ''),
+            sectionKey: String(question.sectionKey || 'general'),
+            options: (question.options || []).map((option) => ({
+              optionIndex: Number(option.optionIndex),
+              label: String(option.label || ''),
+            })),
           })),
         );
         setCurrentQuestionIndex(0);
@@ -67,6 +73,11 @@ export const Assessment: React.FC<AssessmentProps> = ({ onSubmit }) => {
       return;
     }
 
+    if (!attemptId) {
+      setError('Unable to submit this assessment attempt. Please restart the screening.');
+      return;
+    }
+
     const answersPayload = questions.map((question) => ({
       questionId: question.questionId,
       optionIndex: Number(answers[question.questionId]),
@@ -81,17 +92,20 @@ export const Assessment: React.FC<AssessmentProps> = ({ onSubmit }) => {
     setSubmitting(true);
     setError('');
     try {
-      const totalScore = answersPayload.reduce((sum, item) => sum + Number(item.optionIndex || 0), 0);
-      const severityLevel = severityFromClinicalScore('PHQ-9', totalScore);
-      const result = {
-        attemptId: `PHQ-9-${Date.now()}`,
-        templateKey: 'PHQ-9',
-        totalScore,
-        severityLevel,
-      };
+      const result = await patientApi.submitFreeScreening(attemptId, {
+        attemptToken: attemptToken || undefined,
+        answers: answersPayload,
+      });
+
       const isCritical = String(result.severityLevel || '').toLowerCase() === 'severe';
 
-      onSubmit(result, isCritical);
+      onSubmit(
+        {
+          ...result,
+          action: result.actionLabel,
+        },
+        isCritical,
+      );
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Unable to submit assessment. Please try again.');
     } finally {

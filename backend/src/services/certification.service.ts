@@ -113,17 +113,30 @@ export const getMyCertificationState = async (userId: string) => {
 		where: { userId: normalizedUserId },
 		select: {
 			userId: true,
+			displayName: true,
 			certificationStatus: true,
 			certificationCompletedAt: true,
 			certificationPaymentId: true,
 			leadBoostScore: true,
 			certifications: true,
+			user: {
+				select: {
+					name: true,
+					firstName: true,
+					lastName: true,
+				},
+			},
 		},
 	});
 
 	if (!profile) {
+		const user = await prisma.user.findUnique({
+			where: { id: normalizedUserId },
+			select: { name: true, firstName: true, lastName: true }
+		});
 		return {
 			userId: normalizedUserId,
+			userName: user?.name || '',
 			certificationStatus: 'NONE',
 			certificationCompletedAt: null,
 			certificationPaymentId: null,
@@ -132,9 +145,12 @@ export const getMyCertificationState = async (userId: string) => {
 		};
 	}
 
-	const certificationSlugs = Array.isArray(profile.certifications)
-		? profile.certifications.filter((slug) => typeof slug === 'string' && slug.trim().length > 0)
-		: [];
+	const enrollments = await prisma.certificationEnrollment.findMany({
+		where: { userId: normalizedUserId },
+		orderBy: { createdAt: 'desc' },
+	});
+
+	const certificationSlugs = enrollments.map((e) => e.certificationSlug);
 
 	const certificationItems = certificationSlugs.length
 		? await prisma.certification.findMany({
@@ -152,6 +168,114 @@ export const getMyCertificationState = async (userId: string) => {
 
 	return {
 		...profile,
+		userName: profile.user?.name || `${profile.user?.firstName || ''} ${profile.user?.lastName || ''}`.trim(),
+		enrollments,
 		certifications: certificationItems,
 	};
+};
+
+export const markCertificationCompleted = async (userId: string, certSlug: string) => {
+	const normalizedUserId = String(userId || '').trim();
+	const normalizedSlug = String(certSlug || '').trim();
+
+	if (!normalizedUserId) {
+		throw new AppError('User id is required', 400);
+	}
+
+	if (!normalizedSlug) {
+		throw new AppError('Certification slug is required', 400);
+	}
+
+	const profile = await prisma.therapistProfile.findUnique({
+		where: { userId: normalizedUserId },
+		select: {
+			id: true,
+			certifications: true,
+			certificationStatus: true,
+			leadBoostScore: true,
+		},
+	});
+
+	if (!profile) {
+		throw new AppError('Provider profile not found for certification completion', 404);
+	}
+
+	const existingCertifications = Array.isArray(profile.certifications)
+		? profile.certifications.filter((value) => typeof value === 'string' && value.trim().length > 0)
+		: [];
+
+	if (!existingCertifications.includes(normalizedSlug)) {
+		existingCertifications.push(normalizedSlug);
+	}
+
+	const currentStatus = String(profile.certificationStatus || '').toUpperCase();
+	const nextStatus = currentStatus === 'VERIFIED' ? 'VERIFIED' : 'COMPLETED';
+
+	const certification = await prisma.certification.findFirst({
+		where: { slug: normalizedSlug },
+		select: { level: true },
+	});
+
+	const isProfessionalOrMastery = certification?.level === 'PROFESSIONAL' || certification?.level === 'MASTERY';
+
+	await prisma.certificationEnrollment.updateMany({
+		where: { userId: normalizedUserId, certificationSlug: normalizedSlug },
+		data: {
+			status: 'COMPLETED',
+			progress: 100,
+		},
+	});
+
+	await prisma.therapistProfile.update({
+		where: { userId: normalizedUserId },
+		data: {
+			certifications: existingCertifications,
+			certificationStatus: nextStatus as any,
+			certificationCompletedAt: new Date(),
+			leadBoostScore: Math.max(isProfessionalOrMastery ? 70 : 50, Number(profile.leadBoostScore || 0)),
+			...(isProfessionalOrMastery ? { nriPoolCertified: true, nriPoolCertifiedAt: new Date() } : {}),
+		},
+	});
+
+	return getMyCertificationState(normalizedUserId);
+};
+
+export const recordInstallmentPayment = async (userId: string, enrollmentId: string) => {
+	const normalizedUserId = String(userId || '').trim();
+	const normalizedEnrollId = String(enrollmentId || '').trim();
+
+	if (!normalizedUserId || !normalizedEnrollId) {
+		throw new AppError('User id and Enrollment id are required', 400);
+	}
+
+	const enrollment = await prisma.certificationEnrollment.findFirst({
+		where: { id: normalizedEnrollId, userId: normalizedUserId }
+	});
+
+	if (!enrollment) {
+		throw new AppError('Enrollment record not found', 404);
+	}
+
+	if (enrollment.paymentPlan !== 'INSTALLMENT') {
+		throw new AppError('This enrollment is not on an installment plan', 400);
+	}
+
+	const nextPaidCount = (enrollment.installmentsPaidCount || 1) + 1;
+	const isFullyPaid = nextPaidCount >= 3;
+	
+	const amountPerInstallment = enrollment.totalAmount / 3;
+	const nextDue = new Date();
+	nextDue.setDate(nextDue.getDate() + 30);
+
+	const updated = await prisma.certificationEnrollment.update({
+		where: { id: normalizedEnrollId },
+		data: {
+			installmentsPaidCount: nextPaidCount,
+			status: isFullyPaid ? 'PAID' : 'PARTIAL',
+			amountPaid: enrollment.amountPaid + amountPerInstallment,
+			nextInstallmentDue: isFullyPaid ? null : nextDue,
+		}
+	});
+
+	return updated;
 };

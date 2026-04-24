@@ -1453,12 +1453,6 @@ export const createCorporateAccount = async (payload: CorporateAccountCreateInpu
     // Mark OTP as used
     await tx.$executeRaw`UPDATE "corporate_otp_requests" SET status = 'USED' WHERE phone = ${phone}`;
 
-    // Check if phone already registered
-    const existingUser = await tx.user.findFirst({ where: { phone } });
-    if (existingUser && !existingUser.isDeleted) {
-      throw new AppError('Phone number is already registered', 409);
-    }
-
     const companyKey = await resolveUniqueCompanyKey(companyName, tx);
     const companyDomain = email ? getDomainFromEmail(email) : null;
     const companyId = randomUUID();
@@ -1473,26 +1467,52 @@ export const createCorporateAccount = async (payload: CorporateAccountCreateInpu
     const firstName = nameParts[0] || companyName;
     const lastName = nameParts.slice(1).join(' ');
 
-    const corporateMember = await tx.user.create({
-      data: {
-        email: email || undefined,
-        phone,
-        provider: 'PHONE',
-        role: 'PATIENT',
-        firstName,
-        lastName,
-        name: contactName || companyName,
-        phoneVerified: true,
-        emailVerified: Boolean(email),
-      },
-      select: {
-        id: true,
-        email: true,
-        phone: true,
-        firstName: true,
-        lastName: true,
-      },
+    const existingUser = await tx.user.findFirst({
+      where: { phone, isDeleted: false },
+      select: { id: true, email: true, phone: true, firstName: true, lastName: true, role: true },
     });
+
+    const corporateMember = existingUser
+      ? await tx.user.update({
+          where: { id: existingUser.id },
+          data: {
+            email: email || existingUser.email || undefined,
+            provider: 'PHONE',
+            role: existingUser.role || 'PATIENT',
+            firstName: existingUser.firstName || firstName,
+            lastName: existingUser.lastName || lastName,
+            name: contactName || companyName,
+            phoneVerified: true,
+            emailVerified: Boolean(email || existingUser.email),
+          },
+          select: {
+            id: true,
+            email: true,
+            phone: true,
+            firstName: true,
+            lastName: true,
+          },
+        })
+      : await tx.user.create({
+          data: {
+            email: email || undefined,
+            phone,
+            provider: 'PHONE',
+            role: 'PATIENT',
+            firstName,
+            lastName,
+            name: contactName || companyName,
+            phoneVerified: true,
+            emailVerified: Boolean(email),
+          },
+          select: {
+            id: true,
+            email: true,
+            phone: true,
+            firstName: true,
+            lastName: true,
+          },
+        });
 
     await tx.$executeRaw`UPDATE "users"
        SET company_key = ${companyKey},
@@ -1687,5 +1707,57 @@ export const getCorporateEapQrAnalytics = async (companyKey?: string) => {
       revenue: Number(totals.revenue.toFixed(2)),
     },
     breakdown,
+  };
+};
+
+export const listCorporateDemoRequests = async (page = 1, limit = 50) => {
+  await ensureCorporateTables();
+
+  const offset = (Math.max(1, page) - 1) * Math.max(1, limit);
+
+  const [rows, countRows] = await Promise.all([
+    prisma.$queryRaw<Array<{
+      id: string;
+      companyName: string;
+      companyKey: string | null;
+      workEmail: string | null;
+      companySize: string | null;
+      industry: string | null;
+      country: string | null;
+      contactName: string | null;
+      phone: string;
+      status: string;
+      createdAt: Date;
+    }>>`
+      SELECT "id","companyName","companyKey","workEmail","companySize","industry","country","contactName","phone","status","createdAt"
+      FROM "corporate_demo_requests"
+      ORDER BY "createdAt" DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `,
+    prisma.$queryRaw<Array<{ total: bigint }>>`
+      SELECT COUNT(*)::bigint AS total FROM "corporate_demo_requests"
+    `,
+  ]);
+
+  const total = Number(countRows[0]?.total || 0);
+
+  return {
+    requests: rows.map((r) => ({
+      id: r.id,
+      companyName: r.companyName,
+      companyKey: r.companyKey,
+      contactEmail: r.workEmail,
+      contactName: r.contactName,
+      phone: r.phone,
+      companySize: r.companySize,
+      industry: r.industry,
+      country: r.country,
+      status: r.status,
+      requestedAt: r.createdAt,
+    })),
+    total,
+    page,
+    limit,
+    pages: Math.ceil(total / limit),
   };
 };

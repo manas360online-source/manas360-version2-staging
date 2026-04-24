@@ -121,8 +121,13 @@ const isPlatformAdminAccount = async (user: { id: string; role?: string | null }
 		return false;
 	}
 
-	const companyMeta = await getCompanyAdminMeta(String(user.id));
-	return !companyMeta.company_key && !companyMeta.is_company_admin;
+	try {
+		const companyMeta = await getCompanyAdminMeta(String(user.id));
+		return !companyMeta.company_key && !companyMeta.is_company_admin;
+	} catch (err: any) {
+		logger.error('[Auth] isPlatformAdminAccount check failed:', { userId: user.id, error: err.message });
+		return false;
+	}
 };
 
 const getEmailDomain = (email?: string | null): string | null => {
@@ -249,7 +254,7 @@ const audit = async (
 	}
 };
 
-const issueSessionTokens = async (userId: string, meta: RequestMeta) => {
+export const issueSessionTokens = async (userId: string, meta: RequestMeta) => {
 	const user = await db.user.findUnique({ where: { id: userId }, select: { role: true } });
 	const createdSession = await db.authSession.create({
 		data: {
@@ -497,23 +502,37 @@ export const registerWithPhone = async (input: RegisterPhoneInput) => {
 			role: true,
 		},
 	});
+	logger.info('[Auth] registerWithPhone starting:', { phone: input.phone, hasExisting: !!existing });
 	if (existing?.isDeleted) {
 		throw new AppError('Account is deleted. Contact support to restore access.', 410);
 	}
 	if (existing && (await isPlatformAdminAccount({ id: String(existing.id), role: String(existing.role || '') }))) {
+		logger.warn('[Auth] registerWithPhone blocked: Platform admin attempt', { userId: existing.id });
 		throw new AppError('Platform admin accounts must login using email and password', 403);
 	}
 
 	const otp = generateNumericOtp();
 	const otpHash = await hashOtp(otp);
-	const role = input.role ? toPrismaUserRole(input.role) : 'PATIENT';
+	const requestedRole = input.role ? toPrismaUserRole(input.role) : null;
+	const existingRole = String(existing?.role || '').toUpperCase();
+	const role = requestedRole || 'PATIENT';
 	const trimmedName = String(input.name || '').trim();
+
+	// Existing phone users can enter provider/certification flows later.
+	// Promote role for patient accounts when a non-patient role is explicitly requested.
+	const shouldPromoteExistingRole = Boolean(
+		existing
+		&& requestedRole
+		&& requestedRole !== 'PATIENT'
+		&& existingRole === 'PATIENT',
+	);
 	const user = existing
 		? await db.user.update({
 				where: { id: existing.id },
 				data: {
 					phoneVerificationOtpHash: otpHash,
 					phoneVerificationOtpExpiresAt: nowPlusMinutes(env.otpTtlMinutes),
+					...(shouldPromoteExistingRole ? { role: requestedRole as any } : {}),
 				},
 				select: {
 					id: true,

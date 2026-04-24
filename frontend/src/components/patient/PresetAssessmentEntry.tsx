@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { getPresetConfig, parseUtmParams, isValidPresetEntryType } from '../../config/presetDefaults';
-import { CLINICAL_QUESTION_BANK, CLINICAL_ASSESSMENT_OPTIONS } from '../../utils/clinicalAssessments';
+import {
+  CLINICAL_ASSESSMENT_OPTIONS,
+  CLINICAL_ASSESSMENT_TEMPLATE_KEYS,
+} from '../../utils/clinicalAssessments';
 import { patientApi } from '../../api/patient';
 import { useAuth } from '../../context/AuthContext';
 import { ArrowRight, AlertTriangle, CheckCircle, ShieldAlert } from 'lucide-react';
@@ -97,7 +100,7 @@ export const PresetAssessmentEntry = () => {
   const entryType = searchParams.get('entry');
   const presetConfig = entryType && isValidPresetEntryType(entryType) ? getPresetConfig(entryType) : null;
   const assessmentType = presetConfig?.assessmentType || 'PHQ-9';
-  const questions = CLINICAL_QUESTION_BANK[assessmentType] || [];
+  const [questions, setQuestions] = useState<string[]>([]);
   const options = CLINICAL_ASSESSMENT_OPTIONS.map((option: any) => ({ label: option.label, value: option.points }));
   const utmParams = parseUtmParams(searchParams);
   const totalQuestions = questions.length;
@@ -133,7 +136,7 @@ export const PresetAssessmentEntry = () => {
     setSelectedTimezone(detectedRegion);
   }, [isNriEntry, selectedTimezone]);
 
-  const handleStart = () => {
+  const handleStart = async () => {
     if (isNriEntry) {
       if (!selectedTimezone) {
         setMetaError('Please select your timezone region.');
@@ -145,10 +148,31 @@ export const PresetAssessmentEntry = () => {
       }
     }
 
+    if (!presetConfig) {
+      setMetaError('Unable to load assessment questions.');
+      return;
+    }
+
     setMetaError(null);
-    setStep(1);
-    setAnswers([]);
     setHasError(false);
+    setIsSubmitting(true);
+
+    try {
+      if (questions.length === 0) {
+        const response = await patientApi.startStructuredAssessment({
+          templateKey: CLINICAL_ASSESSMENT_TEMPLATE_KEYS[assessmentType],
+        });
+        setQuestions(response.questions.map((question) => String(question.prompt || '')));
+      }
+      setStep(1);
+      setAnswers([]);
+    } catch (error) {
+      console.error('Unable to load assessment questions:', error);
+      setMetaError('Unable to load assessment questions. Please try again.');
+      setHasError(true);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const toggleConcern = (concern: string) => {
