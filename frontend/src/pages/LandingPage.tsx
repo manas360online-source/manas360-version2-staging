@@ -1029,7 +1029,10 @@ const LandingPage: React.FC = () => {
               <div style={{ position: "relative" }}>
                 <button
                   type="button"
-                  onClick={() => setLoginDropdownOpen(!loginDropdownOpen)}
+                  onClick={() => {
+                    setLoginDropdownOpen(false);
+                    navigate('/auth/login');
+                  }}
                   style={{
                     display: "flex",
                     alignItems: "center",
