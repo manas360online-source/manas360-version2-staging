@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import heroVideo from '../../assets/HERO-BackgroundVideo (1).mp4';
+void React;
 
 export const Hero: React.FC = () => {
   const navigate = useNavigate();
