@@ -1,6 +1,6 @@
 import React from 'react';
-import DigitalPetHub from '../components/common/DigitalPetHub';
+import DigitalPetHubPage from './patient/DigitalPetHubPage';
 
-const ChintuPage: React.FC = () => <DigitalPetHub selectedPet="patience-turtle" />;
+const ChintuPage: React.FC = () => <DigitalPetHubPage selectedPet="patience-turtle" />;
 
 export default ChintuPage;

@@ -4,8 +4,8 @@ import react from '@vitejs/plugin-react'
 
 const hmrProtocol = (process.env.VITE_HMR_PROTOCOL as 'ws' | 'wss' | undefined) || 'ws'
 const hmrHost = process.env.VITE_HMR_HOST || undefined
-const hmrPort = Number(process.env.VITE_HMR_PORT || 5173)
-const hmrClientPort = Number(process.env.VITE_HMR_CLIENT_PORT || process.env.VITE_HMR_PORT || 5173)
+const hmrPort = Number(process.env.VITE_HMR_PORT || process.env.PORT || 5173)
+const hmrClientPort = Number(process.env.VITE_HMR_CLIENT_PORT || process.env.VITE_HMR_PORT || process.env.PORT || 5173)
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -21,8 +21,8 @@ export default defineConfig({
     setupFiles: ['./src/test-utils.tsx'],
   },
   server: {
-    host: '0.0.0.0',
-    port: 5173,
+  host: '0.0.0.0',
+  port: Number(process.env.PORT || 5173),
     strictPort: true,
     allowedHosts: true, // ✅ CORRECT: Must be boolean true, not 'all'
     open: false,
@@ -94,7 +94,7 @@ export default defineConfig({
   },
   preview: {
     host: '0.0.0.0',
-    port: 5173,
+    port: Number(process.env.PORT || 5173),
     strictPort: true,
     allowedHosts: true, // ✅ CORRECT: Must be boolean true, not 'all'
     cors: true,

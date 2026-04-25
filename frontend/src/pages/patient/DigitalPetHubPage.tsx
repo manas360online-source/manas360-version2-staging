@@ -1,5 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import Pt06HeroVideoFrame from '../../components/common/Pt06HeroVideoFrame';
+
+interface DigitalPetHubPageProps {
+  returnTo?: string;
+}
 
 // ── TEMBO MODAL ──────────────────────────────────────────────────────────────
 function TemboModal({ onClose }: { onClose: () => void }) {
@@ -661,6 +666,7 @@ client.init('52401c7067f54ff3813da84df073b5f6',{
 export default function DigitalPetHubPage({ returnTo }: DigitalPetHubPageProps) {
   const navigate = useNavigate();
   const [showTembo, setShowTembo] = useState(false);
+  const routeTo = (path: string) => navigate(path);
 
   return (
     <div className="min-h-screen bg-white">
@@ -792,56 +798,29 @@ export default function DigitalPetHubPage({ returnTo }: DigitalPetHubPageProps) 
               <span className="text-sm text-slate-600">Watch, breathe, be present</span>
             </div>
             <div className="grid grid-cols-3 gap-4">
-              <div className="bg-gradient-to-br from-slate-50 to-white border border-slate-200 rounded-2xl overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all">
-                <div style={{ padding: '177.78% 0 0 0', position: 'relative' }}>
-                  <iframe
-                    src="https://player.vimeo.com/video/1184033995?title=0&byline=0&portrait=0&badge=0&autopause=0&player_id=0&app_id=58479"
-                    frameBorder="0"
-                    allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
-                    referrerPolicy="strict-origin-when-cross-origin"
-                    title="MANAS360 MentalWellness Intro_1080p_caption"
-                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
-                    
-                  />
+              {[
+                { vimeoId: '1184033995', title: 'Ponda — Koi Fish', desc: 'Calm ambient koi — watch, breathe, be present', aspect: '177.78%' },
+                { vimeoId: '1184033994', title: 'Bholu — Clown Fish', desc: 'Ocean rhythm ambient — stillness and calm', aspect: '56.25%' },
+                { vimeoId: '1184033993', title: 'Navil — Cheerful Peacock', desc: 'Colourful, cheerful ambient — mood lift', aspect: '177.78%' },
+              ].map((pet, i) => (
+                <div key={i} className="bg-gradient-to-br from-slate-50 to-white border border-slate-200 rounded-2xl overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all">
+                  <div style={{ padding: `${pet.aspect} 0 0 0`, position: 'relative' }}>
+                    <iframe
+                      src={`https://player.vimeo.com/video/${pet.vimeoId}?title=0&byline=0&portrait=0&badge=0&autopause=0&player_id=0&app_id=58479`}
+                      frameBorder="0"
+                      allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
+                      referrerPolicy="strict-origin-when-cross-origin"
+                      title={pet.title}
+                      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+                    />
+                  </div>
+                  <div className="p-4">
+                    <div className="font-bold text-slate-900 mb-0.5">{pet.title}</div>
+                    <div className="text-xs text-slate-500">{pet.desc}</div>
+                    <span className="mt-2 inline-block text-xs font-semibold text-green-700 bg-green-100 px-2.5 py-1 rounded-full">FREE — View Only</span>
+                  </div>
                 </div>
-                <div className="p-4">
-                  <div className="font-bold text-slate-900 mb-0.5">1 Ponda</div>
-                </div>
-              </div>
-
-              <div className="bg-gradient-to-br from-slate-50 to-white border border-slate-200 rounded-2xl overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all">
-                <div style={{ padding: '56.25% 0 0 0', position: 'relative' }}>
-                  <iframe
-                    src="https://player.vimeo.com/video/1184033994?title=0&byline=0&portrait=0&badge=0&autopause=0&player_id=0&app_id=58479"
-                    frameBorder="0"
-                    allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
-                    referrerPolicy="strict-origin-when-cross-origin"
-                    title="FindingStillness"
-                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
-                    
-                  />
-                </div>
-                <div className="p-4">
-                  <div className="font-bold text-slate-900 mb-0.5">2 ClownFish</div>
-                </div>
-              </div>
-
-              <div className="bg-gradient-to-br from-slate-50 to-white border border-slate-200 rounded-2xl overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all">
-                <div style={{ padding: '177.78% 0 0 0', position: 'relative' }}>
-                  <iframe
-                    src="https://player.vimeo.com/video/1184033993?title=0&byline=0&portrait=0&badge=0&autopause=0&player_id=0&app_id=58479"
-                    frameBorder="0"
-                    allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
-                    referrerPolicy="strict-origin-when-cross-origin"
-                    title="3 NavilCheerful"
-                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
-                    
-                  />
-                </div>
-                <div className="p-4">
-                  <div className="font-bold text-slate-900 mb-0.5">3 NavilCheerful</div>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
 
@@ -898,11 +877,17 @@ export default function DigitalPetHubPage({ returnTo }: DigitalPetHubPageProps) 
             </div>
             <div className="grid grid-cols-3 gap-4">
               {[
-                { emoji: '🦋', name: 'Phoenix Friend', env: '🔥 Rebirth Temple', tags: ['Transformation', 'Crisis Support'] },
-                { emoji: '🐉', name: 'Guardian Dragon', env: '💎 Crystal Cave', tags: ['Protection', 'Voice Chat'] },
-                { emoji: '🦚', name: 'Wisdom Peacock', env: '🌸 Lotus Garden', tags: ['Vedic Wisdom', 'Self-Discovery'] },
+                { emoji: '🦋', name: 'Phoenix Friend', env: '🔥 Rebirth Temple', tags: ['Transformation', 'Crisis Support'], price: '₹299/mo or ₹499 own' },
+                { emoji: '🐉', name: 'Guardian Dragon', env: '💎 Crystal Cave', tags: ['Protection', 'AI Voice Chat'], price: '₹299/mo or ₹499 own' },
+                { emoji: '🦚', name: 'Wisdom Peacock', env: '🌸 Lotus Garden', tags: ['Vedic Wisdom', 'Self-Discovery'], price: '₹299/mo or ₹499 own' },
               ].map((pet, i) => (
-                <div key={i} className="bg-gradient-to-br from-pink-50 to-white border border-slate-200 rounded-2xl overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all">
+                <div key={i} className="relative bg-gradient-to-br from-pink-50 to-white border border-slate-200 rounded-2xl overflow-hidden opacity-75">
+                  {/* Lock overlay */}
+                  <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/60 backdrop-blur-sm">
+                    <span className="text-3xl mb-2">🔒</span>
+                    <span className="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1 rounded-full mb-1">COMING SOON</span>
+                    <span className="text-xs text-slate-500">{pet.price}</span>
+                  </div>
                   <div className="h-28 flex items-center justify-center text-5xl">{pet.emoji}</div>
                   <div className="p-4">
                     <div className="font-bold text-slate-900 mb-0.5">{pet.name}</div>
@@ -922,7 +907,8 @@ export default function DigitalPetHubPage({ returnTo }: DigitalPetHubPageProps) 
 
       <div className="py-16 bg-slate-50">
         <div className="max-w-6xl mx-auto px-6">
-          <h2 className="text-center text-4xl font-bold mb-8">Add-On Features (A la Carte)</h2>
+          <h2 className="text-center text-4xl font-bold mb-3">Add-On Features (À la Carte)</h2>
+          <p className="text-center text-slate-500 text-sm mb-8">Click any feature to explore it</p>
 
           <div className="bg-white border border-slate-200 rounded-2xl p-6 overflow-x-auto">
             <table className="w-full min-w-[720px] text-sm">
@@ -930,33 +916,55 @@ export default function DigitalPetHubPage({ returnTo }: DigitalPetHubPageProps) 
                 <tr className="border-b border-slate-200 text-left text-slate-700">
                   <th className="py-2 pr-4">Feature</th>
                   <th className="py-2 pr-4">1 Hour</th>
-                  <th className="py-2 pr-4">3 Hours</th>
+                  <th className="py-2 pr-4">3 Hours ⭐</th>
                   <th className="py-2 pr-4">5 Hours</th>
                   <th className="py-2">Description</th>
                 </tr>
               </thead>
               <tbody className="text-slate-600">
-                <tr className="border-b border-slate-100">
-                  <td className="py-3 pr-4 font-semibold">🤖 AnytimeBuddy</td>
+                <tr
+                  className="border-b border-slate-100 hover:bg-violet-50 cursor-pointer transition-colors"
+                  onClick={() => routeTo('/buddy-chat')}
+                  title="Go to AnytimeBuddy"
+                >
+                  <td className="py-3 pr-4 font-semibold text-violet-700">🤖 AnytimeBuddy <span className="text-xs text-violet-400">↗</span></td>
                   <td className="py-3 pr-4">₹399</td>
-                  <td className="py-3 pr-4">₹999</td>
+                  <td className="py-3 pr-4 font-semibold text-violet-700">₹999</td>
                   <td className="py-3 pr-4">₹1,699</td>
                   <td className="py-3">On-demand emotional support chat (24/7 AI companion)</td>
                 </tr>
-                <tr className="border-b border-slate-100">
-                  <td className="py-3 pr-4 font-semibold">🐾 Digital Pet Hub</td>
-                  <td className="py-3 pr-4" colSpan={3}>Free starter + Premium unlock via subscription</td>
+                <tr
+                  className="border-b border-slate-100 hover:bg-violet-50 cursor-pointer transition-colors"
+                  onClick={() => routeTo('/pet')}
+                  title="Go to Digital Pet Hub"
+                >
+                  <td className="py-3 pr-4 font-semibold text-violet-700">🐾 Digital Pet Hub <span className="text-xs text-violet-400">↗</span></td>
+                  <td className="py-3 pr-4 text-green-700 font-semibold" colSpan={1}>Free starter</td>
+                  <td className="py-3 pr-4" colSpan={2}>Premium unlock via subscription</td>
                   <td className="py-3">Neurotransmitter companions (Chintu, Bholu, Mithi, Dheeraj)</td>
                 </tr>
-                <tr className="border-b border-slate-100">
-                  <td className="py-3 pr-4 font-semibold">📞 IVR Therapy</td>
+                <tr className="border-b border-slate-100 opacity-60">
+                  <td className="py-3 pr-4 font-semibold">📞 IVR Therapy <span className="text-xs bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full">Soon</span></td>
                   <td className="py-3 pr-4" colSpan={3}>Pay-per-session (same as standard fees)</td>
                   <td className="py-3">Voice-based therapy + PHQ screening via phone call</td>
                 </tr>
-                <tr>
-                  <td className="py-3 pr-4 font-semibold">🎵 Sound Therapy</td>
+                <tr className="border-b border-slate-100 hover:bg-teal-50 cursor-pointer transition-colors"
+                  onClick={() => routeTo('/sound-therapy')}
+                  title="Go to Sound Therapy"
+                >
+                  <td className="py-3 pr-4 font-semibold text-teal-700">💬 VentBuddy <span className="text-xs text-teal-400">↗</span></td>
+                  <td className="py-3 pr-4 text-green-700 font-semibold">3 free/day</td>
+                  <td className="py-3 pr-4" colSpan={2}>Premium unlimited</td>
+                  <td className="py-3">Anonymous venting with trained AI listener</td>
+                </tr>
+                <tr
+                  className="hover:bg-teal-50 cursor-pointer transition-colors"
+                  onClick={() => routeTo('/sound-therapy')}
+                  title="Go to Sound Therapy"
+                >
+                  <td className="py-3 pr-4 font-semibold text-teal-700">🎵 Sound Therapy <span className="text-xs text-teal-400">↗</span></td>
                   <td className="py-3 pr-4">₹30/track</td>
-                  <td className="py-3 pr-4">₹250/bundle</td>
+                  <td className="py-3 pr-4 font-semibold text-teal-700">₹250/bundle (10 tracks)</td>
                   <td className="py-3 pr-4">-</td>
                   <td className="py-3">Own forever, unlimited play + download</td>
                 </tr>

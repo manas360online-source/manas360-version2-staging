@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Hero } from '../components/Landing/Hero';
-import logo from '../assets/manas360_main_logo.png';
-import heroBeach from '../assets/You renot alone-Beach.jpeg';
+const logo = "/Logo.jpeg";
+// heroBeach uses the image from the public folder (URL-encoded for spaces)
+const heroBeach = "/You%20renot%20alone-Beach.jpeg";
 import './HeroIntroPage.css';
 
 type OfferCard = {

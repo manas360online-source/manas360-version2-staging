@@ -501,7 +501,20 @@ const Footer = () => (
   </footer>
 );
 
-/* ─── ROOT ─── */
-export default function DigitalPetHub() {
-  return <DigitalPetHubPage />;
+export default function DigitalPetStrategyPage() {
+  return (
+    <div style={{ fontFamily: "Inter, sans-serif", color: "#1E293B", background: "#F8FAFC", minHeight: "100vh" }}>
+      <Nav />
+      <Hero />
+      <ScienceStrip />
+      <Pathways />
+      <PetCatalog />
+      <Schedule />
+      <Loops />
+      <Monetization />
+      <Revenue />
+      <Architecture />
+      <Footer />
+    </div>
+  );
 }
