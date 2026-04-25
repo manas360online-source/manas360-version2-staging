@@ -4,7 +4,7 @@ import { AppError } from '../middleware/error.middleware';
 
 export const createPatient = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { clinicId } = req.params;
+    const clinicId = String(req.params.clinicId);
     const patient = await mdcPatientService.createPatient({ ...req.body, clinicId });
     res.status(201).json(patient);
   } catch (error) {
@@ -14,7 +14,7 @@ export const createPatient = async (req: Request, res: Response, next: NextFunct
 
 export const bulkUploadPatients = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { clinicId } = req.params;
+    const clinicId = String(req.params.clinicId);
     const { patients } = req.body;
     
     if (!Array.isArray(patients)) {
@@ -30,7 +30,7 @@ export const bulkUploadPatients = async (req: Request, res: Response, next: Next
 
 export const listPatients = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { clinicId } = req.params;
+    const clinicId = String(req.params.clinicId);
     const patients = await mdcPatientService.getClinicPatients(clinicId);
     res.json(patients);
   } catch (error) {

@@ -13,7 +13,10 @@ async function runTest() {
       phone: '+919999999999',
       email: 'test@clinic.com',
       ownerName: 'Dr. Test Owner',
-      address: '123 Health Street'
+      address: '123 Health Street',
+      tier: 'solo',
+      billingCycle: 'monthly',
+      selectedFeatures: [],
     });
     console.log('✅ Clinic Created:', clinic.clinicCode);
     

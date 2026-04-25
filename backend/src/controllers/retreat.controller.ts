@@ -70,7 +70,7 @@ export const listRetreatIntentsController = async (req: Request, res: Response):
 };
 
 export const updateRetreatIntentStatusController = async (req: Request, res: Response): Promise<void> => {
-  const { id } = req.params;
+  const id = String(req.params.id);
   const { status, adminNotes } = req.body;
 
   if (!status) throw new AppError('status is required', 400);

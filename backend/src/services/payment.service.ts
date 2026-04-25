@@ -668,11 +668,11 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 		}
 
 		if (merchantTransactionId.startsWith('CERT_')) {
-			const payment = await db.financialPayment.findFirst({
+			const paymentRecord = await db.financialPayment.findFirst({
 				where: { merchantTransactionId: merchantTransactionId },
 				orderBy: { createdAt: 'desc' },
 			});
-			if (payment?.status === 'CAPTURED') {
+			if (paymentRecord?.status === 'CAPTURED') {
 				return { handled: true, message: 'Certification enrollment payment already captured' };
 			}
 
@@ -692,24 +692,24 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 			}
 
 			// Extract metadata from either the webhook data or our local payment record
-			const certSlug = String(data?.metadata?.certSlug || payment?.metadata?.certSlug || '');
+			const certSlugResolved = String(data?.metadata?.certSlug || payment?.metadata?.certSlug || '');
 			const userId = String(data?.metadata?.userId || payment?.patientId || data?.metaInfo?.udf1 || '');
 			const paymentPlan = String(data?.metadata?.paymentPlan || payment?.metadata?.paymentPlan || 'full').toUpperCase();
 			const totalAmountPaise = Number(data?.amount || payment?.amountMinor || 0);
 
-			if (!userId || !certSlug) {
-				logger.error('[PaymentService] Missing required metadata for certification payment', { userId, certSlug, merchantTransactionId });
+			if (!userId || !certSlugResolved) {
+				logger.error('[PaymentService] Missing required metadata for certification payment', { userId, certSlug: certSlugResolved, merchantTransactionId });
 				throw new AppError('Unable to resolve enrollment details from certification payment', 422);
 			}
 
 			await db.$transaction(async (tx: any) => {
 				// 1. Update CertificationEnrollment
 				const enrollment = await tx.certificationEnrollment.findUnique({
-					where: { userId_certificationSlug: { userId, certificationSlug: certSlug } }
+					where: { userId_certificationSlug: { userId, certificationSlug: certSlugResolved } }
 				});
 
 				if (!enrollment) {
-					logger.error('[PaymentService] Enrollment record not found during payment capture', { userId, certSlug });
+					logger.error('[PaymentService] Enrollment record not found during payment capture', { userId, certSlug: certSlugResolved });
 					throw new AppError('Enrollment record not found', 404);
 				}
 
@@ -732,7 +732,7 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 				const existingProfile = await tx.therapistProfile.findUnique({ where: { userId } });
 				const mergedCertifications = Array.from(new Set([
 					...((existingProfile?.certifications as string[] | undefined) || []),
-					certSlug,
+					certSlugResolved,
 				]));
 
 				if (existingProfile) {
@@ -754,7 +754,7 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 							certificationStatus: 'ENROLLED',
 							certificationPaymentId: merchantTransactionId,
 							leadBoostScore: 30,
-							certifications: [certSlug],
+							certifications: [certSlugResolved],
 							onboardingCompleted: false,
 							isVerified: false,
 						},
@@ -773,7 +773,7 @@ export const processPhonePeWebhook = async (decoded: any): Promise<{ handled: bo
 				}
 			});
 
-			logger.info('[PaymentService] Certification payment processed successfully', { merchantTransactionId, userId, certSlug, paymentPlan });
+			logger.info('[PaymentService] Certification payment processed successfully', { merchantTransactionId, userId, certSlug: certSlugResolved, paymentPlan });
 			return { handled: true, message: 'Certification enrollment payment processed' };
 			if (payment.status === 'CAPTURED') {
 				return { handled: true, message: 'Certification already processed' };

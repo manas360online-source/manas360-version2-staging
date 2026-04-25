@@ -124,9 +124,7 @@ export default function ProviderDashboard() {
     queryFn: fetchProviderMyQr,
     staleTime: 5 * 60 * 1000,
   });
-    staleTime: 60 * 1000,
-    refetchInterval: 30 * 1000,
-  });
+  
 
   const mdcUserStr = localStorage.getItem('mdc_user');
   const mdcUser = useMemo(() => {

@@ -422,7 +422,7 @@ export default function SignupPage() {
 			}
 		}
 	}, [location.search, phone, otpSent, error, isPatientLeadFlow, isCertificationContext]);
-	}, [location.search, locationState, phone, otpSent, error, role]);
+
 
 	const resolveReturnTo = (): string => {
 		const qp = new URLSearchParams(location.search);
