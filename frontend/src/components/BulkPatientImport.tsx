@@ -53,6 +53,8 @@ export default function BulkPatientImport({ clinicId }: BulkPatientImportProps) 
     try {
       const text = await file.text();
       const lines = text.split('\n').filter(line => line.trim());
+      const headers = lines[0].split(',');
+      
       const patients = lines.slice(1).map(line => {
         const values = line.split(',');
         return {

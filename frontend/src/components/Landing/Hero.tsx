@@ -1,11 +1,15 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import heroVideo from '../../assets/HERO-BackgroundVideo (1).mp4';
-void React;
+// Preferred video path (place HERO-BackgroundVideo.mp4 in `frontend/public` to enable)
+const PUBLIC_HERO_VIDEO = '/HERO-BackgroundVideo.mp4';
+const PUBLIC_HERO_IMAGE = '/You%20renot%20alone-Beach.jpeg';
+
+// The component will probe for the video at runtime and use it if reachable.
 
 export const Hero: React.FC = () => {
   const navigate = useNavigate();
   const NAVIGATION_DELAY_MS = 180;
+  const [videoAvailable, setVideoAvailable] = useState<boolean | null>(null);
 
   useEffect(() => {
     const prevOverflow = document.body.style.overflow;
@@ -39,6 +43,23 @@ export const Hero: React.FC = () => {
         container.appendChild(p);
       }
     }
+  }, []);
+
+  useEffect(() => {
+    // Probe for public video existence. If it exists, use the video; otherwise fall back to image.
+    let cancelled = false;
+    fetch(PUBLIC_HERO_VIDEO, { method: 'HEAD' })
+      .then((res) => {
+        if (cancelled) return;
+        setVideoAvailable(res.ok && res.headers.get('content-type')?.startsWith('video'));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setVideoAvailable(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleScrollDown = () => {
@@ -272,15 +293,27 @@ export const Hero: React.FC = () => {
 
       {/* Background layers */}
       <div className="hero-bg">
-        <video
-          className="hero-bg-video"
-          autoPlay
-          loop
-          muted
-          playsInline
-        >
-          <source src={heroVideo} type="video/mp4" />
-        </video>
+        {videoAvailable === true ? (
+          <video
+            className="hero-bg-video"
+            autoPlay
+            loop
+            muted
+            playsInline
+            aria-hidden="true"
+          >
+            <source src={PUBLIC_HERO_VIDEO} type="video/mp4" />
+          </video>
+        ) : (
+          // Fallback static image (public path)
+          <img
+            src={PUBLIC_HERO_IMAGE}
+            alt="hero background"
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            className="hero-bg-video"
+            aria-hidden="true"
+          />
+        )}
         <div className="hero-bg-gradient" />
         <div className="hero-bg-pattern" />
       </div>
@@ -300,7 +333,7 @@ export const Hero: React.FC = () => {
         <div className="tier-1">
           <p className="tier-1-text">
             150 million Indians suffer in silence. You don't have to.<br />
-            You're not broken. You're just carrying too much alone ó <em>and you're not alone.</em>
+            You're not broken. You're just carrying too much alone ‚Äî <em>and you're not alone.</em>
           </p>
         </div>
 
@@ -316,7 +349,7 @@ export const Hero: React.FC = () => {
         <div className="tier-3">
           <p className="tier-3-text">
             India's complete mental wellness ecosystem. <strong>Verified therapists</strong>
-            in your language, <strong>AI companion</strong> at 2 AM, clinical care from <strong>?99/month</strong>.
+            in your language, <strong>AI companion</strong> at 2 AM, clinical care from <strong>‚Çπ99/month</strong>.
             You don't have to carry it alone.
           </p>
         </div>
@@ -330,13 +363,13 @@ export const Hero: React.FC = () => {
           </div>
           <div className="cta-row-secondary">
             <button className="cta-pill" onClick={() => handleNavigate('/landing')}>
-              <span className="pill-icon">??</span> I'm a Therapist
+              <span className="pill-icon">ü©∫</span> I'm a Therapist
             </button>
             <button className="cta-pill" onClick={() => handleNavigate('/landing')}>
-              <span className="pill-icon">??</span> I'm a CHO ó Corp ∑ College ∑ Healthcare
+              <span className="pill-icon">üè¢</span> I'm a CHO ‚Äî Corp ¬∑ College ¬∑ Healthcare
             </button>
             <button className="cta-pill cta-genz" onClick={() => handleNavigate('/landing')}>
-              <span className="pill-icon">?</span> I'm GenZ
+              <span className="pill-icon">‚ö°</span> I'm GenZ
             </button>
           </div>
           <p className="cta-gentle">
@@ -363,10 +396,10 @@ export const Hero: React.FC = () => {
       <div className="floating-stats">
         <div className="float-stat">
           <span className="fs-num">5</span>
-          <span className="fs-label">Languages<br />Hindi ∑ English ∑ Tamil ∑ Telugu ∑ Kannada</span>
+          <span className="fs-label">Languages<br />Hindi ¬∑ English ¬∑ Tamil ¬∑ Telugu ¬∑ Kannada</span>
         </div>
         <div className="float-stat">
-          <span className="fs-num">?99</span>
+          <span className="fs-num">‚Çπ99</span>
           <span className="fs-label">Per Month<br />Platform Access</span>
         </div>
         <div className="float-stat">

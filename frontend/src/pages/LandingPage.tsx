@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { MessageCircle, Instagram, Youtube, Linkedin } from "lucide-react";
-import logo from "../assets/manas360_main_logo.png";
-import landingBg from "../assets/You renot alone-Beach.jpeg";
+import { MessageCircle, Instagram, Youtube, Linkedin, Moon, Sun } from "lucide-react";
+import { applyTheme, getStoredThemePreference, persistThemePreference, resolveTheme, type ThemePreference } from '../lib/themePreference';
+const logo = "/Logo.jpeg";
+// landingBg uses the image from the public folder (URL-encoded for spaces)
+const landingBg = "/You%20renot%20alone-Beach.jpeg";
 
 type Language = "English" | "Hindi" | "Kannada" | "Tamil" | "Telugu";
 
@@ -42,6 +44,7 @@ type QuickNavMegaMenu = {
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
 
+  const [activeTheme, setActiveTheme] = useState<ThemePreference>(() => resolveTheme(getStoredThemePreference()));
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [loginDropdownOpen, setLoginDropdownOpen] = useState(false);
@@ -52,6 +55,26 @@ const LandingPage: React.FC = () => {
   const [activeQuickNav, setActiveQuickNav] = useState<string | null>(null);
   const quickNavCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const leftPanelCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    applyTheme(activeTheme);
+  }, [activeTheme]);
+
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'theme-preference') {
+        setActiveTheme(resolveTheme(getStoredThemePreference()));
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  const toggleTheme = () => {
+    const nextTheme: ThemePreference = activeTheme === 'dark' ? 'light' : 'dark';
+    setActiveTheme(nextTheme);
+    persistThemePreference(nextTheme);
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -99,60 +122,84 @@ const LandingPage: React.FC = () => {
     navigate("/hit-a-sixer");
   };
 
-  const handleQuickNavMegaItemClick = (menuLabel: string) => {
-    if (menuLabel === "I Need a Helping Hand") {
-      setActiveQuickNav(null);
-      navigate("/helping-hand");
-      return;
-    }
-
-    if (menuLabel === "AI Power Hub") {
-      setActiveQuickNav(null);
-      navigate("/ai-power-hub");
-      return;
-    }
-
-    if (menuLabel === "Find a Spark Again") {
-      setActiveQuickNav(null);
-      navigate("/find-spark");
-      return;
-    }
-
-    if (menuLabel === "Self-Help Tools") {
-      setActiveQuickNav(null);
-      navigate("/self-help");
-      return;
-    }
-
-    if (menuLabel === "For Corporates / Edu / Healthcare") {
-      setActiveQuickNav(null);
-      navigate("/corporate-landing");
-      return;
-    }
-
-    if (menuLabel === "Premium Therapy Hub") {
-      setActiveQuickNav(null);
-      navigate("/premium-theraphy");
-      return;
-    }
-
-    if (menuLabel === "MyDigitalClinic") {
-      setActiveQuickNav(null);
-      navigate("/my-digital-clinic");
-      return;
-    }
-
-    if (menuLabel === "Certify2EarnMore") {
-      setActiveQuickNav(null);
-      navigate("/certifications");
-      return;
-    }
-
-    if (menuLabel === "Digital Pets4Happy Hormones") {
-      setActiveQuickNav(null);
-      navigate("/pet");
-    }
+  // Route map for individual mega menu items (by item title)
+  const megaItemRoutes: Record<string, string> = {
+    // Premium Therapy Hub items
+    "1-on-1 Therapy": "/premium-theraphy",
+    "Psychiatry Consult": "/premium-theraphy",
+    "Couples Therapy": "/find-spark",
+    "Group Therapy": "/group-therapy",
+    "Sound Therapy": "/sound-therapy",
+    "Executive Coaching": "/premium-theraphy",
+    "Wellness Retreats": "/retreats",
+    // Wellness Shop is "coming soon" — no route
+    // I Need a Helping Hand items
+    "Free Screening": "/assessment",
+    "Find a Therapist": "/helping-hand",
+    "See a Psychiatrist": "/helping-hand",
+    "Specialized Care": "/specialized-care",
+    "Group Sessions": "/group-therapy",
+    "Crisis Support": "/crisis",
+    // AI Power Hub items
+    "Anytime Buddy AI": "/ai-power-hub",
+    "AnytimeBuddy Chat": "/ai-power-hub",
+    "Vent Buddy": "/ai-power-hub",
+    "AI Session Notes": "/ai-power-hub",
+    // Digital Pets items
+    "Baby Dinosaur": "/pet",
+    "Golden Retriever": "/pet",
+    "Healing Elephant": "/pet",
+    "Chintu Fox": "/pet",
+    "Name Your Pet \u2014 Adopt": "/pet",
+    // Self-Help items
+    "Mood Tracker": "/self-help",
+    "Breathing Exercises": "/self-help",
+    "Journaling Prompts": "/self-help",
+    "Sleep Guide": "/self-help",
+    "CBT Worksheets": "/self-help",
+    // Find a Spark items
+    "Find a Spark \u2014 Couples": "/find-spark",
+    "Concerned Parent": "/find-spark",
+    "Family Plan": "/find-spark",
+    "Teen & Student": "/find-spark",
+    // Corporate items
+    "Corporate Wellness": "/corporate-landing",
+    "Education Institutions": "/corporate-landing",
+    "Healthcare Units": "/corporate-landing",
+    "Government Agency": "/corporate-landing",
+    // Certify2EarnMore items
+    "Certification Hub": "/certifications",
+    "Join as Therapist": "/certifications",
+    // MyDigitalClinic items
+    "Patient Database": "/my-digital-clinic",
+    "Session Notes": "/my-digital-clinic",
+    "Scheduling": "/my-digital-clinic",
+    "Prescriptions": "/my-digital-clinic",
+    "Progress Tracking": "/my-digital-clinic",
+    "3 days": "/my-digital-clinic",
   };
+
+  // Fallback route map for parent menu labels (used when no item-specific route exists)
+  const menuFallbackRoutes: Record<string, string> = {
+    "I Need a Helping Hand": "/helping-hand",
+    "AI Power Hub": "/ai-power-hub",
+    "Find a Spark Again": "/find-spark",
+    "Self-Help Tools": "/self-help",
+    "For Corporates / Edu / Healthcare": "/corporate-landing",
+    "Premium Therapy Hub": "/premium-theraphy",
+    "MyDigitalClinic": "/my-digital-clinic",
+    "Certify2EarnMore": "/certifications",
+    "Digital Pets4Happy Hormones": "/pet",
+  };
+
+  const handleMegaItemNav = (itemTitle: string, parentMenu: string | null) => {
+    setActiveQuickNav(null);
+    const route = megaItemRoutes[itemTitle] || (parentMenu ? menuFallbackRoutes[parentMenu] : null);
+    if (route) navigate(route);
+  };
+
+  // handleQuickNavMegaItemClick was removed because the individual mega menu items
+  // are routed via `handleMegaItemNav` and specific onClick handlers in the UI.
 
   const footerQuickLinkRoutes: Record<string, string> = {
     "About Us": "/landing",
@@ -281,12 +328,14 @@ const LandingPage: React.FC = () => {
         subtitle: "Clinically supervised, evidence-based sessions",
         columns: 5,
         items: [
-          { icon: "\uD83E\uDDE0", title: "1-on-1 Therapy", subtitle: "Psychologist sessions from \u20B9699", badge: "\u20B9699" },
-          { icon: "\u2695\uFE0F", title: "Psychiatry Consult", subtitle: "Medication review from \u20B9999", badge: "\u20B9999" },
-          { icon: "\uD83D\uDC91", title: "Couples Therapy", subtitle: "Rebuild your relationship", badge: "\u20B91,499" },
-          { icon: "\uD83D\uDC65", title: "Group Therapy", subtitle: "Peer circles from \u20B9149", badge: "\u20B9149" },
-          { icon: "\uD83C\uDFB5", title: "Sound Therapy", subtitle: "Raga healing + sleep tracks", badge: "20 Free" },
-          { icon: "\uD83D\uDCBC", title: "Executive Coaching", subtitle: "High-performance wellness", badge: "Pro" }
+          { icon: "🧠", title: "1-on-1 Therapy", subtitle: "Psychologist sessions from ₹699", badge: "₹699" },
+          { icon: "⚕️", title: "Psychiatry Consult", subtitle: "Medication review from ₹999", badge: "₹999" },
+          { icon: "💑", title: "Couples Therapy", subtitle: "Rebuild your relationship", badge: "₹1,499" },
+          { icon: "👥", title: "Group Therapy", subtitle: "Peer circles from ₹149", badge: "₹149" },
+          { icon: "🎵", title: "Sound Therapy", subtitle: "Raga healing + sleep tracks", badge: "20 Free" },
+          { icon: "💼", title: "Executive Coaching", subtitle: "High-performance wellness", badge: "Pro" },
+          { icon: "🏕️", title: "Wellness Retreats", subtitle: "Rishikesh, Coorg, Goa" },
+          { icon: "🛒", title: "Wellness Shop", subtitle: "Journals, tools, merch", badge: "Soon" }
         ]
       },
       "Self-Help Tools": {
@@ -334,9 +383,7 @@ const LandingPage: React.FC = () => {
         columns: 4,
         items: [
           { icon: "\uD83C\uDFC6", title: "Certification Hub", subtitle: "CBT, NLP, 5Whys training", badge: "Pro" },
-          { icon: "\uD83E\uDDD1", title: "Join as Therapist", subtitle: "Earn \u20B950K-2L/month" },
-          { icon: "\uD83C\uDFD5\uFE0F", title: "Wellness Retreats", subtitle: "Rishikesh, Coorg, Goa" },
-          { icon: "\uD83D\uDED2", title: "Wellness Shop", subtitle: "Journals, tools, merch" }
+          { icon: "\uD83E\uDDD1", title: "Join as Therapist", subtitle: "Earn \u20B950K-2L/month" }
         ]
       },
       MyDigitalClinic: {
@@ -411,7 +458,7 @@ const LandingPage: React.FC = () => {
       },
       {
         icon: "\uD83D\uDD6F\uFE0F",
-        title: "Grief & Loss � Safe Space",
+        title: "Grief & Loss — Safe Space",
         doctor: "Dr. Rajan",
         language: "Hindi",
         seats: "Only 2 seats left!",
@@ -437,10 +484,10 @@ const LandingPage: React.FC = () => {
 
   const languageLabelMap: Record<Language, string> = {
     English: "English",
-    Hindi: "??????",
-    Tamil: "?????",
-    Telugu: "??????",
-    Kannada: "?????"
+    Hindi: "हिन्दी",
+    Tamil: "தமிழ்",
+    Telugu: "తెలుగు",
+    Kannada: "ಕನ್ನಡ"
   };
 
   return (
@@ -622,15 +669,15 @@ const LandingPage: React.FC = () => {
             }}
           >
             {[
-              { id: "bot", icon: "??", bg: "linear-gradient(180deg, #EFE7FF, #E6EEFF)", dot: true },
-              { id: "pets", icon: "??", bg: "linear-gradient(180deg, #EFE7FF, #ECE9FF)" },
-              { id: "sound", icon: "??", bg: "linear-gradient(180deg, #DDF3EC, #E3F0FF)" },
+              { id: "bot", icon: "🤖", bg: "linear-gradient(180deg, #EFE7FF, #E6EEFF)", dot: true },
+              { id: "pets", icon: "🐾", bg: "linear-gradient(180deg, #EFE7FF, #ECE9FF)" },
+              { id: "sound", icon: "🎵", bg: "linear-gradient(180deg, #DDF3EC, #E3F0FF)" },
               { id: "divider-1", divider: true },
-              { id: "schedule", icon: "???", bg: "linear-gradient(180deg, #DDF3EC, #E3F0FF)" },
-              { id: "chat-mid", icon: "??", bg: "linear-gradient(180deg, #DDF3EC, #E6EDF8)" },
+              { id: "schedule", icon: "🗓️", bg: "linear-gradient(180deg, #DDF3EC, #E3F0FF)" },
+              { id: "chat-mid", icon: "💬", bg: "linear-gradient(180deg, #DDF3EC, #E6EDF8)" },
               { id: "divider-2", divider: true },
-              { id: "notes", icon: "??", bg: "linear-gradient(180deg, #E6F0FF, #E9EEF8)" },
-              { id: "brain", icon: "??", bg: "linear-gradient(180deg, #FDE7EF, #F4E8FF)" }
+              { id: "notes", icon: "📋", bg: "linear-gradient(180deg, #E6F0FF, #E9EEF8)" },
+              { id: "brain", icon: "🧠", bg: "linear-gradient(180deg, #FDE7EF, #F4E8FF)" }
             ].map((item) => {
               if (item.divider) {
                 return <div key={item.id} style={{ height: "1px", background: "#D7DEE8", margin: "8px 6px" }} />;
@@ -907,6 +954,25 @@ const LandingPage: React.FC = () => {
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <button
                   type="button"
+                  onClick={toggleTheme}
+                  aria-label="Toggle theme"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: "36px",
+                    height: "36px",
+                    borderRadius: "50%",
+                    border: "1px solid #D5DEE9",
+                    background: "#F8FBFF",
+                    cursor: "pointer",
+                    color: "#64748B",
+                  }}
+                >
+                  {activeTheme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+                </button>
+                <button
+                  type="button"
                   onClick={() => setShowSearch(true)}
                   style={{
                     display: "flex",
@@ -932,7 +998,7 @@ const LandingPage: React.FC = () => {
                       borderRadius: "8px"
                     }}
                   >
-                    ? K
+                    ⌘ K
                   </span>
                 </button>
 
@@ -1184,22 +1250,11 @@ const LandingPage: React.FC = () => {
                                   ? 0
                                   : undefined
                               }
-                              onClick={() => handleQuickNavMegaItemClick(activeQuickNav)}
+                              onClick={() => handleMegaItemNav(mi.title, activeQuickNav)}
                               onKeyDown={(e) => {
-                                if (
-                                  (activeQuickNav === "I Need a Helping Hand" ||
-                                    activeQuickNav === "AI Power Hub" ||
-                                    activeQuickNav === "Find a Spark Again" ||
-                                    activeQuickNav === "Self-Help Tools" ||
-                                    activeQuickNav === "For Corporates / Edu / Healthcare" ||
-                                    activeQuickNav === "Premium Therapy Hub" ||
-                                    activeQuickNav === "MyDigitalClinic" ||
-                                    activeQuickNav === "Certify2EarnMore" ||
-                                    activeQuickNav === "Digital Pets4Happy Hormones") &&
-                                  (e.key === "Enter" || e.key === " ")
-                                ) {
+                                if (e.key === "Enter" || e.key === " ") {
                                   e.preventDefault();
-                                  handleQuickNavMegaItemClick(activeQuickNav);
+                                  handleMegaItemNav(mi.title, activeQuickNav);
                                 }
                               }}
                               onMouseEnter={(e) => {
@@ -1279,9 +1334,9 @@ const LandingPage: React.FC = () => {
             fontFamily: "Georgia, 'Times New Roman', serif"
           }}
         >
-          You're <span style={{ color: "#16190bff" }}>not alone</span>. Let's take
+          You're <span style={{ color: "#7F8000" }}>not alone</span>. Let's take
           <br />
-          this <span style={{ color: "#232C00" }}>together</span>.
+          this <span style={{ color: "#7F8000" }}>together</span>.
         </h1>
         <p style={{ fontSize: "14px", color: "#08101E", lineHeight: 1.6, margin: "0 0 8px 0", fontWeight: 900 }}>
           Feeling overwhelmed? Confused? That's okay. We'll help you
@@ -1380,8 +1435,8 @@ const LandingPage: React.FC = () => {
                 </div>
               </div>
               <div style={{ marginTop: "14px", fontSize: "16px", fontWeight: 900, color: "#0F172A" }}>Psychologist</div>
-              <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#64748B", lineHeight: 1.55 }}>Clinical &amp; counseling psychology. RCI registered. Earn ?60K&ndash;?2L/mo</div>
-              <button type="button" style={{ marginTop: "14px", border: "1.5px solid rgba(124,58,237,0.7)", background: "rgba(255,255,255,0.95)", color: "#6D28D9", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
+              <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#64748B", lineHeight: 1.55 }}>Clinical &amp; counseling psychology. RCI registered. Earn ₹60K&ndash;₹2L/mo</div>
+              <button type="button" onClick={() => navigate("/provider-landing")} style={{ marginTop: "14px", border: "1.5px solid rgba(124,58,237,0.7)", background: "rgba(255,255,255,0.95)", color: "#6D28D9", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
                 &#10022; Join Now
               </button>
               <div style={{ marginTop: "10px", fontSize: "11px", fontWeight: 800, color: "#64748B" }}>Discover &mdash; Plans &mdash; Profile</div>
@@ -1398,7 +1453,7 @@ const LandingPage: React.FC = () => {
               </div>
               <div style={{ marginTop: "14px", fontSize: "16px", fontWeight: 900, color: "#0F172A" }}>Psychiatrist</div>
               <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#64748B", lineHeight: 1.55 }}>Diagnosis, medication, e-prescriptions. NMC registered MDs</div>
-              <button type="button" style={{ marginTop: "14px", border: "1.5px solid rgba(14,165,166,0.7)", background: "rgba(255,255,255,0.95)", color: "#0F766E", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
+              <button type="button" onClick={() => navigate("/provider-landing")} style={{ marginTop: "14px", border: "1.5px solid rgba(14,165,166,0.7)", background: "rgba(255,255,255,0.95)", color: "#0F766E", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
                 &#10022; Join Now
               </button>
               <div style={{ marginTop: "10px", fontSize: "11px", fontWeight: 800, color: "#64748B" }}>Discover &mdash; Plans &mdash; Profile</div>
@@ -1415,7 +1470,7 @@ const LandingPage: React.FC = () => {
               </div>
               <div style={{ marginTop: "14px", fontSize: "16px", fontWeight: 900, color: "#0F172A" }}>Therapist</div>
               <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#64748B", lineHeight: 1.55 }}>CBT, DBT, REBT, integrative. Build your practice on your terms</div>
-              <button type="button" style={{ marginTop: "14px", border: "1.5px solid rgba(34,197,94,0.7)", background: "rgba(255,255,255,0.95)", color: "#15803D", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
+              <button type="button" onClick={() => navigate("/provider-landing")} style={{ marginTop: "14px", border: "1.5px solid rgba(34,197,94,0.7)", background: "rgba(255,255,255,0.95)", color: "#15803D", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
                 &#10022; Join Now
               </button>
               <div style={{ marginTop: "10px", fontSize: "11px", fontWeight: 800, color: "#64748B" }}>Discover &mdash; Plans &mdash; Profile</div>
@@ -1432,7 +1487,7 @@ const LandingPage: React.FC = () => {
               </div>
               <div style={{ marginTop: "14px", fontSize: "16px", fontWeight: 900, color: "#0F172A" }}>NLP Coach</div>
               <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#64748B", lineHeight: 1.55 }}>Neuro-linguistic programming. Life coaching. Transformation specialists</div>
-              <button type="button" style={{ marginTop: "14px", border: "1.5px solid rgba(245,158,11,0.75)", background: "rgba(255,255,255,0.95)", color: "#B45309", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
+              <button type="button" onClick={() => navigate("/provider-landing")} style={{ marginTop: "14px", border: "1.5px solid rgba(245,158,11,0.75)", background: "rgba(255,255,255,0.95)", color: "#B45309", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
                 &#10022; Join Now
               </button>
               <div style={{ marginTop: "10px", fontSize: "11px", fontWeight: 800, color: "#64748B" }}>Discover &mdash; Plans &mdash; Profile</div>
@@ -1641,7 +1696,7 @@ const LandingPage: React.FC = () => {
                 relationships across continents.
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "12px" }}>
-                {["IST + Your Timezone", "Hindi � Tamil � Telugu � Kannada", "HIPAA + DPDPA", "USD / GBP / AED / SGD"].map((chip) => (
+                {["IST + Your Timezone", "Hindi · Tamil · Telugu · Kannada", "HIPAA + DPDPA", "USD / GBP / AED / SGD"].map((chip) => (
                   <div key={chip} style={{ fontSize: "10px", fontWeight: 900, color: "#9A3412", background: "rgba(255,255,255,0.65)", border: "1px solid rgba(251, 191, 36, 0.55)", padding: "4px 8px", borderRadius: "999px" }}>
                     {chip}
                   </div>
