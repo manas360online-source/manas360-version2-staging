@@ -198,11 +198,8 @@ const LandingPage: React.FC = () => {
     if (route) navigate(route);
   };
 
-  const handleQuickNavMegaItemClick = (menuLabel: string) => {
-    setActiveQuickNav(null);
-    const route = menuFallbackRoutes[menuLabel];
-    if (route) navigate(route);
-  };
+  // handleQuickNavMegaItemClick was removed because the individual mega menu items
+  // are routed via `handleMegaItemNav` and specific onClick handlers in the UI.
 
   const footerQuickLinkRoutes: Record<string, string> = {
     "About Us": "/landing",

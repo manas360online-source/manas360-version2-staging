@@ -23,13 +23,12 @@ export const CheckoutPage: React.FC = () => {
         return statePlan === 'installment' ? 'installment' : 'full';
     });
     const [generalError, setGeneralError] = useState<string | null>(null);
-    const [duplicateMessage, setDuplicateMessage] = useState<string | null>(null);
+    const [duplicateMessage] = useState<string | null>(null);
     const myCertificationsPath = location.pathname.startsWith('/provider') ? '/provider/my-certifications' : '/my-certifications';
 
     const cert = CERTIFICATIONS.find(c => c.slug === slug);
 
-    const fullName = String((location.state as any)?.fullName || '').trim();
-    const mobile = String((location.state as any)?.mobile || '').trim();
+    // NOTE: fullName and mobile are read from location.state inside the transaction handler when needed
 
     const installmentAmount = useMemo(() => Math.ceil((cert?.price_inr || 0) / 3), [cert?.price_inr]);
     const totalToday = plan === 'full' ? (cert?.price_inr || 0) : installmentAmount;
