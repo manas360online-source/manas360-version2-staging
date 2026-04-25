@@ -29,7 +29,7 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({ data }) => {
   const apiSeverity = String(data.severityLevel || '').trim();
   const hasApiResult = apiSeverity.length > 0 || typeof data.totalScore === 'number';
   let severity = "Mild";
-  let emoji = "??";
+  let emoji = "😊";
   let color = "text-emerald-600";
   let message = "You're showing some mild indicators.";
 
@@ -37,21 +37,21 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({ data }) => {
     severity = apiSeverity || 'Assessment Complete';
     message = data.interpretation || 'Your assessment is complete.';
     if (severity.toLowerCase() === 'severe') {
-      emoji = '??';
+      emoji = '😞';
       color = 'text-red-500';
     } else if (severity.toLowerCase() === 'moderate') {
-      emoji = '??';
+      emoji = '😟';
       color = 'text-orange-500';
     }
   } else {
     if (symptomCount >= 3 && symptomCount < 6) {
       severity = "Moderate";
-      emoji = "??";
+      emoji = "😟";
       color = "text-orange-500";
       message = "You seem to be carrying a heavy emotional load.";
     } else if (symptomCount >= 6) {
       severity = "Significant";
-      emoji = "??";
+      emoji = "😞";
       color = "text-red-500";
       message = "Your symptoms suggest you might be facing significant challenges.";
     }
@@ -139,7 +139,7 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({ data }) => {
                 flex items-center justify-center gap-2
               `}
             >
-              <span>??</span>
+              <span>🩺</span>
               Full Health Assessment
             </button>
           </div>

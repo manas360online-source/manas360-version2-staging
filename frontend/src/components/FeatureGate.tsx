@@ -13,7 +13,7 @@ interface FeatureGateProps {
  * unless specified otherwise.
  */
 export const FeatureGate: React.FC<FeatureGateProps> = ({ feature, children, fallback = null }) => {
-  useAuth();
+  const { user } = useAuth();
   
   // Detect if we are in MDC mode
   const mdcUserStr = localStorage.getItem('mdc_user');

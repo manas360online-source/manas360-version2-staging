@@ -1,9 +1,11 @@
 
-import { useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 
+type PetKey = "baby-dino" | "golden-retriever" | "healing-elephant" | "chintu-fox";
+
 type DigitalPetsHubPageProps = {
-  selectedPet?: string;
+  selectedPet?: PetKey;
 };
 
 const PETS = [
@@ -223,3 +225,5 @@ export default function DigitalPetsHubPage({ selectedPet }: DigitalPetsHubPagePr
     </div>
   );
 }
+
+export default DigitalPetsHubPage;

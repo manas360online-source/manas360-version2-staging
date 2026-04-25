@@ -164,18 +164,18 @@ export const Assessment: React.FC<AssessmentProps> = ({ onSubmit }) => {
                               key={`${question.questionId}-${option.optionIndex}`}
                               onClick={() => setAnswer(question.questionId, option.optionIndex)}
                               className={`
-                                w-full px-7 py-4 rounded-2xl text-base font-medium transition-smooth border-2 text-left flex justify-between items-center
-                                ${isSelected
-                                  ? 'text-white shadow-soft-lg ring-2 ring-white/20 scale-[1.01]'
-                                  : 'bg-white/10 text-white border-white/20 hover:border-white/30 hover:bg-white/15'
-                                }
-                              `}
-                              style={isSelected
-                                ? { backgroundColor: theme.colors.brandTopbar, borderColor: theme.colors.brandTopbar }
-                                : { backgroundColor: 'rgba(255,255,255,0.10)' }}
+                                  w-full px-7 py-4 rounded-2xl text-base font-medium transition-smooth border-2 text-left flex justify-between items-center
+                                  ${isSelected
+                                    ? 'text-white shadow-soft-lg ring-2 ring-white/20 scale-[1.01]'
+                                    : 'bg-white text-wellness-text border-calm-sage/20 hover:border-calm-sage/40 hover:bg-calm-sage/5'
+                                  }
+                                `}
+                                style={isSelected
+                                  ? { backgroundColor: theme.colors.brandTopbar, borderColor: theme.colors.brandTopbar }
+                                  : undefined}
                             >
                               {option.label}
-                              {isSelected && <span className="text-xl">?</span>}
+                              {isSelected && <span className="text-xl">✓</span>}
                             </button>
                           );
                         })}
@@ -205,7 +205,7 @@ export const Assessment: React.FC<AssessmentProps> = ({ onSubmit }) => {
                 }
               `}
             >
-              {submitting ? 'Submitting...' : 'Submit � Analyze My Results'}
+              {submitting ? 'Submitting...' : 'Submit • Analyze My Results'}
             </button>
           </div>
         </div>

@@ -326,7 +326,7 @@
 }
 
 .hero-trust-row span::before {
-  content: '•';
+  content: 'â€¢';
   color: #97b111;
   margin-right: 8px;
 }

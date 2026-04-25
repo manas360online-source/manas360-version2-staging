@@ -3,6 +3,7 @@ import {
   Bell,
   CalendarDays,
   ClipboardList,
+  FileText,
   HeartPulse,
   Home,
   BarChart3,
