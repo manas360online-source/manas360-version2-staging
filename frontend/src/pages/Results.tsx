@@ -16,10 +16,11 @@ interface ResultsPageProps {
 
 export const ResultsPage: React.FC<ResultsPageProps> = ({ data }) => {
   const navigate = useNavigate();
+  const handleGoHome = () => navigate('/landing', { replace: true });
   if (!data) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <button onClick={() => window.location.href = '/'} className="text-blue-500 underline">Return Home</button>
+        <button onClick={handleGoHome} className="text-blue-500 underline">Return Home</button>
       </div>
     );
   }
@@ -65,9 +66,9 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({ data }) => {
       <div className="responsive-container section-stack py-8 sm:py-12">
        
        <div className="w-full max-w-screen-lg mx-auto flex flex-col sm:flex-row gap-4 justify-between sm:items-center">
-       <div className="font-serif text-2xl font-normal text-wellness-text tracking-wide cursor-pointer hover:opacity-80 transition-smooth" onClick={() => navigate('/')}>
-          MANAS<span className="font-semibold text-calm-sage">360</span>
-        </div>
+          <div className="font-serif text-2xl font-normal text-wellness-text tracking-wide cursor-pointer hover:opacity-80 transition-smooth" onClick={() => navigate('/')}>
+            MANAS<span className="font-semibold text-calm-sage">360</span>
+          </div>
         <div className="text-sm font-medium text-gentle-blue bg-gentle-blue/15 px-5 py-2 rounded-full">
           Results
         </div>
@@ -144,7 +145,7 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({ data }) => {
           </div>
           
           <button 
-            onClick={() => navigate('/')} 
+            onClick={handleGoHome} 
             className="
               responsive-action-btn w-full
               bg-wellness-surface border-2 border-calm-sage/20 text-wellness-text
