@@ -1,0 +1,332 @@
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Link } from 'react-router-dom';
+import { X } from 'lucide-react';
+import { MegaPanel, MegaNavOption } from './MegaPanel';
+
+type TabLabel =
+  | 'I Need Support'
+  | 'AI & Self-Help'
+  | 'For Relationships'
+  | 'For Professionals'
+  | 'Learn & Grow';
+
+interface TabConfig {
+  label: TabLabel;
+  items: MegaNavOption[];
+}
+
+interface MegaNavProps {
+  tone?: 'dark' | 'light';
+}
+
+const tabs: TabConfig[] = [
+  {
+    label: 'I Need Support',
+    items: [
+      { icon: '🩺', title: 'Quick Check-In', description: 'Start with a brief guided check-in', route: '/checkin' },
+      { icon: '🧠', title: 'Find a Therapist', description: 'Browse and connect with therapists', route: '/therapists' },
+      { icon: '💊', title: 'See a Psychiatrist', description: 'Medical consultation options', route: '/psychiatry' },
+      { icon: '🌱', title: 'Specialized Care', description: 'Focused support pathways', route: '/specialized-care' },
+      { icon: '👥', title: 'Group Sessions', description: 'Shared support and healing groups', route: '/groups' },
+      { icon: '🚨', title: 'Crisis Support', description: 'Immediate urgent support options', route: '/crisis' },
+    ],
+  },
+  {
+    label: 'AI & Self-Help',
+    items: [
+      { icon: '🤖', title: 'AI Room', description: 'Private AI-led support space', route: '/ai-chat' },
+      { icon: '🧕', title: 'Anytime Buddy AI', description: 'Guidance from Anytime Buddy AI', route: '/ai-chat' },
+      { icon: '💬', title: 'Anytime Buddy', description: '24/7 companion support', route: '/ai-chat' },
+      { icon: '🫧', title: 'Vent Buddy', description: 'A safe place to express feelings', route: '/vent' },
+      { icon: '📞', title: 'Call & Talk', description: 'Voice support when needed', route: '/call' },
+      { icon: '🎵', title: 'Sound Therapy', description: 'Calm sound-based relaxation', route: '/sound' },
+      { icon: '📈', title: 'Mood Tracker', description: 'Track emotional trends daily', route: '/mood' },
+      { icon: '🐾', title: 'Digital Pet', description: 'Gentle habit companion', route: '/pet' },
+    ],
+  },
+  {
+    label: 'For Relationships',
+    items: [
+      { icon: '💞', title: 'Couples', description: 'Support for partners', route: '/couples' },
+      { icon: '🧑‍🍼', title: 'Concerned Parent', description: 'Guidance for caregivers', route: '/parent' },
+      { icon: '🏠', title: 'Family Plan', description: 'Wellness support for families', route: '/family' },
+      { icon: '🎓', title: 'Teen & Student', description: 'Support for young minds', route: '/teen' },
+    ],
+  },
+  {
+    label: 'For Professionals',
+    items: [
+      { icon: '🏢', title: 'Corporate Wellness', description: 'Employee mental wellness programs', route: '/corporate' },
+      { icon: '🏫', title: 'Education Partner', description: 'Campus and school wellbeing solutions', route: '/education' },
+      { icon: '🏥', title: 'Healthcare Partner', description: 'Clinical collaboration models', route: '/healthcare' },
+      // Insurance Partner and Government Agency removed per request
+    ],
+  },
+  {
+    label: 'Learn & Grow',
+    items: [
+      { icon: '📜', title: 'Certifications', description: 'Professional credential pathways', route: '/certifications' },
+      { icon: '🧑‍⚕️', title: 'Join as Therapist', description: 'Become part of the MANAS360 network', route: '/certifications' },
+      { icon: '📚', title: 'Psychoeducation', description: 'Learn practical wellbeing skills', route: '/learn' },
+      { icon: '🏞️', title: 'Wellness Retreats', description: 'Restorative retreat experiences', route: '/retreats' },
+      { icon: '🛍️', title: 'Wellness Shop', description: 'Tools and resources for wellbeing', route: '/shop' },
+    ],
+  },
+];
+
+export const MegaNav: React.FC<MegaNavProps> = ({ tone = 'dark' }) => {
+  const [activeTab, setActiveTab] = useState<TabLabel | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const closeTimerRef = useRef<number | null>(null);
+
+  const activeItems = useMemo(
+    () => tabs.find((tab) => tab.label === activeTab)?.items ?? [],
+    [activeTab]
+  );
+
+  const desktopGridClass = useMemo(() => {
+    if (!activeTab) return 'grid-cols-4' as const;
+    if (activeTab === 'I Need Support') return 'grid-cols-6' as const;
+    if (activeTab === 'For Relationships') return 'grid-cols-4' as const;
+    if (activeTab === 'For Professionals') return 'grid-cols-3' as const;
+    if (activeTab === 'Learn & Grow') return 'grid-cols-5' as const;
+    return 'grid-cols-4' as const;
+  }, [activeTab]);
+
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (!rootRef.current) return;
+      if (!rootRef.current.contains(event.target as Node)) {
+        setActiveTab(null);
+      }
+    };
+
+    const handleEsc = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setActiveTab(null);
+        setMobileMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('keydown', handleEsc);
+
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('keydown', handleEsc);
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current) {
+        window.clearTimeout(closeTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [mobileMenuOpen]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 768) {
+        setMobileMenuOpen(false);
+      }
+    };
+
+    window.addEventListener('resize', handleResize, { passive: true });
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const handleDesktopEnter = (tab: TabLabel) => {
+    if (closeTimerRef.current) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+    setActiveTab(tab);
+  };
+
+  const handleDesktopLeave = () => {
+    closeTimerRef.current = window.setTimeout(() => {
+      setActiveTab(null);
+    }, 220);
+  };
+
+  const isLight = tone === 'light';
+  const closeMobileMenu = () => {
+    setMobileMenuOpen(false);
+  };
+
+  return (
+    <div ref={rootRef} className="relative" onMouseLeave={handleDesktopLeave}>
+      <nav
+        className={`mx-auto mt-2 hidden w-full max-w-7xl flex-nowrap items-center gap-0.5 border-t px-3 pt-1.5 md:flex ${isLight ? 'border-calm-sage/12' : 'border-cream/10'}`}
+        aria-label="Mega navigation tabs"
+      >
+        <div className="flex min-w-0 flex-1 items-center gap-0.5">
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.label;
+
+            return (
+              <button
+                key={tab.label}
+                type="button"
+                onMouseEnter={() => handleDesktopEnter(tab.label)}
+                onFocus={() => handleDesktopEnter(tab.label)}
+                onClick={() => setActiveTab(isActive ? null : tab.label)}
+                className={`min-h-[36px] flex-1 whitespace-nowrap border-b-2 border-transparent px-2.5 py-1.5 text-[13px] font-medium tracking-wide transition-all duration-300 ease-out ${
+                  isActive
+                    ? isLight
+                      ? 'border-b-gentle-blue text-charcoal'
+                      : 'border-b-gentle-blue text-cream [text-shadow:0_0_10px_rgba(157,173,190,0.45)]'
+                    : isLight
+                      ? 'text-charcoal/70 hover:border-b-gentle-blue/70 hover:text-charcoal'
+                      : 'text-cream/80 hover:border-b-gentle-blue/80 hover:text-cream'
+                }`}
+                aria-expanded={isActive}
+                aria-controls={`panel-${tab.label}`}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+          <Link
+            to="/my-digital-clinic"
+            className={`min-h-[36px] flex-1 whitespace-nowrap border-b-2 border-transparent px-2.5 py-1.5 text-center text-[13px] font-medium tracking-wide transition-all duration-300 ease-out ${
+              isLight
+                ? 'text-charcoal/70 hover:border-b-gentle-blue/70 hover:text-charcoal'
+                : 'text-cream/80 hover:border-b-gentle-blue/80 hover:text-cream'
+            }`}
+          >
+            MyDigitalClinic
+          </Link>
+          <Link
+            to="/how-it-works"
+            className={`min-h-[36px] flex-1 whitespace-nowrap border-b-2 border-transparent px-2.5 py-1.5 text-center text-[13px] font-medium tracking-wide transition-all duration-300 ease-out ${
+              isLight
+                ? 'text-charcoal/70 hover:border-b-gentle-blue/70 hover:text-charcoal'
+                : 'text-cream/80 hover:border-b-gentle-blue/80 hover:text-cream'
+            }`}
+          >
+            How It Works
+          </Link>
+        </div>
+      </nav>
+
+      <div
+        onMouseEnter={() => {
+          if (closeTimerRef.current) {
+            window.clearTimeout(closeTimerRef.current);
+            closeTimerRef.current = null;
+          }
+        }}
+        className={`absolute left-1/2 top-full z-40 hidden w-screen -translate-x-1/2 px-0 pt-0 transform-gpu transition-all duration-300 ease-out md:block ${
+          activeTab ? 'pointer-events-auto opacity-100 translate-y-0 scale-100' : 'pointer-events-none opacity-0 -translate-y-2 scale-[0.99]'
+        }`}
+      >
+        {activeTab ? (
+          <div id={`panel-${activeTab}`} className="w-full border border-gentle-blue/40 bg-[#075869]/98 shadow-[0_0_18px_rgba(157,173,190,0.2)]">
+            <MegaPanel
+              items={activeItems}
+              onNavigate={() => setActiveTab(null)}
+              tone={tone}
+              desktopGridClass={desktopGridClass}
+              fullBleedDesktop
+            />
+          </div>
+        ) : null}
+      </div>
+
+      <div className="mt-2 flex justify-start md:hidden">
+        <button
+          type="button"
+          onClick={() => setMobileMenuOpen(true)}
+          className={`inline-flex min-h-[36px] items-center rounded-md border px-2.5 py-1 transition-all duration-[250ms] ease-out ${
+            isLight
+              ? 'border-calm-sage/35 bg-white/95 text-charcoal hover:bg-cream'
+              : 'border-calm-sage/35 bg-[#075869]/92 text-cream hover:bg-[#0C7C8A]/45'
+          }`}
+          aria-expanded={mobileMenuOpen}
+          aria-controls="mobile-left-drawer"
+          aria-label="Open sidebar menu"
+        >
+          <span aria-hidden="true" className="inline-flex h-4 w-4 flex-col justify-between">
+            <span className={`h-0.5 w-4 rounded ${isLight ? 'bg-charcoal' : 'bg-cream'}`} />
+            <span className={`h-0.5 w-4 rounded ${isLight ? 'bg-charcoal' : 'bg-cream'}`} />
+            <span className={`h-0.5 w-4 rounded ${isLight ? 'bg-charcoal' : 'bg-cream'}`} />
+          </span>
+        </button>
+      </div>
+
+      {/* Portal: render mobile drawer at document.body so it escapes the header stacking context */}
+      {createPortal(
+        <div
+          id="mobile-left-drawer"
+          className={`fixed inset-0 z-[9999] transition-opacity duration-300 md:hidden ${
+            mobileMenuOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
+          }`}
+          aria-label="Mobile mega navigation sidebar"
+        >
+          <div
+            className="absolute inset-0 z-0 bg-charcoal/40 backdrop-blur-[2px]"
+            onClick={closeMobileMenu}
+            aria-hidden="true"
+          />
+
+          <aside
+            className={`absolute inset-y-0 left-0 z-10 w-[85%] max-w-sm overflow-y-auto border-r border-calm-sage/15 px-3 pb-6 pt-4 shadow-soft-lg transition-transform duration-300 ease-out will-change-transform ${
+              isLight ? 'bg-cream' : 'bg-[#075869]'
+            } ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}
+            onClick={(event) => event.stopPropagation()}
+            aria-modal="true"
+            role="dialog"
+          >
+              <div className="mb-4 flex items-center justify-between">
+                <span className={`font-serif text-lg font-light ${isLight ? 'text-charcoal' : 'text-cream'}`}>
+                  MANAS<span className="font-semibold">360</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={closeMobileMenu}
+                  className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors duration-200 ${
+                    isLight ? 'text-charcoal/60 hover:bg-charcoal/5 hover:text-charcoal' : 'text-cream/60 hover:bg-cream/10 hover:text-cream'
+                  }`}
+                  aria-label="Close menu"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {tabs.map((tab) => (
+                  <section key={tab.label}>
+                    <h3 className={`mb-1.5 px-1 text-[11px] font-bold uppercase tracking-widest ${
+                      isLight ? 'text-charcoal/40' : 'text-cream/40'
+                    }`}>
+                      {tab.label}
+                    </h3>
+                    <MegaPanel items={tab.items} onNavigate={closeMobileMenu} mobile tone={tone} />
+                  </section>
+                ))}
+              </div>
+          </aside>
+        </div>,
+        document.body,
+      )}
+    </div>
+  );
+};
+
+export default MegaNav;

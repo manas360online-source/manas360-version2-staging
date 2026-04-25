@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MANAS360 — Professional Profile Setup</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ocean:#0C7C8A;--ocean-deep:#064E5C;--ocean-light:#E0F4F7;
+  --gold:#D4A017;--gold-light:#FDF6E3;
+  --dark:#1A2332;--dark-soft:#2D3748;--white:#FFFFFF;
+  --gray:#718096;--gray-light:#EDF2F7;--gray-bg:#F7FAFC;
+  --rose:#E53E6B;--green:#38A169;--purple:#7C3AED;--teal:#0D9488;
+  --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Sans',sans-serif;background:linear-gradient(170deg,#E8F4F7 0%,#F0F7F8 40%,#F7FAFC 100%);min-height:100vh;color:var(--dark);}
+::-webkit-scrollbar{width:5px;}
+::-webkit-scrollbar-thumb{background:#CBD5E0;border-radius:4px;}
+
+/* Layout */
+.shell{max-width:860px;margin:0 auto;padding:24px 16px 60px;}
+
+/* Header */
+.header{text-align:center;margin-bottom:28px;}
+.header .logo{font-size:20px;font-weight:800;color:var(--ocean-deep);margin-bottom:4px;}
+.header .logo em{font-style:normal;color:var(--gold);}
+.header h1{font-family:'Playfair Display',serif;font-size:26px;font-weight:700;color:var(--dark);margin-bottom:6px;}
+.header p{font-size:13px;color:var(--gray);max-width:500px;margin:0 auto;line-height:1.6;}
+
+/* Progress stepper */
+.stepper{display:flex;align-items:center;justify-content:center;gap:0;margin-bottom:30px;padding:0 10px;flex-wrap:wrap;}
+.step-dot{
+  width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:700;cursor:pointer;transition:all .25s;flex-shrink:0;
+  border:2px solid var(--gray-light);color:var(--gray);background:var(--white);
+}
+.step-dot.active{border-color:var(--ocean);color:var(--white);background:var(--ocean);box-shadow:0 0 0 4px rgba(12,124,138,.15);}
+.step-dot.done{border-color:var(--green);color:var(--white);background:var(--green);}
+.step-line{width:28px;height:2px;background:var(--gray-light);flex-shrink:0;}
+.step-line.done{background:var(--green);}
+.step-labels{display:flex;justify-content:center;gap:12px;margin-top:8px;flex-wrap:wrap;}
+.step-label{font-size:9px;font-weight:600;color:var(--gray);text-transform:uppercase;letter-spacing:.8px;width:60px;text-align:center;}
+.step-label.active{color:var(--ocean);}
+
+/* Card */
+.form-card{
+  background:var(--white);border-radius:16px;
+  box-shadow:0 4px 24px rgba(0,0,0,.06);
+  padding:32px;border:1px solid rgba(0,0,0,.04);
+  transition:all .3s;
+}
+
+/* Section title */
+.sec-title{
+  display:flex;align-items:center;gap:10px;
+  margin-bottom:20px;padding-bottom:12px;border-bottom:1px solid var(--gray-light);
+}
+.sec-title .sec-icon{font-size:22px;}
+.sec-title h2{font-size:17px;font-weight:700;color:var(--dark);}
+.sec-title .sec-sub{font-size:11px;color:var(--gray);margin-top:2px;}
+
+/* Form elements */
+.field{margin-bottom:18px;}
+.field label{display:block;font-size:12px;font-weight:700;color:var(--dark-soft);margin-bottom:5px;}
+.field label .req{color:var(--rose);margin-left:2px;}
+.field label .hint{font-weight:400;color:var(--gray);font-size:11px;margin-left:6px;}
+.field input[type="text"],.field input[type="email"],.field input[type="tel"],.field input[type="number"],.field input[type="url"],
+.field input[type="date"],.field select,.field textarea{
+  width:100%;padding:10px 14px;border:1.5px solid var(--gray-light);border-radius:10px;
+  font-size:13px;font-family:'DM Sans',sans-serif;color:var(--dark);
+  transition:all .2s;background:var(--white);outline:none;
+}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--ocean);box-shadow:0 0 0 3px rgba(12,124,138,.1);}
+.field textarea{resize:vertical;min-height:80px;}
+.field select{cursor:pointer;appearance:auto;}
+
+/* Inline fields */
+.row{display:grid;gap:14px;}
+.row-2{grid-template-columns:1fr 1fr;}
+.row-3{grid-template-columns:1fr 1fr 1fr;}
+.row-4{grid-template-columns:1fr 1fr 1fr 1fr;}
+
+/* Chip selectors (multi-select) */
+.chip-group{display:flex;flex-wrap:wrap;gap:8px;}
+.chip{
+  padding:7px 14px;border-radius:20px;font-size:12px;font-weight:600;
+  border:1.5px solid var(--gray-light);color:var(--dark-soft);cursor:pointer;
+  transition:all .2s;user-select:none;display:flex;align-items:center;gap:5px;
+}
+.chip:hover{border-color:var(--ocean);color:var(--ocean);background:var(--ocean-light);}
+.chip.selected{border-color:var(--ocean);color:var(--white);background:var(--ocean);}
+.chip .chip-icon{font-size:14px;}
+
+/* Specialization cards */
+.spec-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;}
+.spec-card{
+  padding:12px 14px;border-radius:12px;border:1.5px solid var(--gray-light);
+  cursor:pointer;transition:all .2s;position:relative;
+}
+.spec-card:hover{border-color:var(--ocean);background:var(--ocean-light);}
+.spec-card.selected{border-color:var(--ocean);background:rgba(12,124,138,.06);}
+.spec-card.selected::after{
+  content:'✓';position:absolute;top:8px;right:10px;
+  width:20px;height:20px;border-radius:50%;background:var(--ocean);color:white;
+  font-size:11px;display:flex;align-items:center;justify-content:center;font-weight:700;
+}
+.spec-card .sc-header{display:flex;align-items:center;gap:8px;margin-bottom:4px;}
+.spec-card .sc-icon{font-size:20px;}
+.spec-card .sc-name{font-size:13px;font-weight:700;color:var(--dark);}
+.spec-card .sc-symptoms{font-size:10.5px;color:var(--gray);line-height:1.5;}
+
+/* Toggle switch */
+.toggle-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 16px;border-radius:12px;border:1.5px solid var(--gray-light);
+  margin-bottom:10px;transition:all .2s;
+}
+.toggle-row:hover{border-color:var(--ocean-light);}
+.toggle-row.active{border-color:var(--ocean);background:rgba(12,124,138,.03);}
+.toggle-left{display:flex;align-items:center;gap:10px;}
+.toggle-left .tl-icon{font-size:20px;}
+.toggle-left .tl-title{font-size:13px;font-weight:700;color:var(--dark);}
+.toggle-left .tl-desc{font-size:11px;color:var(--gray);margin-top:1px;}
+.toggle-right{display:flex;align-items:center;gap:10px;}
+.toggle-bonus{font-size:10px;font-weight:700;color:var(--green);background:rgba(56,161,105,.1);padding:2px 8px;border-radius:10px;}
+
+/* Custom toggle switch */
+.switch{position:relative;width:44px;height:24px;flex-shrink:0;}
+.switch input{display:none;}
+.switch .slider{
+  position:absolute;top:0;left:0;right:0;bottom:0;
+  background:var(--gray-light);border-radius:24px;cursor:pointer;transition:.3s;
+}
+.switch .slider::before{
+  content:'';position:absolute;width:18px;height:18px;border-radius:50%;
+  background:white;left:3px;bottom:3px;transition:.3s;box-shadow:0 1px 3px rgba(0,0,0,.15);
+}
+.switch input:checked + .slider{background:var(--ocean);}
+.switch input:checked + .slider::before{transform:translateX(20px);}
+
+/* Availability grid */
+.avail-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;}
+.avail-slot{
+  padding:14px;border-radius:12px;border:1.5px solid var(--gray-light);
+  text-align:center;cursor:pointer;transition:all .2s;
+}
+.avail-slot:hover{border-color:var(--ocean);background:var(--ocean-light);}
+.avail-slot.selected{border-color:var(--ocean);background:rgba(12,124,138,.06);}
+.avail-slot .as-icon{font-size:24px;margin-bottom:4px;}
+.avail-slot .as-time{font-size:13px;font-weight:700;color:var(--dark);}
+.avail-slot .as-label{font-size:10px;color:var(--gray);margin-top:2px;}
+
+/* Day pills for availability */
+.day-row{display:flex;gap:6px;margin-top:10px;justify-content:center;}
+.day-pill{
+  width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:700;border:1.5px solid var(--gray-light);color:var(--gray);
+  cursor:pointer;transition:all .15s;
+}
+.day-pill.selected{border-color:var(--ocean);color:var(--white);background:var(--ocean);}
+
+/* Upload zone */
+.upload-zone{
+  border:2px dashed var(--gray-light);border-radius:12px;padding:24px;text-align:center;
+  cursor:pointer;transition:all .2s;
+}
+.upload-zone:hover{border-color:var(--ocean);background:var(--ocean-light);}
+.upload-zone .uz-icon{font-size:32px;margin-bottom:6px;}
+.upload-zone .uz-text{font-size:12px;color:var(--gray);line-height:1.6;}
+.upload-zone .uz-formats{font-size:10px;color:#A0AEC0;margin-top:4px;}
+
+/* Info callout */
+.callout{
+  display:flex;align-items:flex-start;gap:10px;
+  padding:12px 14px;border-radius:10px;margin-bottom:16px;font-size:12px;line-height:1.6;
+}
+.callout-info{background:var(--ocean-light);color:var(--ocean-deep);border-left:3px solid var(--ocean);}
+.callout-warn{background:#FEF3CD;color:#856404;border-left:3px solid var(--gold);}
+.callout-green{background:#D4EDDA;color:#155724;border-left:3px solid var(--green);}
+.callout .co-icon{font-size:16px;flex-shrink:0;margin-top:1px;}
+
+/* Fee input */
+.fee-input{
+  display:flex;align-items:center;gap:0;
+}
+.fee-input .prefix{
+  padding:10px 12px;background:var(--gray-bg);border:1.5px solid var(--gray-light);
+  border-right:none;border-radius:10px 0 0 10px;font-size:13px;font-weight:700;color:var(--dark);
+}
+.fee-input input{border-radius:0 10px 10px 0!important;}
+
+/* Buttons */
+.btn-row{display:flex;justify-content:space-between;align-items:center;margin-top:28px;padding-top:18px;border-top:1px solid var(--gray-light);}
+.btn{
+  padding:10px 24px;border-radius:10px;font-size:13px;font-weight:700;
+  cursor:pointer;transition:all .2s;border:none;font-family:'DM Sans',sans-serif;
+}
+.btn-primary{background:var(--ocean);color:white;}
+.btn-primary:hover{background:var(--ocean-deep);transform:translateY(-1px);box-shadow:0 4px 12px rgba(12,124,138,.3);}
+.btn-outline{background:transparent;color:var(--dark-soft);border:1.5px solid var(--gray-light);}
+.btn-outline:hover{border-color:var(--ocean);color:var(--ocean);}
+.btn-ghost{background:transparent;color:var(--gray);border:none;font-size:12px;}
+
+/* Completion bar */
+.completion{margin-bottom:20px;}
+.completion .comp-text{display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;}
+.completion .comp-label{color:var(--gray);font-weight:600;}
+.completion .comp-pct{color:var(--ocean);font-weight:700;}
+.comp-bar{height:6px;background:var(--gray-light);border-radius:6px;overflow:hidden;}
+.comp-fill{height:100%;background:linear-gradient(90deg,var(--ocean),var(--teal));border-radius:6px;transition:width .5s ease;}
+
+/* Step panels */
+.step-panel{display:none;}
+.step-panel.active{display:block;animation:fadeUp .3s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+
+/* Responsive */
+@media(max-width:768px){
+  .row-2,.row-3,.row-4{grid-template-columns:1fr;}
+  .spec-grid{grid-template-columns:1fr;}
+  .form-card{padding:20px;}
+  .avail-grid{grid-template-columns:1fr 1fr;}
+}
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">MANAS<em>360</em></div>
+    <h1>Setup Your Professional Profile</h1>
+    <p>One unified profile for Psychologists, Psychiatrists & Therapists. Takes ~10 minutes. Verification in 48 hours.</p>
+  </div>
+
+  <!-- Progress -->
+  <div class="completion">
+    <div class="comp-text"><span class="comp-label">Profile Completion</span><span class="comp-pct" id="compPct">0%</span></div>
+    <div class="comp-bar"><div class="comp-fill" id="compFill" style="width:0%"></div></div>
+  </div>
+
+  <div class="stepper" id="stepper"></div>
+
+  <!-- Form Card -->
+  <div class="form-card">
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- STEP 1: PROFESSIONAL IDENTITY -->
+    <!-- ═══════════════════════════════════════════ -->
+    <div class="step-panel active" id="step1">
+      <div class="sec-title">
+        <span class="sec-icon">⚕️</span>
+        <div><h2>Professional Identity</h2><div class="sec-sub">Tell us who you are and your credentials</div></div>
+      </div>
+
+      <div class="callout callout-info">
+        <span class="co-icon">ℹ️</span>
+        <span>One profile works for all — whether you're a Psychiatrist, Psychologist, Counselor, or Therapist. Select all that apply.</span>
+      </div>
+
+      <div class="field">
+        <label>Professional Type <span class="req">*</span></label>
+        <div class="chip-group" id="ptypeGroup">
+          <div class="chip" data-group="ptype" onclick="toggleChip(this)"><span class="chip-icon">🩺</span> Psychiatrist</div>
+          <div class="chip" data-group="ptype" onclick="toggleChip(this)"><span class="chip-icon">🧠</span> Clinical Psychologist</div>
+          <div class="chip" data-group="ptype" onclick="toggleChip(this)"><span class="chip-icon">💬</span> Counseling Psychologist</div>
+          <div class="chip" data-group="ptype" onclick="toggleChip(this)"><span class="chip-icon">👨‍⚕️</span> Therapist / Counselor</div>
+          <div class="chip" data-group="ptype" onclick="toggleChip(this)"><span class="chip-icon">🎓</span> Trainee / Intern</div>
+        </div>
+      </div>
+
+      <div class="row row-2">
+        <div class="field">
+          <label>Full Name (as per registration) <span class="req">*</span></label>
+          <input id="fullNameInput" type="text" placeholder="Dr. Priya Sharma">
+        </div>
+        <div class="field">
+          <label>Display Name <span class="hint">Shown to patients</span></label>
+          <input type="text" placeholder="Dr. Priya">
+        </div>
+      </div>
+
+      <div class="row row-3">
+        <div class="field">
+          <label>Date of Birth <span class="req">*</span></label>
+          <input id="dobInput" type="date">
+        </div>
+        <div class="field">
+          <label>Gender</label>
+          <select>
+            <option value="">Select…</option>
+            <option>Female</option><option>Male</option>
+            <option>Non-binary</option><option>Prefer not to say</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Years of Experience <span class="req">*</span></label>
+          <select id="experienceSelect">
+            <option value="">Select…</option>
+            <option>0-1 (Intern/Fresh)</option><option>1-3 years</option>
+            <option>3-5 years</option><option>5-10 years</option>
+            <option>10-20 years</option><option>20+ years</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row row-2">
+        <div class="field">
+          <label>Email <span class="req">*</span></label>
+          <input id="emailInput" type="email" placeholder="priya.sharma@example.com">
+        </div>
+        <div class="field">
+          <label>Mobile <span class="req">*</span> <span class="hint">WhatsApp-enabled preferred</span></label>
+          <input id="mobileInput" type="tel" placeholder="+91 98765 43210">
+        </div>
+      </div>
+
+      <div class="row row-2">
+        <div class="field">
+          <label>City / Town <span class="req">*</span></label>
+          <input id="cityInput" type="text" placeholder="Bengaluru">
+        </div>
+        <div class="field">
+          <label>State <span class="req">*</span></label>
+          <select id="stateSelect">
+            <option value="">Select…</option>
+            <option>Karnataka</option><option>Maharashtra</option><option>Tamil Nadu</option>
+            <option>Telangana</option><option>Andhra Pradesh</option><option>Kerala</option>
+            <option>Delhi NCR</option><option>Uttar Pradesh</option><option>West Bengal</option>
+            <option>Rajasthan</option><option>Gujarat</option><option>Madhya Pradesh</option>
+            <option>Other (specify below)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <span></span>
+        <button class="btn btn-primary" onclick="goStep(2)">Next: Credentials →</button>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- STEP 2: CREDENTIALS & VERIFICATION -->
+    <!-- ═══════════════════════════════════════════ -->
+    <div class="step-panel" id="step2">
+      <div class="sec-title">
+        <span class="sec-icon">🔒</span>
+        <div><h2>Credentials & Verification</h2><div class="sec-sub">We verify all credentials within 48 hours for patient safety</div></div>
+      </div>
+
+      <div class="callout callout-warn">
+        <span class="co-icon">⚡</span>
+        <span><strong>Fast-track:</strong> If your RCI/NMC number is active, verification completes in under 24 hours via API.</span>
+      </div>
+
+      <!-- Registration numbers -->
+      <div class="field">
+        <label>Registration Type <span class="req">*</span></label>
+        <div class="chip-group" id="regTypeGroup">
+          <div class="chip" data-group="regtype" onclick="toggleChipSingle(this,'regtype')"><span class="chip-icon">🏛️</span> RCI (Psychologists)</div>
+          <div class="chip" data-group="regtype" onclick="toggleChipSingle(this,'regtype')"><span class="chip-icon">⚕️</span> NMC / NMR (Psychiatrists)</div>
+          <div class="chip" data-group="regtype" onclick="toggleChipSingle(this,'regtype')"><span class="chip-icon">🏥</span> State Medical Council</div>
+          <div class="chip" data-group="regtype" onclick="toggleChipSingle(this,'regtype')"><span class="chip-icon">📋</span> IACCP / IAC</div>
+          <div class="chip" data-group="regtype" onclick="toggleChipSingle(this,'regtype')"><span class="chip-icon">🌍</span> International (specify)</div>
+        </div>
+      </div>
+
+      <div class="row row-2">
+        <div class="field">
+          <label>Registration / License Number <span class="req">*</span></label>
+          <input id="registrationNumberInput" type="text" placeholder="e.g., RCI-A12345 or NMR-2024-0078">
+        </div>
+        <div class="field">
+          <label>NMR ID <span class="hint">If available (National Medical Register)</span></label>
+          <input type="text" placeholder="NMR ID from nmc.org.in">
+        </div>
+      </div>
+
+      <div class="row row-3">
+        <div class="field">
+          <label>State Medical Council <span class="hint">If applicable</span></label>
+          <input type="text" placeholder="Karnataka Medical Council">
+        </div>
+        <div class="field">
+          <label>Registration Date</label>
+          <input type="date">
+        </div>
+        <div class="field">
+          <label>License Expiry Date</label>
+          <input type="date">
+        </div>
+      </div>
+
+      <!-- Education -->
+      <div style="margin-top:8px;" class="sec-title">
+        <span class="sec-icon">🎓</span>
+        <div><h2>Educational Qualifications</h2></div>
+      </div>
+
+      <div class="row row-2">
+        <div class="field">
+          <label>Highest Qualification <span class="req">*</span></label>
+          <select id="highestQualificationSelect">
+            <option value="">Select…</option>
+            <option>MBBS + MD Psychiatry</option>
+            <option>MBBS + DPM</option>
+            <option>MBBS + DNB Psychiatry</option>
+            <option>M.Phil Clinical Psychology</option>
+            <option>Ph.D. Clinical Psychology</option>
+            <option>M.A. Psychology</option>
+            <option>M.Sc. Psychology</option>
+            <option>PG Diploma in Counseling</option>
+            <option>M.Phil Psychiatric Social Work</option>
+            <option>Other (specify)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>University / Institution <span class="req">*</span></label>
+          <input id="universityInput" type="text" placeholder="NIMHANS, Bengaluru">
+        </div>
+      </div>
+
+      <div class="row row-2">
+        <div class="field">
+          <label>Year of Completion</label>
+          <input type="number" placeholder="2020" min="1970" max="2026">
+        </div>
+        <div class="field">
+          <label>Additional Qualifications <span class="hint">Comma separated</span></label>
+          <input type="text" placeholder="CBT certified, EMDR trained, DBT">
+        </div>
+      </div>
+
+      <!-- Document uploads -->
+      <div style="margin-top:8px;" class="sec-title">
+        <span class="sec-icon">📄</span>
+        <div><h2>Document Uploads</h2></div>
+      </div>
+
+      <div class="row row-2" style="margin-bottom:14px;">
+        <div class="upload-zone">
+          <div class="uz-icon">🎓</div>
+          <div class="uz-text"><strong>Degree Certificate</strong><br>MBBS / MD / M.Phil / PhD</div>
+          <div class="uz-formats">PDF or JPEG, max 5MB</div>
+        </div>
+        <div class="upload-zone">
+          <div class="uz-icon">🏛️</div>
+          <div class="uz-text"><strong>Registration Certificate</strong><br>RCI / NMC / State Council</div>
+          <div class="uz-formats">PDF or JPEG, max 5MB</div>
+        </div>
+      </div>
+      <div class="row row-2" style="margin-bottom:14px;">
+        <div class="upload-zone">
+          <div class="uz-icon">🪪</div>
+          <div class="uz-text"><strong>Aadhaar Card</strong><br>For identity verification</div>
+          <div class="uz-formats">PDF or JPEG, max 5MB</div>
+        </div>
+        <div class="upload-zone">
+          <div class="uz-icon">🛡️</div>
+          <div class="uz-text"><strong>Professional Liability Insurance</strong><br>Min ₹10L coverage recommended</div>
+          <div class="uz-formats">PDF, max 5MB (optional)</div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-outline" onclick="goStep(1)">← Back</button>
+        <button class="btn btn-primary" onclick="goStep(3)">Next: Specializations →</button>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- STEP 3: SPECIALIZATIONS (9 DISORDER TYPES) -->
+    <!-- ═══════════════════════════════════════════ -->
+    <div class="step-panel" id="step3">
+      <div class="sec-title">
+        <span class="sec-icon">🎯</span>
+        <div><h2>Specializations</h2><div class="sec-sub">Select all conditions you are trained and willing to treat</div></div>
+      </div>
+
+      <div class="callout callout-info">
+        <span class="co-icon">🧩</span>
+        <span>Your selections directly power our patient-matching algorithm. The more specific you are, the better your matches.</span>
+      </div>
+
+      <div class="spec-grid" id="specGrid">
+        <div class="spec-card" onclick="this.classList.toggle('selected'); refreshProgressUI();">
+          <div class="sc-header"><span class="sc-icon">😞</span><span class="sc-name">Depression & Mood Disorders</span></div>
+          <div class="sc-symptoms">Major depression, Bipolar, Dysthymia, Seasonal affective, Persistent depressive</div>
+        </div>
+        <div class="spec-card" onclick="this.classList.toggle('selected'); refreshProgressUI();">
+          <div class="sc-header"><span class="sc-icon">😰</span><span class="sc-name">Anxiety Disorders</span></div>
+          <div class="sc-symptoms">GAD, Panic disorder, Social anxiety, Phobias, Agoraphobia, Separation anxiety</div>
+        </div>
+        <div class="spec-card" onclick="this.classList.toggle('selected'); refreshProgressUI();">
+          <div class="sc-header"><span class="sc-icon">😵</span><span class="sc-name">Trauma & Stress Disorders</span></div>
+          <div class="sc-symptoms">PTSD, Complex PTSD, Acute stress, Adjustment disorders, Abuse survivors</div>
+        </div>
+        <div class="spec-card" onclick="this.classList.toggle('selected'); refreshProgressUI();">
+          <div class="sc-header"><span class="sc-icon">🧪</span><span class="sc-name">Substance Use & Addiction</span></div>
+          <div class="sc-symptoms">Alcohol, Drug, Tobacco, Behavioral addictions, Gambling, Internet/gaming</div>
+        </div>
+        <div class="spec-card" onclick="this.classList.toggle('selected'); refreshProgressUI();">
+          <div class="sc-header"><span class="sc-icon">🍽️</span><span class="sc-name">Eating Disorders</span></div>
+          <div class="sc-symptoms">Anorexia, Bulimia, Binge eating, ARFID, Orthorexia, Body dysmorphia</div>
+        </div>
+        <div class="spec-card" onclick="this.classList.toggle('selected'); refreshProgressUI();">
+          <div class="sc-header"><span class="sc-icon">🎭</span><span class="sc-name">Personality Disorders</span></div>
+          <div class="sc-symptoms">Borderline, Narcissistic, Avoidant, Antisocial, Dependent, Obsessive-compulsive PD</div>
+        </div>
+        <div class="spec-card" onclick="this.classList.toggle('selected'); refreshProgressUI();">
+          <div class="sc-header"><span class="sc-icon">🌀</span><span class="sc-name">Psychotic Disorders</span></div>
+          <div class="sc-symptoms">Schizophrenia, Schizoaffective, Delusional disorder, Brief psychotic episode</div>
+        </div>
+        <div class="spec-card" onclick="this.classList.toggle('selected'); refreshProgressUI();">
+          <div class="sc-header"><span class="sc-icon">⚡</span><span class="sc-name">ADHD & Neurodevelopmental</span></div>
+          <div class="sc-symptoms">ADHD, Autism spectrum, Learning disabilities, Intellectual disability, Tic disorders</div>
+        </div>
+        <div class="spec-card" onclick="this.classList.toggle('selected'); refreshProgressUI();">
+          <div class="sc-header"><span class="sc-icon">🌙</span><span class="sc-name">Sleep & Somatic Disorders</span></div>
+          <div class="sc-symptoms">Insomnia, Narcolepsy, Restless legs, Somatic symptom, Conversion disorder, Chronic fatigue</div>
+        </div>
+      </div>
+
+      <!-- Sub-specialties -->
+      <div style="margin-top:22px;" class="sec-title">
+        <span class="sec-icon">🔍</span>
+        <div><h2>Focused Expertise</h2><div class="sec-sub">Additional areas of focused practice</div></div>
+      </div>
+
+      <div class="chip-group">
+        <div class="chip" onclick="toggleChip(this)"><span class="chip-icon">💑</span> Couples / Relationship</div>
+        <div class="chip" onclick="toggleChip(this)"><span class="chip-icon">👨‍👧</span> Child & Adolescent</div>
+        <div class="chip" onclick="toggleChip(this)"><span class="chip-icon">👴</span> Geriatric / Elderly</div>
+        <div class="chip" onclick="toggleChip(this)"><span class="chip-icon">🤰</span> Perinatal / Postpartum</div>
+        <div class="chip" onclick="toggleChip(this)"><span class="chip-icon">🏳️‍🌈</span> LGBTQIA+ Affirming</div>
+        <div class="chip" onclick="toggleChip(this)"><span class="chip-icon">🎖️</span> Trauma / Abuse Survivors</div>
+        <div class="chip" onclick="toggleChip(this)"><span class="chip-icon">💼</span> Workplace / Burnout</div>
+        <div class="chip" onclick="toggleChip(this)"><span class="chip-icon">📱</span> Digital / Gaming Addiction</div>
+        <div class="chip" onclick="toggleChip(this)"><span class="chip-icon">🧬</span> Psychosomatic Disorders</div>
+        <div class="chip" onclick="toggleChip(this)"><span class="chip-icon">🏫</span> Academic / Exam Anxiety</div>
+        <div class="chip" onclick="toggleChip(this)"><span class="chip-icon">🕊️</span> Grief & Bereavement</div>
+        <div class="chip" onclick="toggleChip(this)"><span class="chip-icon">🧘</span> Chronic Pain / Illness</div>
+      </div>
+
+      <!-- Therapeutic approaches -->
+      <div style="margin-top:22px;" class="sec-title">
+        <span class="sec-icon">🛠️</span>
+        <div><h2>Therapeutic Approaches</h2><div class="sec-sub">Methods you practice</div></div>
+      </div>
+
+      <div class="chip-group">
+        <div class="chip" onclick="toggleChip(this)">CBT</div>
+        <div class="chip" onclick="toggleChip(this)">DBT</div>
+        <div class="chip" onclick="toggleChip(this)">EMDR</div>
+        <div class="chip" onclick="toggleChip(this)">Psychoanalytic</div>
+        <div class="chip" onclick="toggleChip(this)">Humanistic</div>
+        <div class="chip" onclick="toggleChip(this)">Family Systems</div>
+        <div class="chip" onclick="toggleChip(this)">ACT</div>
+        <div class="chip" onclick="toggleChip(this)">Solution-Focused</div>
+        <div class="chip" onclick="toggleChip(this)">Mindfulness-Based</div>
+        <div class="chip" onclick="toggleChip(this)">Art / Expressive</div>
+        <div class="chip" onclick="toggleChip(this)">Play Therapy</div>
+        <div class="chip" onclick="toggleChip(this)">Motivational Interviewing</div>
+        <div class="chip" onclick="toggleChip(this)">Somatic</div>
+        <div class="chip" onclick="toggleChip(this)">NLP</div>
+        <div class="chip" onclick="toggleChip(this)">Medication Management</div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-outline" onclick="goStep(2)">← Back</button>
+        <button class="btn btn-primary" onclick="goStep(4)">Next: Languages & Location →</button>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- STEP 4: LANGUAGES & LOCATION -->
+    <!-- ═══════════════════════════════════════════ -->
+    <div class="step-panel" id="step4">
+      <div class="sec-title">
+        <span class="sec-icon">🌐</span>
+        <div><h2>Languages & Location Preferences</h2><div class="sec-sub">For patient matching and corporate engagements</div></div>
+      </div>
+
+      <div class="field">
+        <label>Languages You Can Conduct Sessions In <span class="req">*</span> <span class="hint">Select all</span></label>
+        <div class="chip-group" id="languageGroup">
+          <div class="chip" onclick="toggleChip(this)">🇬🇧 English</div>
+          <div class="chip" onclick="toggleChip(this)">🇮🇳 Hindi / हिन्दी</div>
+          <div class="chip" onclick="toggleChip(this)">Tamil / தமிழ்</div>
+          <div class="chip" onclick="toggleChip(this)">Telugu / తెలుగు</div>
+          <div class="chip" onclick="toggleChip(this)">Kannada / ಕನ್ನಡ</div>
+          <div class="chip" onclick="toggleChip(this)">Malayalam</div>
+          <div class="chip" onclick="toggleChip(this)">Bengali</div>
+          <div class="chip" onclick="toggleChip(this)">Marathi</div>
+          <div class="chip" onclick="toggleChip(this)">Gujarati</div>
+          <div class="chip" onclick="toggleChip(this)">Punjabi</div>
+          <div class="chip" onclick="toggleChip(this)">Urdu</div>
+          <div class="chip" onclick="toggleChip(this)">Odia</div>
+          <div class="chip" onclick="toggleChip(this)">Assamese</div>
+          <div class="chip" onclick="toggleChip(this)">Other…</div>
+        </div>
+      </div>
+
+      <div style="margin-top:22px;" class="sec-title">
+        <span class="sec-icon">🏢</span>
+        <div><h2>Corporate Engagement Preferences</h2><div class="sec-sub">Cities/regions where you'd do on-site corporate sessions</div></div>
+      </div>
+
+      <div class="callout callout-green">
+        <span class="co-icon">💰</span>
+        <span>Corporate sessions pay <strong>₹3,000-8,000/session</strong>. Select cities where you can travel for in-person workshops.</span>
+      </div>
+
+      <div class="field">
+        <label>Willing to do Corporate Engagements? <span class="req">*</span></label>
+        <div class="chip-group" id="corpWillingGroup">
+          <div class="chip" data-group="corpwilling" onclick="toggleChipSingle(this,'corpwilling')">✅ Yes, in-person + virtual</div>
+          <div class="chip" data-group="corpwilling" onclick="toggleChipSingle(this,'corpwilling')">💻 Virtual only</div>
+          <div class="chip" data-group="corpwilling" onclick="toggleChipSingle(this,'corpwilling')">❌ Not interested</div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Preferred Cities for In-Person Corporate <span class="hint">Select all reachable cities</span></label>
+        <div class="chip-group">
+          <div class="chip" onclick="toggleChip(this)">Bengaluru</div>
+          <div class="chip" onclick="toggleChip(this)">Mumbai</div>
+          <div class="chip" onclick="toggleChip(this)">Delhi NCR</div>
+          <div class="chip" onclick="toggleChip(this)">Hyderabad</div>
+          <div class="chip" onclick="toggleChip(this)">Chennai</div>
+          <div class="chip" onclick="toggleChip(this)">Pune</div>
+          <div class="chip" onclick="toggleChip(this)">Kolkata</div>
+          <div class="chip" onclick="toggleChip(this)">Ahmedabad</div>
+          <div class="chip" onclick="toggleChip(this)">Dharwad / Hubli</div>
+          <div class="chip" onclick="toggleChip(this)">Mysuru</div>
+          <div class="chip" onclick="toggleChip(this)">Coimbatore</div>
+          <div class="chip" onclick="toggleChip(this)">Jaipur</div>
+          <div class="chip" onclick="toggleChip(this)">Chandigarh</div>
+          <div class="chip" onclick="toggleChip(this)">Kochi</div>
+          <div class="chip" onclick="toggleChip(this)">Tier 2/3 — Anywhere</div>
+        </div>
+      </div>
+
+      <div class="field" style="margin-top:6px;">
+        <label>Corporate Specialties <span class="hint">Select what you can deliver</span></label>
+        <div class="chip-group">
+          <div class="chip" onclick="toggleChip(this)">Stress Management Workshop</div>
+          <div class="chip" onclick="toggleChip(this)">Burnout Prevention</div>
+          <div class="chip" onclick="toggleChip(this)">Manager Mental Health Training</div>
+          <div class="chip" onclick="toggleChip(this)">EAP Counseling</div>
+          <div class="chip" onclick="toggleChip(this)">Mindfulness Programs</div>
+          <div class="chip" onclick="toggleChip(this)">Resilience Building</div>
+          <div class="chip" onclick="toggleChip(this)">Work-Life Balance</div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-outline" onclick="goStep(3)">← Back</button>
+        <button class="btn btn-primary" onclick="goStep(5)">Next: Availability →</button>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- STEP 5: AVAILABILITY, SERVICES & PRICING -->
+    <!-- ═══════════════════════════════════════════ -->
+    <div class="step-panel" id="step5">
+      <div class="sec-title">
+        <span class="sec-icon">🕐</span>
+        <div><h2>Availability & Shift Preferences</h2><div class="sec-sub">Choose your working hours — multiple shifts allowed</div></div>
+      </div>
+
+      <div class="field">
+        <label>Preferred Shifts <span class="req">*</span> <span class="hint">Select one or more</span></label>
+        <div class="avail-grid">
+          <div class="avail-slot" onclick="toggleSlot(this)">
+            <div class="as-icon">🌅</div>
+            <div class="as-time">8:00 AM — 4:00 PM</div>
+            <div class="as-label">Morning Shift</div>
+            <div class="day-row">
+              <div class="day-pill selected">M</div><div class="day-pill selected">T</div><div class="day-pill selected">W</div>
+              <div class="day-pill selected">T</div><div class="day-pill selected">F</div><div class="day-pill">S</div><div class="day-pill">S</div>
+            </div>
+          </div>
+          <div class="avail-slot" onclick="toggleSlot(this)">
+            <div class="as-icon">🌆</div>
+            <div class="as-time">4:00 PM — 10:00 PM</div>
+            <div class="as-label">Evening Shift</div>
+            <div class="day-row">
+              <div class="day-pill selected">M</div><div class="day-pill selected">T</div><div class="day-pill selected">W</div>
+              <div class="day-pill selected">T</div><div class="day-pill selected">F</div><div class="day-pill selected">S</div><div class="day-pill">S</div>
+            </div>
+          </div>
+          <div class="avail-slot" onclick="toggleSlot(this)">
+            <div class="as-icon">🌙</div>
+            <div class="as-time">10:00 PM — 6:00 AM</div>
+            <div class="as-label">Night Owl Shift</div>
+            <div class="day-row">
+              <div class="day-pill">M</div><div class="day-pill">T</div><div class="day-pill">W</div>
+              <div class="day-pill">T</div><div class="day-pill">F</div><div class="day-pill">S</div><div class="day-pill">S</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Maximum Sessions Per Day</label>
+        <select style="max-width:200px;">
+          <option>4 sessions</option><option>6 sessions</option><option selected>8 sessions</option>
+          <option>10 sessions</option><option>12+ sessions</option>
+        </select>
+      </div>
+
+      <!-- Service willingness toggles -->
+      <div style="margin-top:22px;" class="sec-title">
+        <span class="sec-icon">🤝</span>
+        <div><h2>Service Willingness</h2><div class="sec-sub">What services are you open to providing?</div></div>
+      </div>
+
+      <div class="toggle-row" onclick="toggleToggle(this)">
+        <div class="toggle-left">
+          <span class="tl-icon">🫂</span>
+          <div><div class="tl-title">AnytimeBuddy Calls</div><div class="tl-desc">Accept short 15-min support calls from patients anytime during your shift</div></div>
+        </div>
+        <div class="toggle-right">
+          <span class="toggle-bonus">+ ₹150/call</span>
+          <label class="switch"><input type="checkbox"><span class="slider"></span></label>
+        </div>
+      </div>
+
+      <div class="toggle-row" onclick="toggleToggle(this)">
+        <div class="toggle-left">
+          <span class="tl-icon">🌙</span>
+          <div><div class="tl-title">Night Shift Premium</div><div class="tl-desc">Willing to take 10 PM — 6 AM sessions for additional 10% fee premium</div></div>
+        </div>
+        <div class="toggle-right">
+          <span class="toggle-bonus">+ 10% premium</span>
+          <label class="switch"><input type="checkbox"><span class="slider"></span></label>
+        </div>
+      </div>
+
+      <div class="toggle-row" onclick="toggleToggle(this)">
+        <div class="toggle-left">
+          <span class="tl-icon">👥</span>
+          <div><div class="tl-title">Group Therapy Sessions</div><div class="tl-desc">Facilitate theme-based group sessions (Anxiety, Grief, Parenting, etc.)</div></div>
+        </div>
+        <div class="toggle-right">
+          <span class="toggle-bonus">+ ₹500/group</span>
+          <label class="switch"><input type="checkbox"><span class="slider"></span></label>
+        </div>
+      </div>
+
+      <div class="toggle-row" onclick="toggleToggle(this)">
+        <div class="toggle-left">
+          <span class="tl-icon">💑</span>
+          <div><div class="tl-title">Couples / Family Sessions</div><div class="tl-desc">Joint sessions with partners or family members</div></div>
+        </div>
+        <div class="toggle-right">
+          <label class="switch"><input type="checkbox"><span class="slider"></span></label>
+        </div>
+      </div>
+
+      <div class="toggle-row" onclick="toggleToggle(this)">
+        <div class="toggle-left">
+          <span class="tl-icon">🆘</span>
+          <div><div class="tl-title">Crisis Intervention</div><div class="tl-desc">On-call for emergency escalations from AI chatbot / IVR</div></div>
+        </div>
+        <div class="toggle-right">
+          <span class="toggle-bonus">+ ₹300/call</span>
+          <label class="switch"><input type="checkbox"><span class="slider"></span></label>
+        </div>
+      </div>
+
+      <div class="toggle-row" onclick="toggleToggle(this)">
+        <div class="toggle-left">
+          <span class="tl-icon">📞</span>
+          <div><div class="tl-title">IVR / Phone-Only Sessions</div><div class="tl-desc">Voice-only sessions for patients without video capability</div></div>
+        </div>
+        <div class="toggle-right">
+          <label class="switch"><input type="checkbox"><span class="slider"></span></label>
+        </div>
+      </div>
+
+      <div class="toggle-row" onclick="toggleToggle(this)">
+        <div class="toggle-left">
+          <span class="tl-icon">🏢</span>
+          <div><div class="tl-title">Corporate EAP Counselor</div><div class="tl-desc">Be assigned to corporate accounts as dedicated counselor</div></div>
+        </div>
+        <div class="toggle-right">
+          <span class="toggle-bonus">Retainer-based</span>
+          <label class="switch"><input type="checkbox"><span class="slider"></span></label>
+        </div>
+      </div>
+
+      <div class="toggle-row" onclick="toggleToggle(this)">
+        <div class="toggle-left">
+          <span class="tl-icon">🏛️</span>
+          <div><div class="tl-title">Tele-MANAS / Government Referrals</div><div class="tl-desc">Accept referrals from government programs (may be subsidized rate)</div></div>
+        </div>
+        <div class="toggle-right">
+          <label class="switch"><input type="checkbox"><span class="slider"></span></label>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-outline" onclick="goStep(4)">← Back</button>
+        <button class="btn btn-primary" onclick="goStep(6)">Next: Certify & Pricing →</button>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- STEP 6: CERTIFICATION, PRICING & BIO -->
+    <!-- ═══════════════════════════════════════════ -->
+    <div class="step-panel" id="step6">
+      <div class="sec-title">
+        <span class="sec-icon">🏆</span>
+        <div><h2>MANAS360 Certification Hub</h2><div class="sec-sub">Earn badges that boost patient trust and your visibility</div></div>
+      </div>
+
+      <div class="callout callout-green">
+        <span class="co-icon">📈</span>
+        <span>Certified therapists receive <strong>3x more patient matches</strong> and get featured on the homepage. First certification is free.</span>
+      </div>
+
+      <div class="field">
+        <label>Willing to Certify Through MANAS360? <span class="hint">Select all programs of interest</span></label>
+        <div class="chip-group">
+          <div class="chip" onclick="toggleChip(this)"><span class="chip-icon">🧠</span> CBT Practitioner (12 hrs)</div>
+          <div class="chip" onclick="toggleChip(this)"><span class="chip-icon">💬</span> NLP Practitioner (8 hrs)</div>
+          <div class="chip" onclick="toggleChip(this)"><span class="chip-icon">❓</span> 5Whys Empathy Framework (4 hrs)</div>
+          <div class="chip" onclick="toggleChip(this)"><span class="chip-icon">🆘</span> Crisis Intervention (6 hrs)</div>
+          <div class="chip" onclick="toggleChip(this)"><span class="chip-icon">👶</span> Child & Adolescent (10 hrs)</div>
+          <div class="chip" onclick="toggleChip(this)"><span class="chip-icon">💑</span> Couples Therapy (8 hrs)</div>
+          <div class="chip" onclick="toggleChip(this)"><span class="chip-icon">📱</span> Digital Wellness (4 hrs)</div>
+          <div class="chip" onclick="toggleChip(this)"><span class="chip-icon">🧘</span> Mindfulness-Based CBT (6 hrs)</div>
+        </div>
+      </div>
+
+      <!-- Pricing -->
+      <div style="margin-top:22px;" class="sec-title">
+        <span class="sec-icon">💰</span>
+        <div><h2>Session Pricing</h2><div class="sec-sub">Set your rates — patients see this on your profile</div></div>
+      </div>
+
+      <div class="callout callout-info">
+        <span class="co-icon">📊</span>
+        <span>Revenue split: You keep <strong>60%</strong>, MANAS360 retains 40%. Payouts weekly via PhonePe if balance ≥ ₹500. TDS 10% auto-deducted.</span>
+      </div>
+
+      <div class="row row-3">
+        <div class="field">
+          <label>Individual Session (50 min) <span class="req">*</span></label>
+          <div class="fee-input"><span class="prefix">₹</span><input id="individualFeeInput" type="number" placeholder="1,200"></div>
+        </div>
+        <div class="field">
+          <label>Couples / Family (60 min)</label>
+          <div class="fee-input"><span class="prefix">₹</span><input type="number" placeholder="1,800"></div>
+        </div>
+        <div class="field">
+          <label>Follow-up Session (30 min)</label>
+          <div class="fee-input"><span class="prefix">₹</span><input type="number" placeholder="700"></div>
+        </div>
+      </div>
+
+      <div class="row row-2">
+        <div class="field">
+          <label>First Session Pricing</label>
+          <div class="chip-group">
+            <div class="chip" data-group="firstsess" onclick="toggleChipSingle(this,'firstsess')">🆓 Free (build trust)</div>
+            <div class="chip" data-group="firstsess" onclick="toggleChipSingle(this,'firstsess')">💸 50% discount</div>
+            <div class="chip" data-group="firstsess" onclick="toggleChipSingle(this,'firstsess')">💰 Full price</div>
+          </div>
+        </div>
+        <div class="field">
+          <label>Accept Insurance Patients?</label>
+          <div class="chip-group">
+            <div class="chip" data-group="insurance" onclick="toggleChipSingle(this,'insurance')">✅ Yes</div>
+            <div class="chip" data-group="insurance" onclick="toggleChipSingle(this,'insurance')">❌ No</div>
+            <div class="chip" data-group="insurance" onclick="toggleChipSingle(this,'insurance')">🔜 When available</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Payout -->
+      <div style="margin-top:22px;" class="sec-title">
+        <span class="sec-icon">🏦</span>
+        <div><h2>Payout Details</h2><div class="sec-sub">For receiving your earnings via PhonePe</div></div>
+      </div>
+
+      <div class="row row-2">
+        <div class="field">
+          <label>PAN Number <span class="req">*</span></label>
+          <input id="panInput" type="text" placeholder="ABCDE1234F">
+        </div>
+        <div class="field">
+          <label>PhonePe / UPI ID <span class="req">*</span></label>
+          <input id="upiInput" type="text" placeholder="priya.sharma@ybl">
+        </div>
+      </div>
+      <div class="row row-2">
+        <div class="field">
+          <label>Bank Account Number <span class="hint">For direct transfer fallback</span></label>
+          <input type="text" placeholder="Account number">
+        </div>
+        <div class="field">
+          <label>IFSC Code</label>
+          <input type="text" placeholder="SBIN0001234">
+        </div>
+      </div>
+
+      <!-- Bio -->
+      <div style="margin-top:22px;" class="sec-title">
+        <span class="sec-icon">✍️</span>
+        <div><h2>Profile Bio & Photo</h2><div class="sec-sub">This is what patients see when choosing you</div></div>
+      </div>
+
+      <div class="row row-2" style="margin-bottom:14px;">
+        <div>
+          <div class="field">
+            <label>Professional Bio <span class="req">*</span> <span class="hint">200-500 words</span></label>
+            <textarea id="bioInput" rows="6" placeholder="I'm a clinical psychologist with 8 years of experience specializing in anxiety, depression, and trauma-focused care. I believe healing begins with being truly heard…"></textarea>
+          </div>
+          <div class="field">
+            <label>Personal Tagline <span class="hint">Shown on search cards</span></label>
+            <input type="text" placeholder="Healing begins with being heard." maxlength="80">
+          </div>
+        </div>
+        <div>
+          <div class="upload-zone" style="height:100%;display:flex;flex-direction:column;justify-content:center;">
+            <div class="uz-icon">📸</div>
+            <div class="uz-text"><strong>Profile Photo</strong><br>Professional headshot<br>White/neutral background</div>
+            <div class="uz-formats">JPEG/PNG, min 400×400px</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Video Introduction <span class="hint">Optional — 60-sec intro increases bookings by 40%</span></label>
+        <div class="upload-zone">
+          <div class="uz-icon">🎬</div>
+          <div class="uz-text"><strong>Upload a 60-second video intro</strong><br>Patients love putting a face to the name</div>
+          <div class="uz-formats">MP4, max 50MB</div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-outline" onclick="goStep(5)">← Back</button>
+        <button class="btn btn-primary" onclick="goStep(7)">Next: Review & Submit →</button>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- STEP 7: REVIEW & AGREEMENTS -->
+    <!-- ═══════════════════════════════════════════ -->
+    <div class="step-panel" id="step7">
+      <div class="sec-title">
+        <span class="sec-icon">✅</span>
+        <div><h2>Review & Submit</h2><div class="sec-sub">Almost there! Review your consents and submit.</div></div>
+      </div>
+
+      <div class="callout callout-green">
+        <span class="co-icon">🚀</span>
+        <span>After submission: Credential verification (24-48 hrs) → Platform training (2 hrs, self-paced) → Quiz (80% pass) → Profile LIVE. Start earning from Day 1 of activation.</span>
+      </div>
+
+      <!-- Agreements -->
+      <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;">
+        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 14px;border-radius:10px;border:1.5px solid var(--gray-light);transition:all .2s;">
+          <input type="checkbox" style="margin-top:3px;accent-color:var(--ocean);">
+          <span style="font-size:12px;color:var(--dark-soft);line-height:1.6;">
+            <strong>Independent Contractor Agreement</strong> — I understand I am joining as an independent contractor, not an employee. Revenue split is 60/40 (I receive 60%). Payments via PhonePe, weekly.
+          </span>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 14px;border-radius:10px;border:1.5px solid var(--gray-light);transition:all .2s;">
+          <input type="checkbox" style="margin-top:3px;accent-color:var(--ocean);">
+          <span style="font-size:12px;color:var(--dark-soft);line-height:1.6;">
+            <strong>DPDPA Compliance</strong> — I agree to handle patient data per Digital Personal Data Protection Act 2023. No data stored outside MANAS360 platform.
+          </span>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 14px;border-radius:10px;border:1.5px solid var(--gray-light);transition:all .2s;">
+          <input type="checkbox" style="margin-top:3px;accent-color:var(--ocean);">
+          <span style="font-size:12px;color:var(--dark-soft);line-height:1.6;">
+            <strong>Crisis Protocol</strong> — I agree to follow MANAS360 crisis escalation protocol. If a patient shows suicidal ideation, I will follow the mandatory reporting workflow.
+          </span>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 14px;border-radius:10px;border:1.5px solid var(--gray-light);transition:all .2s;">
+          <input type="checkbox" style="margin-top:3px;accent-color:var(--ocean);">
+          <span style="font-size:12px;color:var(--dark-soft);line-height:1.6;">
+            <strong>Telemedicine Guidelines</strong> — I confirm I hold a valid license and am compliant with Indian Telemedicine Practice Guidelines 2020.
+          </span>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 14px;border-radius:10px;border:1.5px solid var(--gray-light);transition:all .2s;">
+          <input type="checkbox" style="margin-top:3px;accent-color:var(--ocean);">
+          <span style="font-size:12px;color:var(--dark-soft);line-height:1.6;">
+            <strong>Code of Ethics</strong> — I agree to maintain patient confidentiality, avoid dual relationships, obtain informed consent, and maintain session records per MANAS360 clinical standards.
+          </span>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 14px;border-radius:10px;border:1.5px solid var(--gray-light);transition:all .2s;">
+          <input type="checkbox" style="margin-top:3px;accent-color:var(--ocean);">
+          <span style="font-size:12px;color:var(--dark-soft);line-height:1.6;">
+            <strong>Credential Accuracy</strong> — I certify that all information, credentials, and documents submitted are authentic. Falsification will result in permanent removal and possible legal action.
+          </span>
+        </label>
+      </div>
+
+      <div class="field">
+        <label>Digital Signature <span class="req">*</span> <span class="hint">Type your full name as registered</span></label>
+        <input id="signatureInput" type="text" placeholder="Dr. Priya Sharma" style="font-family:'Caveat',cursive;font-size:22px;padding:14px;">
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-outline" onclick="goStep(6)">← Back</button>
+        <button class="btn btn-primary" onclick="submitProfile()" style="padding:12px 32px;font-size:14px;background:linear-gradient(135deg,var(--ocean),var(--teal));">
+          🚀 Submit Profile for Verification
+        </button>
+      </div>
+    </div>
+
+  </div><!-- /form-card -->
+</div><!-- /shell -->
+
+<script>
+// ─── STEPPER ───
+const STEPS = [
+  {num:1,label:"Identity"},
+  {num:2,label:"Credentials"},
+  {num:3,label:"Specialize"},
+  {num:4,label:"Languages"},
+  {num:5,label:"Availability"},
+  {num:6,label:"Certify"},
+  {num:7,label:"Submit"},
+];
+let currentStep = 1;
+
+function isFilled(el) {
+  return Boolean(el && String(el.value || '').trim());
+}
+
+function countSelected(selector) {
+  return document.querySelectorAll(selector).length;
+}
+
+function isStepCompleted(stepNum) {
+  if (stepNum === 1) {
+    return countSelected('#ptypeGroup .chip.selected') > 0
+      && isFilled(document.getElementById('fullNameInput'))
+      && isFilled(document.getElementById('dobInput'))
+      && isFilled(document.getElementById('experienceSelect'))
+      && isFilled(document.getElementById('emailInput'))
+      && isFilled(document.getElementById('mobileInput'))
+      && isFilled(document.getElementById('cityInput'))
+      && isFilled(document.getElementById('stateSelect'));
+  }
+  if (stepNum === 2) {
+    return countSelected('#regTypeGroup .chip.selected') > 0
+      && isFilled(document.getElementById('registrationNumberInput'))
+      && isFilled(document.getElementById('highestQualificationSelect'))
+      && isFilled(document.getElementById('universityInput'));
+  }
+  if (stepNum === 3) {
+    return countSelected('#specGrid .spec-card.selected') > 0;
+  }
+  if (stepNum === 4) {
+    return countSelected('#languageGroup .chip.selected') > 0
+      && countSelected('#corpWillingGroup .chip.selected') > 0;
+  }
+  if (stepNum === 5) {
+    return countSelected('#step5 .avail-slot.selected') > 0;
+  }
+  if (stepNum === 6) {
+    return isFilled(document.getElementById('individualFeeInput'))
+      && isFilled(document.getElementById('panInput'))
+      && isFilled(document.getElementById('upiInput'))
+      && isFilled(document.getElementById('bioInput'));
+  }
+  if (stepNum === 7) {
+    const checks = document.querySelectorAll('#step7 input[type="checkbox"]');
+    const allChecked = [...checks].every(c => c.checked);
+    return allChecked && isFilled(document.getElementById('signatureInput'));
+  }
+  return false;
+}
+
+function refreshProgressUI() {
+  buildStepper();
+  updateCompletion();
+}
+
+function buildStepper() {
+  const el = document.getElementById('stepper');
+  el.innerHTML = STEPS.map((s,i) => {
+    const done = isStepCompleted(s.num);
+    const dot = `<div class="step-dot ${s.num===currentStep?'active':done?'done':''}" onclick="goStep(${s.num})">${done?'✓':s.num}</div>`;
+    const line = i < STEPS.length-1 ? `<div class="step-line ${done?'done':''}"></div>` : '';
+    return dot + line;
+  }).join('');
+}
+
+function goStep(n) {
+  if (n > currentStep && !isStepCompleted(currentStep)) {
+    alert(`Please complete Step ${currentStep} before moving ahead.`);
+    return;
+  }
+  currentStep = n;
+  document.querySelectorAll('.step-panel').forEach((p,i) => {
+    p.classList.toggle('active', i+1 === n);
+  });
+  refreshProgressUI();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function updateCompletion() {
+  const completed = STEPS.filter(step => isStepCompleted(step.num)).length;
+  const pct = Math.round((completed / STEPS.length) * 100);
+  document.getElementById('compPct').textContent = pct + '%';
+  document.getElementById('compFill').style.width = pct + '%';
+}
+
+refreshProgressUI();
+
+// ─── CHIP TOGGLES ───
+function toggleChip(el) { el.classList.toggle('selected'); refreshProgressUI(); }
+function toggleChipSingle(el, group) {
+  document.querySelectorAll(`.chip[data-group="${group}"]`).forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  refreshProgressUI();
+}
+
+// ─── SLOT TOGGLE ───
+function toggleSlot(el) { el.classList.toggle('selected'); refreshProgressUI(); }
+
+// ─── TOGGLE SWITCH ───
+function toggleToggle(row) {
+  const cb = row.querySelector('input[type="checkbox"]');
+  if(cb){ cb.checked = !cb.checked; row.classList.toggle('active',cb.checked); refreshProgressUI(); }
+}
+
+// ─── SUBMIT ───
+function submitProfile() {
+  const checks = document.querySelectorAll('#step7 input[type="checkbox"]');
+  const allChecked = [...checks].every(c => c.checked);
+  if(!allChecked) { alert('Please agree to all terms to continue.'); return; }
+  // Simulate submission
+  document.querySelector('.form-card').innerHTML = `
+    <div style="text-align:center;padding:60px 20px;">
+      <div style="font-size:64px;margin-bottom:16px;">🎉</div>
+      <h2 style="font-size:24px;font-weight:800;color:var(--dark);margin-bottom:10px;">Profile Submitted!</h2>
+      <p style="font-size:14px;color:var(--gray);max-width:400px;margin:0 auto 24px;line-height:1.6;">
+        Your credentials are being verified. You'll receive an email within <strong>24-48 hours</strong> with next steps for platform training.
+      </p>
+      <div style="display:flex;justify-content:center;gap:12px;flex-wrap:wrap;">
+        <div style="background:var(--ocean-light);padding:12px 18px;border-radius:10px;text-align:center;">
+          <div style="font-size:22px;">📋</div>
+          <div style="font-size:11px;font-weight:700;color:var(--ocean);margin-top:4px;">Step 1</div>
+          <div style="font-size:10px;color:var(--gray);">Verification (48hr)</div>
+        </div>
+        <div style="background:var(--gray-bg);padding:12px 18px;border-radius:10px;text-align:center;">
+          <div style="font-size:22px;">🎓</div>
+          <div style="font-size:11px;font-weight:700;color:var(--gray);margin-top:4px;">Step 2</div>
+          <div style="font-size:10px;color:var(--gray);">Training (2 hrs)</div>
+        </div>
+        <div style="background:var(--gray-bg);padding:12px 18px;border-radius:10px;text-align:center;">
+          <div style="font-size:22px;">✅</div>
+          <div style="font-size:11px;font-weight:700;color:var(--gray);margin-top:4px;">Step 3</div>
+          <div style="font-size:10px;color:var(--gray);">Go LIVE!</div>
+        </div>
+      </div>
+    </div>
+  `;
+  document.getElementById('compPct').textContent = '100%';
+  document.getElementById('compFill').style.width = '100%';
+}
+
+// Day pill toggle
+document.querySelectorAll('.day-pill').forEach(p => {
+  p.addEventListener('click', e => { e.stopPropagation(); p.classList.toggle('selected'); refreshProgressUI(); });
+});
+
+document.querySelectorAll('input, select, textarea').forEach(el => {
+  el.addEventListener('input', refreshProgressUI);
+  el.addEventListener('change', refreshProgressUI);
+});
+</script>
+</body>
+</html>

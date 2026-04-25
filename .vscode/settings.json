@@ -1,0 +1,10 @@
+{
+  "files.associations": {
+    "*.sql": "postgresql",
+    "prisma/migrations/**/*.sql": "postgresql",
+    "backend/prisma/migrations/**/*.sql": "postgresql"
+  },
+  "mssql.intelliSense.enableErrorChecking": false,
+  "typescript.tsserver.experimental.enableProjectDiagnostics": false,
+  "java.configuration.updateBuildConfiguration": "interactive"
+}

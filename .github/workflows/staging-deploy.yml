@@ -1,0 +1,174 @@
+name: Staging Deploy
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+      - master
+      - staging
+      - sync/staging-docker
+  workflow_dispatch:
+
+concurrency:
+  group: staging-deploy
+  cancel-in-progress: true
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    outputs:
+      ec2-host: ${{ steps.validate.outputs.ec2-host }}
+      ec2-user: ${{ steps.validate.outputs.ec2-user }}
+      staging-dir: ${{ steps.validate.outputs.staging-dir }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate required staging secrets and vars
+        id: validate
+        env:
+          EC2_HOST: ${{ secrets['EC2_HOST'] }}
+          EC2_USER: ${{ secrets['EC2_USER'] }}
+          EC2_KEY: ${{ secrets['EC2_KEY'] }}
+          STAGING_APP_DIR: ${{ vars['STAGING_APP_DIR'] }}
+        run: |
+          set -euo pipefail
+
+          missing=0
+
+          if [ -z "${EC2_HOST}" ]; then
+            echo "::error::Missing required secret: EC2_HOST"
+            missing=1
+          fi
+
+          if [ -z "${EC2_USER}" ]; then
+            echo "::error::Missing required secret: EC2_USER"
+            missing=1
+          fi
+
+          if [ -z "${EC2_KEY}" ]; then
+            echo "::error::Missing required secret: EC2_KEY"
+            missing=1
+          fi
+
+          if [ -z "${STAGING_APP_DIR}" ]; then
+            echo "::warning::Repository variable STAGING_APP_DIR is not set. Default '/var/www/manas360' will be used."
+            STAGING_APP_DIR="/var/www/manas360"
+          fi
+
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+          
+          # Output to job outputs for use in deploy job
+          echo "ec2-host=${EC2_HOST}" >> $GITHUB_OUTPUT
+          echo "ec2-user=${EC2_USER}" >> $GITHUB_OUTPUT
+          echo "staging-dir=${STAGING_APP_DIR}" >> $GITHUB_OUTPUT
+
+      - name: Validate deploy script exists
+        run: |
+          set -euo pipefail
+          echo "Deployment validation passed"
+
+  deploy:
+    needs: preflight
+    runs-on: ubuntu-latest
+    env:
+      EC2_HOST: ${{ secrets['EC2_HOST'] }}
+      EC2_USER: ${{ secrets['EC2_USER'] }}
+      EC2_KEY: ${{ secrets['EC2_KEY'] }}
+      STAGING_APP_DIR: ${{ vars['STAGING_APP_DIR'] }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build backend
+        working-directory: backend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ env.EC2_HOST }}
+          username: ${{ env.EC2_USER }}
+          key: ${{ env.EC2_KEY }}
+          script: |
+            set -e
+            cd ~/manas360-version2-staging
+
+            echo "Syncing code with GitHub..."
+            git remote set-url origin https://github.com/manas360online-source/manas360-version2-staging.git
+            git remote prune origin || true
+            if ! git fetch --prune origin; then
+              echo "git fetch failed; attempting ref cleanup..."
+              rm -f .git/refs/remotes/origin/main || true
+              git gc --prune=now || true
+              git fetch --prune origin
+            fi
+            git reset --hard origin/${{ github.ref_name }}
+
+            echo "Detecting docker compose command..."
+            which docker-compose || true
+            docker-compose version || true
+            which docker || true
+            docker compose version || true
+
+            if command -v docker-compose >/dev/null 2>&1; then
+              DC="docker-compose"
+            else
+              DC="docker compose"
+            fi
+
+            echo "Using compose command: ${DC}"
+
+            echo "Stopping containers cleanly (staging project) without dropping volumes..."
+            ${DC} -p manas360-version2-staging down --remove-orphans || true
+
+            echo "Force remove stale service containers if still exist..."
+            docker rm -f manas360-version2-staging_backend_1 manas360-version2-staging_redis_1 manas360-version2-staging_db_1 || true
+
+            echo "Force remove compose-managed stale services..."
+            ${DC} -p manas360-version2-staging rm -f -s -v || true
+
+            echo "Cleaning leftover containers..."
+            docker system prune -af || true
+
+            echo "Starting fresh containers..."
+            ${DC} -p manas360-version2-staging up -d --build --no-cache
+
+            echo "Applying database schema (migrate deploy only)..."
+            BACKEND_ID="$(${DC} -p manas360-version2-staging ps -q backend)"
+            if [ -n "${BACKEND_ID}" ]; then
+              docker exec "${BACKEND_ID}" sh -lc 'npx prisma migrate deploy'
+              docker exec "${BACKEND_ID}" sh -lc 'npx prisma generate'
+            else
+              echo "Backend container not found; cannot apply schema"
+              exit 1
+            fi
+
+            echo "Waiting for backend readiness (DB reachable)..."
+            until curl -f http://localhost:5000/ready > /dev/null 2>&1; do
+              echo "  Waiting for backend readiness..."
+              sleep 2
+            done
+
+            echo "Running post-deploy endpoint smoke checks..."
+            curl -f http://localhost:5000/api/v1/group-therapy/public/sessions > /dev/null
+            curl -f http://localhost:5000/api/v1/shared/plans/patient/patient-3month > /dev/null
+
+            echo "✅ Deployment complete"

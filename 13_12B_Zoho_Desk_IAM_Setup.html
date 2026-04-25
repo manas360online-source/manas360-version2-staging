@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>13.12B — MANAS360 IAM: Zoho Desk Role Matrix Setup & Configuration</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--sage:#4A6741;--sage-dark:#2D4128;--sage-light:#e8f0e5;--clay:#C4956A;--cream:#FFFDF7;--ink:#1a1a1a;--muted:#6b6b6b;--border:#d4ddd0;--white:#fff;--code-bg:#1e2a1e;--code-text:#d4e8d0;--warn-bg:#fff8e1;--warn-border:#f9a825;--info-bg:#e3f2fd;--info-border:#1976d2;--crit-bg:#fce4ec;--crit-border:#c62828}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);line-height:1.7;font-size:15px}
+.doc-header{background:linear-gradient(135deg,#1a3a5c,#2a5a8c);color:white;padding:48px 60px}
+.doc-header h1{font-family:'Outfit',sans-serif;font-size:28px;font-weight:800;margin-bottom:6px}
+.doc-header .subtitle{font-size:14px;opacity:.75;margin-bottom:16px}
+.doc-meta{display:flex;gap:24px;flex-wrap:wrap;font-size:12px;opacity:.7}
+.doc-meta span{display:flex;align-items:center;gap:4px}
+.container{max-width:1100px;margin:0 auto;padding:40px 60px 80px}
+h2{font-family:'Outfit',sans-serif;font-size:22px;font-weight:700;color:#1a3a5c;margin:48px 0 16px;padding-bottom:8px;border-bottom:2px solid #1a3a5c}
+h3{font-family:'Outfit',sans-serif;font-size:17px;font-weight:600;color:var(--ink);margin:32px 0 12px}
+h4{font-size:14px;font-weight:600;color:#1a3a5c;margin:20px 0 8px;text-transform:uppercase;letter-spacing:.5px}
+p{margin-bottom:12px}
+.callout{padding:14px 18px;border-radius:8px;margin:16px 0;font-size:13px;line-height:1.6}
+.callout-warn{background:var(--warn-bg);border-left:4px solid var(--warn-border)}
+.callout-info{background:var(--info-bg);border-left:4px solid var(--info-border)}
+.callout-crit{background:var(--crit-bg);border-left:4px solid var(--crit-border)}
+.callout strong{display:block;margin-bottom:4px}
+code{font-family:'JetBrains Mono',monospace;font-size:12.5px;background:#e3eaf0;padding:2px 6px;border-radius:3px;color:#1a3a5c}
+pre{background:var(--code-bg);color:var(--code-text);padding:20px 24px;border-radius:10px;overflow-x:auto;margin:14px 0;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.65}
+pre code{background:none;padding:0;color:inherit}
+table{width:100%;border-collapse:collapse;margin:16px 0;font-size:13px}
+th{background:#1a3a5c;color:white;padding:10px 12px;text-align:left;font-weight:600;font-size:12px}
+td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+tr:nth-child(even) td{background:#f0f4f8}
+.perm-full{color:#2e7d32;font-weight:700}
+.perm-view{color:#1565c0;font-weight:600}
+.perm-none{color:#bdbdbd}
+.perm-comment{color:#f57f17;font-weight:600}
+.phase-block{background:var(--white);border:1.5px solid var(--border);border-radius:10px;padding:20px 24px;margin:16px 0}
+.phase-block-title{font-family:'Outfit',sans-serif;font-size:14px;font-weight:700;color:#1a3a5c;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.phase-num{background:#1a3a5c;color:white;padding:2px 10px;border-radius:4px;font-size:12px;font-family:'JetBrains Mono',monospace}
+.check-item{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:13px}
+.check-item:last-child{border-bottom:none}
+.check-box{width:18px;height:18px;border:2px solid #1a3a5c;border-radius:3px;flex-shrink:0;margin-top:2px}
+.check-where{color:var(--muted);font-size:11px;margin-top:2px}
+.check-detail{color:#555;font-size:12px;margin-top:2px;font-style:italic}
+.toc{background:var(--white);border:1px solid var(--border);border-radius:10px;padding:24px 28px;margin:24px 0}
+.toc h3{margin-top:0}
+.toc ol{padding-left:20px}
+.toc li{margin:4px 0;font-size:13px}
+.toc a{color:#1a3a5c;text-decoration:none;font-weight:500}
+.toc a:hover{text-decoration:underline}
+.cost-row-total td{background:#e3f2fd !important;font-weight:700}
+@media(max-width:768px){.container,.doc-header{padding:24px 20px}pre{font-size:11px;padding:14px}}
+@media print{body{font-size:11px}pre{font-size:9px}.doc-header{padding:24px}}
+</style>
+</head>
+<body>
+
+<div class="doc-header">
+  <h1>13.12B — IAM Role Matrix: Zoho Desk Setup</h1>
+  <div class="subtitle">Department Structure, Role Hierarchy, Permission Profiles, Blueprints, SLA Policies & Deluge Scripts</div>
+  <div class="doc-meta">
+    <span>📅 March 2026</span>
+    <span>📋 Version 1.0</span>
+    <span>👥 27 Agent IDs (16 Full + 11 Light)</span>
+    <span>🏢 8 Departments</span>
+    <span>📊 11 Custom Profiles</span>
+    <span>💰 ₹10,471/month</span>
+  </div>
+</div>
+
+<div class="container">
+
+<!-- TOC -->
+<div class="toc">
+  <h3>Table of Contents</h3>
+  <ol>
+    <li><a href="#b1">Executive Overview & Plan Selection</a></li>
+    <li><a href="#b2">Phase 1: Department Structure</a></li>
+    <li><a href="#b3">Phase 2: Role Hierarchy (4 Levels)</a></li>
+    <li><a href="#b4">Phase 3: Permission Profiles (11 Custom)</a></li>
+    <li><a href="#b5">Phase 4: Agent Provisioning (27 IDs)</a></li>
+    <li><a href="#b6">Phase 5: Feature Permission Matrix</a></li>
+    <li><a href="#b7">Phase 6: Blueprint Automation (3 Blueprints)</a></li>
+    <li><a href="#b8">Phase 7: SLA Policies</a></li>
+    <li><a href="#b9">Phase 8: Workflow Rules & Deluge Scripts</a></li>
+    <li><a href="#b10">Phase 9: Portal & Self-Service Setup</a></li>
+    <li><a href="#b11">Workflow-to-Role Access Mapping</a></li>
+    <li><a href="#b12">Cost Planning</a></li>
+    <li><a href="#b13">Complete Setup Checklist</a></li>
+  </ol>
+</div>
+
+<!-- B1 -->
+<h2 id="b1">1. Executive Overview & Plan Selection</h2>
+
+<div class="callout callout-info">
+  <strong>ℹ️ Recommended Plan: Zoho Desk Professional</strong>
+  ₹2,100/agent/month (billed annually) for Full Agents + ₹345/light agent/month. Why Professional: Multi-department support, round-robin assignment, Blueprint automation, light agents, time tracking, and ticket sharing — all required for MANAS360's cross-department clinical+finance+legal workflows.
+</div>
+
+<table>
+  <tr><th>Dimension</th><th>Value</th></tr>
+  <tr><td>Total Agent IDs</td><td>27</td></tr>
+  <tr><td>Full Agents</td><td>16 (DEV: 4, TADM: 2, CCA: 2, FIN: 2, BDE: 2, ECOM: 2, + 2 reserve)</td></tr>
+  <tr><td>Light Agents</td><td>11 (PSY: 4, PSR: 2, CAB: 1, INS: 4)</td></tr>
+  <tr><td>Departments</td><td>8</td></tr>
+  <tr><td>Role Hierarchy Levels</td><td>4</td></tr>
+  <tr><td>Custom Profiles</td><td>11</td></tr>
+  <tr><td>Blueprints</td><td>3 (Therapist Onboarding, Clinical Escalation, Insurance Claims)</td></tr>
+  <tr><td>CCORP (Corporate Client)</td><td>Via self-service portal (not agent seat)</td></tr>
+</table>
+
+<!-- B2 -->
+<h2 id="b2">2. Phase 1: Department Structure</h2>
+
+<p>Navigate to: <code>Setup → Departments → Add Department</code></p>
+
+<table>
+  <tr><th>#</th><th>Department Name</th><th>Support Email</th><th>Ticket Scope</th><th>Assigned Roles</th></tr>
+  <tr><td>1</td><td>Engineering</td><td><code>dev-support@mans360.co</code></td><td>Bug reports, feature requests, deployment, infra</td><td>DEV + TADM</td></tr>
+  <tr><td>2</td><td>Clinical</td><td><code>clinical@mans360.co</code></td><td>Patient escalations, clinical reviews, protocol queries</td><td>PSY + PSR + CAB</td></tr>
+  <tr><td>3</td><td>Legal & Contracts</td><td><code>legal@mans360.co</code></td><td>NDA tracking, contractor onboarding, DPDPA requests</td><td>CCA</td></tr>
+  <tr><td>4</td><td>Finance</td><td><code>finance@mans360.co</code></td><td>Payout issues, billing disputes, GST queries, refunds</td><td>FIN</td></tr>
+  <tr><td>5</td><td>Business Dev</td><td><code>bd@mans360.co</code></td><td>Partnership leads, insurance onboarding, outreach</td><td>BDE</td></tr>
+  <tr><td>6</td><td>Insurance</td><td><code>insurance@mans360.co</code></td><td>Claims, coverage queries, reimbursement tracking</td><td>INS</td></tr>
+  <tr><td>7</td><td>Ecommerce</td><td><code>store@mans360.co</code></td><td>Subscriptions, payment failures, promo issues</td><td>ECOM</td></tr>
+  <tr><td>8</td><td>Corporate Clients</td><td><code>corporate@mans360.co</code></td><td>B2B client admin, wellness program queries</td><td>CCORP</td></tr>
+</table>
+
+<h4>Post-Creation Configuration</h4>
+<pre><code>// After creating all 8 departments:
+
+1. Setup → General → Departments
+   ☑ Enable multi-department ticketing
+   // Required for cross-dept visibility (Finance sees billing across all depts)
+
+2. Setup → Data Sharing → Edit
+   // Share Clinical data with Finance (billing tickets only)
+   Clinical → Finance: View (billing-tagged tickets only)
+   // Share BD data with Insurance
+   Business Dev → Insurance: View (partnership tickets only)
+   
+3. Setup → Channels → Email
+   // Map each department email as incoming channel
+   // Emails to dev-support@mans360.co → auto-create ticket in Engineering dept
+   // Emails to clinical@mans360.co → auto-create ticket in Clinical dept
+   // ... repeat for all 8 departments</code></pre>
+
+<!-- B3 -->
+<h2 id="b3">3. Phase 2: Role Hierarchy (4 Levels)</h2>
+
+<p>Navigate to: <code>Setup → Roles → New Role</code></p>
+
+<div class="callout callout-warn">
+  <strong>⚠️ Create roles top-down (CEO first, then Level 2, then 3, then 4)</strong>
+  Zoho Desk requires parent roles to exist before child roles can reference them in "Reports To."
+</div>
+
+<table>
+  <tr><th>Level</th><th>Role Name</th><th>Reports To</th><th>Data Visibility</th></tr>
+  <tr><td>Level 1 (CEO)</td><td>Super Admin</td><td>—</td><td>Full org access, all departments</td></tr>
+  <tr><td>Level 2</td><td>Tech Manager</td><td>CEO</td><td>Engineering dept data + cross-dept tech view</td></tr>
+  <tr><td>Level 2</td><td>Clinical Director</td><td>CEO</td><td>Clinical dept data + patient escalation view</td></tr>
+  <tr><td>Level 2</td><td>Finance Manager</td><td>CEO</td><td>Finance dept + billing cross-dept</td></tr>
+  <tr><td>Level 2</td><td>BD Manager</td><td>CEO</td><td>Business Dev dept + Insurance dept view</td></tr>
+  <tr><td>Level 2</td><td>Legal Manager</td><td>CEO</td><td>Legal dept + contract cross-dept</td></tr>
+  <tr><td>Level 3</td><td>Engineer</td><td>Tech Manager</td><td>Own tickets + Engineering dept</td></tr>
+  <tr><td>Level 3</td><td>Sr. Clinician</td><td>Clinical Director</td><td>Own patients + clinical dept</td></tr>
+  <tr><td>Level 3</td><td>Clinician</td><td>Clinical Director</td><td>Own patients only</td></tr>
+  <tr><td>Level 3</td><td>Ecom Manager</td><td>Finance Manager</td><td>Ecommerce dept only</td></tr>
+  <tr><td>Level 4</td><td>CAB Chair</td><td>Clinical Director</td><td>Read-only clinical, comment-only</td></tr>
+  <tr><td>Level 4</td><td>Insurance Partner</td><td>BD Manager</td><td>Own org claims only</td></tr>
+  <tr><td>Level 4</td><td>Client Manager</td><td>BD Manager</td><td>Own org wellness data only</td></tr>
+</table>
+
+<pre><code>// Role Hierarchy Visual
+//
+// ┌─────────────────────────────────────────────────────────┐
+// │                    SUPER ADMIN (CEO)                     │
+// │                      Level 1                             │
+// └───────┬──────┬──────┬──────┬──────┬─────────────────────┘
+//         │      │      │      │      │
+//    Tech Mgr  Clinical  Finance  BD Mgr  Legal Mgr
+//    Level 2   Director  Manager  Level 2  Level 2
+//         │      │      │      │
+//    Engineer  Sr.Clin  Ecom   InsPartner
+//    Level 3  Clinician  Mgr   CliManager
+//              CAB Chair  L3     L4
+//              Level 4</code></pre>
+
+<!-- B4 -->
+<h2 id="b4">4. Phase 3: Permission Profiles (11 Custom)</h2>
+
+<p>Navigate to: <code>Setup → Profiles → Clone 'Agent' default → Customize each</code></p>
+
+<div class="callout callout-crit">
+  <strong>🔴 Critical: Roles ≠ Profiles</strong>
+  Roles control WHAT DATA agents can SEE (hierarchy-based visibility). Profiles control WHAT ACTIONS agents can DO (feature permissions). A role is assigned one profile. Both must be configured correctly.
+</div>
+
+<table>
+  <tr><th>Profile Name</th><th>For Role(s)</th><th>Permissions Summary</th><th>Setup Notes</th></tr>
+  <tr><td>Support Administrator</td><td>TADM</td><td>All features enabled — full admin</td><td>Do NOT assign to non-tech staff</td></tr>
+  <tr><td>Developer Profile</td><td>DEV</td><td>Tickets: view/create/edit. No admin. Workflows: view only.</td><td>Clone from Agent, disable admin features</td></tr>
+  <tr><td>Therapist Profile</td><td>PSY</td><td>Tickets: view/comment only. No create/delete. Add internal notes.</td><td>Light agent — cannot reply to end users</td></tr>
+  <tr><td>Psychiatrist Profile</td><td>PSR</td><td>Same as Therapist + escalate + close clinical tickets + medication module</td><td>Light agent with elevated clinical permissions</td></tr>
+  <tr><td>Contract Admin Profile</td><td>CCA</td><td>Tickets: full CRUD. Manage templates. Import/export. Workflow access.</td><td>Needs Zoho Sign integration active</td></tr>
+  <tr><td>Advisory Profile</td><td>CAB</td><td>Tickets: view + comment only. No create/edit/delete. Clinical dept only.</td><td>Most restricted light agent profile</td></tr>
+  <tr><td>Finance Profile</td><td>FIN</td><td>Tickets: full CRUD in Finance dept. View cross-dept billing. Export data.</td><td>Needs Razorpay integration view</td></tr>
+  <tr><td>BD Profile</td><td>BDE</td><td>Tickets: full CRUD in BD + Insurance dept. Lead management.</td><td>CRM integration recommended</td></tr>
+  <tr><td>Insurance Profile</td><td>INS</td><td>Tickets: view own org claims only. Comment + status update. No delete.</td><td>Light agent — strict data isolation per insurer</td></tr>
+  <tr><td>Ecommerce Profile</td><td>ECOM</td><td>Tickets: full CRUD in Ecommerce. Subscription management. Promo tracking.</td><td>PhonePe webhook ticket integration</td></tr>
+  <tr><td>Corp Client Profile</td><td>CCORP</td><td>Tickets: view own org only. Usage dashboards. No create/edit/delete others.</td><td>Light agent — self-service portal recommended</td></tr>
+</table>
+
+<h4>Profile Creation Script (Step-by-Step)</h4>
+<pre><code>// For each profile:
+// 1. Go to Setup → Profiles
+// 2. Click "Clone" on the "Agent" default profile
+// 3. Name it per the table above
+// 4. Configure permissions:
+
+// === THERAPIST PROFILE (PSY) — Example ===
+Profile Name: Therapist Profile
+Type: Light Agent
+
+Ticket Permissions:
+  ☑ View Tickets (own department only)
+  ☐ Create Tickets
+  ☐ Edit Tickets  
+  ☐ Delete Tickets
+  ☐ Close Tickets
+  ☑ Add Internal Comments
+  ☐ Reply to End Users
+  ☑ View Ticket History
+
+Module Access:
+  ☑ Tickets (view only)
+  ☑ Contacts (view only)
+  ☐ Knowledge Base (edit)
+  ☐ Reports
+  ☐ Social
+  ☐ Community
+
+Admin Permissions:
+  ☐ Manage Agents
+  ☐ Manage Departments
+  ☐ Workflow Rules
+  ☐ Blueprint Editor
+  ☐ Import/Export
+  ☐ Rebranding
+  ALL UNCHECKED for Therapist Profile
+
+// === SUPPORT ADMINISTRATOR (TADM) — Example ===
+Profile Name: Support Administrator
+Type: Full Agent
+
+ALL PERMISSIONS: ☑ ENABLED
+// This is the only profile with full admin access
+// Assign ONLY to TADM-01 and TADM-02</code></pre>
+
+<!-- B5 -->
+<h2 id="b5">5. Phase 4: Agent Provisioning (27 IDs)</h2>
+
+<p>Navigate to: <code>Setup → Agents → Add Agent</code></p>
+
+<table>
+  <tr><th>Agent ID Range</th><th>Role Name</th><th>Count</th><th>Department</th><th>Zoho Desk Role</th><th>Profile</th><th>Agent Type</th><th>Email Pattern</th></tr>
+  <tr><td>DEV-01 to 04</td><td>Developer / Tester</td><td>4</td><td>Engineering</td><td>Engineer</td><td>Developer Profile</td><td>Full</td><td><code>@mans360.dev</code></td></tr>
+  <tr><td>TADM-01 to 02</td><td>Tech Admin</td><td>2</td><td>Engineering</td><td>Tech Manager</td><td>Support Administrator</td><td>Full</td><td><code>@mans360.dev</code></td></tr>
+  <tr><td>PSY-01 to 04</td><td>Clinical Psychologist</td><td>4</td><td>Clinical</td><td>Clinician</td><td>Therapist Profile</td><td>Light</td><td><code>@clinical.mans360.co</code></td></tr>
+  <tr><td>PSR-01 to 02</td><td>Psychiatrist</td><td>2</td><td>Clinical</td><td>Sr. Clinician</td><td>Psychiatrist Profile</td><td>Light</td><td><code>@clinical.mans360.co</code></td></tr>
+  <tr><td>CCA-01 to 02</td><td>Corp Contract Admin</td><td>2</td><td>Legal & Contracts</td><td>Legal Manager</td><td>Contract Admin Profile</td><td>Full</td><td><code>@legal.mans360.co</code></td></tr>
+  <tr><td>CCORP-01</td><td>Client Corp Admin</td><td>1</td><td>Corporate Clients</td><td>Client Manager</td><td>Corp Client Profile</td><td>Light</td><td><code>client-admin@[corp].com</code></td></tr>
+  <tr><td>CAB-01</td><td>Chair, Clinical Advisory Board</td><td>1</td><td>Clinical</td><td>CAB Chair</td><td>Advisory Profile</td><td>Light</td><td><code>cab@mans360.co</code></td></tr>
+  <tr><td>FIN-01 to 02</td><td>Finance & Accounts</td><td>2</td><td>Finance</td><td>Finance Manager</td><td>Finance Profile</td><td>Full</td><td><code>@finance.mans360.co</code></td></tr>
+  <tr><td>BDE-01 to 02</td><td>Business Dev Executive</td><td>2</td><td>Business Dev</td><td>BD Manager</td><td>BD Profile</td><td>Full</td><td><code>@mans360.co</code></td></tr>
+  <tr><td>INS-01 to 04</td><td>Insurance Partner</td><td>4</td><td>Insurance</td><td>Insurance Partner</td><td>Insurance Profile</td><td>Light</td><td><code>@[insurer].com</code></td></tr>
+  <tr><td>ECOM-01 to 02</td><td>Admin - Ecommerce</td><td>2</td><td>Ecommerce</td><td>Ecom Manager</td><td>Ecommerce Profile</td><td>Full</td><td><code>@mans360.co</code></td></tr>
+</table>
+
+<h4>Security Configuration</h4>
+<pre><code>// Setup → Security → Authentication
+
+// Mandatory 2FA for:
+TADM-01, TADM-02    // Tech Admin — full system access
+FIN-01, FIN-02       // Finance — payment/payout access  
+CCA-01, CCA-02       // Legal — contract/DPDPA access
+
+// Recommended 2FA for:
+All remaining agents  // Best practice
+
+// Session Settings:
+Session timeout: 30 minutes (inactivity)
+Password policy: Minimum 12 chars, 1 uppercase, 1 number, 1 special
+IP restriction: Optional — enable for TADM/FIN roles (office IPs only)</code></pre>
+
+<!-- B6 -->
+<h2 id="b6">6. Phase 5: Feature Permission Matrix</h2>
+
+<p>Legend: <span class="perm-full">✓ Full Access</span> &nbsp; <span class="perm-view">👁 View Only</span> &nbsp; <span class="perm-comment">C Comment</span> &nbsp; <span class="perm-none">✗ No Access</span></p>
+
+<h4>6.1 Ticket Permissions</h4>
+<table>
+  <tr><th>Action</th><th>TADM</th><th>DEV</th><th>PSY</th><th>PSR</th><th>CCA</th><th>CAB</th><th>FIN</th><th>BDE</th><th>INS</th><th>ECOM</th><th>CCORP</th></tr>
+  <tr><td>Create Tickets</td><td class="perm-full">✓</td><td class="perm-full">✓</td><td class="perm-none">✗</td><td class="perm-full">✓</td><td class="perm-full">✓</td><td class="perm-none">✗</td><td class="perm-full">✓</td><td class="perm-full">✓</td><td class="perm-none">✗</td><td class="perm-full">✓</td><td class="perm-none">✗</td></tr>
+  <tr><td>View (Own Dept)</td><td class="perm-full">✓</td><td class="perm-full">✓</td><td class="perm-full">✓</td><td class="perm-full">✓</td><td class="perm-full">✓</td><td class="perm-view">👁</td><td class="perm-full">✓</td><td class="perm-full">✓</td><td class="perm-view">👁</td><td class="perm-full">✓</td><td class="perm-view">👁</td></tr>
+  <tr><td>View (All Dept)</td><td class="perm-full">✓</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-view">👁</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td></tr>
+  <tr><td>Edit Tickets</td><td class="perm-full">✓</td><td class="perm-full">✓</td><td class="perm-none">✗</td><td class="perm-full">✓</td><td class="perm-full">✓</td><td class="perm-none">✗</td><td class="perm-full">✓</td><td class="perm-full">✓</td><td class="perm-none">✗</td><td class="perm-full">✓</td><td class="perm-none">✗</td></tr>
+  <tr><td>Delete Tickets</td><td class="perm-full">✓</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td></tr>
+  <tr><td>Close Tickets</td><td class="perm-full">✓</td><td class="perm-full">✓</td><td class="perm-none">✗</td><td class="perm-full">✓</td><td class="perm-full">✓</td><td class="perm-none">✗</td><td class="perm-full">✓</td><td class="perm-full">✓</td><td class="perm-none">✗</td><td class="perm-full">✓</td><td class="perm-none">✗</td></tr>
+  <tr><td>Internal Comments</td><td class="perm-full">✓</td><td class="perm-full">✓</td><td class="perm-full">✓</td><td class="perm-full">✓</td><td class="perm-full">✓</td><td class="perm-comment">C</td><td class="perm-full">✓</td><td class="perm-full">✓</td><td class="perm-comment">C</td><td class="perm-full">✓</td><td class="perm-comment">C</td></tr>
+  <tr><td>Reply to End User</td><td class="perm-full">✓</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-full">✓</td><td class="perm-none">✗</td><td class="perm-full">✓</td><td class="perm-full">✓</td><td class="perm-none">✗</td><td class="perm-full">✓</td><td class="perm-none">✗</td></tr>
+</table>
+
+<h4>6.2 Workflow & Admin Permissions</h4>
+<table>
+  <tr><th>Feature</th><th>TADM</th><th>DEV</th><th>PSY</th><th>PSR</th><th>CCA</th><th>CAB</th><th>FIN</th><th>BDE</th><th>INS</th><th>ECOM</th><th>CCORP</th></tr>
+  <tr><td>Manage Agents</td><td class="perm-full">✓</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td></tr>
+  <tr><td>Manage Departments</td><td class="perm-full">✓</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td></tr>
+  <tr><td>Workflow Automation Rules</td><td class="perm-full">✓</td><td class="perm-view">👁</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td></tr>
+  <tr><td>Blueprint Editor</td><td class="perm-full">✓</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td></tr>
+  <tr><td>Import / Export Data</td><td class="perm-full">✓</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-full">✓</td><td class="perm-none">✗</td><td class="perm-full">✓</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td></tr>
+  <tr><td>Custom Reports</td><td class="perm-full">✓</td><td class="perm-full">✓</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-full">✓</td><td class="perm-full">✓</td><td class="perm-none">✗</td><td class="perm-full">✓</td><td class="perm-none">✗</td></tr>
+  <tr><td>Patient Clinical Data</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-full">✓</td><td class="perm-full">✓</td><td class="perm-none">✗</td><td class="perm-view">👁</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td></tr>
+</table>
+
+<h4>6.3 Integration & Data Access</h4>
+<table>
+  <tr><th>Integration</th><th>TADM</th><th>DEV</th><th>PSY</th><th>PSR</th><th>CCA</th><th>CAB</th><th>FIN</th><th>BDE</th><th>INS</th><th>ECOM</th><th>CCORP</th></tr>
+  <tr><td>AWS Console</td><td class="perm-full">✓</td><td class="perm-view">👁</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td></tr>
+  <tr><td>PhonePe Dashboard</td><td class="perm-full">✓</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-full">✓</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-full">✓</td><td class="perm-none">✗</td></tr>
+  <tr><td>Zoho Sign</td><td class="perm-full">✓</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-full">✓</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td></tr>
+  <tr><td>Zoho Analytics</td><td class="perm-full">✓</td><td class="perm-view">👁</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-full">✓</td><td class="perm-full">✓</td><td class="perm-none">✗</td><td class="perm-full">✓</td><td class="perm-none">✗</td></tr>
+  <tr><td>Supabase DB</td><td class="perm-full">✓</td><td class="perm-full">✓</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td><td class="perm-none">✗</td></tr>
+</table>
+
+<!-- B7 -->
+<h2 id="b7">7. Phase 6: Blueprint Automation</h2>
+
+<p>Navigate to: <code>Setup → Blueprint → New Blueprint</code></p>
+
+<h3>Blueprint 1: Therapist Onboarding</h3>
+<pre><code>Blueprint Name: Therapist Onboarding Pipeline
+Department: Clinical + Legal & Contracts
+Applies to: Tickets with tag "therapist_onboarding"
+
+STATES (in order):
+┌──────────┐    ┌──────────┐    ┌────────────┐    ┌──────────┐    ┌────────┐
+│ Applied  │ →  │ Verified │ →  │ Contracted │ →  │ Training │ →  │ Active │
+└──────────┘    └──────────┘    └────────────┘    └──────────┘    └────────┘
+
+TRANSITIONS:
+1. Applied → Verified
+   Mandatory Fields: license_number, qualification, NMC_status
+   Allowed Roles: TADM, BDE
+   Custom Function: validate_therapist_credentials (Deluge)
+   SLA: 48 hours from ticket creation
+
+2. Verified → Contracted
+   Mandatory Fields: contract_sent, contract_signed
+   Allowed Roles: TADM, CCA
+   Action: Trigger Zoho Sign template "MANS360_Therapist_ICA_v3"
+   SLA: 7 days from verification
+
+3. Contracted → Training  
+   Mandatory Fields: training_enrolled, training_link_sent
+   Allowed Roles: TADM
+   Action: Send ZeptoMail training enrollment email
+   SLA: 1 day from contract signing
+
+4. Training → Active
+   Mandatory Fields: quiz_score (must be >= 80), cert_generated
+   Allowed Roles: TADM
+   Before Transition: Check all 4 gates (license ✓, contract ✓, training ✓, bank ✓)
+   Action: Update Supabase therapist status = 'active'
+   Notification: ZeptoMail activation email + Twilio SMS</code></pre>
+
+<h3>Blueprint 2: Clinical Escalation</h3>
+<pre><code>Blueprint Name: Clinical Escalation (Crisis)
+Department: Clinical
+Applies to: Tickets with priority "Urgent" AND tag "crisis"
+
+STATES:
+┌───────────┐    ┌───────────────┐    ┌──────────┐    ┌──────────┐
+│ Triggered │ →  │ PSR Assigned  │ →  │ In Care  │ →  │ Resolved │
+└───────────┘    └───────────────┘    └──────────┘    └──────────┘
+
+TRANSITIONS:
+1. Triggered → PSR Assigned
+   Auto-Assignment: Round-robin to available PSR agent
+   SLA: 15 MINUTES (critical)
+   Notification: Twilio SMS to assigned psychiatrist
+   Escalation: If no response in 10min → auto-assign backup PSR
+
+2. PSR Assigned → In Care
+   Mandatory Fields: patient_contacted, risk_assessment
+   Allowed Roles: PSR
+   SLA: 1 hour from assignment
+
+3. In Care → Resolved
+   Mandatory Fields: outcome_notes, follow_up_scheduled
+   Allowed Roles: PSR, TADM
+   Action: Generate incident report, schedule 24h follow-up
+   Notification: Update referring clinician (PSY)</code></pre>
+
+<h3>Blueprint 3: Insurance Claims</h3>
+<pre><code>Blueprint Name: Insurance Claim Processing
+Department: Insurance + Finance
+Applies to: Tickets with tag "insurance_claim"
+
+STATES:
+┌──────────┐    ┌────────┐    ┌─────────┐    ┌───────────┐    ┌────────┐
+│ Submitted│ →  │ Verify │ →  │ Process │ →  │ Reimburse │ →  │ Closed │
+└──────────┘    └────────┘    └─────────┘    └───────────┘    └────────┘
+
+TRANSITIONS:
+1. Submitted → Verify
+   Allowed Roles: BDE, FIN
+   Action: Validate claim against insurance partner API
+   SLA: 24 hours
+
+2. Verify → Process
+   Allowed Roles: FIN, INS (own org claims)
+   Mandatory: claim_amount, policy_number, verification_status
+   SLA: 48 hours
+
+3. Process → Reimburse
+   Allowed Roles: FIN
+   Action: Trigger PhonePe payout to patient (copay refund)
+   SLA: 5 business days
+
+4. Reimburse → Closed
+   Allowed Roles: FIN, TADM
+   Mandatory: payment_reference, patient_notified
+   Action: ZeptoMail confirmation to patient + insurer</code></pre>
+
+<!-- B8 -->
+<h2 id="b8">8. Phase 7: SLA Policies</h2>
+
+<p>Navigate to: <code>Setup → SLA → New Policy</code></p>
+
+<table>
+  <tr><th>Department</th><th>Priority</th><th>First Response</th><th>Resolution</th><th>Escalation</th></tr>
+  <tr><td>Clinical</td><td>🔴 Urgent (Crisis)</td><td>15 minutes</td><td>1 hour</td><td>10 min → backup PSR, 30 min → Clinical Director</td></tr>
+  <tr><td>Clinical</td><td>🟡 Normal</td><td>4 hours</td><td>24 hours</td><td>8 hr → Clinical Director</td></tr>
+  <tr><td>Engineering</td><td>🔴 Urgent</td><td>1 hour</td><td>8 hours</td><td>4 hr → Tech Manager</td></tr>
+  <tr><td>Engineering</td><td>🟡 Normal</td><td>8 hours</td><td>48 hours</td><td>24 hr → Tech Manager</td></tr>
+  <tr><td>Finance</td><td>All</td><td>4 hours</td><td>24 hours</td><td>12 hr → Finance Manager</td></tr>
+  <tr><td>Legal & Contracts</td><td>All</td><td>8 hours</td><td>48 hours</td><td>24 hr → Legal Manager</td></tr>
+  <tr><td>Business Dev</td><td>All</td><td>8 hours</td><td>48 hours</td><td>24 hr → BD Manager</td></tr>
+  <tr><td>Insurance</td><td>All</td><td>24 hours</td><td>5 business days</td><td>48 hr → BD Manager</td></tr>
+  <tr><td>Ecommerce</td><td>All</td><td>4 hours</td><td>24 hours</td><td>12 hr → Finance Manager</td></tr>
+  <tr><td>Corporate Clients</td><td>All</td><td>8 hours</td><td>48 hours</td><td>24 hr → BD Manager</td></tr>
+</table>
+
+<!-- B9 -->
+<h2 id="b9">9. Phase 8: Workflow Rules & Deluge Scripts</h2>
+
+<h4>9.1 Auto-Assignment Rules</h4>
+<pre><code>// Setup → Assignment Rules → New Rule (per department)
+
+// ENGINEERING: Round-robin among DEV agents
+Rule Name: Engineering Round Robin
+Department: Engineering
+Condition: All new tickets
+Assignment: Round Robin → DEV-01, DEV-02, DEV-03, DEV-04
+Skip if: Agent is offline/on leave
+
+// CLINICAL: Priority-based routing
+Rule Name: Clinical Priority Router
+Department: Clinical
+Conditions:
+  IF Priority == "Urgent" AND Tags contains "crisis"
+    → Assign to PSR (round-robin: PSR-01, PSR-02)
+  ELSE IF Tags contains "medication" OR Tags contains "prescription"
+    → Assign to PSR (round-robin)
+  ELSE
+    → Assign to PSY (round-robin: PSY-01 to PSY-04)
+
+// FINANCE: Direct assignment
+Rule Name: Finance Assignment
+Department: Finance
+Assignment: Round Robin → FIN-01, FIN-02</code></pre>
+
+<h4>9.2 Deluge: Auto-Tagging Incoming Tickets</h4>
+<pre><code>// Workflow Rule: Auto-tag tickets based on subject/description keywords
+// Setup → Workflow Rules → New Rule
+// Trigger: On ticket creation (all departments)
+
+subject = ticket.get("subject").toLowerCase();
+description = ticket.get("description").toLowerCase();
+
+tags = List();
+
+// Clinical keywords
+if (subject.contains("crisis") || description.contains("suicidal") || description.contains("self-harm"))
+{
+  tags.add("crisis");
+  zoho.desk.updateTicket(ticket.get("id"), {"priority": "Urgent"});
+}
+
+if (subject.contains("phq") || description.contains("assessment"))
+{
+  tags.add("assessment");
+}
+
+// Payment keywords
+if (subject.contains("payment failed") || description.contains("refund"))
+{
+  tags.add("payment_issue");
+}
+
+if (subject.contains("payout") || description.contains("wallet"))
+{
+  tags.add("therapist_payout");
+}
+
+// Onboarding keywords
+if (subject.contains("onboarding") || description.contains("credential"))
+{
+  tags.add("therapist_onboarding");
+}
+
+// DPDPA keywords
+if (subject.contains("delete my data") || description.contains("dpdpa") || description.contains("right to erasure"))
+{
+  tags.add("dpdpa_request");
+  tags.add("compliance");
+}
+
+// Insurance keywords
+if (subject.contains("claim") || description.contains("reimbursement"))
+{
+  tags.add("insurance_claim");
+}
+
+// Apply tags
+if (tags.size() > 0)
+{
+  zoho.desk.updateTicket(ticket.get("id"), {"tags": tags});
+}</code></pre>
+
+<h4>9.3 Deluge: Webhook Integration for Zoho Flow</h4>
+<pre><code>// Workflow Rule: Send ticket events to Zoho Flow for automation
+// Trigger: On ticket creation or status change
+
+ticketData = Map();
+ticketData.put("ticket_id", ticket.get("id"));
+ticketData.put("subject", ticket.get("subject"));
+ticketData.put("department", ticket.get("departmentId"));
+ticketData.put("priority", ticket.get("priority"));
+ticketData.put("status", ticket.get("status"));
+ticketData.put("tags", ticket.get("tags"));
+ticketData.put("assignee", ticket.get("assigneeId"));
+ticketData.put("created_at", ticket.get("createdTime"));
+ticketData.put("contact_email", ticket.get("contactId"));
+
+// Send to Zoho Flow webhook for further automation
+response = invokeurl
+[
+  url: "https://flow.zoho.in/webhook/incoming?zapikey=YOUR_ZOHO_FLOW_WEBHOOK_KEY"
+  type: POST
+  headers: {"Content-Type": "application/json"}
+  parameters: ticketData.toString()
+];</code></pre>
+
+<!-- B10 -->
+<h2 id="b10">10. Phase 9: Portal & Self-Service</h2>
+
+<pre><code>// Setup → Help Center → Portal
+
+// PORTAL 1: Corporate Client Self-Service
+Portal Name: MANAS360 Corporate Wellness Portal
+Access: CCORP role agents (client-admin@[corp].com)
+Features:
+  ☑ View own organization's tickets
+  ☑ Create new support tickets
+  ☑ View employee wellness usage dashboards
+  ☑ Download billing/invoice documents
+  ☐ Edit other org data (BLOCKED)
+  ☐ View other organizations (BLOCKED)
+
+// PORTAL 2: Insurance Partner Portal
+Portal Name: MANAS360 Insurance Claims Portal
+Access: INS role agents (@[insurer].com)
+Features:
+  ☑ View own org's claims
+  ☑ Submit claim responses
+  ☑ Track reimbursement status
+  ☑ Update coverage rules (own plans only)
+  ☐ View other insurer data (BLOCKED)
+  ☐ Access patient PII (BLOCKED)
+
+// KNOWLEDGE BASE: Internal
+// Setup → Help Center → Knowledge Base
+KB 1: Engineering SOPs (access: DEV, TADM)
+KB 2: Clinical Protocols (access: PSY, PSR, CAB)
+KB 3: Legal Templates (access: CCA, TADM)
+KB 4: Onboarding Guides (access: All agents)
+
+// CUSTOMER HAPPINESS RATINGS
+// Setup → General → Happiness Ratings
+Enable for: Clinical, Finance, Ecommerce departments
+Rating scale: Good / OK / Bad
+Trigger: On ticket closure</code></pre>
+
+<!-- B11 -->
+<h2 id="b11">11. Workflow-to-Role Access Mapping</h2>
+
+<table>
+  <tr><th>Workflow ID</th><th>Workflow Name</th><th>Full Access</th><th>Limited Access</th><th>Tech Stack</th></tr>
+  <tr><td>WF-1.1</td><td>Patient Registration</td><td>TADM, DEV</td><td>PSY (view), PSR (view)</td><td>Zoho Flow → Supabase → ZeptoMail</td></tr>
+  <tr><td>WF-1.2</td><td>Therapist Onboarding</td><td>TADM, CCA, BDE</td><td>CAB (review), PSY (view)</td><td>Zoho Flow → Zoho Sign → S3</td></tr>
+  <tr><td>WF-2.1</td><td>Coach Onboarding</td><td>TADM, CCA, BDE</td><td>CAB (review)</td><td>Zoho Flow → Zoho Sign → S3</td></tr>
+  <tr><td>WF-3.1</td><td>Subscription Payment</td><td>TADM, ECOM, FIN</td><td>—</td><td>PhonePe → Zoho Flow → Supabase</td></tr>
+  <tr><td>WF-3.2</td><td>Recurring Billing</td><td>TADM, FIN, ECOM</td><td>—</td><td>Cron → PhonePe → Zoho Flow</td></tr>
+  <tr><td>WF-3.3</td><td>Therapist Payout</td><td>TADM, FIN</td><td>—</td><td>Supabase → PhonePe → Zoho Flow</td></tr>
+  <tr><td>WF-4.1</td><td>Insurance Claim</td><td>TADM, FIN, BDE</td><td>INS (own claims)</td><td>Zoho Flow → Insurance API</td></tr>
+  <tr><td>WF-5.1</td><td>Clinical Escalation</td><td>TADM</td><td>PSY (create), PSR (resolve), CAB (review)</td><td>Zoho Desk Blueprint</td></tr>
+  <tr><td>WF-5.2</td><td>Session Notes</td><td>TADM</td><td>PSY (CRUD), PSR (CRUD), CAB (view)</td><td>Supabase → S3 (encrypted)</td></tr>
+  <tr><td>WF-6.1</td><td>Contract / NDA</td><td>TADM, CCA</td><td>FIN (view)</td><td>Zoho Sign → S3 → Zoho Flow</td></tr>
+  <tr><td>WF-6.2</td><td>DPDPA Data Deletion</td><td>TADM, CCA</td><td>FIN (audit)</td><td>Zoho Desk → Zoho Flow → Supabase → S3</td></tr>
+  <tr><td>WF-7.1</td><td>Lead Management</td><td>TADM, BDE</td><td>—</td><td>Zoho Desk → Supabase → Zoho Flow</td></tr>
+  <tr><td>WF-8.1</td><td>Corporate Wellness</td><td>TADM, BDE</td><td>CCORP (own org), FIN (billing)</td><td>Zoho Flow → Supabase → Analytics</td></tr>
+  <tr><td>WF-9.1</td><td>Certification & Badges</td><td>TADM, DEV</td><td>PSY/PSR (earn), CAB (audit)</td><td>Zoho Flow → PDF gen → S3</td></tr>
+</table>
+
+<!-- B12 -->
+<h2 id="b12">12. Cost Planning</h2>
+
+<table>
+  <tr><th>Category</th><th>Role(s)</th><th>Count</th><th>Type</th><th>Unit Cost</th><th>Monthly (₹)</th></tr>
+  <tr><td>Engineering</td><td>Developer/Tester</td><td>1*</td><td>Full Agent</td><td>₹2,100</td><td>₹2,100</td></tr>
+  <tr><td>Engineering</td><td>Tech Admin</td><td>1</td><td>Full Agent</td><td>₹2,100</td><td>₹2,100</td></tr>
+  <tr><td>Legal</td><td>Corp Contract Admin</td><td>1</td><td>Full Agent</td><td>₹2,100</td><td>₹2,100</td></tr>
+  <tr><td>Finance</td><td>Finance & Accounts</td><td>1</td><td>Full Agent</td><td>₹2,100</td><td>₹2,100</td></tr>
+  <tr><td>Business Dev</td><td>BD Executive</td><td>1</td><td>Full Agent</td><td>₹2,100</td><td>₹2,100</td></tr>
+  <tr><td>Ecommerce</td><td>Admin - Ecommerce</td><td>1</td><td>Full Agent</td><td>₹2,100</td><td>₹2,100</td></tr>
+  <tr><td colspan="4" style="text-align:right;font-weight:700">Full Agent Subtotal (6 agents)</td><td></td><td style="font-weight:700">₹12,600</td></tr>
+  <tr><td>Clinical</td><td>Psychologist</td><td>2</td><td>Light Agent</td><td>₹345</td><td>₹690</td></tr>
+  <tr><td>Clinical</td><td>Psychiatrist</td><td>1</td><td>Light Agent</td><td>₹345</td><td>₹345</td></tr>
+  <tr><td>Clinical</td><td>CAB Chair</td><td>1</td><td>Light Agent</td><td>₹345</td><td>₹345</td></tr>
+  <tr><td>Insurance</td><td>Insurance Partner</td><td>1</td><td>Light Agent</td><td>₹345</td><td>₹345</td></tr>
+  <tr><td>Corporate</td><td>Client Corp Admin</td><td>1</td><td>Light Agent</td><td>₹345</td><td>₹345</td></tr>
+  <tr><td colspan="4" style="text-align:right;font-weight:700">Light Agent Subtotal (6 agents)</td><td></td><td style="font-weight:700">₹2,070</td></tr>
+  <tr class="cost-row-total"><td colspan="4" style="text-align:right">TOTAL MONTHLY (MVP — 12 agents)</td><td></td><td>₹14,670</td></tr>
+  <tr class="cost-row-total"><td colspan="4" style="text-align:right">TOTAL ANNUAL</td><td></td><td>₹1,76,040</td></tr>
+</table>
+
+<div class="callout callout-info">
+  <strong>ℹ️ MVP vs Full Scale</strong>
+  The table above shows MVP costs (12 agents — 1 per role). The full 27-agent build from the IAM matrix (4 DEVs, 4 PSYs, 4 INS, etc.) would cost approximately ₹39,270/month. Start with MVP, scale agent count as ticket volume grows.
+</div>
+
+<!-- B13 -->
+<h2 id="b13">13. Complete Setup Checklist</h2>
+
+<div class="phase-block">
+  <div class="phase-block-title"><span class="phase-num">PHASE 1</span> STRUCTURE</div>
+  <div class="check-item"><div class="check-box"></div><div>Create 8 Departments<div class="check-where">Setup → Departments → Add</div><div class="check-detail">Engineering, Clinical, Legal, Finance, BD, Insurance, Ecommerce, Corporate Clients</div></div></div>
+  <div class="check-item"><div class="check-box"></div><div>Set up Role Hierarchy (4 levels, 13 roles)<div class="check-where">Setup → Roles → New Role</div><div class="check-detail">CEO → 5 Managers → 4 Staff → 3 External. Create top-down.</div></div></div>
+  <div class="check-item"><div class="check-box"></div><div>Enable multi-department ticketing<div class="check-where">Setup → General → Departments</div><div class="check-detail">Required for Finance cross-dept billing visibility</div></div></div>
+  <div class="check-item"><div class="check-box"></div><div>Configure data sharing rules<div class="check-where">Setup → Data Sharing → Edit</div><div class="check-detail">Clinical → Finance (billing only), BD → Insurance</div></div></div>
+</div>
+
+<div class="phase-block">
+  <div class="phase-block-title"><span class="phase-num">PHASE 2</span> PROFILES</div>
+  <div class="check-item"><div class="check-box"></div><div>Clone 'Agent' profile → create 11 custom profiles<div class="check-where">Setup → Profiles → Clone</div><div class="check-detail">See Section 4 for each profile's exact permission set</div></div></div>
+  <div class="check-item"><div class="check-box"></div><div>Set ticket permissions per profile<div class="check-where">Profile → Ticket Permissions</div><div class="check-detail">CRUD per dept — reference Permission Matrix (Section 6)</div></div></div>
+  <div class="check-item"><div class="check-box"></div><div>Disable admin features for non-admin profiles<div class="check-where">Profile → Administrative</div><div class="check-detail">Only TADM gets Manage Agents, Workflows, Rebranding</div></div></div>
+  <div class="check-item"><div class="check-box"></div><div>Enable comment-only for light agents (CAB, INS, CCORP)<div class="check-where">Profile → Feature Permissions</div><div class="check-detail">Disable Reply, Close, Delete — enable View + Comment only</div></div></div>
+</div>
+
+<div class="phase-block">
+  <div class="phase-block-title"><span class="phase-num">PHASE 3</span> AGENTS</div>
+  <div class="check-item"><div class="check-box"></div><div>Add Full Agents (6 MVP, up to 16 full scale)<div class="check-where">Setup → Agents → Add</div><div class="check-detail">DEV + TADM + CCA + FIN + BDE + ECOM</div></div></div>
+  <div class="check-item"><div class="check-box"></div><div>Add Light Agents (6 MVP, up to 11 full scale)<div class="check-where">Setup → Agents → Add (Light)</div><div class="check-detail">PSY + PSR + CAB + INS + CCORP (via portal)</div></div></div>
+  <div class="check-item"><div class="check-box"></div><div>Assign Role + Profile + Department to each agent<div class="check-where">Agent → Edit → Roles & Permissions</div><div class="check-detail">Match exactly to Agent Provisioning table (Section 5)</div></div></div>
+  <div class="check-item"><div class="check-box"></div><div>Set up email aliases per department<div class="check-where">Setup → Channels → Email</div><div class="check-detail">8 department support emails (see Section 2)</div></div></div>
+  <div class="check-item"><div class="check-box"></div><div>Configure SSO / 2FA for all agents<div class="check-where">Setup → Security → Authentication</div><div class="check-detail">Mandatory 2FA for TADM, FIN, CCA. Recommended for all.</div></div></div>
+</div>
+
+<div class="phase-block">
+  <div class="phase-block-title"><span class="phase-num">PHASE 4</span> AUTOMATION</div>
+  <div class="check-item"><div class="check-box"></div><div>Create Blueprint: Therapist Onboarding<div class="check-where">Setup → Blueprint → New</div><div class="check-detail">5 states: Applied → Verified → Contracted → Training → Active</div></div></div>
+  <div class="check-item"><div class="check-box"></div><div>Create Blueprint: Clinical Escalation<div class="check-where">Setup → Blueprint → New</div><div class="check-detail">4 states: Triggered → PSR Assigned → In Care → Resolved. 15-min SLA.</div></div></div>
+  <div class="check-item"><div class="check-box"></div><div>Create Blueprint: Insurance Claims<div class="check-where">Setup → Blueprint → New</div><div class="check-detail">5 states: Submitted → Verify → Process → Reimburse → Closed</div></div></div>
+  <div class="check-item"><div class="check-box"></div><div>Set SLA policies per department<div class="check-where">Setup → SLA → New Policy</div><div class="check-detail">Clinical crisis: 15min. Finance: 24hr. Engineering: 8hr. See Section 8.</div></div></div>
+  <div class="check-item"><div class="check-box"></div><div>Configure round-robin ticket assignment<div class="check-where">Setup → Assignment Rules</div><div class="check-detail">Per dept: rotate among active agents. See Section 9.1.</div></div></div>
+  <div class="check-item"><div class="check-box"></div><div>Set up webhook integrations<div class="check-where">Setup → Webhooks</div><div class="check-detail">Zoho Flow, PhonePe, Zoho Sign callbacks</div></div></div>
+  <div class="check-item"><div class="check-box"></div><div>Deploy Deluge workflow rules<div class="check-where">Setup → Workflow Rules</div><div class="check-detail">Auto-tagging (Section 9.2), Zoho Flow webhook (Section 9.3)</div></div></div>
+</div>
+
+<div class="phase-block">
+  <div class="phase-block-title"><span class="phase-num">PHASE 5</span> PORTAL & SELF-SERVICE</div>
+  <div class="check-item"><div class="check-box"></div><div>Create Corporate Client Portal<div class="check-where">Setup → Help Center → Portal</div><div class="check-detail">CCORP admins: view employees, usage data, raise tickets</div></div></div>
+  <div class="check-item"><div class="check-box"></div><div>Create Insurance Partner Portal<div class="check-where">Setup → Help Center → Portal</div><div class="check-detail">Insurers: view claims, submit responses, track status</div></div></div>
+  <div class="check-item"><div class="check-box"></div><div>Set up Knowledge Base per department<div class="check-where">Setup → Help Center → KB</div><div class="check-detail">Engineering SOPs, Clinical Protocols, Legal Templates, Onboarding Guides</div></div></div>
+  <div class="check-item"><div class="check-box"></div><div>Enable Customer Happiness Ratings<div class="check-where">Setup → General → Happiness</div><div class="check-detail">Post-ticket rating for Clinical, Finance, Ecommerce depts</div></div></div>
+</div>
+
+<div class="callout callout-warn">
+  <strong>📎 Supplementary Deliverables (Separate Files)</strong>
+  • Zoho Desk import CSV (all 27 agent records — bulk import ready)<br>
+  • Deluge script files (.ds — 3 workflow rules ready to paste)<br>
+  • Blueprint JSON exports (3 blueprints — import directly into Zoho Desk)<br>
+  • SLA policy configuration screenshots (step-by-step visual guide)
+</div>
+
+</div>
+</body>
+</html>

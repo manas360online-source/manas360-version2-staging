@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MANAS360 — Pricing Plans</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --sage:#4A6741;--sage-d:#2D4128;--sage-l:#e8f0e5;--clay:#C4956A;
+  --cream:#FFFDF7;--ink:#1a1a1a;--mute:#6b7280;--border:#e2e8f0;
+  --white:#fff;--blue:#2563eb;--purple:#7c3aed;--rose:#e11d48;
+  --green:#16a34a;--amber:#d97706;--teal:#0d9488;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);-webkit-font-smoothing:antialiased}
+
+/* HEADER */
+.pg-header{background:linear-gradient(135deg,var(--sage-d) 0%,var(--sage) 60%,#5a7d4f 100%);padding:48px 24px 32px;text-align:center;position:relative;overflow:hidden}
+.pg-header::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 30% 20%,rgba(255,255,255,.06),transparent 60%)}
+.pg-header h1{font-family:'Outfit',sans-serif;font-size:32px;font-weight:900;color:var(--white);letter-spacing:-.5px;position:relative}
+.pg-header .sub{font-size:14px;color:rgba(255,255,255,.65);margin-top:6px;position:relative}
+.pg-header .sub strong{color:var(--clay)}
+
+/* ROLE TABS */
+.role-tabs{display:flex;justify-content:center;gap:6px;margin:-22px auto 0;position:relative;z-index:5;max-width:560px;padding:0 16px}
+.role-tab{
+  flex:1;padding:14px 8px;border-radius:14px 14px 0 0;text-align:center;cursor:pointer;
+  font-size:13px;font-weight:700;transition:all .25s;border:2px solid transparent;border-bottom:none;
+  background:rgba(255,255,255,.85);color:var(--mute);backdrop-filter:blur(8px);
+}
+.role-tab:hover{background:var(--white);color:var(--ink)}
+.role-tab.active{background:var(--white);color:var(--sage-d);border-color:var(--sage);box-shadow:0 -4px 16px rgba(74,103,65,.1)}
+.role-tab .tab-icon{font-size:20px;display:block;margin-bottom:3px}
+.role-tab .tab-label{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.8px}
+
+/* CONTENT */
+.content{max-width:1200px;margin:0 auto;padding:0 16px 60px}
+.role-panel{display:none;animation:fadeUp .4s ease}
+.role-panel.active{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+
+/* SECTION TITLES */
+.section-label{
+  font-family:'Outfit',sans-serif;font-size:11px;font-weight:800;
+  color:var(--sage);text-transform:uppercase;letter-spacing:2px;margin:36px 0 6px;
+}
+.section-title{font-family:'Outfit',sans-serif;font-size:22px;font-weight:800;color:var(--ink);margin-bottom:4px}
+.section-desc{font-size:13px;color:var(--mute);margin-bottom:20px;max-width:680px}
+
+/* PRICING CARDS */
+.cards-row{display:grid;gap:14px;margin:16px 0 28px}
+.cards-3{grid-template-columns:repeat(3,1fr)}
+.cards-4{grid-template-columns:repeat(4,1fr)}
+.cards-5{grid-template-columns:repeat(5,1fr)}
+@media(max-width:900px){.cards-3,.cards-4,.cards-5{grid-template-columns:1fr 1fr}}
+@media(max-width:560px){.cards-3,.cards-4,.cards-5{grid-template-columns:1fr}}
+
+.card{
+  background:var(--white);border:2px solid var(--border);border-radius:16px;
+  padding:24px 20px;position:relative;transition:all .3s;display:flex;flex-direction:column;
+}
+.card:hover{transform:translateY(-4px);box-shadow:0 12px 32px rgba(0,0,0,.08)}
+.card.popular{border-color:var(--sage);box-shadow:0 0 0 1px var(--sage)}
+.card.popular::after{
+  content:'MOST POPULAR';position:absolute;top:-11px;left:50%;transform:translateX(-50%);
+  background:var(--sage);color:var(--white);font-size:9px;font-weight:800;
+  padding:3px 14px;border-radius:10px;letter-spacing:1px;
+}
+.card.mvp{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue)}
+.card.mvp::after{
+  content:'MVP PLAN';position:absolute;top:-11px;left:50%;transform:translateX(-50%);
+  background:var(--blue);color:var(--white);font-size:9px;font-weight:800;
+  padding:3px 14px;border-radius:10px;letter-spacing:1px;
+}
+.card-icon{font-size:28px;margin-bottom:8px}
+.card-name{font-family:'Outfit',sans-serif;font-size:18px;font-weight:800;color:var(--ink)}
+.card-price{margin:8px 0;display:flex;align-items:baseline;gap:4px}
+.card-price .amt{font-family:'Outfit',sans-serif;font-size:28px;font-weight:900;color:var(--sage-d)}
+.card-price .per{font-size:12px;color:var(--mute);font-weight:500}
+.card-price .save{font-size:10px;color:var(--green);font-weight:700;background:#dcfce7;padding:2px 7px;border-radius:6px;margin-left:4px}
+.card-target{font-size:11px;color:var(--mute);font-weight:600;margin-bottom:12px}
+.card-features{list-style:none;flex:1;margin-bottom:14px}
+.card-features li{font-size:12px;padding:4px 0;display:flex;align-items:flex-start;gap:6px;color:#374151}
+.card-features li::before{content:'✓';color:var(--green);font-weight:800;font-size:11px;margin-top:1px}
+.card-features li.no::before{content:'✕';color:#d1d5db}
+.card-features li.no{color:#9ca3af}
+.card-cta{
+  display:block;width:100%;padding:10px;border-radius:10px;text-align:center;
+  font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;border:2px solid var(--sage);
+  background:var(--white);color:var(--sage);text-decoration:none;
+}
+.card-cta:hover{background:var(--sage);color:var(--white)}
+.card-cta.filled{background:var(--sage);color:var(--white);border-color:var(--sage)}
+.card-cta.filled:hover{background:var(--sage-d)}
+
+/* FEATURE TABLE */
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:12.5px}
+th{background:var(--sage);color:var(--white);padding:10px 12px;text-align:left;font-weight:700;font-size:11px}
+td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+tr:nth-child(even) td{background:#f8faf7}
+tr:hover td{background:#f0f5ee}
+.tbl-note{font-size:11px;color:var(--mute);margin-top:6px;font-style:italic}
+
+/* TAGS */
+.tag{display:inline-block;padding:2px 8px;border-radius:8px;font-size:9px;font-weight:700}
+.tag-free{background:#dcfce7;color:var(--green)}
+.tag-new{background:#dbeafe;color:var(--blue)}
+.tag-hot{background:#fee2e2;color:var(--rose)}
+.tag-warm{background:#fef3c7;color:var(--amber)}
+.tag-cold{background:#e0e7ff;color:#4338ca}
+
+/* ROI CALLOUT */
+.roi-box{background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:2px solid #86efac;border-radius:14px;padding:20px;margin:16px 0}
+.roi-box h4{font-family:'Outfit',sans-serif;font-size:14px;font-weight:800;color:var(--green);margin-bottom:8px}
+.roi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:10px 0}
+@media(max-width:700px){.roi-grid{grid-template-columns:1fr 1fr}}
+.roi-stat{text-align:center;background:var(--white);border-radius:10px;padding:12px 8px;border:1px solid #bbf7d0}
+.roi-stat .val{font-family:'Outfit',sans-serif;font-size:22px;font-weight:900;color:var(--sage-d)}
+.roi-stat .lbl{font-size:10px;color:var(--mute);font-weight:600;margin-top:2px}
+
+/* FOOTER */
+.pg-footer{text-align:center;padding:20px;font-size:11px;color:var(--mute);border-top:1px solid var(--border)}
+.pg-footer strong{color:var(--sage-d)}
+</style>
+</head>
+<body>
+
+<div class="pg-header">
+  <h1>MANAS360 Pricing Plans</h1>
+  <div class="sub">Transparent pricing · <strong>21-day free trial for everyone</strong> · Payment via PhonePe</div>
+</div>
+
+<div class="role-tabs">
+  <div class="role-tab active" onclick="switchRole('patient')">
+    <span class="tab-icon">🧑</span>
+    <span class="tab-label">Patient</span>
+  </div>
+  <div class="role-tab" onclick="switchRole('provider')">
+    <span class="tab-icon">👨‍⚕️</span>
+    <span class="tab-label">Provider / Therapist</span>
+  </div>
+  <div class="role-tab" onclick="switchRole('corporate')">
+    <span class="tab-icon">🏢</span>
+    <span class="tab-label">Corporate</span>
+  </div>
+</div>
+
+<div class="content">
+
+<!-- ═══════════════════════════════════════════
+     PATIENT PANEL
+     ═══════════════════════════════════════════ -->
+<div class="role-panel active" id="panel-patient">
+
+  <div class="section-label">Platform Access</div>
+  <div class="section-title">Choose Your Plan</div>
+  <div class="section-desc">Platform subscription gives you access to assessments, therapist matching, streaming, and AI tools. Therapy sessions are booked and paid separately.</div>
+
+  <div class="cards-row cards-4">
+    <!-- Free (compact) -->
+    <div class="card" style="background:#f9fafb;border-color:#e5e7eb;padding:18px 16px;opacity:.85">
+      <div class="card-icon" style="font-size:22px">🆓</div>
+      <div class="card-name" style="font-size:15px">Free</div>
+      <div class="card-price"><span class="amt" style="font-size:20px">₹0</span></div>
+      <div class="card-target">First-time users</div>
+      <ul class="card-features" style="font-size:11px">
+        <li>3 sound tracks / day</li>
+        <li>AI chatbot (basic)</li>
+        <li>Basic self-help content</li>
+        <li class="no">No assessments</li>
+        <li class="no">No therapist matching</li>
+      </ul>
+      <a class="card-cta" href="#" style="font-size:11px;padding:8px">Start Free</a>
+    </div>
+
+    <!-- Monthly -->
+    <div class="card">
+      <div class="card-icon">💡</div>
+      <div class="card-name">Monthly</div>
+      <div class="card-price"><span class="amt">₹99</span><span class="per">/month</span></div>
+      <div class="card-target">Trial users</div>
+      <ul class="card-features">
+        <li>Full platform access</li>
+        <li>PHQ-9 & GAD-7 assessments</li>
+        <li>Therapist matching</li>
+        <li>Standard streaming</li>
+        <li>Mood tracking + analytics</li>
+        <li class="no">Priority matching</li>
+        <li class="no">Downloads / AI insights</li>
+      </ul>
+      <a class="card-cta" href="#">Start 21-Day Trial</a>
+    </div>
+
+    <!-- Quarterly MVP — HERO CARD -->
+    <div class="card mvp" style="border-width:3px;transform:scale(1.04);box-shadow:0 8px 32px rgba(37,99,235,.15)">
+      <div class="card-icon">⭐</div>
+      <div class="card-name">Quarterly</div>
+      <div class="card-price"><span class="amt">₹279</span><span class="per">/quarter</span><span class="save">₹93/mo</span></div>
+      <div class="card-target">Primary B2C plan</div>
+      <div style="background:#dbeafe;color:#1e40af;font-size:10px;font-weight:700;padding:5px 10px;border-radius:8px;margin-bottom:10px;text-align:center">📱 78% of smartphone users selected this plan</div>
+      <ul class="card-features">
+        <li>Full platform access</li>
+        <li>All assessments (5 languages)</li>
+        <li><strong>Priority</strong> therapist matching</li>
+        <li>Standard streaming</li>
+        <li>Mood tracking + analytics</li>
+        <li>Session recordings access</li>
+        <li class="no">Unlimited streaming / AI insights</li>
+      </ul>
+      <a class="card-cta filled" href="#" style="font-size:13px;padding:12px">Start 21-Day Trial →</a>
+    </div>
+
+    <!-- Premium Monthly -->
+    <div class="card popular">
+      <div class="card-icon">🏆</div>
+      <div class="card-name">Premium</div>
+      <div class="card-price"><span class="amt">₹299</span><span class="per">/month</span></div>
+      <div class="card-target">Power users</div>
+      <ul class="card-features">
+        <li>Everything in Quarterly</li>
+        <li><strong>Unlimited</strong> streaming</li>
+        <li>Offline downloads</li>
+        <li>AI-powered insights</li>
+        <li>Priority support</li>
+        <li>Advanced mood analytics</li>
+        <li>Digital Pet Hub (all pets)</li>
+      </ul>
+      <a class="card-cta filled" href="#">Start 21-Day Trial</a>
+    </div>
+  </div>
+
+  <!-- Session Fees -->
+  <div class="section-label">Therapy Sessions</div>
+  <div class="section-title">Session Fees (Paid Per Session)</div>
+  <div class="section-desc">Sessions are booked and paid separately via PhonePe. Revenue split: Provider 60% / MANAS360 40%. Video sessions include +10% surcharge.</div>
+
+  <table>
+    <tr><th>Provider Type</th><th>Standard Fee</th><th>Video (+10%)</th><th>Notes</th></tr>
+    <tr><td>🧠 Clinical Psychologist</td><td><strong>₹699</strong></td><td>₹769</td><td>Assessment, testing, CBT/DBT</td></tr>
+    <tr><td>⚕️ Psychiatrist (MD)</td><td><strong>₹999</strong></td><td>₹1,099</td><td>Diagnosis, e-Prescription, medication</td></tr>
+    <tr><td>🌟 NLP Coach</td><td><strong>₹999</strong></td><td>₹1,099</td><td>NLP + Neuro Associative Conditioning</td></tr>
+    <tr><td>👔 Executive Coach</td><td><strong>₹1,999</strong></td><td>₹2,199</td><td>Leadership, career, performance</td></tr>
+    <tr><td>🌏 NRI Coach</td><td><strong>₹2,999</strong></td><td>₹3,299</td><td>Cross-cultural, dual timezone</td></tr>
+  </table>
+
+  <!-- Specialty -->
+  <div class="section-label">Specialty Services</div>
+  <table>
+    <tr><th>Service</th><th>Price</th><th>Format</th><th>Availability</th></tr>
+    <tr><td>💑 Couple Therapy</td><td><strong>₹1,499</strong>/session</td><td>Video 60 min</td><td>By appointment</td></tr>
+    <tr><td>😴 Sleep Therapy</td><td><strong>₹1,499</strong>/session</td><td>Video 45 min</td><td>Evening slots</td></tr>
+    <tr><td>🌏 NRI — Psychologist</td><td><strong>₹2,999</strong>/session</td><td>Video 50 min</td><td>IST eve / NRI AM</td></tr>
+    <tr><td>🌏 NRI — Psychiatrist</td><td><strong>₹3,499</strong>/session</td><td>Video 30 min</td><td>IST eve / NRI AM</td></tr>
+    <tr><td>🌏 NRI — Therapist</td><td><strong>₹3,599</strong>/session</td><td>Video 50 min</td><td>IST eve / NRI AM</td></tr>
+    <tr><td>👔 Executive (Weekend)</td><td><strong>₹1,999</strong>/session</td><td>Video 60 min</td><td>Sat & Sun only</td></tr>
+  </table>
+
+  <!-- Add-ons -->
+  <div class="section-label">Add-On Features (À la Carte)</div>
+  <table>
+    <tr><th>Feature</th><th>1 Hour</th><th>3 Hours ⭐</th><th>5 Hours</th><th>Description</th></tr>
+    <tr><td>🤖 AnytimeBuddy</td><td>₹399</td><td><strong>₹999</strong></td><td>₹1,699</td><td>On-demand emotional support chat (24/7 AI companion)</td></tr>
+    <tr><td>🐾 Digital Pet Hub</td><td colspan="3">Free starter + Premium unlock via subscription</td><td>Neurotransmitter companions (Chintu, Bholu, Mithi, Dheeraj)</td></tr>
+    <tr><td>📞 IVR Therapy</td><td colspan="3">Pay-per-session (same as standard fees)</td><td>Voice-based therapy + PHQ screening via phone call</td></tr>
+    <tr><td>💬 VentBuddy</td><td colspan="3">3 free/day, Premium unlimited</td><td>Anonymous venting with trained AI listener</td></tr>
+    <tr><td>🎵 Sound Therapy</td><td colspan="2">₹30/track</td><td>₹250/bundle (10 tracks)</td><td>Own forever, unlimited play + download</td></tr>
+  </table>
+  <p class="tbl-note">ASHA referral patients: First 3 sessions free/subsidized · Student/Employee pricing: As per corporate contract</p>
+
+</div>
+
+<!-- ═══════════════════════════════════════════
+     PROVIDER / THERAPIST PANEL
+     ═══════════════════════════════════════════ -->
+<div class="role-panel" id="panel-provider">
+
+  <div class="section-label">Platform Access (Required)</div>
+  <div class="section-title">₹99/month Platform Access</div>
+  <div class="section-desc">All providers pay ₹99/M (or ₹279/Q) for platform access — profile hosting, credential verification, dashboard, payment processing. Required before any lead delivery. Payment method collected at profile creation.</div>
+
+  <div class="section-label">Lead Subscription Tiers</div>
+  <div class="section-title">Choose Your Lead Plan</div>
+  <div class="section-desc">Guaranteed weekly leads auto-pushed to your dashboard. Revenue split on sessions: You keep 60%, platform takes 40%. Lead subscription fees are separate.</div>
+
+  <div class="cards-row cards-4">
+    <!-- Free (compact) -->
+    <div class="card" style="background:#f9fafb;border-color:#e5e7eb;padding:18px 16px;opacity:.85">
+      <div class="card-icon" style="font-size:22px">🆓</div>
+      <div class="card-name" style="font-size:15px">Free</div>
+      <div class="card-price"><span class="amt" style="font-size:20px">₹0</span><span class="per">/month</span></div>
+      <div class="card-target">Profile only</div>
+      <ul class="card-features" style="font-size:11px">
+        <li>Basic text profile</li>
+        <li>Basic stats dashboard</li>
+        <li>Self-serve FAQ support</li>
+        <li class="no">0 leads / week</li>
+        <li class="no">No marketplace</li>
+      </ul>
+      <a class="card-cta" href="#" style="font-size:11px;padding:8px">Create Profile</a>
+    </div>
+
+    <!-- Basic -->
+    <div class="card">
+      <div class="card-icon">💡</div>
+      <div class="card-name">Basic</div>
+      <div class="card-price"><span class="amt">₹199</span><span class="per">/month</span></div>
+      <div class="card-target">New providers · testing the waters</div>
+      <ul class="card-features">
+        <li><strong>3 leads/week</strong> (~12/month)</li>
+        <li>Warm + Cold leads</li>
+        <li>Enhanced profile (photo + video)</li>
+        <li>Full analytics + conversion tracking</li>
+        <li>Marketplace at full price</li>
+        <li>✅ Verified Provider badge</li>
+        <li>Email support (48h)</li>
+      </ul>
+      <a class="card-cta" href="#">Start 21-Day Trial</a>
+    </div>
+
+    <!-- Standard — HERO CARD -->
+    <div class="card popular" style="border-width:3px;transform:scale(1.04);box-shadow:0 8px 32px rgba(74,103,65,.18)">
+      <div class="card-icon">⭐</div>
+      <div class="card-name">Standard</div>
+      <div class="card-price"><span class="amt">₹299</span><span class="per">/month</span><span class="save">₹829/Q</span></div>
+      <div class="card-target">Active providers · building practice</div>
+      <div style="background:#dcfce7;color:#166534;font-size:10px;font-weight:700;padding:5px 10px;border-radius:8px;margin-bottom:10px;text-align:center">💰 Providers wanting to increase their income by 70% have opted this plan</div>
+      <ul class="card-features">
+        <li><strong>6 leads/week</strong> (~24/month)</li>
+        <li>Hot + Warm + Cold leads</li>
+        <li>Featured profile (search priority)</li>
+        <li>Full analytics + patient insights</li>
+        <li>Marketplace at <strong>10% off</strong></li>
+        <li>✅ Verified + Preferred badge</li>
+        <li>Priority email (24h)</li>
+      </ul>
+      <a class="card-cta filled" href="#" style="font-size:13px;padding:12px">Start 21-Day Trial →</a>
+    </div>
+
+    <!-- Premium -->
+    <div class="card">
+      <div class="card-icon">🏆</div>
+      <div class="card-name">Premium</div>
+      <div class="card-price"><span class="amt">₹399</span><span class="per">/month</span><span class="save">₹1,099/Q</span></div>
+      <div class="card-target">Full-time providers · max patient flow</div>
+      <ul class="card-features">
+        <li><strong>7 leads/week</strong> (~28/month) — daily!</li>
+        <li>Priority Hot leads (first access)</li>
+        <li>Spotlight profile (top + badge)</li>
+        <li>Full analytics + AI recommendations</li>
+        <li>Marketplace at <strong>20% off</strong></li>
+        <li>✅ Verified + Premium badge</li>
+        <li>Dedicated manager + WhatsApp</li>
+      </ul>
+      <a class="card-cta filled" href="#">Start 21-Day Trial</a>
+    </div>
+  </div>
+
+  <!-- Marketplace Leads -->
+  <div class="section-label">Marketplace Add-On</div>
+  <div class="section-title">Buy Additional Leads Beyond Your Weekly Allocation</div>
+
+  <table>
+    <tr><th>Lead Type</th><th>Price</th><th>Match Score</th><th>Conversion</th><th>Characteristics</th></tr>
+    <tr><td><span class="tag tag-hot">🔥 HOT</span></td><td><strong>₹299</strong></td><td>90–100</td><td>~70%</td><td>3+ specialization match, language + budget aligned</td></tr>
+    <tr><td><span class="tag tag-warm">🌟 WARM</span></td><td><strong>₹199</strong></td><td>70–89</td><td>~50%</td><td>2 specialization match, language aligned</td></tr>
+    <tr><td><span class="tag tag-cold">❄️ COLD</span></td><td><strong>₹99</strong></td><td>50–69</td><td>~25%</td><td>1 specialization match, budget stretch</td></tr>
+  </table>
+  <p class="tbl-note">Free tier has NO marketplace access · Subscription leads expire in 48h (72h for Premium) · Marketplace leads: first-come, first-served</p>
+
+  <!-- Revenue Split -->
+  <div class="section-label">Session Revenue</div>
+  <div class="section-title">You Keep 60% of Every Session</div>
+
+  <table>
+    <tr><th>Your Type</th><th>Session Fee</th><th>You Get (60%)</th><th>Platform (40%)</th></tr>
+    <tr><td>Therapist</td><td>₹500–₹2,000</td><td><strong>₹300–₹1,200</strong></td><td>₹200–₹800</td></tr>
+    <tr><td>Psychologist</td><td>₹699–₹2,500</td><td><strong>₹419–₹1,500</strong></td><td>₹280–₹1,000</td></tr>
+    <tr><td>Psychiatrist</td><td>₹999–₹5,000</td><td><strong>₹599–₹3,000</strong></td><td>₹400–₹2,000</td></tr>
+    <tr><td>NLP Coach</td><td>₹500–₹1,500</td><td><strong>₹300–₹900</strong></td><td>₹200–₹600</td></tr>
+    <tr><td>Executive Coach</td><td>₹1,500–₹5,000</td><td><strong>₹900–₹3,000</strong></td><td>₹600–₹2,000</td></tr>
+  </table>
+
+  <!-- ROI -->
+  <div class="roi-box">
+    <h4>💰 Your ROI — Why Upgrading Makes Sense</h4>
+    <div class="section-desc" style="max-width:100%">Assuming ₹1,500 avg session fee · 40-55% conversion · 2.5-3 sessions/patient/month</div>
+    <div class="roi-grid">
+      <div class="roi-stat"><div class="val">₹11,501</div><div class="lbl">Basic Net Income/Mo</div></div>
+      <div class="roi-stat"><div class="val">₹26,701</div><div class="lbl">Standard Net Income/Mo</div></div>
+      <div class="roi-stat"><div class="val">₹40,101</div><div class="lbl">Premium Net Income/Mo</div></div>
+      <div class="roi-stat"><div class="val">10,050%</div><div class="lbl">Premium ROI on Fee</div></div>
+    </div>
+    <p class="tbl-note" style="margin-top:10px">Key pitch: "₹199/month generates ₹11,500+ in income — that's 58× return" · MANAS360 Academy certified providers get 20% more Hot leads</p>
+  </div>
+
+  <!-- Earning Potential -->
+  <div class="section-label">Monthly Earning Potential</div>
+  <table>
+    <tr><th>Provider Type</th><th>Session Range</th><th>With Basic</th><th>With Standard</th><th>With Premium</th><th>+ Marketplace</th></tr>
+    <tr><td>Therapist</td><td>₹500–₹2,000</td><td>₹8K–₹22K</td><td>₹18K–₹54K</td><td><strong>₹24K–₹80K</strong></td><td>+₹5K–₹20K</td></tr>
+    <tr><td>Psychologist</td><td>₹699–₹2,500</td><td>₹10K–₹28K</td><td>₹24K–₹68K</td><td><strong>₹32K–₹1L</strong></td><td>+₹7K–₹25K</td></tr>
+    <tr><td>Psychiatrist</td><td>₹999–₹5,000</td><td>₹15K–₹56K</td><td>₹36K–₹1.35L</td><td><strong>₹48K–₹2L</strong></td><td>+₹10K–₹50K</td></tr>
+    <tr><td>NLP Coach</td><td>₹500–₹1,500</td><td>₹8K–₹17K</td><td>₹18K–₹41K</td><td><strong>₹24K–₹60K</strong></td><td>+₹5K–₹15K</td></tr>
+    <tr><td>Executive Coach</td><td>₹1,500–₹5,000</td><td>₹22K–₹56K</td><td>₹54K–₹1.35L</td><td><strong>₹80K–₹2L</strong></td><td>+₹15K–₹50K</td></tr>
+  </table>
+
+</div>
+
+<!-- ═══════════════════════════════════════════
+     CORPORATE PANEL
+     ═══════════════════════════════════════════ -->
+<div class="role-panel" id="panel-corporate">
+
+  <div class="section-label">Corporate EAP</div>
+  <div class="section-title">Employee Assistance Programs</div>
+  <div class="section-desc">CSR-aligned (Section 135, Companies Act 2013) · 60% cheaper than traditional EAPs · Tax deduction eligible · All tiers include 24/7 AI chatbot, crisis support, corporate dashboard</div>
+
+  <div class="cards-row cards-3">
+    <div class="card">
+      <div class="card-icon">🚀</div>
+      <div class="card-name">Startup</div>
+      <div class="card-price"><span class="amt">₹2L</span><span class="per">/year</span></div>
+      <div class="card-target">50–200 employees · ₹1,000/employee/mo</div>
+      <ul class="card-features">
+        <li>Unlimited 1:1 therapy sessions</li>
+        <li>AI chatbot (24/7)</li>
+        <li>4 group sessions/year</li>
+        <li>Crisis support hotline</li>
+        <li>Basic corporate dashboard</li>
+        <li>25% CSR tax deduction</li>
+      </ul>
+      <a class="card-cta" href="#">Get Quote</a>
+    </div>
+    <div class="card popular" style="border-width:3px;transform:scale(1.04);box-shadow:0 8px 32px rgba(74,103,65,.18)">
+      <div class="card-icon">📈</div>
+      <div class="card-name">Growth</div>
+      <div class="card-price"><span class="amt">₹5L</span><span class="per">/year</span></div>
+      <div class="card-target">200–1,000 employees · ₹500/emp/mo</div>
+      <div style="background:#dcfce7;color:#166534;font-size:10px;font-weight:700;padding:5px 10px;border-radius:8px;margin-bottom:10px;text-align:center">🏛️ 75% of CSR-funded companies serious on mental health enhancement & productivity increase have opted this plan</div>
+      <ul class="card-features">
+        <li>All Startup features</li>
+        <li>Aggregate analytics dashboard</li>
+        <li>Dedicated Customer Success Manager</li>
+        <li>Quarterly wellness reports</li>
+        <li>Manager training workshops</li>
+        <li>25% CSR tax deduction</li>
+      </ul>
+      <a class="card-cta filled" href="#" style="font-size:13px;padding:12px">Get Growth Quote →</a>
+    </div>
+    <div class="card">
+      <div class="card-icon">🏢</div>
+      <div class="card-name">Enterprise</div>
+      <div class="card-price"><span class="amt">₹12L</span><span class="per">/year</span></div>
+      <div class="card-target">1,000–5,000 employees · ₹250/emp/mo</div>
+      <ul class="card-features">
+        <li>All Growth features</li>
+        <li>SSO integration</li>
+        <li>Custom reporting</li>
+        <li>API access</li>
+        <li>Onsite wellness events</li>
+        <li>30% CSR tax deduction</li>
+      </ul>
+      <a class="card-cta" href="#">Get Quote</a>
+    </div>
+  </div>
+
+  <!-- Executive Wellness -->
+  <div class="section-label">Executive Wellness (Premium B2B)</div>
+  <div class="section-title">Leadership Mental Health Programs</div>
+
+  <div class="cards-row cards-3">
+    <div class="card">
+      <div class="card-icon">🎖️</div>
+      <div class="card-name">Corporate Certified</div>
+      <div class="card-price"><span class="amt">₹5,996</span><span class="per">/month</span></div>
+      <div class="card-target">Mid-level managers</div>
+      <ul class="card-features">
+        <li>4 sessions/month</li>
+        <li>Video only</li>
+        <li>Provider split: 80% / 20%</li>
+        <li>Certified therapist assigned</li>
+        <li>Progress reports to HR (anonymized)</li>
+      </ul>
+      <a class="card-cta" href="#">Enroll Team</a>
+    </div>
+    <div class="card popular">
+      <div class="card-icon">🎯</div>
+      <div class="card-name">Executive Concierge</div>
+      <div class="card-price"><span class="amt">₹10,496</span><span class="per">/month</span></div>
+      <div class="card-target">Senior leaders</div>
+      <ul class="card-features">
+        <li>4 sessions/month</li>
+        <li>Video + House visits</li>
+        <li>Provider split: 75% / 25%</li>
+        <li>Dedicated executive therapist</li>
+        <li>Wellness concierge (WhatsApp)</li>
+      </ul>
+      <a class="card-cta filled" href="#">Enroll Leaders</a>
+    </div>
+    <div class="card">
+      <div class="card-icon">👑</div>
+      <div class="card-name">Leadership Elite</div>
+      <div class="card-price"><span class="amt">₹19,996</span><span class="per">/month</span></div>
+      <div class="card-target">C-suite / Founders</div>
+      <ul class="card-features">
+        <li><strong>Unlimited</strong> sessions</li>
+        <li>Video + House visits (unlimited)</li>
+        <li>Provider split: 70% / 30%</li>
+        <li>Personal therapist on retainer</li>
+        <li>Family extension available</li>
+      </ul>
+      <a class="card-cta" href="#">Contact Us</a>
+    </div>
+  </div>
+
+  <!-- Institutional -->
+  <div class="section-label">Institutional Partnerships</div>
+  <table>
+    <tr><th>Partner Type</th><th>Model</th><th>Pricing</th><th>Revenue Flow</th><th>Example</th></tr>
+    <tr><td>🏥 Medical Colleges (34 in KA)</td><td>Referral + Training</td><td>Free / Subsidized</td><td>Volume-based</td><td>DIMHANS Dharwad</td></tr>
+    <tr><td>🏛️ Government (DMHP)</td><td>Integration</td><td>Per-referral fee</td><td>Government funded</td><td>ASHA referral program</td></tr>
+    <tr><td>🛡️ Insurance Companies</td><td>Covered benefit</td><td>Per-member/month</td><td>Insurer pays</td><td>EAP add-on to group health</td></tr>
+    <tr><td>💊 Pharmacy Chains</td><td>Referral partner</td><td>Revenue share</td><td>Pharmacy refers</td><td>Apollo / MedPlus tie-up</td></tr>
+  </table>
+  <p class="tbl-note">ASHA incentive: ₹200/referral (₹50 registration + ₹100 first session + ₹50 engagement bonus at 30 days)</p>
+
+</div>
+
+</div><!-- /content -->
+
+<div class="pg-footer">
+  🌿 <strong>MANAS360</strong> · All prices in INR · GST 18% additional · Revenue split: Provider 60% / Platform 40%<br>
+  21-day free trial for all plans · ₹1 authorization (auto-refunded) · Payment via PhonePe exclusively
+</div>
+
+<script>
+function switchRole(role) {
+  document.querySelectorAll('.role-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.role-panel').forEach(p => p.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  document.getElementById('panel-' + role).classList.add('active');
+}
+</script>
+</body>
+</html>

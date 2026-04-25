@@ -1,0 +1,17 @@
+# Logs
+backend/logs/
+
+# Node
+node_modules/
+
+# Env
+.env
+
+# Database
+backend/.pgdata/
+
+# Build
+dist/
+build/
+# Local env
+backend/.env.local

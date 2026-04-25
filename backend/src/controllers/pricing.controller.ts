@@ -1,0 +1,102 @@
+import type { Request, Response } from 'express';
+import { AppError } from '../middleware/error.middleware';
+import { sendSuccess } from '../utils/response';
+import { getPricingConfig, getAdminPricingConfigWithImpact, updatePricingConfig } from '../services/pricing.service';
+import { recordAdminAuditEvent } from '../services/admin-audit.service';
+
+// Public pricing controller for landing page
+export const getLivePricingController = async (req: Request, res: Response): Promise<void> => {
+	const { category } = req.params;
+	const rawMode = String(req.query.mode || req.query.pricingMode || '').trim().toLowerCase();
+	let mode: 'domestic' | 'nri' = rawMode === 'nri' ? 'nri' : 'domestic';
+
+	if (mode !== 'nri') {
+		const token = (req as Request & { cookies?: Record<string, string> }).cookies?.access_token
+			|| (typeof req.headers.authorization === 'string' && req.headers.authorization.startsWith('Bearer ') ? req.headers.authorization.slice(7) : null);
+		if (token) {
+			try {
+				const { verifyAccessToken } = await import('../utils/jwt');
+				const { hasAcceptedNriTerms } = await import('../services/legal-compliance.service');
+				const payload = verifyAccessToken(token);
+				if (await hasAcceptedNriTerms(payload.sub)) {
+					mode = 'nri';
+				}
+			} catch {
+				// keep domestic pricing if auth lookup fails
+			}
+		}
+	}
+
+	const data = await getPricingConfig({ mode });
+	const results = category ? (data as any)[category as string] || {} : data;
+	sendSuccess(res, results, 'Live pricing fetched');
+};
+
+export const getPricingConfigController = async (_req: Request, res: Response): Promise<void> => {
+	const req = _req;
+	const rawMode = String(req.query.mode || req.query.pricingMode || '').trim().toLowerCase();
+	let mode: 'domestic' | 'nri' = rawMode === 'nri' ? 'nri' : 'domestic';
+
+	if (mode !== 'nri') {
+		const token = (req as Request & { cookies?: Record<string, string> }).cookies?.access_token
+			|| (typeof req.headers.authorization === 'string' && req.headers.authorization.startsWith('Bearer ') ? req.headers.authorization.slice(7) : null);
+		if (token) {
+			try {
+				const { verifyAccessToken } = await import('../utils/jwt');
+				const { hasAcceptedNriTerms } = await import('../services/legal-compliance.service');
+				const payload = verifyAccessToken(token);
+				if (await hasAcceptedNriTerms(payload.sub)) {
+					mode = 'nri';
+				}
+			} catch {
+				// keep domestic pricing if auth lookup fails
+			}
+		}
+	}
+
+	const data = await getPricingConfig({ mode });
+	sendSuccess(res, data, 'Pricing configuration fetched');
+};
+
+export const getAdminPricingConfigController = async (_req: Request, res: Response): Promise<void> => {
+	const data = await getAdminPricingConfigWithImpact();
+	sendSuccess(res, data, 'Admin pricing configuration fetched');
+};
+
+export const updateAdminPricingConfigController = async (req: Request, res: Response): Promise<void> => {
+	const body = req.body || {};
+	const hasBody = typeof body === 'object' && Object.keys(body).length > 0;
+	if (!hasBody) {
+		throw new AppError('Pricing update payload is required', 422);
+	}
+	const actorId = (req as Request & { auth?: { userId?: string } }).auth?.userId ?? null;
+	const beforeConfig = await getAdminPricingConfigWithImpact();
+	const data = await updatePricingConfig(body, actorId);
+
+	if (actorId) {
+		await recordAdminAuditEvent({
+			userId: actorId,
+			action: 'PRICING_UPDATED',
+			resource: 'PricingConfig',
+			details: {
+				changedKeys: Object.keys(body),
+				before: {
+					platformFee: beforeConfig.platformFee?.monthlyFee ?? null,
+					surchargePercent: beforeConfig.surchargePercent,
+					sessionPricingCount: beforeConfig.sessionPricing.length,
+					platformPlansCount: beforeConfig.platformPlans.length,
+					premiumBundlesCount: beforeConfig.premiumBundles.length,
+				},
+				after: {
+					platformFee: data.platformFee?.monthlyFee ?? null,
+					surchargePercent: data.surchargePercent,
+					sessionPricingCount: data.sessionPricing.length,
+					platformPlansCount: data.plans.length,
+					premiumBundlesCount: data.premiumBundles.length,
+				},
+			},
+		});
+	}
+
+	sendSuccess(res, data, 'Pricing configuration updated');
+};
