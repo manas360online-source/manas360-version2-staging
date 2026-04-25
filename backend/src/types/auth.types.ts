@@ -61,6 +61,9 @@ export interface JwtAccessPayload {
 	type: 'access';
 	sessionId: string;
 	jti: string;
+	clinicId?: string;
+	mdcRole?: 'admin' | 'therapist' | 'patient';
+	loginCode?: string;
 }
 
 export interface JwtRefreshPayload {

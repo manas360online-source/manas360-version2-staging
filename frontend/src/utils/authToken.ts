@@ -30,3 +30,25 @@ export const getAuthHeaders = (): Record<string, string> => {
     'Authorization': `Bearer ${getAuthToken()}`,
   };
 };
+
+/**
+ * Set authorization token in localStorage
+ */
+export const setAuthToken = (token: string): void => {
+  try {
+    localStorage.setItem(TOKEN_KEY, token);
+  } catch (error) {
+    console.warn('Failed to set token in localStorage', error);
+  }
+};
+
+/**
+ * Remove authorization token from localStorage
+ */
+export const removeAuthToken = (): void => {
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+  } catch (error) {
+    console.warn('Failed to remove token from localStorage', error);
+  }
+};

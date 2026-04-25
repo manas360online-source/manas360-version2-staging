@@ -11,7 +11,30 @@ export interface CreateStaffInput {
 }
 
 export const createStaff = async (input: CreateStaffInput) => {
-  const loginCode = `${await getClinicCode(input.clinicId)}-${input.loginSuffix}`;
+  const clinic = await mdcPrisma.clinic.findUnique({
+    where: { id: input.clinicId },
+    include: {
+      subscriptions: {
+        where: { status: { in: ['active', 'trial'] } },
+      },
+    },
+  });
+
+  if (!clinic) throw new AppError('Clinic not found', 404);
+
+  const activeSub = clinic.subscriptions[0];
+  if (!activeSub) throw new AppError('No active subscription found', 403);
+
+  if (input.role === 'therapist' && !activeSub.selectedFeatures.includes('multi-therapist')) {
+    const existingStaff = await mdcPrisma.clinicUser.count({
+      where: { clinicId: input.clinicId, role: 'therapist', isActive: true },
+    });
+    if (existingStaff >= 1) {
+      throw new AppError('Therapist limit reached for your current plan.', 403);
+    }
+  }
+
+  const loginCode = `${clinic.clinicCode}-${input.loginSuffix}`;
   
   // Check if login code already exists
   const existing = await mdcPrisma.clinicUser.findUnique({
@@ -49,12 +72,3 @@ export const deactivateStaff = async (staffId: string) => {
   });
 };
 
-const getClinicCode = async (clinicId: string): Promise<string> => {
-  const clinic = await mdcPrisma.clinic.findUnique({
-    where: { id: clinicId },
-    select: { clinicCode: true },
-  });
-  
-  if (!clinic) throw new AppError('Clinic not found', 404);
-  return clinic.clinicCode;
-};

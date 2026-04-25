@@ -51,14 +51,34 @@ export default function BulkPatientImport({ clinicId }: BulkPatientImportProps) 
     setMessage('');
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('clinicId', clinicId);
+      const text = await file.text();
+      const lines = text.split('\n').filter(line => line.trim());
+      const headers = lines[0].split(',');
+      
+      const patients = lines.slice(1).map(line => {
+        const values = line.split(',');
+        return {
+          fullName: `${values[0]} ${values[1]}`.replace(/"/g, '').trim(),
+          email: values[2]?.replace(/"/g, '').trim(),
+          phone: values[4]?.replace(/"/g, '').trim(), // Reusing Employee ID column as phone for now or similar
+          gender: values[3]?.replace(/"/g, '').trim(),
+        };
+      }).filter(p => p.fullName && p.phone);
 
-      // Mock upload - replace with actual API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      setMessage(`✓ File uploaded successfully for clinic ${clinicId}`);
-      setFile(null);
+      const response = await fetch(`${import.meta.env.VITE_API_BASE}/mdc/clinics/${clinicId}/patients/bulk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ patients }),
+      });
+
+      const result = await response.json();
+      
+      if (response.ok) {
+        setMessage(`✓ Uploaded ${result.success} patients. ${result.failed} failed.`);
+        setFile(null);
+      } else {
+        throw new Error(result.message || 'Upload failed');
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Upload failed';
       setMessage(`✗ ${errorMessage}`);

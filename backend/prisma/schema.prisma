@@ -2961,6 +2961,7 @@ enum UserRole {
   FINANCE_MANAGER
   COMPLIANCE_OFFICER
   LEARNER
+  CLINICAL_ADMIN
 }
 
 enum UserStatus {
@@ -3329,11 +3330,93 @@ model Clinic {
   sessions          ClinicSession[]
   reports           ClinicReport[]
   assessments       ClinicAssessment[]
+  subscriptions     ClinicSubscription[]
+  transactions      ClinicBillingTransaction[]
 
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
 
   @@map("clinics")
+}
+
+model MDCFeatureCatalog {
+  id              String   @id @default(uuid())
+  name            String   @unique
+  slug            String   @unique
+  description     String?
+  category        String   // core, addon, analytics, integration
+  availabilityDate DateTime? @map("availability_date")
+  isActive        Boolean  @default(true) @map("is_active")
+  
+  pricing         MDCTierPricing[]
+
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("mdc_feature_catalog")
+}
+
+model MDCTierPricing {
+  id              String   @id @default(uuid())
+  featureId       String   @map("feature_id")
+  clinicTier      String   @map("clinic_tier") // solo, small, large
+  monthlyPrice    Float    @map("monthly_price")
+  quarterlyPrice  Float    @map("quarterly_price")
+
+  feature         MDCFeatureCatalog @relation(fields: [featureId], references: [id])
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@unique([featureId, clinicTier])
+  @@map("mdc_tier_pricing")
+}
+
+model ClinicSubscription {
+  id                String   @id @default(uuid())
+  clinicId          String   @map("clinic_id")
+  selectedFeatures  Json     @map("selected_features")
+  clinicTier        String   @map("clinic_tier")
+  billingCycle      String   @map("billing_cycle") // monthly, quarterly
+  monthlyTotal      Float    @map("monthly_total")
+  billingAmount     Float    @map("billing_amount")
+  status            String   @default("trial") // trial, active, paused, cancelled
+  
+  trialStartsAt     DateTime @default(now()) @map("trial_starts_at")
+  trialEndsAt       DateTime @map("trial_ends_at")
+  nextBillingDate   DateTime? @map("next_billing_date")
+  nextRenewalAmount Float?    @map("next_renewal_amount")
+
+  clinic            Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  transactions      ClinicBillingTransaction[]
+
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("clinic_subscriptions")
+}
+
+model ClinicBillingTransaction {
+  id                String   @id @default(uuid())
+  clinicId          String   @map("clinic_id")
+  subscriptionId    String   @map("subscription_id")
+  periodStart       DateTime @map("period_start")
+  periodEnd         DateTime @map("period_end")
+  amountDue         Float    @map("amount_due")
+  amountPaid        Float?   @map("amount_paid")
+  paymentStatus     String   @default("pending") // pending, paid, failed, refunded
+  paymentGateway    String?  @map("payment_gateway")
+  paymentId         String?  @map("payment_id")
+  attemptedAt       DateTime? @map("attempted_at")
+  paidAt            DateTime? @map("paid_at")
+  failureReason     String?  @map("failure_reason")
+
+  clinic            Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  subscription      ClinicSubscription @relation(fields: [subscriptionId], references: [id])
+
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("clinic_billing_transactions")
 }
 
 model ClinicUser {
@@ -3362,8 +3445,43 @@ model ClinicUser {
   clinic          Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
   assignedPatients ClinicPatient[] @relation("AssignedTherapist")
   sessions        ClinicSession[]
+  authSessions    MDCSession[]
 
   @@map("clinic_users")
+}
+
+model MDCSession {
+  id               String    @id @default(uuid())
+  clinicUserId     String    @map("clinic_user_id")
+  jti              String    @unique
+  refreshTokenHash String
+  ipAddress        String?
+  userAgent        String?
+  device           String?
+  revokedAt        DateTime?
+  expiresAt        DateTime
+  lastActiveAt     DateTime  @default(now())
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  clinicUser       ClinicUser @relation(fields: [clinicUserId], references: [id], onDelete: Cascade)
+
+  @@index([clinicUserId, revokedAt])
+  @@index([clinicUserId, expiresAt])
+  @@map("mdc_sessions")
+}
+
+model MDCAuditLog {
+  id        String   @id @default(uuid())
+  clinicUserId String? @map("clinic_user_id")
+  event     String
+  status    String   // success, failure
+  ipAddress String?
+  userAgent String?
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("mdc_audit_logs")
 }
 
 model ClinicPatient {

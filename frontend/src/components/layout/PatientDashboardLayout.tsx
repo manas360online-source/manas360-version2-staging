@@ -21,27 +21,26 @@ import { patientApi } from '../../api/patient';
 import { useWallet } from '@/hooks/useWallet';
 import { useAuth } from '../../context/AuthContext';
 import { getDraftStorageKey } from '../../hooks/useAssessmentFlow';
+import { FeatureGate } from '../FeatureGate';
+
+const STORAGE_KEY_MDC = 'mdc_user';
 
 const mainNavItems = [
   { to: '/patient/dashboard', label: 'Dashboard', icon: Home },
-  { to: '/patient/therapy-plan', label: 'My Therapy Plan', icon: ClipboardList },
-  { to: '/patient/sessions', label: 'My Care', icon: CalendarDays },
-  { to: '/patient/group-therapy', label: 'Group Therapy', icon: CalendarDays, badge: 'Live' },
+  { to: '/patient/therapy-plan', label: 'My Therapy Plan', icon: ClipboardList, feature: 'progress-tracking' },
+  { to: '/patient/sessions', label: 'My Care', icon: CalendarDays, feature: 'scheduling' },
+  { to: '/patient/group-therapy', label: 'Group Therapy', icon: CalendarDays, badge: 'Live', feature: 'group-therapy' },
 ];
 
-const clinicalNavItems = [
-  { to: '/patient/progress', label: 'Clinical Reports', icon: BarChart3 },
-];
 
 const selfCareNavItems = [
-  { to: '/patient/messages', label: 'Anytime Buddy (AI)', icon: MessageSquare, badge: 'AI' },
-  { to: '/patient/check-in', label: 'Daily Check-in', icon: HeartPulse },
-  { to: '/patient/wellness-library', label: 'Premium Library', icon: Sparkles },
+  { to: '/patient/messages', label: 'Anytime Buddy (AI)', icon: MessageSquare, badge: 'AI', feature: 'ai-support' },
+  { to: '/patient/check-in', label: 'Daily Check-in', icon: HeartPulse, feature: 'daily-checkin' },
+  { to: '/patient/wellness-library', label: 'Premium Library', icon: Sparkles, feature: 'wellness-library' },
 ];
 
 const progressNavItems = [
-  { to: '/patient/progress', label: 'My Progress', icon: BarChart3 },
-  { to: '/patient/reports', label: 'Clinical Records', icon: FileText },
+  { to: '/patient/progress', label: 'My Progress', icon: BarChart3, feature: 'progress-tracking' },
 ];
 
 const supportNavItems = [
@@ -62,6 +61,7 @@ type NavItem = {
   label: string;
   icon: any;
   badge?: string;
+  feature?: string;
 };
 
 export default function PatientDashboardLayout() {
@@ -72,6 +72,20 @@ export default function PatientDashboardLayout() {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const { balance } = useWallet();
+  const [mdcUser, setMdcUser] = useState<any>(null);
+  const isMdcMode = !!mdcUser;
+
+  useEffect(() => {
+    const stored = localStorage.getItem(STORAGE_KEY_MDC);
+    if (stored) {
+      try {
+        setMdcUser(JSON.parse(stored));
+      } catch (e) {
+        console.error('Failed to parse mdc_user', e);
+      }
+    }
+  }, []);
+
   const walletBalance = balance ? Number((balance as any)?.total_balance ?? 0) : null;
 
   const fetchUnread = useCallback(async () => {
@@ -118,8 +132,8 @@ export default function PatientDashboardLayout() {
     '/patient/insights': 'My Progress',
     '/patient/timeline': 'Patient Timeline',
     '/patient/assessment-reports': 'My Progress',
-    '/patient/reports': 'Clinical Records',
-  
+    '/patient/reports': 'Reports',
+
     '/patient/support': 'Help Center',
     '/patient/settings': 'Settings',
     '/patient/profile': 'Profile',
@@ -150,8 +164,14 @@ export default function PatientDashboardLayout() {
       localStorage.removeItem('patient-clinical-assessment-draft-v1');
       sessionStorage.removeItem('patient-clinical-assessment-draft-v1');
     } catch { /* ignore storage errors */ }
-    await logout();
-    navigate('/auth/login', { replace: true });
+    
+    if (isMdcMode) {
+      localStorage.removeItem(STORAGE_KEY_MDC);
+      navigate('/mdc/login', { replace: true });
+    } else {
+      await logout();
+      navigate('/auth/login', { replace: true });
+    }
   };
 
   useEffect(() => {
@@ -187,34 +207,37 @@ export default function PatientDashboardLayout() {
           const Icon = item.icon;
           const active = isActive(item.to);
 
-          return (
+          const link = (
             <Link
               key={`${heading}-${item.to}-${item.label}`}
               to={item.to}
               onClick={() => setMobileSidebarOpen(false)}
-              className={`flex min-h-[50px] items-center gap-3 rounded-2xl px-3.5 py-3 text-[15px] transition ${
-                active
+              className={`flex min-h-[50px] items-center gap-3 rounded-2xl px-3.5 py-3 text-[15px] transition ${active
                   ? 'bg-wellness-aqua font-semibold text-wellness-deep shadow-[0_10px_26px_rgba(30,75,63,0.08)]'
                   : 'text-charcoal/72 hover:bg-white/85 hover:text-charcoal'
-              }`}
+                }`}
             >
               <Icon className={`h-[19px] w-[19px] ${active ? 'text-wellness-sky' : 'text-charcoal/42'}`} />
               <span>{item.label}</span>
               {item.badge && (
                 <span
-                  className={`ml-auto rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                    item.badge === 'AI'
+                  className={`ml-auto rounded-full px-2 py-0.5 text-[11px] font-semibold ${item.badge === 'AI'
                       ? 'bg-wellness-sky text-white'
                       : item.badge === 'Premium'
                         ? 'bg-warm-terracotta/15 text-warm-terracotta'
                         : 'bg-wellness-aqua text-charcoal/75'
-                  }`}
+                    }`}
                 >
                   {item.badge}
                 </span>
               )}
             </Link>
           );
+
+          if (item.feature) {
+            return <FeatureGate key={item.to} feature={item.feature}>{link}</FeatureGate>;
+          }
+          return link;
         })}
       </div>
     </div>
@@ -232,9 +255,8 @@ export default function PatientDashboardLayout() {
 
       <div className="mx-auto flex w-full max-w-[1600px] items-start">
         <aside
-          className={`fixed left-0 top-0 z-50 flex h-full w-72 flex-col border-r border-white/60 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(242,248,247,0.98))] backdrop-blur-md transition-transform duration-300 lg:sticky lg:top-0 lg:self-start lg:z-20 lg:h-screen lg:translate-x-0 ${
-            mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
-          }`}
+          className={`fixed left-0 top-0 z-50 flex h-full w-72 flex-col border-r border-white/60 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(242,248,247,0.98))] backdrop-blur-md transition-transform duration-300 lg:sticky lg:top-0 lg:self-start lg:z-20 lg:h-screen lg:translate-x-0 ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+            }`}
         >
           <div className="flex h-20 items-center justify-between border-b border-white/70 px-5">
             <Link to="/patient/dashboard" className="inline-flex items-center gap-3 font-display text-lg font-bold text-charcoal">
@@ -261,7 +283,6 @@ export default function PatientDashboardLayout() {
 
           <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4" aria-label="Patient dashboard navigation">
             {renderNavSection('Main', mainNavItems)}
-            {renderNavSection('Clinical', clinicalNavItems)}
             {renderNavSection('Self Care', selfCareNavItems)}
             {renderNavSection('Progress', progressNavItems)}
             {renderNavSection('Support', supportNavItems)}
@@ -309,53 +330,57 @@ export default function PatientDashboardLayout() {
             </div>
 
             <div className="ml-auto flex items-center gap-2 sm:gap-3">
-                <div className="inline-flex min-h-[36px] items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                  <span className="text-[10px] uppercase tracking-[0.18em] text-emerald-800/70">Wallet</span>
-                  <span>{formattedWalletBalance}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => navigate('/crisis')}
-                  className="inline-flex min-h-[40px] items-center gap-1.5 rounded-full bg-red-50 px-4 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-100"
-                >
-                  <LifeBuoy className="h-4 w-4" />
-                  <span className="hidden sm:inline">Crisis Support</span>
-                  <span className="sm:hidden">🆘</span>
-                </button>
-
-                <Link
-                  to="/patient/notifications"
-                  className="relative inline-flex h-10 w-10 items-center justify-center rounded-2xl text-charcoal/55 transition hover:bg-wellness-aqua"
-                  aria-label="Open notifications"
-                >
-                  <Bell className="h-4 w-4" />
-                  {unreadCount > 0 && (
-                    <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white" aria-hidden="true">
-                      {unreadCount > 9 ? '9+' : unreadCount}
-                    </span>
-                  )}
-                </Link>
-
-                <button
-                  type="button"
-                  onClick={() => void handleLogout()}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-2xl text-charcoal/60 transition hover:bg-wellness-aqua"
-                  aria-label="Logout"
-                  title="Logout"
-                >
-                  <LogOut className="h-4 w-4" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setProfileMenuOpen(true)}
-                  className="inline-flex items-center gap-2 rounded-2xl p-1 pr-2 transition hover:bg-wellness-aqua"
-                  aria-label="Open profile menu"
-                >
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-warm-terracotta/25 text-xs font-semibold text-warm-terracotta">
-                    {initials}
+              {!isMdcMode && (
+                <>
+                  <div className="inline-flex min-h-[36px] items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                    <span className="text-[10px] uppercase tracking-[0.18em] text-emerald-800/70">Wallet</span>
+                    <span>{formattedWalletBalance}</span>
                   </div>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/crisis')}
+                    className="inline-flex min-h-[40px] items-center gap-1.5 rounded-full bg-red-50 px-4 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-100"
+                  >
+                    <LifeBuoy className="h-4 w-4" />
+                    <span className="hidden sm:inline">Crisis Support</span>
+                    <span className="sm:hidden">🆘</span>
+                  </button>
+                </>
+              )}
+
+              <Link
+                to="/patient/notifications"
+                className="relative inline-flex h-10 w-10 items-center justify-center rounded-2xl text-charcoal/55 transition hover:bg-wellness-aqua"
+                aria-label="Open notifications"
+              >
+                <Bell className="h-4 w-4" />
+                {unreadCount > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white" aria-hidden="true">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </Link>
+
+              <button
+                type="button"
+                onClick={() => void handleLogout()}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-2xl text-charcoal/60 transition hover:bg-wellness-aqua"
+                aria-label="Logout"
+                title="Logout"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setProfileMenuOpen(true)}
+                className="inline-flex items-center gap-2 rounded-2xl p-1 pr-2 transition hover:bg-wellness-aqua"
+                aria-label="Open profile menu"
+              >
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-warm-terracotta/25 text-xs font-semibold text-warm-terracotta">
+                  {initials}
+                </div>
+              </button>
             </div>
           </header>
 
@@ -376,9 +401,8 @@ export default function PatientDashboardLayout() {
               <Link
                 key={item.to}
                 to={item.to}
-                className={`inline-flex min-h-[50px] flex-col items-center justify-center rounded-2xl px-1 text-[11px] font-medium ${
-                  active ? 'bg-wellness-aqua text-charcoal shadow-wellness-sm' : 'text-charcoal/70 hover:bg-wellness-card'
-                }`}
+                className={`inline-flex min-h-[50px] flex-col items-center justify-center rounded-2xl px-1 text-[11px] font-medium ${active ? 'bg-wellness-aqua text-charcoal shadow-wellness-sm' : 'text-charcoal/70 hover:bg-wellness-card'
+                  }`}
               >
                 <Icon className="mb-0.5 h-4 w-4" />
                 {item.label}

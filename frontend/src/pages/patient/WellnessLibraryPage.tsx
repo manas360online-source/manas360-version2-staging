@@ -28,7 +28,7 @@ const modules: ModuleCard[] = [
     highlights: ['Raga Therapy sub-section', 'Deep focus sessions', 'Anxiety relief playlists'],
     goal: 'Anxiety Relief & Focus',
     cta: 'Explore Sounds →',
-    to: '/patient/sound-therapy',
+    to: '/sound-therapy',
     themeClass: 'from-[#1f2f6d]/85 via-[#273c82]/80 to-[#2f4ea3]/75',
     badge: 'FREE CONTENT',
   },

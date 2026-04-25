@@ -13,9 +13,9 @@ interface MultiTherapistManagerProps {
 }
 
 export default function MultiTherapistManager({ clinicId }: MultiTherapistManagerProps) {
-  const [therapists, setTherapists] = useState<Therapist[]>([]);
+  const [therapists, setTherapists] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [newTherapist, setNewTherapist] = useState({ name: '', email: '', specialty: '' });
+  const [newTherapist, setNewTherapist] = useState({ name: '', email: '', phone: '', specialty: '', loginSuffix: '' });
   const [message, setMessage] = useState<string>('');
 
   useEffect(() => {
@@ -23,14 +23,12 @@ export default function MultiTherapistManager({ clinicId }: MultiTherapistManage
   }, [clinicId]);
 
   const loadTherapists = async () => {
+    if (!clinicId) return;
     setIsLoading(true);
     try {
-      // Mock data - replace with actual API call
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      setTherapists([
-        { id: 'th1', name: 'Dr. Sarah Smith', email: 'sarah@clinic.com', specialty: 'CBT', isActive: true },
-        { id: 'th2', name: 'Dr. John Doe', email: 'john@clinic.com', specialty: 'DBT', isActive: true },
-      ]);
+      const response = await fetch(`${import.meta.env.VITE_API_BASE}/mdc/clinics/${clinicId}/staff`);
+      const data = await response.json();
+      setTherapists(data);
     } catch (error) {
       setMessage('Failed to load therapists');
     } finally {
@@ -39,27 +37,35 @@ export default function MultiTherapistManager({ clinicId }: MultiTherapistManage
   };
 
   const handleAddTherapist = async () => {
-    if (!newTherapist.name || !newTherapist.email) {
-      setMessage('Name and email are required');
+    if (!newTherapist.name || !newTherapist.phone || !newTherapist.loginSuffix) {
+      setMessage('Name, Phone, and Login Suffix are required');
       return;
     }
 
     setIsLoading(true);
     try {
-      // Mock add - replace with actual API call
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      const therapist: Therapist = {
-        id: `th${Date.now()}`,
-        name: newTherapist.name,
-        email: newTherapist.email,
-        specialty: newTherapist.specialty || undefined,
-        isActive: true,
-      };
-      setTherapists([...therapists, therapist]);
-      setNewTherapist({ name: '', email: '', specialty: '' });
-      setMessage(`✓ Therapist ${newTherapist.name} added successfully`);
-    } catch (error) {
-      setMessage('Failed to add therapist');
+      const response = await fetch(`${import.meta.env.VITE_API_BASE}/mdc/clinics/${clinicId}/staff`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: newTherapist.name,
+          email: newTherapist.email,
+          phone: newTherapist.phone,
+          role: 'therapist',
+          loginSuffix: newTherapist.loginSuffix,
+        }),
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        setTherapists([...therapists, data]);
+        setNewTherapist({ name: '', email: '', phone: '', specialty: '', loginSuffix: '' });
+        setMessage(`✓ Therapist ${newTherapist.name} added successfully. Login Code: ${data.loginCode}`);
+      } else {
+        throw new Error(data.message || 'Failed to add therapist');
+      }
+    } catch (error: any) {
+      setMessage(`✗ ${error.message}`);
     } finally {
       setIsLoading(false);
     }
@@ -85,34 +91,44 @@ export default function MultiTherapistManager({ clinicId }: MultiTherapistManage
         <h3 className="font-medium text-gray-900">Add New Therapist</h3>
         <input
           type="text"
-          placeholder="Name"
+          placeholder="Full Name"
           value={newTherapist.name}
           onChange={(e) => setNewTherapist({ ...newTherapist, name: e.target.value })}
           className="block w-full rounded border border-gray-300 px-3 py-2 text-sm"
           disabled={isLoading}
         />
+        <div className="grid grid-cols-2 gap-2">
+          <input
+            type="tel"
+            placeholder="Phone (+91...)"
+            value={newTherapist.phone}
+            onChange={(e) => setNewTherapist({ ...newTherapist, phone: e.target.value })}
+            className="block w-full rounded border border-gray-300 px-3 py-2 text-sm"
+            disabled={isLoading}
+          />
+          <input
+            type="text"
+            placeholder="Login Suffix (e.g. 1)"
+            value={newTherapist.loginSuffix}
+            onChange={(e) => setNewTherapist({ ...newTherapist, loginSuffix: e.target.value.toUpperCase() })}
+            className="block w-full rounded border border-gray-300 px-3 py-2 text-sm font-mono"
+            disabled={isLoading}
+          />
+        </div>
         <input
           type="email"
-          placeholder="Email"
+          placeholder="Email (Optional)"
           value={newTherapist.email}
           onChange={(e) => setNewTherapist({ ...newTherapist, email: e.target.value })}
-          className="block w-full rounded border border-gray-300 px-3 py-2 text-sm"
-          disabled={isLoading}
-        />
-        <input
-          type="text"
-          placeholder="Specialty (optional)"
-          value={newTherapist.specialty}
-          onChange={(e) => setNewTherapist({ ...newTherapist, specialty: e.target.value })}
           className="block w-full rounded border border-gray-300 px-3 py-2 text-sm"
           disabled={isLoading}
         />
         <button
           onClick={handleAddTherapist}
           disabled={isLoading}
-          className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:bg-gray-400"
+          className="w-full inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-200 hover:bg-blue-700 disabled:bg-gray-400 transition-all active:scale-95"
         >
-          {isLoading ? 'Adding...' : 'Add Therapist'}
+          {isLoading ? 'Processing...' : 'Authorize New Therapist'}
         </button>
       </div>
 
@@ -134,10 +150,11 @@ export default function MultiTherapistManager({ clinicId }: MultiTherapistManage
                 className="flex items-center justify-between rounded-lg border border-gray-200 p-3"
               >
                 <div>
-                  <p className="font-medium text-gray-900">{therapist.name}</p>
-                  <p className="text-xs text-gray-600">{therapist.email}</p>
-                  {therapist.specialty && (
-                    <p className="text-xs text-gray-500">Specialty: {therapist.specialty}</p>
+                  <p className="font-bold text-slate-900">{therapist.fullName}</p>
+                  <p className="text-xs text-slate-500 font-mono bg-slate-100 px-1.5 py-0.5 rounded inline-block mt-1">ID: {therapist.loginCode}</p>
+                  <p className="text-xs text-slate-600 mt-1">{therapist.phone}</p>
+                  {therapist.email && (
+                    <p className="text-xs text-slate-500">{therapist.email}</p>
                   )}
                 </div>
                 <button

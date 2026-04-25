@@ -124,12 +124,19 @@ export default function ProviderDashboard() {
     queryFn: fetchProviderMyQr,
     staleTime: 5 * 60 * 1000,
   });
-  const providerQrAnalyticsQuery = useQuery({
-    queryKey: ['providerQr', 'analytics'],
-    queryFn: fetchProviderMyQrAnalytics,
     staleTime: 60 * 1000,
     refetchInterval: 30 * 1000,
   });
+
+  const mdcUserStr = localStorage.getItem('mdc_user');
+  const mdcUser = useMemo(() => {
+    try {
+      return mdcUserStr ? JSON.parse(mdcUserStr) : null;
+    } catch {
+      return null;
+    }
+  }, [mdcUserStr]);
+  const isMdcMode = !!mdcUser;
 
   const providerRole = useMemo(() => toProviderKind(user?.role), [user?.role]);
   const stats = roleStats[providerRole];
@@ -201,24 +208,26 @@ export default function ProviderDashboard() {
       <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">
-            Good morning, Dr. {user?.firstName || 'Provider'} 👋
+            {isMdcMode ? `Welcome back, ${mdcUser.fullName}` : `Good morning, Dr. ${user?.firstName || 'Provider'} 👋`}
           </h1>
           <p className="mt-1 text-sm text-gray-500">
-            Here is your practice overview for today.
+            {isMdcMode ? `Workspace: ${mdcUser.clinicName}` : 'Here is your practice overview for today.'}
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => navigate('/provider/earnings')}
-          className="rounded-2xl border border-emerald-200 bg-white px-5 py-4 text-left shadow-sm transition hover:border-emerald-300 hover:shadow"
-        >
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-700">Wallet</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-800">
-            {`₹${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(availableMinor / 100)}`}
-          </p>
-          <p className="mt-1 text-xs text-slate-500">Available for withdrawal</p>
-        </button>
+        {!isMdcMode && (
+          <button
+            type="button"
+            onClick={() => navigate('/provider/earnings')}
+            className="rounded-2xl border border-emerald-200 bg-white px-5 py-4 text-left shadow-sm transition hover:border-emerald-300 hover:shadow"
+          >
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-700">Wallet</p>
+            <p className="mt-2 text-2xl font-semibold text-slate-800">
+              {`₹${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(availableMinor / 100)}`}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">Available for withdrawal</p>
+          </button>
+        )}
       </div>
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -293,95 +302,97 @@ export default function ProviderDashboard() {
         </article>
       </section>
 
-      <section className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm xl:col-span-1">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-slate-900">Your Profile QR</h2>
-            <button
-              type="button"
-              onClick={() => void providerQrQuery.refetch()}
-              className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
-            >
-              Refresh
-            </button>
-          </div>
-
-          {providerQrQuery.isLoading ? (
-            <div className="h-40 animate-pulse rounded-lg bg-slate-100" />
-          ) : providerQrQuery.data ? (
-            <div className="space-y-3">
-              <div className="flex items-center gap-4">
-                <div className="rounded-lg border border-slate-200 bg-white p-2">
-                  <QRCodeSVG value={providerQrQuery.data.trackingUrl} size={120} fgColor="#032467" bgColor="#FFFFFF" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">QR Code</p>
-                  <p className="truncate text-sm font-semibold text-slate-900">{providerQrQuery.data.qrCode.code}</p>
-                  <p className="mt-1 truncate text-xs text-slate-500">{providerQrQuery.data.trackingPath}</p>
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => void navigator.clipboard?.writeText(providerQrQuery.data.trackingUrl)}
-                  className="rounded-md bg-[#032467] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#021d54]"
-                >
-                  Copy Link
-                </button>
-                <a
-                  href={providerQrQuery.data.trackingUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                >
-                  Open
-                </a>
-              </div>
+      {!isMdcMode && (
+        <section className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+          <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm xl:col-span-1">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-base font-semibold text-slate-900">Your Profile QR</h2>
+              <button
+                type="button"
+                onClick={() => void providerQrQuery.refetch()}
+                className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+              >
+                Refresh
+              </button>
             </div>
-          ) : (
-            <p className="text-sm text-slate-500">QR not available right now.</p>
-          )}
-        </article>
 
-        <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm xl:col-span-2">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-slate-900">QR Performance</h2>
-            <button
-              type="button"
-              onClick={() => void providerQrAnalyticsQuery.refetch()}
-              className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
-            >
-              Refresh
-            </button>
-          </div>
+            {providerQrQuery.isLoading ? (
+              <div className="h-40 animate-pulse rounded-lg bg-slate-100" />
+            ) : providerQrQuery.data ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-4">
+                  <div className="rounded-lg border border-slate-200 bg-white p-2">
+                    <QRCodeSVG value={providerQrQuery.data.trackingUrl} size={120} fgColor="#032467" bgColor="#FFFFFF" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">QR Code</p>
+                    <p className="truncate text-sm font-semibold text-slate-900">{providerQrQuery.data.qrCode.code}</p>
+                    <p className="mt-1 truncate text-xs text-slate-500">{providerQrQuery.data.trackingPath}</p>
+                  </div>
+                </div>
 
-          {providerQrAnalyticsQuery.isLoading ? (
-            <div className="h-24 animate-pulse rounded-lg bg-slate-100" />
-          ) : providerQrAnalyticsQuery.data ? (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                <p className="text-[11px] uppercase tracking-wide text-slate-500">Month Scans</p>
-                <p className="mt-1 text-xl font-bold text-slate-900">{providerQrAnalyticsQuery.data.month.scans}</p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void navigator.clipboard?.writeText(providerQrQuery.data.trackingUrl)}
+                    className="rounded-md bg-[#032467] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#021d54]"
+                  >
+                    Copy Link
+                  </button>
+                  <a
+                    href={providerQrQuery.data.trackingUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    Open
+                  </a>
+                </div>
               </div>
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                <p className="text-[11px] uppercase tracking-wide text-slate-500">Month Bookings</p>
-                <p className="mt-1 text-xl font-bold text-slate-900">{providerQrAnalyticsQuery.data.month.bookings}</p>
-              </div>
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                <p className="text-[11px] uppercase tracking-wide text-slate-500">Conversion</p>
-                <p className="mt-1 text-xl font-bold text-slate-900">{providerQrAnalyticsQuery.data.month.conversionRate}%</p>
-              </div>
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                <p className="text-[11px] uppercase tracking-wide text-slate-500">Revenue</p>
-                <p className="mt-1 text-xl font-bold text-slate-900">₹{new Intl.NumberFormat('en-IN').format(providerQrAnalyticsQuery.data.month.revenue)}</p>
-              </div>
+            ) : (
+              <p className="text-sm text-slate-500">QR not available right now.</p>
+            )}
+          </article>
+
+          <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm xl:col-span-2">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-base font-semibold text-slate-900">QR Performance</h2>
+              <button
+                type="button"
+                onClick={() => void providerQrAnalyticsQuery.refetch()}
+                className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+              >
+                Refresh
+              </button>
             </div>
-          ) : (
-            <p className="text-sm text-slate-500">Analytics not available right now.</p>
-          )}
-        </article>
-      </section>
+
+            {providerQrAnalyticsQuery.isLoading ? (
+              <div className="h-24 animate-pulse rounded-lg bg-slate-100" />
+            ) : providerQrAnalyticsQuery.data ? (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-[11px] uppercase tracking-wide text-slate-500">Month Scans</p>
+                  <p className="mt-1 text-xl font-bold text-slate-900">{providerQrAnalyticsQuery.data.month.scans}</p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-[11px] uppercase tracking-wide text-slate-500">Month Bookings</p>
+                  <p className="mt-1 text-xl font-bold text-slate-900">{providerQrAnalyticsQuery.data.month.bookings}</p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-[11px] uppercase tracking-wide text-slate-500">Conversion</p>
+                  <p className="mt-1 text-xl font-bold text-slate-900">{providerQrAnalyticsQuery.data.month.conversionRate}%</p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-[11px] uppercase tracking-wide text-slate-500">Revenue</p>
+                  <p className="mt-1 text-xl font-bold text-slate-900">₹{new Intl.NumberFormat('en-IN').format(providerQrAnalyticsQuery.data.month.revenue)}</p>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-slate-500">Analytics not available right now.</p>
+            )}
+          </article>
+        </section>
+      )}
     </div>
   );
 }

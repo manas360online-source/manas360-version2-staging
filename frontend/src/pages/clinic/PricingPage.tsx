@@ -77,10 +77,10 @@ export default function PricingPage() {
 
         if (selectedFeatureSlugs.length === 0) {
           setPricing({
-            monthly_total: 0,
-            billing_amount: 0,
-            discount_applied: 0,
-            breakdown: [],
+            monthlyTotal: 0,
+            billingAmount: 0,
+            discountApplied: 0,
+            breakdown: {},
           });
           setPricingSource(null);
           return;
@@ -91,16 +91,16 @@ export default function PricingPage() {
 
         if (isDevelopment && import.meta.env.VITE_USE_MOCK_API === 'true') {
           response = calculateSubscriptionPriceMock({
-            clinic_tier: currentTier,
-            billing_cycle: currentBilling,
-            selected_features: selectedFeatureSlugs,
+            clinicTier: currentTier,
+            billingCycle: currentBilling,
+            selectedFeatures: selectedFeatureSlugs,
           });
           setPricingSource('fallback');
         } else {
           const result = await calculateSubscriptionPriceSafe({
-            clinic_tier: currentTier,
-            billing_cycle: currentBilling,
-            selected_features: selectedFeatureSlugs,
+            clinicTier: currentTier,
+            billingCycle: currentBilling,
+            selectedFeatures: selectedFeatureSlugs,
           });
 
           response = result.pricing;
@@ -128,14 +128,27 @@ export default function PricingPage() {
   };
 
   const handleStartTrial = () => {
-    alert('Starting 21-day free trial with your selected features!');
+    const selectedFeatureSlugs = getSelectedFeatureSlugs();
+    navigate('/my-digital-clinic/register', {
+      state: {
+        tier: currentTier,
+        billingCycle: currentBilling,
+        selectedFeatures: selectedFeatureSlugs,
+        isTrial: true,
+      },
+    });
   };
 
   const handleContinue = () => {
     const selectedFeatureSlugs = getSelectedFeatureSlugs();
-    const dashboardFeatureKeys = toDashboardFeatureKeys(selectedFeatureSlugs);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(dashboardFeatureKeys));
-    navigate('/my-digital-clinic/dashboard');
+    navigate('/my-digital-clinic/register', {
+      state: {
+        tier: currentTier,
+        billingCycle: currentBilling,
+        selectedFeatures: selectedFeatureSlugs,
+        isTrial: false,
+      },
+    });
   };
 
   return (
