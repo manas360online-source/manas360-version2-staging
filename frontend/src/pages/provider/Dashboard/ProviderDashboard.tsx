@@ -124,7 +124,11 @@ export default function ProviderDashboard() {
     queryFn: fetchProviderMyQr,
     staleTime: 5 * 60 * 1000,
   });
-  
+  const providerQrAnalyticsQuery = useQuery({
+    queryKey: ['providerQrAnalytics', 'my-qr-analytics'],
+    queryFn: fetchProviderMyQrAnalytics,
+    staleTime: 5 * 60 * 1000,
+  });
 
   const mdcUserStr = localStorage.getItem('mdc_user');
   const mdcUser = useMemo(() => {

@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 
 type PetKey = "baby-dino" | "golden-retriever" | "healing-elephant" | "chintu-fox";
@@ -38,11 +38,16 @@ const PETS = [
     hormoneDesc: "Endorphins — breathwork, play, laughter"
   }
 ];
+const scienceCards = [
+  { emoji: "🧪", chem: "Oxytocin", desc: "The love hormone", trigger: "Touch/Petting" },
+  { emoji: "🧠", chem: "Dopamine", desc: "The reward system", trigger: "Games/Feeding" },
+  { emoji: "🌊", chem: "Serotonin", desc: "The mood stabilizer", trigger: "Daily Routine" },
+  { emoji: "✨", chem: "Endorphins", desc: "The pain reliever", trigger: "Play/Laughter" }
+];
 
-import { Link } from 'react-router-dom';
 import Pt06HeroVideoFrame from '../../components/common/Pt06HeroVideoFrame';
 
-export default function DigitalPetsHubPage() {
+export default function DigitalPetsHubPage({ selectedPet }: DigitalPetsHubPageProps) {
   const scrollToId = (id: string) => {
     const el = document.getElementById(id);
     if (el) el.scrollIntoView({ behavior: 'smooth' });
@@ -219,6 +224,6 @@ export default function DigitalPetsHubPage() {
       </div>
     </div>
   );
-};
+}
 
 export default DigitalPetsHubPage;

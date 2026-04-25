@@ -1,6 +1,6 @@
 import React from 'react';
-import DigitalPetHub from '../components/common/DigitalPetHub';
+import DigitalPetHubPage from './patient/DigitalPetHubPage';
 
-const GoldenPupPage: React.FC = () => <DigitalPetHub selectedPet="golden-puppy" />;
+const GoldenPupPage: React.FC = () => <DigitalPetHubPage selectedPet="golden-puppy" />;
 
 export default GoldenPupPage;

@@ -139,10 +139,12 @@ const CertificationCard: React.FC<{ cert: Certification }> = ({ cert }) => {
   const [processing, setProcessing] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const inProviderShell = location.pathname.startsWith('/provider');
-  const detailPath = inProviderShell ? `/provider/certifications/${cert.slug}` : `/certifications/${cert.slug}`;
-  const enrollPath = inProviderShell
-    ? `/provider/certification/enroll/${cert.slug}`
-    : `/certification/enroll/${cert.slug}`;
+  const forcePublicDetail = /therapist/i.test(cert.slug) || /therapist/i.test(cert.name);
+  const detailPath = forcePublicDetail ? `/certifications/${cert.slug}` : (inProviderShell ? `/provider/certifications/${cert.slug}` : `/certifications/${cert.slug}`);
+  const enrollPath = forcePublicDetail
+    ? `/certification/enroll/${cert.slug}`
+    : (inProviderShell ? `/provider/certification/enroll/${cert.slug}` : `/certification/enroll/${cert.slug}`);
+  const checkoutPath = forcePublicDetail ? `/checkout/${cert.slug}` : (inProviderShell ? `/provider/checkout/${cert.slug}` : `/checkout/${cert.slug}`);
   const guestAuthPath = `/auth/signup?next=${encodeURIComponent(enrollPath)}`;
   const myCertificationsPath = inProviderShell ? '/provider/my-certifications' : '/my-certifications';
 
@@ -163,7 +165,7 @@ const CertificationCard: React.FC<{ cert: Certification }> = ({ cert }) => {
     const isFree = cert.price_inr === 0;
 
     if (!isFree) {
-      navigate(`/checkout/${cert.slug}`);
+      navigate(checkoutPath);
       return;
     }
 

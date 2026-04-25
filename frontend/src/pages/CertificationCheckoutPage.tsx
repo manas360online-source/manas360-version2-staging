@@ -297,7 +297,7 @@ export const CheckoutPage: React.FC = () => {
                         <div className="text-center py-8">
                             <h3 className="text-xl font-bold text-slate-800 mb-4">Free Enrollment</h3>
                             <button
-                                onClick={() => handleTransaction()}
+                                onClick={handlePayment}
                                 disabled={processing}
                                 className="w-full bg-purple-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-purple-700 transition disabled:opacity-50"
                             >
@@ -332,7 +332,7 @@ export const CheckoutPage: React.FC = () => {
 
                             {/* Pay button */}
                             <button
-                                onClick={() => handleTransaction()}
+                                onClick={handlePayment}
                                 disabled={processing}
                                 className="w-full bg-purple-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-purple-700 transition flex items-center justify-center gap-2 disabled:opacity-70 mb-6"
                             >

@@ -61,6 +61,7 @@ const HitASixerGamePage = lazy(() => import('./pages/patient/HitASixerGamePage')
 const WalletPage = lazy(() => import('./pages/patient/WalletPage'));
 const GroupTherapySessionsPage = lazy(() => import('./pages/patient/GroupTherapySessionsPage'));
 const DigitalPetPage = lazy(() => import('./pages/patient/DigitalPetPage'));
+const DigitalPetStrategyPage = lazy(() => import('./pages/patient/DigitalPetStrategyPage.jsx'));
 const TemboPage = lazy(() => import('./pages/patient/TemboPage'));
 const ChintuPage = lazy(() => import('./pages/ChintuPage'));
 const DinoPage = lazy(() => import('./pages/DinoPage'));
@@ -344,6 +345,7 @@ function App() {
               <Route path="/wise-owl" element={<DinoPage />} />
               <Route path="/patience-turtle" element={<ChintuPage />} />
               <Route path="/pet" element={<DigitalPetPage />} />
+              <Route path="/pet-strategy" element={<DigitalPetStrategyPage />} />
               <Route path="/chintu" element={<ChintuPage />} />
               <Route path="/dino" element={<DinoPage />} />
               <Route path="/elephant" element={<TemboPage />} />

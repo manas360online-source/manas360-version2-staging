@@ -1,7 +1,7 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Instagram, Linkedin, MessageCircle, Moon, Sun, Youtube } from 'lucide-react';
-import logo from '../../assets/manas360_main_logo.png';
+const logo = "/Logo.jpeg";
 import {
   applyTheme,
   getStoredThemePreference,
