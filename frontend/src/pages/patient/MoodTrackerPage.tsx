@@ -519,7 +519,7 @@ export default function MoodTrackerPage() {
                   <p className="mt-2 text-base font-medium text-charcoal">Based on this check-in, Anytime Buddy has a quick audio reset ready.</p>
                   <p className="mt-1 text-sm text-charcoal/65">{successState.ctaTitle}</p>
                   <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-                    <Link to="/sound-therapy" className="inline-flex min-h-[46px] items-center justify-center rounded-full bg-[#18322d] px-5 text-sm font-semibold text-white transition hover:opacity-95">
+                    <Link to="/patient/sound-therapy" className="inline-flex min-h-[46px] items-center justify-center rounded-full bg-[#18322d] px-5 text-sm font-semibold text-white transition hover:opacity-95">
                       Play now
                     </Link>
                     <button

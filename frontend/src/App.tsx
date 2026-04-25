@@ -693,7 +693,7 @@ function App() {
               <Route path="mood" element={<Navigate to="/patient/check-in?tab=daily-mood" replace />} />
               <Route path="wellness-library" element={<WellnessLibraryPage />} />
               <Route path="sleep-therapy" element={<SleepTherapyPage />} />
-              <Route path="sound-therapy" element={<Navigate to="/sound-therapy" replace />} />
+              <Route path="sound-therapy" element={<SoundTherapyPage />} />
               <Route path="pet" element={<DigitalPetPage />} />
               <Route path="chintu" element={<ChintuPage />} />
               <Route path="dino" element={<DinoPage />} />
