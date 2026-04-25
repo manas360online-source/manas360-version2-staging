@@ -1,6 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { groupTherapyApi } from "../api/groupTherapy";
+import { MessageCircle, Instagram, Youtube, Linkedin, Moon, Sun } from "lucide-react";
+import { applyTheme, getStoredThemePreference, persistThemePreference, resolveTheme, type ThemePreference } from '../lib/themePreference';
+const logo = "/Logo.jpeg";
+// landingBg uses the image from the public folder (URL-encoded for spaces)
+const landingBg = "/You%20renot%20alone-Beach.jpeg";
 
 type Language = "English" | "Hindi" | "Kannada" | "Tamil" | "Telugu";
 
@@ -12,7 +16,6 @@ type LoginOption = {
 };
 
 type LiveCard = {
-  id?: string;
   icon: string;
   title: string;
   doctor: string;
@@ -28,7 +31,6 @@ type QuickNavMegaItem = {
   title: string;
   subtitle: string;
   badge?: string;
-  route?: string;
 };
 
 type QuickNavMegaMenu = {
@@ -42,6 +44,7 @@ type QuickNavMegaMenu = {
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
 
+  const [activeTheme, setActiveTheme] = useState<ThemePreference>(() => resolveTheme(getStoredThemePreference()));
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [loginDropdownOpen, setLoginDropdownOpen] = useState(false);
@@ -50,9 +53,28 @@ const LandingPage: React.FC = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [leftPanelOpen, setLeftPanelOpen] = useState(false);
   const [activeQuickNav, setActiveQuickNav] = useState<string | null>(null);
-  const [liveCards, setLiveCards] = useState<LiveCard[]>([]);
   const quickNavCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const leftPanelCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    applyTheme(activeTheme);
+  }, [activeTheme]);
+
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'theme-preference') {
+        setActiveTheme(resolveTheme(getStoredThemePreference()));
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  const toggleTheme = () => {
+    const nextTheme: ThemePreference = activeTheme === 'dark' ? 'light' : 'dark';
+    setActiveTheme(nextTheme);
+    persistThemePreference(nextTheme);
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -100,93 +122,86 @@ const LandingPage: React.FC = () => {
     navigate("/hit-a-sixer");
   };
 
-  const handleQuickNavMegaItemClick = (menuLabel: string, itemTitle?: string) => {
-    const normalizedItemTitle = String(itemTitle || '').toLowerCase();
-    const itemRoute = quickNavMegaMenus[menuLabel]?.items.find((it) => it.title === itemTitle)?.route;
-    if (itemRoute) {
-      setActiveQuickNav(null);
-      navigate(itemRoute);
-      return;
-    }
+  // Route map for individual mega menu items (by item title)
+  const megaItemRoutes: Record<string, string> = {
+    // Premium Therapy Hub items
+    "1-on-1 Therapy": "/premium-theraphy",
+    "Psychiatry Consult": "/premium-theraphy",
+    "Couples Therapy": "/find-spark",
+    "Group Therapy": "/group-therapy",
+    "Sound Therapy": "/sound-therapy",
+    "Executive Coaching": "/premium-theraphy",
+    "Wellness Retreats": "/retreats",
+    // Wellness Shop is "coming soon" — no route
+    // I Need a Helping Hand items
+    "Free Screening": "/assessment",
+    "Find a Therapist": "/helping-hand",
+    "See a Psychiatrist": "/helping-hand",
+    "Specialized Care": "/specialized-care",
+    "Group Sessions": "/group-therapy",
+    "Crisis Support": "/crisis",
+    // AI Power Hub items
+    "Anytime Buddy AI": "/ai-power-hub",
+    "AnytimeBuddy Chat": "/ai-power-hub",
+    "Vent Buddy": "/ai-power-hub",
+    "AI Session Notes": "/ai-power-hub",
+    // Digital Pets items
+    "Baby Dinosaur": "/pet",
+    "Golden Retriever": "/pet",
+    "Healing Elephant": "/pet",
+    "Chintu Fox": "/pet",
+    "Name Your Pet \u2014 Adopt": "/pet",
+    // Self-Help items
+    "Mood Tracker": "/self-help",
+    "Breathing Exercises": "/self-help",
+    "Journaling Prompts": "/self-help",
+    "Sleep Guide": "/self-help",
+    "CBT Worksheets": "/self-help",
+    // Find a Spark items
+    "Find a Spark \u2014 Couples": "/find-spark",
+    "Concerned Parent": "/find-spark",
+    "Family Plan": "/find-spark",
+    "Teen & Student": "/find-spark",
+    // Corporate items
+    "Corporate Wellness": "/corporate-landing",
+    "Education Institutions": "/corporate-landing",
+    "Healthcare Units": "/corporate-landing",
+    "Government Agency": "/corporate-landing",
+    // Certify2EarnMore items
+    "Certification Hub": "/certifications",
+    "Join as Therapist": "/certifications",
+    // MyDigitalClinic items
+    "Patient Database": "/my-digital-clinic",
+    "Session Notes": "/my-digital-clinic",
+    "Scheduling": "/my-digital-clinic",
+    "Prescriptions": "/my-digital-clinic",
+    "Progress Tracking": "/my-digital-clinic",
+    "3 days": "/my-digital-clinic",
+  };
 
-    if (normalizedItemTitle.includes('group therapy') || normalizedItemTitle.includes('group sessions')) {
-      setActiveQuickNav(null);
-      navigate('/group-therapy');
-      return;
-    }
+  // Fallback route map for parent menu labels (used when no item-specific route exists)
+  const menuFallbackRoutes: Record<string, string> = {
+    "I Need a Helping Hand": "/helping-hand",
+    "AI Power Hub": "/ai-power-hub",
+    "Find a Spark Again": "/find-spark",
+    "Self-Help Tools": "/self-help",
+    "For Corporates / Edu / Healthcare": "/corporate-landing",
+    "Premium Therapy Hub": "/premium-theraphy",
+    "MyDigitalClinic": "/my-digital-clinic",
+    "Certify2EarnMore": "/certifications",
+    "Digital Pets4Happy Hormones": "/pet",
+  };
 
-    if (menuLabel === "I Need a Helping Hand") {
-      setActiveQuickNav(null);
-      navigate("/helping-hand");
-      return;
-    }
+  const handleMegaItemNav = (itemTitle: string, parentMenu: string | null) => {
+    setActiveQuickNav(null);
+    const route = megaItemRoutes[itemTitle] || (parentMenu ? menuFallbackRoutes[parentMenu] : null);
+    if (route) navigate(route);
+  };
 
-    if (menuLabel === "AI Power Hub") {
-      setActiveQuickNav(null);
-      navigate("/ai-power-hub");
-      return;
-    }
-
-    if (menuLabel === "Find a Spark Again") {
-      setActiveQuickNav(null);
-      navigate("/find-spark");
-      return;
-    }
-
-    if (menuLabel === "Self-Help Tools") {
-      setActiveQuickNav(null);
-      navigate("/self-help");
-      return;
-    }
-
-    if (menuLabel === "For Corporates / Edu / Healthcare") {
-      setActiveQuickNav(null);
-      navigate("/corporate-landing");
-      return;
-    }
-
-    if (menuLabel === "Premium Therapy Hub") {
-      setActiveQuickNav(null);
-      if (itemTitle === "Group Therapy") {
-        navigate("/group-therapy");
-        return;
-      }
-      if (itemTitle === "Wellness Retreats") {
-        navigate("/retreats");
-        return;
-      }
-      if (itemTitle === "Sound Therapy") {
-        navigate("/sound-therapy");
-        return;
-      }
-      navigate("/premium-theraphy");
-      return;
-    }
-
-    if (menuLabel === "Self-Help Tools") {
-      setActiveQuickNav(null);
-      if (itemTitle === "Sound Therapy") {
-        navigate("/sound-therapy");
-        return;
-      }
-    }
-
-    if (menuLabel === "MyDigitalClinic") {
-      setActiveQuickNav(null);
-      navigate("/my-digital-clinic");
-      return;
-    }
-
-    if (menuLabel === "Certify2EarnMore") {
-      setActiveQuickNav(null);
-      navigate("/certifications");
-      return;
-    }
-
-    if (menuLabel === "Digital Pets4Happy Hormones") {
-      setActiveQuickNav(null);
-      navigate("/pet");
-    }
+  const handleQuickNavMegaItemClick = (menuLabel: string) => {
+    setActiveQuickNav(null);
+    const route = menuFallbackRoutes[menuLabel];
+    if (route) navigate(route);
   };
 
   const footerQuickLinkRoutes: Record<string, string> = {
@@ -257,10 +272,10 @@ const LandingPage: React.FC = () => {
   );
   const quickNavItems: Array<{ icon: string; label: string }> = useMemo(
     () => [
-      { icon: "\uD83E\uDD1D", label: "I Need a Helping Hand" },
-      { icon: "\u26A1", label: "AI Power Hub" },
-      { icon: "\uD83D\uDC3E", label: "Digital Pets4Happy Hormones" },
       { icon: "\uD83D\uDC8E", label: "Premium Therapy Hub" },
+      { icon: "\u26A1", label: "AI Power Hub" },
+      { icon: "\uD83E\uDD1D", label: "I Need a Helping Hand" },
+      { icon: "\uD83D\uDC3E", label: "Digital Pets4Happy Hormones" },
       { icon: "\uD83E\uDDF0", label: "Self-Help Tools" },
       { icon: "\u2728", label: "Find a Spark Again" },
       { icon: "\uD83C\uDFDB\uFE0F", label: "For Corporates / Edu / Healthcare" },
@@ -316,14 +331,14 @@ const LandingPage: React.FC = () => {
         subtitle: "Clinically supervised, evidence-based sessions",
         columns: 5,
         items: [
-          { icon: "\uD83E\uDDE0", title: "1-on-1 Therapy", subtitle: "Psychologist sessions from \u20B9699", badge: "\u20B9699" },
-          { icon: "\u2695\uFE0F", title: "Psychiatry Consult", subtitle: "Medication review from \u20B9999", badge: "\u20B9999" },
-          { icon: "\uD83D\uDC91", title: "Couples Therapy", subtitle: "Rebuild your relationship", badge: "\u20B91,499" },
-          { icon: "\uD83D\uDC65", title: "Group Therapy", subtitle: "Peer circles from \u20B9149", badge: "\u20B9149" },
-          { icon: "\uD83C\uDFB5", title: "Sound Therapy", subtitle: "Raga healing + sleep tracks", badge: "20 Free" },
-          { icon: "\uD83D\uDCBC", title: "Executive Coaching", subtitle: "High-performance wellness", badge: "Pro" },
-          { icon: "\uD83C\uDFD5\uFE0F", title: "Wellness Retreats", subtitle: "Rishikesh, Coorg, Goa", route: "/retreats" },
-          { icon: "\uD83D\uDED2", title: "Wellness Shop", subtitle: "Journals, tools, merch", badge: "Soon" }
+          { icon: "🧠", title: "1-on-1 Therapy", subtitle: "Psychologist sessions from ₹699", badge: "₹699" },
+          { icon: "⚕️", title: "Psychiatry Consult", subtitle: "Medication review from ₹999", badge: "₹999" },
+          { icon: "💑", title: "Couples Therapy", subtitle: "Rebuild your relationship", badge: "₹1,499" },
+          { icon: "👥", title: "Group Therapy", subtitle: "Peer circles from ₹149", badge: "₹149" },
+          { icon: "🎵", title: "Sound Therapy", subtitle: "Raga healing + sleep tracks", badge: "20 Free" },
+          { icon: "💼", title: "Executive Coaching", subtitle: "High-performance wellness", badge: "Pro" },
+          { icon: "🏕️", title: "Wellness Retreats", subtitle: "Rishikesh, Coorg, Goa" },
+          { icon: "🛒", title: "Wellness Shop", subtitle: "Journals, tools, merch", badge: "Soon" }
         ]
       },
       "Self-Help Tools": {
@@ -333,7 +348,7 @@ const LandingPage: React.FC = () => {
         columns: 5,
         items: [
           { icon: "\uD83D\uDCCA", title: "Mood Tracker", subtitle: "Track emotional trends daily", badge: "Free" },
-          { icon: "\uD83C\uDFB5", title: "Sound Therapy", subtitle: "Calm sound-based relaxation", badge: "Free", route: "/sound-therapy" },
+          { icon: "\uD83C\uDFB5", title: "Sound Therapy", subtitle: "Calm sound-based relaxation", badge: "Free" },
           { icon: "\uD83C\uDF2C\uFE0F", title: "Breathing Exercises", subtitle: "4-7-8 \u2022 Box \u2022 Calm Breath \u2022 Guided sessions", badge: "Free" },
           { icon: "\uD83D\uDCD3", title: "Journaling Prompts", subtitle: "Daily reflection questions" },
           { icon: "\uD83C\uDF19", title: "Sleep Guide", subtitle: "Hygiene checklist + wind-down" },
@@ -370,8 +385,8 @@ const LandingPage: React.FC = () => {
         subtitle: "Certifications, training & shop",
         columns: 4,
         items: [
-          { icon: "\uD83C\uDFC6", title: "Certification Hub", subtitle: "CBT, NLP, 5Whys training", badge: "Pro", route: "/certifications" },
-          { icon: "\uD83E\uDDD1", title: "Join as Therapist", subtitle: "Earn \u20B950K-2L/month", route: "/certifications" }
+          { icon: "\uD83C\uDFC6", title: "Certification Hub", subtitle: "CBT, NLP, 5Whys training", badge: "Pro" },
+          { icon: "\uD83E\uDDD1", title: "Join as Therapist", subtitle: "Earn \u20B950K-2L/month" }
         ]
       },
       MyDigitalClinic: {
@@ -385,7 +400,7 @@ const LandingPage: React.FC = () => {
           { icon: "\uD83D\uDCC6", title: "Scheduling", subtitle: "Booking + auto-reminders" },
           { icon: "\uD83D\uDC8A", title: "Prescriptions", subtitle: "Digital sign + PDF + delivery" },
           { icon: "\uD83D\uDCCA", title: "Progress Tracking", subtitle: "PHQ-9/GAD-7 trends" },
-          { icon: "\u2728", title: "21-Day Free Trial", subtitle: "All modules unlocked", badge: "Free" }
+          { icon: "\u2728", title: "3 days", subtitle: "All modules unlocked", badge: "Free" }
         ]
       }
     }),
@@ -420,10 +435,9 @@ const LandingPage: React.FC = () => {
     }, 120);
   };
 
-  const defaultLiveCards: LiveCard[] = useMemo(
+  const liveCards: LiveCard[] = useMemo(
     () => [
       {
-        id: "mock-anxiety",
         icon: "\uD83E\uDDE0",
         title: "Anxiety Support Circle",
         doctor: "Dr. Priya",
@@ -435,7 +449,6 @@ const LandingPage: React.FC = () => {
         buttonBg: "linear-gradient(135deg, #FF6A00, #FF8A3D)"
       },
       {
-        id: "mock-burnout",
         icon: "\uD83D\uDD25",
         title: "Work Burnout Recovery",
         doctor: "Dr. Meera",
@@ -447,7 +460,6 @@ const LandingPage: React.FC = () => {
         buttonBg: "linear-gradient(135deg, #15803D, #22C55E)"
       },
       {
-        id: "mock-grief",
         icon: "\uD83D\uDD6F\uFE0F",
         title: "Grief & Loss — Safe Space",
         doctor: "Dr. Rajan",
@@ -459,7 +471,6 @@ const LandingPage: React.FC = () => {
         buttonBg: "linear-gradient(135deg, #1D4ED8, #3B82F6)"
       },
       {
-        id: "mock-couples",
         icon: "\uD83D\uDC9E",
         title: "Couples Communication Workshop",
         doctor: "Ms. Ananya",
@@ -474,69 +485,6 @@ const LandingPage: React.FC = () => {
     []
   );
 
-  useEffect(() => {
-    const toStatusBadge = (scheduledAt: string, durationMinutes: number): string => {
-      const now = Date.now();
-      const start = new Date(scheduledAt).getTime();
-      if (Number.isNaN(start)) return "Upcoming";
-      const end = start + Math.max(30, Number(durationMinutes || 60)) * 60 * 1000;
-      if (now >= start && now <= end) return "LIVE";
-      const diffMin = Math.ceil((start - now) / (60 * 1000));
-      if (diffMin > 0 && diffMin <= 120) return "Starting Soon";
-      if (diffMin > 120) {
-        const hrs = Math.floor(diffMin / 60);
-        const mins = diffMin % 60;
-        return hrs > 0 ? `${hrs}H ${mins}M` : `${mins}M`;
-      }
-      return "Upcoming";
-    };
-
-    const pickIcon = (title: string, topic: string): string => {
-      const key = `${title} ${topic}`.toLowerCase();
-      if (key.includes("anxiety")) return "\uD83E\uDDE0";
-      if (key.includes("burnout")) return "\uD83D\uDD25";
-      if (key.includes("grief") || key.includes("loss")) return "\uD83D\uDD6F\uFE0F";
-      if (key.includes("couple") || key.includes("relationship")) return "\uD83D\uDC9E";
-      return "\uD83D\uDC65";
-    };
-
-    const loadLiveCards = async () => {
-      try {
-        const response = await groupTherapyApi.listPublicSessions();
-        const rows = Array.isArray(response?.items) ? response.items : [];
-
-        const mapped: LiveCard[] = rows
-          .slice(0, 4)
-          .map((row: any) => {
-            const price = Number(row?.priceMinor || 0);
-            const maxMembers = Number(row?.maxMembers || 0);
-            const joinedCount = Number(row?.joinedCount || 0);
-            const seatsLeft = maxMembers > 0 ? Math.max(0, maxMembers - joinedCount) : null;
-            const status = toStatusBadge(String(row?.scheduledAt || ""), Number(row?.durationMinutes || 60));
-
-            return {
-              id: String(row?.id || ""),
-              icon: pickIcon(String(row?.title || ""), String(row?.topic || "")),
-              title: String(row?.title || "Group Therapy Session"),
-              doctor: String(row?.hostName || "MANAS360 Expert"),
-              language: String(row?.language || "English"),
-              seats: seatsLeft !== null ? (seatsLeft <= 3 ? `Only ${seatsLeft} seat${seatsLeft === 1 ? "" : "s"} left!` : `${joinedCount}/${maxMembers} joined`) : "Limited seats",
-              rightBadge: String(row?.status || "").toUpperCase() === "LIVE" ? "LIVE" : status,
-              buttonText: price > 0 ? `JOIN NOW → ₹${Math.round(price / 100)}` : "JOIN NOW → FREE",
-              bg: "linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(248, 250, 252, 0.96))",
-              buttonBg: (String(row?.status || "").toUpperCase() === "LIVE" || status === "LIVE") ? "linear-gradient(135deg, #FF6A00, #FF8A3D)" : "linear-gradient(135deg, #2563EB, #3B82F6)",
-            };
-          });
-
-        setLiveCards(mapped.length > 0 ? mapped : defaultLiveCards);
-      } catch {
-        setLiveCards(defaultLiveCards);
-      }
-    };
-
-    void loadLiveCards();
-  }, [defaultLiveCards]);
-
   const languageLabelMap: Record<Language, string> = {
     English: "English",
     Hindi: "हिन्दी",
@@ -549,715 +497,738 @@ const LandingPage: React.FC = () => {
     <div
       style={{
         minHeight: "100vh",
-        position: "relative",
-        backgroundImage: 'url("/You%20renot%20alone-Beach.jpeg")',
-        backgroundPosition: "center",
+        backgroundImage: `linear-gradient(rgba(238, 233, 233, 0.46), rgba(223, 213, 213, 0.46)), url(${landingBg})`,
         backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
         backgroundAttachment: "fixed",
-        backgroundRepeat: "no-repeat"
+        backgroundColor: "#F8FAFC"
       }}
     >
-      {showTopPromo && !isScrolled && (
-        <div
-          style={{
-            background: "linear-gradient(90deg, #2E7D32, #2F855A)",
-            color: "white",
-            fontSize: "12px",
-            fontWeight: 700
-          }}
-        >
-          <div
-            style={{
-              maxWidth: "1260px",
-              margin: "0 auto",
-              padding: "10px 16px",
-              display: "flex",
-              alignItems: "center",
-              gap: "14px"
-            }}
-            role="button"
-            tabIndex={0}
-            onClick={handleHitASixerPromo}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                handleHitASixerPromo();
-              }
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, minWidth: 0 }}>
-              <span style={{ opacity: 0.95 }}>&#127951;</span>
-              <span style={{ whiteSpace: "nowrap" }}>HIT A SIXER!</span>
-              <span style={{ opacity: 0.95, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis" }}>
-                Refer a friend & both get <span style={{ color: "#FFE082" }}>10% off</span> next therapy session
-              </span>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleHitASixerPromo}
-              style={{
-                border: "none",
-                cursor: "pointer",
-                background: "#9CCC65",
-                color: "#1B1B1B",
-                fontWeight: 800,
-                fontSize: "11px",
-                padding: "6px 14px",
-                borderRadius: "16px",
-                whiteSpace: "nowrap"
-              }}
-            >
-              CLAIM &#8377;70 CREDIT &#9889;
-            </button>
-
-            <span style={{ fontSize: "11px", fontWeight: 600, opacity: 0.9, whiteSpace: "nowrap" }}>
-              Offer expires in 23:57:36
-            </span>
-
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowTopPromo(false);
-              }}
-              aria-label="Close"
-              style={{
-                border: "none",
-                cursor: "pointer",
-                background: "transparent",
-                color: "rgba(255,255,255,0.9)",
-                fontSize: "16px",
-                lineHeight: 1
-              }}
-            >
-              &times;
-            </button>
-          </div>
-        </div>
-      )}
-
-      <a
-        href="#/landing"
-        aria-label="MANAS360 Home"
-        onClick={(event) => {
-          event.preventDefault();
-          navigate('/landing');
-        }}
+      <header
         style={{
-          position: "absolute",
-          left: "8px",
-          top: "56px",
-          zIndex: 95,
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          width: "104px",
-          height: "104px",
-          borderRadius: "24px",
-          padding: "10px",
-          boxSizing: "border-box",
-          overflow: "hidden",
-          background: "rgba(255,255,255,0.82)",
-          border: "1px solid rgba(226, 232, 240, 0.95)",
-          backdropFilter: "blur(6px)",
-          boxShadow: "0 10px 28px rgba(0,0,0,0.12)",
-          textDecoration: "none",
+          position: "sticky",
+          top: 0,
+          zIndex: 1000,
+          width: "100%",
+          transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
+          background: isScrolled
+            ? "rgba(255, 255, 255, 0.95)"
+            : "rgba(255, 255, 255, 0.8)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+          borderBottom: isScrolled
+            ? "1px solid rgba(226, 232, 240, 0.8)"
+            : "1px solid rgba(46, 38, 38, 0.3)",
+          boxShadow: isScrolled
+            ? "0 4px 25px rgba(0, 0, 0, 0.05)"
+            : "none"
         }}
       >
-        <img src="/Logo.jpeg" alt="MANAS360" style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: "center", display: "block", borderRadius: "12px", background: "#FFFFFF" }} />
-      </a>
-      <div
-        className="left-dock-wrap"
-        style={{
-          position: "fixed",
-          left: 0,
-          top: "120px",
-          transform: "none",
-          zIndex: 95,
-          display: "flex",
-          alignItems: "center"
-        }}
-        onMouseEnter={openLeftPanel}
-        onMouseLeave={closeLeftPanelWithDelay}
-      >
-        <div
-          className="floating-left-dock"
-          style={{
-            background: "rgba(255,255,255,0.88)",
-            border: "1px solid #E1E8F0",
-            borderLeft: "none",
-            borderRadius: "0 18px 18px 0",
-            padding: "10px 8px 10px 6px",
-            boxShadow: "0 14px 36px rgba(15, 23, 42, 0.14)",
-            backdropFilter: "blur(10px)",
-            width: "56px"
-          }}
-        >
-          {[
-            { id: "bot", icon: "🤖", bg: "linear-gradient(180deg, #EFE7FF, #E6EEFF)", dot: true },
-            { id: "pets", icon: "🐾", bg: "linear-gradient(180deg, #EFE7FF, #ECE9FF)" },
-            { id: "sound", icon: "🎵", bg: "linear-gradient(180deg, #DDF3EC, #E3F0FF)" },
-            { id: "divider-1", divider: true },
-            { id: "schedule", icon: "🗓️", bg: "linear-gradient(180deg, #DDF3EC, #E3F0FF)" },
-            { id: "chat-mid", icon: "💬", bg: "linear-gradient(180deg, #DDF3EC, #E6EDF8)" },
-            { id: "divider-2", divider: true },
-            { id: "notes", icon: "📋", bg: "linear-gradient(180deg, #E6F0FF, #E9EEF8)" },
-            { id: "brain", icon: "🧠", bg: "linear-gradient(180deg, #FDE7EF, #F4E8FF)" }
-          ].map((item) => {
-            if (item.divider) {
-              return <div key={item.id} style={{ height: "1px", background: "#D7DEE8", margin: "8px 6px" }} />;
-            }
-
-            return (
-              <button
-                key={item.id}
-                type="button"
-                style={{
-                  width: "36px",
-                  height: "36px",
-                  borderRadius: "11px",
-                  border: "none",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                  margin: "4px 2px",
-                  background: item.bg,
-                  fontSize: "18px",
-                  position: "relative"
-                }}
-                aria-label="Quick item"
-              >
-                <span>{item.icon}</span>
-                {item.dot ? (
-                  <span
-                    style={{
-                      position: "absolute",
-                      top: "2px",
-                      right: "2px",
-                      width: "7px",
-                      height: "7px",
-                      borderRadius: "999px",
-                      background: "#22C55E",
-                      border: "1.5px solid #FFFFFF"
-                    }}
-                    aria-hidden
-                  />
-                ) : null}
-              </button>
-            );
-          })}
-        </div>
-
-        <div
-          className="left-dock-panel"
-          style={{
-            width: leftPanelOpen ? "272px" : "0px",
-            opacity: leftPanelOpen ? 1 : 0,
-            overflow: "hidden",
-            transform: leftPanelOpen ? "translateX(0)" : "translateX(-8px)",
-            transition: "width 0.22s ease, opacity 0.18s ease, transform 0.22s ease",
-            pointerEvents: leftPanelOpen ? "auto" : "none"
-          }}
-        >
+        {showTopPromo && !isScrolled && (
           <div
             style={{
-              marginLeft: "8px",
-              background: "rgba(255,255,255,0.92)",
-              border: "1px solid #E1E8F0",
-              borderRadius: "0 20px 20px 0",
-              boxShadow: "0 18px 40px rgba(15,23,42,0.16)",
-              padding: "12px 12px 10px",
-              maxHeight: "76vh",
-              overflowY: "auto"
-            }}
-          >
-            <div style={{ fontSize: "11px", fontWeight: 800, letterSpacing: "2px", color: "#0B2D5E", marginBottom: "7px" }}>QUICK ACCESS</div>
-
-            {[
-              { icon: "\uD83E\uDD16", title: "AnytimeBUDDY", text: "Your 24/7 AI companion", tag: "LIVE" },
-              { icon: "\uD83D\uDC3E", title: "Digital Pets", text: "Oxytocin \u2022 Serotonin \u2022 Dopamine", tag: "NEW" },
-              { icon: "\uD83C\uDFA7", title: "Sound Therapy", text: "Sleep, calm, focus" }
-            ].map((row) => (
-              <div key={row.title} style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "7px" }}>
-                <div style={{ width: "36px", height: "36px", borderRadius: "12px", background: "linear-gradient(180deg,#ECF4F1,#DFE8F1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "21px", flexShrink: 0 }}>{row.icon}</div>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: "17px", color: "#2B3345", lineHeight: 1.05 }}>
-                    {row.tag ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#0A8F4D", background: "#DCFCE7", borderRadius: "999px", padding: "2px 6px", marginRight: "6px", verticalAlign: "middle" }}>{row.tag}</span> : null}
-                    <span style={{ fontSize: "17px", fontWeight: 800, color: "#1F2937", verticalAlign: "middle" }}>{row.title}</span>
-                  </div>
-                  <div style={{ fontSize: "11px", color: "#6B7280", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{row.text}</div>
-                </div>
-              </div>
-            ))}
-
-            <div style={{ height: "1px", background: "#D7DEE8", margin: "10px 2px" }} />
-            <div style={{ fontSize: "11px", fontWeight: 800, letterSpacing: "2px", color: "#0B2D5E", marginBottom: "7px" }}>WHATSAPP</div>
-
-            {[
-              { icon: "\uD83D\uDCC5", title: "WA Book Session", text: "Book therapist via WhatsApp" },
-              { icon: "\uD83D\uDCAC", title: "WA Session", text: "Text-based therapy chat" }
-            ].map((row) => (
-              <div key={row.title} style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "7px" }}>
-                <div style={{ width: "36px", height: "36px", borderRadius: "12px", background: "linear-gradient(180deg,#ECF4F1,#DFE8F1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "21px", flexShrink: 0 }}>{row.icon}</div>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: "15px", fontWeight: 800, color: "#1F2937", lineHeight: 1.1 }}>{row.title}</div>
-                  <div style={{ fontSize: "11px", color: "#6B7280", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{row.text}</div>
-                </div>
-              </div>
-            ))}
-
-            <div style={{ height: "1px", background: "#D7DEE8", margin: "10px 2px" }} />
-            <div style={{ fontSize: "11px", fontWeight: 800, letterSpacing: "2px", color: "#0B2D5E", marginBottom: "7px" }}>FREE TOOLS</div>
-
-            {[
-              { icon: "\uD83D\uDCDD", title: "Free Screening", text: "PHQ-9 \u2022 GAD-7 \u2022 3 min" },
-              { icon: "\uD83E\uDDE0", title: "AI Self-Service", text: "CBT \u2022 Journaling \u2022 Mood" }
-            ].map((row) => (
-              <div key={row.title} style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "7px" }}>
-                <div style={{ width: "36px", height: "36px", borderRadius: "12px", background: "linear-gradient(180deg,#ECF4F1,#DFE8F1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "21px", flexShrink: 0 }}>{row.icon}</div>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: "15px", fontWeight: 800, color: "#1F2937", lineHeight: 1.1 }}>{row.title}</div>
-                  <div style={{ fontSize: "11px", color: "#6B7280", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{row.text}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div
-        className="floating-right-avatars" 
-        style={{
-          position: "fixed",
-          right: "18px",
-          top: "168px",
-          zIndex: 160,
-          display: "flex",
-          flexDirection: "column",
-          gap: "14px"
-        }}
-      >
-        {[
-          { bg: "#FFF", image: "/AnytimeBUDDY.jpeg", label: "Doctor" },
-          { bg: "#111827", image: "/HitASixer.jpeg", label: "Cricket", href: "/hit-a-sixer" },
-          { bg: "#03163A", image: "/Digital-Pet-Hub.png", label: "Digital Pet", href: "/pet" }
-        ].map((item, idx) => (
-          <div
-            key={idx}
-            style={{
-              width: "58px",
-              height: "58px",
-              borderRadius: "999px",
-              background: item.bg,
-              border: "5px solid rgba(255,255,255,0.9)",
-              boxShadow: "0 12px 30px rgba(0,0,0,0.18)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: item.href ? "pointer" : "default",
-              animation: `avatarFloat 3.8s ease-in-out ${idx * 0.35}s infinite`
-            }}
-            role={item.href ? "button" : undefined}
-            tabIndex={item.href ? 0 : undefined}
-            onClick={() => {
-              if (item.href) {
-                navigate(item.href);
-              }
-            }}
-            onKeyDown={(e) => {
-              if (item.href && (e.key === "Enter" || e.key === " ")) {
-                e.preventDefault();
-                navigate(item.href);
-              }
-            }}
-            aria-hidden
-          >
-            {item.image ? (
-              <img
-                src={item.image}
-                alt={item.label}
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "contain",
-                  objectPosition: "center",
-                  display: "block",
-                  borderRadius: "999px",
-                  background: item.bg
-                }}
-              />
-            ) : (
-              <span style={{ fontSize: "24px" }}>{item.label}</span>
-            )}
-          </div>
-        ))}
-      </div>
-
-      <div style={{ position: "fixed", right: "24px", bottom: "24px", zIndex: 120 }}>
-        <button
-          type="button"
-          style={{
-            width: "62px",
-            height: "62px",
-            borderRadius: "999px",
-            border: "none",
-            cursor: "pointer",
-            background: "linear-gradient(135deg, #7C3AED, #5B21B6)",
-            boxShadow: "0 16px 36px rgba(0,0,0,0.22)",
-            color: "white",
-            position: "relative",
-            animation: "chatFloat 3.2s ease-in-out infinite"
-          }}
-          aria-label="Chat"
-        >
-          <span style={{ fontSize: "30px", display: "inline-block", transform: "rotate(0deg)", animation: "chatTilt 3s ease-in-out infinite" }}>&#129302;</span>
-          <span
-            style={{
-              position: "absolute",
-              top: "-8px",
-              left: "-7px",
-              width: "18px",
-              height: "18px",
-              borderRadius: "999px",
-              background: "#EF4444",
+              background: "linear-gradient(90deg, #2E7D32, #2F855A)",
               color: "white",
-              fontSize: "11px",
-              fontWeight: 800,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              border: "2px solid rgba(255,255,255,0.9)"
+              fontSize: "12px",
+              fontWeight: 700
             }}
           >
-            3
-          </span>
-          <span
-            style={{
-              position: "absolute",
-              top: "4px",
-              right: "4px",
-              width: "14px",
-              height: "14px",
-              borderRadius: "999px",
-              background: "#22C55E",
-              border: "2px solid rgba(255,255,255,0.95)"
-            }}
-            aria-hidden
-          />
-        </button>
-      </div>
-
-      <div className="brand-bar">
-        <div style={{ maxWidth: "1260px", margin: "0 auto", padding: "0 16px" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: "56px", gap: "12px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", justifyContent: "center" }}>
-              {(["English", "Hindi", "Kannada", "Tamil", "Telugu"] as const).map((lang) => {
-                const active = selectedLanguage === lang;
-                return (
-                  <button
-                    key={lang}
-                    type="button"
-                    onClick={() => setSelectedLanguage(lang)}
-                    style={{
-                      border: "1px solid #E8EDF2",
-                      background: active ? "#0B2D5E" : "white",
-                      color: active ? "white" : "#1A1A2E",
-                      fontSize: "11px",
-                      fontWeight: 800,
-                      padding: "6px 12px",
-                      borderRadius: "16px",
-                      cursor: "pointer"
-                    }}
-                  >
-                    {languageLabelMap[lang]}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <button
-                type="button"
-                onClick={() => setShowSearch(true)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  padding: "8px 14px",
-                  borderRadius: "18px",
-                  border: "1px solid #D5DEE9",
-                  cursor: "pointer",
-                  background: "#F8FBFF",
-                  minWidth: "214px"
-                }}
-              >
-                <span style={{ fontSize: "14px", color: "#2563EB" }}>&#128269;</span>
-                <span style={{ fontSize: "11px", color: "#64748B", flex: 1, textAlign: "left", fontWeight: 700 }}>Search or ask...</span>
-                <span
-                  style={{
-                    fontSize: "10px",
-                    color: "#64748B",
-                    background: "#FFFFFF",
-                    border: "1px solid #DDE5EF",
-                    padding: "2px 7px",
-                    borderRadius: "8px"
-                  }}
-                >
-                  ⌘ K
+            <div
+              style={{
+                maxWidth: "1260px",
+                margin: "0 auto",
+                padding: "10px 16px",
+                display: "flex",
+                alignItems: "center",
+                gap: "14px"
+              }}
+              role="button"
+              tabIndex={0}
+              onClick={handleHitASixerPromo}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  handleHitASixerPromo();
+                }
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, minWidth: 0 }}>
+                <span style={{ opacity: 0.95 }}>&#127951;</span>
+                <span style={{ whiteSpace: "nowrap" }}>HIT A SIXER!</span>
+                <span style={{ opacity: 0.95, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis" }}>
+                  Refer a friend & both get <span style={{ color: "#FFE082" }}>10% off</span> next therapy session
                 </span>
-              </button>
+              </div>
 
               <button
                 type="button"
+                onClick={handleHitASixerPromo}
                 style={{
-                  background: "#0B2D5E",
-                  color: "white",
-                  padding: "9px 20px",
-                  borderRadius: "18px",
-                  fontSize: "12px",
-                  fontWeight: 900,
-                  cursor: "pointer",
                   border: "none",
+                  cursor: "pointer",
+                  background: "#9CCC65",
+                  color: "#1B1B1B",
+                  fontWeight: 800,
+                  fontSize: "11px",
+                  padding: "6px 14px",
+                  borderRadius: "16px",
                   whiteSpace: "nowrap"
                 }}
               >
-                Subscribe
+                CLAIM &#8377;70 CREDIT &#9889;
               </button>
 
-              <div style={{ position: "relative" }}>
+              <span style={{ fontSize: "11px", fontWeight: 600, opacity: 0.9, whiteSpace: "nowrap" }}>
+                Offer expires in 23:57:36
+              </span>
+
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowTopPromo(false);
+                }}
+                aria-label="Close"
+                style={{
+                  border: "none",
+                  cursor: "pointer",
+                  background: "transparent",
+                  color: "rgba(255,255,255,0.9)",
+                  fontSize: "16px",
+                  lineHeight: 1
+                }}
+              >
+                &times;
+              </button>
+            </div>
+          </div>
+        )}
+
+        <a
+          href="/"
+          aria-label="MANAS360 Home"
+          style={{
+            position: "fixed",
+            left: "16px",
+            top: showTopPromo && !isScrolled ? "76px" : "16px",
+            zIndex: 100,
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "62px",
+            height: "62px",
+            borderRadius: "16px",
+            padding: "4px",
+            boxSizing: "border-box",
+            overflow: "hidden",
+            background: "rgba(255,255,255,0.92)",
+            border: "1px solid rgba(226, 232, 240, 0.88)",
+            backdropFilter: "blur(8px)",
+            boxShadow: "0 8px 18px rgba(15,23,42,0.10)",
+            textDecoration: "none",
+            transition: "top 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease"
+          }}
+        >
+          <img
+            src={logo}
+            alt="MANAS360"
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "contain",
+              objectPosition: "center",
+              display: "block",
+              borderRadius: "12px",
+              background: "#FFFFFF"
+            }}
+          />
+        </a>
+        <div
+          className="left-dock-wrap"
+          style={{
+            position: "fixed",
+            left: 0,
+            top: "120px",
+            transform: "none",
+            zIndex: 95,
+            display: "block",
+            alignItems: "center"
+          }}
+          onMouseEnter={openLeftPanel}
+          onMouseLeave={closeLeftPanelWithDelay}
+        >
+          <div
+            className="floating-left-dock"
+            style={{
+              background: "rgba(255,255,255,0.88)",
+              border: "1px solid #E1E8F0",
+              borderLeft: "none",
+              borderRadius: "0 18px 18px 0",
+              padding: "10px 8px 10px 6px",
+              boxShadow: "0 14px 36px rgba(15, 23, 42, 0.14)",
+              backdropFilter: "blur(10px)",
+              width: "56px"
+            }}
+          >
+            {[
+              { id: "bot", icon: "🤖", bg: "linear-gradient(180deg, #EFE7FF, #E6EEFF)", dot: true },
+              { id: "pets", icon: "🐾", bg: "linear-gradient(180deg, #EFE7FF, #ECE9FF)" },
+              { id: "sound", icon: "🎵", bg: "linear-gradient(180deg, #DDF3EC, #E3F0FF)" },
+              { id: "divider-1", divider: true },
+              { id: "schedule", icon: "🗓️", bg: "linear-gradient(180deg, #DDF3EC, #E3F0FF)" },
+              { id: "chat-mid", icon: "💬", bg: "linear-gradient(180deg, #DDF3EC, #E6EDF8)" },
+              { id: "divider-2", divider: true },
+              { id: "notes", icon: "📋", bg: "linear-gradient(180deg, #E6F0FF, #E9EEF8)" },
+              { id: "brain", icon: "🧠", bg: "linear-gradient(180deg, #FDE7EF, #F4E8FF)" }
+            ].map((item) => {
+              if (item.divider) {
+                return <div key={item.id} style={{ height: "1px", background: "#D7DEE8", margin: "8px 6px" }} />;
+              }
+
+              return (
                 <button
+                  key={item.id}
                   type="button"
-                  onClick={() => {
-                    setLoginDropdownOpen(false);
-                    navigate('/auth/login');
-                  }}
                   style={{
+                    width: "36px",
+                    height: "36px",
+                    borderRadius: "11px",
+                    border: "none",
                     display: "flex",
                     alignItems: "center",
-                    gap: "0px",
-                    padding: "9px 18px",
-                    borderRadius: "18px",
-                    border: "1px solid #D5DEE9",
+                    justifyContent: "center",
                     cursor: "pointer",
-                    fontSize: "12px",
-                    fontWeight: 800,
-                    color: "#1A1A2E",
-                    background: "white",
-                    whiteSpace: "nowrap"
+                    margin: "4px 2px",
+                    background: item.bg,
+                    fontSize: "18px",
+                    position: "relative"
                   }}
+                  aria-label="Quick item"
                 >
-                  Log In
+                  <span>{item.icon}</span>
+                  {item.dot ? (
+                    <span
+                      style={{
+                        position: "absolute",
+                        top: "2px",
+                        right: "2px",
+                        width: "7px",
+                        height: "7px",
+                        borderRadius: "999px",
+                        background: "#22C55E",
+                        border: "1.5px solid #FFFFFF"
+                      }}
+                      aria-hidden
+                    />
+                  ) : null}
                 </button>
-
-                {loginDropdownOpen && (
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: "calc(100% + 8px)",
-                      right: 0,
-                      background: "white",
-                      borderRadius: "12px",
-                      boxShadow: "0 14px 50px rgba(0, 0, 0, 0.14)",
-                      padding: "6px",
-                      width: "248px",
-                      zIndex: 150,
-                      border: "1px solid #E8EDF2"
-                    }}
-                  >
-                    {loginOptions.map((option) => (
-                      <div
-                        key={option.type}
-                        onClick={() => handleLogin(option.type)}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "10px",
-                          padding: "8px 10px",
-                          borderRadius: "9px",
-                          cursor: "pointer",
-                          transition: "background 0.15s"
-                        }}
-                        onMouseEnter={(e) => {
-                          (e.currentTarget as HTMLElement).style.background = "#FAFCFF";
-                        }}
-                        onMouseLeave={(e) => {
-                          (e.currentTarget as HTMLElement).style.background = "transparent";
-                        }}
-                      >
-                        <span style={{ fontSize: "17px", width: "24px", textAlign: "center" }}>{option.icon}</span>
-                        <div>
-                          <div style={{ fontSize: "12px", fontWeight: 900, color: "#1A1A2E" }}>{option.label}</div>
-                          <div style={{ fontSize: "10px", color: "#666680", marginTop: "1px" }}>{option.desc}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginLeft: "6px" }}>
-                {[
-                  { key: "wa", label: "◔" },
-                  { key: "ig", label: "◌" },
-                  { key: "yt", label: "▶" },
-                  { key: "in", label: "in" }
-                ].map((s) => (
-                  <div
-                    key={s.key}
-                    style={{
-                      width: "24px",
-                      height: "24px",
-                      borderRadius: "7px",
-                      background: "transparent",
-                      border: "none",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "13px",
-                      fontWeight: 900,
-                      color: "#66708A"
-                    }}
-                    aria-hidden
-                  >
-                    {s.label}
-                  </div>
-                ))}
-              </div>
-            </div>
+              );
+            })}
           </div>
 
           <div
+            className="left-dock-panel"
             style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: "12px",
-              padding: "10px 0 14px 0",
-              borderTop: "1px solid rgba(232, 237, 242, 0.7)"
+              width: leftPanelOpen ? "272px" : "0px",
+              opacity: leftPanelOpen ? 1 : 0,
+              overflow: "hidden",
+              transform: leftPanelOpen ? "translateX(0)" : "translateX(-8px)",
+              transition: "width 0.22s ease, opacity 0.18s ease, transform 0.22s ease",
+              pointerEvents: leftPanelOpen ? "auto" : "none"
             }}
           >
-            <div style={{ position: "relative", flex: 1, minWidth: 0 }} onMouseEnter={keepQuickNavMenuOpen} onMouseLeave={closeQuickNavMenuWithDelay}>
-              <div className="quick-nav" style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "nowrap", flex: 1, minWidth: 0, maxWidth: "100%" }}>
-                {quickNavItems.map((item) => {
-                  const menu = quickNavMegaMenus[item.label];
-                  const isActive = activeQuickNav === item.label && !!menu;
-                  const accent = menu?.accent;
+            <div
+              style={{
+                marginLeft: "8px",
+                background: "rgba(255,255,255,0.92)",
+                border: "1px solid #E1E8F0",
+                borderRadius: "0 20px 20px 0",
+                boxShadow: "0 18px 40px rgba(15,23,42,0.16)",
+                padding: "12px 12px 10px",
+                maxHeight: "76vh",
+                overflowY: "auto"
+              }}
+            >
+              <div style={{ fontSize: "11px", fontWeight: 800, letterSpacing: "2px", color: "#0B2D5E", marginBottom: "7px" }}>QUICK ACCESS</div>
 
+              {[
+                { icon: "\uD83E\uDD16", title: "AnytimeBUDDY", text: "Your 24/7 AI companion", tag: "LIVE" },
+                { icon: "\uD83D\uDC3E", title: "Digital Pets", text: "Oxytocin \u2022 Serotonin \u2022 Dopamine", tag: "NEW" },
+                { icon: "\uD83C\uDFA7", title: "Sound Therapy", text: "Sleep, calm, focus" }
+              ].map((row) => (
+                <div key={row.title} style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "7px" }}>
+                  <div style={{ width: "36px", height: "36px", borderRadius: "12px", background: "linear-gradient(180deg,#ECF4F1,#DFE8F1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "21px", flexShrink: 0 }}>{row.icon}</div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: "17px", color: "#2B3345", lineHeight: 1.05 }}>
+                      {row.tag ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#0A8F4D", background: "#DCFCE7", borderRadius: "999px", padding: "2px 6px", marginRight: "6px", verticalAlign: "middle" }}>{row.tag}</span> : null}
+                      <span style={{ fontSize: "17px", fontWeight: 800, color: "#1F2937", verticalAlign: "middle" }}>{row.title}</span>
+                    </div>
+                    <div style={{ fontSize: "11px", color: "#6B7280", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{row.text}</div>
+                  </div>
+                </div>
+              ))}
+
+              <div style={{ height: "1px", background: "#D7DEE8", margin: "10px 2px" }} />
+              <div style={{ fontSize: "11px", fontWeight: 800, letterSpacing: "2px", color: "#0B2D5E", marginBottom: "7px" }}>WHATSAPP</div>
+
+              {[
+                { icon: "\uD83D\uDCC5", title: "WA Book Session", text: "Book therapist via WhatsApp" },
+                { icon: "\uD83D\uDCAC", title: "WA Session", text: "Text-based therapy chat" }
+              ].map((row) => (
+                <div key={row.title} style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "7px" }}>
+                  <div style={{ width: "36px", height: "36px", borderRadius: "12px", background: "linear-gradient(180deg,#ECF4F1,#DFE8F1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "21px", flexShrink: 0 }}>{row.icon}</div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: "15px", fontWeight: 800, color: "#1F2937", lineHeight: 1.1 }}>{row.title}</div>
+                    <div style={{ fontSize: "11px", color: "#6B7280", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{row.text}</div>
+                  </div>
+                </div>
+              ))}
+
+              <div style={{ height: "1px", background: "#D7DEE8", margin: "10px 2px" }} />
+              <div style={{ fontSize: "11px", fontWeight: 800, letterSpacing: "2px", color: "#0B2D5E", marginBottom: "7px" }}>FREE TOOLS</div>
+
+              {[
+                { icon: "\uD83D\uDCDD", title: "Free Screening", text: "PHQ-9 \u2022 GAD-7 \u2022 3 min" },
+                { icon: "\uD83E\uDDE0", title: "AI Self-Service", text: "CBT \u2022 Journaling \u2022 Mood" }
+              ].map((row) => (
+                <div key={row.title} style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "7px" }}>
+                  <div style={{ width: "36px", height: "36px", borderRadius: "12px", background: "linear-gradient(180deg,#ECF4F1,#DFE8F1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "21px", flexShrink: 0 }}>{row.icon}</div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: "15px", fontWeight: 800, color: "#1F2937", lineHeight: 1.1 }}>{row.title}</div>
+                    <div style={{ fontSize: "11px", color: "#6B7280", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{row.text}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div
+          className="floating-right-avatars"
+          style={{
+            position: "fixed",
+            right: "18px",
+            top: "168px",
+            zIndex: 160,
+            display: "flex",
+            flexDirection: "column",
+            gap: "14px"
+          }}
+        >
+          {[
+            { bg: "#FFF", image: "/AnytimeBUDDY.jpeg", label: "Doctor" },
+            { bg: "#111827", image: "/HitASixer.jpeg", label: "Cricket", href: "/hit-a-sixer" },
+            { bg: "#03163A", image: "/Digital-Pet-Hub.png", label: "Digital Pet", href: "/pet" }
+          ].map((item, idx) => (
+            <div
+              key={idx}
+              style={{
+                width: "58px",
+                height: "58px",
+                borderRadius: "999px",
+                background: item.bg,
+                border: "5px solid rgba(255,255,255,0.9)",
+                boxShadow: "0 12px 30px rgba(0,0,0,0.18)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: item.href ? "pointer" : "default",
+                animation: `avatarFloat 3.8s ease-in-out ${idx * 0.35}s infinite`
+              }}
+              role={item.href ? "button" : undefined}
+              tabIndex={item.href ? 0 : undefined}
+              onClick={() => {
+                if (item.href) {
+                  navigate(item.href);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (item.href && (e.key === "Enter" || e.key === " ")) {
+                  e.preventDefault();
+                  navigate(item.href);
+                }
+              }}
+              aria-hidden
+            >
+              {item.image ? (
+                <img
+                  src={item.image}
+                  alt={item.label}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "contain",
+                    objectPosition: "center",
+                    display: "block",
+                    borderRadius: "999px",
+                    background: item.bg
+                  }}
+                />
+              ) : (
+                <span style={{ fontSize: "24px" }}>{item.label}</span>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div style={{ position: "fixed", right: "24px", bottom: "24px", zIndex: 120 }}>
+          <button
+            type="button"
+            style={{
+              width: "62px",
+              height: "62px",
+              borderRadius: "999px",
+              border: "none",
+              cursor: "pointer",
+              background: "linear-gradient(135deg, #7C3AED, #5B21B6)",
+              boxShadow: "0 16px 36px rgba(0,0,0,0.22)",
+              color: "white",
+              position: "relative",
+              animation: "chatFloat 3.2s ease-in-out infinite"
+            }}
+            aria-label="Chat"
+          >
+            <span style={{ fontSize: "30px", display: "inline-block", transform: "rotate(0deg)", animation: "chatTilt 3s ease-in-out infinite" }}>&#129302;</span>
+            <span
+              style={{
+                position: "absolute",
+                top: "-8px",
+                left: "-7px",
+                width: "18px",
+                height: "18px",
+                borderRadius: "999px",
+                background: "#EF4444",
+                color: "white",
+                fontSize: "11px",
+                fontWeight: 800,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                border: "2px solid rgba(255,255,255,0.9)"
+              }}
+            >
+              3
+            </span>
+            <span
+              style={{
+                position: "absolute",
+                top: "4px",
+                right: "4px",
+                width: "14px",
+                height: "14px",
+                borderRadius: "999px",
+                background: "#22C55E",
+                border: "2px solid rgba(255,255,255,0.95)"
+              }}
+              aria-hidden
+            />
+          </button>
+        </div>
+
+        <div className="brand-bar">
+          <div style={{ maxWidth: "1260px", margin: "0 auto", padding: "0 16px" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: "56px", gap: "12px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", justifyContent: "center" }}>
+                {(["English", "Hindi", "Kannada", "Tamil", "Telugu"] as const).map((lang) => {
+                  const active = selectedLanguage === lang;
                   return (
-                    <div
-                      key={item.label}
-                      onMouseEnter={() => openQuickNavMenu(item.label)}
+                    <button
+                      key={lang}
+                      type="button"
+                      onClick={() => setSelectedLanguage(lang)}
                       style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px",
-                        fontSize: "clamp(9px, 0.85vw, 11px)",
+                        border: "1px solid #E8EDF2",
+                        background: active ? "#0B2D5E" : "white",
+                        color: active ? "white" : "#1A1A2E",
+                        fontSize: "11px",
                         fontWeight: 800,
-                        color: "#1A1A2E",
-                        cursor: "pointer",
-                        whiteSpace: "nowrap",
-                        padding: "4px 8px",
-                        borderRadius: "999px",
-                        border: isActive && accent ? `1px solid ${accent}` : "1px solid rgba(232, 237, 242, 0.9)",
-                        background: isActive ? "rgba(255,255,255,0.98)" : "rgba(250, 252, 255, 0.9)",
-                        boxShadow: isActive ? "0 10px 24px rgba(15, 23, 42, 0.10)" : "none"
+                        padding: "6px 12px",
+                        borderRadius: "16px",
+                        cursor: "pointer"
                       }}
                     >
-                      <span style={{ fontSize: "clamp(11px, 1.0vw, 13px)" }}>{item.icon}</span>
-                      <span>{item.label}</span>
-                    </div>
+                      {languageLabelMap[lang]}
+                    </button>
                   );
                 })}
               </div>
 
-              {activeQuickNav && quickNavMegaMenus[activeQuickNav] && (
-                <div style={{ position: "absolute", left: 0, right: 0, top: "calc(100% + 10px)", zIndex: 170 }}>
-                  <div
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <button
+                  type="button"
+                  onClick={toggleTheme}
+                  aria-label="Toggle theme"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: "36px",
+                    height: "36px",
+                    borderRadius: "50%",
+                    border: "1px solid #D5DEE9",
+                    background: "#F8FBFF",
+                    cursor: "pointer",
+                    color: "#64748B",
+                  }}
+                >
+                  {activeTheme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowSearch(true)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    padding: "8px 14px",
+                    borderRadius: "18px",
+                    border: "1px solid #D5DEE9",
+                    cursor: "pointer",
+                    background: "#F8FBFF",
+                    minWidth: "214px"
+                  }}
+                >
+                  <span style={{ fontSize: "14px", color: "#2563EB" }}>&#128269;</span>
+                  <span style={{ fontSize: "11px", color: "#64748B", flex: 1, textAlign: "left", fontWeight: 700 }}>Search or ask...</span>
+                  <span
                     style={{
-                      background: "white",
-                      borderRadius: "18px",
-                      border: "1px solid rgba(226, 232, 240, 0.95)",
-                      boxShadow: "0 28px 90px rgba(15, 23, 42, 0.22)",
-                      overflow: "hidden"
+                      fontSize: "10px",
+                      color: "#64748B",
+                      background: "#FFFFFF",
+                      border: "1px solid #DDE5EF",
+                      padding: "2px 7px",
+                      borderRadius: "8px"
                     }}
                   >
-                    <div style={{ height: "3px", background: quickNavMegaMenus[activeQuickNav].accent }} />
+                    ⌘ K
+                  </span>
+                </button>
 
-                    <div style={{ padding: "18px 18px 16px 18px" }}>
-                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" }}>
-                        <div>
-                          <div style={{ fontSize: "18px", fontWeight: 900, color: "#0F172A", lineHeight: 1.15 }}>
-                            {quickNavMegaMenus[activeQuickNav].title}
-                          </div>
-                          <div style={{ marginTop: "4px", fontSize: "12px", fontWeight: 700, color: "#64748B" }}>
-                            {quickNavMegaMenus[activeQuickNav].subtitle}
+                <button
+                  type="button"
+                  onClick={() => navigate('/subscribe')}
+                  style={{
+                    background: "#0B2D5E",
+                    color: "white",
+                    padding: "9px 20px",
+                    borderRadius: "18px",
+                    fontSize: "12px",
+                    fontWeight: 900,
+                    cursor: "pointer",
+                    border: "none",
+                    whiteSpace: "nowrap"
+                  }}
+                >
+                  Subscribe
+                </button>
+
+                <div style={{ position: "relative" }}>
+                  <button
+                    type="button"
+                    onClick={() => setLoginDropdownOpen(!loginDropdownOpen)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0px",
+                      padding: "9px 18px",
+                      borderRadius: "18px",
+                      border: "1px solid #D5DEE9",
+                      cursor: "pointer",
+                      fontSize: "12px",
+                      fontWeight: 800,
+                      color: "#1A1A2E",
+                      background: "white",
+                      whiteSpace: "nowrap"
+                    }}
+                  >
+                    Log In
+                  </button>
+
+                  {loginDropdownOpen && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: "calc(100% + 8px)",
+                        right: 0,
+                        background: "white",
+                        borderRadius: "12px",
+                        boxShadow: "0 14px 50px rgba(0, 0, 0, 0.14)",
+                        padding: "6px",
+                        width: "248px",
+                        zIndex: 150,
+                        border: "1px solid #E8EDF2"
+                      }}
+                    >
+                      {loginOptions.map((option) => (
+                        <div
+                          key={option.type}
+                          onClick={() => handleLogin(option.type)}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "10px",
+                            padding: "8px 10px",
+                            borderRadius: "9px",
+                            cursor: "pointer",
+                            transition: "background 0.15s"
+                          }}
+                          onMouseEnter={(e) => {
+                            (e.currentTarget as HTMLElement).style.background = "#FAFCFF";
+                          }}
+                          onMouseLeave={(e) => {
+                            (e.currentTarget as HTMLElement).style.background = "transparent";
+                          }}
+                        >
+                          <span style={{ fontSize: "17px", width: "24px", textAlign: "center" }}>{option.icon}</span>
+                          <div>
+                            <div style={{ fontSize: "12px", fontWeight: 900, color: "#1A1A2E" }}>{option.label}</div>
+                            <div style={{ fontSize: "10px", color: "#666680", marginTop: "1px" }}>{option.desc}</div>
                           </div>
                         </div>
-                      </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginLeft: "6px" }}>
+                  {[
+                    { key: "wa", label: <MessageCircle className="h-4 w-4" />, href: "https://wa.me/919876543210" },
+                    { key: "ig", label: <Instagram className="h-4 w-4" />, href: "https://instagram.com/manas360" },
+                    { key: "yt", label: <Youtube className="h-4 w-4" />, href: "https://youtube.com/@manas360" },
+                    { key: "in", label: <Linkedin className="h-4 w-4" />, href: "https://linkedin.com/company/manas360" }
+                  ].map((s) => (
+                    <a
+                      key={s.key}
+                      href={s.href}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        width: "24px",
+                        height: "24px",
+                        borderRadius: "7px",
+                        background: "transparent",
+                        border: "none",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "13px",
+                        fontWeight: 900,
+                        color: "#66708A",
+                        textDecoration: "none"
+                      }}
+                    >
+                      {s.label}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "12px",
+                padding: "10px 0 14px 0",
+                borderTop: "1px solid rgba(232, 237, 242, 0.7)"
+              }}
+            >
+              <div style={{ position: "relative", flex: 1, minWidth: 0 }} onMouseEnter={keepQuickNavMenuOpen} onMouseLeave={closeQuickNavMenuWithDelay}>
+                <div className="quick-nav" style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "nowrap", flex: 1, minWidth: 0, maxWidth: "100%" }}>
+                  {quickNavItems.map((item) => {
+                    const menu = quickNavMegaMenus[item.label];
+                    const isActive = activeQuickNav === item.label && !!menu;
+                    const accent = menu?.accent;
+
+                    return (
                       <div
+                        key={item.label}
+                        onMouseEnter={() => openQuickNavMenu(item.label)}
+                        className="quick-nav-chip"
                         style={{
-                          marginTop: "14px",
-                          display: "grid",
-                          gridTemplateColumns: `repeat(${quickNavMegaMenus[activeQuickNav].columns}, minmax(0, 1fr))`,
-                          gap: "10px"
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          fontSize: "clamp(11px, 1vw, 13px)",
+                          fontWeight: 900,
+                          color: "#000000",
+                          opacity: 1,
+                          cursor: "pointer",
+                          whiteSpace: "nowrap",
+                          padding: "6px 10px",
+                          borderRadius: "999px",
+                          border: isActive && accent ? `1px solid ${accent}` : "1px solid rgba(15, 23, 42, 0.22)",
+                          background: "rgba(255,255,255,1)",
+                          boxShadow: isActive ? "0 10px 24px rgba(15, 23, 42, 0.14)" : "0 2px 4px rgba(15,23,42,0.08)"
                         }}
                       >
-                        {quickNavMegaMenus[activeQuickNav].items.map((mi) => (
-                          <div
-                            key={mi.title}
-                            style={{
-                              display: "flex",
-                              alignItems: "flex-start",
-                              gap: "10px",
-                              padding: "12px 12px",
-                              borderRadius: "14px",
-                              background: "rgba(255,255,255,0.98)",
-                              cursor:
+                        <span className="quick-nav-chip-icon" style={{ fontSize: "clamp(11px, 1.0vw, 13px)" }}>{item.icon}</span>
+                        <span className="quick-nav-chip-label">{item.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {activeQuickNav && quickNavMegaMenus[activeQuickNav] && (
+                  <div style={{ position: "absolute", left: 0, right: 0, top: "calc(100% + 10px)", zIndex: 170 }}>
+                    <div
+                      style={{
+                        background: "white",
+                        borderRadius: "18px",
+                        border: "1px solid rgba(226, 232, 240, 0.95)",
+                        boxShadow: "0 28px 90px rgba(15, 23, 42, 0.22)",
+                        overflow: "hidden"
+                      }}
+                    >
+                      <div style={{ height: "3px", background: quickNavMegaMenus[activeQuickNav].accent }} />
+
+                      <div style={{ padding: "18px 18px 16px 18px" }}>
+                        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" }}>
+                          <div>
+                            <div style={{ fontSize: "18px", fontWeight: 900, color: "#0F172A", lineHeight: 1.15 }}>
+                              {quickNavMegaMenus[activeQuickNav].title}
+                            </div>
+                            <div style={{ marginTop: "4px", fontSize: "12px", fontWeight: 700, color: "#64748B" }}>
+                              {quickNavMegaMenus[activeQuickNav].subtitle}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div
+                          style={{
+                            marginTop: "14px",
+                            display: "grid",
+                            gridTemplateColumns: `repeat(${quickNavMegaMenus[activeQuickNav].columns}, minmax(0, 1fr))`,
+                            gap: "10px"
+                          }}
+                        >
+                          {quickNavMegaMenus[activeQuickNav].items.map((mi) => (
+                            <div
+                              key={mi.title}
+                              style={{
+                                display: "flex",
+                                alignItems: "flex-start",
+                                gap: "10px",
+                                padding: "12px 12px",
+                                borderRadius: "14px",
+                                background: "rgba(255,255,255,0.98)",
+                                cursor:
+                                  activeQuickNav === "I Need a Helping Hand" ||
+                                    activeQuickNav === "AI Power Hub" ||
+                                    activeQuickNav === "Find a Spark Again" ||
+                                    activeQuickNav === "Self-Help Tools" ||
+                                    activeQuickNav === "For Corporates / Edu / Healthcare" ||
+                                    activeQuickNav === "Premium Therapy Hub" ||
+                                    activeQuickNav === "MyDigitalClinic" ||
+                                    activeQuickNav === "Certify2EarnMore" ||
+                                    activeQuickNav === "Digital Pets4Happy Hormones"
+                                    ? "pointer"
+                                    : "default"
+                              }}
+                              role={
                                 activeQuickNav === "I Need a Helping Hand" ||
-                                activeQuickNav === "AI Power Hub" ||
-                                activeQuickNav === "Find a Spark Again" ||
-                                activeQuickNav === "Self-Help Tools" ||
-                                activeQuickNav === "For Corporates / Edu / Healthcare" ||
-                                activeQuickNav === "Premium Therapy Hub" ||
-                                activeQuickNav === "MyDigitalClinic" ||
-                                activeQuickNav === "Certify2EarnMore" ||
-                                activeQuickNav === "Digital Pets4Happy Hormones"
-                                  ? "pointer"
-                                  : "default"
-                            }}
-                            role={
-                              activeQuickNav === "I Need a Helping Hand" ||
-                              activeQuickNav === "AI Power Hub" ||
-                              activeQuickNav === "Find a Spark Again" ||
-                              activeQuickNav === "Self-Help Tools" ||
-                              activeQuickNav === "For Corporates / Edu / Healthcare" ||
-                              activeQuickNav === "Premium Therapy Hub" ||
-                              activeQuickNav === "MyDigitalClinic" ||
-                              activeQuickNav === "Certify2EarnMore" ||
-                              activeQuickNav === "Digital Pets4Happy Hormones"
-                                ? "button"
-                                : undefined
-                            }
-                            tabIndex={
-                              activeQuickNav === "I Need a Helping Hand" ||
-                              activeQuickNav === "AI Power Hub" ||
-                              activeQuickNav === "Find a Spark Again" ||
-                              activeQuickNav === "Self-Help Tools" ||
-                              activeQuickNav === "For Corporates / Edu / Healthcare" ||
-                              activeQuickNav === "Premium Therapy Hub" ||
-                              activeQuickNav === "MyDigitalClinic" ||
-                              activeQuickNav === "Certify2EarnMore" ||
-                              activeQuickNav === "Digital Pets4Happy Hormones"
-                                ? 0
-                                : undefined
-                            }
-                            onClick={() => handleQuickNavMegaItemClick(activeQuickNav, mi.title)}
-                            onKeyDown={(e) => {
-                              if (
-                                (activeQuickNav === "I Need a Helping Hand" ||
                                   activeQuickNav === "AI Power Hub" ||
                                   activeQuickNav === "Find a Spark Again" ||
                                   activeQuickNav === "Self-Help Tools" ||
@@ -1265,76 +1236,93 @@ const LandingPage: React.FC = () => {
                                   activeQuickNav === "Premium Therapy Hub" ||
                                   activeQuickNav === "MyDigitalClinic" ||
                                   activeQuickNav === "Certify2EarnMore" ||
-                                  activeQuickNav === "Digital Pets4Happy Hormones") &&
-                                (e.key === "Enter" || e.key === " ")
-                              ) {
-                                e.preventDefault();
-                                handleQuickNavMegaItemClick(activeQuickNav, mi.title);
+                                  activeQuickNav === "Digital Pets4Happy Hormones"
+                                  ? "button"
+                                  : undefined
                               }
-                            }}
-                            onMouseEnter={(e) => {
-                              (e.currentTarget as HTMLElement).style.background = "#FAFCFF";
-                            }}
-                            onMouseLeave={(e) => {
-                              (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.98)";
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: "34px",
-                                height: "34px",
-                                borderRadius: "10px",
-                                border: "1px solid rgba(232, 237, 242, 0.95)",
-                                background: "#FFFFFF",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                flex: "0 0 auto",
-                                fontSize: "18px"
+                              tabIndex={
+                                activeQuickNav === "I Need a Helping Hand" ||
+                                  activeQuickNav === "AI Power Hub" ||
+                                  activeQuickNav === "Find a Spark Again" ||
+                                  activeQuickNav === "Self-Help Tools" ||
+                                  activeQuickNav === "For Corporates / Edu / Healthcare" ||
+                                  activeQuickNav === "Premium Therapy Hub" ||
+                                  activeQuickNav === "MyDigitalClinic" ||
+                                  activeQuickNav === "Certify2EarnMore" ||
+                                  activeQuickNav === "Digital Pets4Happy Hormones"
+                                  ? 0
+                                  : undefined
+                              }
+                              onClick={() => handleMegaItemNav(mi.title, activeQuickNav)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
+                                  handleMegaItemNav(mi.title, activeQuickNav);
+                                }
                               }}
-                              aria-hidden
+                              onMouseEnter={(e) => {
+                                (e.currentTarget as HTMLElement).style.background = "#FAFCFF";
+                              }}
+                              onMouseLeave={(e) => {
+                                (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.98)";
+                              }}
                             >
-                              {mi.icon}
-                            </div>
+                              <div
+                                style={{
+                                  width: "34px",
+                                  height: "34px",
+                                  borderRadius: "10px",
+                                  border: "1px solid rgba(232, 237, 242, 0.95)",
+                                  background: "#FFFFFF",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  flex: "0 0 auto",
+                                  fontSize: "18px"
+                                }}
+                                aria-hidden
+                              >
+                                {mi.icon}
+                              </div>
 
-                            <div style={{ minWidth: 0, flex: 1 }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
-                                <div style={{ fontSize: "13px", fontWeight: 900, color: "#0F172A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                  {mi.title}
-                                </div>
-                                {mi.badge && (
-                                  <div
-                                    style={{
-                                      fontSize: "10px",
-                                      fontWeight: 900,
-                                      padding: "2px 8px",
-                                      borderRadius: "999px",
-                                      border: "1px solid rgba(232, 237, 242, 0.95)",
-                                      background: "#F1F5F9",
-                                      color: "#0F172A",
-                                      whiteSpace: "nowrap"
-                                    }}
-                                  >
-                                    {mi.badge}
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+                                  <div style={{ fontSize: "13px", fontWeight: 900, color: "#0F172A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                    {mi.title}
                                   </div>
-                                )}
-                              </div>
-                              <div style={{ marginTop: "2px", fontSize: "11px", fontWeight: 700, color: "#64748B", lineHeight: 1.45 }}>
-                                {mi.subtitle}
+                                  {mi.badge && (
+                                    <div
+                                      style={{
+                                        fontSize: "10px",
+                                        fontWeight: 900,
+                                        padding: "2px 8px",
+                                        borderRadius: "999px",
+                                        border: "1px solid rgba(232, 237, 242, 0.95)",
+                                        background: "#F1F5F9",
+                                        color: "#0F172A",
+                                        whiteSpace: "nowrap"
+                                      }}
+                                    >
+                                      {mi.badge}
+                                    </div>
+                                  )}
+                                </div>
+                                <div style={{ marginTop: "2px", fontSize: "11px", fontWeight: 700, color: "#64748B", lineHeight: 1.45 }}>
+                                  {mi.subtitle}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </div>
-      </div>
-
+      </header>
 
 
 
@@ -1343,7 +1331,7 @@ const LandingPage: React.FC = () => {
           style={{
             fontSize: "56px",
             fontWeight: 900,
-            color: "#0F172A",
+            color: "#050B14",
             lineHeight: 1.05,
             margin: "16px 0 12px 0",
             fontFamily: "Georgia, 'Times New Roman', serif"
@@ -1353,12 +1341,12 @@ const LandingPage: React.FC = () => {
           <br />
           this <span style={{ color: "#7F8000" }}>together</span>.
         </h1>
-        <p style={{ fontSize: "14px", color: "#334155", lineHeight: 1.6, margin: "0 0 8px 0", fontWeight: 600 }}>
+        <p style={{ fontSize: "14px", color: "#08101E", lineHeight: 1.6, margin: "0 0 8px 0", fontWeight: 900 }}>
           Feeling overwhelmed? Confused? That's okay. We'll help you
           <br />
           understand your feelings in a safe, quiet space.
         </p>
-        <p style={{ fontSize: "12px", color: "#64748B", margin: "0 0 18px 0", fontWeight: 800 }}>Takes just 60 seconds.</p>
+        <p style={{ fontSize: "12px", color: "#08101E", margin: "0 0 18px 0", fontWeight: 900 }}>Takes just 60 seconds.</p>
 
         <button
           type="button"
@@ -1387,7 +1375,7 @@ const LandingPage: React.FC = () => {
             flexWrap: "wrap",
             fontSize: "12px",
             fontWeight: 800,
-            color: "#334155"
+            color: "#08101E"
           }}
         >
           {["Confidential", "No Judgment", "Immediate"].map((t) => (
@@ -1440,18 +1428,7 @@ const LandingPage: React.FC = () => {
           </div>
 
           <div className="pro-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "18px" }}>
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={() => navigate('/provider-landing')}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault();
-                  navigate('/provider-landing');
-                }
-              }}
-              style={{ background: "rgba(255,255,255,0.92)", border: "1px solid rgba(226,232,240,0.95)", borderRadius: "22px", padding: "18px 16px", boxShadow: "0 16px 40px rgba(0,0,0,0.07)", cursor: 'pointer' }}
-            >
+            <div style={{ background: "rgba(255,255,255,0.92)", border: "1px solid rgba(226,232,240,0.95)", borderRadius: "22px", padding: "18px 16px", boxShadow: "0 16px 40px rgba(0,0,0,0.07)" }}>
               <div style={{ display: "flex", justifyContent: "flex-end" }}>
                 <span style={{ fontSize: "10px", fontWeight: 900, color: "white", background: "linear-gradient(135deg,#7C3AED,#A78BFA)", padding: "4px 8px", borderRadius: "999px" }}>RCI VERIFIED</span>
               </div>
@@ -1462,24 +1439,13 @@ const LandingPage: React.FC = () => {
               </div>
               <div style={{ marginTop: "14px", fontSize: "16px", fontWeight: 900, color: "#0F172A" }}>Psychologist</div>
               <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#64748B", lineHeight: 1.55 }}>Clinical &amp; counseling psychology. RCI registered. Earn ₹60K&ndash;₹2L/mo</div>
-              <button type="button" onClick={() => navigate('/provider-landing')} style={{ marginTop: "14px", border: "1.5px solid rgba(124,58,237,0.7)", background: "rgba(255,255,255,0.95)", color: "#6D28D9", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
+              <button type="button" onClick={() => navigate("/provider-landing")} style={{ marginTop: "14px", border: "1.5px solid rgba(124,58,237,0.7)", background: "rgba(255,255,255,0.95)", color: "#6D28D9", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
                 &#10022; Join Now
               </button>
               <div style={{ marginTop: "10px", fontSize: "11px", fontWeight: 800, color: "#64748B" }}>Discover &mdash; Plans &mdash; Profile</div>
             </div>
 
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={() => navigate('/provider-landing')}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault();
-                  navigate('/provider-landing');
-                }
-              }}
-              style={{ background: "rgba(255,255,255,0.92)", border: "1px solid rgba(226,232,240,0.95)", borderRadius: "22px", padding: "18px 16px", boxShadow: "0 16px 40px rgba(0,0,0,0.07)", cursor: 'pointer' }}
-            >
+            <div style={{ background: "rgba(255,255,255,0.92)", border: "1px solid rgba(226,232,240,0.95)", borderRadius: "22px", padding: "18px 16px", boxShadow: "0 16px 40px rgba(0,0,0,0.07)" }}>
               <div style={{ display: "flex", justifyContent: "flex-end" }}>
                 <span style={{ fontSize: "10px", fontWeight: 900, color: "white", background: "linear-gradient(135deg,#0EA5A6,#22C1C3)", padding: "4px 8px", borderRadius: "999px" }}>NMC VERIFIED</span>
               </div>
@@ -1490,24 +1456,13 @@ const LandingPage: React.FC = () => {
               </div>
               <div style={{ marginTop: "14px", fontSize: "16px", fontWeight: 900, color: "#0F172A" }}>Psychiatrist</div>
               <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#64748B", lineHeight: 1.55 }}>Diagnosis, medication, e-prescriptions. NMC registered MDs</div>
-              <button type="button" onClick={() => navigate('/provider-landing')} style={{ marginTop: "14px", border: "1.5px solid rgba(14,165,166,0.7)", background: "rgba(255,255,255,0.95)", color: "#0F766E", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
+              <button type="button" onClick={() => navigate("/provider-landing")} style={{ marginTop: "14px", border: "1.5px solid rgba(14,165,166,0.7)", background: "rgba(255,255,255,0.95)", color: "#0F766E", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
                 &#10022; Join Now
               </button>
               <div style={{ marginTop: "10px", fontSize: "11px", fontWeight: 800, color: "#64748B" }}>Discover &mdash; Plans &mdash; Profile</div>
             </div>
 
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={() => navigate('/provider-landing')}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault();
-                  navigate('/provider-landing');
-                }
-              }}
-              style={{ background: "rgba(255,255,255,0.92)", border: "1px solid rgba(226,232,240,0.95)", borderRadius: "22px", padding: "18px 16px", boxShadow: "0 16px 40px rgba(0,0,0,0.07)", cursor: 'pointer' }}
-            >
+            <div style={{ background: "rgba(255,255,255,0.92)", border: "1px solid rgba(226,232,240,0.95)", borderRadius: "22px", padding: "18px 16px", boxShadow: "0 16px 40px rgba(0,0,0,0.07)" }}>
               <div style={{ display: "flex", justifyContent: "flex-end" }}>
                 <span style={{ fontSize: "10px", fontWeight: 900, color: "white", background: "linear-gradient(135deg,#16A34A,#22C55E)", padding: "4px 8px", borderRadius: "999px" }}>0% FEE &mdash; 3 MO</span>
               </div>
@@ -1518,24 +1473,13 @@ const LandingPage: React.FC = () => {
               </div>
               <div style={{ marginTop: "14px", fontSize: "16px", fontWeight: 900, color: "#0F172A" }}>Therapist</div>
               <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#64748B", lineHeight: 1.55 }}>CBT, DBT, REBT, integrative. Build your practice on your terms</div>
-              <button type="button" onClick={() => navigate('/provider-landing')} style={{ marginTop: "14px", border: "1.5px solid rgba(34,197,94,0.7)", background: "rgba(255,255,255,0.95)", color: "#15803D", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
+              <button type="button" onClick={() => navigate("/provider-landing")} style={{ marginTop: "14px", border: "1.5px solid rgba(34,197,94,0.7)", background: "rgba(255,255,255,0.95)", color: "#15803D", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
                 &#10022; Join Now
               </button>
               <div style={{ marginTop: "10px", fontSize: "11px", fontWeight: 800, color: "#64748B" }}>Discover &mdash; Plans &mdash; Profile</div>
             </div>
 
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={() => navigate('/provider-landing')}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault();
-                  navigate('/provider-landing');
-                }
-              }}
-              style={{ background: "rgba(255,255,255,0.92)", border: "1px solid rgba(226,232,240,0.95)", borderRadius: "22px", padding: "18px 16px", boxShadow: "0 16px 40px rgba(0,0,0,0.07)", cursor: 'pointer' }}
-            >
+            <div style={{ background: "rgba(255,255,255,0.92)", border: "1px solid rgba(226,232,240,0.95)", borderRadius: "22px", padding: "18px 16px", boxShadow: "0 16px 40px rgba(0,0,0,0.07)" }}>
               <div style={{ display: "flex", justifyContent: "flex-end" }}>
                 <span style={{ fontSize: "10px", fontWeight: 900, color: "white", background: "linear-gradient(135deg,#D97706,#F59E0B)", padding: "4px 8px", borderRadius: "999px" }}>CERTIFIED</span>
               </div>
@@ -1546,7 +1490,7 @@ const LandingPage: React.FC = () => {
               </div>
               <div style={{ marginTop: "14px", fontSize: "16px", fontWeight: 900, color: "#0F172A" }}>NLP Coach</div>
               <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#64748B", lineHeight: 1.55 }}>Neuro-linguistic programming. Life coaching. Transformation specialists</div>
-              <button type="button" onClick={() => navigate('/provider-landing')} style={{ marginTop: "14px", border: "1.5px solid rgba(245,158,11,0.75)", background: "rgba(255,255,255,0.95)", color: "#B45309", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
+              <button type="button" onClick={() => navigate("/provider-landing")} style={{ marginTop: "14px", border: "1.5px solid rgba(245,158,11,0.75)", background: "rgba(255,255,255,0.95)", color: "#B45309", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
                 &#10022; Join Now
               </button>
               <div style={{ marginTop: "10px", fontSize: "11px", fontWeight: 800, color: "#64748B" }}>Discover &mdash; Plans &mdash; Profile</div>
@@ -1743,30 +1687,33 @@ const LandingPage: React.FC = () => {
             >
               <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "11px", fontWeight: 900, letterSpacing: "2px", textTransform: "uppercase", color: "#F97316" }}>
                 <span style={{ width: "8px", height: "8px", borderRadius: "999px", background: "#38BDF8" }} />
-                FOR NRI & GLOBAL INDIAN COMMUNITY
+                FOR NRIS & GLOBAL INDIANS
               </div>
               <div style={{ fontSize: "24px", fontWeight: 900, color: "#9A3412", lineHeight: 1.15, marginTop: "10px" }}>
                 Find a <span style={{ fontStyle: "italic", fontFamily: "Georgia, 'Times New Roman', serif" }}>Janmabhoomi</span>
                 <br />
-                Connection &mdash; Heal with the Right Care
+                Connection &mdash; Heal
               </div>
               <div style={{ fontSize: "12px", color: "#7C2D12", lineHeight: 1.6, fontWeight: 700, marginTop: "10px" }}>
-                Therapy in your mother tongue with Indian experts who understand NRI realities &mdash; career pressure abroad, family guilt, identity shifts,
-                and relationships across continents.
+                Therapy in your mother tongue with Indian therapists who understand your desi dilemma &mdash; career pressure abroad, family guilt, identity crisis,
+                relationships across continents.
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "12px" }}>
-                {["IST + Your Local Timezone", "Hindi · Tamil · Telugu · Kannada · English", "DPDPA-aligned care", "USD / GBP / AED / SGD accepted"].map((chip) => (
+                {["IST + Your Timezone", "Hindi · Tamil · Telugu · Kannada", "HIPAA + DPDPA", "USD / GBP / AED / SGD"].map((chip) => (
                   <div key={chip} style={{ fontSize: "10px", fontWeight: 900, color: "#9A3412", background: "rgba(255,255,255,0.65)", border: "1px solid rgba(251, 191, 36, 0.55)", padding: "4px 8px", borderRadius: "999px" }}>
                     {chip}
                   </div>
                 ))}
               </div>
               <div style={{ display: "flex", alignItems: "baseline", gap: "10px", marginTop: "12px" }}>
-                <span style={{ fontSize: "12px", color: "#9A3412", fontWeight: 800 }}>NRI session model:</span>
-                <span style={{ fontSize: "18px", fontWeight: 900, color: "#B45309" }}>from ₹2,999/session</span>
+                <span style={{ fontSize: "12px", color: "#9CA3AF", textDecoration: "line-through", fontWeight: 800 }}>$45/session</span>
+                <span style={{ fontSize: "22px", fontWeight: 900, color: "#B45309" }}>$29</span>
+                <span style={{ fontSize: "11px", fontWeight: 900, color: "#166534", background: "rgba(187, 247, 208, 0.7)", border: "1px solid #BBF7D0", padding: "4px 10px", borderRadius: "999px" }}>
+                  SAVE 35%
+                </span>
               </div>
               <button type="button" onClick={() => navigate("/nri-landing")} style={{ marginTop: "12px", width: "100%", border: "none", cursor: "pointer", borderRadius: "14px", padding: "12px 14px", background: "linear-gradient(135deg, #C2410C, #EA580C)", color: "white", fontWeight: 900, fontSize: "12px", boxShadow: "0 18px 40px rgba(0,0,0,0.12)" }}>
-                IN Connect to Home &mdash; Book NRI Session &rarr;
+                IN Connect to Home &mdash; Start Free &rarr;
               </button>
             </div>
 
@@ -1787,7 +1734,7 @@ const LandingPage: React.FC = () => {
                 ))}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "12px" }}>
-                <span style={{ fontSize: "10px", fontWeight: 900, color: "white", background: "rgba(21, 128, 61, 0.9)", padding: "5px 10px", borderRadius: "999px" }}>21 DAYS FREE</span>
+                <span style={{ fontSize: "10px", fontWeight: 900, color: "white", background: "rgba(21, 128, 61, 0.9)", padding: "5px 10px", borderRadius: "999px" }}>3 DAYS FREE</span>
                 <span style={{ fontSize: "12px", fontWeight: 900, color: "#166534" }}>Pick only modules you need &mdash; from &#8377;99/mo</span>
               </div>
               <button type="button" onClick={() => navigate("/my-digital-clinic")} style={{ marginTop: "12px", width: "100%", border: "none", cursor: "pointer", borderRadius: "14px", padding: "12px 14px", background: "linear-gradient(135deg, #14532D, #1F7A3D)", color: "white", fontWeight: 900, fontSize: "12px", boxShadow: "0 18px 40px rgba(0,0,0,0.12)" }}>
@@ -1831,35 +1778,12 @@ const LandingPage: React.FC = () => {
               <span style={{ fontSize: "18px" }}>&#128293;</span>
               <span style={{ fontSize: "16px", fontWeight: 900, color: "#0F172A" }}>Live &amp; Upcoming Group Sessions</span>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <span style={{ fontSize: "11px", fontWeight: 900, color: "#EF4444", background: "rgba(254, 226, 226, 0.9)", border: "1px solid rgba(239, 68, 68, 0.25)", padding: "4px 8px", borderRadius: "999px" }}>
-                {`${liveCards.filter((card) => String(card.rightBadge).includes("LIVE")).length} LIVE NOW`}
-              </span>
-              <button
-                type="button"
-                onClick={() => navigate('/group-therapy')}
-                style={{ border: "1px solid rgba(15, 23, 42, 0.2)", background: "white", color: "#0F172A", fontWeight: 900, fontSize: "11px", padding: "6px 10px", borderRadius: "999px", cursor: "pointer" }}
-              >
-                View More
-              </button>
-            </div>
+            <span style={{ fontSize: "11px", fontWeight: 900, color: "#EF4444", background: "rgba(254, 226, 226, 0.9)", border: "1px solid rgba(239, 68, 68, 0.25)", padding: "4px 8px", borderRadius: "999px" }}>3 LIVE NOW</span>
           </div>
 
           <div className="live-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "12px" }}>
             {liveCards.map((card) => (
-              <div
-                key={card.id || card.title}
-                role="button"
-                tabIndex={0}
-                onClick={() => navigate('/group-therapy')}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    navigate('/group-therapy');
-                  }
-                }}
-                style={{ borderRadius: "18px", border: "1px solid rgba(239, 68, 68, 0.55)", background: "rgba(255, 255, 255, 0.78)", boxShadow: "0 18px 55px rgba(0,0,0,0.10)", overflow: "hidden", cursor: "pointer" }}
-              >
+              <div key={card.title} style={{ borderRadius: "18px", border: "1px solid rgba(239, 68, 68, 0.55)", background: "rgba(255, 255, 255, 0.78)", boxShadow: "0 18px 55px rgba(0,0,0,0.10)", overflow: "hidden" }}>
                 <div style={{ padding: "12px" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -1881,16 +1805,7 @@ const LandingPage: React.FC = () => {
                 </div>
 
                 <div style={{ padding: "12px" }}>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate('/group-therapy');
-                    }}
-                    style={{ width: "100%", border: "none", cursor: "pointer", borderRadius: "12px", padding: "10px 12px", background: card.buttonBg, color: "white", fontWeight: 900, fontSize: "12px", boxShadow: "0 14px 30px rgba(0,0,0,0.12)" }}
-                  >
-                    {card.buttonText}
-                  </button>
+                  <button type="button" style={{ width: "100%", border: "none", cursor: "pointer", borderRadius: "12px", padding: "10px 12px", background: card.buttonBg, color: "white", fontWeight: 900, fontSize: "12px", boxShadow: "0 14px 30px rgba(0,0,0,0.12)" }}>{card.buttonText}</button>
                 </div>
               </div>
             ))}
@@ -1904,7 +1819,7 @@ const LandingPage: React.FC = () => {
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "14px" }}>
                 <div style={{ width: "56px", height: "56px", borderRadius: "14px", background: "rgba(255,255,255,0.95)", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <img src="/Logo.jpeg" alt="MANAS360" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                  <img src={logo} alt="MANAS360" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
                 </div>
               </div>
               <div style={{ fontSize: "13px", fontWeight: 800, opacity: 0.9, lineHeight: 1.6 }}>Holistic Mental Wellness<br />Anytime, Anywhere</div>
@@ -2145,9 +2060,25 @@ const LandingPage: React.FC = () => {
                   -ms-overflow-style: none;
                   scrollbar-width: none;
                 }
-                .quick-nav::-webkit-scrollbar {
-                  display: none;
-                }
+        .quick-nav::-webkit-scrollbar {
+          display: none;
+        }
+        .quick-nav-chip {
+          color: #000000 !important;
+          opacity: 1 !important;
+          filter: none !important;
+          -webkit-text-fill-color: #000000 !important;
+          text-shadow: none !important;
+          background: #ffffff !important;
+        }
+        .quick-nav-chip-icon,
+        .quick-nav-chip-label {
+          color: #000000 !important;
+          opacity: 1 !important;
+          filter: none !important;
+          -webkit-text-fill-color: #000000 !important;
+          text-shadow: none !important;
+        }
         @media (max-width: 980px) {
           .live-grid {
             grid-template-columns: 1fr;
@@ -2174,6 +2105,5 @@ const LandingPage: React.FC = () => {
     </div>
   );
 };
-  
-export default LandingPage;
 
+export default LandingPage;

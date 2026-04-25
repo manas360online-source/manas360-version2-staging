@@ -47,71 +47,77 @@ export const CheckoutPage: React.FC = () => {
         }
 
         let active = true;
-    const handleTransaction = async () => {
-        setProcessing(true);
-        try {
-            const fullName = (location.state as any)?.fullName;
-            const email = (location.state as any)?.email;
-            const mobile = (location.state as any)?.mobile;
-            const city = (location.state as any)?.city;
-            const education = (location.state as any)?.education;
-            const motivation = (location.state as any)?.motivation;
 
-            const response = await fetch('/api/v1/enrollment/register', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    fullName,
-                    email,
-                    mobile,
-                    city,
-                    education,
-                    motivation,
-                    certName: cert.name,
-                    certSlug: cert.slug,
-                    price: finalTotal
-                }),
-            });
+        const handleTransaction = async () => {
+            setProcessing(true);
+            try {
+                const fullName = (location.state as any)?.fullName;
+                const email = (location.state as any)?.email;
+                const mobile = (location.state as any)?.mobile;
+                const city = (location.state as any)?.city;
+                const education = (location.state as any)?.education;
+                const motivation = (location.state as any)?.motivation;
 
-        const run = async () => {
-            if (cert.price_inr === 0) {
-              try {
-                  await registerCertificationEnrollment({
-                      certSlug: cert.slug,
-                      paymentPlan: 'full',
-                      installmentCount: 1,
-                      bypassPayment: true,
-                  });
-                  
-                  const newEnrollment = {
-                      id: `ENR-${Date.now()}`,
-                      certificationId: cert.id,
-                      certificationName: cert.name,
-                      slug: cert.slug,
-                      badgeColor: cert.badgeColor,
-                      enrollmentDate: new Date().toISOString().split('T')[0],
-                      paymentStatus: 'Sponsoring' as const,
-                      paymentPlan: 'full' as const,
-                      amountPaid: 0,
-                      totalAmount: 0,
-                      installmentsPaidCount: 1,
-                      completionPercentage: 0,
-                      modulesCompleted: 0,
-                      certId: Math.random().toString(36).substring(2, 8).toUpperCase(),
-                  };
+                await fetch('/api/v1/enrollment/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        fullName,
+                        email,
+                        mobile,
+                        city,
+                        education,
+                        motivation,
+                        certName: cert.name,
+                        certSlug: cert.slug,
+                        price: finalTotal,
+                    }),
+                });
 
-                  addEnrollment(newEnrollment as any);
-                  navigate(myCertificationsPath, { replace: true });
-              } catch (error: any) {
-                  const status = Number(error?.response?.status || 0);
-                  if (status !== 409 && active) {
-                      setGeneralError(getCertificationsErrorMessage(error, 'Unable to start enrollment.'));
-                  }
-              }
+                if (cert.price_inr === 0) {
+                    try {
+                        await registerCertificationEnrollment({
+                            certSlug: cert.slug,
+                            paymentPlan: 'full',
+                            installmentCount: 1,
+                            bypassPayment: true,
+                        });
+
+                        const newEnrollment = {
+                            id: `ENR-${Date.now()}`,
+                            certificationId: cert.id,
+                            certificationName: cert.name,
+                            slug: cert.slug,
+                            badgeColor: cert.badgeColor,
+                            enrollmentDate: new Date().toISOString().split('T')[0],
+                            paymentStatus: 'Sponsoring' as const,
+                            paymentPlan: 'full' as const,
+                            amountPaid: 0,
+                            totalAmount: 0,
+                            installmentsPaidCount: 1,
+                            completionPercentage: 0,
+                            modulesCompleted: 0,
+                            certId: Math.random().toString(36).substring(2, 8).toUpperCase(),
+                        };
+
+                        addEnrollment(newEnrollment as any);
+                        navigate(myCertificationsPath, { replace: true });
+                    } catch (error: any) {
+                        const status = Number(error?.response?.status || 0);
+                        if (status !== 409 && active) {
+                            setGeneralError(getCertificationsErrorMessage(error, 'Unable to start enrollment.'));
+                        }
+                    }
+                }
+            } catch (err: any) {
+                console.error('Enrollment transaction failed', err);
+                if (active) setGeneralError('Unable to start enrollment.');
+            } finally {
+                if (active) setProcessing(false);
             }
         };
 
-        void run();
+        void handleTransaction();
 
         return () => {
             active = false;
@@ -164,28 +170,8 @@ export const CheckoutPage: React.FC = () => {
             if (status !== 409) {
                 setGeneralError(getCertificationsErrorMessage(error, 'Unable to initiate payment.'));
             } else {
-              navigate(myCertificationsPath, { replace: true });
+                navigate(myCertificationsPath, { replace: true });
             }
-        } finally {
-          setProcessing(false);
-            if (response.ok && data.success && data.data.redirectUrl) {
-                // ── Redirect to PhonePe ──────────────────────────────────
-                window.location.href = data.data.redirectUrl;
-            } else if (response.ok && data.success && data.data.intentCreated) {
-                // Handle free/direct cases if backend supports it
-                navigate('/enrollment-confirmed', {
-                    state: {
-                        certName: cert.name,
-                        fullName,
-                        slug: cert.slug,
-                    },
-                });
-            } else {
-                throw new Error(data.message || 'Failed to initiate payment');
-            }
-        } catch (err: any) {
-            console.error('Payment initiation error:', err);
-            navigate(`/payment-failed?slug=${cert.slug}`);
         } finally {
             setProcessing(false);
         }
@@ -307,10 +293,11 @@ export const CheckoutPage: React.FC = () => {
                         )}
                 <div className="bg-white p-8 rounded-2xl shadow-xl border border-slate-100 h-fit">
                     {cert.price_inr === 0 ? (
+                        <>
                         <div className="text-center py-8">
                             <h3 className="text-xl font-bold text-slate-800 mb-4">Free Enrollment</h3>
                             <button
-                                onClick={() => handleTransaction()}
+                                onClick={handlePayment}
                                 disabled={processing}
                                 className="w-full bg-purple-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-purple-700 transition disabled:opacity-50"
                             >
@@ -341,11 +328,11 @@ export const CheckoutPage: React.FC = () => {
                                         <span>Payment 3 due {monthAfter.toLocaleDateString()}</span>
                                     </div>
                                 </div>
-                            </div>
+                            )}
 
                             {/* Pay button */}
                             <button
-                                onClick={() => handleTransaction()}
+                                onClick={handlePayment}
                                 disabled={processing}
                                 className="w-full bg-purple-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-purple-700 transition flex items-center justify-center gap-2 disabled:opacity-70 mb-6"
                             >
@@ -377,8 +364,11 @@ export const CheckoutPage: React.FC = () => {
                         <div className="flex items-center justify-center gap-2 text-slate-400 text-xs mb-2">
                             <CreditCard size={14} /> UPI • Cards • Net Banking
                         </div>
+                        </>
+                    ) : null}
                     </div>
             </div>
+        </div>
         </div>
     );
 };

@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { sendSuccess } from '../utils/response.util';
+import { sendSuccess } from '../utils/response';
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/error.middleware';
 import { initiatePhonePePayment } from '../services/phonepe.service';

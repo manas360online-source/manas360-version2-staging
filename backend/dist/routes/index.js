@@ -27,7 +27,7 @@ const landing_routes_1 = __importDefault(require("./landing.routes"));
 const chat_routes_1 = __importDefault(require("./chat.routes"));
 const riskAnalytics_routes_1 = __importDefault(require("./riskAnalytics.routes"));
 const psychiatrist_routes_1 = __importDefault(require("./psychiatrist.routes"));
-// import psychologistRoutes from './psychologist.routes'; // Commented out - not implementing psychologist functionality
+const psychologist_routes_1 = __importDefault(require("./psychologist.routes"));
 const corporate_routes_1 = __importDefault(require("./corporate.routes"));
 const sso_routes_1 = __importDefault(require("./sso.routes"));
 const pricing_routes_1 = __importDefault(require("./pricing.routes"));
@@ -47,6 +47,8 @@ const free_screening_routes_1 = __importDefault(require("./free-screening.routes
 const free_screening_provider_routes_1 = __importDefault(require("./free-screening-provider.routes"));
 const free_screening_admin_routes_1 = __importDefault(require("./free-screening-admin.routes"));
 const mdc_routes_1 = __importDefault(require("./mdc.routes"));
+const system_routes_1 = __importDefault(require("./system.routes"));
+const retreat_routes_1 = __importDefault(require("./retreat.routes"));
 const router = (0, express_1.Router)();
 const shared_routes_1 = __importDefault(require("./shared.routes"));
 // Defensive public pricing route for landing page
@@ -86,13 +88,15 @@ router.use('/v1/presence', presence_routes_1.default);
 router.use('/v1/therapist/dashboard', dashboard_routes_1.default);
 router.use('/v1/therapists/dashboard', dashboard_routes_1.default);
 router.use('/v1/psychiatrist', psychiatrist_routes_1.default);
-// router.use('/v1/psychologist', psychologistRoutes); // Commented out - not implementing psychologist functionality
+router.use('/v1/psychologist', psychologist_routes_1.default);
 router.use('/v1/provider', provider_routes_1.default);
 // Mount public & patient-facing free-screening routes under /v1
 router.use('/v1', free_screening_routes_1.default);
 router.use('/v1/payments', payment_routes_1.default);
 router.use('/v1/sso', sso_routes_1.default);
 router.use('/v1/subscriptions', subscription_routes_1.default);
+// Backward-compatibility alias for legacy clients still using /api/subscriptions/*.
+router.use('/subscriptions', subscription_routes_1.default);
 router.use('/v1/pricing', pricing_routes_1.default);
 router.use('/pricing', pricing_routes_1.default);
 router.use('/v1/patient-journey', patient_journey_routes_1.default);
@@ -117,6 +121,7 @@ router.use('/v1/game', game_routes_1.default);
 router.use('/v1/wallet', wallet_routes_1.default);
 router.use('/v1/legal', legal_routes_1.default);
 router.use('/v1/mdc', mdc_routes_1.default);
+router.use('/v1/system', system_routes_1.default);
 // Backward-compatibility: expose legacy public QR mounts so old public URLs work
 // Tests and external links use `/api/q/...` and `/q/...` paths; keep these
 // mounted to avoid 404s and noisy error logs.
@@ -126,4 +131,5 @@ router.use('/v1/qr', qr_routes_1.default);
 router.use('/v1/invoices', invoice_routes_1.default);
 router.use('/agreements', institutional_agreement_routes_1.default);
 router.use('/v1/agreements', institutional_agreement_routes_1.default);
+router.use('/v1/retreat', retreat_routes_1.default);
 exports.default = router;

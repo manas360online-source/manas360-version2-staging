@@ -7,6 +7,7 @@ const validate_middleware_1 = require("../middleware/validate.middleware");
 const providerVerification_controller_1 = require("../controllers/providerVerification.controller");
 const admin_controller_1 = require("../controllers/admin.controller");
 const admin_analytics_controller_1 = require("../controllers/admin-analytics.controller");
+const admin_sound_controller_1 = require("../controllers/admin-sound.controller");
 const admin_payment_reliability_controller_1 = require("../controllers/admin-payment-reliability.controller");
 const admin_module_controller_1 = require("../controllers/admin-module.controller");
 const rateLimiter_middleware_1 = require("../middleware/rateLimiter.middleware");
@@ -23,6 +24,8 @@ const admin_groups_controller_1 = require("../controllers/admin-groups.controlle
 const admin_qr_controller_1 = require("../controllers/admin-qr.controller");
 const platform_config_controller_1 = require("../controllers/platform-config.controller");
 const admin_agreement_controller_1 = require("../controllers/admin-agreement.controller");
+const corporate_controller_1 = require("../controllers/corporate.controller");
+const retreat_controller_1 = require("../controllers/retreat.controller");
 const router = (0, express_1.Router)();
 router.post('/users/wallet/credit', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin', 'financemanager']), (0, rbac_middleware_1.requireAdminPolicy)('payments.manage'), (0, validate_middleware_1.asyncHandler)(admin_controller_1.creditUserWalletController));
 router.get('/ping', (req, res) => res.json({ message: 'pong' }));
@@ -316,4 +319,13 @@ router.patch('/roles/:role', auth_middleware_1.requireAuth, (0, rbac_middleware_
 router.get('/rbac/platform-admins', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin', 'clinicaldirector', 'financemanager', 'complianceofficer']), (0, rbac_middleware_1.requireAdminPolicy)('users.view'), (0, validate_middleware_1.asyncHandler)(admin_controller_1.getPlatformAdminRoleInventoryController));
 router.post('/rbac/platform-admins', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)('superadmin'), (0, rbac_middleware_1.requireAdminPolicy)('users.moderate'), (0, validate_middleware_1.asyncHandler)(admin_controller_1.createPlatformAdminAccountController));
 router.get('/rbac/effective-policies', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin', 'clinicaldirector', 'financemanager', 'complianceofficer']), (0, rbac_middleware_1.requireAdminPolicy)('users.view'), (0, validate_middleware_1.asyncHandler)(admin_controller_1.getEffectiveAdminPoliciesController));
+// === CORPORATE DEMO REQUESTS ===
+router.get('/corporate-demo-requests', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin']), (0, rbac_middleware_1.requireAdminPolicy)('users.view'), (0, validate_middleware_1.asyncHandler)(corporate_controller_1.listCorporateDemoRequestsController));
+// === RETREAT INTENTS ===
+router.get('/retreat-intents', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin']), (0, rbac_middleware_1.requireAdminPolicy)('users.view'), (0, validate_middleware_1.asyncHandler)(retreat_controller_1.listRetreatIntentsController));
+router.patch('/retreat-intents/:id/status', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin']), (0, rbac_middleware_1.requireAdminPolicy)('users.moderate'), (0, validate_middleware_1.asyncHandler)(retreat_controller_1.updateRetreatIntentStatusController));
+// === SOUND THERAPY ADMIN ===
+router.get('/sound', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin']), (0, validate_middleware_1.asyncHandler)(admin_sound_controller_1.getAllTracks));
+router.post('/sound', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin']), (0, validate_middleware_1.asyncHandler)(admin_sound_controller_1.createTrack));
+router.delete('/sound/:id', auth_middleware_1.requireAuth, (0, rbac_middleware_1.requireRole)(['admin', 'superadmin']), (0, validate_middleware_1.asyncHandler)(admin_sound_controller_1.deleteTrack));
 exports.default = router;

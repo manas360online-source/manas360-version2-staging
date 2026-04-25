@@ -1,9 +1,7 @@
-import React, { useState } from 'react';
-import { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Instagram, Linkedin, MessageCircle, Moon, Sun, Youtube } from 'lucide-react';
-import { MegaNav } from './MegaNav';
-import { theme } from '../../theme/theme';
+const logo = "/Logo.jpeg";
 import {
   applyTheme,
   getStoredThemePreference,
@@ -17,35 +15,7 @@ const LANG_OPTIONS = ['English', 'हिन्दी', 'தமிழ்', 'త�
 
 export const Header: React.FC = () => {
   const [activeLang, setActiveLang] = useState('English');
-  const [scrollProgress, setScrollProgress] = useState(0);
-  const [activeTheme, setActiveTheme] = useState<ThemePreference>(() => {
-    return resolveTheme(getStoredThemePreference());
-  });
-
-  useEffect(() => {
-    const onScroll = () => {
-      const scrollTop = window.scrollY || document.documentElement.scrollTop;
-      const scrollHeight =
-        document.documentElement.scrollHeight - window.innerHeight;
-
-      if (scrollHeight <= 0) {
-        setScrollProgress(0);
-        return;
-      }
-
-      const progress = Math.min(100, Math.max(0, (scrollTop / scrollHeight) * 100));
-      setScrollProgress(progress);
-    };
-
-    onScroll();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onScroll);
-
-    return () => {
-      window.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', onScroll);
-    };
-  }, []);
+  const [activeTheme, setActiveTheme] = useState<ThemePreference>(() => resolveTheme(getStoredThemePreference()));
 
   useEffect(() => {
     applyTheme(activeTheme);
@@ -58,30 +28,8 @@ export const Header: React.FC = () => {
       }
     };
 
-    const darkModeQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleSystemThemeChange = () => {
-      if (getStoredThemePreference() === null) {
-        setActiveTheme(resolveTheme(null));
-      }
-    };
-
     window.addEventListener('storage', handleStorage);
-
-    if (typeof darkModeQuery.addEventListener === 'function') {
-      darkModeQuery.addEventListener('change', handleSystemThemeChange);
-    } else if (typeof darkModeQuery.addListener === 'function') {
-      darkModeQuery.addListener(handleSystemThemeChange);
-    }
-
-    return () => {
-      window.removeEventListener('storage', handleStorage);
-
-      if (typeof darkModeQuery.removeEventListener === 'function') {
-        darkModeQuery.removeEventListener('change', handleSystemThemeChange);
-      } else if (typeof darkModeQuery.removeListener === 'function') {
-        darkModeQuery.removeListener(handleSystemThemeChange);
-      }
-    };
+    return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
   const toggleTheme = () => {
@@ -92,24 +40,18 @@ export const Header: React.FC = () => {
 
   return (
     <header className="fixed inset-x-0 top-0 z-50" role="banner">
-      <div
-        className="w-full border-b border-calm-sage/20 px-4 py-2.5 shadow-soft-md backdrop-blur-md transition-all duration-500 md:px-6 lg:px-10"
-        style={{ backgroundColor: theme.colors.brandTopbarOverlay }}
-      >
-        {/* Top row: brand + actions */}
+      <div className="w-full border-b border-charcoal/10 bg-white/98 px-4 py-2.5 shadow-soft-lg backdrop-blur-xl md:px-6 lg:px-10">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 rounded-2xl px-3 py-1.5">
           <Link
-            to="/"
-            className="group inline-flex items-center gap-2 rounded-lg px-1 py-1 text-lg font-light tracking-wide text-cream transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-gentle-blue/60 focus:ring-offset-2 focus:ring-offset-charcoal md:text-xl lg:text-2xl"
+            to="/landing"
+            className="group inline-flex items-center gap-2 rounded-lg px-1 py-1 text-lg font-light tracking-wide text-charcoal transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-gentle-blue/60 focus:ring-offset-2 focus:ring-offset-white md:text-xl lg:text-2xl"
             aria-label="MANAS360 home"
           >
-            <img
-              src="/Untitled.png"
-              alt="MANAS360 logo"
-              className="h-6 w-6 rounded-md object-cover"
-            />
-            <span className="font-serif">
-              MANAS<span className="font-semibold">360</span>
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-charcoal/[0.03] p-0.5">
+              <img src={logo} alt="MANAS360 logo" className="h-full w-full object-contain" />
+            </div>
+            <span className="font-serif font-medium">
+              MANAS<span className="font-bold">360</span>
             </span>
           </Link>
 
@@ -121,12 +63,11 @@ export const Header: React.FC = () => {
                   key={lang}
                   type="button"
                   onClick={() => setActiveLang(lang)}
-                  className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
+                  className={`rounded-full px-3 py-1.5 text-sm font-medium transition-all duration-300 ${
                     isActive
-                      ? 'border-calm-sage bg-calm-sage text-charcoal'
-                      : 'border-white/25 bg-white/10 text-cream hover:border-white/40 hover:bg-white/20'
+                      ? 'bg-charcoal text-white shadow-soft-md'
+                      : 'bg-charcoal/[0.03] text-charcoal/70 hover:bg-charcoal/[0.05] hover:text-charcoal'
                   }`}
-                  aria-label={`Select language ${lang}`}
                 >
                   {lang}
                 </button>
@@ -134,88 +75,60 @@ export const Header: React.FC = () => {
             })}
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-2 lg:gap-3">
+            <a
+              href="https://wa.me/919876543210"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-charcoal/10 bg-charcoal/[0.03] text-charcoal/70 transition-all duration-300 hover:bg-charcoal/5 hover:text-charcoal"
+              aria-label="WhatsApp"
+            >
+              <MessageCircle className="h-4 w-4" />
+            </a>
+            <a
+              href="https://instagram.com/manas360"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-charcoal/10 bg-charcoal/[0.03] text-charcoal/70 transition-all duration-300 hover:bg-charcoal/5 hover:text-charcoal"
+              aria-label="Instagram"
+            >
+              <Instagram className="h-4 w-4" />
+            </a>
+            <a
+              href="https://youtube.com/@manas360"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-charcoal/10 bg-charcoal/[0.03] text-charcoal/70 transition-all duration-300 hover:bg-charcoal/5 hover:text-charcoal"
+              aria-label="YouTube"
+            >
+              <Youtube className="h-4 w-4" />
+            </a>
+            <a
+              href="https://linkedin.com/company/manas360"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-charcoal/10 bg-charcoal/[0.03] text-charcoal/70 transition-all duration-300 hover:bg-charcoal/5 hover:text-charcoal"
+              aria-label="LinkedIn"
+            >
+              <Linkedin className="h-4 w-4" />
+            </a>
             <button
               type="button"
               onClick={toggleTheme}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/30 bg-white/10 text-cream transition-all duration-300 hover:border-white/50 hover:bg-white/20 hover:text-white"
-              aria-label={activeTheme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-              title={activeTheme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-charcoal/10 bg-charcoal/[0.03] text-charcoal/70 transition-all duration-300 hover:bg-charcoal/5 hover:text-charcoal"
+              aria-label="Toggle theme"
             >
-              {activeTheme === 'dark' ? (
-                <Sun className="h-4 w-4" />
-              ) : (
-                <Moon className="h-4 w-4" />
-              )}
+              {activeTheme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
-
-            <Link
-              to="/patient/pricing"
-              className="hidden rounded-full px-4 py-2 text-xs font-medium tracking-wide text-cream/75 transition-all duration-300 hover:text-cream sm:inline-flex md:text-sm"
+            <button
+              type="button"
+              className="rounded-full bg-gentle-blue px-4 py-2 text-sm font-medium text-white shadow-soft-md transition-all duration-300 hover:bg-gentle-blue/90"
             >
               Subscribe
-            </Link>
-
-            <Link
-              to="/auth/login"
-              className="inline-flex min-h-[36px] items-center justify-center rounded-full bg-cream px-4 py-1.5 text-xs font-semibold tracking-wide text-charcoal transition-all duration-300 hover:bg-white md:min-h-[40px] md:px-5 md:text-sm"
-            >
-              Login / Signup
-            </Link>
-
-            <div className="hidden items-center gap-1 md:flex">
-              <a
-                href="https://wa.me/919876543210"
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-cream/75 transition hover:bg-white/15 hover:text-white"
-                aria-label="WhatsApp"
-              >
-                <MessageCircle className="h-4 w-4" />
-              </a>
-              <a
-                href="https://instagram.com/manas360"
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-cream/75 transition hover:bg-white/15 hover:text-white"
-                aria-label="Instagram"
-              >
-                <Instagram className="h-4 w-4" />
-              </a>
-              <a
-                href="https://youtube.com/@manas360"
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-cream/75 transition hover:bg-white/15 hover:text-white"
-                aria-label="YouTube"
-              >
-                <Youtube className="h-4 w-4" />
-              </a>
-              <a
-                href="https://linkedin.com/company/manas360"
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-cream/75 transition hover:bg-white/15 hover:text-white"
-                aria-label="LinkedIn"
-              >
-                <Linkedin className="h-4 w-4" />
-              </a>
-            </div>
+            </button>
           </div>
-        </div>
-
-        {/* Navigation */}
-        <MegaNav tone="dark" />
-
-        <div className="mt-2 h-[2px] w-full rounded-full bg-white/10" aria-hidden="true">
-          <div
-            className="h-full rounded-full bg-gentle-blue/90 transition-[width] duration-150 ease-out"
-            style={{ width: `${scrollProgress}%` }}
-          />
         </div>
       </div>
     </header>
   );
 };
-
-export default Header;

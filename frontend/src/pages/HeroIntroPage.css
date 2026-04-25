@@ -19,7 +19,7 @@
 }
 
 .hero-content-reveal {
-  animation: heroContentFadeIn 1.6s ease-out 1 forwards;
+  animation: heroContentFadeIn 2s ease-out 1 forwards;
 }
 
 @keyframes heroContentFadeIn {
@@ -81,7 +81,7 @@
 
 .hero-nav-cta:hover {
   transform: translateY(-1px);
-  filter: brightness(1.06);
+  filter: brightness(2);
 }
 
 .hero-logo-intro {
@@ -107,7 +107,7 @@
   overflow: hidden;
   padding: clamp(14px, 1.8vw, 22px);
   opacity: 0;
-  animation: heroLogoRiseAndFade 8.6s ease-in-out 1 forwards;
+  animation: heroLogoRiseAndFade 5s ease-in-out 1 forwards;
 }
 
 .hero-logo-intro-card img {
@@ -128,7 +128,7 @@
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.85), transparent);
   transform: skewX(-24deg) translateX(-160%);
   opacity: 0;
-  animation: heroLogoShine 3s ease-in-out 3s 1 forwards;
+  animation: heroLogoShine 1s ease-in-out 1s 1 forwards;
 }
 
 @keyframes heroLogoRiseAndFade {
@@ -263,7 +263,7 @@
   }
 }
 
-.hero-main-copy > p {
+.hero-main-copy>p {
   margin: 20px auto 0;
   max-width: 760px;
   font-size: clamp(0.88rem, 1.8vw, 1.28rem);

@@ -5,7 +5,7 @@ async function checkAdmin() {
   try {
     const admin = await prisma.user.findFirst({
       where: {
-        role: { in: ['ADMIN', 'SUPERADMIN', 'SUPER_ADMIN'] }
+        role: { in: ['ADMIN', 'SUPER_ADMIN'] }
       }
     });
 
