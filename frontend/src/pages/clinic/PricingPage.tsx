@@ -137,6 +137,7 @@ export default function PricingPage() {
         isTrial: true,
       },
     });
+    navigate('/universal/checkout?type=provider&planId=lead-free&trialAuth=1&trialDays=21&postTrialCycle=monthly');
   };
 
   const handleContinue = () => {

@@ -47,6 +47,31 @@ export const CheckoutPage: React.FC = () => {
         }
 
         let active = true;
+    const handleTransaction = async () => {
+        setProcessing(true);
+        try {
+            const fullName = (location.state as any)?.fullName;
+            const email = (location.state as any)?.email;
+            const mobile = (location.state as any)?.mobile;
+            const city = (location.state as any)?.city;
+            const education = (location.state as any)?.education;
+            const motivation = (location.state as any)?.motivation;
+
+            const response = await fetch('/api/v1/enrollment/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    fullName,
+                    email,
+                    mobile,
+                    city,
+                    education,
+                    motivation,
+                    certName: cert.name,
+                    certSlug: cert.slug,
+                    price: finalTotal
+                }),
+            });
 
         const run = async () => {
             if (cert.price_inr === 0) {
@@ -143,6 +168,26 @@ export const CheckoutPage: React.FC = () => {
             }
         } finally {
           setProcessing(false);
+            if (response.ok && data.success && data.data.redirectUrl) {
+                // ── Redirect to PhonePe ──────────────────────────────────
+                window.location.href = data.data.redirectUrl;
+            } else if (response.ok && data.success && data.data.intentCreated) {
+                // Handle free/direct cases if backend supports it
+                navigate('/enrollment-confirmed', {
+                    state: {
+                        certName: cert.name,
+                        fullName,
+                        slug: cert.slug,
+                    },
+                });
+            } else {
+                throw new Error(data.message || 'Failed to initiate payment');
+            }
+        } catch (err: any) {
+            console.error('Payment initiation error:', err);
+            navigate(`/payment-failed?slug=${cert.slug}`);
+        } finally {
+            setProcessing(false);
         }
     };
 
@@ -260,6 +305,18 @@ export const CheckoutPage: React.FC = () => {
                             </div>
                           </div>
                         )}
+                <div className="bg-white p-8 rounded-2xl shadow-xl border border-slate-100 h-fit">
+                    {cert.price_inr === 0 ? (
+                        <div className="text-center py-8">
+                            <h3 className="text-xl font-bold text-slate-800 mb-4">Free Enrollment</h3>
+                            <button
+                                onClick={() => handleTransaction()}
+                                disabled={processing}
+                                className="w-full bg-purple-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-purple-700 transition disabled:opacity-50"
+                            >
+                                {processing ? 'Enrolling...' : 'Confirm Enrollment'}
+                            </button>
+                        </div>
 
                         <div className="bg-slate-50 rounded-xl border border-slate-100 p-4 mb-8">
                             <div className="flex justify-between items-center text-sm text-slate-600 mb-2">
@@ -271,6 +328,36 @@ export const CheckoutPage: React.FC = () => {
                                 <span className="font-bold text-emerald-600">PhonePe Protected</span>
                             </div>
                         </div>
+                            <div className="text-2xl font-bold text-slate-900 mt-2">₹{installmentAmount.toLocaleString()} <span className="text-sm font-normal text-slate-500">/mo</span></div>
+
+                            {plan === 'installment' && (
+                                <div className="mt-4 pt-4 border-t border-slate-100 space-y-2">
+                                    <div className="flex items-center gap-2 text-xs text-slate-600">
+                                        <Calendar size={12} className="text-purple-500" />
+                                        <span>Payment 2 due {nextMonth.toLocaleDateString()}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-xs text-slate-600">
+                                        <Calendar size={12} className="text-purple-500" />
+                                        <span>Payment 3 due {monthAfter.toLocaleDateString()}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Pay button */}
+                            <button
+                                onClick={() => handleTransaction()}
+                                disabled={processing}
+                                className="w-full bg-purple-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-purple-700 transition flex items-center justify-center gap-2 disabled:opacity-70 mb-6"
+                            >
+                                {processing ? (
+                                    <>Processing...</>
+                                ) : (
+                                    <>
+                                        <Lock size={18} className="text-purple-200" />
+                                        Pay ₹{finalTotal.toLocaleString()}
+                                    </>
+                                )}
+                            </button>
 
                         <button
                             onClick={handlePayment}

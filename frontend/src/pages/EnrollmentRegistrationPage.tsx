@@ -57,31 +57,11 @@ const EnrollmentRegistrationPage: React.FC = () => {
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    setGeneralError(null);
+    if (!validate()) return;
 
-    if (!slug) {
-      setGeneralError('Certification link is invalid. Please open enrollment from certification details.');
-      return;
-    }
-
-    if (!validateMobile(mobile)) {
-      setGeneralError('Please enter a valid mobile number to continue.');
-      return;
-    }
-
-    setProcessing(true);
-    try {
-      const response = await signupWithPhone(mobile, {
-        name: fullName.trim() || undefined,
-        role: 'learner',
-      });
-      setOtpSent(true);
-      setDevOtp(response.devOtp || null);
-    } catch (error: any) {
-      setGeneralError(getApiErrorMessage(error, 'Unable to send OTP. Please try again.'));
-    } finally {
-      setProcessing(false);
-    }
+    // We no longer call the API here. 
+    // We pass the form data to the Checkout page which will handle the payment initiation.
+    navigateToCheckout();
   };
 
   const handleVerifyOtpAndEnroll = async (e: React.FormEvent) => {
