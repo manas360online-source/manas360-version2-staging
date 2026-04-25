@@ -1,0 +1,1744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your MANS360 Therapist Journey - Transform Your Career & Income</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            overflow-x: hidden;
+        }
+        
+        .hero {
+            text-align: center;
+            padding: 60px 20px 40px;
+            color: white;
+        }
+        
+        .hero h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+            text-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            animation: fadeInDown 1s ease;
+        }
+        
+        .hero .subtitle {
+            font-size: 24px;
+            margin-bottom: 30px;
+            opacity: 0.95;
+            animation: fadeInUp 1s ease 0.3s both;
+        }
+        
+        .stats-bar {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            flex-wrap: wrap;
+            margin: 40px 0;
+            animation: fadeIn 1s ease 0.6s both;
+        }
+        
+        .stat {
+            background: rgba(255,255,255,0.2);
+            backdrop-filter: blur(10px);
+            padding: 20px 30px;
+            border-radius: 15px;
+            border: 2px solid rgba(255,255,255,0.3);
+        }
+        
+        .stat-number {
+            font-size: 42px;
+            font-weight: bold;
+            display: block;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .journey-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            position: relative;
+        }
+        
+        /* The Wave Path */
+        .wave-path {
+            position: relative;
+            height: 2000px;
+            margin: 60px 0;
+        }
+        
+        .wave-line {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            stroke: rgba(255,255,255,0.3);
+            stroke-width: 4;
+            fill: none;
+            stroke-dasharray: 20 10;
+            animation: dashAnimation 2s linear infinite;
+        }
+        
+        @keyframes dashAnimation {
+            to { stroke-dashoffset: -30; }
+        }
+        
+        /* Milestone Flags */
+        .milestone {
+            position: absolute;
+            display: flex;
+            align-items: center;
+            animation: slideIn 0.8s ease both;
+        }
+        
+        .milestone.left {
+            flex-direction: row;
+            left: 0;
+            right: 52%;
+            justify-content: flex-end;
+        }
+        
+        .milestone.right {
+            flex-direction: row-reverse;
+            right: 0;
+            left: 52%;
+            justify-content: flex-end;
+        }
+        
+        .flag-post {
+            width: 4px;
+            height: 60px;
+            background: white;
+            position: relative;
+            margin: 0 20px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        
+        .flag {
+            position: absolute;
+            top: 0;
+            width: 80px;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            background: white;
+            border-radius: 50%;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+            border: 4px solid #667eea;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        
+        .milestone-content {
+            background: white;
+            padding: 25px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            max-width: 450px;
+            position: relative;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .milestone-content:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.4);
+        }
+        
+        .milestone-badge {
+            position: absolute;
+            top: -15px;
+            right: -15px;
+            background: linear-gradient(135deg, #ff6b9d 0%, #ff8e53 100%);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            box-shadow: 0 4px 12px rgba(255,107,157,0.4);
+            animation: bounce 2s ease-in-out infinite;
+        }
+        
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        .milestone-title {
+            color: #667eea;
+            font-size: 22px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .milestone-timeline {
+            color: #999;
+            font-size: 13px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .milestone-desc {
+            color: #555;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+        
+        .milestone-income {
+            background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            margin-top: 15px;
+            font-weight: bold;
+        }
+        
+        .income-label {
+            font-size: 12px;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+        
+        .income-amount {
+            font-size: 32px;
+            display: block;
+        }
+        
+        .milestone-skills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 15px;
+        }
+        
+        .skill-tag {
+            background: #e0e7ff;
+            color: #667eea;
+            padding: 6px 12px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        /* Social Proof Floating Elements */
+        .social-proof {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            max-width: 350px;
+            animation: slideInLeft 0.8s ease;
+            z-index: 1000;
+        }
+        
+        .social-proof-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+        
+        .avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+        }
+        
+        .social-proof-name {
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .social-proof-action {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .social-proof-time {
+            color: #999;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+        
+        /* FOMO Timer */
+        .fomo-banner {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #ff6b9d 0%, #ff8e53 100%);
+            color: white;
+            padding: 20px 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(255,107,157,0.4);
+            z-index: 1000;
+            animation: slideInRight 0.8s ease;
+            max-width: 300px;
+        }
+        
+        .fomo-title {
+            font-weight: bold;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        
+        .timer {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 15px;
+        }
+        
+        .timer-block {
+            text-align: center;
+        }
+        
+        .timer-number {
+            font-size: 28px;
+            font-weight: bold;
+            display: block;
+        }
+        
+        .timer-label {
+            font-size: 11px;
+            opacity: 0.9;
+        }
+        
+        /* CTA Section */
+        .cta-section {
+            text-align: center;
+            padding: 80px 20px;
+            background: white;
+            margin-top: 60px;
+        }
+        
+        .cta-title {
+            font-size: 42px;
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+        
+        .cta-subtitle {
+            font-size: 20px;
+            color: #666;
+            margin-bottom: 40px;
+        }
+        
+        .cta-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            padding: 18px 40px;
+            border: none;
+            border-radius: 30px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 30px rgba(102, 126, 234, 0.6);
+        }
+        
+        .btn-secondary {
+            background: white;
+            color: #667eea;
+            border: 3px solid #667eea;
+        }
+        
+        .btn-secondary:hover {
+            background: #667eea;
+            color: white;
+        }
+        
+        .comparison-table {
+            max-width: 900px;
+            margin: 60px auto;
+            background: #f8f9fa;
+            border-radius: 20px;
+            padding: 40px;
+        }
+        
+        .comparison-title {
+            font-size: 32px;
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .comparison-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 20px;
+            border-bottom: 1px solid #ddd;
+            align-items: center;
+        }
+        
+        .comparison-label {
+            font-weight: 600;
+            color: #555;
+            flex: 1;
+        }
+        
+        .comparison-before {
+            flex: 1;
+            text-align: center;
+            color: #999;
+            text-decoration: line-through;
+        }
+        
+        .comparison-after {
+            flex: 1;
+            text-align: center;
+            color: #4ade80;
+            font-weight: bold;
+            font-size: 20px;
+        }
+        
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        @keyframes slideInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-100%);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(100%);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 32px; }
+            .hero .subtitle { font-size: 18px; }
+            .stats-bar { gap: 20px; }
+            .milestone.left, .milestone.right {
+                flex-direction: column !important;
+                left: 0 !important;
+                right: 0 !important;
+                justify-content: center !important;
+            }
+            .flag-post { display: none; }
+            .milestone-content { max-width: 100%; }
+            .fomo-banner, .social-proof {
+                position: relative;
+                max-width: 100%;
+                margin: 20px;
+            }
+        }
+        /* ── LEADS PRICING TABLE ── */
+        .leads-section {
+            max-width: 1000px;
+            margin: 60px auto;
+            padding: 0 20px;
+        }
+        .leads-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .leads-header h2 {
+            font-size: 32px;
+            color: white;
+            margin-bottom: 8px;
+        }
+        .leads-header p {
+            font-size: 16px;
+            color: rgba(255,255,255,0.7);
+        }
+        .leads-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        .lead-plan {
+            background: rgba(255,255,255,0.08);
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255,255,255,0.15);
+            border-radius: 16px;
+            padding: 24px 20px;
+            text-align: center;
+            transition: all 0.3s;
+            position: relative;
+        }
+        .lead-plan:hover {
+            transform: translateY(-4px);
+            border-color: rgba(102,126,234,0.5);
+            box-shadow: 0 12px 32px rgba(0,0,0,0.3);
+        }
+        .lead-plan.featured {
+            border-color: #fbbf24;
+            background: rgba(251,191,36,0.08);
+        }
+        .lead-plan-badge {
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 3px 14px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 700;
+            color: #fff;
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            white-space: nowrap;
+        }
+        .lead-plan-name {
+            font-size: 18px;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 4px;
+        }
+        .lead-plan-price {
+            font-size: 36px;
+            font-weight: 800;
+            color: white;
+            margin: 10px 0 4px;
+        }
+        .lead-plan-price span {
+            font-size: 14px;
+            font-weight: 500;
+            color: rgba(255,255,255,0.5);
+        }
+        .lead-plan-period {
+            font-size: 12px;
+            color: rgba(255,255,255,0.5);
+            margin-bottom: 16px;
+        }
+        .lead-plan-features {
+            text-align: left;
+            margin-bottom: 18px;
+        }
+        .lead-plan-features li {
+            list-style: none;
+            font-size: 12px;
+            color: rgba(255,255,255,0.75);
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+        }
+        .lead-plan-features li:last-child { border-bottom: none; }
+        .lead-plan-features .icon { flex-shrink: 0; }
+        .lead-plan-cta {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .lead-plan-cta.primary {
+            background: #667eea;
+            color: white;
+        }
+        .lead-plan-cta.primary:hover {
+            background: #5a6fd6;
+            transform: scale(1.03);
+        }
+        .lead-plan-cta.gold {
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            color: #1a1a2e;
+        }
+        .lead-plan-cta.gold:hover {
+            filter: brightness(1.1);
+            transform: scale(1.03);
+        }
+        .lead-plan-cta.outline {
+            background: transparent;
+            color: rgba(255,255,255,0.7);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .lead-plan-cta.outline:hover {
+            border-color: rgba(255,255,255,0.5);
+            color: white;
+        }
+        .leads-note {
+            text-align: center;
+            font-size: 12px;
+            color: rgba(255,255,255,0.5);
+            line-height: 1.5;
+            margin-top: 16px;
+        }
+        .leads-note strong { color: rgba(255,255,255,0.8); }
+        .leads-comparison {
+            max-width: 900px;
+            margin: 30px auto 0;
+            background: rgba(255,255,255,0.05);
+            border-radius: 14px;
+            padding: 20px;
+            overflow-x: auto;
+        }
+        .leads-comparison table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            color: rgba(255,255,255,0.8);
+        }
+        .leads-comparison th {
+            text-align: left;
+            padding: 8px 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.15);
+            font-weight: 600;
+            color: rgba(255,255,255,0.5);
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: .5px;
+        }
+        .leads-comparison td {
+            padding: 8px 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        .leads-comparison tr:last-child td { border-bottom: none; }
+        .check { color: #34d399; }
+        .cross { color: #666; }
+        @media (max-width: 600px) {
+            .leads-grid { grid-template-columns: 1fr 1fr; }
+            .lead-plan-price { font-size: 28px; }
+        }
+        @media (max-width: 460px) {
+            .leads-grid { grid-template-columns: 1fr; }
+        }
+        /* ── SELF-SERVICE SIGNUP FLOW ── */
+        .signup-flow {
+            max-width: 520px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        .signup-flow.hidden { display: none; }
+        .signup-card {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(12px);
+            border: 2px solid rgba(255,255,255,0.15);
+            border-radius: 18px;
+            padding: 28px 24px;
+            margin-bottom: 16px;
+        }
+        .signup-step-indicator {
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+            margin-bottom: 20px;
+        }
+        .step-dot {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            transition: all .3s;
+        }
+        .step-dot.active { background: #fbbf24; width: 28px; border-radius: 5px; }
+        .step-dot.done { background: #34d399; }
+        .signup-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: white;
+            text-align: center;
+            margin-bottom: 6px;
+        }
+        .signup-sub {
+            font-size: 13px;
+            color: rgba(255,255,255,0.6);
+            text-align: center;
+            margin-bottom: 20px;
+            line-height: 1.4;
+        }
+        .s-input-group { margin-bottom: 14px; }
+        .s-input-group label {
+            display: block;
+            font-size: 11px;
+            font-weight: 600;
+            color: rgba(255,255,255,0.5);
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: .5px;
+        }
+        .s-input {
+            width: 100%;
+            padding: 11px 14px;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 10px;
+            color: white;
+            font-size: 14px;
+            font-family: inherit;
+            transition: border-color .2s;
+        }
+        .s-input:focus { outline: none; border-color: #667eea; }
+        .s-input::placeholder { color: rgba(255,255,255,0.3); }
+        select.s-input { appearance: none; cursor: pointer; }
+        .s-btn {
+            width: 100%;
+            padding: 13px;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all .2s;
+            font-family: inherit;
+            margin-top: 8px;
+        }
+        .s-btn-primary { background: #667eea; color: white; }
+        .s-btn-primary:hover { background: #5a6fd6; transform: scale(1.02); }
+        .s-btn-gold { background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #1a1a2e; }
+        .s-btn-gold:hover { filter: brightness(1.1); transform: scale(1.02); }
+        .s-btn-green { background: #059669; color: white; }
+        .s-btn-green:hover { background: #047857; }
+        .s-btn-outline {
+            background: transparent;
+            color: rgba(255,255,255,0.6);
+            border: 1px solid rgba(255,255,255,0.2);
+            margin-top: 10px;
+        }
+        .s-btn-outline:hover { border-color: rgba(255,255,255,0.4); color: white; }
+        .plan-select-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+        .plan-option {
+            padding: 14px 10px;
+            background: rgba(0,0,0,0.2);
+            border: 2px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: all .2s;
+        }
+        .plan-option:hover { border-color: rgba(102,126,234,0.4); }
+        .plan-option.selected { border-color: #667eea; background: rgba(102,126,234,0.1); }
+        .plan-option.featured-opt { border-color: rgba(251,191,36,0.4); }
+        .plan-option.featured-opt.selected { border-color: #fbbf24; background: rgba(251,191,36,0.1); }
+        .plan-option .po-name { font-size: 13px; font-weight: 700; color: white; }
+        .plan-option .po-price { font-size: 18px; font-weight: 800; color: white; margin: 4px 0; }
+        .plan-option .po-note { font-size: 10px; color: rgba(255,255,255,0.4); }
+        .plan-option .po-tag {
+            display: inline-block;
+            padding: 2px 8px;
+            background: rgba(251,191,36,0.2);
+            border-radius: 6px;
+            font-size: 9px;
+            font-weight: 700;
+            color: #fbbf24;
+            margin-bottom: 6px;
+        }
+        .commitment-box {
+            padding: 14px;
+            background: rgba(251,191,36,0.08);
+            border: 1px solid rgba(251,191,36,0.2);
+            border-radius: 10px;
+            margin: 14px 0;
+            text-align: center;
+        }
+        .commitment-box .cb-title { font-size: 13px; font-weight: 700; color: #fbbf24; margin-bottom: 4px; }
+        .commitment-box .cb-desc { font-size: 11px; color: rgba(255,255,255,0.5); line-height: 1.4; }
+        .onboard-checklist {
+            list-style: none;
+            margin: 14px 0;
+        }
+        .onboard-checklist li {
+            padding: 8px 0;
+            font-size: 13px;
+            color: rgba(255,255,255,0.7);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        .onboard-checklist li:last-child { border-bottom: none; }
+        .onboard-checklist .done-icon { color: #34d399; font-size: 16px; }
+        .onboard-checklist .pending-icon { color: rgba(255,255,255,0.2); font-size: 16px; }
+        .s-footer-note {
+            text-align: center;
+            font-size: 11px;
+            color: rgba(255,255,255,0.35);
+            margin-top: 12px;
+            line-height: 1.4;
+        }
+        @media (max-width: 460px) {
+            .plan-select-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Hero Section -->
+    <div class="hero">
+        <h1>Your Journey to ₹2.5 Lakh/Month Starts Here</h1>
+        <p class="subtitle">Join 1,247 therapists already transforming their careers on MANS360</p>
+        
+        <div class="stats-bar">
+            <div class="stat">
+                <span class="stat-number">₹2.5L</span>
+                <span class="stat-label">Avg Income (Master Mentors)</span>
+            </div>
+            <div class="stat">
+                <span class="stat-number">573%</span>
+                <span class="stat-label">Average ROI</span>
+            </div>
+            <div class="stat">
+                <span class="stat-number">18 months</span>
+                <span class="stat-label">To Master Mentor</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- FOMO Timer Banner -->
+    <div class="fomo-banner" id="fomoBanner">
+        <div class="fomo-title">⚡ Limited Time: Early Bird Discount</div>
+        <p style="font-size: 14px; margin: 10px 0;">Join in the next 24 hours & get:</p>
+        <ul style="font-size: 13px; margin-left: 20px;">
+            <li>₹5,000 lead credits FREE</li>
+            <li>First certification 50% off</li>
+            <li>Priority profile verification</li>
+        </ul>
+        <div class="timer">
+            <div class="timer-block">
+                <span class="timer-number" id="hours">23</span>
+                <span class="timer-label">HOURS</span>
+            </div>
+            <div class="timer-block">
+                <span class="timer-number" id="minutes">47</span>
+                <span class="timer-label">MINS</span>
+            </div>
+            <div class="timer-block">
+                <span class="timer-number" id="seconds">32</span>
+                <span class="timer-label">SECS</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Social Proof Notifications -->
+    <div class="social-proof" id="socialProof" style="display: none;">
+        <div class="social-proof-header">
+            <div class="avatar">DR</div>
+            <div>
+                <div class="social-proof-name">Dr. Rajesh K.</div>
+                <div class="social-proof-action">Just completed NLP Certification</div>
+            </div>
+        </div>
+        <div class="social-proof-time">🎉 2 minutes ago • Mumbai</div>
+    </div>
+    
+    <!-- Journey Wave Path -->
+    <div class="journey-container">
+        <svg class="wave-line" viewBox="0 0 100 2000" preserveAspectRatio="none">
+            <path d="M 50,0 Q 80,100 50,200 T 50,400 T 50,600 T 50,800 T 50,1000 T 50,1200 T 50,1400 T 50,1600 T 50,1800 T 50,2000" />
+        </svg>
+        
+        <div class="wave-path">
+            <!-- Milestone 1: Onboarding -->
+            <div class="milestone left" style="top: 50px; animation-delay: 0.1s;">
+                <div class="milestone-content">
+                    <div class="milestone-badge">FREE</div>
+                    <div class="milestone-title">🚀 Week 1: Get Started</div>
+                    <div class="milestone-timeline">📅 Week 1-2 • ⏱️ 2 hours</div>
+                    <div class="milestone-desc">
+                        Submit credentials, complete platform training, get verified. 
+                        <strong>Zero investment required.</strong>
+                    </div>
+                    <div class="milestone-income">
+                        <div class="income-label">Investment</div>
+                        <span class="income-amount">₹0</span>
+                    </div>
+                </div>
+                <div class="flag-post">
+                    <div class="flag">🎯</div>
+                </div>
+            </div>
+            
+            <!-- Milestone 2: 5 Whys Certification -->
+            <div class="milestone right" style="top: 250px; animation-delay: 0.2s;">
+                <div class="milestone-content">
+                    <div class="milestone-badge">FREE CERTIFICATION</div>
+                    <div class="milestone-title">🧠 Week 3: Master 5 Whys</div>
+                    <div class="milestone-timeline">📅 Week 3-4 • ⏱️ 6 hours</div>
+                    <div class="milestone-desc">
+                        Learn root cause analysis, empathy framework, and projecting questions. 
+                        Earn your first certification!
+                    </div>
+                    <div class="milestone-skills">
+                        <span class="skill-tag">Root Cause Analysis</span>
+                        <span class="skill-tag">Empathy Framework</span>
+                        <span class="skill-tag">Active Listening</span>
+                    </div>
+                </div>
+                <div class="flag-post">
+                    <div class="flag">🎓</div>
+                </div>
+            </div>
+            
+            <!-- Milestone 3: First Revenue -->
+            <div class="milestone left" style="top: 450px; animation-delay: 0.3s;">
+                <div class="milestone-content">
+                    <div class="milestone-badge">💰 REVENUE STARTS</div>
+                    <div class="milestone-title">💵 Month 2: First Earnings</div>
+                    <div class="milestone-timeline">📅 Week 5+ • 15 sessions/month</div>
+                    <div class="milestone-desc">
+                        Buy lead package (₹2,500), convert patients, start earning. 
+                        <strong>ROI: 399%</strong>
+                    </div>
+                    <div class="milestone-income">
+                        <div class="income-label">Monthly Income</div>
+                        <span class="income-amount">₹25,000</span>
+                    </div>
+                    <div style="margin-top: 10px; font-size: 12px; color: #666;">
+                        ↗️ Dr. Priya S. earned ₹32,000 in her first month
+                    </div>
+                </div>
+                <div class="flag-post">
+                    <div class="flag">💰</div>
+                </div>
+            </div>
+            
+            <!-- Milestone 4: NLP Certification -->
+            <div class="milestone right" style="top: 650px; animation-delay: 0.4s;">
+                <div class="milestone-content">
+                    <div class="milestone-badge">+30% RATES</div>
+                    <div class="milestone-title">🧬 Month 3: NLP Master</div>
+                    <div class="milestone-timeline">📅 Month 3-4 • ⏱️ 40 hours</div>
+                    <div class="milestone-desc">
+                        Advanced communication skills. Charge premium rates. 
+                        Free after 50 sessions!
+                    </div>
+                    <div class="milestone-income">
+                        <div class="income-label">New Monthly Income</div>
+                        <span class="income-amount">₹33,000</span>
+                        <div style="font-size: 14px; margin-top: 5px;">
+                            ⬆️ +₹8,000 from previous month
+                        </div>
+                    </div>
+                    <div class="milestone-skills">
+                        <span class="skill-tag">NLP Practitioner</span>
+                        <span class="skill-tag">Anchoring</span>
+                        <span class="skill-tag">Reframing</span>
+                    </div>
+                </div>
+                <div class="flag-post">
+                    <div class="flag">🎯</div>
+                </div>
+            </div>
+            
+            <!-- Milestone 5: Corporate Access -->
+            <div class="milestone left" style="top: 850px; animation-delay: 0.5s;">
+                <div class="milestone-content">
+                    <div class="milestone-badge">🚀 +150% RATES</div>
+                    <div class="milestone-title">🏢 Month 6: Certified Corp-Executive Therapist</div>
+                    <div class="milestone-timeline">📅 Month 5-6 • 🎯 B2B Access</div>
+                    <div class="milestone-desc">
+                        Unlock corporate clients. Deliver workshops. Land retainers. 
+                        <strong>₹15K-60K per workshop!</strong>
+                    </div>
+                    <div class="milestone-income">
+                        <div class="income-label">Monthly Income (with workshops)</div>
+                        <span class="income-amount">₹65,000</span>
+                    </div>
+                    <div style="margin-top: 10px; font-size: 12px; color: #666;">
+                        💼 Dr. Amit R. landed a ₹2L/month retainer with TCS
+                    </div>
+                </div>
+                <div class="flag-post">
+                    <div class="flag">🏢</div>
+                </div>
+            </div>
+            
+            <!-- Milestone 6: Certified Aatman Coach -->
+            <div class="milestone right" style="top: 1050px; animation-delay: 0.6s;">
+                <div class="milestone-content">
+                    <div class="milestone-badge">⭐ PREMIUM POSITIONING</div>
+                    <div class="milestone-title">🕉️ Month 9: Certified Aatman Coach</div>
+                    <div class="milestone-timeline">📅 Month 7-9 • ⏱️ 60 hours + retreat</div>
+                    <div class="milestone-desc">
+                        Master soul-level transformation. Eastern + Western synthesis. 
+                        <strong>Top 10% exclusive certification.</strong>
+                    </div>
+                    <div class="milestone-income">
+                        <div class="income-label">Session Rate</div>
+                        <span class="income-amount">₹6,500</span>
+                        <div style="font-size: 14px; margin-top: 5px;">
+                            💎 Premium clients only
+                        </div>
+                    </div>
+                    <div class="milestone-skills">
+                        <span class="skill-tag">Vedanta</span>
+                        <span class="skill-tag">Shadow Work</span>
+                        <span class="skill-tag">Consciousness</span>
+                    </div>
+                </div>
+                <div class="flag-post">
+                    <div class="flag">💎</div>
+                </div>
+            </div>
+            
+            <!-- Milestone 7: Certified NRI-Global Indian Coach -->
+            <div class="milestone left" style="top: 1250px; animation-delay: 0.7s;">
+                <div class="milestone-content">
+                    <div class="milestone-badge">DUAL PRACTICE</div>
+                    <div class="milestone-title">🎯 Month 12: Certified NRI-Global Indian Coach</div>
+                    <div class="milestone-timeline">📅 Month 10-12 • 🎓 ICF-equivalent</div>
+                    <div class="milestone-desc">
+                        Therapy + Coaching = 2x revenue streams. 
+                        Executive coaching: <strong>₹8,000/session</strong>
+                    </div>
+                    <div class="milestone-income">
+                        <div class="income-label">Combined Monthly Income</div>
+                        <span class="income-amount">₹1,20,000</span>
+                    </div>
+                </div>
+                <div class="flag-post">
+                    <div class="flag">🚀</div>
+                </div>
+            </div>
+            
+            <!-- Milestone 8: Group-Retreat Therapist -->
+            <div class="milestone right" style="top: 1450px; animation-delay: 0.8s;">
+                <div class="milestone-content">
+                    <div class="milestone-badge">SCALE IMPACT</div>
+                    <div class="milestone-title">👥 Month 18: Group-Retreat Therapist</div>
+                    <div class="milestone-timeline">📅 Month 16-18 • 👥 8 people/session</div>
+                    <div class="milestone-desc">
+                        Serve 8 people simultaneously. 
+                        <strong>₹15,000 per group = ₹1,875/person</strong>
+                    </div>
+                    <div class="milestone-income">
+                        <div class="income-label">With 2 Groups/Week</div>
+                        <span class="income-amount">₹1,92,000</span>
+                        <div style="font-size: 14px; margin-top: 5px;">
+                            + Individual sessions
+                        </div>
+                    </div>
+                </div>
+                <div class="flag-post">
+                    <div class="flag">👥</div>
+                </div>
+            </div>
+            
+            <!-- Milestone 9: Master Mentor -->
+            <div class="milestone left" style="top: 1650px; animation-delay: 0.9s;">
+                <div class="milestone-content">
+                    <div class="milestone-badge">👑 THE PINNACLE</div>
+                    <div class="milestone-title">🏆 Month 18+: Master Mentor</div>
+                    <div class="milestone-timeline">📅 Month 18+ • 👑 Top 5% Elite</div>
+                    <div class="milestone-desc">
+                        Train therapists. Earn passive income from supervisees. 
+                        <strong>Build your legacy.</strong>
+                    </div>
+                    <div class="milestone-income" style="background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);">
+                        <div class="income-label">Total Monthly Income</div>
+                        <span class="income-amount">₹2,53,000</span>
+                        <div style="font-size: 14px; margin-top: 5px;">
+                            💰 Therapy + Coaching + Supervision + Groups
+                        </div>
+                    </div>
+                    <div style="margin-top: 15px; padding: 15px; background: #fef3c7; border-radius: 10px;">
+                        <strong style="color: #92400e;">🎉 Dr. Meera S. hit ₹3.2L/month in Month 24</strong>
+                    </div>
+                </div>
+                <div class="flag-post">
+                    <div class="flag">👑</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Comparison: Before vs After -->
+    <div class="comparison-table">
+        <div class="comparison-title">🔄 Your Career Transformation</div>
+        
+        <div class="comparison-row">
+            <div class="comparison-label">Monthly Income</div>
+            <div class="comparison-before">₹40,000</div>
+            <div class="comparison-after">₹2,53,000 📈</div>
+        </div>
+        
+        <div class="comparison-row">
+            <div class="comparison-label">Career Control</div>
+            <div class="comparison-before">Employee</div>
+            <div class="comparison-after">Entrepreneur ⭐</div>
+        </div>
+        
+        <div class="comparison-row">
+            <div class="comparison-label">Skills</div>
+            <div class="comparison-before">Basic therapy</div>
+            <div class="comparison-after">9 Certifications 🎓</div>
+        </div>
+        
+        <div class="comparison-row">
+            <div class="comparison-label">Client Access</div>
+            <div class="comparison-before">Limited network</div>
+            <div class="comparison-after">Unlimited leads 🚀</div>
+        </div>
+        
+        <div class="comparison-row">
+            <div class="comparison-label">Income Ceiling</div>
+            <div class="comparison-before">Fixed salary</div>
+            <div class="comparison-after">Sky's the limit 🌟</div>
+        </div>
+        
+        <div class="comparison-row" style="border: none;">
+            <div class="comparison-label">Legacy Impact</div>
+            <div class="comparison-before">Individual</div>
+            <div class="comparison-after">Mentor generations 💙</div>
+        </div>
+    </div>
+    
+    <!-- ═══ LEADS PRICING PLANS ═══ -->
+    <div class="leads-section" id="leadsPricing">
+        <div class="leads-header">
+            <h2>💰 Choose Your Lead Plan</h2>
+            <p>Buy leads, convert patients, earn 60% of every session. Platform access: ₹99/month.</p>
+        </div>
+        
+        <div class="leads-grid">
+            <!-- Plan 1: Starter (Free) -->
+            <div class="lead-plan">
+                <div class="lead-plan-name">Starter</div>
+                <div class="lead-plan-price">₹0 <span>/month</span></div>
+                <div class="lead-plan-period">No commitment</div>
+                <ul class="lead-plan-features">
+                    <li><span class="icon">✅</span> Profile listing on marketplace</li>
+                    <li><span class="icon">✅</span> 1 free lead/month</li>
+                    <li><span class="icon">✅</span> Basic dashboard</li>
+                    <li><span class="icon">❌</span> No priority matching</li>
+                    <li><span class="icon">❌</span> No corporate leads</li>
+                    <li><span class="icon">❌</span> No analytics</li>
+                </ul>
+                <button class="lead-plan-cta outline" onclick="selectPlan('starter')">Get Started Free</button>
+            </div>
+
+            <!-- Plan 2: Growth -->
+            <div class="lead-plan">
+                <div class="lead-plan-name">Growth</div>
+                <div class="lead-plan-price">₹199 <span>/lead</span></div>
+                <div class="lead-plan-period">+ ₹99/mo platform access</div>
+                <ul class="lead-plan-features">
+                    <li><span class="icon">✅</span> Warm leads (70-89 match)</li>
+                    <li><span class="icon">✅</span> Up to 5 leads/month</li>
+                    <li><span class="icon">✅</span> Patient preview before buy</li>
+                    <li><span class="icon">✅</span> Basic analytics</li>
+                    <li><span class="icon">❌</span> No corporate leads</li>
+                    <li><span class="icon">✅</span> 50% refund if no response</li>
+                </ul>
+                <button class="lead-plan-cta primary" onclick="selectPlan('growth')">Start Growing →</button>
+            </div>
+
+            <!-- Plan 3: Professional (Featured) -->
+            <div class="lead-plan featured">
+                <div class="lead-plan-badge" style="background: linear-gradient(135deg, #fbbf24, #f59e0b);">⭐ MOST POPULAR</div>
+                <div class="lead-plan-name">Professional</div>
+                <div class="lead-plan-price">₹299 <span>/lead</span></div>
+                <div class="lead-plan-period">+ ₹99/mo platform access</div>
+                <ul class="lead-plan-features">
+                    <li><span class="icon">✅</span> Hot leads (90-100 match)</li>
+                    <li><span class="icon">✅</span> Up to 10 leads/month</li>
+                    <li><span class="icon">✅</span> Priority matching</li>
+                    <li><span class="icon">✅</span> Full analytics dashboard</li>
+                    <li><span class="icon">✅</span> Corporate B2B leads</li>
+                    <li><span class="icon">✅</span> 50% refund if no response</li>
+                </ul>
+                <button class="lead-plan-cta gold" onclick="selectPlan('professional')">Go Professional →</button>
+            </div>
+
+            <!-- Plan 4: Elite -->
+            <div class="lead-plan">
+                <div class="lead-plan-name">Elite</div>
+                <div class="lead-plan-price">₹399 <span>/lead</span></div>
+                <div class="lead-plan-period">+ ₹99/mo platform access</div>
+                <ul class="lead-plan-features">
+                    <li><span class="icon">✅</span> Premium hot leads only</li>
+                    <li><span class="icon">✅</span> Unlimited leads/month</li>
+                    <li><span class="icon">✅</span> Auto-matching (AI)</li>
+                    <li><span class="icon">✅</span> Executive coaching leads</li>
+                    <li><span class="icon">✅</span> NRI client access</li>
+                    <li><span class="icon">✅</span> Profile boosting</li>
+                </ul>
+                <button class="lead-plan-cta primary" onclick="selectPlan('elite')">Go Elite →</button>
+            </div>
+        </div>
+
+        <!-- Marketplace Leads (reverse auction) -->
+        <div class="leads-note">
+            <strong>Marketplace Leads:</strong> Unclaimed leads drop in price daily — ₹299 → ₹199 → ₹99.<br>
+            Revenue split: <strong>60% therapist / 40% platform</strong> on every session. Always.<br>
+            Platform access fee: <strong>₹99/month</strong> applies to all paid plans.
+        </div>
+
+        <!-- Feature Comparison Table -->
+        <div class="leads-comparison">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Feature</th>
+                        <th>Starter</th>
+                        <th>Growth</th>
+                        <th>Professional</th>
+                        <th>Elite</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Lead price</td>
+                        <td>Free (1/mo)</td>
+                        <td>₹199</td>
+                        <td>₹299</td>
+                        <td>₹399</td>
+                    </tr>
+                    <tr>
+                        <td>Leads per month</td>
+                        <td>1</td>
+                        <td>5</td>
+                        <td>10</td>
+                        <td>Unlimited</td>
+                    </tr>
+                    <tr>
+                        <td>Match quality</td>
+                        <td>Cold (50-69)</td>
+                        <td>Warm (70-89)</td>
+                        <td>Hot (90-100)</td>
+                        <td>Premium hot</td>
+                    </tr>
+                    <tr>
+                        <td>Patient preview</td>
+                        <td class="cross">—</td>
+                        <td class="check">✓</td>
+                        <td class="check">✓</td>
+                        <td class="check">✓</td>
+                    </tr>
+                    <tr>
+                        <td>Priority matching</td>
+                        <td class="cross">—</td>
+                        <td class="cross">—</td>
+                        <td class="check">✓</td>
+                        <td class="check">✓</td>
+                    </tr>
+                    <tr>
+                        <td>Corporate / B2B leads</td>
+                        <td class="cross">—</td>
+                        <td class="cross">—</td>
+                        <td class="check">✓</td>
+                        <td class="check">✓</td>
+                    </tr>
+                    <tr>
+                        <td>Executive coaching leads</td>
+                        <td class="cross">—</td>
+                        <td class="cross">—</td>
+                        <td class="cross">—</td>
+                        <td class="check">✓</td>
+                    </tr>
+                    <tr>
+                        <td>NRI client access</td>
+                        <td class="cross">—</td>
+                        <td class="cross">—</td>
+                        <td class="cross">—</td>
+                        <td class="check">✓</td>
+                    </tr>
+                    <tr>
+                        <td>Analytics dashboard</td>
+                        <td>Basic</td>
+                        <td>Basic</td>
+                        <td>Full</td>
+                        <td>Full + AI</td>
+                    </tr>
+                    <tr>
+                        <td>Profile boosting</td>
+                        <td class="cross">—</td>
+                        <td class="cross">—</td>
+                        <td class="cross">—</td>
+                        <td class="check">✓</td>
+                    </tr>
+                    <tr>
+                        <td>Refund (no response 7 days)</td>
+                        <td class="cross">—</td>
+                        <td>50%</td>
+                        <td>50%</td>
+                        <td>50%</td>
+                    </tr>
+                    <tr>
+                        <td>Revenue share (you keep)</td>
+                        <td>60%</td>
+                        <td>60%</td>
+                        <td>60%</td>
+                        <td>60%</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- CTA Section — Self-Service Provider Lifecycle -->
+    <div class="cta-section">
+        <h2 class="cta-title">Start Your Provider Journey Now</h2>
+        <p class="cta-subtitle">No phone calls. No waiting. Self-service from register to earning.</p>
+        
+        <!-- STEP 1: Register Profile -->
+        <div class="signup-flow" id="step1">
+            <div class="signup-card">
+                <div class="signup-step-indicator">
+                    <div class="step-dot active"></div>
+                    <div class="step-dot"></div>
+                    <div class="step-dot"></div>
+                    <div class="step-dot"></div>
+                </div>
+                <div class="signup-title">Step 1: Register Your Profile</div>
+                <div class="signup-sub">Takes 60 seconds. This creates your provider identity on MANAS360.</div>
+                
+                <div class="s-input-group">
+                    <label>Full Name</label>
+                    <input class="s-input" id="sName" type="text" placeholder="Dr. Priya Sharma">
+                </div>
+                <div class="s-input-group">
+                    <label>Mobile Number</label>
+                    <input class="s-input" id="sPhone" type="tel" placeholder="+91 98765 43210">
+                </div>
+                <div class="s-input-group">
+                    <label>Qualification</label>
+                    <select class="s-input" id="sQual">
+                        <option value="">Select your qualification</option>
+                        <option>M.Phil Clinical Psychology</option>
+                        <option>MA Clinical Psychology</option>
+                        <option>PhD Psychology</option>
+                        <option>MD Psychiatry</option>
+                        <option>MSW / Counseling</option>
+                        <option>NLP Practitioner / Coach</option>
+                        <option>Executive / Life Coach</option>
+                        <option>Other</option>
+                    </select>
+                </div>
+                <div class="s-input-group">
+                    <label>RCI / NMC Registration (optional — verified later)</label>
+                    <input class="s-input" id="sReg" type="text" placeholder="Will be verified during onboarding">
+                </div>
+                
+                <button class="s-btn s-btn-primary" onclick="goToStep(2)">Register & Continue →</button>
+                <div class="s-footer-note">✅ No payment at this step. Your data is encrypted.</div>
+            </div>
+        </div>
+
+        <!-- STEP 2: Pay ₹99 Platform Commitment -->
+        <div class="signup-flow hidden" id="step2">
+            <div class="signup-card">
+                <div class="signup-step-indicator">
+                    <div class="step-dot done"></div>
+                    <div class="step-dot active"></div>
+                    <div class="step-dot"></div>
+                    <div class="step-dot"></div>
+                </div>
+                <div class="signup-title">Step 2: Activate Your Platform Access</div>
+                <div class="signup-sub">₹99/month keeps your profile live, dashboard open, and leads flowing to you.</div>
+                
+                <div class="commitment-box">
+                    <div class="cb-title">₹99/month — Your Commitment to Growth</div>
+                    <div class="cb-desc">
+                        This isn't a fee — it's your stake in the game.<br>
+                        Therapists who pay ₹99 earn <strong>3x more</strong> than free-tier fence-sitters.<br>
+                        Why? Because committed providers show up, respond faster, and convert more leads.
+                    </div>
+                </div>
+
+                <div style="text-align:center;margin:16px 0;">
+                    <div style="font-size:42px;font-weight:800;color:white;">₹99<span style="font-size:16px;font-weight:500;color:rgba(255,255,255,.4)">/month</span></div>
+                    <div style="font-size:12px;color:rgba(255,255,255,.4);margin-top:4px;">Cancel anytime. No lock-in. Charged via PhonePe.</div>
+                </div>
+
+                <div style="padding:12px;background:rgba(255,255,255,.04);border-radius:10px;margin-bottom:16px;">
+                    <div style="font-size:12px;color:rgba(255,255,255,.6);line-height:1.6;">
+                        <strong style="color:rgba(255,255,255,.8);">What ₹99 unlocks immediately:</strong><br>
+                        ✅ Live provider profile on MANAS360 marketplace<br>
+                        ✅ Provider dashboard with lead management<br>
+                        ✅ Access to browse & discover lead plans<br>
+                        ✅ Free 5 Whys certification (start earning faster)<br>
+                        ✅ Session scheduling & Jitsi audio rooms<br>
+                        ✅ 1 free lead in your first month
+                    </div>
+                </div>
+                
+                <button class="s-btn s-btn-gold" onclick="goToStep(3)">Pay ₹99 & Activate →</button>
+                <button class="s-btn s-btn-outline" onclick="goToStep(1)">← Back</button>
+            </div>
+        </div>
+
+        <!-- STEP 3: Discover Plans & Select -->
+        <div class="signup-flow hidden" id="step3">
+            <div class="signup-card">
+                <div class="signup-step-indicator">
+                    <div class="step-dot done"></div>
+                    <div class="step-dot done"></div>
+                    <div class="step-dot active"></div>
+                    <div class="step-dot"></div>
+                </div>
+                <div class="signup-title">Step 3: Choose Your Lead Plan</div>
+                <div class="signup-sub">You're activated! Now pick how you want to receive patient leads. Start with any plan — upgrade anytime as you grow.</div>
+                
+                <div class="plan-select-grid">
+                    <div class="plan-option" onclick="pickPlan(this,'starter')">
+                        <div class="po-name">Starter</div>
+                        <div class="po-price">₹0</div>
+                        <div class="po-note">1 free lead/month<br>Cold leads (50-69 match)</div>
+                    </div>
+                    <div class="plan-option" onclick="pickPlan(this,'growth')">
+                        <div class="po-name">Growth</div>
+                        <div class="po-price">₹199<span style="font-size:11px;font-weight:400;color:rgba(255,255,255,.4)">/lead</span></div>
+                        <div class="po-note">5 warm leads/month<br>Patient preview + 50% refund</div>
+                    </div>
+                    <div class="plan-option featured-opt" onclick="pickPlan(this,'professional')">
+                        <div class="po-tag">⭐ POPULAR</div>
+                        <div class="po-name">Professional</div>
+                        <div class="po-price">₹299<span style="font-size:11px;font-weight:400;color:rgba(255,255,255,.4)">/lead</span></div>
+                        <div class="po-note">10 hot leads + Corporate B2B<br>Priority matching + full analytics</div>
+                    </div>
+                    <div class="plan-option" onclick="pickPlan(this,'elite')">
+                        <div class="po-name">Elite</div>
+                        <div class="po-price">₹399<span style="font-size:11px;font-weight:400;color:rgba(255,255,255,.4)">/lead</span></div>
+                        <div class="po-note">Unlimited + NRI + Executive<br>AI matching + profile boosting</div>
+                    </div>
+                </div>
+
+                <div style="padding:10px;background:rgba(255,255,255,.03);border-radius:8px;margin:12px 0;text-align:center;">
+                    <div style="font-size:11px;color:rgba(255,255,255,.4);line-height:1.4;">
+                        <strong style="color:rgba(255,255,255,.6);">Marketplace leads:</strong> Unclaimed leads drop daily — ₹299 → ₹199 → ₹99<br>
+                        You keep <strong style="color:#34d399;">60%</strong> of every session. Always. On every plan.
+                    </div>
+                </div>
+                
+                <button class="s-btn s-btn-primary" id="step3Btn" onclick="goToStep(4)" style="opacity:0.5;pointer-events:none;">Select a plan to continue →</button>
+                <button class="s-btn s-btn-outline" onclick="goToStep(2)">← Back</button>
+            </div>
+        </div>
+
+        <!-- STEP 4: Your Growth Roadmap -->
+        <div class="signup-flow hidden" id="step4">
+            <div class="signup-card">
+                <div class="signup-step-indicator">
+                    <div class="step-dot done"></div>
+                    <div class="step-dot done"></div>
+                    <div class="step-dot done"></div>
+                    <div class="step-dot active"></div>
+                </div>
+                <div class="signup-title">Your Growth Roadmap</div>
+                <div class="signup-sub">Here's your journey from activation to ₹2.5L/month. Each step unlocks the next.</div>
+
+                <ul class="onboard-checklist" id="roadmapList">
+                    <li><span class="done-icon">✅</span> <strong>Profile registered</strong></li>
+                    <li><span class="done-icon">✅</span> <strong>₹99 platform access activated</strong></li>
+                    <li><span class="done-icon">✅</span> <strong><span id="planConfirm">Professional</span> lead plan selected</strong></li>
+                    <li style="border-left:2px solid rgba(251,191,36,.3);padding-left:12px;margin-left:8px;">
+                        <span class="pending-icon">🔓</span> <strong>NOW:</strong> Start 5 Whys certification (free, 2 hrs) — unlocks lead access
+                    </li>
+                    <li style="border-left:2px solid rgba(251,191,36,.3);padding-left:12px;margin-left:8px;">
+                        <span class="pending-icon">⏳</span> Credential verification runs in background (24-48 hrs)
+                    </li>
+                    <li style="border-left:2px solid rgba(52,211,153,.3);padding-left:12px;margin-left:8px;">
+                        <span class="pending-icon">📥</span> <strong>Week 1:</strong> Accept first leads → Schedule sessions
+                    </li>
+                    <li style="border-left:2px solid rgba(52,211,153,.3);padding-left:12px;margin-left:8px;">
+                        <span class="pending-icon">💰</span> <strong>Week 2+:</strong> First sessions → You earn 60% per session
+                    </li>
+                    <li style="border-left:2px solid rgba(102,126,234,.3);padding-left:12px;margin-left:8px;">
+                        <span class="pending-icon">🔄</span> <strong>Monthly:</strong> Repeat cycle — buy leads, schedule, earn, grow
+                    </li>
+                    <li style="border-left:2px solid rgba(124,58,237,.3);padding-left:12px;margin-left:8px;">
+                        <span class="pending-icon">🎓</span> <strong>Month 3+:</strong> Discover NLP, Certified Aatman Coach, NRI-Global Indian Coach certifications → higher session rates
+                    </li>
+                    <li style="border-left:2px solid rgba(124,58,237,.3);padding-left:12px;margin-left:8px;">
+                        <span class="pending-icon">⬆️</span> <strong>Month 6+:</strong> Unlock Corp-Executive, Group-Retreat, NRI-Global leads
+                    </li>
+                    <li style="border-left:2px solid rgba(251,191,36,.3);padding-left:12px;margin-left:8px;">
+                        <span class="pending-icon">👑</span> <strong>Month 18+:</strong> Master Mentor — train others, earn passive income
+                    </li>
+                </ul>
+
+                <div class="commitment-box" style="border-color:rgba(102,126,234,.3);background:rgba(102,126,234,.06);">
+                    <div class="cb-title" style="color:#a5b4fc;">The Flywheel</div>
+                    <div class="cb-desc" style="font-size:12px;">
+                        ₹99/month commitment → leads flow → sessions happen → you earn 60% → invest in certifications → unlock higher-value leads → earn more → upgrade plan → repeat. <strong>The more you put in, the more you get out.</strong>
+                    </div>
+                </div>
+                
+                <button class="s-btn s-btn-green" onclick="completeSignup()">🚀 Open My Dashboard & Start Certification</button>
+                <button class="s-btn s-btn-outline" onclick="goToStep(3)">← Change Plan</button>
+                
+                <div class="s-footer-note">
+                    Your dashboard opens with the 5 Whys certification ready to start.<br>
+                    Need help? Call <strong>+91 8867736009</strong> (Mon-Sat 10AM-6PM)
+                </div>
+            </div>
+        </div>
+        
+        <div style="margin-top: 60px; padding: 40px; background: #fef3c7; border-radius: 20px; max-width: 800px; margin-left: auto; margin-right: auto;">
+            <h3 style="color: #92400e; font-size: 24px; margin-bottom: 20px;">⚠️ The Cost of Waiting</h3>
+            <p style="color: #78350f; font-size: 16px; line-height: 1.8;">
+                Every month you delay is <strong>₹25,000-₹2,53,000</strong> you're not earning. 
+                That's <strong>₹3L-₹30L per year</strong> left on the table.
+                <br><br>
+                <strong>Dr. Priya waited 6 months before joining.</strong><br>
+                "I thought I wasn't ready. Biggest mistake. I lost ₹1.5L in potential income."
+                <br><br>
+                <strong style="font-size: 20px;">Don't make the same mistake.</strong>
+            </p>
+        </div>
+    </div>
+    
+    <script>
+        // Countdown Timer (Dan Ariely: Scarcity creates urgency)
+        function updateTimer() {
+            const now = new Date();
+            const end = new Date(now.getTime() + 24*60*60*1000); // 24 hours from now
+            const total = end - now;
+            
+            const hours = Math.floor((total / (1000 * 60 * 60)) % 24);
+            const minutes = Math.floor((total / 1000 / 60) % 60);
+            const seconds = Math.floor((total / 1000) % 60);
+            
+            document.getElementById('hours').textContent = hours.toString().padStart(2, '0');
+            document.getElementById('minutes').textContent = minutes.toString().padStart(2, '0');
+            document.getElementById('seconds').textContent = seconds.toString().padStart(2, '0');
+        }
+        
+        setInterval(updateTimer, 1000);
+        updateTimer();
+        
+        // Social Proof Notifications (Dan Ariely: Social proof influences behavior)
+        const notifications = [
+            { name: 'Dr. Rajesh K.', action: 'Just completed NLP Certification', time: '2 minutes ago', city: 'Mumbai' },
+            { name: 'Dr. Priya S.', action: 'Earned ₹32,000 in first month', time: '5 minutes ago', city: 'Delhi' },
+            { name: 'Dr. Amit R.', action: 'Just landed ₹2L corporate retainer', time: '8 minutes ago', city: 'Bangalore' },
+            { name: 'Dr. Meera J.', action: 'Became Master Mentor', time: '12 minutes ago', city: 'Pune' },
+            { name: 'Dr. Karthik V.', action: 'Started group therapy sessions', time: '15 minutes ago', city: 'Chennai' },
+            { name: 'Dr. Anjali M.', action: 'Completed Certified Aatman Coach program', time: '18 minutes ago', city: 'Hyderabad' }
+        ];
+        
+        let notificationIndex = 0;
+        
+        function showSocialProof() {
+            const notification = notifications[notificationIndex];
+            const element = document.getElementById('socialProof');
+            
+            const initials = notification.name.split(' ').map(n => n[0]).join('');
+            
+            element.innerHTML = `
+                <div class="social-proof-header">
+                    <div class="avatar">${initials}</div>
+                    <div>
+                        <div class="social-proof-name">${notification.name}</div>
+                        <div class="social-proof-action">${notification.action}</div>
+                    </div>
+                </div>
+                <div class="social-proof-time">🎉 ${notification.time} • ${notification.city}</div>
+            `;
+            
+            element.style.display = 'block';
+            
+            setTimeout(() => {
+                element.style.display = 'none';
+            }, 5000);
+            
+            notificationIndex = (notificationIndex + 1) % notifications.length;
+        }
+        
+        // Show first notification after 3 seconds
+        setTimeout(showSocialProof, 3000);
+        
+        // Show new notification every 12 seconds
+        setInterval(showSocialProof, 12000);
+        
+        // Self-Service Provider Lifecycle Flow
+        let selectedPlan = null;
+        
+        function goToStep(n) {
+            // Validate step 1 (register)
+            if (n === 2) {
+                const name = document.getElementById('sName').value.trim();
+                const phone = document.getElementById('sPhone').value.trim();
+                const qual = document.getElementById('sQual').value;
+                if (!name) { document.getElementById('sName').focus(); return; }
+                if (!phone || phone.length < 10) { document.getElementById('sPhone').focus(); return; }
+                if (!qual) { document.getElementById('sQual').focus(); return; }
+                // In production: POST /api/provider/register → create profile (unpaid)
+            }
+            
+            // Step 2→3: payment would happen here in production
+            // In production: PhonePe ₹99 → on success → show step 3
+            
+            // Validate step 3 (plan selection)
+            if (n === 4 && !selectedPlan) { return; }
+            
+            document.querySelectorAll('.signup-flow').forEach(el => el.classList.add('hidden'));
+            document.getElementById('step' + n).classList.remove('hidden');
+            document.getElementById('step' + n).scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        
+        function pickPlan(el, plan) {
+            selectedPlan = plan;
+            document.querySelectorAll('.plan-option').forEach(p => p.classList.remove('selected'));
+            el.classList.add('selected');
+            
+            const btn = document.getElementById('step3Btn');
+            btn.style.opacity = '1';
+            btn.style.pointerEvents = 'auto';
+            
+            const names = { starter: 'Starter (Free)', growth: 'Growth (₹199/lead)', professional: 'Professional (₹299/lead)', elite: 'Elite (₹399/lead)' };
+            document.getElementById('planConfirm').textContent = names[plan];
+        }
+        
+        function completeSignup() {
+            const name = document.getElementById('sName').value.trim();
+            const phone = document.getElementById('sPhone').value.trim();
+            
+            // In production:
+            // POST /api/provider/activate { plan: selectedPlan }
+            // → Update Supabase provider record with plan
+            // → Redirect to /provider/dashboard with 5 Whys certification ready
+            
+            document.getElementById('step4').innerHTML = `
+                <div class="signup-card" style="text-align:center;">
+                    <div style="font-size:56px;margin-bottom:12px;">🎉</div>
+                    <div class="signup-title">Welcome, ${name}!</div>
+                    <div class="signup-sub" style="margin-bottom:20px;">
+                        Your <strong>${document.getElementById('planConfirm')?.textContent || 'Professional'}</strong> profile is live on MANAS360.<br>
+                        OTP sent to <strong>${phone}</strong> for verification.
+                    </div>
+                    
+                    <ul class="onboard-checklist">
+                        <li><span class="done-icon">✅</span> Profile registered</li>
+                        <li><span class="done-icon">✅</span> ₹99/month platform access activated</li>
+                        <li><span class="done-icon">✅</span> Lead plan selected</li>
+                        <li><span class="pending-icon">⏳</span> Verify OTP (check your phone)</li>
+                        <li style="border-left:2px solid rgba(251,191,36,.3);padding-left:12px;margin-left:8px;">
+                            <span class="pending-icon">🔓</span> <strong>Start 5 Whys certification now</strong> — unlocks lead access
+                        </li>
+                    </ul>
+                    
+                    <div class="commitment-box" style="border-color:rgba(52,211,153,.3);background:rgba(52,211,153,.06);">
+                        <div class="cb-title" style="color:#34d399;">Your Flywheel Starts Now</div>
+                        <div class="cb-desc" style="font-size:12px;">
+                            Complete certification → Leads start flowing → Schedule sessions → Earn 60% →<br>
+                            Discover advanced certifications → Unlock Corporate & Executive leads → Grow monthly
+                        </div>
+                    </div>
+                    
+                    <button class="s-btn s-btn-green" onclick="window.location.href='/provider/dashboard'">
+                        🚀 Open My Dashboard & Start Certification
+                    </button>
+                    <div class="s-footer-note" style="margin-top:16px;">
+                        Need help? Call <strong>+91 8867736009</strong> (Mon-Sat 10AM-6PM)
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Plan cards in the pricing table above also trigger signup flow
+        function selectPlan(plan) {
+            goToStep(1);
+            document.getElementById('step1').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        
+        // Scroll animations
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        });
+        
+        document.querySelectorAll('.milestone').forEach(el => {
+            observer.observe(el);
+        });
+    </script>
+</body>
+</html>

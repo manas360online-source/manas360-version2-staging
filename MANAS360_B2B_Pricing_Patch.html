@@ -1,0 +1,357 @@
+<!-- ═══════════════════════════════════════════════════════════
+  MANAS360 — B2B Pricing Patch
+  
+  INSTRUCTIONS FOR CHANDU:
+  1. Copy the <style> block into the existing <style> tag
+  2. Copy the HTML section into the page — insert AFTER the 4 card-grid
+     and BEFORE the "Invest in Your People" CTA
+  3. Copy the <script> before </body>
+═══════════════════════════════════════════════════════════ -->
+
+<!-- ══════ CSS — add inside existing <style> ══════ -->
+<style>
+.pricing-section { padding: 50px 0; }
+.pricing-toggle { display: flex; justify-content: center; gap: 8px; margin-bottom: 28px; flex-wrap: wrap; }
+.toggle-btn {
+  padding: 8px 20px; border-radius: 24px; border: 1px solid var(--gray-light);
+  font-size: 13px; font-weight: 600; cursor: pointer; background: var(--white);
+  color: var(--gray); transition: all 0.2s; font-family: 'DM Sans', sans-serif;
+}
+.toggle-btn.active { background: var(--ocean); color: var(--white); border-color: var(--ocean); }
+.toggle-btn:hover:not(.active) { border-color: var(--sky); color: var(--ocean); }
+.discount-badge {
+  display: inline-block; padding: 2px 8px; border-radius: 6px;
+  font-size: 9px; font-weight: 700; margin-left: 4px; vertical-align: middle;
+}
+.discount-10 { background: rgba(12,124,138,0.1); color: #0C7C8A; }
+.discount-25 { background: rgba(5,150,105,0.1); color: #059669; }
+.pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; }
+.price-card {
+  background: var(--white); border: 2px solid var(--gray-light); border-radius: 18px;
+  padding: 28px 22px; text-align: center; position: relative; transition: all 0.25s;
+}
+.price-card:hover { transform: translateY(-4px); box-shadow: 0 12px 32px rgba(0,0,0,0.08); }
+.price-card.featured { border-color: var(--ocean); }
+.price-card.featured::before {
+  content: '⭐ MOST POPULAR'; position: absolute; top: -11px; left: 50%; transform: translateX(-50%);
+  padding: 3px 14px; border-radius: 10px; font-size: 9px; font-weight: 700;
+  background: var(--ocean); color: var(--white); letter-spacing: 0.5px; white-space: nowrap;
+}
+.pc-name { font-family: 'Outfit', sans-serif; font-size: 18px; font-weight: 700; color: var(--dark); margin-bottom: 2px; }
+.pc-size { font-size: 12px; color: var(--gray); margin-bottom: 14px; }
+.pc-price { font-size: 36px; font-weight: 800; color: var(--ocean); margin-bottom: 2px; }
+.pc-price span { font-size: 14px; font-weight: 500; color: var(--gray); }
+.pc-per { font-size: 12px; color: var(--gray); margin-bottom: 4px; }
+.pc-original { font-size: 12px; color: var(--gray); text-decoration: line-through; margin-bottom: 14px; display: none; }
+.pc-savings { font-size: 11px; font-weight: 700; color: var(--green); margin-bottom: 14px; display: none; }
+.pc-features { text-align: left; margin-bottom: 18px; }
+.pc-features li {
+  list-style: none; font-size: 13px; color: var(--dark-soft); padding: 5px 0;
+  border-bottom: 1px solid var(--gray-light); display: flex; align-items: flex-start; gap: 6px;
+}
+.pc-features li:last-child { border-bottom: none; }
+.pc-cta {
+  width: 100%; padding: 11px; border: none; border-radius: 12px;
+  font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 700;
+  cursor: pointer; transition: all 0.2s; text-decoration: none; display: inline-block; text-align: center;
+}
+.pc-cta-primary { background: var(--ocean); color: var(--white); }
+.pc-cta-primary:hover { background: var(--ocean-deep); }
+.pc-cta-outline { background: transparent; color: var(--ocean); border: 1.5px solid var(--gray-light); }
+.pc-cta-outline:hover { border-color: var(--ocean); }
+.pc-cta-gold { background: var(--gold); color: var(--white); }
+.pc-cta-gold:hover { filter: brightness(1.1); }
+.pricing-note { text-align: center; margin-top: 20px; font-size: 12px; color: var(--gray); line-height: 1.6; }
+.pricing-note strong { color: var(--dark-soft); }
+.comparison-wrap { margin-top: 24px; overflow-x: auto; }
+.comparison-table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 600px; }
+.comparison-table th { background: var(--ocean); color: var(--white); padding: 10px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+.comparison-table td { padding: 8px 10px; border-bottom: 1px solid var(--gray-light); }
+.comparison-table tr:hover td { background: var(--ocean-light); }
+.ct-check { color: var(--green); font-weight: 700; }
+.ct-cross { color: var(--gray); }
+@media (max-width: 768px) { .pricing-grid { grid-template-columns: 1fr; } .pc-price { font-size: 28px; } .badge-grid { grid-template-columns: 1fr; } }
+
+/* ── BADGE OF HONOR ── */
+.badge-section { margin: 28px 0 8px; }
+.badge-section-title {
+  font-family: 'Outfit', sans-serif; font-size: 16px; font-weight: 700;
+  text-align: center; color: var(--dark); margin-bottom: 16px;
+}
+.badge-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.honor-badge {
+  background: var(--white); border: 2px solid var(--gray-light); border-radius: 16px;
+  padding: 20px 16px; text-align: center; position: relative; transition: all 0.3s; overflow: hidden;
+}
+.honor-badge:hover { transform: translateY(-3px); box-shadow: 0 10px 28px rgba(0,0,0,0.08); }
+.honor-badge::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; }
+.honor-badge.badge-bronze::before { background: linear-gradient(90deg, #CD7F32, #E8A849); }
+.honor-badge.badge-silver::before { background: linear-gradient(90deg, #8B95A5, #C0C8D4); }
+.honor-badge.badge-gold::before { background: linear-gradient(90deg, #D4A017, #F0C75E); }
+.honor-badge.badge-bronze { border-color: rgba(205,127,50,0.25); }
+.honor-badge.badge-silver { border-color: rgba(139,149,165,0.25); }
+.honor-badge.badge-gold { border-color: rgba(212,160,23,0.25); }
+.hb-star { font-size: 28px; margin-bottom: 6px; }
+.hb-tier { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+.badge-bronze .hb-tier { color: #CD7F32; }
+.badge-silver .hb-tier { color: #8B95A5; }
+.badge-gold .hb-tier { color: #D4A017; }
+.hb-emps { font-family: 'Outfit', sans-serif; font-size: 22px; font-weight: 800; color: var(--dark); margin-bottom: 2px; }
+.hb-label { font-size: 11px; color: var(--gray); margin-bottom: 12px; }
+.hb-daily {
+  display: inline-block; padding: 6px 16px; border-radius: 20px;
+  font-family: 'Outfit', sans-serif; font-size: 20px; font-weight: 800; margin-bottom: 4px;
+}
+.badge-bronze .hb-daily { background: rgba(205,127,50,0.08); color: #CD7F32; }
+.badge-silver .hb-daily { background: rgba(139,149,165,0.08); color: #6B7A8D; }
+.badge-gold .hb-daily { background: rgba(212,160,23,0.08); color: #B8860B; }
+.hb-daily-label { font-size: 10px; color: var(--gray); margin-bottom: 4px; }
+.hb-daily-compare { font-size: 10px; color: var(--gray); font-style: italic; margin-bottom: 14px; }
+.hb-badges { display: flex; flex-direction: column; gap: 6px; }
+.hb-mini {
+  display: flex; align-items: center; gap: 6px; padding: 6px 10px;
+  border-radius: 8px; font-size: 11px; font-weight: 600;
+}
+.hb-mini-csr { background: rgba(5,150,105,0.06); color: #059669; }
+.hb-mini-compliance { background: rgba(0,35,101,0.06); color: var(--ocean); }
+.hb-mini-icon { font-size: 14px; flex-shrink: 0; }
+.hb-mini-text { text-align: left; line-height: 1.3; }
+.hb-mini-text strong { display: block; font-size: 12px; }
+.hb-mini-text span { font-size: 9px; font-weight: 400; color: var(--gray); }
+</style>
+
+
+<!-- ══════ HTML — insert after card-grid, before CTA ══════ -->
+
+<div class="section pricing-section">
+  <div class="container">
+    <div class="section-title">Pricing Plans</div>
+
+    <div class="pricing-toggle">
+      <button class="toggle-btn active" onclick="switchSegment('corporate',this)">🏢 Corporate</button>
+      <button class="toggle-btn" onclick="switchSegment('healthcare',this)">🏥 Healthcare <span class="discount-badge discount-10">10% OFF</span></button>
+      <button class="toggle-btn" onclick="switchSegment('education',this)">🏫 Education <span class="discount-badge discount-25">25% OFF</span></button>
+    </div>
+
+    <div class="pricing-grid">
+
+      <!-- Startup -->
+      <div class="price-card">
+        <div class="pc-name">Startup</div>
+        <div class="pc-size">50 – 200 employees</div>
+        <div class="pc-price" data-base="200000">₹2L <span>/year</span></div>
+        <div class="pc-per" data-base="1000">₹1,000 per employee</div>
+        <div class="pc-original"></div>
+        <div class="pc-savings"></div>
+        <ul class="pc-features">
+          <li>✅ Unlimited 1:1 therapy sessions</li>
+          <li>✅ 24/7 AnytimeBuddy AI chatbot</li>
+          <li>✅ 1 group session per quarter</li>
+          <li>✅ Crisis support + helpline access</li>
+          <li>✅ Anonymous QR screening standees</li>
+          <li>✅ HR dashboard (anonymous analytics)</li>
+          <li>✅ CSR Section 135 (25% deduction)</li>
+          <li>❌ No manager training</li>
+          <li>❌ No dedicated account manager</li>
+        </ul>
+        <a class="pc-cta pc-cta-outline" href="/corporate/demo?tier=startup">Request Demo →</a>
+      </div>
+
+      <!-- Growth (Featured) -->
+      <div class="price-card featured">
+        <div class="pc-name">Growth</div>
+        <div class="pc-size">200 – 1,000 employees</div>
+        <div class="pc-price" data-base="500000">₹5L <span>/year</span></div>
+        <div class="pc-per" data-base="500">₹500 per employee</div>
+        <div class="pc-original"></div>
+        <div class="pc-savings"></div>
+        <ul class="pc-features">
+          <li>✅ Everything in Startup</li>
+          <li>✅ 2 group sessions per quarter</li>
+          <li>✅ Manager mental health training (2/yr)</li>
+          <li>✅ Custom wellness workshops</li>
+          <li>✅ Dedicated account manager</li>
+          <li>✅ Monthly anonymous usage reports</li>
+          <li>✅ SSO / email domain login</li>
+          <li>✅ CSR Section 135 (25% deduction)</li>
+          <li>❌ No executive coaching</li>
+        </ul>
+        <a class="pc-cta pc-cta-primary" href="/corporate/demo?tier=growth">Request Demo →</a>
+      </div>
+
+      <!-- Enterprise -->
+      <div class="price-card">
+        <div class="pc-name">Enterprise</div>
+        <div class="pc-size">1,000 – 5,000 employees</div>
+        <div class="pc-price" data-base="1200000">₹12L <span>/year</span></div>
+        <div class="pc-per" data-base="250">₹250 per employee</div>
+        <div class="pc-original"></div>
+        <div class="pc-savings"></div>
+        <ul class="pc-features">
+          <li>✅ Everything in Growth</li>
+          <li>✅ 4 group sessions per quarter</li>
+          <li>✅ Executive coaching access</li>
+          <li>✅ Leadership resilience workshops</li>
+          <li>✅ Multilingual (5 languages)</li>
+          <li>✅ Custom ROI dashboard</li>
+          <li>✅ API / HRIS integration</li>
+          <li>✅ On-site wellness day (1/year)</li>
+          <li>✅ CSR Section 135 (30% deduction)</li>
+        </ul>
+        <a class="pc-cta pc-cta-gold" href="/corporate/demo?tier=enterprise">Request Demo →</a>
+      </div>
+
+    </div>
+
+    <div class="pricing-note">
+      <strong>5,000+ employees?</strong> Custom pricing. <a href="/corporate/contact" style="color:var(--sky);">Contact us →</a><br>
+      All plans: DPDPA compliant · NMC/RCI verified therapists · AWS Mumbai data residency · MANAS360 is a technology aggregator, not a healthcare provider.
+    </div>
+
+    <!-- Badge of Honor -->
+    <div class="badge-section">
+      <div class="badge-section-title">🏆 Your Badge of Honor — What You're Really Paying</div>
+      <div class="badge-grid">
+
+        <!-- Bronze: 5,000 -->
+        <div class="honor-badge badge-bronze">
+          <div class="hb-star">⭐</div>
+          <div class="hb-tier">Bronze Wellness Champion</div>
+          <div class="hb-emps">5,000</div>
+          <div class="hb-label">employees</div>
+          <div class="hb-daily">₹0.68</div>
+          <div class="hb-daily-label">per employee per day</div>
+          <div class="hb-daily-compare">Less than a matchstick. For a human life.</div>
+          <div class="hb-badges">
+            <div class="hb-mini hb-mini-csr">
+              <span class="hb-mini-icon">💰</span>
+              <div class="hb-mini-text"><strong>CSR Fund: ₹12.5L/year</strong><span>Sec 135 · 30% tax deduction = ₹3.75L saved</span></div>
+            </div>
+            <div class="hb-mini hb-mini-compliance">
+              <span class="hb-mini-icon">🛡️</span>
+              <div class="hb-mini-text"><strong>5 Compliances in One Shot</strong><span>DPDPA · NMC/RCI · POSH · OSH Act · CSR Sec 135</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Silver: 10,000 -->
+        <div class="honor-badge badge-silver">
+          <div class="hb-star">⭐⭐</div>
+          <div class="hb-tier">Silver Wellness Champion</div>
+          <div class="hb-emps">10,000</div>
+          <div class="hb-label">employees</div>
+          <div class="hb-daily">₹0.68</div>
+          <div class="hb-daily-label">per employee per day</div>
+          <div class="hb-daily-compare">Less than a single SMS. For total mental wellness.</div>
+          <div class="hb-badges">
+            <div class="hb-mini hb-mini-csr">
+              <span class="hb-mini-icon">💰</span>
+              <div class="hb-mini-text"><strong>CSR Fund: ₹25L/year</strong><span>Sec 135 · 30% tax deduction = ₹7.5L saved</span></div>
+            </div>
+            <div class="hb-mini hb-mini-compliance">
+              <span class="hb-mini-icon">🛡️</span>
+              <div class="hb-mini-text"><strong>5 Compliances in One Shot</strong><span>DPDPA · NMC/RCI · POSH · OSH Act · CSR Sec 135</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Gold: 49,000 -->
+        <div class="honor-badge badge-gold">
+          <div class="hb-star">⭐⭐⭐</div>
+          <div class="hb-tier">Gold Wellness Champion</div>
+          <div class="hb-emps">49,000</div>
+          <div class="hb-label">employees</div>
+          <div class="hb-daily">₹0.68</div>
+          <div class="hb-daily-label">per employee per day</div>
+          <div class="hb-daily-compare">Less than one chai. For 49,000 lives protected.</div>
+          <div class="hb-badges">
+            <div class="hb-mini hb-mini-csr">
+              <span class="hb-mini-icon">💰</span>
+              <div class="hb-mini-text"><strong>CSR Fund: ₹1.22Cr/year</strong><span>Sec 135 · 30% tax deduction = ₹36.75L saved</span></div>
+            </div>
+            <div class="hb-mini hb-mini-compliance">
+              <span class="hb-mini-icon">🛡️</span>
+              <div class="hb-mini-text"><strong>5 Compliances in One Shot</strong><span>DPDPA · NMC/RCI · POSH · OSH Act · CSR Sec 135</span></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Feature comparison -->
+    <div class="comparison-wrap">
+      <table class="comparison-table">
+        <thead><tr><th>Feature</th><th>Startup</th><th>Growth ⭐</th><th>Enterprise</th></tr></thead>
+        <tbody>
+          <tr><td>Annual fee</td><td id="cmpS">₹2L</td><td id="cmpG">₹5L</td><td id="cmpE">₹12L</td></tr>
+          <tr><td>Per employee</td><td id="cmpSe">₹1,000</td><td id="cmpGe">₹500</td><td id="cmpEe">₹250</td></tr>
+          <tr><td>Unlimited 1:1 therapy</td><td class="ct-check">✓</td><td class="ct-check">✓</td><td class="ct-check">✓</td></tr>
+          <tr><td>24/7 AI chatbot</td><td class="ct-check">✓</td><td class="ct-check">✓</td><td class="ct-check">✓</td></tr>
+          <tr><td>Group sessions / quarter</td><td>1</td><td>2</td><td>4</td></tr>
+          <tr><td>Crisis support</td><td class="ct-check">✓</td><td class="ct-check">✓</td><td class="ct-check">✓</td></tr>
+          <tr><td>Anonymous QR screening</td><td class="ct-check">✓</td><td class="ct-check">✓</td><td class="ct-check">✓</td></tr>
+          <tr><td>HR dashboard</td><td class="ct-check">✓</td><td class="ct-check">✓</td><td class="ct-check">✓</td></tr>
+          <tr><td>Manager training</td><td class="ct-cross">—</td><td>2/year</td><td>4/year</td></tr>
+          <tr><td>Account manager</td><td class="ct-cross">—</td><td class="ct-check">✓</td><td class="ct-check">✓</td></tr>
+          <tr><td>SSO / email domain login</td><td class="ct-cross">—</td><td class="ct-check">✓</td><td class="ct-check">✓</td></tr>
+          <tr><td>Executive coaching</td><td class="ct-cross">—</td><td class="ct-cross">—</td><td class="ct-check">✓</td></tr>
+          <tr><td>Multilingual (5 languages)</td><td class="ct-cross">—</td><td class="ct-cross">—</td><td class="ct-check">✓</td></tr>
+          <tr><td>API / HRIS integration</td><td class="ct-cross">—</td><td class="ct-cross">—</td><td class="ct-check">✓</td></tr>
+          <tr><td>On-site wellness day</td><td class="ct-cross">—</td><td class="ct-cross">—</td><td>1/year</td></tr>
+          <tr><td>CSR tax deduction</td><td>25%</td><td>25%</td><td>30%</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ══════ JavaScript — add before </body> ══════ -->
+<script>
+function switchSegment(seg, btn) {
+  document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  var discount = seg === 'healthcare' ? 0.10 : seg === 'education' ? 0.25 : 0;
+
+  document.querySelectorAll('.price-card').forEach(function(card) {
+    var priceEl = card.querySelector('.pc-price');
+    var perEl = card.querySelector('.pc-per');
+    var origEl = card.querySelector('.pc-original');
+    var saveEl = card.querySelector('.pc-savings');
+    var base = parseInt(priceEl.dataset.base);
+    var basePer = parseInt(perEl.dataset.base);
+
+    if (discount > 0) {
+      var discounted = Math.round(base * (1 - discount));
+      var discountedPer = Math.round(basePer * (1 - discount));
+      priceEl.innerHTML = '₹' + fmtL(discounted) + ' <span>/year</span>';
+      perEl.textContent = '₹' + discountedPer.toLocaleString('en-IN') + ' per employee';
+      origEl.textContent = '₹' + fmtL(base) + '/year (Corporate rate)';
+      origEl.style.display = 'block';
+      saveEl.textContent = 'You save ₹' + fmtL(base - discounted) + '/year';
+      saveEl.style.display = 'block';
+    } else {
+      priceEl.innerHTML = '₹' + fmtL(base) + ' <span>/year</span>';
+      perEl.textContent = '₹' + basePer.toLocaleString('en-IN') + ' per employee';
+      origEl.style.display = 'none';
+      saveEl.style.display = 'none';
+    }
+  });
+
+  // Update comparison table
+  var bases = [[200000,500000,1200000],['cmpS','cmpG','cmpE']];
+  var basesP = [[1000,500,250],['cmpSe','cmpGe','cmpEe']];
+  for (var i=0;i<3;i++) {
+    document.getElementById(bases[1][i]).textContent = '₹' + fmtL(Math.round(bases[0][i]*(1-discount)));
+    document.getElementById(basesP[1][i]).textContent = '₹' + Math.round(basesP[0][i]*(1-discount)).toLocaleString('en-IN');
+  }
+}
+
+function fmtL(n) {
+  if (n >= 100000) { var v = n/100000; return (v === Math.floor(v) ? v.toFixed(0) : v.toFixed(1)) + 'L'; }
+  return n.toLocaleString('en-IN');
+}
+</script>

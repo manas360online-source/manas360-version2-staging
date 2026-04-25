@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Manas360 Flow Documentation</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #f5f7fb;
+      color: #333;
+    }
+
+    h1, h2, h3 {
+      color: #1a237e;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: auto;
+    }
+
+    .card {
+      background: white;
+      padding: 20px;
+      margin-bottom: 25px;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 14px;
+    }
+
+    th, td {
+      border: 1px solid #ddd;
+      padding: 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #e8eaf6;
+      font-weight: bold;
+    }
+
+    .highlight {
+      color: #2e7d32;
+      font-weight: bold;
+    }
+
+    .flow-box {
+      background: #eef2ff;
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 10px;
+      white-space: pre-line;
+      font-family: monospace;
+      font-size: 13px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      background: #3949ab;
+      color: white;
+    }
+
+    .domestic {
+      border-left: 5px solid #1976d2;
+    }
+
+    .nri {
+      border-left: 5px solid #2e7d32;
+    }
+  </style>
+</head>
+
+<body>
+<div class="container">
+
+  <h1>Manas360 End-to-End Flow</h1>
+
+  <!-- DOMESTIC -->
+  <div class="card domestic">
+    <h2>DOMESTIC FLOW (PATCH-LM-001)</h2>
+
+    <table>
+      <tr>
+        <th>Stage</th>
+        <th>User Action</th>
+        <th>System Response</th>
+        <th>Data Passed</th>
+      </tr>
+
+      <tr>
+        <td>Search</td>
+        <td>Google search: therapist / psychiatrist</td>
+        <td>Landing pages served via Ads</td>
+        <td>utm params</td>
+      </tr>
+
+      <tr>
+        <td>Landing</td>
+        <td>Clicks CTA</td>
+        <td>/assessment?entry=type</td>
+        <td>entry_type</td>
+      </tr>
+
+      <tr>
+        <td>Preset</td>
+        <td>Page loads</td>
+        <td>Defaults applied</td>
+        <td>modality, budget</td>
+      </tr>
+
+      <tr>
+        <td>Assessment</td>
+        <td>Completes 10 steps</td>
+        <td>Scores + DB save</td>
+        <td>phq, gad, concerns</td>
+      </tr>
+
+      <tr>
+        <td>Matching</td>
+        <td>-</td>
+        <td>Filter + scoring (0-100)</td>
+        <td>provider list</td>
+      </tr>
+
+      <tr>
+        <td>Results</td>
+        <td>Select provider</td>
+        <td>Top matches shown</td>
+        <td>score + fee</td>
+      </tr>
+
+      <tr>
+        <td>Booking</td>
+        <td>Select slot</td>
+        <td>Calendar + IST slots</td>
+        <td>datetime</td>
+      </tr>
+
+      <tr>
+        <td>Payment</td>
+        <td>UPI payment</td>
+        <td>PhonePe integration</td>
+        <td>amountMinor</td>
+      </tr>
+
+      <tr>
+        <td>Success</td>
+        <td>Payment done</td>
+        <td>Session created</td>
+        <td>session_id</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- NRI -->
+  <div class="card nri">
+    <h2>NRI FLOW (PATCH-LM-002)</h2>
+
+    <table>
+      <tr>
+        <th>Stage</th>
+        <th>User Action</th>
+        <th>System Response</th>
+        <th>Data Passed</th>
+      </tr>
+
+      <tr>
+        <td>Search</td>
+        <td>NRI queries</td>
+        <td>NRI landing page</td>
+        <td>utm params</td>
+      </tr>
+
+      <tr>
+        <td>Landing</td>
+        <td>Select card</td>
+        <td>/nri/book?entry=type</td>
+        <td>entry_type</td>
+      </tr>
+
+      <tr>
+        <td>Preset</td>
+        <td>Loads</td>
+        <td><span class="highlight">Locked pricing</span></td>
+        <td>fee fixed</td>
+      </tr>
+
+      <tr>
+        <td>Timezone</td>
+        <td>Select timezone</td>
+        <td>Auto-detect + override</td>
+        <td>timezoneRegion</td>
+      </tr>
+
+      <tr>
+        <td>Concerns</td>
+        <td>Select NRI issues</td>
+        <td>Stored</td>
+        <td>concerns[]</td>
+      </tr>
+
+      <tr>
+        <td>Assessment</td>
+        <td>PHQ + GAD</td>
+        <td>Score + save</td>
+        <td>scores</td>
+      </tr>
+
+      <tr>
+        <td>Matching</td>
+        <td>-</td>
+        <td>
+          <span class="highlight">4 HARD FILTERS</span><br/>
+          timezone + language + certification
+        </td>
+        <td>filtered list</td>
+      </tr>
+
+      <tr>
+        <td>Results</td>
+        <td>Select therapist</td>
+        <td>Top 3-5 shown</td>
+        <td>score (0-80)</td>
+      </tr>
+
+      <tr>
+        <td>Payment</td>
+        <td>Confirm ₹2999</td>
+        <td><span class="highlight">Fixed pricing</span></td>
+        <td>amountMinor</td>
+      </tr>
+
+      <tr>
+        <td>Success</td>
+        <td>Payment done</td>
+        <td>Timezone-aware session</td>
+        <td>session_id</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- COMPARISON -->
+  <div class="card">
+    <h2>Key Differences</h2>
+
+    <table>
+      <tr>
+        <th>Aspect</th>
+        <th>Domestic</th>
+        <th>NRI</th>
+      </tr>
+
+      <tr>
+        <td>Pricing</td>
+        <td>Variable</td>
+        <td class="highlight">Fixed</td>
+      </tr>
+
+      <tr>
+        <td>Budget Step</td>
+        <td>Yes</td>
+        <td class="highlight">Removed</td>
+      </tr>
+
+      <tr>
+        <td>Timezone</td>
+        <td>IST</td>
+        <td class="highlight">User-defined</td>
+      </tr>
+
+      <tr>
+        <td>Matching</td>
+        <td>Basic filters</td>
+        <td class="highlight">Strict filters + scoring</td>
+      </tr>
+
+      <tr>
+        <td>Language</td>
+        <td>Optional</td>
+        <td class="highlight">Mandatory match</td>
+      </tr>
+
+      <tr>
+        <td>Concerns</td>
+        <td>General</td>
+        <td class="highlight">NRI-specific</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- FLOW DIAGRAM -->
+  <div class="card">
+    <h2>Example NRI User Journey</h2>
+
+    <div class="flow-box">
+🔍 Google Search
+→ NRI Landing Page
+→ Select Psychologist (₹2,999)
+
+📋 Assessment
+→ Timezone: US_EST
+→ Concerns: career + family
+→ Language: Hindi
+
+🎯 Matching
+→ Filters: timezone + language + NRI certified
+→ Top therapists returned
+
+📅 Booking
+→ Slot: 5:00 PM EST
+
+💳 Payment
+→ Fixed ₹2,999
+
+🎉 Confirmation
+→ SMS (Hindi)
+→ Jitsi Link
+→ EST + IST timing
+
+📞 Session
+→ 50 min video call
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

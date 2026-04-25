@@ -1,0 +1,3306 @@
+STORY 11.5 - HIT A SIXER GAMIFICATION
+SYSTEM
+Complete Technical Specification & Implementation Guide
+Sprint: 12
+Story Points: 13
+Priority: High
+Type: Feature - Gamification
+Dependencies: User authentication, Subscription system (Story 11.1), Payment integration
+EPIC CONTEXT
+Build a cricket-themed daily gamification system ("Hit a Sixer") that:
+-
+-
+-
+-
+-
+-
+Is available ONLY to paid subscribers (₹99/month platform fee)
+Awards wallet credits based on probability (8% FOUR=₹50, 4% SIXER=₹100, 88%
+OUT=₹10)
+Allows one play per user per day (resets midnight IST)
+Must be played before 6:00 PM IST
+Credits expire 30 days after earning
+Credits auto-apply at session booking checkout
+USER STORY
+As a MANAS360 subscriber
+I want to play a daily cricket game to win wallet credits
+So that I can reduce my therapy session costs and feel rewarded for being a subscriber
+BUSINESS VALUE
+Revenue Impact
+-
+-
+-
+-
+-
+Subscription revenue: ₹99K/month (1,000 subscribers)
+Game cost: ₹5.04L/month (1,000 plays daily)
+Session revenue: ₹73.35L/month
+Net profit: ₹70.98L/month
+ROI: 2,112%
+User Retention
+-
+-
+-
+Expected retention: 95%+
+Daily engagement: 80%+ of subscribers
+LTV increase: ₹2,376 (24-month average)
+Behavioral Goals
+-
+-
+-
+-
+Create daily habit (play every day)
+Drive subscription conversions (game as premium feature)
+Increase booking frequency (use credits before expiry)
+Reduce perceived session cost (₹999 → ₹549 average)
+ACCEPTANCE CRITERIA
+Functional Requirements
+✅ AC1: Subscription Gate
+-
+-
+-
+-
+GIVEN a user is NOT subscribed
+WHEN they attempt to access the cricket game
+THEN they see "Subscribe to Play" screen with upgrade prompt
+AND game is locked/disabled
+✅ AC2: Daily Play Limit
+-
+-
+-
+-
+GIVEN a subscribed user
+AND they have already played today
+WHEN they attempt to play again
+THEN they see "Already played today. Come back tomorrow!" message
+-
+AND cannot play until midnight IST
+✅ AC3: Time Window Enforcement
+-
+-
+-
+-
+GIVEN current time is after 6:00 PM IST
+WHEN user attempts to play
+THEN they see "Game closed for today. Play tomorrow before 6 PM!"
+AND game is disabled
+✅ AC4: Probability Distribution
+-
+-
+-
+-
+-
+GIVEN 1,000 plays
+WHEN results are aggregated
+THEN FOUR appears 75-85 times (7.5-8.5%)
+AND SIXER appears 35-45 times (3.5-4.5%)
+AND OUT appears 875-890 times (87.5-89%)
+✅ AC5: Wallet Credit Award
+-
+-
+-
+-
+-
+GIVEN user wins FOUR
+WHEN game result is processed
+THEN ₹50 is added to their wallet INSTANTLY
+AND transaction is logged
+AND credit expires in exactly 30 days
+✅ AC6: Credit Expiry
+-
+-
+-
+-
+-
+GIVEN a wallet credit is 30 days old
+WHEN expiry cron job runs
+THEN credit is marked as expired
+AND removed from available balance
+AND user is notified (if >₹50 expiring)
+✅ AC7: Checkout Integration
+-
+-
+-
+-
+-
+GIVEN user has ₹100 in wallet
+WHEN they book a ₹999 session
+THEN wallet credits auto-apply
+AND final amount is ₹899
+AND wallet balance reduces to ₹0
+✅ AC8: Transaction Tracking
+-
+-
+-
+-
+-
+GIVEN any wallet activity
+WHEN credit is earned, used, or expired
+THEN transaction is logged with timestamp
+AND user can view complete history
+AND balance is updated atomically
+TECHNICAL ARCHITECTURE
+Tech Stack
+-
+-
+-
+-
+-
+-
+Backend: Python 3.11+ with FastAPI OR Node.js 18+ with Express
+Database: PostgreSQL 15+
+Cache: Redis 7+ (for rate limiting, daily play tracking)
+Queue: Celery (Python) or Bull (Node.js) for background jobs
+Randomization: Python secrets module or Node.js crypto (cryptographically
+secure)
+Timezone: pytz or moment-timezone for IST handling
+System Components
+┌───────────────────────────────────────────────────────────
+──┐
+│ CRICKET GAME SYSTEM │
+├───────────────────────────────────────────────────────────
+──┤
+│ │
+│ ┌────────────────┐ ┌────────────────┐ │
+│ │ Frontend │─────▶│ API Gateway │ │
+│ │ (React/Vue) │ │ (FastAPI) │ │
+│ └────────────────┘ └────────────────┘ │
+│ │ │
+│ ▼ │
+│ ┌─────────────────────┐ │
+│ │ Game Engine Service │ │
+│ │ - Eligibility check │ │
+│ │ - Probability calc │ │
+│ │ - Result generation │ │
+│ └─────────────────────┘ │
+│ │ │
+│ ┌────────────┴────────────┐ │
+│ ▼ ▼ │
+│ ┌──────────────────┐ ┌──────────────────┐ │
+│ │ Wallet Service │ │ Redis Cache │ │
+│ │ - Add credits │ │ - Daily plays │ │
+│ │ - Track balance │ │ - Rate limits │ │
+│ │ - Handle expiry │ └──────────────────┘ │
+│ └──────────────────┘ │
+│ │ │
+│ ▼ │
+│ ┌──────────────────┐ │
+│ │ PostgreSQL │ │
+│ │ - game
+_plays │ │
+│ │ - wallet │ │
+│ │ - transactions │ │
+│ └──────────────────┘ │
+│ │
+│ ┌────────────────────────────────────────────────────┐ │
+│ │ Background Jobs (Celery) │ │
+│ ├────────────────────────────────────────────────────┤ │
+│ │ - Expire credits (daily midnight) │ │
+│ │ - Send expiry warnings (7 days before) │ │
+│ │ - Generate daily stats │ │
+│ │ - Send morning reminders (10 AM) │ │
+│ └────────────────────────────────────────────────────┘ │
+└───────────────────────────────────────────────────────────
+──┘
+DATABASE SCHEMA
+Table 1: daily_game_plays
+Purpose: Track each user's daily game play and result
+CREATE TABLE daily_game
+_plays (
+id SERIAL PRIMARY KEY,
+user
+_
+id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+game
+date DATE NOT NULL,
+_
+played
+_
+at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+-- Subscription validation
+subscription
+_
+id INTEGER REFERENCES subscriptions(id),
+subscription
+active BOOLEAN NOT NULL DEFAULT FALSE,
+_
+-- Game outcome
+outcome VARCHAR(10) NOT NULL CHECK (outcome IN ('sixer'
+,
+'four'
+,
+'out')),
+credit
+amount INTEGER NOT NULL,
+_
+-- 100, 50, or 10 (in rupees)
+-- Wallet reference
+wallet
+transaction
+_
+id INTEGER REFERENCES wallet
+_
+_
+transactions(id),
+-- Metadata
+ip_
+address INET,
+user
+_
+agent TEXT,
+device
+_
+fingerprint VARCHAR(255),
+created
+_
+at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+-- Constraints
+CONSTRAINT unique
+user
+_
+_game
+_
+date UNIQUE (user
+_
+id, game
+_
+date),
+CONSTRAINT valid
+credit
+_
+_
+amount CHECK (credit
+_
+amount IN (10, 50, 100)),
+-- Indexes
+INDEX idx
+user
+_
+_game
+_
+date (user
+_
+id, game
+_
+date DESC),
+INDEX idx
+_game
+_
+date (game
+_
+date),
+INDEX idx
+_
+outcome (outcome, game
+_
+date),
+INDEX idx
+_
+subscription (subscription
+_
+id, subscription
+_
+active)
+);
+COMMENT ON TABLE daily_game
+_plays IS 'Tracks each users daily cricket game play and
+outcome';
+COMMENT ON COLUMN daily_game
+_plays.outcome IS 'Game result: sixer (4%), four (8%),
+out (88%)';
+COMMENT ON COLUMN daily_game
+_plays.credit
+amount IS 'Wallet credit awarded: 100 for
+_
+sixer, 50 for four, 10 for out';
+Table 2: user_wallet
+Purpose: Store user's current wallet balance and aggregates
+CREATE TABLE user
+_
+wallet (
+id SERIAL PRIMARY KEY,
+user
+_
+id INTEGER UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+-- Balances (in rupees)
+total
+_
+balance INTEGER NOT NULL DEFAULT 0 CHECK (total
+_
+balance >= 0),
+game
+_
+credits INTEGER NOT NULL DEFAULT 0 CHECK (game
+_
+credits >= 0),
+referral
+_
+credits INTEGER NOT NULL DEFAULT 0 CHECK (referral
+_
+credits >= 0),
+promo
+_
+credits INTEGER NOT NULL DEFAULT 0 CHECK (promo
+_
+credits >= 0),
+-- Lifetime tracking
+lifetime
+earned INTEGER NOT NULL DEFAULT 0,
+_
+lifetime
+_
+spent INTEGER NOT NULL DEFAULT 0,
+lifetime
+_
+expired INTEGER NOT NULL DEFAULT 0,
+-- Timestamps
+created
+_
+at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+updated
+_
+at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+last
+transaction
+at TIMESTAMP WITH TIME ZONE,
+_
+_
+-- Indexes
+INDEX idx
+user
+_
+_
+balance (user
+id, total
+_
+_
+balance),
+INDEX idx
+_
+_
+_
+updated
+at (updated
+at DESC)
+);
+COMMENT ON TABLE user
+wallet IS 'User wallet balances and lifetime statistics';
+_
+COMMENT ON COLUMN user
+credit types';
+wallet.total
+balance IS 'Current available balance across all
+_
+_
+Table 3: wallet_transactions
+Purpose: Complete audit trail of all wallet activity
+CREATE TABLE wallet
+_
+transactions (
+id SERIAL PRIMARY KEY,
+user
+_
+id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+wallet
+id INTEGER NOT NULL REFERENCES user
+_
+_
+wallet(id) ON DELETE CASCADE,
+-- Transaction type
+transaction
+_
+type VARCHAR(30) NOT NULL CHECK (
+transaction
+_
+type IN (
+'credit
+earned
+_
+_game
+four'
+,
+_
+'credit
+earned
+_
+_game
+sixer'
+,
+_
+'credit
+_
+earned
+_game
+out'
+,
+_
+'credit
+earned
+_
+referral'
+_
+,
+'credit
+earned
+_
+_promo'
+,
+'credit
+used
+_
+_
+booking'
+,
+'credit
+_
+expired'
+,
+'credit
+refunded'
+_
+)
+),
+-- Amount (positive for earned, negative for used/expired)
+amount INTEGER NOT NULL,
+-- Source reference
+source VARCHAR(30),
+source
+id INTEGER,
+--
+'game'
+,
+'referral'
+,
+'promo'
+,
+'booking'
+_
+-- game
+_play_
+id, referral
+_
+id, booking_
+id, etc.
+-- Balance snapshot
+balance
+before INTEGER NOT NULL,
+_
+balance
+after INTEGER NOT NULL,
+_
+-- Expiry tracking (for earned credits)
+expires
+at TIMESTAMP WITH TIME ZONE,
+_
+expired BOOLEAN DEFAULT FALSE,
+-- Description
+description TEXT,
+-- Metadata
+metadata JSONB,
+created
+_
+at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+-- Indexes
+INDEX idx
+user
+_
+_
+transactions (user
+id, created
+_
+_
+at DESC),
+INDEX idx
+transaction
+_
+_
+_
+_
+type (transaction
+type, created
+at DESC),
+INDEX idx
+_
+source (source, source
+_
+id),
+INDEX idx
+_
+expiry (expires
+_
+at, expired) WHERE expires
+_
+at IS NOT NULL,
+INDEX idx
+created
+_
+_
+_
+at (created
+at DESC)
+);
+COMMENT ON TABLE wallet
+_
+transactions IS 'Complete audit trail of all wallet credit
+movements';
+COMMENT ON COLUMN wallet
+_
+transactions.amount IS 'Positive for credits earned, negative
+for credits used or expired';
+Table 4: wallet_credits
+Purpose: Individual credit line items with expiry tracking
+CREATE TABLE wallet
+_
+credits (
+id SERIAL PRIMARY KEY,
+user
+_
+id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+-- Credit details
+amount INTEGER NOT NULL CHECK (amount > 0),
+remaining_
+balance INTEGER NOT NULL CHECK (remaining_
+balance >= 0),
+-- Source
+source VARCHAR(30) NOT NULL,
+--
+'game
+four'
+_
+,
+'game
+sixer'
+_
+,
+'game
+out'
+_
+source
+id INTEGER,
+_
+-- game
+_play_
+id
+transaction
+id INTEGER REFERENCES wallet
+_
+_
+transactions(id),
+-- Expiry
+earned
+_
+at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+expires
+at TIMESTAMP WITH TIME ZONE NOT NULL,
+_
+expired BOOLEAN DEFAULT FALSE,
+-- Usage
+fully_
+used BOOLEAN DEFAULT FALSE,
+-- Timestamps
+created
+_
+at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+updated
+_
+at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+-- Constraints
+CONSTRAINT valid
+_
+remaining CHECK (remaining_
+balance <= amount),
+-- Indexes
+INDEX idx
+fully_
+used,
+user
+_
+_
+active (user
+_
+id, expired, fully_
+used) WHERE NOT expired AND NOT
+INDEX idx
+_
+expiry_pending (expires
+_
+at) WHERE NOT expired,
+INDEX idx
+_
+source (source, source
+_
+id)
+);
+COMMENT ON TABLE wallet
+usage tracking';
+_
+credits IS 'Individual credit line items with expiry and partial
+COMMENT ON COLUMN wallet
+_
+credits.remaining_
+balance IS 'Current balance of this credit
+line (supports partial usage)';
+Table 5: game_stats_daily
+Purpose: Aggregated daily statistics for monitoring
+CREATE TABLE game
+stats
+_
+_
+daily (
+id SERIAL PRIMARY KEY,
+stat
+date DATE UNIQUE NOT NULL,
+_
+-- Play counts
+total
+_plays INTEGER DEFAULT 0,
+unique
+_players INTEGER DEFAULT 0,
+-- Outcome distribution
+total
+sixers INTEGER DEFAULT 0,
+_
+total
+fours INTEGER DEFAULT 0,_
+total
+outs INTEGER DEFAULT 0,
+_
+-- Percentages (for validation)
+sixer
+_percentage DECIMAL(5,2),
+four
+_percentage DECIMAL(5,2),
+out
+_percentage DECIMAL(5,2),
+-- Financial tracking
+total
+credits
+issued INTEGER DEFAULT 0,
+_
+_
+-- in rupees
+total
+credits
+redeemed INTEGER DEFAULT 0,
+_
+_
+total
+credits
+_
+_
+expired INTEGER DEFAULT 0,
+-- Session impact
+sessions
+booked
+with
+credits INTEGER DEFAULT 0,
+_
+_
+_
+revenue
+_generated INTEGER DEFAULT 0,
+created
+_
+at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+updated
+_
+at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+INDEX idx
+stat
+_
+_
+date (stat
+_
+date DESC)
+);
+COMMENT ON TABLE game
+stats
+_
+_
+daily IS 'Daily aggregated statistics for monitoring and
+analytics';
+Table 6: booking_wallet_usage
+Purpose: Track wallet credit usage in bookings
+CREATE TABLE booking_
+wallet
+_
+usage (
+id SERIAL PRIMARY KEY,
+booking_
+id INTEGER UNIQUE NOT NULL REFERENCES bookings(id) ON DELETE
+CASCADE,
+user
+_
+id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+-- Pricing breakdown
+original
+amount INTEGER NOT NULL,
+_
+wallet
+credits
+used INTEGER NOT NULL,
+_
+_
+final
+amount INTEGER NOT NULL,
+_
+-- Credit sources used (array of wallet
+_
+credit IDs)
+credit
+_
+ids INTEGER[] NOT NULL,
+-- Transaction reference
+wallet
+transaction
+_
+id INTEGER REFERENCES wallet
+_
+_
+transactions(id),
+applied
+_
+at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+-- Indexes
+INDEX idx
+_
+booking (booking_
+id),
+INDEX idx
+_
+user (user
+_
+id, applied
+_
+at DESC)
+);
+COMMENT ON TABLE booking_
+wallet
+_
+usage IS 'Tracks which credits were used for which
+bookings';
+BACKEND CODE (PYTHON/FASTAPI)
+File: models/game.py
+from enum import Enum
+from datetime import datetime, timedelta
+from typing import Optional
+from pydantic import BaseModel, Field, validator
+import pytz
+class GameOutcome(str, Enum):
+"""Game outcome types"""
+SIXER = "sixer"
+FOUR = "four"
+OUT = "out"
+class GameOutcomeConfig:
+"""Probability configuration"""
+OUTCOMES = {
+GameOutcome.SIXER: {
+'probability': 0.04, # 4%
+'credit
+amount': 100,
+_
+'display_
+name': 'SIXER'
+,
+'emoji': '🚀'
+},
+GameOutcome.FOUR: {
+'probability': 0.08, # 8%
+'credit
+amount': 50,
+_
+'display_
+name': 'FOUR'
+,
+'emoji': '🎯'
+},
+GameOutcome.OUT: {
+'probability': 0.88, # 88%
+'credit
+amount': 10,
+_
+'display_
+name': 'OUT'
+,
+'emoji': '💰'
+}
+}
+# Time constraints
+IST = pytz.timezone('Asia/Kolkata')
+GAME
+CLOSE
+HOUR = 18 # 6 PM
+_
+_
+GAME
+CLOSE
+MINUTE = 0
+_
+_
+class GamePlayRequest(BaseModel):
+"""Request to play the game"""
+user
+_
+id: int = Field(..., gt=0)
+class GamePlayResponse(BaseModel):
+"""Game play result"""
+success: bool
+outcome: Optional[GameOutcome] = None
+prize: Optional[dict] = None
+wallet: Optional[dict] = None
+message: str
+monthly_
+stats: Optional[dict] = None
+class WalletBalance(BaseModel):
+"""Wallet balance response"""
+user
+id: int
+_
+total
+balance: int
+_
+game
+_
+credits: int
+referral
+credits: int
+_
+promo
+credits: int
+_
+lifetime
+earned: int
+_
+lifetime
+_
+spent: int
+lifetime
+_
+expired: int
+class WalletTransaction(BaseModel):
+"""Wallet transaction"""
+id: int
+transaction
+_
+type: str
+amount: int
+balance
+before: int
+_
+balance
+after: int
+_
+description: str
+created
+at: datetime
+_
+expires
+_
+at: Optional[datetime] = None
+File: services/game_engine.py
+import secrets
+from datetime import datetime, date, timedelta
+from typing import Tuple, Optional
+import pytz
+from sqlalchemy.orm import Session
+from models.game import GameOutcome, GameOutcomeConfig
+from models.database import DailyGamePlay, UserWallet, WalletTransaction, WalletCredit
+from services.subscription
+_
+service import SubscriptionService
+class GameEngine:
+"""Core game logic and probability engine"""
+def
+init
+__
+__(self, db: Session):
+self.db = db
+self.config = GameOutcomeConfig
+self.subscription
+_
+service = SubscriptionService(db)
+def check
+_
+eligibility(self, user
+_
+id: int) -> Tuple[bool, Optional[str], Optional[dict]]:
+"""
+Check if user is eligible to play today
+Returns:
+(eligible: bool, error
+_
+message: str, data: dict)
+"""
+# 1. Check subscription
+is
+_
+subscribed, subscription = self.subscription
+service.is
+active
+_
+_
+_
+subscriber(user
+_
+id)
+if not is
+subscribed:
+_
+return False,
+"SUBSCRIPTION
+REQUIRED"
+_
+, {
+"upgrade
+_prompt": {
+"plan": "Premium"
+,
+"price": 99,
+"benefits": [
+"Play daily cricket game"
+,
+"Win ₹10-₹100 credits daily"
+,
+"Average ₹450/month winnings"
+,
+"Reduce session costs by 45%"
+]
+}
+}
+# 2. Check if already played today
+today = self.
+_get
+ist
+_
+_
+date()
+existing_play = self.db.query(DailyGamePlay).filter(
+DailyGamePlay.user
+_
+id == user
+id,
+_
+DailyGamePlay.game
+_
+date == today
+).first()
+if existing_play:
+return False,
+"ALREADY
+PLAYED
+TODAY"
+_
+_
+, {
+"today_
+result": {
+"outcome": existing_play.outcome,
+"amount
+_
+won": existing_play.credit
+_
+amount
+},
+"next
+_play_
+at": self.
+_get
+next
+_
+_play_
+time()
+}
+# 3. Check time window (before 6 PM IST)
+ist
+_
+now = self.
+_get
+ist
+_
+_
+now()
+close
+time = ist
+_
+_
+now.replace(
+hour=self.config.GAME
+_
+CLOSE
+HOUR,
+_
+minute=self.config.GAME
+CLOSE
+_
+_
+MINUTE,
+second=0,
+microsecond=0
+)
+if ist
+now >= close
+time:
+_
+_
+return False,
+"GAME
+CLOSED"
+_
+, {
+"message": "Game closed for today. Play tomorrow before 6 PM!"
+,
+"next
+_play_
+at": self.
+_get
+next
+_
+_play_
+time()
+}
+# All checks passed
+time
+_
+remaining = close
+time - ist
+_
+_
+now
+return True, None, {
+"time
+_
+remaining_
+seconds": int(time
+_
+remaining.total
+_
+seconds()),
+"closes
+at": close
+_
+_
+time.isoformat()
+}
+def generate
+_
+outcome(self) -> Tuple[GameOutcome, int]:
+"""
+Generate game outcome using cryptographically secure randomization
+Returns:
+(outcome: GameOutcome, credit
+_
+amount: int)
+"""
+# Use secrets module for cryptographically secure random
+rand = secrets.SystemRandom()
+# Generate random float [0.0, 1.0)
+random
+_
+value = rand.random()
+# Determine outcome based on probabilities
+cumulative = 0.0
+for outcome, config in self.config.OUTCOMES.items():
+cumulative += config['probability']
+if random
+value < cumulative:
+_
+return outcome, config['credit
+_
+amount']
+# Fallback (should never reach here)
+return GameOutcome.OUT, self.config.OUTCOMES[GameOutcome.OUT]['credit
+_
+amount']
+def play_game(self, user
+_
+id: int, ip_
+address: str = None,
+user
+_
+agent: str = None) -> dict:
+"""
+Execute game play for user
+Returns:
+Game result dictionary
+"""
+# Check eligibility
+eligible, error, data = self.check
+_
+eligibility(user
+_
+id)
+if not eligible:
+return {
+"success": False,
+"error": error,
+"data": data
+}
+# Get subscription for tracking
+_, subscription = self.subscription
+service.is
+active
+_
+_
+_
+subscriber(user
+_
+id)
+# Generate outcome
+outcome, credit
+_
+amount = self.generate
+_
+outcome()
+# Record game play
+game
+_play = DailyGamePlay(
+user
+id=user
+id,
+_
+_
+game
+date=self.
+_
+_get
+_
+ist
+_
+date(),
+played
+_
+at=self.
+_get
+ist
+_
+_
+now(),
+subscription
+_
+id=subscription.id if subscription else None,
+subscription
+active=True,
+_
+outcome=outcome.value,
+credit
+amount=credit
+amount,
+_
+_
+ip_
+address=ip_
+address,
+user
+_
+agent=user
+_
+agent
+)
+self.db.add(game
+_play)
+self.db.flush() # Get game
+_play.id
+# Add credits to wallet
+wallet
+data = self.
+_
+add
+wallet
+_
+_
+_
+credit(
+user
+id=user
+_
+_
+id,
+amount=credit
+amount,
+_
+source=f"game
+_{outcome.value}"
+,
+source
+_
+id=game
+_play.id
+)
+# Update game play with transaction reference
+game
+_play.wallet
+_
+transaction
+id = wallet
+_
+_
+data['transaction
+_
+id']
+self.db.commit()
+# Get monthly stats
+monthly_
+stats = self.
+_get
+_
+monthly_
+stats(user
+_
+id)
+# Build response
+outcome
+_
+config = self.config.OUTCOMES[outcome]
+return {
+"success": True,
+"outcome": outcome.value,
+"prize": {
+"amount": credit
+amount,
+_
+"description": f"₹{credit
+_
+amount} added to wallet"
+,
+"display_
+name": outcome
+_
+config['display_
+name'],
+"emoji": outcome
+_
+config['emoji'],
+"expires
+in
+_
+_
+days": 30,
+"expires
+at": wallet
+_
+_
+data['expires
+_
+at'].isoformat()
+},
+"wallet": {
+"previous
+balance": wallet
+_
+_
+data['balance
+_
+before'],
+"credit
+added": credit
+amount,
+_
+_
+"new
+balance": wallet
+_
+_
+_
+data['balance
+after']
+},
+"monthly_
+stats": monthly_
+stats,
+"message": f"{outcome
+_
+config['emoji']} {outcome
+_
+config['display_
+name']}!
+₹{credit
+_
+amount} added to your wallet!"
+}
+def
+add
+wallet
+_
+_
+_
+credit(self, user
+_
+id: int, amount: int,
+source: str, source
+_
+id: int) -> dict:
+"""Add credit to user's wallet"""
+from services.wallet
+_
+service import WalletService
+wallet
+_
+service = WalletService(self.db)
+return wallet
+service.add
+_
+_
+credit(
+user
+id=user
+id,
+_
+_
+amount=amount,
+source=source,
+source
+_
+id=source
+id,
+_
+expires
+in
+_
+_
+days=30
+)
+def
+_get
+_
+monthly_
+stats(self, user
+_
+id: int) -> dict:
+"""Get user's monthly game statistics"""
+today = self.
+_get
+ist
+_
+_
+date()
+month
+_
+start = today.replace(day=1)
+plays = self.db.query(DailyGamePlay).filter(
+DailyGamePlay.user
+_
+id == user
+id,
+_
+DailyGamePlay.game
+date >= month
+_
+_
+start
+).all()
+total
+_
+won = sum(p.credit
+_
+amount for p in plays)
+# Get wallet to calculate spent
+wallet = self.db.query(UserWallet).filter(
+UserWallet.user
+id == user
+id
+_
+_
+).first()
+subscription
+fee = 99
+_
+net
+_profit = total
+_
+won - subscription
+fee if total
+_
+_
+won > subscription
+_
+fee else 0
+roi
+_percentage = int((net
+_profit / subscription
+_
+fee) * 100) if subscription
+_
+fee > 0 else 0
+return {
+"games
+_played": len(plays),
+"total
+won": total
+_
+won,
+_
+"subscription
+_
+fee": subscription
+fee,
+_
+"net
+_profit": net
+_profit,
+"roi
+_percentage": roi
+_percentage
+}
+def
+_get
+ist
+_
+_
+now(self) -> datetime:
+"""Get current time in IST"""
+return datetime.now(self.config.IST)
+def
+_get
+ist
+_
+_
+date(self) -> date:
+"""Get current date in IST"""
+return self.
+_get
+ist
+_
+_
+now().date()
+def
+_get
+next
+_
+_play_
+time(self) -> str:
+"""Get next available play time (tomorrow midnight IST)"""
+ist
+_
+now = self.
+_get
+ist
+_
+_
+now()
+tomorrow = ist
+_
+now + timedelta(days=1)
+next
+_play = tomorrow.replace(hour=0, minute=0, second=0, microsecond=0)
+return next
+_play.isoformat()
+File: services/wallet_service.py
+from datetime import datetime, timedelta
+from typing import List, Optional
+import pytz
+from sqlalchemy import and
+_
+from sqlalchemy.orm import Session
+from models.database import UserWallet, WalletTransaction, WalletCredit
+class WalletService:
+"""Wallet management service"""
+def
+__
+init
+__(self, db: Session):
+self.db = db
+self.IST = pytz.timezone('Asia/Kolkata')
+def get
+or
+create
+_
+_
+_
+wallet(self, user
+_
+id: int) -> UserWallet:
+"""Get or create user wallet"""
+wallet = self.db.query(UserWallet).filter(
+UserWallet.user
+id == user
+id
+_
+_
+).first()
+if not wallet:
+wallet = UserWallet(user
+id=user
+_
+_
+id)
+self.db.add(wallet)
+self.db.commit()
+return wallet
+def add
+_
+credit(self, user
+id: int, amount: int, source: str,
+_
+source
+_
+id: int, expires
+in
+_
+_
+days: int = 30) -> dict:
+"""
+Add credit to user's wallet
+Returns:
+Transaction details
+"""
+wallet = self.get
+or
+create
+_
+_
+_
+wallet(user
+_
+id)
+# Calculate expiry
+now = datetime.now(self.IST)
+expires
+_
+at = now + timedelta(days=expires
+in
+_
+_
+days)
+# Record balance before
+balance
+before = wallet.total
+balance
+_
+_
+# Create wallet credit (line item)
+credit = WalletCredit(
+user
+id=user
+id,
+_
+_
+amount=amount,
+remaining_
+balance=amount,
+source=source,
+source
+id=source
+id,
+_
+_
+earned
+at=now,
+_
+expires
+_
+at=expires
+_
+at
+)
+self.db.add(credit)
+self.db.flush()
+# Create transaction record
+transaction
+_
+type = f"credit
+earned
+_
+_{source}"
+transaction = WalletTransaction(
+user
+id=user
+id,
+_
+_
+wallet
+id=wallet.id,
+_
+transaction
+_
+type=transaction
+_
+type,
+amount=amount,
+source=source.split('
+_
+')[0], # 'game'
+,
+'referral'
+, etc.
+source
+id=source
+id,
+_
+_
+balance
+before=balance
+before,
+_
+_
+balance
+after=balance
+before + amount,
+_
+_
+expires
+_
+at=expires
+_
+at,
+description=f"Earned ₹{amount} from {source}"
+)
+self.db.add(transaction)
+self.db.flush()
+# Update credit with transaction reference
+credit.transaction
+id = transaction.id
+_
+# Update wallet balances
+wallet.total
+balance += amount
+_
+if source.startswith('game
+_
+'):
+wallet.game
+credits += amount
+_
+elif source.startswith('referral'):
+wallet.referral
+credits += amount
+_
+else:
+wallet.promo
+credits += amount
+_
+wallet.lifetime
+earned += amount
+_
+wallet.last
+transaction
+at = now
+_
+_
+wallet.updated
+at = now
+_
+self.db.commit()
+return {
+"transaction
+id": transaction.id,
+_
+"credit
+id": credit.id,
+_
+"balance
+before": balance
+before,
+_
+_
+"balance
+after": wallet.total
+balance,
+_
+_
+"expires
+_
+at": expires
+_
+at
+}
+def use
+_
+credit(self, user
+_
+id: int, amount: int, booking_
+id: int) -> dict:
+"""
+Use wallet credit for booking (FIFO - oldest credits first)
+Returns:
+Usage details
+"""
+wallet = self.get
+or
+create
+_
+_
+_
+wallet(user
+_
+id)
+if wallet.total
+balance < amount:
+_
+raise ValueError(f"Insufficient balance. Available: ₹{wallet.total
+_
+balance}, Required:
+₹{amount}")
+# Get active credits (FIFO - oldest first)
+active
+_
+credits = self.db.query(WalletCredit).filter(
+and
+_(
+WalletCredit.user
+id == user
+id,
+_
+_
+WalletCredit.expired == False,
+WalletCredit.fully_
+used == False,
+WalletCredit.remaining_
+balance > 0
+)
+).order
+_
+by(WalletCredit.earned
+_
+at.asc()).all()
+# Deduct from credits
+remaining_
+to
+_
+deduct = amount
+credits
+_
+used = []
+for credit in active
+credits:
+_
+if remaining_
+to
+_
+deduct <= 0:
+break
+deduction = min(remaining_
+to
+_
+deduct, credit.remaining_
+balance)
+credit.remaining_
+balance -= deduction
+if credit.remaining_
+balance == 0:
+credit.fully_
+used = True
+credits
+_
+used.append(credit.id)
+remaining_
+to
+_
+deduct -= deduction
+if remaining_
+to
+_
+deduct > 0:
+raise ValueError("Failed to deduct full amount")
+# Record transaction
+balance
+before = wallet.total
+balance
+_
+_
+transaction = WalletTransaction(
+user
+id=user
+id,
+_
+_
+wallet
+id=wallet.id,
+_
+transaction
+_
+type="credit
+_
+used
+_
+booking"
+,
+amount=-amount, # Negative for deduction
+source="booking"
+,
+source
+_
+id=booking_
+id,
+balance
+before=balance
+before,
+_
+_
+balance
+after=balance
+before - amount,
+_
+_
+description=f"Used ₹{amount} for session booking #{booking_
+id}"
+)
+self.db.add(transaction)
+# Update wallet balance
+wallet.total
+balance -= amount
+_
+wallet.game
+_
+credits = max(0, wallet.game
+_
+credits - amount)
+wallet.lifetime
+_
+spent += amount
+wallet.last
+transaction
+_
+_
+at = datetime.now(self.IST)
+wallet.updated
+_
+at = datetime.now(self.IST)
+self.db.commit()
+return {
+"transaction
+id": transaction.id,
+_
+"credits
+used": credits
+used,
+_
+_
+"amount
+deducted": amount,
+_
+"balance
+before": balance
+before,
+_
+_
+"balance
+after": wallet.total
+balance
+_
+_
+}
+def expire
+old
+_
+_
+credits(self) -> dict:
+"""
+Expire credits older than 30 days (background job)
+Returns:
+Expiry stats
+"""
+now = datetime.now(self.IST)
+# Find expired credits
+expired
+_
+credits = self.db.query(WalletCredit).filter(
+and
+_(
+WalletCredit.expired == False,
+WalletCredit.expires
+_
+at <= now,
+WalletCredit.remaining_
+balance > 0
+)
+).all()
+total
+_
+expired
+_
+amount = 0
+users
+_
+affected = set()
+for credit in expired
+credits:
+_
+expired
+_
+amount = credit.remaining_
+balance
+# Mark as expired
+credit.expired = True
+credit.remaining_
+balance = 0
+# Get wallet
+wallet = self.db.query(UserWallet).filter(
+UserWallet.user
+id == credit.user
+id
+_
+_
+).first()
+if wallet:
+# Deduct from balance
+wallet.total
+_
+balance -= expired
+_
+amount
+wallet.game
+_
+credits -= expired
+_
+amount
+wallet.lifetime
+_
+expired += expired
+_
+amount
+# Record transaction
+transaction = WalletTransaction(
+user
+id=credit.user
+id,
+_
+_
+wallet
+id=wallet.id,
+_
+transaction
+_
+type="credit
+_
+expired"
+,
+amount=-expired
+amount,
+_
+source=credit.source,
+source
+id=credit.source
+id,
+_
+_
+balance
+before=wallet.total
+_
+_
+balance + expired
+_
+amount,
+balance
+after=wallet.total
+balance,
+_
+_
+description=f"₹{expired
+_
+amount} credit expired (earned {credit.earned
+_
+at.date()})"
+)
+self.db.add(transaction)
+total
+_
+expired
+_
+amount += expired
+_
+amount
+users
+_
+affected.add(credit.user
+_
+id)
+self.db.commit()
+return {
+"total
+_
+expired": total
+_
+expired
+_
+amount,
+"credits
+_
+expired": len(expired
+_
+credits),
+"users
+_
+affected": len(users
+_
+affected)
+}
+def get
+_
+expiring_
+soon(self, user
+_
+id: int, days: int = 7) -> List[dict]:
+"""Get credits expiring within specified days"""
+now = datetime.now(self.IST)
+threshold = now + timedelta(days=days)
+expiring = self.db.query(WalletCredit).filter(
+and
+_(
+WalletCredit.user
+id == user
+id,
+_
+_
+WalletCredit.expired == False,
+WalletCredit.remaining_
+balance > 0,
+WalletCredit.expires
+_
+at <= threshold,
+WalletCredit.expires
+_
+at > now
+)
+).order
+_
+by(WalletCredit.expires
+_
+at.asc()).all()
+result = []
+for credit in expiring:
+days
+_
+until = (credit.expires
+_
+at - now).days
+urgency = "high" if days
+_
+until <= 3 else "medium" if days
+_
+until <= 7 else "low"
+result.append({
+"credit
+id": credit.id,
+_
+"amount": credit.remaining_
+balance,
+"source": credit.source,
+"earned
+on": credit.earned
+_
+_
+at.date().isoformat(),
+"expires
+_
+at": credit.expires
+_
+at.isoformat(),
+"days
+until
+_
+_
+expiry": days
+_
+until,
+"urgency": urgency
+})
+return result
+File: api/endpoints/game.py
+from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy.orm import Session
+from services.game
+_
+engine import GameEngine
+from services.wallet
+_
+service import WalletService
+from database import get
+_
+db
+from auth import get
+current
+_
+_
+user
+router = APIRouter(prefix="/api/v1/games/cricket"
+, tags=["cricket-game"])
+@router.get("/eligibility")
+async def check
+_game
+_
+eligibility(
+current
+_
+user: dict = Depends(get
+_
+current
+_
+user),
+db: Session = Depends(get
+_
+db)
+):
+"""
+Check if user is eligible to play today's game
+Returns eligibility status and relevant data
+"""
+game
+_
+engine = GameEngine(db)
+wallet
+_
+service = WalletService(db)
+eligible, error, data = game
+_
+engine.check
+_
+eligibility(current
+_
+user['id'])
+if not eligible:
+return {
+"eligible": False,
+"reason": error,
+**data
+}
+# Get wallet balance
+wallet = wallet
+_
+service.get
+or
+create
+_
+_
+_
+wallet(current
+_
+user['id'])
+monthly_
+stats = game
+_
+engine.
+_get
+_
+monthly_
+stats(current
+_
+user['id'])
+return {
+"eligible": True,
+"game
+status": data,
+_
+"wallet": {
+"current
+balance": wallet.total
+balance,
+_
+_
+"this
+month
+_
+_
+winnings": monthly_
+stats['total
+_
+won'],
+"roi": monthly_
+stats['roi
+_percentage']
+}
+}
+@router.post("/play")
+async def play_
+cricket
+_game(
+request: Request,
+current
+_
+user: dict = Depends(get
+_
+current
+_
+user),
+db: Session = Depends(get
+_
+db)
+):
+"""
+Play today's cricket game
+Returns game outcome and wallet update
+"""
+game
+_
+engine = GameEngine(db)
+# Get client info
+ip_
+address = request.client.host
+user
+_
+agent = request.headers.get("user-agent")
+result = game
+_
+engine.play_game(
+user
+id=current
+_
+_
+user['id'],
+ip_
+address=ip_
+address,
+user
+_
+agent=user
+_
+agent
+)
+if not result['success']:
+raise HTTPException(
+status
+code=400,
+_
+detail={
+"error": result['error'],
+"message": result['data'].get('message'
+,
+'Cannot play game')
+}
+)
+return result
+@router.get("/winners")
+async def get
+recent
+_
+_
+winners(
+limit: int = 20,
+db: Session = Depends(get
+_
+db)
+):
+"""
+Get recent game winners (for social proof feed)
+Privacy: Shows only first name + last initial
+"""
+from models.database import DailyGamePlay, User
+from datetime import datetime, timedelta
+import pytz
+IST = pytz.timezone('Asia/Kolkata')
+today = datetime.now(IST).date()
+winners = db.query(DailyGamePlay, User).join(
+User, DailyGamePlay.user
+_
+id == User.id
+).filter(
+DailyGamePlay.game
+_
+date == today,
+DailyGamePlay.outcome.in
+_(['sixer'
+,
+'four'])
+).order
+_
+by(
+DailyGamePlay.played
+_
+at.desc()
+).limit(limit).all()
+result = []
+for play, user in winners:
+# Privacy: first name + last initial
+display_
+name = f"{user.first
+_
+name} {user.last
+_
+name[0]}.
+" if user.last
+_
+user.first
+name
+_
+name else
+result.append({
+"display_
+name": display_
+name,
+"outcome": play.outcome,
+"amount
+_
+won": play.credit
+_
+amount,
+"time
+_
+ago":
+format
+time
+_
+_
+_
+ago(play.played
+_
+at),
+"emoji": "🚀" if play.outcome == "sixer" else "🎯"
+})
+return {
+"winners": result,
+"total
+_
+today": len(winners)
+}
+def
+format
+time
+_
+_
+_
+ago(dt: datetime) -> str:
+"""Format datetime as 'X mins ago'"""
+import pytz
+IST = pytz.timezone('Asia/Kolkata')
+now = datetime.now(IST)
+if dt.tzinfo is None:
+dt = IST.localize(dt)
+diff = now - dt
+if diff.seconds < 60:
+return "just now"
+elif diff.seconds < 3600:
+mins = diff.seconds // 60
+return f"{mins} min{'s' if mins > 1 else ''} ago"
+elif diff.seconds < 86400:
+hours = diff.seconds // 3600
+return f"{hours} hour{'s' if hours > 1 else ''} ago"
+else:
+return dt.strftime("%b %d")
+FRONTEND CODE (REACT)
+File: components/CricketGame.jsx
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { api } from '
+../services/api';
+import '
+./CricketGame.css';
+const CricketGame = () => {
+const [eligibility, setEligibility] = useState(null);
+const [loading, setLoading] = useState(true);
+const [playing, setPlaying] = useState(false);
+const [result, setResult] = useState(null);
+const [timeRemaining, setTimeRemaining] = useState('');
+useEffect(() => {
+checkEligibility();
+const interval = setInterval(updateTimeRemaining, 1000);
+return () => clearInterval(interval);
+}, []);
+const checkEligibility = async () => {
+try {
+const response = await api.get('/games/cricket/eligibility');
+setEligibility(response.data);
+setLoading(false);
+} catch (error) {
+console.error('Failed to check eligibility:'
+, error);
+setLoading(false);
+}
+};
+const updateTimeRemaining = () => {
+if (!eligibility?.game
+status?.time
+_
+_
+remaining_
+seconds) return;
+const seconds = eligibility.game
+_
+status.time
+const hours = Math.floor(seconds / 3600);
+const minutes = Math.floor((seconds % 3600) / 60);
+_
+remaining_
+seconds;
+setTimeRemaining(`${hours}h ${minutes}m left`);
+};
+const playGame = async () => {
+setPlaying(true);
+try {
+// Simulate ball animation delay
+await new Promise(resolve => setTimeout(resolve, 2000));
+const response = await api.post('/games/cricket/play');
+setResult(response.data);
+} catch (error) {
+console.error('Failed to play game:'
+, error);
+alert(error.response?.data?.detail?.message || 'Failed to play game');
+} finally {
+setPlaying(false);
+}
+};
+if (loading) {
+return <div className="game-loading">Loading game...
+</div>;
+}
+// Not eligible - show upgrade prompt
+if (!eligibility?.eligible) {
+return <SubscribePrompt reason={eligibility?.reason} />;
+}
+// Show result if just played
+if (result) {
+return <GameResult result={result} onClose={() => setResult(null)} />;
+}
+// Game UI
+return (
+<div className="cricket-game">
+<div className="game-header">
+<h2>🏏 HIT A SIXER 🏏</h2>
+<p className="tagline">Play before 6 PM today!</p>
+<div className="time-remaining">⏰ {timeRemaining}</div>
+</div>
+<div className="wallet-display">
+<div className="wallet-label">YOUR WALLET</div>
+<div className="wallet-amount">₹{eligibility.wallet.current
+_
+balance}</div>
+<div className="wallet-roi">
+This month: ₹{eligibility.wallet.this
+month
+_
+_
+winnings}
+({eligibility.wallet.roi}% ROI)
+</div>
+</div>
+<div className="game-arena">
+<AnimatePresence>
+{playing ? (
+<motion.div
+className="ball-animation"
+initial={{ x: -100, y: 0 }}
+animate={{ x: 300, y: -50 }}
+transition={{ duration: 2 }}
+>
+🔴
+</motion.div>
+) : (
+<motion.div
+className="bat-icon"
+whileHover={{ scale: 1.1 }}
+whileTap={{ scale: 0.95 }}
+>
+🏏
+</motion.div>
+)}
+</AnimatePresence>
+</div>
+<button
+className="play-button"
+onClick={playGame}
+disabled={playing}
+>
+{playing ? 'SWINGING...
+' : 'SWING! 🎯'}
+</button>
+<div className="prizes-list">
+<div className="prize-item">
+<span className="prize-emoji">🚀</span>
+<span className="prize-name">SIXER</span>
+<span className="prize-value">₹100</span>
+<span className="prize-chance">(4%)</span>
+</div>
+<div className="prize-item">
+<span className="prize-emoji">🎯</span>
+<span className="prize-name">FOUR</span>
+<span className="prize-value">₹50</span>
+<span className="prize-chance">(8%)</span>
+</div>
+<div className="prize-item">
+<span className="prize-emoji">💰</span>
+<span className="prize-name">OUT</span>
+<span className="prize-value">₹10</span>
+<span className="prize-chance">(88%)</span>
+</div>
+</div>
+<WinnersFeed />
+</div>
+);
+};
+const GameResult = ({ result, onClose }) => {
+const outcomeConfig = {
+sixer: { emoji: '🚀'
+, color: '#00ff88'
+, title: 'SIXER!!!' },
+four: { emoji: '🎯'
+, color: '#ffaa00'
+, title: 'FOUR!' },
+out: { emoji: '💰'
+, color: '#0088ff'
+, title: 'OUT' }
+};
+const config = outcomeConfig[result.outcome];
+return (
+<motion.div
+className="game-result"
+initial={{ scale: 0 }}
+animate={{ scale: 1 }}
+transition={{ type: 'spring'
+, duration: 0.5 }}
+>
+<div className="result-content" style={{ borderColor: config.color }}>
+<div className="result-emoji">{config.emoji}</div>
+<h2 className="result-title">{config.title}</h2>
+<div className="result-prize">
+<div className="prize-amount">₹{result.prize.amount}</div>
+<div className="prize-description">{result.prize.description}</div>
+</div>
+<div className="wallet-update">
+<div className="wallet-row">
+<span>Before:</span>
+<span>₹{result.wallet.previous
+_
+balance}</span>
+</div>
+<div className="wallet-row highlight">
+<span>Won:</span>
+<span>+₹{result.wallet.credit
+_
+added} {config.emoji}</span>
+</div>
+<div className="wallet-row total">
+<span>Now:</span>
+<span>₹{result.wallet.new
+_
+</div>
+balance}</span>
+</div>
+<div className="expiry-notice">
+Expires in 30 days - use it or lose it!
+</div>
+<div className="result-actions">
+<button className="btn-primary" onClick={() => window.location.href = '/book-session'}>
+📅 BOOK SESSION
+</button>
+<button className="btn-secondary" onClick={() => window.location.href = '/wallet'}>
+💳 VIEW WALLET
+</button>
+<button className="btn-tertiary" onClick={onClose}>
+Close
+</button>
+</div>
+<div className="monthly-stats">
+<div>Games this month: {result.monthly_
+stats.games
+_played}</div>
+<div>Total won: ₹{result.monthly_
+stats.total
+_
+won}</div>
+<div>ROI: {result.monthly_
+stats.roi
+_percentage}% 🚀</div>
+</div>
+</div>
+</motion.div>
+);
+};
+const WinnersFeed = () => {
+const [winners, setWinners] = useState([]);
+useEffect(() => {
+fetchWinners();
+const interval = setInterval(fetchWinners, 30000); // Refresh every 30s
+return () => clearInterval(interval);
+}, []);
+const fetchWinners = async () => {
+try {
+const response = await api.get('/games/cricket/winners?limit=10');
+setWinners(response.data.winners);
+} catch (error) {
+console.error('Failed to fetch winners:'
+, error);
+}
+};
+return (
+<div className="winners-feed">
+<h3>🏆 TODAY'S WINNERS 🏆</h3>
+<div className="winners-list">
+{winners.map((winner, index) => (
+<div key={index} className="winner-item">
+<span className="winner-emoji">{winner.emoji}</span>
+<span className="winner-name">{winner.display_
+name}</span>
+<span className="winner-outcome">{winner.outcome.toUpperCase()}</span>
+<span className="winner-time">{winner.time
+_
+ago}</span>
+</div>
+))}
+</div>
+</div>
+);
+};
+const SubscribePrompt = ({ reason }) => {
+return (
+<div className="subscribe-prompt">
+<div className="lock-icon">🔒</div>
+<h2>🏏 HIT A SIXER 🏏</h2>
+<p className="subtitle">Subscriber Exclusive Feature</p>
+<div className="benefits">
+<div className="benefit-item">
+<span className="check">✓</span>
+<span>Win up to ₹100 daily</span>
+</div>
+<div className="benefit-item">
+<span className="check">✓</span>
+<span>Average ₹450/month winnings</span>
+</div>
+<div className="benefit-item">
+<span className="check">✓</span>
+<span>354% ROI guaranteed</span>
+</div>
+<div className="benefit-item">
+<span className="check">✓</span>
+<span>Reduce therapy costs by 45%</span>
+</div>
+</div>
+<div className="pricing">
+<div className="price">₹99/month</div>
+<div className="price-description">Break-even in just 10 days!</div>
+</div>
+<button className="subscribe-button" onClick={() => window.location.href = '/subscribe'}>
+SUBSCRIBE & START WINNING 🚀
+</button>
+<div className="guarantee">30-day money-back guarantee</div>
+</div>
+);
+};
+export default CricketGame;
+BACKGROUND JOBS
+File: jobs/expire_credits.py
+from celery import Celery
+from datetime import datetime
+import pytz
+from database import SessionLocal
+from services.wallet
+_
+service import WalletService
+from services.notification
+_
+service import NotificationService
+celery = Celery('mans360'
+, broker='redis://localhost:6379/0')
+@celery.task
+def expire
+old
+_
+_
+credits():
+"""
+Daily job to expire credits older than 30 days
+Runs at midnight IST
+"""
+db = SessionLocal()
+try:
+wallet
+_
+service = WalletService(db)
+notification
+_
+service = NotificationService(db)
+# Expire credits
+result = wallet
+_
+service.expire
+old
+_
+_
+credits()
+print(f"Credits expired: {result['credits
+_
+expired']}")
+print(f"Amount expired: ₹{result['total
+_
+expired']}")
+print(f"Users affected: {result['users
+_
+affected']}")
+# Notify users who lost credits (if > ₹50)
+# ... notification logic ...
+return result
+finally:
+db.close()
+@celery.task
+def send
+_
+expiry_
+warnings():
+"""
+Send warnings 7 days before credit expiry
+Runs daily at 10 AM IST
+"""
+db = SessionLocal()
+try:
+# Get all users with credits expiring in 7 days
+# Send push notification / email
+pass
+finally:
+db.close()
+@celery.task
+def send
+_
+morning_game
+_
+reminder():
+"""
+Send morning reminder to play game
+Runs daily at 10 AM IST
+"""
+db = SessionLocal()
+try:
+# Get all subscribers who haven't played today
+# Send push notification
+pass
+finally:
+db.close()
+# Schedule tasks
+celery.conf.beat
+_
+schedule = {
+'expire-credits-midnight': {
+'task': 'jobs.expire
+_
+credits.expire
+old
+credits'
+,
+_
+_
+'schedule': crontab(hour=0, minute=0), # Midnight IST
+},
+'expiry-warnings-morning': {
+'task': 'jobs.expire
+credits.send
+_
+_
+expiry_
+warnings'
+,
+'schedule': crontab(hour=10, minute=0), # 10 AM IST
+},
+'game-reminder-morning': {
+'task': 'jobs.expire
+credits.send
+_
+_
+morning_game
+reminder'
+,
+_
+'schedule': crontab(hour=10, minute=0), # 10 AM IST
+},
+}
+TESTING SPECIFICATIONS
+Unit Tests
+# tests/test
+_game
+_
+engine.py
+import pytest
+from services.game
+_
+engine import GameEngine
+def test
+_probability_
+distribution():
+"""Test that probabilities are within expected ranges"""
+engine = GameEngine(db)
+outcomes = {'sixer': 0,
+'four': 0,
+'out': 0}
+iterations = 10000
+for
+_
+in range(iterations):
+outcome, _
+= engine.generate
+_
+outcomes[outcome.value] += 1
+outcome()
+# Check percentages (with 1% tolerance)
+sixer
+_pct = (outcomes['sixer'] / iterations) * 100
+four
+_pct = (outcomes['four'] / iterations) * 100
+out
+_pct = (outcomes['out'] / iterations) * 100
+assert 3.0 <= sixer
+_pct <= 5.0, f"SIXER: {sixer
+_pct}% (expected 4%)"
+assert 7.0 <= four
+_pct <= 9.0, f"FOUR: {four
+_pct}% (expected 8%)"
+assert 87.0 <= out
+_pct <= 89.0, f"OUT: {out
+_pct}% (expected 88%)"
+def test
+time
+window
+_
+_
+_
+enforcement():
+"""Test that game closes after 6 PM"""
+from datetime import datetime
+import pytz
+engine = GameEngine(db)
+IST = pytz.timezone('Asia/Kolkata')
+# Mock time to 6:30 PM
+with freeze
+_
+time(IST.localize(datetime(2026, 1, 17, 18, 30))):
+eligible, error, _
+= engine.check
+_
+eligibility(user
+_
+id=1)
+assert not eligible
+assert error == "GAME
+CLOSED"
+_
+def test
+_
+daily_
+limit
+_
+enforcement():
+"""Test that user can only play once per day"""
+engine = GameEngine(db)
+# First play - should succeed
+result1 = engine.play_game(user
+_
+assert result1['success'] == True
+id=1)
+# Second play same day - should fail
+result2 = engine.play_game(user
+_
+id=1)
+assert result2['success'] == False
+assert result2['error'] == "ALREADY
+PLAYED
+_
+_
+TODAY"
+def test
+_
+subscription
+_
+requirement():
+"""Test that non-subscribers cannot play"""
+engine = GameEngine(db)
+# User without active subscription
+eligible, error, _
+= engine.check
+_
+eligibility(user
+_
+id=999)
+assert not eligible
+assert error == "SUBSCRIPTION
+_
+REQUIRED"
+def test
+wallet
+credit
+_
+_
+_
+addition():
+"""Test that credits are correctly added to wallet"""
+from services.wallet
+_
+service import WalletService
+wallet
+_
+service = WalletService(db)
+# Add credit
+result = wallet
+service.add
+_
+_
+credit(
+user
+id=1,
+_
+amount=100,
+source="game
+sixer"
+_
+,
+source
+id=1,
+_
+expires
+in
+_
+_
+days=30
+)
+# Verify wallet balance
+wallet = wallet
+_
+service.get
+or
+create
+_
+_
+_
+wallet(user
+_
+id=1)
+assert wallet.total
+_
+balance == result['balance
+_
+after']
+assert result['balance
+_
+after'] - result['balance
+_
+before'] == 100
+def test
+credit
+_
+_
+expiry():
+"""Test that credits expire after 30 days"""
+from datetime import timedelta
+wallet
+_
+service = WalletService(db)
+# Add credit that expires today
+with freeze
+_
+time(datetime.now() - timedelta(days=31)):
+wallet
+service.add
+_
+_
+credit(
+user
+id=1,
+_
+amount=50,
+source="game
+four"
+_
+,
+source
+id=1,
+_
+expires
+in
+_
+_
+days=30
+)
+# Run expiry job
+result = wallet
+_
+service.expire
+old
+_
+_
+credits()
+assert result['total
+_
+expired'] == 50
+assert result['credits
+_
+expired'] == 1
+TASK BREAKDOWN
+Backend Tasks (8 points)
+Task 1.1: Database Schema Setup (1 point)
+Create all 6 tables
+Add indexes
+Set up foreign keys
+Write migration scripts
+Verify schema in dev environment
+Task 1.2: Game Engine Service (2 points)
+Implement eligibility checking
+Build cryptographically secure probability engine
+Add IST timezone handling
+Create outcome generation logic
+Write unit tests (>90% coverage)
+Task 1.3: Wallet Service (2 points)
+Implement credit addition (FIFO)
+Build credit usage logic
+Add expiry handling
+Create transaction logging
+Write integration tests
+Task 1.4: API Endpoints (2 points)
+GET /eligibility endpoint
+POST /play endpoint
+GET /winners endpoint
+Error handling
+Request validation
+API documentation (OpenAPI)
+Task 1.5: Background Jobs (1 point)
+Credit expiry cron (midnight IST)
+Expiry warning job (7 days before)
+Morning reminder job (10 AM IST)
+Job monitoring & logging
+Frontend Tasks (5 points)
+Task 2.1: Game Component UI (2 points)
+Cricket game interface
+Ball swing animation
+Play button interaction
+Wallet display widget
+Mobile responsive design
+Task 2.2: Result Screens (1 point)
+SIXER celebration screen
+FOUR result screen
+OUT result screen
+Wallet balance update animation
+Share buttons integration
+Task 2.3: Subscribe Prompt (1 point)
+Non-subscriber gate screen
+Upgrade benefits list
+Pricing display
+CTA button integration
+A/B testing hooks
+Task 2.4: Winners Feed (1 point)
+Real-time winners list
+Privacy-safe name display
+Auto-refresh (30s interval)
+Animation on new winner
+DEFINITION OF DONE
+Technical Requirements
+All database tables created and migrated
+All API endpoints functional and documented
+Unit test coverage >90%
+Integration tests passing
+Load testing completed (1,000 concurrent plays)
+Security audit passed
+Code review approved
+Functional Requirements
+Subscribers can play once per day
+Non-subscribers see upgrade prompt
+Game closes at 6 PM IST
+Probabilities match spec (4%, 8%, 88%)
+Credits added to wallet instantly
+Credits expire after 30 days
+Wallet auto-applies at checkout
+Quality Requirements
+No P0/P1 bugs
+Response time <200ms for play endpoint
+Database queries optimized
+Error handling comprehensive
+Logging implemented
+Monitoring dashboards created
+Documentation
+API documentation complete
+Database schema documented
+README updated
+Deployment guide written
+Runbook for on-call created
+DEPLOYMENT CHECKLIST
+Pre-Deployment
+Run all tests in staging
+Verify database migrations
+Test background jobs
+Load test with 1,000 concurrent users
+Security scan
+Backup database
+Deployment
+Apply database migrations
+Deploy backend code
+Deploy frontend code
+Start background job workers
+Verify cron schedules (IST timezone)
+Enable feature flag for 10% users
+Post-Deployment
+Monitor error rates
+Check probability distribution
+Verify wallet balances
+Test full user journey
+Monitor performance metrics
+Gradual rollout to 100%
+MONITORING & ALERTS
+Key Metrics to Monitor
+Game Metrics:
+-
+-
+-
+-
+Plays per day
+Probability distribution (4%, 8%, 88%)
+Play rate (% of subscribers)
+Time-of-day distribution
+Financial Metrics:
+-
+-
+-
+-
+-
+Credits issued per day
+Credits redeemed per day
+Breakage rate (% expired)
+Cost per play
+Revenue impact
+Technical Metrics:
+-
+-
+-
+-
+API response time (<200ms)
+Error rate (<0.1%)
+Database query time (<50ms)
+Background job success rate (>99%)
+Alerts to Configure
+Critical:
+-
+-
+-
+-
+Game down (can't play)
+Database connection failed
+Probability skewed >2% from target
+Credits not being added to wallet
+Warning:
+-
+-
+-
+-
+Play rate drops >20%
+Response time >500ms
+Background job failures
+Unusual spike in plays (bot detection)
+RISKS & MITIGATION
+Risk 1: Probability Manipulation
+Risk: Users try to manipulate outcomes Mitigation:
+-
+-
+-
+-
+-
+Use cryptographically secure randomization
+Server-side only (no client-side RNG)
+Audit trail in database
+Device fingerprinting
+Rate limiting
+Risk 2: Multi-Account Abuse
+Risk: Users create multiple accounts Mitigation:
+-
+-
+-
+-
+-
+Subscription required (payment verification)
+Device fingerprinting
+IP tracking
+Phone number verification
+Manual review of suspicious patterns
+Risk 3: Timezone Issues
+Risk: Wrong timezone causes incorrect closing time Mitigation:
+-
+-
+-
+-
+All times in IST (pytz enforced)
+Extensive timezone testing
+Server clock monitoring
+User sees local time conversion
+Risk 4: High Redemption Cost
+Risk: More users redeem than expected Mitigation:
+-
+-
+-
+-
+Conservative estimates (85% redemption)
+Real-time cost monitoring
+Alert if cost >120% of budget
+Can reduce OUT from ₹10 to ₹5 if needed
+APPENDIX
+Sample Database Queries
+Get daily statistics:
+SELECT
+game
+_
+date,
+COUNT(*) as total
+_plays,
+SUM(CASE WHEN outcome = 'sixer' THEN 1 ELSE 0 END) as sixers,
+SUM(CASE WHEN outcome = 'four' THEN 1 ELSE 0 END) as fours,
+SUM(CASE WHEN outcome = 'out' THEN 1 ELSE 0 END) as outs,
+SUM(credit
+_
+amount) as total
+credits
+_
+_
+issued
+FROM daily_game
+_plays
+WHERE game
+date >= CURRENT
+_
+_
+DATE - INTERVAL '7 days'
+GROUP BY game
+_
+date
+ORDER BY game
+_
+date DESC;
+Get user's wallet balance:
+SELECT
+u.id,
+u.first
+name,
+_
+uw.total
+balance,
+_
+uw.game
+_
+credits,
+uw.lifetime
+earned,
+_
+uw.lifetime
+_
+spent
+FROM users u
+JOIN user
+wallet uw ON u.id = uw.user
+_
+id
+_
+WHERE u.id = :user
+id;
+_
+Find expiring credits:
+SELECT
+wc.id,
+wc.user
+id,
+_
+wc.amount,
+wc.remaining_
+balance,
+wc.expires
+at,
+_
+DATE
+_
+PART('day'
+, wc.expires
+_
+at - NOW()) as days
+until
+_
+_
+expiry
+FROM wallet
+credits wc
+_
+WHERE wc.expired = FALSE
+AND wc.fully_
+used = FALSE
+AND wc.expires
+_
+at <= NOW() + INTERVAL '7 days'
+ORDER BY wc.expires
+_
+at ASC;
+END OF STORY 11.5 SPECIFICATION

@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Manas360 Flow Diagram</title>
+
+<style>
+body {
+  background: #0b0f19;
+  color: #fff;
+  font-family: Arial;
+  margin: 0;
+  padding: 20px;
+  overflow-x: auto;
+}
+
+h2 {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.pipeline {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.step {
+  min-width: 280px;
+}
+
+.step-title {
+  text-align: center;
+  font-size: 12px;
+  color: #aaa;
+  margin-bottom: 10px;
+}
+
+.box {
+  background: #111827;
+  padding: 12px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  border: 1px solid #2d3748;
+}
+
+.light {
+  background: #d6c9cf;
+  color: #000;
+}
+
+.beige {
+  background: #e8dcc9;
+  color: #000;
+}
+
+.blue {
+  background: #c9d8dc;
+  color: #000;
+}
+
+.green {
+  background: #cde3d0;
+  color: #000;
+}
+
+.arrow {
+  text-align: center;
+  margin: 5px 0;
+  font-size: 18px;
+}
+
+.label {
+  font-size: 11px;
+  color: #aaa;
+  margin: 5px 0;
+}
+
+</style>
+</head>
+
+<body>
+
+<h2>Manas360 End-to-End Flow (Domestic + NRI)</h2>
+
+<div class="pipeline">
+
+  <!-- STEP 1 -->
+  <div class="step">
+    <div class="step-title">STEP 1: SEARCH → LANDING</div>
+
+    <div class="box">
+      User Intent Detection<br>
+      Google Search Query
+    </div>
+
+    <div class="arrow">↓</div>
+
+    <div class="box">
+      Domestic Landing<br>
+      CTA → therapist / psychiatrist / couples
+    </div>
+
+    <div class="box">
+      NRI Landing<br>
+      3 Fixed Session Cards
+    </div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="step">
+    <div class="step-title">STEP 2: ASSESSMENT PRESET</div>
+
+    <div class="box light">
+      Therapist<br>
+      ✓ Budget ₹500–2000<br>
+      ✓ Individual
+    </div>
+
+    <div class="box light">
+      Psychiatrist<br>
+      ✓ ₹1000–3000<br>
+      ✓ Medication Priority
+    </div>
+
+    <div class="box light">
+      Couples<br>
+      ✓ ₹1500–3000<br>
+      ✓ Relationship Focus
+    </div>
+
+    <div class="box light">
+      NRI Flow<br>
+      ✓ Provider LOCKED<br>
+      ✓ Fee LOCKED<br>
+      ✓ Budget SKIPPED
+    </div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="step">
+    <div class="step-title">STEP 3: MATCHING FILTERS</div>
+
+    <div class="box">
+      Therapist Filter<br>
+      Psychologist / Counselor
+    </div>
+
+    <div class="box">
+      Psychiatrist Filter<br>
+      MD / DPM Required
+    </div>
+
+    <div class="box">
+      Couples Filter<br>
+      Relationship Specialist
+    </div>
+
+    <div class="box">
+      NRI HARD FILTERS<br>
+      ✓ nri_pool_certified<br>
+      ✓ timezone match<br>
+      ✓ language match
+    </div>
+  </div>
+
+  <!-- STEP 4 -->
+  <div class="step">
+    <div class="step-title">STEP 4: SCORING</div>
+
+    <div class="box beige">
+      Score: 0–100<br>
+      Spec: 20<br>
+      Language: 20<br>
+      Rating: 15<br>
+      Exp: 10
+    </div>
+
+    <div class="box beige">
+      Psychiatrist Boost<br>
+      Credentials weighted higher
+    </div>
+
+    <div class="box beige">
+      Couples Bonus<br>
+      Both partners match
+    </div>
+
+    <div class="box beige">
+      NRI Score (0–80)<br>
+      Timezone +15<br>
+      Pool +10<br>
+      Spec +20<br>
+      Location = 0
+    </div>
+  </div>
+
+  <!-- STEP 5 -->
+  <div class="step">
+    <div class="step-title">STEP 5: PAYMENT</div>
+
+    <div class="box blue">
+      Therapist Pricing<br>
+      ₹500–3000
+    </div>
+
+    <div class="box blue">
+      Psychiatrist<br>
+      ₹1000–3000
+    </div>
+
+    <div class="box blue">
+      Couples<br>
+      ₹1500–3000
+    </div>
+
+    <div class="box blue">
+      NRI FIXED<br>
+      ₹2999 / ₹3499 / ₹3599
+    </div>
+  </div>
+
+  <!-- STEP 6 -->
+  <div class="step">
+    <div class="step-title">STEP 6: CONFIRMATION</div>
+
+    <div class="box green">
+      ✓ Jitsi Link<br>
+      ✓ SMS<br>
+      ✓ IST Time
+    </div>
+
+    <div class="box green">
+      ✓ Jitsi Link<br>
+      ✓ Rx Consult
+    </div>
+
+    <div class="box green">
+      ✓ Both Partners<br>
+      ✓ SMS Notification
+    </div>
+
+    <div class="box green">
+      NRI Confirmation<br>
+      ✓ Timezone Adjusted<br>
+      ✓ Language Applied
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

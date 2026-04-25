@@ -1,0 +1,610 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Zoho Flow Automation Blueprint - MANAS360</title>
+  <style>
+    :root {
+      --bg: #f5f3ef;
+      --paper: #ffffff;
+      --ink: #25302a;
+      --muted: #62706a;
+      --line: #d9ddd6;
+      --primary: #4a6741;
+      --primary-soft: #ecf3ea;
+      --accent: #c4956a;
+      --warn: #9a4e38;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at 10% 5%, #ffffff 0%, var(--bg) 50%);
+      color: var(--ink);
+      line-height: 1.5;
+    }
+
+    .wrap {
+      width: min(1200px, 94%);
+      margin: 20px auto 40px;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, #ffffff 0%, #f2f8f7 55%, #edf6ff 100%);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 10px 28px rgba(44, 51, 51, 0.07);
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 1.8rem;
+      color: #1e2c1b;
+    }
+
+    h2 {
+      margin: 24px 0 10px;
+      font-size: 1.25rem;
+      color: #1e2c1b;
+    }
+
+    p {
+      margin: 6px 0;
+      color: var(--muted);
+    }
+
+    .legend {
+      margin-top: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .pill {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 12px;
+      color: #3f5148;
+    }
+
+    .panel {
+      margin-top: 16px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      box-shadow: 0 6px 18px rgba(44, 51, 51, 0.05);
+    }
+
+    .flowline {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(140px, 1fr));
+      gap: 10px;
+      align-items: center;
+      margin-top: 8px;
+      overflow-x: auto;
+      padding-bottom: 8px;
+    }
+
+    .node {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px;
+      background: #fff;
+      min-height: 80px;
+      position: relative;
+    }
+
+    .node strong {
+      display: block;
+      color: var(--primary);
+      font-size: 12px;
+      letter-spacing: 0.3px;
+      margin-bottom: 4px;
+    }
+
+    .node p {
+      margin: 0;
+      font-size: 13px;
+      color: #334039;
+    }
+
+    .arrow::after {
+      content: "→";
+      position: absolute;
+      right: -12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #8a9a90;
+      font-size: 18px;
+      font-weight: 700;
+      z-index: 2;
+    }
+
+    .lanes {
+      margin-top: 14px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .lane {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+      background: #fff;
+    }
+
+    .lane-head {
+      background: var(--primary-soft);
+      color: #2c4733;
+      border-bottom: 1px solid var(--line);
+      padding: 10px 12px;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    .lane-body {
+      padding: 10px 12px 12px;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(180px, 1fr));
+      gap: 8px;
+      align-items: stretch;
+    }
+
+    .step {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      background: #fcfcfb;
+      position: relative;
+      min-height: 78px;
+    }
+
+    .step b {
+      color: #2f4c37;
+      font-size: 12px;
+      display: block;
+      margin-bottom: 3px;
+    }
+
+    .step code {
+      background: #f4f2ee;
+      border: 1px solid #e7e2d9;
+      border-radius: 6px;
+      padding: 1px 5px;
+      font-size: 12px;
+    }
+
+    .step.arrow-right::after {
+      content: "→";
+      position: absolute;
+      right: -10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #97a69d;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .a2z {
+      margin-top: 12px;
+      border: 1px dashed #cdd5ce;
+      border-radius: 12px;
+      padding: 12px;
+      background: #fafcf9;
+    }
+
+    .a2z ol {
+      margin: 0;
+      padding-left: 18px;
+      columns: 2;
+      column-gap: 24px;
+    }
+
+    .a2z li {
+      margin: 4px 0;
+      break-inside: avoid;
+      color: #3b4a42;
+      font-size: 14px;
+    }
+
+    .note {
+      margin-top: 10px;
+      border-left: 4px solid var(--accent);
+      background: #fff6ef;
+      padding: 10px 12px;
+      border-radius: 8px;
+      color: #62493e;
+      font-size: 13px;
+    }
+
+    .danger {
+      border-left-color: var(--warn);
+      background: #fff2ef;
+      color: #6f3d2f;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      margin-top: 10px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 760px;
+      font-size: 13px;
+    }
+
+    th,
+    td {
+      border-bottom: 1px solid #edf0ea;
+      padding: 8px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #f6faf4;
+      color: #304c38;
+      font-weight: 700;
+    }
+
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      color: #30463a;
+      background: #f7f5f0;
+      border: 1px solid #e8e2d7;
+      border-radius: 6px;
+      padding: 1px 5px;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 980px) {
+      .lane-body { grid-template-columns: 1fr 1fr; }
+      .a2z ol { columns: 1; }
+    }
+
+    @media (max-width: 680px) {
+      .lane-body { grid-template-columns: 1fr; }
+      .step.arrow-right::after { display: none; }
+      .flowline { grid-template-columns: 1fr; }
+      .arrow::after { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="hero">
+      <h1>Zoho Flow Automation - Visual Blueprint (A to Z)</h1>
+      <p>
+        This is the exact structure to implement in Zoho Flow for MANAS360 WhatsApp automation.
+        Start from webhook, branch by event, branch again by role/type when needed, then send via Watti.
+      </p>
+      <div class="legend">
+        <span class="pill">Trigger: Webhook</span>
+        <span class="pill">Decision 1: Event</span>
+        <span class="pill">Decision 2: Role / Clinical Type</span>
+        <span class="pill">Action: Build Variables</span>
+        <span class="pill">Action: Watti API</span>
+        <span class="pill">Decision 3: Success / Retry</span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Top Flow (Main Pipeline)</h2>
+      <div class="flowline" aria-label="main flow line">
+        <div class="node arrow"><strong>A</strong><p>Incoming Webhook</p></div>
+        <div class="node arrow"><strong>B</strong><p>Validate payload keys:<br><code>event</code>, <code>data</code>, <code>timestamp</code></p></div>
+        <div class="node arrow"><strong>C</strong><p>Decision: Event switch</p></div>
+        <div class="node arrow"><strong>D</strong><p>Branch-specific sub decision</p></div>
+        <div class="node arrow"><strong>E</strong><p>Set templateName + variables</p></div>
+        <div class="node arrow"><strong>F</strong><p>POST to Watti sendTemplateMessage</p></div>
+        <div class="node"><strong>G</strong><p>Success log or Retry + Error log</p></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Decision 1: Event Branches</h2>
+      <div class="lanes">
+        <article class="lane">
+          <div class="lane-head">Branch 1 - USER_REGISTERED</div>
+          <div class="lane-body">
+            <div class="step arrow-right"><b>Condition</b><code>event == "USER_REGISTERED"</code></div>
+            <div class="step arrow-right"><b>Sub Decision</b><code>data.role</code></div>
+            <div class="step arrow-right"><b>Template</b>patient/provider welcome template</div>
+            <div class="step"><b>Send</b>Watti API + log</div>
+          </div>
+        </article>
+
+        <article class="lane">
+          <div class="lane-head">Branch 2 - SESSION_BOOKED</div>
+          <div class="lane-body">
+            <div class="step arrow-right"><b>Condition</b><code>event == "SESSION_BOOKED"</code></div>
+            <div class="step arrow-right"><b>Template A</b><code>booking_confirmed_patient</code></div>
+            <div class="step arrow-right"><b>Template B</b><code>booking_confirmed_provider</code></div>
+            <div class="step"><b>Send</b>2 Watti calls + log</div>
+          </div>
+        </article>
+
+        <article class="lane">
+          <div class="lane-head">Branch 3 - PAYMENT_SUCCESS</div>
+          <div class="lane-body">
+            <div class="step arrow-right"><b>Condition</b><code>event == "PAYMENT_SUCCESS"</code></div>
+            <div class="step arrow-right"><b>Template</b><code>payment_success</code></div>
+            <div class="step arrow-right"><b>Map Variables</b><code>name, amount, planName, expiryDate</code></div>
+            <div class="step"><b>Send</b>Watti API + log</div>
+          </div>
+        </article>
+
+        <article class="lane">
+          <div class="lane-head">Branch 4 - PAYMENT_FAILED</div>
+          <div class="lane-body">
+            <div class="step arrow-right"><b>Condition</b><code>event == "PAYMENT_FAILED"</code></div>
+            <div class="step arrow-right"><b>Sub Decision</b><code>data.role</code> / <code>data.domain</code></div>
+            <div class="step arrow-right"><b>Template</b><code>payment_failed_user</code> OR <code>payment_failed_provider</code></div>
+            <div class="step"><b>Send</b>Watti API + log</div>
+          </div>
+        </article>
+
+        <article class="lane">
+          <div class="lane-head">Branch 5 - SESSION_FOLLOWUP</div>
+          <div class="lane-body">
+            <div class="step arrow-right"><b>Condition</b><code>event == "SESSION_FOLLOWUP"</code></div>
+            <div class="step arrow-right"><b>Template</b><code>session_followup</code></div>
+            <div class="step arrow-right"><b>Map Variables</b><code>name, therapistName, sessionDate, feedbackUrl</code></div>
+            <div class="step"><b>Send</b>Watti API + log</div>
+          </div>
+        </article>
+
+        <article class="lane">
+          <div class="lane-head">Branch 6 - CLINICAL_EVENT</div>
+          <div class="lane-body">
+            <div class="step arrow-right"><b>Condition</b><code>event == "CLINICAL_EVENT"</code></div>
+            <div class="step arrow-right"><b>Sub Decision</b><code>data.clinicalType</code></div>
+            <div class="step arrow-right"><b>Template</b>clinical template per type</div>
+            <div class="step"><b>Send</b>Watti API + log</div>
+          </div>
+        </article>
+
+        <article class="lane">
+          <div class="lane-head">Branch 7 - DEFAULT</div>
+          <div class="lane-body">
+            <div class="step arrow-right"><b>Condition</b>Else (unknown event)</div>
+            <div class="step arrow-right"><b>Action</b>Log unknown payload</div>
+            <div class="step arrow-right"><b>Action</b>Optional admin alert</div>
+            <div class="step"><b>End</b>No Watti call</div>
+          </div>
+        </article>
+      </div>
+
+      <div class="note">
+        Total Decision Blocks in Zoho Flow:
+        <b>1 main event decision</b> + <b>3 sub-decisions</b> (role, payment role/domain, clinicalType) +
+        <b>1 send result decision</b>.
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>A to Z Build Order (Zoho Blocks)</h2>
+      <div class="a2z">
+        <ol>
+          <li>Create Flow: <code>MANAS360 - Event Router</code></li>
+          <li>Add Trigger: Incoming Webhook</li>
+          <li>Capture fields: <code>event</code>, <code>source</code>, <code>timestamp</code>, <code>data.*</code></li>
+          <li>Add Decision block: <code>event</code></li>
+          <li>Create branch: <code>USER_REGISTERED</code></li>
+          <li>Create sub-decision: <code>data.role</code></li>
+          <li>Map role to welcome template</li>
+          <li>Create branch: <code>SESSION_BOOKED</code></li>
+          <li>Add patient booking template action</li>
+          <li>Add provider booking template action</li>
+          <li>Create branch: <code>PAYMENT_SUCCESS</code></li>
+          <li>Map payment success variables</li>
+          <li>Create branch: <code>PAYMENT_FAILED</code></li>
+          <li>Add sub-decision for patient/provider</li>
+          <li>Map failed-payment template variables</li>
+          <li>Create branch: <code>SESSION_FOLLOWUP</code></li>
+          <li>Map follow-up variables</li>
+          <li>Create branch: <code>CLINICAL_EVENT</code></li>
+          <li>Add sub-decision: <code>data.clinicalType</code></li>
+          <li>Map clinical type to template</li>
+          <li>Add DEFAULT branch logging</li>
+          <li>Add common HTTP action config (Watti)</li>
+          <li>Add response decision: success/failure</li>
+          <li>Add retry/backoff on failure</li>
+          <li>Add delivery logs</li>
+          <li>Test all 6 main events with sample payloads</li>
+        </ol>
+      </div>
+
+      <div class="note danger">
+        Important: Do not hardcode template variables inside one generic block.
+        For each branch, map only that template's required variables to avoid runtime template mismatch errors.
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Decision Blocks - Exact Builder Inputs</h2>
+      <p>
+        Use these variable paths exactly. Payload is flattened for Zoho, so use direct fields such as
+        <span class="mono">Trigger-Webhook.role</span> and <span class="mono">Trigger-Webhook.clinicalType</span>.
+      </p>
+
+      <h3>1) Decision-Event</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Condition Label</th>
+              <th>Variable</th>
+              <th>Operator</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>1</td><td>USER_REGISTERED</td><td><span class="mono">Trigger-Webhook.event</span></td><td>equals</td><td><span class="mono">USER_REGISTERED</span></td></tr>
+            <tr><td>2</td><td>SESSION_BOOKED</td><td><span class="mono">Trigger-Webhook.event</span></td><td>equals</td><td><span class="mono">SESSION_BOOKED</span></td></tr>
+            <tr><td>3</td><td>PAYMENT_SUCCESS</td><td><span class="mono">Trigger-Webhook.event</span></td><td>equals</td><td><span class="mono">PAYMENT_SUCCESS</span></td></tr>
+            <tr><td>4</td><td>PAYMENT_FAILED</td><td><span class="mono">Trigger-Webhook.event</span></td><td>equals</td><td><span class="mono">PAYMENT_FAILED</span></td></tr>
+            <tr><td>5</td><td>SESSION_FOLLOWUP</td><td><span class="mono">Trigger-Webhook.event</span></td><td>equals</td><td><span class="mono">SESSION_FOLLOWUP</span></td></tr>
+            <tr><td>6</td><td>CLINICAL_EVENT</td><td><span class="mono">Trigger-Webhook.event</span></td><td>equals</td><td><span class="mono">CLINICAL_EVENT</span></td></tr>
+            <tr><td>7</td><td>DEFAULT</td><td>Else branch</td><td>-</td><td>-</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>2) Decision-Role-Registered (show all 4 provider roles)</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Condition Label</th>
+              <th>Variable</th>
+              <th>Operator</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>1</td><td>PATIENT</td><td><span class="mono">Trigger-Webhook.role</span></td><td>equals</td><td><span class="mono">PATIENT</span></td></tr>
+            <tr><td>2</td><td>THERAPIST</td><td><span class="mono">Trigger-Webhook.role</span></td><td>equals</td><td><span class="mono">THERAPIST</span></td></tr>
+            <tr><td>3</td><td>PSYCHIATRIST</td><td><span class="mono">Trigger-Webhook.role</span></td><td>equals</td><td><span class="mono">PSYCHIATRIST</span></td></tr>
+            <tr><td>4</td><td>PSYCHOLOGIST</td><td><span class="mono">Trigger-Webhook.role</span></td><td>equals</td><td><span class="mono">PSYCHOLOGIST</span></td></tr>
+            <tr><td>5</td><td>COACH</td><td><span class="mono">Trigger-Webhook.role</span></td><td>equals</td><td><span class="mono">COACH</span></td></tr>
+            <tr><td>6</td><td>DEFAULT</td><td>Else branch</td><td>-</td><td>-</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>3) Decision-Role-PaymentFailed</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Condition Label</th>
+              <th>Variable</th>
+              <th>Operator</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>1</td><td>patient</td><td><span class="mono">Trigger-Webhook.role</span></td><td>equals</td><td><span class="mono">patient</span></td></tr>
+            <tr><td>2</td><td>provider</td><td><span class="mono">Trigger-Webhook.role</span></td><td>equals</td><td><span class="mono">provider</span></td></tr>
+            <tr><td>3</td><td>DEFAULT</td><td>Else branch</td><td>-</td><td>-</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>4) Decision-ClinicalType</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Condition Label</th>
+              <th>Variable</th>
+              <th>Operator</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>1</td><td>RESULTS_READY</td><td><span class="mono">Trigger-Webhook.clinicalType</span></td><td>equals</td><td><span class="mono">RESULTS_READY</span></td></tr>
+            <tr><td>2</td><td>TREATMENT_PLAN_UPDATED</td><td><span class="mono">Trigger-Webhook.clinicalType</span></td><td>equals</td><td><span class="mono">TREATMENT_PLAN_UPDATED</span></td></tr>
+            <tr><td>3</td><td>REPORT_UPLOADED</td><td><span class="mono">Trigger-Webhook.clinicalType</span></td><td>equals</td><td><span class="mono">REPORT_UPLOADED</span></td></tr>
+            <tr><td>4</td><td>PRESCRIPTION_ISSUED</td><td><span class="mono">Trigger-Webhook.clinicalType</span></td><td>equals</td><td><span class="mono">PRESCRIPTION_ISSUED</span></td></tr>
+            <tr><td>5</td><td>THERAPIST_NOTE_SHARED</td><td><span class="mono">Trigger-Webhook.clinicalType</span></td><td>equals</td><td><span class="mono">THERAPIST_NOTE_SHARED</span></td></tr>
+            <tr><td>6</td><td>THERAPIST_MESSAGE</td><td><span class="mono">Trigger-Webhook.clinicalType</span></td><td>equals</td><td><span class="mono">THERAPIST_MESSAGE</span></td></tr>
+            <tr><td>7</td><td>CLINICAL_NOTES_UPDATED</td><td><span class="mono">Trigger-Webhook.clinicalType</span></td><td>equals</td><td><span class="mono">CLINICAL_NOTES_UPDATED</span></td></tr>
+            <tr><td>8</td><td>DEFAULT</td><td>Else branch</td><td>-</td><td>-</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>5) Decision-Watti-Success (repeat after every send action)</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Condition Label</th>
+              <th>Variable</th>
+              <th>Operator</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>1</td><td>Success</td><td><span class="mono">Action-WattiSend.response.status_code</span></td><td>equals</td><td><span class="mono">200</span> or <span class="mono">202</span></td></tr>
+            <tr><td>2</td><td>Failure</td><td>Else branch</td><td>-</td><td>-</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note">
+        If Zoho is not showing role, re-capture webhook sample after sending a payload that includes top-level
+        <span class="mono">role</span> and <span class="mono">clinicalType</span>.
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Watti Template Variables for Links (Jitsi, Prescription, Report)</h2>
+      <p>These fields should be present in webhook data and mapped inside Set Variables before HTTP call.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Use case</th>
+              <th>Webhook Field</th>
+              <th>Example Value</th>
+              <th>Typical Template Variable</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Session join link (Jitsi)</td>
+              <td><span class="mono">Trigger-Webhook.jitsiLink</span></td>
+              <td><span class="mono">https://meet.jit.si/manas360-room-123</span></td>
+              <td><span class="mono">join_link</span></td>
+            </tr>
+            <tr>
+              <td>Prescription download link</td>
+              <td><span class="mono">Trigger-Webhook.prescriptionUrl</span></td>
+              <td><span class="mono">https://app.manas360.com/prescriptions/abc/download</span></td>
+              <td><span class="mono">prescription_link</span></td>
+            </tr>
+            <tr>
+              <td>Clinical report link</td>
+              <td><span class="mono">Trigger-Webhook.reportUrl</span></td>
+              <td><span class="mono">https://app.manas360.com/reports/r_123</span></td>
+              <td><span class="mono">report_link</span></td>
+            </tr>
+            <tr>
+              <td>Provider profile / follow-up link</td>
+              <td><span class="mono">Trigger-Webhook.providerDashboardUrl</span></td>
+              <td><span class="mono">https://app.manas360.com/provider/dashboard</span></td>
+              <td><span class="mono">cta_link</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note danger">
+        Keep role values consistent in one style only: either uppercase role values everywhere or lowercase everywhere.
+        Mixed values (example: PATIENT in one branch and patient in another) can break decision matching.
+      </div>
+    </section>
+  </main>
+</body>
+</html>

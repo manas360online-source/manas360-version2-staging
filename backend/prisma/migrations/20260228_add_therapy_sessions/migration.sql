@@ -1,0 +1,3 @@
+-- Legacy placeholder migration.
+-- Canonical therapy_sessions definition is created in 20260301_financial_core_cutover.
+-- This file is intentionally left as a no-op to keep migration ordering without duplicating schema objects.
