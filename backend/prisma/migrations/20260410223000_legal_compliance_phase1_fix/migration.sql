@@ -1,3 +1,0 @@
--- No-op migration.
--- Superseded by 20260410121136_legal_compliance_phase1_fix.
--- Kept intentionally to preserve migration history ordering.
