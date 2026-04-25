@@ -1,5 +1,6 @@
 import { prisma as mdcPrisma } from '../config/db';
 import { AppError } from '../middleware/error.middleware';
+import { mdcPricingService } from './mdc-pricing.service';
 
 export interface CreateClinicInput {
   name: string;
@@ -7,6 +8,10 @@ export interface CreateClinicInput {
   email: string;
   address?: string;
   ownerName: string;
+  license?: string;
+  tier: 'solo' | 'small' | 'large';
+  billingCycle: 'monthly' | 'quarterly';
+  selectedFeatures: string[];
 }
 
 export const createClinic = async (input: CreateClinicInput) => {
@@ -16,6 +21,13 @@ export const createClinic = async (input: CreateClinicInput) => {
   const sequence = String(count + 1).padStart(3, '0');
   const clinicCode = `MDC-${year}-${sequence}`;
 
+  // Calculate pricing for the selected plan
+  const pricing = await mdcPricingService.calculatePrice({
+    clinicTier: input.tier,
+    billingCycle: input.billingCycle,
+    selectedFeatures: input.selectedFeatures,
+  });
+
   return mdcPrisma.$transaction(async (tx) => {
     const clinic = await tx.clinic.create({
       data: {
@@ -24,10 +36,28 @@ export const createClinic = async (input: CreateClinicInput) => {
         phone: input.phone,
         email: input.email,
         address: input.address,
+        license: input.license,
         ownerName: input.ownerName,
         ownerPhone: input.phone,
         ownerEmail: input.email,
+        tier: input.tier,
         trialEndsAt: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000), // 21 days
+        maxTherapists: input.tier === 'solo' ? 1 : input.tier === 'small' ? 3 : 15,
+        maxPatients: input.tier === 'solo' ? 50 : input.tier === 'small' ? 200 : 2000,
+      },
+    });
+
+    // Create the trial subscription record
+    await tx.clinicSubscription.create({
+      data: {
+        clinicId: clinic.id,
+        clinicTier: input.tier,
+        billingCycle: input.billingCycle,
+        selectedFeatures: input.selectedFeatures,
+        monthlyTotal: pricing.monthlyTotal,
+        billingAmount: pricing.billingAmount,
+        status: 'trial',
+        trialEndsAt: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000),
       },
     });
 
@@ -53,6 +83,10 @@ export const getClinicByCode = async (code: string) => {
     where: { clinicCode: code },
     include: {
       staff: true,
+      subscriptions: {
+        where: { status: { in: ['trial', 'active'] } },
+        take: 1,
+      },
     },
   });
   

@@ -20,8 +20,8 @@ export const PricingSummary: React.FC<PricingSummaryProps> = ({
   const featureCount = selectedFeatures.filter(Boolean).length;
 
   // Use API pricing data if available, otherwise calculate locally
-  const displayTotal = pricing?.billing_amount ?? 0;
-  const monthlyTotal = pricing?.monthly_total ?? 0;
+  const displayTotal = pricing?.billingAmount ?? 0;
+  const monthlyTotal = pricing?.monthlyTotal ?? 0;
   const period = currentBilling === 'monthly' ? '/month' : '/quarter';
 
   return (

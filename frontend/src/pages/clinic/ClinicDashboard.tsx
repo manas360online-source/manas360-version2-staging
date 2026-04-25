@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import AuditExportExample from '../../components/patient/AuditExportExample';
 import NotesModule from '../../components/clinic/NotesModule';
@@ -11,6 +11,7 @@ import SchedulingModule from '../../components/clinic/SchedulingModule';
 import BulkPatientImport from '../../components/BulkPatientImport';
 import MultiTherapistManager from '../../components/MultiTherapistManager';
 import JitsiSessionLauncher from '../../components/JitsiSessionLauncher';
+import { AdminStats } from '../../components/clinic/AdminStats';
 
 type ClinicTab = 'patients' | 'sessions' | 'notes' | 'progress' | 'prescriptions' | 'homework' | 'audit' | 'bulk' | 'therapists' | 'jitsi';
 type DashboardFeatureKey =
@@ -62,30 +63,36 @@ const isDashboardFeatureKey = (value: unknown): value is DashboardFeatureKey => 
 };
 
 export default function ClinicDashboard() {
+  const navigate = useNavigate();
   const [features, setFeatures] = useState<DashboardFeatureKey[]>([]);
   const [activeTab, setActiveTab] = useState<ClinicTab | null>(null);
+  const [clinicId, setClinicId] = useState<string | null>(null);
+  const [mdcRole, setMdcRole] = useState<string | null>(null);
 
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
+      const stored = localStorage.getItem('mdc_user');
       if (!stored) {
-        setFeatures([]);
+        navigate('/mdc/login');
         return;
       }
 
-      const parsed: unknown = JSON.parse(stored);
-      if (!Array.isArray(parsed)) {
-        setFeatures([]);
-        return;
+      const mdcUser = JSON.parse(stored);
+      setClinicId(mdcUser.clinicId);
+      setMdcRole(mdcUser.role);
+      // In a real app, we'd fetch the latest features from the backend here
+      // For now, we'll assume the login response included them or we fetch them
+      setFeatures(mdcUser.selectedFeatures || []);
+      
+      // If we don't have features in the user object, let's fetch them
+      if (!mdcUser.selectedFeatures) {
+        // fetchFeatures(mdcUser.clinicId).then(setFeatures);
       }
-
-      const validFeatures = parsed.filter(isDashboardFeatureKey);
-      setFeatures(Array.from(new Set(validFeatures)));
     } catch (error) {
-      console.error('Failed to read selected features from localStorage', error);
-      setFeatures([]);
+      console.error('Failed to read MDC user', error);
+      navigate('/mdc/login');
     }
-  }, []);
+  }, [navigate]);
 
   const allowedTabs = useMemo(() => {
     return TABS.filter((tab) => features.includes(tab.featureKey));
@@ -110,11 +117,11 @@ export default function ClinicDashboard() {
     if (activeTab === 'progress') return <ProgressModule />;
     if (activeTab === 'prescriptions') return <PrescriptionModule />;
     if (activeTab === 'homework') return <HomeworkModule />;
-    if (activeTab === 'bulk') return <BulkPatientImport clinicId="demo-clinic" />;
-    if (activeTab === 'therapists') return <MultiTherapistManager clinicId="demo-clinic" />;
-    if (activeTab === 'jitsi') return <JitsiSessionLauncher sessionId="demo-session" clinicId="demo-clinic" patientName="Test Patient" />;
+    if (activeTab === 'bulk') return <BulkPatientImport clinicId={clinicId || ''} />;
+    if (activeTab === 'therapists') return <MultiTherapistManager clinicId={clinicId || ''} />;
+    if (activeTab === 'jitsi') return <JitsiSessionLauncher sessionId="demo-session" clinicId={clinicId || ''} patientName="Test Patient" />;
     return <AuditExportExample />;
-  }, [activeTab]);
+  }, [activeTab, clinicId]);
 
   return (
     <>
@@ -122,14 +129,28 @@ export default function ClinicDashboard() {
         <title>MyDigitalClinic Dashboard - MANAS360</title>
       </Helmet>
 
-      <main className="min-h-screen bg-slate-50 p-4 md:p-6">
-        <div className="mx-auto max-w-7xl space-y-4">
-          <header className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <h1 className="text-2xl font-semibold text-slate-900">MyDigitalClinic Dashboard</h1>
-            <p className="mt-1 text-sm text-slate-600">
-              Unified clinical workspace for patient records, sessions, notes, progress, prescriptions, homework, and audit controls.
-            </p>
+      <main className="min-h-screen bg-slate-50 p-4 md:p-6 font-outfit">
+        <div className="mx-auto max-w-7xl space-y-6">
+          <header className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-black text-slate-900 tracking-tight">Clinical Workspace</h1>
+              <p className="mt-1 text-sm text-slate-500 font-medium">
+                Unified engine for modern mental healthcare.
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+               <button onClick={() => { localStorage.removeItem('mdc_user'); navigate('/mdc/login'); }} className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-600 text-sm font-bold hover:bg-slate-50 transition-all">Sign Out</button>
+            </div>
           </header>
+
+          {mdcRole === 'admin' && (
+            <AdminStats 
+              totalPatients={124} 
+              totalTherapists={3} 
+              totalSessions={842} 
+              therapistLimit={features.includes('multi-therapist') ? 15 : 1}
+            />
+          )}
 
           <nav className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
             {allowedTabs.map((tab) => {
