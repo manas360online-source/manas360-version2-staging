@@ -8,7 +8,7 @@ import { Enrollment } from '../CertificationTypes';
 import { useAuth } from '../context/AuthContext';
 
 export const MyCertificationsPage: React.FC = () => {
-    const { enrollments, payInstallment, updateProgress, clearEnrollments, syncEnrollments, loading } = useEnrollmentStore();
+    const { enrollments, payInstallment, clearEnrollments, syncEnrollments, loading } = useEnrollmentStore();
     const navigate = useNavigate();
     const [processingId, setProcessingId] = useState<string | null>(null);
     const { user, becomeProvider } = useAuth();

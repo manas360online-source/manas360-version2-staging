@@ -1,45 +1,34 @@
-import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-const logo = "/Logo.jpeg";
-const INTRO_ANIMATION_MS = 4000;
+﻿import { useEffect, useState } from 'react';
+import { Hero } from '../components/Landing/Hero';
+import logo from '../assets/manas360_main_logo.png';
 import './HeroIntroPage.css';
 
+const INTRO_ANIMATION_MS = 4000;
+
 export default function HeroIntroPage() {
-  const navigate = useNavigate();
+  const [showIntroSplash, setShowIntroSplash] = useState(true);
 
   useEffect(() => {
-    // If user already saw the intro once, skip it and go to landing
-    try {
-      const seen = window.localStorage.getItem('manas360_intro_seen');
-      if (seen) {
-        navigate('/landing', { replace: true });
-        return;
-      }
-    } catch (err) {
-      // ignore storage errors and proceed to show intro
-    }
-
     const introTimer = window.setTimeout(() => {
-      try {
-        window.localStorage.setItem('manas360_intro_seen', '1');
-      } catch (e) {
-        // ignore storage errors
-      }
-      navigate('/landing', { replace: true });
+      setShowIntroSplash(false);
     }, INTRO_ANIMATION_MS);
 
     return () => {
       window.clearTimeout(introTimer);
     };
-  }, [navigate]);
+  }, []);
 
   return (
     <div className="hero-intro-page">
-      <div className="hero-logo-intro" aria-hidden="true">
-        <div className="hero-logo-intro-card">
-          <img src={logo} alt="" />
+      {showIntroSplash ? (
+        <div className="hero-logo-intro" aria-hidden="true">
+          <div className="hero-logo-intro-card">
+            <img src={logo} alt="" />
+          </div>
         </div>
-      </div>
+      ) : (
+        <Hero />
+      )}
     </div>
   );
 }

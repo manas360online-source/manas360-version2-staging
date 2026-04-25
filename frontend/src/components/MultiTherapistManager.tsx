@@ -1,13 +1,5 @@
 import { useState, useEffect } from 'react';
 
-interface Therapist {
-  id: string;
-  name: string;
-  email: string;
-  specialty?: string;
-  isActive: boolean;
-}
-
 interface MultiTherapistManagerProps {
   clinicId: string;
 }
