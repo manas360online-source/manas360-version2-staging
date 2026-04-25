@@ -101,6 +101,7 @@ export interface EnvConfig {
 	corsOrigins: string[];
 	frontendUrl: string;
 	databaseUrl?: string;
+	mdcDatabaseUrl?: string;
 	jwtAccessSecret: string;
 	jwtRefreshSecret: string;
 	jwtSecret: string;
@@ -167,6 +168,7 @@ export const env: EnvConfig = Object.freeze({
 	corsOrigins: parsedCorsOrigins,
 	frontendUrl: parseFrontendUrl(process.env.FRONTEND_URL, parsedCorsOrigins),
 	databaseUrl: process.env.DATABASE_URL,
+	mdcDatabaseUrl: process.env.MDC_DATABASE_URL,
 	jwtAccessSecret: process.env.JWT_ACCESS_SECRET ?? JWT_ACCESS_FALLBACK,
 	jwtRefreshSecret: process.env.JWT_REFRESH_SECRET ?? JWT_REFRESH_FALLBACK,
 	jwtSecret: process.env.JWT_SECRET ?? JWT_ACCESS_FALLBACK,

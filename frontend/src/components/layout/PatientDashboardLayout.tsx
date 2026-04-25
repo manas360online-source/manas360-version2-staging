@@ -37,7 +37,6 @@ const selfCareNavItems = [
   { to: '/patient/messages', label: 'Anytime Buddy (AI)', icon: MessageSquare, badge: 'AI' },
   { to: '/patient/check-in', label: 'Daily Check-in', icon: HeartPulse },
   { to: '/patient/wellness-library', label: 'Premium Library', icon: Sparkles },
-  { to: '/sound-therapy', label: 'Sound Therapy', icon: Sparkles },
 ];
 
 const progressNavItems = [
