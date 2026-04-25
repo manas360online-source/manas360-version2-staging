@@ -30,7 +30,7 @@ export default function GlobalAudioPlayerConsole() {
 
   const [collapsed, setCollapsed] = useState(true);
 
-  const isSoundTherapyPage = location.pathname.includes('/patient/sound-therapy');
+  const isSoundTherapyPage = location.pathname.includes('/patient/sound-therapy') || location.pathname.includes('/sound-therapy');
 
   useEffect(() => {
     // Keep player minimal when paused, and default to compact mode outside PT04.

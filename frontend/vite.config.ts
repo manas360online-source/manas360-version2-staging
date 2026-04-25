@@ -39,7 +39,7 @@ export default defineConfig({
       '/api': {
         // Docker compose backend is published on 5001 by default.
         // Override via VITE_BACKEND_URL when running backend directly on another port.
-        target: process.env.VITE_BACKEND_URL || 'http://localhost:5001',
+        target: process.env.VITE_BACKEND_URL || 'http://127.0.0.1:5001',
         changeOrigin: true,
       },
     },
