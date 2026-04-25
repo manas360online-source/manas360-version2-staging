@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { Hero } from '../components/Landing/Hero';
 import logo from '../assets/manas360_main_logo.png';
 import './HeroIntroPage.css';
