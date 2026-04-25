@@ -56,6 +56,7 @@ const ADMIN_DOMAINS: AdminDomain[] = [
 			{ to: '/admin/operations/crisis', label: 'Crisis Console', shortLabel: 'Crs' },
 			{ to: '/admin/operations/agreements', label: 'Agreements', shortLabel: 'Agr' },
 			{ to: '/admin/operations/retreat-requests', label: 'Retreat Requests', shortLabel: 'Ret' },
+			{ to: '/admin/audio-upload', label: 'Audio Upload', shortLabel: 'Aud' },
 		],
 	},
 	{

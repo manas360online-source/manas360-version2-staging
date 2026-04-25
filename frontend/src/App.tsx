@@ -74,6 +74,7 @@ const ComplianceDashboard = lazy(() => import('./pages/admin/ComplianceDashboard
 const GovernanceCenterPage = lazy(() => import('./pages/admin/GovernanceCenter'));
 const LegalDocuments = lazy(() => import('./pages/admin/LegalDocuments'));
 const AdminShellLayout = lazy(() => import('./components/admin/AdminShellLayout'));
+const SoundTherapyAdminPage = lazy(() => import('./pages/admin/SoundTherapyAdminPage'));
 const AdminEntryGate = lazy(() => import('./components/admin/AdminEntryGate'));
 const AdminUsersPage = lazy(() => import('./pages/admin/Users'));
 const AdminCompaniesPage = lazy(() => import('./pages/admin/Companies'));
@@ -547,6 +548,7 @@ function App() {
                 {/* Domain routes */}
                 <Route path="control/dashboard" element={<AdminDashboardGate />} />
                 <Route path="control/platform-health" element={<AdminPlatformHealthPage />} />
+                <Route path="audio-upload" element={<SoundTherapyAdminPage />} />
 
                 <Route path="identity/users" element={<AdminUsersPage />} />
                 <Route path="identity/users/:id" element={<AdminUsersPage />} />
@@ -691,7 +693,7 @@ function App() {
               <Route path="mood" element={<Navigate to="/patient/check-in?tab=daily-mood" replace />} />
               <Route path="wellness-library" element={<WellnessLibraryPage />} />
               <Route path="sleep-therapy" element={<SleepTherapyPage />} />
-              <Route path="sound-therapy" element={<SoundTherapyPage />} />
+              <Route path="sound-therapy" element={<Navigate to="/sound-therapy" replace />} />
               <Route path="pet" element={<DigitalPetPage />} />
               <Route path="chintu" element={<ChintuPage />} />
               <Route path="dino" element={<DinoPage />} />

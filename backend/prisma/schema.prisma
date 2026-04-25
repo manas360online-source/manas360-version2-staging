@@ -3311,3 +3311,19 @@ model RetreatIntent {
   @@index([createdAt])
   @@map("retreat_intents")
 }
+
+model SoundTherapyTrack {
+  id          String   @id @default(uuid())
+  title       String
+  artist      String   @default("MANAS360")
+  genre       String
+  description String?
+  frequency   String?
+  duration    String?
+  embedCode   String   @db.Text
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("sound_therapy_tracks")
+}

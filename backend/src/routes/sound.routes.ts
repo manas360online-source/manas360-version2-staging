@@ -4,6 +4,7 @@ import { requireAuth } from '../middleware/auth.middleware';
 import { AppError } from '../middleware/error.middleware';
 import { asyncHandler } from '../middleware/validate.middleware';
 import { sendSuccess } from '../utils/response';
+import { getPublicTracks } from '../controllers/admin-sound.controller';
 
 type FreesoundResult = {
   id: number;
@@ -18,6 +19,8 @@ type FreesoundResult = {
 };
 
 const router = Router();
+
+router.get('/tracks', asyncHandler(getPublicTracks));
 
 const isCc0License = (license: string): boolean => {
   const normalized = String(license || '').toLowerCase();

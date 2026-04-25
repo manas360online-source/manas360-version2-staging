@@ -32,6 +32,11 @@ import {
 	getAdminPlatformAnalyticsController,
 } from '../controllers/admin-analytics.controller';
 import {
+  getAllTracks,
+  createTrack,
+  deleteTrack
+} from '../controllers/admin-sound.controller';
+import {
 	listPaymentReliabilityController,
 	getPaymentReliabilityMetricsController,
 	getPaymentReliabilityDetailController,
@@ -520,5 +525,10 @@ router.get('/corporate-demo-requests', requireAuth, requireRole(['admin', 'super
 // === RETREAT INTENTS ===
 router.get('/retreat-intents', requireAuth, requireRole(['admin', 'superadmin']), requireAdminPolicy('users.view'), asyncHandler(listRetreatIntentsController));
 router.patch('/retreat-intents/:id/status', requireAuth, requireRole(['admin', 'superadmin']), requireAdminPolicy('users.moderate'), asyncHandler(updateRetreatIntentStatusController));
+
+// === SOUND THERAPY ADMIN ===
+router.get('/sound', requireAuth, requireRole(['admin', 'superadmin']), asyncHandler(getAllTracks));
+router.post('/sound', requireAuth, requireRole(['admin', 'superadmin']), asyncHandler(createTrack));
+router.delete('/sound/:id', requireAuth, requireRole(['admin', 'superadmin']), asyncHandler(deleteTrack));
 
 export default router;
