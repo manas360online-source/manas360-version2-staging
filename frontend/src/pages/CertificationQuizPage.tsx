@@ -2,7 +2,6 @@ import React, { useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { CheckCircle2, XCircle, ArrowLeft, Award, RotateCcw } from "lucide-react";
 import { useEnrollmentStore } from "../store/CertificationEnrollmentStore";
-import { getModulesByCertification } from "../utils/certificationLessonUtils";
 import { completeCertification } from "../api/certifications";
 
 /* ──────────────────────────────────────────────────────────
@@ -149,7 +148,7 @@ export const CertificationQuizPage: React.FC = () => {
     [enrollments, enrollmentId]
   );
 
-  const certName = enrollment?.certificationName || "Certified Practitioner";
+  // `certName` was previously unused — keep enrollment reference directly where needed.
 
   // New logic: Match certification slug to track ID
   const trackId = useMemo(() => {
