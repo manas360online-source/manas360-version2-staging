@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Helmet } from 'react-helmet-async';
-import { CheckCircle, Clock, ExternalLink, Filter, Search, XCircle } from 'lucide-react';
+import { CheckCircle, Clock, Search, XCircle } from 'lucide-react';
 import { API_BASE } from '../../lib/runtimeEnv';
 
 interface Clinic {

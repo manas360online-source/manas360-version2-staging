@@ -1,8 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import Chintu from "./Chintu";
-import Dino from "./Dino";
-import Pt06HeroVideoFrame from "./Pt06HeroVideoFrame";
+import Pt06HeroVideoFrame from "../../components/common/Pt06HeroVideoFrame";
 
 const tokens = {
   teal: "#0C7C8A", tealDeep: "#064E5C", tealLight: "#E8F6F8", tealMist: "#F0FAFB",

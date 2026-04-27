@@ -1,8 +1,8 @@
 
-import React, { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
 
-type PetKey = "baby-dino" | "golden-retriever" | "healing-elephant" | "chintu-fox";
+type PetKey = "baby-dino" | "golden-retriever" | "healing-elephant" | "chintu-fox" | "patience-turtle" | "wise-owl" | "golden-puppy";
 
 type DigitalPetsHubPageProps = {
   selectedPet?: PetKey;
@@ -36,6 +36,27 @@ const PETS = [
     emoji: "🦊",
     hormone: "Energy",
     hormoneDesc: "Endorphins — breathwork, play, laughter"
+  },
+  {
+    key: "patience-turtle",
+    name: "Patience Turtle",
+    emoji: "🐢",
+    hormone: "Calm",
+    hormoneDesc: "Serotonin — patience, stillness, peace"
+  },
+  {
+    key: "wise-owl",
+    name: "Wise Owl",
+    emoji: "🦉",
+    hormone: "Focus",
+    hormoneDesc: "Dopamine — clarity, focus, wisdom"
+  },
+  {
+    key: "golden-puppy",
+    name: "Golden Puppy",
+    emoji: "🐶",
+    hormone: "Love",
+    hormoneDesc: "Oxytocin — companionship, warmth, joy"
   }
 ];
 const scienceCards = [
@@ -225,5 +246,3 @@ export default function DigitalPetsHubPage({ selectedPet }: DigitalPetsHubPagePr
     </div>
   );
 }
-
-export default DigitalPetsHubPage;

@@ -102,7 +102,7 @@ export const getPatientById = async (id: string): Promise<Patient> => {
     return unwrap(response.data);
   } catch (error) {
     console.error('getPatientById failed, using mock fallback', error);
-    return mockPatient({ fullName: 'Mock Patient', email: 'mock@example.com' }, id);
+    return mockPatient({ clinicId: 'mock-clinic', fullName: 'Mock Patient', email: 'mock@example.com' }, id);
   }
 };
 
@@ -113,7 +113,7 @@ export const updatePatient = async (id: string, data: UpdatePatientInput): Promi
   } catch (error) {
     console.error('updatePatient failed, using mock fallback', error);
     return {
-      ...mockPatient({ fullName: data.fullName || 'Mock Patient' }, id),
+      ...mockPatient({ clinicId: 'mock-clinic', fullName: data.fullName || 'Mock Patient' }, id),
       ...data,
       id,
       updatedAt: new Date().toISOString(),

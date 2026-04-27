@@ -26,7 +26,7 @@ type DashboardFeatureKey =
   | 'multi-therapist'
   | 'jitsi-session';
 
-const STORAGE_KEY = 'selectedFeatures';
+
 
 type TabConfig = {
   key: ClinicTab;
@@ -46,21 +46,6 @@ const TABS: TabConfig[] = [
   { key: 'therapists', label: 'Therapists', featureKey: 'multi-therapist' },
   { key: 'jitsi', label: 'Live Session', featureKey: 'jitsi-session' },
 ];
-
-const isDashboardFeatureKey = (value: unknown): value is DashboardFeatureKey => {
-  return (
-    value === 'patient-database'
-    || value === 'session-notes'
-    || value === 'scheduling'
-    || value === 'progress-tracking'
-    || value === 'prescriptions'
-    || value === 'homework'
-    || value === 'audit-export'
-    || value === 'bulk-import'
-    || value === 'multi-therapist'
-    || value === 'jitsi-session'
-  );
-};
 
 export default function ClinicDashboard() {
   const navigate = useNavigate();

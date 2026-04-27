@@ -567,7 +567,7 @@ export const registerWithPhone = async (input: RegisterPhoneInput) => {
 		  });
 
 	// Send OTP via 2factor.in SMS (non-blocking)
-	const smsTemplate = existing ? 'otp_login' : 'Registration1';
+	const smsTemplate = existing ? 'otp_login' : 'Registration11';
 	send2FactorOtp(input.phone, otp, smsTemplate).catch((err) => {
 		console.error('[Auth] Failed to send 2Factor SMS OTP:', err.message);
 	});

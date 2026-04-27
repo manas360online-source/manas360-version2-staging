@@ -1,5 +1,4 @@
 import React from 'react';
-import { useAuth } from '../context/AuthContext';
 
 interface FeatureGateProps {
   feature: string;
@@ -13,8 +12,6 @@ interface FeatureGateProps {
  * unless specified otherwise.
  */
 export const FeatureGate: React.FC<FeatureGateProps> = ({ feature, children, fallback = null }) => {
-  const { user } = useAuth();
-  
   // Detect if we are in MDC mode
   const mdcUserStr = localStorage.getItem('mdc_user');
   const isMdcMode = !!mdcUserStr;

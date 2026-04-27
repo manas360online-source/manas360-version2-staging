@@ -1405,7 +1405,7 @@ export const requestCorporateOtp = async (payload: CorporateOtpRequestInput) => 
     ) VALUES (${otpRecordId},${phone},${otpHash},${companyName},${String(payload.companySize || '').trim() || null},${String(payload.industry || '').trim() || null},${String(payload.country || '').trim() || null},${String(payload.contactName || '').trim() || null},${String(payload.email || '').trim().toLowerCase() || null},'PENDING',${expiresAt},NOW(),NOW())`;
 
   // Send OTP via 2factor.in SMS
-  send2FactorOtp(phone, otp, 'Registration1').catch((err) => {
+  send2FactorOtp(phone, otp, 'Registration11').catch((err) => {
     console.error('[Corporate] Failed to send 2Factor SMS:', err.message);
   });
 
