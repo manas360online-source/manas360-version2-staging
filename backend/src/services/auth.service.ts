@@ -31,6 +31,7 @@ import { logger } from '../utils/logger';
 import { sendPlatformAdminPasswordResetEmail } from './email.service';
 import { NRI_CONSENT_TYPE, getActiveLegalDocuments, hasAcceptedNriTerms, recordUserAcceptances } from './legal-compliance.service';
 import { sendWhatsAppMessage } from './whatsapp.service';
+import { send2FactorOtp } from './otp.service';
 import type { WhatsAppUserType } from './whatsapp.service';
 import { addCredit } from './wallet.service';
 import jwt from 'jsonwebtoken';
@@ -518,14 +519,21 @@ export const registerWithPhone = async (input: RegisterPhoneInput) => {
 	const role = requestedRole || 'PATIENT';
 	const trimmedName = String(input.name || '').trim();
 
-	// Existing phone users can enter provider/certification flows later.
-	// Promote role for patient accounts when a non-patient role is explicitly requested.
-	const shouldPromoteExistingRole = Boolean(
-		existing
-		&& requestedRole
-		&& requestedRole !== 'PATIENT'
-		&& existingRole === 'PATIENT',
-	);
+	// Role Hierarchy: PATIENT < LEARNER < PROVIDER (therapist, coach, etc.)
+	const getRoleWeight = (r: string): number => {
+		const nr = String(r || '').toUpperCase();
+		if (nr === 'SUPER_ADMIN' || nr === 'ADMIN') return 100;
+		if (['THERAPIST', 'PSYCHOLOGIST', 'COACH', 'PSYCHIATRIST'].includes(nr)) return 30;
+		if (nr === 'LEARNER') return 20;
+		if (nr === 'PATIENT') return 10;
+		return 0;
+	};
+
+	const existingWeight = getRoleWeight(existingRole);
+	const requestedWeight = getRoleWeight(role);
+
+	// Promote role if the requested role is higher than the current one
+	const shouldPromoteExistingRole = existing && requestedWeight > existingWeight;
 	const user = existing
 		? await db.user.update({
 				where: { id: existing.id },
@@ -557,6 +565,12 @@ export const registerWithPhone = async (input: RegisterPhoneInput) => {
 					phone: true,
 				},
 		  });
+
+	// Send OTP via 2factor.in SMS (non-blocking)
+	const smsTemplate = existing ? 'otp_login' : 'Registration1';
+	send2FactorOtp(input.phone, otp, smsTemplate).catch((err) => {
+		console.error('[Auth] Failed to send 2Factor SMS OTP:', err.message);
+	});
 
 	// Send WhatsApp OTP message (non-blocking)
 	sendWhatsAppMessage({

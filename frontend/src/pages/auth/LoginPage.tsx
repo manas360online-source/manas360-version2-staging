@@ -110,7 +110,7 @@ export default function LoginPage() {
 
 		const normalizedRole = String(role || '').toLowerCase();
 		if (normalizedRole === 'learner') {
-			return '/certifications';
+			return '/provider/dashboard';
 		}
 		const isPricingTarget = candidate.startsWith('/plans');
 		if (normalizedRole !== 'patient' || !isPricingTarget) {
@@ -298,13 +298,13 @@ export default function LoginPage() {
 									id="login-otp"
 									label="One-Time Code"
 									inputMode="numeric"
-									pattern="\\d{6}"
-									maxLength={6}
+									pattern="\\d{4}"
+									maxLength={4}
 									autoComplete="one-time-code"
-									placeholder="6-digit OTP"
+									placeholder="4-digit OTP"
 									helperText="We'll send you a one-time code"
 									value={otp}
-									onChange={(event) => setOtp(event.target.value.replace(/\D/g, '').slice(0, 6))}
+									onChange={(event) => setOtp(event.target.value.replace(/\D/g, '').slice(0, 4))}
 									required
 								/>
 							) : null}

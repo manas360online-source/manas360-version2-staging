@@ -29,6 +29,8 @@ export const ProviderSidebar = () => {
           category: 'LEARNER',
           items: [
             { label: 'Dashboard', path: '/provider/dashboard', icon: <Home size={18} /> },
+            { label: 'My Patients', path: '/provider/patients', icon: <Users size={18} /> },
+            { label: 'Calendar', path: '/provider/calendar', icon: <Calendar size={18} /> },
             { label: 'Certifications', path: '/provider/certifications', icon: <Award size={18} /> },
             { label: 'My Certifications', path: '/provider/my-certifications', icon: <ClipboardCheck size={18} /> },
             { label: 'Complete Onboarding', path: '/onboarding/provider-setup', icon: <Star size={18} /> },

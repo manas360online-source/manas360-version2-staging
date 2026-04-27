@@ -3523,6 +3523,9 @@ model ClinicPatient {
   clinicId          String   @map("clinic_id")
   assignedTherapistId String? @map("assigned_therapist_id")
   
+  loginCode         String   @unique @map("login_code")
+  loginSuffix       String   @map("login_suffix")
+  
   fullName          String   @map("full_name")
   phone             String
   email             String?
@@ -3530,8 +3533,13 @@ model ClinicPatient {
   gender            String?
   primaryCondition  String?  @map("primary_condition")
   notes             String?
+  verificationStatus String @default("pending") @map("verification_status")
   
   status            String   @default("active")
+  
+  phoneVerificationOtpHash      String?  @map("phone_verification_otp_hash")
+  phoneVerificationOtpExpiresAt DateTime? @map("phone_verification_otp_expires_at")
+  
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
 

@@ -3,6 +3,7 @@ import { AppError } from '../middleware/error.middleware';
 import { generateNumericOtp, hashOtp, verifyOtp } from '../utils/hash';
 import { createTokenPair } from '../utils/jwt';
 import { env } from '../config/env';
+import { send2FactorOtp } from './otp.service';
 
 export const requestLoginOtp = async (loginCode: string, phone: string) => {
   const staff = await prisma.clinicUser.findUnique({
@@ -29,8 +30,11 @@ export const requestLoginOtp = async (loginCode: string, phone: string) => {
     }
   });
 
-  // In a real app, send SMS/WhatsApp here.
-  // For testing, we return it in dev mode.
+  // Send OTP via 2factor.in SMS
+  send2FactorOtp(phone, otp, 'otp_login').catch((err) => {
+    console.error('[MDC Auth Service] Failed to send 2Factor SMS:', err.message);
+  });
+
   return {
     message: 'OTP sent to your registered phone',
     devOtp: env.nodeEnv !== 'production' ? otp : undefined,

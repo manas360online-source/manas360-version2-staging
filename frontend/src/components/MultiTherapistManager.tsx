@@ -37,8 +37,8 @@ export default function MultiTherapistManager({ clinicId }: MultiTherapistManage
   };
 
   const handleAddTherapist = async () => {
-    if (!newTherapist.name || !newTherapist.phone || !newTherapist.loginSuffix) {
-      setMessage('Name, Phone, and Login Suffix are required');
+    if (!newTherapist.name || !newTherapist.phone) {
+      setMessage('Name and Phone are required');
       return;
     }
 
@@ -97,21 +97,13 @@ export default function MultiTherapistManager({ clinicId }: MultiTherapistManage
           className="block w-full rounded border border-gray-300 px-3 py-2 text-sm"
           disabled={isLoading}
         />
-        <div className="grid grid-cols-2 gap-2">
+        <div className="mb-3">
           <input
             type="tel"
             placeholder="Phone (+91...)"
             value={newTherapist.phone}
             onChange={(e) => setNewTherapist({ ...newTherapist, phone: e.target.value })}
             className="block w-full rounded border border-gray-300 px-3 py-2 text-sm"
-            disabled={isLoading}
-          />
-          <input
-            type="text"
-            placeholder="Login Suffix (e.g. 1)"
-            value={newTherapist.loginSuffix}
-            onChange={(e) => setNewTherapist({ ...newTherapist, loginSuffix: e.target.value.toUpperCase() })}
-            className="block w-full rounded border border-gray-300 px-3 py-2 text-sm font-mono"
             disabled={isLoading}
           />
         </div>

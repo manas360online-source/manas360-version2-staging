@@ -245,10 +245,10 @@ const EnrollmentRegistrationPage: React.FC = () => {
                     <input
                       type="text"
                       inputMode="numeric"
-                      maxLength={6}
-                      placeholder="Enter 6-digit OTP"
+                      maxLength={4}
+                      placeholder="Enter 4-digit OTP"
                       value={otp}
-                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 4))}
                       className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-200 transition"
                     />
                     {devOtp && (

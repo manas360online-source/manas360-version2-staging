@@ -23,7 +23,7 @@ export const hashOpaqueToken = (value: string): string => {
 	return createHash('sha256').update(value).digest('hex');
 };
 
-export const generateNumericOtp = (length = 6): string => {
+export const generateNumericOtp = (length = 4): string => {
 	const max = 10 ** length;
 	const value = randomInt(0, max);
 

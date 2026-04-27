@@ -14,12 +14,14 @@ export interface Patient {
 }
 
 export interface CreatePatientInput {
+  clinicId: string;
   fullName: string;
   email?: string;
   phone?: string;
   dateOfBirth?: string;
   gender?: string;
   address?: string;
+  assignedTherapistId?: string;
 }
 
 export type UpdatePatientInput = Partial<CreatePatientInput>;
@@ -34,7 +36,7 @@ interface ApiEnvelope<T> {
 }
 
 const mdcApi = axios.create({
-  baseURL: '/api/mdc',
+  baseURL: '/api/v1/mdc',
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
@@ -73,7 +75,7 @@ const mockPatient = (data: CreatePatientInput, id?: string): Patient => ({
 
 export const createPatient = async (data: CreatePatientInput): Promise<Patient> => {
   try {
-    const response = await mdcApi.post<Patient | ApiEnvelope<Patient>>('/patients', data);
+    const response = await mdcApi.post<Patient | ApiEnvelope<Patient>>(`/clinics/${data.clinicId}/patients`, data);
     return unwrap(response.data);
   } catch (error) {
     console.error('createPatient failed, using mock fallback', error);
@@ -81,15 +83,15 @@ export const createPatient = async (data: CreatePatientInput): Promise<Patient> 
   }
 };
 
-export const getPatients = async (): Promise<Patient[]> => {
+export const getPatients = async (clinicId: string): Promise<Patient[]> => {
   try {
-    const response = await mdcApi.get<Patient[] | ApiEnvelope<Patient[]>>('/patients');
+    const response = await mdcApi.get<Patient[] | ApiEnvelope<Patient[]>>(`/clinics/${clinicId}/patients`);
     return unwrap(response.data);
   } catch (error) {
     console.error('getPatients failed, using mock fallback', error);
     return [
-      mockPatient({ fullName: 'Mock Patient One', email: 'mock1@example.com', phone: '+91 9000000001' }, 'mock-p1'),
-      mockPatient({ fullName: 'Mock Patient Two', email: 'mock2@example.com', phone: '+91 9000000002' }, 'mock-p2'),
+      mockPatient({ clinicId, fullName: 'Mock Patient One', email: 'mock1@example.com', phone: '+91 9000000001' }, 'mock-p1'),
+      mockPatient({ clinicId, fullName: 'Mock Patient Two', email: 'mock2@example.com', phone: '+91 9000000002' }, 'mock-p2'),
     ];
   }
 };

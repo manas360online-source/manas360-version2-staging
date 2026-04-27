@@ -6,7 +6,7 @@ export interface CreatePatientInput {
   fullName: string;
   phone: string;
   email?: string;
-  externalId?: string; // ID from clinic's own system
+  assignedTherapistId?: string;
 }
 
 export const createPatient = async (input: CreatePatientInput) => {
@@ -22,13 +22,25 @@ export const createPatient = async (input: CreatePatientInput) => {
     throw new AppError('Patient with this phone number already exists in your clinic', 409);
   }
 
+  const clinic = await prisma.clinic.findUnique({ where: { id: input.clinicId } });
+  if (!clinic) throw new AppError('Clinic not found', 404);
+
+  const existingPatientCount = await prisma.clinicPatient.count({
+    where: { clinicId: input.clinicId },
+  });
+
+  const loginSuffix = `PT${existingPatientCount + 1}`;
+  const loginCode = `${clinic.clinicCode}-${loginSuffix}`;
+
   return prisma.clinicPatient.create({
     data: {
       clinicId: input.clinicId,
       fullName: input.fullName,
       phone: input.phone,
       email: input.email,
-      externalId: input.externalId,
+      assignedTherapistId: input.assignedTherapistId || null,
+      loginSuffix,
+      loginCode,
     },
   });
 };
