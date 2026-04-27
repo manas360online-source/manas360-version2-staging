@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import "./PremiumTheraphyLandingPage.css";
 
 type HubCard = {
@@ -166,7 +167,13 @@ const PremiumTheraphyLandingPage: React.FC = () => {
               ))}
             </div>
             <div className="tool-footer">
-              <a href="#">{card.action}</a>
+              {card.title === "Sound Therapy" ? (
+                <Link to="/sound-therapy">{card.action}</Link>
+              ) : card.title.includes("Digital Pets") || card.title === "Digital Pets Hub" ? (
+                <Link to="/pet">{card.action}</Link>
+              ) : (
+                <a href="#">{card.action}</a>
+              )}
               <strong>{card.price}</strong>
             </div>
           </article>

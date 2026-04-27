@@ -8,9 +8,9 @@ export default function HeroIntroPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // If user already saw the intro once, skip it and go to landing
+    // If user already saw the intro in this session, skip it and go to landing
     try {
-      const seen = window.localStorage.getItem('manas360_intro_seen');
+      const seen = window.sessionStorage.getItem('manas360_intro_seen');
       if (seen) {
         navigate('/landing', { replace: true });
         return;
@@ -21,11 +21,11 @@ export default function HeroIntroPage() {
 
     const introTimer = window.setTimeout(() => {
       try {
-        window.localStorage.setItem('manas360_intro_seen', '1');
+        window.sessionStorage.setItem('manas360_intro_seen', '1');
       } catch (e) {
         // ignore storage errors
       }
-      navigate('/landing', { replace: true });
+      navigate('/hero', { replace: true });
     }, INTRO_ANIMATION_MS);
 
     return () => {
