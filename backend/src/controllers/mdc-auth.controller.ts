@@ -274,7 +274,7 @@ export const registerClinicRequestOtp = async (req: Request, res: Response, next
     });
 
     // Send 2Factor OTP
-    await send2FactorOtp(req.body.ownerPhone, otp, 'Registration1');
+    await send2FactorOtp(req.body.ownerPhone, otp, 'Registration11');
 
     res.status(201).json({
       message: 'Clinic created. OTP sent to owner phone.',

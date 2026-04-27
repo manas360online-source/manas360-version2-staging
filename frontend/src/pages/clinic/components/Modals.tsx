@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 
 export const AddStaffModal = ({ onClose, onSave }: { onClose: () => void, onSave: (data: any) => void }) => {
   const [form, setForm] = useState({ fullName: '', phone: '', email: '', role: 'therapist', loginSuffix: '' });
@@ -100,7 +100,6 @@ export const ScheduleSessionModal = ({ patients, staff, onClose, onSave }: { pat
           </button>
         </div>
       </div>
-    </div>
     </div>
   );
 };

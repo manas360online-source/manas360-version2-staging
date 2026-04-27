@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Home, Users, Calendar, Settings, MessageSquare, CreditCard, LogOut, ClipboardCheck, Star, Radio, GraduationCap, Award } from 'lucide-react';
+import { Home, Users, Calendar, Settings, MessageSquare, CreditCard, LogOut, ClipboardCheck, Star, Radio, Award } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 export const ProviderSidebar = () => {

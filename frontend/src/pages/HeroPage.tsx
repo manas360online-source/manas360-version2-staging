@@ -62,9 +62,7 @@ export const Hero: React.FC = () => {
     };
   }, []);
 
-  const handleScrollDown = () => {
-    window.scrollTo({ top: window.innerHeight, behavior: 'smooth' });
-  };
+
 
   const handleNavigate = (path: string) => {
     window.setTimeout(() => {
