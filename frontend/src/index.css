@@ -614,7 +614,7 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
   background: #010e2a;
 }
 
@@ -648,9 +648,10 @@
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 0 24px 80px;
+  padding: 0 40px 80px;
   max-width: 960px;
   margin: 0 auto;
+  overflow: visible;
 }
 
 @keyframes tierFadeIn {
@@ -685,7 +686,7 @@
   font-family: 'Playfair Display', serif;
   font-size: clamp(40px, 8vw, 82px);
   font-weight: 800;
-  line-height: 1.05;
+  line-height: 1.12;
   color: #ffffff;
   margin-bottom: 24px;
 }
@@ -696,6 +697,11 @@
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  display: inline-block;
+  white-space: nowrap;
+  font-size: 0.98em;
 }
 
 .tier-3-refined {
