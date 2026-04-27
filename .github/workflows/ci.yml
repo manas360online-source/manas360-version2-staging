@@ -136,6 +136,10 @@ jobs:
             git fetch origin
             git reset --hard origin/main
 
+            echo "Pulling Git LFS objects for images..."
+            git lfs install || true
+            git lfs pull
+
             echo "Stopping containers cleanly..."
             docker-compose down --remove-orphans
 

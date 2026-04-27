@@ -32,11 +32,22 @@ export default function PatientModule() {
   const [createError, setCreateError] = useState<string | null>(null);
   const [detailsError, setDetailsError] = useState<string | null>(null);
 
+  const getClinicId = () => {
+    try {
+      const stored = localStorage.getItem('mdc_user');
+      if (stored) return JSON.parse(stored).clinicId;
+    } catch (e) {}
+    return null;
+  };
+
   const loadPatients = async () => {
+    const clinicId = getClinicId();
+    if (!clinicId) return;
+
     setIsListLoading(true);
     setListError(null);
     try {
-      const records = await getPatients();
+      const records = await getPatients(clinicId);
       setPatients(records);
     } catch (error) {
       console.error('loadPatients failed', error);
@@ -52,11 +63,15 @@ export default function PatientModule() {
 
   const handleAddPatient = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const clinicId = getClinicId();
+    if (!clinicId) return;
+
     setIsCreateLoading(true);
     setCreateError(null);
 
     try {
       const created = await createPatient({
+        clinicId,
         fullName: form.fullName.trim(),
         email: form.email.trim() || undefined,
         phone: form.phone.trim() || undefined,

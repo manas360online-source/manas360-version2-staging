@@ -710,16 +710,16 @@ export default function Tembo() {
   }, []);
 
   const buttons = [
-    {key:'streak_fire',icon:'💧',label:'Streak',sub:'water aura',dp:'+25 DP',cls:'btn-streak',img:'/streak.png'},
-    {key:'celebrate',icon:'🎉',label:'Celebrate',sub:'victory dance',dp:'+30 DP',cls:'btn-celebrate',img:'/celebrate.png'},
-    {key:'challenge_focus',icon:'🎯',label:'Challenge',sub:'focus + burst',dp:'+20 DP',cls:'btn-challenge',img:'/challenge.png'},
-    {key:'trick_show',icon:'🌀',label:'Trick Show',sub:'stomp splash',dp:'+18 DP',cls:'btn-trick',img:'/trick.png'},
-    {key:'level_up',icon:'⚡',label:'Level Up!',sub:'ek aur!',dp:'+50 DP',cls:'btn-levelup',img:'/levelup.png'},
-    {key:'fly',icon:'🦅',label:'Fly',sub:'soar & swoop',dp:'+12 DP',cls:'btn-fly',img:'/fly.png'},
+    {key:'streak_fire',icon:'💧',label:'Streak',sub:'water aura',dp:'+25 DP',cls:'btn-streak'},
+    {key:'celebrate',icon:'🎉',label:'Celebrate',sub:'victory dance',dp:'+30 DP',cls:'btn-celebrate'},
+    {key:'challenge_focus',icon:'🎯',label:'Challenge',sub:'focus + burst',dp:'+20 DP',cls:'btn-challenge'},
+    {key:'trick_show',icon:'🌀',label:'Trick Show',sub:'stomp splash',dp:'+18 DP',cls:'btn-trick'},
+    {key:'level_up',icon:'⚡',label:'Level Up!',sub:'ek aur!',dp:'+50 DP',cls:'btn-levelup'},
+    {key:'fly',icon:'🦅',label:'Fly',sub:'soar & swoop',dp:'+12 DP',cls:'btn-fly'},
   ];
   const endoButtons = [
-    {key:'breathe',icon:'🫁',label:'Breathwork',sub:'calm glow',ep:'+20 EP',cls:'btn-breathe',img:'/breathe.png'},
-    {key:'laugh',icon:'😂',label:'Laughter',sub:'joy burst',ep:'+25 EP',cls:'btn-laugh',img:'/laugh.png'},
+    {key:'breathe',icon:'🫁',label:'Breathwork',sub:'calm glow',ep:'+20 EP',cls:'btn-breathe'},
+    {key:'laugh',icon:'😂',label:'Laughter',sub:'joy burst',ep:'+25 EP',cls:'btn-laugh'},
   ];
 
   return (
@@ -843,9 +843,8 @@ export default function Tembo() {
                   </button>
                 ))}
                 <button className={`tembo-reward-btn btn-play${activeBtn==='play_time'?' active':''}`} onClick={()=>triggerReward('play_time')} onMouseEnter={(e) => {const img = e.currentTarget.querySelector('.r-image-preview'); if(img) { img.style.display='block'; img.style.left = e.currentTarget.getBoundingClientRect().right + 12 + 'px'; img.style.top = e.currentTarget.getBoundingClientRect().top + 'px'; }}} onMouseLeave={(e) => {const img = e.currentTarget.querySelector('.r-image-preview'); if(img) img.style.display='none';}}>
-                  <span className="r-ep">+15 EP</span><img src="/playtime.png" alt="Play Time" className="r-image" />
+                  <span className="r-ep">+15 EP</span><span className="r-icon">🎈</span>
                   <div style={{flex:1,textAlign:'left'}}><div className="r-label">Play Time</div><div className="r-sub">bounce &amp; float</div></div>
-                  <img src="/playtime.png" alt="Play Time preview" className="r-image-preview" />
                 </button>
               </div>
             </div>

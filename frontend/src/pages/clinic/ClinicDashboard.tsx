@@ -95,8 +95,20 @@ export default function ClinicDashboard() {
   }, [navigate]);
 
   const allowedTabs = useMemo(() => {
-    return TABS.filter((tab) => features.includes(tab.featureKey));
-  }, [features]);
+    let baseTabs = TABS.filter((tab) => features.includes(tab.featureKey));
+
+    if (mdcRole === 'patient') {
+      // Patients should only see their own sessions, homework, and prescriptions
+      const patientAllowedKeys: ClinicTab[] = ['sessions', 'homework', 'prescriptions', 'jitsi', 'progress'];
+      baseTabs = baseTabs.filter(tab => patientAllowedKeys.includes(tab.key));
+    } else if (mdcRole === 'therapist') {
+      // Therapists shouldn't see admin features
+      const adminOnlyKeys: ClinicTab[] = ['bulk', 'therapists', 'audit'];
+      baseTabs = baseTabs.filter(tab => !adminOnlyKeys.includes(tab.key));
+    }
+
+    return baseTabs;
+  }, [features, mdcRole]);
 
   useEffect(() => {
     if (allowedTabs.length === 0) {

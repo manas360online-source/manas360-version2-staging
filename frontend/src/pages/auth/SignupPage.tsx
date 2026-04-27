@@ -322,7 +322,7 @@ export default function SignupPage() {
 
 		setIsAadhaarOtpLoading(true);
 		setError(null);
-		const mockOtp = Math.floor(100000 + Math.random() * 900000).toString();
+		const mockOtp = Math.floor(1000 + Math.random() * 9000).toString();
 		setGeneratedAadhaarOtp(mockOtp);
 		setIsAadhaarVerified(false);
 		setIsAadhaarOtpSent(true);
@@ -341,9 +341,9 @@ export default function SignupPage() {
 			return;
 		}
 
-		const enteredOtp = otpForAadhaar.replace(/\D/g, '').slice(0, 6);
-		if (enteredOtp.length !== 6) {
-			setError('Please enter a valid 6-digit Aadhaar OTP.');
+		const enteredOtp = otpForAadhaar.replace(/\D/g, '').slice(0, 4);
+		if (enteredOtp.length !== 4) {
+			setError('Please enter a valid 4-digit OTP.');
 			return;
 		}
 
@@ -611,11 +611,11 @@ export default function SignupPage() {
 											id="provider-aadhaar-otp"
 											label="Aadhaar OTP"
 											inputMode="numeric"
-											pattern="\\d{6}"
-											maxLength={6}
-											placeholder="6-digit OTP"
+											pattern="\\d{4}"
+											maxLength={4}
+											placeholder="4-digit OTP"
 											value={otpForAadhaar}
-											onChange={(event) => setOtpForAadhaar(event.target.value.replace(/\D/g, '').slice(0, 6))}
+											onChange={(event) => setOtpForAadhaar(event.target.value.replace(/\D/g, '').slice(0, 4))}
 											required
 										/>
 										<Button type="button" onClick={verifyAadhaarOtp} className="min-h-[48px] sm:self-end">
@@ -666,12 +666,12 @@ export default function SignupPage() {
 								id="signup-otp"
 								label="OTP"
 								inputMode="numeric"
-								pattern="\\d{6}"
-								maxLength={6}
+								pattern="\\d{4}"
+								maxLength={4}
 								autoComplete="one-time-code"
-								placeholder="6-digit OTP"
+								placeholder="4-digit OTP"
 								value={otp}
-								onChange={(event) => setOtp(event.target.value.replace(/\D/g, '').slice(0, 6))}
+								onChange={(event) => setOtp(event.target.value.replace(/\D/g, '').slice(0, 4))}
 								required
 							/>
 						) : null}

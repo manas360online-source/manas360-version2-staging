@@ -234,11 +234,11 @@ export default function CorporateOnboardingPage() {
                     <input
                       className={inputClassName}
                       inputMode="numeric"
-                      pattern="[0-9]{6}"
-                      maxLength={6}
-                      placeholder="6-digit OTP"
+                      pattern="[0-9]{4}"
+                      maxLength={4}
+                      placeholder="4-digit OTP"
                       value={otp}
-                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 4))}
                       required
                       autoFocus
                     />

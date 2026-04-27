@@ -8,27 +8,32 @@ export interface CreateClinicInput {
   email: string;
   address?: string;
   ownerName: string;
+  ownerPhone?: string;
+  ownerEmail?: string;
   license?: string;
-  tier: 'solo' | 'small' | 'large';
+  tier: 'trial' | 'solo' | 'small' | 'large';
   billingCycle: 'monthly' | 'quarterly';
   selectedFeatures: string[];
 }
 
 export const createClinic = async (input: CreateClinicInput) => {
-  // Generate a clinic code like MDC-2026-001
-  const count = await mdcPrisma.clinic.count();
-  const year = new Date().getFullYear();
-  const sequence = String(count + 1).padStart(3, '0');
-  const clinicCode = `MDC-${year}-${sequence}`;
-
   // Calculate pricing for the selected plan
-  const pricing = await mdcPricingService.calculatePrice({
-    clinicTier: input.tier,
-    billingCycle: input.billingCycle,
-    selectedFeatures: input.selectedFeatures,
-  });
+  let pricing = { monthlyTotal: 0, billingAmount: 0 };
+  if (input.tier !== 'trial') {
+    pricing = await mdcPricingService.calculatePrice({
+      clinicTier: input.tier,
+      billingCycle: input.billingCycle,
+      selectedFeatures: input.selectedFeatures,
+    });
+  }
 
   return mdcPrisma.$transaction(async (tx) => {
+    // Generate a clinic code like MDC-2026-001 inside the transaction
+    const count = await tx.clinic.count();
+    const year = new Date().getFullYear();
+    const sequence = String(count + 1).padStart(3, '0');
+    const clinicCode = `MDC-${year}-${sequence}`;
+
     const clinic = await tx.clinic.create({
       data: {
         clinicCode,
@@ -38,8 +43,8 @@ export const createClinic = async (input: CreateClinicInput) => {
         address: input.address,
         license: input.license,
         ownerName: input.ownerName,
-        ownerPhone: input.phone,
-        ownerEmail: input.email,
+        ownerPhone: input.ownerPhone || input.phone,
+        ownerEmail: input.ownerEmail || input.email,
         tier: input.tier,
         trialEndsAt: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000), // 21 days
         maxTherapists: input.tier === 'solo' ? 1 : input.tier === 'small' ? 3 : 15,
@@ -47,7 +52,7 @@ export const createClinic = async (input: CreateClinicInput) => {
       },
     });
 
-    // Create the trial subscription record
+    // Create the initial subscription record
     await tx.clinicSubscription.create({
       data: {
         clinicId: clinic.id,

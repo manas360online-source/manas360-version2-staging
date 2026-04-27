@@ -52,8 +52,8 @@ export const validatePassword = (value: unknown): string => {
 export const validateOtp = (value: unknown): string => {
 	const otp = assertString(value, 'otp');
 
-	if (!/^\d{6}$/.test(otp)) {
-		throw new AppError('OTP must be 6 digits', 400);
+	if (!/^\d{4}$/.test(otp)) {
+		throw new AppError('OTP must be 4 digits', 400);
 	}
 
 	return otp;

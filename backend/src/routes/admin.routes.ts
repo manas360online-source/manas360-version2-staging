@@ -119,6 +119,7 @@ import {
 } from '../controllers/admin-agreement.controller';
 import { listCorporateDemoRequestsController } from '../controllers/corporate.controller';
 import { listRetreatIntentsController, updateRetreatIntentStatusController } from '../controllers/retreat.controller';
+import { listMdcClinicsController, updateMdcClinicSubscriptionController } from '../controllers/admin-mdc.controller';
 
 const router = Router();
 
@@ -530,5 +531,9 @@ router.patch('/retreat-intents/:id/status', requireAuth, requireRole(['admin', '
 router.get('/sound', requireAuth, requireRole(['admin', 'superadmin']), asyncHandler(getAllTracks));
 router.post('/sound', requireAuth, requireRole(['admin', 'superadmin']), asyncHandler(createTrack));
 router.delete('/sound/:id', requireAuth, requireRole(['admin', 'superadmin']), asyncHandler(deleteTrack));
+
+// === DIGITAL CLINICS ADMIN ===
+router.get('/mdc-clinics', requireAuth, requireRole(['admin', 'superadmin']), requireAdminPolicy('users.view'), asyncHandler(listMdcClinicsController));
+router.patch('/mdc-clinics/:id/subscription', requireAuth, requireRole(['admin', 'superadmin']), requireAdminPolicy('users.moderate'), asyncHandler(updateMdcClinicSubscriptionController));
 
 export default router;

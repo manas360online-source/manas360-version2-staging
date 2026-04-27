@@ -122,6 +122,10 @@ jobs:
             fi
             git reset --hard origin/${{ github.ref_name }}
 
+            echo "Pulling Git LFS objects for images..."
+            git lfs install || true
+            git lfs pull
+
             echo "Detecting docker compose command..."
             which docker-compose || true
             docker-compose version || true

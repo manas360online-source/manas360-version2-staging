@@ -34,7 +34,15 @@ export const createStaff = async (input: CreateStaffInput) => {
     }
   }
 
-  const loginCode = `${clinic.clinicCode}-${input.loginSuffix}`;
+  let loginSuffix = input.loginSuffix;
+  if (!loginSuffix) {
+    const existingStaffCount = await mdcPrisma.clinicUser.count({
+      where: { clinicId: input.clinicId, role: input.role },
+    });
+    loginSuffix = input.role === 'admin' ? `ADMIN${existingStaffCount + 1}` : `P${existingStaffCount + 1}`;
+  }
+
+  const loginCode = `${clinic.clinicCode}-${loginSuffix}`;
   
   // Check if login code already exists
   const existing = await mdcPrisma.clinicUser.findUnique({

@@ -4,6 +4,7 @@ import { prisma } from '../config/db';
 import { redis } from '../config/redis';
 import { AppError } from '../middleware/error.middleware';
 import { hashPassword, generateNumericOtp, hashOtp, verifyOtp } from '../utils/hash';
+import { send2FactorOtp } from './otp.service';
 import { env } from '../config/env';
 import { createQrCode } from './admin-qr.service';
 
@@ -1402,6 +1403,11 @@ export const requestCorporateOtp = async (payload: CorporateOtpRequestInput) => 
   await prisma.$executeRaw`INSERT INTO "corporate_otp_requests" (
       "id","phone","otpHash","companyName","companySize","industry","country","contactName","email","status","expiresAt","createdAt","updatedAt"
     ) VALUES (${otpRecordId},${phone},${otpHash},${companyName},${String(payload.companySize || '').trim() || null},${String(payload.industry || '').trim() || null},${String(payload.country || '').trim() || null},${String(payload.contactName || '').trim() || null},${String(payload.email || '').trim().toLowerCase() || null},'PENDING',${expiresAt},NOW(),NOW())`;
+
+  // Send OTP via 2factor.in SMS
+  send2FactorOtp(phone, otp, 'Registration1').catch((err) => {
+    console.error('[Corporate] Failed to send 2Factor SMS:', err.message);
+  });
 
   return {
     otpRecordId,
