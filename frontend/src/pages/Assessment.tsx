@@ -143,20 +143,20 @@ export const Assessment: React.FC<AssessmentProps> = ({ onSubmit }) => {
                 </div>
               </div>
 
-              <div className="space-y-10">
+              <div className="space-y-6">
                 {questions.map((question, index) => {
                   const selectedValue = answers[question.questionId];
                   return (
-                    <div key={question.questionId} className="rounded-[28px] border border-calm-sage/10 bg-white/5 p-5 sm:p-7">
-                      <h2 className="font-serif text-2xl sm:text-3xl text-wellness-text mb-3 leading-tight font-light">
+                    <div key={question.questionId} className="rounded-[28px] border border-calm-sage/10 bg-white/5 p-4 sm:p-6">
+                      <h2 className="font-serif text-2xl sm:text-3xl text-wellness-text mb-1 leading-tight font-light">
                         {index + 1}. {question.prompt}
                       </h2>
 
-                      <p className="text-sm text-wellness-muted mb-6">
+                      <p className="text-sm text-wellness-muted mb-3">
                         Choose one answer below.
                       </p>
 
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
                         {question.options.map((option) => {
                           const isSelected = selectedValue === option.optionIndex;
                           return (
@@ -164,7 +164,7 @@ export const Assessment: React.FC<AssessmentProps> = ({ onSubmit }) => {
                               key={`${question.questionId}-${option.optionIndex}`}
                               onClick={() => setAnswer(question.questionId, option.optionIndex)}
                               className={`
-                                  w-full px-7 py-4 rounded-2xl text-base font-medium transition-smooth border-2 text-left flex justify-between items-center
+                                  w-full px-7 py-3 rounded-2xl text-base font-medium transition-smooth border-2 text-left flex justify-between items-center
                                   ${isSelected
                                     ? 'text-white shadow-soft-lg ring-2 ring-white/20 scale-[1.01]'
                                     : 'bg-white text-wellness-text border-calm-sage/20 hover:border-calm-sage/40 hover:bg-calm-sage/5'
