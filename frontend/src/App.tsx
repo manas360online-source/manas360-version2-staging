@@ -8,6 +8,7 @@ import { GlobalAudioProvider } from './context/GlobalAudioContext';
 import GlobalAudioPlayerConsole from './components/audio/GlobalAudioPlayerConsole';
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 const HeroIntroPage = lazy(() => import('./pages/HeroIntroPage'));
+const HeroPage = lazy(() => import('./pages/HeroPage'));
 const HelpingHandLandingPage = lazy(() => import('./pages/HelpingHandLandingPage'));
 const AiPowerHubLandingPage = lazy(() => import('./pages/AiPowerHubLandingPage'));
 const FindSparkLandingPage = lazy(() => import('./pages/FindSparkLandingPage'));
@@ -275,8 +276,9 @@ function App() {
           <Suspense fallback={<GlobalFallbackLoader />}>
             <ScrollToTop />
             <Routes>
-              <Route path="/" element={<Navigate to="/landing" replace />} />
+              <Route path="/" element={<Navigate to="/intro" replace />} />
               <Route path="/intro" element={<HeroIntroPage />} />
+              <Route path="/hero" element={<HeroPage />} />
               <Route path="/landing" element={<LandingPage />} />
               <Route path="/provider-landing" element={<ProviderLandingPage />} />
               <Route path="/main-landing" element={<Navigate to="/landing" replace />} />
