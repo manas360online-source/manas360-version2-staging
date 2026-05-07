@@ -12,7 +12,7 @@ export const Header: React.FC = () => {
 
         {/* Trial Badge */}
         <div className="bg-gradient-to-b from-red-500 to-red-700 text-white px-5 py-3 rounded-lg font-bold text-center">
-          <div className="text-2xl mb-1">21 Days</div>
+          <div className="text-2xl mb-1">3 Days</div>
           <div className="text-xs opacity-90">Free Trial Only</div>
           <div className="text-[10px] mt-1">Then Full Payment Required</div>
         </div>

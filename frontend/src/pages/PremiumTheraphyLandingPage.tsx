@@ -1,5 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import logo from "../assets/manas360_main_logo.png";
 import "./PremiumTheraphyLandingPage.css";
 
 type HubCard = {
@@ -10,6 +11,7 @@ type HubCard = {
   status?: string;
   action: string;
   price: string;
+  to?: string;
 };
 
 const basicCards: HubCard[] = [
@@ -21,7 +23,8 @@ const basicCards: HubCard[] = [
     tags: ["PT04 - Sound Library", "Offline Downloads", "Raga Therapy", "Binaural Beats", "200+ Tracks"],
     status: "ACTIVE",
     action: "Explore Sounds →",
-    price: "Free tier + Premium Unlimited"
+    price: "Free tier + Premium Unlimited",
+    to: "/patient/sound-therapy"
   },
   {
     icon: "🤖",
@@ -31,7 +34,8 @@ const basicCards: HubCard[] = [
     tags: ["PT07 - AnytimeBuddy", "24/7 Available", "15-min Sessions", "Mood Check-ins", "Breathing Guide"],
     status: "ACTIVE",
     action: "Start Chat →",
-    price: "₹150/call or Premium Free"
+    price: "₹150/call or Premium Free",
+    to: "/patient/messages"
   },
   {
     icon: "🔥",
@@ -41,7 +45,8 @@ const basicCards: HubCard[] = [
     tags: ["PT09 - Vent Buddy", "Voice Venting", "Text Expression", "Empathetic AI", "Auto Journals"],
     status: "ACTIVE",
     action: "Vent Now →",
-    price: "3 free/day or Premium Unlimited"
+    price: "3 free/day or Premium Unlimited",
+    to: "/patient/buddy"
   },
   {
     icon: "🐾",
@@ -51,7 +56,8 @@ const basicCards: HubCard[] = [
     tags: ["PT06 - Digital Pets", "10 Unique Species", "AR Mode", "Mini-Games", "Habit Building"],
     status: "ACTIVE",
     action: "Meet Your Pet →",
-    price: "Starter free + Premium All Pets"
+    price: "Starter free + Premium All Pets",
+    to: "/patient/digital-pets"
   }
 ];
 
@@ -93,12 +99,13 @@ const PremiumTheraphyLandingPage: React.FC = () => {
     <main className="premium-theraphy-page">
       <header className="premium-topbar">
         <div className="premium-shell premium-topbar-inner">
-          <div className="premium-logo">
+          <Link to="/" className="premium-logo">
+            <img src={logo} alt="MANAS360" className="h-6 w-6 rounded-md object-cover mr-2" />
             MANAS<span>360</span>
-          </div>
+          </Link>
           <div className="premium-nav-actions">
-            <button type="button">📋 My Sessions</button>
-            <button type="button">💬 Messages</button>
+            <Link to="/patient/sessions" className="premium-nav-btn">📋 My Sessions</Link>
+            <Link to="/patient/provider-messages" className="premium-nav-btn">💬 Messages</Link>
             <button type="button" className="premium-badge">👑 Premium Active</button>
           </div>
         </div>
@@ -167,10 +174,8 @@ const PremiumTheraphyLandingPage: React.FC = () => {
               ))}
             </div>
             <div className="tool-footer">
-              {card.title === "Sound Therapy" ? (
-                <Link to="/sound-therapy">{card.action}</Link>
-              ) : card.title.includes("Digital Pets") || card.title === "Digital Pets Hub" ? (
-                <Link to="/pet">{card.action}</Link>
+              {card.to ? (
+                <Link to={card.to}>{card.action}</Link>
               ) : (
                 <a href="#">{card.action}</a>
               )}

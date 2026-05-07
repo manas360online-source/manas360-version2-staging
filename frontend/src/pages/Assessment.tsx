@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { theme } from '../theme/theme';
 import {
   CLINICAL_ASSESSMENT_OPTIONS,
   CLINICAL_QUESTION_BANK,
@@ -105,112 +104,172 @@ export const Assessment: React.FC<AssessmentProps> = ({ onSubmit }) => {
   const progressPercent = questions.length > 0 ? (answeredCount / questions.length) * 100 : 0;
 
   return (
-    <div className="responsive-page bg-wellness-bg animate-fadeIn">
-      <div className="responsive-container section-stack py-8 sm:py-12">
-        <div className="w-full max-w-screen-lg mx-auto flex flex-col sm:flex-row gap-4 justify-between sm:items-center">
+    <div className="animate-fadeIn" style={{ minHeight: '100vh', background: '#13292F' }}>
+      <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '20px 18px 40px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', marginBottom: '20px' }}>
           <div
-            className="font-serif text-2xl font-normal text-wellness-text tracking-wide cursor-pointer hover:opacity-80 transition-smooth"
             onClick={() => navigate('/landing')}
+            style={{
+              fontFamily: 'Georgia, "Times New Roman", serif',
+              fontSize: '30px',
+              color: '#F8F3EA',
+              cursor: 'pointer',
+              letterSpacing: '0.5px'
+            }}
           >
-            MANAS<span className="font-semibold text-calm-sage">360</span>
+            MANAS360
           </div>
-          <div className="text-sm font-medium text-wellness-text bg-calm-sage/15 px-5 py-2 rounded-full">
+          <div
+            style={{
+              color: '#F8F3EA',
+              background: 'rgba(255,255,255,0.10)',
+              borderRadius: '999px',
+              padding: '10px 24px',
+              fontSize: '14px',
+              fontWeight: 700
+            }}
+          >
             Assessment
           </div>
         </div>
 
-        <div className="w-full max-w-screen-xl mx-auto section-stack gap-12 sm:gap-16 lg:gap-20">
-          {loading ? (
-            <section>
-              <h2 className="font-serif text-2xl sm:text-3xl text-wellness-text mb-2 leading-tight font-light">
-                Loading your assessment...
-              </h2>
-              <p className="text-sm text-wellness-muted">Preparing questions</p>
-            </section>
-          ) : null}
+        {loading ? (
+          <section>
+            <h2 style={{ color: '#F8F3EA', fontFamily: 'Georgia, "Times New Roman", serif', fontSize: '34px', fontWeight: 400 }}>
+              Loading your assessment...
+            </h2>
+            <p style={{ color: 'rgba(248,243,234,0.78)', marginTop: '8px' }}>Preparing questions</p>
+          </section>
+        ) : null}
 
-          {!loading && questions.length > 0 ? (
-            <section className="max-w-screen-xl mx-auto">
-              <div className="mb-8">
-                <p className="text-sm font-medium text-wellness-muted">
-                  {answeredCount} of {questions.length} answered
-                </p>
-                <div className="mt-2 h-2 w-full rounded-full bg-calm-sage/15">
-                  <div
-                    className="h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${progressPercent}%`, backgroundColor: theme.colors.brandTopbar }}
-                  />
-                </div>
+        {!loading && questions.length > 0 ? (
+          <section>
+            <div style={{ marginBottom: '20px' }}>
+              <p style={{ color: '#F8F3EA', fontSize: '16px', fontWeight: 700 }}>
+                {answeredCount} of {questions.length} answered
+              </p>
+              <div style={{ marginTop: '12px', height: '8px', width: '100%', borderRadius: '999px', background: 'rgba(255,255,255,0.10)' }}>
+                <div
+                  style={{
+                    height: '8px',
+                    borderRadius: '999px',
+                    width: `${progressPercent}%`,
+                    background: '#31484D',
+                    transition: 'width 0.3s ease'
+                  }}
+                />
               </div>
-
-              <div className="space-y-6">
-                {questions.map((question, index) => {
-                  const selectedValue = answers[question.questionId];
-                  return (
-                    <div key={question.questionId} className="rounded-[28px] border border-calm-sage/10 bg-white/5 p-4 sm:p-6">
-                      <h2 className="font-serif text-2xl sm:text-3xl text-wellness-text mb-1 leading-tight font-light">
-                        {index + 1}. {question.prompt}
-                      </h2>
-
-                      <p className="text-sm text-wellness-muted mb-3">
-                        Choose one answer below.
-                      </p>
-
-                      <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-                        {question.options.map((option) => {
-                          const isSelected = selectedValue === option.optionIndex;
-                          return (
-                            <button
-                              key={`${question.questionId}-${option.optionIndex}`}
-                              onClick={() => setAnswer(question.questionId, option.optionIndex)}
-                              className={`
-                                  w-full px-7 py-3 rounded-2xl text-base font-medium transition-smooth border-2 text-left flex justify-between items-center
-                                  ${isSelected
-                                    ? 'text-white shadow-soft-lg ring-2 ring-white/20 scale-[1.01]'
-                                    : 'bg-white text-wellness-text border-calm-sage/20 hover:border-calm-sage/40 hover:bg-calm-sage/5'
-                                  }
-                                `}
-                                style={isSelected
-                                  ? { backgroundColor: theme.colors.brandTopbar, borderColor: theme.colors.brandTopbar }
-                                  : undefined}
-                            >
-                              {option.label}
-                              {isSelected && <span className="text-xl">✓</span>}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          ) : null}
-
-          {error ? (
-            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {error}
             </div>
-          ) : null}
 
-          <div className="pt-4 pb-20">
-            <button
-              onClick={handleFinish}
-              disabled={loading || submitting || questions.length === 0 || answeredCount !== questions.length}
-              className={`
-                responsive-action-btn w-full rounded-full text-lg font-semibold tracking-wide transition-smooth shadow-soft-md
-                ${(loading || submitting || questions.length === 0 || answeredCount !== questions.length)
-                  ? 'bg-wellness-surface text-wellness-muted cursor-not-allowed'
-                  : 'bg-gradient-calm text-white hover:shadow-soft-lg hover:-translate-y-1'
-                }
-              `}
-            >
-              {submitting ? 'Submitting...' : 'Submit • Analyze My Results'}
-            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {questions.map((question, index) => {
+                const selectedValue = answers[question.questionId];
+                return (
+                  <div
+                    key={question.questionId}
+                    style={{
+                      borderRadius: '26px',
+                      border: '1px solid rgba(196,214,214,0.16)',
+                      background: '#13292F',
+                      padding: '24px'
+                    }}
+                  >
+                    <h2
+                      style={{
+                        color: '#F8F3EA',
+                        fontFamily: 'Georgia, "Times New Roman", serif',
+                        fontSize: '28px',
+                        fontWeight: 400,
+                        lineHeight: 1.2,
+                        marginBottom: '12px'
+                      }}
+                    >
+                      {index + 1}. {question.prompt}
+                    </h2>
+
+                    <p style={{ color: '#F8F3EA', fontSize: '14px', fontWeight: 500, marginBottom: '18px' }}>
+                      Choose one answer below.
+                    </p>
+
+                    <div style={{ display: 'flex', flexWrap: 'nowrap', gap: '12px' }}>
+                      {question.options.map((option) => {
+                        const isSelected = selectedValue === option.optionIndex;
+                        return (
+                          <button
+                            key={`${question.questionId}-${option.optionIndex}`}
+                            type="button"
+                            onClick={() => setAnswer(question.questionId, option.optionIndex)}
+                            style={{
+                              width: '100%',
+                              flex: '1 1 0',
+                              minWidth: 0,
+                              padding: '16px 20px',
+                              borderRadius: '18px',
+                              border: isSelected ? '1px solid #3E5B60' : '1px solid rgba(196,214,214,0.16)',
+                              background: isSelected ? '#31484D' : 'transparent',
+                              color: '#FFFFFF',
+                              fontSize: '16px',
+                              fontWeight: 600,
+                              textAlign: 'left',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            <span>{option.label}</span>
+                            {isSelected ? <span style={{ fontSize: '18px' }}>✓</span> : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        ) : null}
+
+        {error ? (
+          <div
+            style={{
+              marginTop: '18px',
+              borderRadius: '18px',
+              border: '1px solid rgba(248,113,113,0.4)',
+              background: 'rgba(239,68,68,0.12)',
+              color: '#FECACA',
+              padding: '12px 16px',
+              fontSize: '14px'
+            }}
+          >
+            {error}
           </div>
+        ) : null}
+
+        <div style={{ paddingTop: '14px', paddingBottom: '12px' }}>
+          <button
+            type="button"
+            onClick={handleFinish}
+            disabled={loading || submitting || questions.length === 0 || answeredCount !== questions.length}
+            style={{
+              width: '100%',
+              borderRadius: '999px',
+              padding: '14px 20px',
+              fontSize: '16px',
+              fontWeight: 700,
+              border: 'none',
+              cursor: loading || submitting || questions.length === 0 || answeredCount !== questions.length ? 'not-allowed' : 'pointer',
+              background: loading || submitting || questions.length === 0 || answeredCount !== questions.length ? 'rgba(255,255,255,0.12)' : '#31484D',
+              color: loading || submitting || questions.length === 0 || answeredCount !== questions.length ? 'rgba(248,243,234,0.55)' : '#FFFFFF'
+            }}
+          >
+            {submitting ? 'Submitting...' : 'Submit • Analyze My Results'}
+          </button>
         </div>
       </div>
     </div>
   );
 };
 
+export default Assessment;

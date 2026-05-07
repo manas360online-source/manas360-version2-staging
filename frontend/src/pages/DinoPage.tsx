@@ -1,6 +1,6 @@
 import React from 'react';
-import DigitalPetsHubPage from './patient/DigitalPetsHubPage';
+import DigitalPetHub from '../components/common/DigitalPetHub';
 
-const DinoPage: React.FC = () => <DigitalPetsHubPage selectedPet="wise-owl" />;
+const DinoPage: React.FC = () => <DigitalPetHub selectedPet="wise-owl" />;
 
 export default DinoPage;

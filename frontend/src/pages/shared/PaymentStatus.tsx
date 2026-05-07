@@ -116,18 +116,7 @@ export default function PaymentStatusPage() {
 								const pendingPayload = JSON.parse(pendingRaw);
 								await axios.post('/api/v1/patient/appointments/smart-match', pendingPayload, { withCredentials: true });
 								localStorage.removeItem(pendingKey);
-								const smartMatchSummary = pendingPayload?.smartMatchSummary || null;
-								if (smartMatchSummary) {
-									window.sessionStorage.setItem('manas360.smartmatch.lastSummary', JSON.stringify(smartMatchSummary));
-								}
-								navigate('/patient/sessions', {
-									replace: true,
-									state: {
-										smartMatchSummary,
-										assessmentResults: pendingPayload?.assessmentResults || [],
-										paymentConfirmed: true,
-									},
-								});
+								navigate('/patient/sessions', { replace: true });
 								return;
 							} catch (err) {
 								console.warn('Failed to finalize smart-match appointment request after payment', err);

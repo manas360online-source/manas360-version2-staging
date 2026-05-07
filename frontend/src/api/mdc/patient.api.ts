@@ -14,14 +14,12 @@ export interface Patient {
 }
 
 export interface CreatePatientInput {
-  clinicId: string;
   fullName: string;
   email?: string;
   phone?: string;
   dateOfBirth?: string;
   gender?: string;
   address?: string;
-  assignedTherapistId?: string;
 }
 
 export type UpdatePatientInput = Partial<CreatePatientInput>;
@@ -36,7 +34,7 @@ interface ApiEnvelope<T> {
 }
 
 const mdcApi = axios.create({
-  baseURL: '/api/v1/mdc',
+  baseURL: '/api/mdc',
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
@@ -75,7 +73,7 @@ const mockPatient = (data: CreatePatientInput, id?: string): Patient => ({
 
 export const createPatient = async (data: CreatePatientInput): Promise<Patient> => {
   try {
-    const response = await mdcApi.post<Patient | ApiEnvelope<Patient>>(`/clinics/${data.clinicId}/patients`, data);
+    const response = await mdcApi.post<Patient | ApiEnvelope<Patient>>('/patients', data);
     return unwrap(response.data);
   } catch (error) {
     console.error('createPatient failed, using mock fallback', error);
@@ -83,15 +81,15 @@ export const createPatient = async (data: CreatePatientInput): Promise<Patient> 
   }
 };
 
-export const getPatients = async (clinicId: string): Promise<Patient[]> => {
+export const getPatients = async (): Promise<Patient[]> => {
   try {
-    const response = await mdcApi.get<Patient[] | ApiEnvelope<Patient[]>>(`/clinics/${clinicId}/patients`);
+    const response = await mdcApi.get<Patient[] | ApiEnvelope<Patient[]>>('/patients');
     return unwrap(response.data);
   } catch (error) {
     console.error('getPatients failed, using mock fallback', error);
     return [
-      mockPatient({ clinicId, fullName: 'Mock Patient One', email: 'mock1@example.com', phone: '+91 9000000001' }, 'mock-p1'),
-      mockPatient({ clinicId, fullName: 'Mock Patient Two', email: 'mock2@example.com', phone: '+91 9000000002' }, 'mock-p2'),
+      mockPatient({ fullName: 'Mock Patient One', email: 'mock1@example.com', phone: '+91 9000000001' }, 'mock-p1'),
+      mockPatient({ fullName: 'Mock Patient Two', email: 'mock2@example.com', phone: '+91 9000000002' }, 'mock-p2'),
     ];
   }
 };
@@ -102,7 +100,7 @@ export const getPatientById = async (id: string): Promise<Patient> => {
     return unwrap(response.data);
   } catch (error) {
     console.error('getPatientById failed, using mock fallback', error);
-    return mockPatient({ clinicId: 'mock-clinic', fullName: 'Mock Patient', email: 'mock@example.com' }, id);
+    return mockPatient({ fullName: 'Mock Patient', email: 'mock@example.com' }, id);
   }
 };
 
@@ -113,7 +111,7 @@ export const updatePatient = async (id: string, data: UpdatePatientInput): Promi
   } catch (error) {
     console.error('updatePatient failed, using mock fallback', error);
     return {
-      ...mockPatient({ clinicId: 'mock-clinic', fullName: data.fullName || 'Mock Patient' }, id),
+      ...mockPatient({ fullName: data.fullName || 'Mock Patient' }, id),
       ...data,
       id,
       updatedAt: new Date().toISOString(),

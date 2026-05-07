@@ -3,7 +3,6 @@ import {
   login as loginApi,
   logout as logoutApi,
   me as meApi,
-  becomeProvider as becomeProviderApi,
   type AuthUser,
 } from '../api/auth';
 
@@ -118,19 +117,16 @@ export const getPostLoginRoute = (user: AuthUser | null | undefined): string => 
   }
 
   if (isProviderRole(user.role)) {
+    if (normalizeRole(user.role) === 'learner') {
+      return '/provider/dashboard';
+    }
+
     // Dev/testing bypass only: never allow onboarding skip in production builds.
     const isProductionBuild = import.meta.env.PROD === true || String(import.meta.env.MODE || '').toLowerCase() === 'production';
     const skipFlagEnabled = (import.meta.env.VITE_SKIP_ONBOARDING || '').toString() === 'true';
     const skipOnboarding = import.meta.env.DEV === true || (!isProductionBuild && skipFlagEnabled);
     if (skipOnboarding) return '/provider/dashboard';
-
-    const normalizedRole = normalizeRole(user.role);
     const onboardingStatus = String(user.onboardingStatus || '').toUpperCase();
-
-    // Learners can bypass subscription and setup screens to access their dashboard/certifications
-    if (normalizedRole === 'learner') {
-      return '/provider/dashboard';
-    }
 
     if (!user.platformAccessActive) {
       return '/provider/subscription';
@@ -155,7 +151,6 @@ type AuthContextValue = {
   login: (identifier: string, password: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
   checkAuth: (options?: { force?: boolean }) => Promise<void>;
-  becomeProvider: () => Promise<void>;
 };
 
 type AuthContextGlobal = typeof globalThis & {
@@ -269,11 +264,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [clearSessionHint]);
 
-  const becomeProvider = useCallback(async () => {
-    const updatedUser = await becomeProviderApi();
-    setUser(updatedUser);
-  }, []);
-
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -283,9 +273,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       login,
       logout,
       checkAuth,
-      becomeProvider,
     }),
-    [user, loading, login, logout, checkAuth, becomeProvider],
+    [user, loading, login, logout, checkAuth],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -33,15 +33,6 @@ const EnrollmentRegistrationPage: React.FC = () => {
 
   const validateMobile = (value: string): boolean => value.replace(/\D/g, '').length >= 10;
 
-  const validate = (): boolean => {
-    setGeneralError(null);
-    if (!validateMobile(mobile)) {
-      setGeneralError('Please enter a valid 10-digit mobile number.');
-      return false;
-    }
-    return true;
-  };
-
   const continueToCheckout = (input: { fullName?: string; mobile?: string }) => {
     if (!slug) {
       setGeneralError('Certification link is invalid. Please reopen from certification details.');
@@ -66,16 +57,29 @@ const EnrollmentRegistrationPage: React.FC = () => {
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validate()) return;
+    setGeneralError(null);
+
+    if (!slug) {
+      setGeneralError('Certification link is invalid. Please open enrollment from certification details.');
+      return;
+    }
+
+    if (!validateMobile(mobile)) {
+      setGeneralError('Please enter a valid mobile number to continue.');
+      return;
+    }
 
     setProcessing(true);
     try {
-      const response = await signupWithPhone(mobile, { name: fullName, role: 'learner' });
+      const response = await signupWithPhone(mobile, {
+        name: fullName.trim() || undefined,
+        role: 'learner',
+      });
       setOtpSent(true);
       setDevOtp(response.devOtp || null);
-      setProcessing(false);
     } catch (error: any) {
-      setGeneralError(getApiErrorMessage(error, 'Failed to send OTP. Please try again.'));
+      setGeneralError(getApiErrorMessage(error, 'Unable to send OTP. Please try again.'));
+    } finally {
       setProcessing(false);
     }
   };
@@ -245,10 +249,10 @@ const EnrollmentRegistrationPage: React.FC = () => {
                     <input
                       type="text"
                       inputMode="numeric"
-                      maxLength={4}
-                      placeholder="Enter 4-digit OTP"
+                      maxLength={6}
+                      placeholder="Enter 6-digit OTP"
                       value={otp}
-                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                       className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-200 transition"
                     />
                     {devOtp && (

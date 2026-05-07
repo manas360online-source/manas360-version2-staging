@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { getApiErrorMessage, me as fetchMe, signupWithPhone, verifyPhoneSignupOtp } from '../../api/auth';
+import { getApiErrorMessage, signupWithPhone, verifyPhoneSignupOtp } from '../../api/auth';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import { useAuth, getPostLoginRoute } from '../../context/AuthContext';
@@ -145,22 +144,12 @@ const PATIENT_TERMS_SECTIONS: string[] = [
 
 export default function SignupPage() {
 	const { checkAuth } = useAuth();
-	const queryClient = useQueryClient();
 	const navigate = useNavigate();
 	const location = useLocation();
-	const locationState = location.state as { role?: SignupRole } | null;
-	const initialRole = useMemo<SignupRole>(() => {
-		const candidateRole = locationState?.role || new URLSearchParams(location.search).get('role');
-		if (candidateRole === 'therapist' || candidateRole === 'psychiatrist' || candidateRole === 'psychologist' || candidateRole === 'coach') {
-			return candidateRole;
-		}
-
-		return 'patient';
-	}, [location.search, locationState]);
 
 	const [name, setName] = useState('');
 	const [phone, setPhone] = useState('');
-	const [role, setRole] = useState<SignupRole>(initialRole);
+	const [role, setRole] = useState<SignupRole>('patient');
 	const [otp, setOtp] = useState('');
 	const [otpSent, setOtpSent] = useState(false);
 	const [devOtp, setDevOtp] = useState<string | null>(null);
@@ -322,7 +311,7 @@ export default function SignupPage() {
 
 		setIsAadhaarOtpLoading(true);
 		setError(null);
-		const mockOtp = Math.floor(1000 + Math.random() * 9000).toString();
+		const mockOtp = Math.floor(100000 + Math.random() * 900000).toString();
 		setGeneratedAadhaarOtp(mockOtp);
 		setIsAadhaarVerified(false);
 		setIsAadhaarOtpSent(true);
@@ -341,9 +330,9 @@ export default function SignupPage() {
 			return;
 		}
 
-		const enteredOtp = otpForAadhaar.replace(/\D/g, '').slice(0, 4);
-		if (enteredOtp.length !== 4) {
-			setError('Please enter a valid 4-digit OTP.');
+		const enteredOtp = otpForAadhaar.replace(/\D/g, '').slice(0, 6);
+		if (enteredOtp.length !== 6) {
+			setError('Please enter a valid 6-digit Aadhaar OTP.');
 			return;
 		}
 
@@ -398,54 +387,19 @@ export default function SignupPage() {
 		const query = new URLSearchParams(location.search);
 		const prefillPhone = query.get('phone');
 		const reason = query.get('reason');
-		const userType = String(query.get('userType') || '').toLowerCase();
-		const queryRole = query.get('role');
 
 		if (prefillPhone && !phone) {
 			setPhone(prefillPhone);
 		}
 
-		if ((locationState?.role || queryRole) && role === 'patient') {
-			const candidateRole = locationState?.role || queryRole;
-			if (candidateRole === 'therapist' || candidateRole === 'psychiatrist' || candidateRole === 'psychologist' || candidateRole === 'coach') {
-				setRole(candidateRole);
-			}
-		}
-
 		if (reason === 'terms' && !otpSent && !error) {
 			setError('Please review and accept Terms & Conditions to complete registration.');
 		}
-
-		if (!isPatientLeadFlow && !isCertificationContext && !otpSent) {
-			if (userType === 'therapist' || userType === 'psychiatrist' || userType === 'psychologist' || userType === 'coach' || userType === 'patient') {
-				setRole(userType as SignupRole);
-			}
-		}
-	}, [location.search, phone, otpSent, error, isPatientLeadFlow, isCertificationContext]);
-
+	}, [location.search, phone, otpSent, error]);
 
 	const resolveReturnTo = (): string => {
 		const qp = new URLSearchParams(location.search);
-		const candidate = qp.get('returnTo') || qp.get('next') || '';
-		if (!candidate) {
-			return '';
-		}
-
-		if (!candidate.startsWith('/')) {
-			return '';
-		}
-
-		if (candidate.startsWith('/auth/')) {
-			return '';
-		}
-
-		return candidate;
-	};
-
-	const hasSessionCookieHint = (): boolean => {
-		if (typeof document === 'undefined') return false;
-		const csrfCookieName = (import.meta.env.VITE_CSRF_COOKIE_NAME || 'csrf_token').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-		return new RegExp(`(?:^|; )${csrfCookieName}=`).test(document.cookie);
+		return qp.get('returnTo') || qp.get('next') || window.location.pathname || '/';
 	};
 
 	const verifyOtp = async () => {
@@ -476,28 +430,17 @@ export default function SignupPage() {
 				localStorage.removeItem('guest_game_token');
 			}
 			await checkAuth({ force: true });
-			await queryClient.invalidateQueries({ queryKey: ['wallet'] });
-
-			let resolvedUser = result.user;
-			if (hasSessionCookieHint()) {
-				try {
-					resolvedUser = await fetchMe();
-				} catch {
-					// Keep OTP response user as fallback.
-				}
-			}
-
 			const returnTo = resolveReturnTo();
 			if (isCertificationContext) {
 				navigate(returnTo || '/certifications', { replace: true });
 				return;
 			}
 			// If backend indicates patient requires a subscription, send to plans page
-			if ((resolvedUser as any)?.requiresSubscription) {
+			if ((result.user as any)?.requiresSubscription) {
 				navigate(`/plans?returnTo=${encodeURIComponent(returnTo)}`, { replace: true });
 				return;
 			}
-			const postLoginRoute = getPostLoginRoute(resolvedUser);
+			const postLoginRoute = getPostLoginRoute(result.user);
 			navigate(postLoginRoute, { replace: true });
 		} catch (err) {
 			setError(getApiErrorMessage(err, 'OTP verification failed'));
@@ -611,11 +554,11 @@ export default function SignupPage() {
 											id="provider-aadhaar-otp"
 											label="Aadhaar OTP"
 											inputMode="numeric"
-											pattern="\\d{4}"
-											maxLength={4}
-											placeholder="4-digit OTP"
+											pattern="\\d{6}"
+											maxLength={6}
+											placeholder="6-digit OTP"
 											value={otpForAadhaar}
-											onChange={(event) => setOtpForAadhaar(event.target.value.replace(/\D/g, '').slice(0, 4))}
+											onChange={(event) => setOtpForAadhaar(event.target.value.replace(/\D/g, '').slice(0, 6))}
 											required
 										/>
 										<Button type="button" onClick={verifyAadhaarOtp} className="min-h-[48px] sm:self-end">
@@ -666,12 +609,12 @@ export default function SignupPage() {
 								id="signup-otp"
 								label="OTP"
 								inputMode="numeric"
-								pattern="\\d{4}"
-								maxLength={4}
+								pattern="\\d{6}"
+								maxLength={6}
 								autoComplete="one-time-code"
-								placeholder="4-digit OTP"
+								placeholder="6-digit OTP"
 								value={otp}
-								onChange={(event) => setOtp(event.target.value.replace(/\D/g, '').slice(0, 4))}
+								onChange={(event) => setOtp(event.target.value.replace(/\D/g, '').slice(0, 6))}
 								required
 							/>
 						) : null}

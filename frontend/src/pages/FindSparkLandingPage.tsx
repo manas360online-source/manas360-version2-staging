@@ -1,6 +1,5 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { buildPresetAssessmentLink } from "../config/presetDefaults";
 import "./FindSparkLandingPage.css";
 
 type SparkCard = {
@@ -43,20 +42,15 @@ const sparkCards: SparkCard[] = [
 
 const FindSparkLandingPage: React.FC = () => {
   const navigate = useNavigate();
-  const couplesAssessmentLink = buildPresetAssessmentLink('couples', {
-    utmSource: 'landing',
-    utmMedium: 'quickrail',
-    utmCampaign: 'couples-therapy',
-  });
 
   return (
     <main className="spark-page">
       <header className="spark-header">
         <div className="spark-container spark-header-inner">
-          <button type="button" className="spark-logo" onClick={() => navigate(couplesAssessmentLink)}>
+          <div className="spark-logo">
             MANAS<span>360</span>
-          </button>
-          <button type="button" className="spark-back" onClick={() => navigate(couplesAssessmentLink)}>
+          </div>
+          <button type="button" className="spark-back" onClick={() => navigate("/")}>
             ← Back to Home
           </button>
         </div>
@@ -69,7 +63,7 @@ const FindSparkLandingPage: React.FC = () => {
           </div>
           <h1>Find a Spark Again</h1>
           <p>Couples, parents, and families - expert support for the relationships that matter most.</p>
-          <button type="button" className="spark-primary" onClick={() => navigate(couplesAssessmentLink)}>Book Couples Session →</button>
+          <button type="button" className="spark-primary">Book Couples Session →</button>
         </div>
       </section>
 
@@ -99,7 +93,7 @@ const FindSparkLandingPage: React.FC = () => {
       <section className="spark-container spark-cta">
         <h2>Every Relationship Deserves Care</h2>
         <p>First couples session at ₹499 (normally ₹999). Take the first step together.</p>
-        <button type="button" onClick={() => navigate(couplesAssessmentLink)}>Book Couples Session - ₹499 →</button>
+        <button type="button">Book Couples Session - ₹499 →</button>
       </section>
 
       <footer className="spark-footer">
@@ -109,7 +103,7 @@ const FindSparkLandingPage: React.FC = () => {
         <p className="spark-footer-tagline">From Episodic to Transformational</p>
 
         <div className="spark-footer-links">
-          <button type="button" onClick={() => navigate(couplesAssessmentLink)}>Home</button>
+          <button type="button" onClick={() => navigate("/")}>Home</button>
           <span>·</span>
           <button type="button" onClick={() => navigate("/privacy")}>Privacy</button>
           <span>·</span>
@@ -117,7 +111,7 @@ const FindSparkLandingPage: React.FC = () => {
           <span>·</span>
           <button type="button" onClick={() => navigate("/refunds")}>Refund</button>
           <span>·</span>
-          <button type="button" onClick={() => navigate(couplesAssessmentLink)}>Contact</button>
+          <button type="button" onClick={() => navigate("/")}>Contact</button>
         </div>
 
         <p className="spark-footer-copy">

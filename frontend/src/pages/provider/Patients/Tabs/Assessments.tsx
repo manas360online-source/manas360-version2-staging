@@ -141,8 +141,8 @@ export default function Assessments() {
   };
 
   return (
-    <div className="space-y-4" style={{ fontFamily: 'DM Sans, sans-serif' }}>
-      <header className="flex flex-col gap-3 rounded-xl border border-[#E5E5E5] bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-3" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+      <header className="flex flex-col gap-2.5 rounded-xl border border-[#E5E5E5] bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="font-display text-2xl font-semibold text-[#2D4128]">Clinical Assessments</h2>
           <p className="mt-1 text-sm text-slate-500">Review score trends and question-level responses for patient ID {patientId || '123'}.</p>
@@ -178,9 +178,9 @@ export default function Assessments() {
         </div>
       </header>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
         <aside className="lg:col-span-1">
-          <div className="rounded-xl border border-[#E5E5E5] bg-white p-4 shadow-sm">
+          <div className="rounded-xl border border-[#E5E5E5] bg-white p-3.5 shadow-sm">
             <div className="flex items-center justify-between gap-3 border-b border-[#E5E5E5] pb-4">
               <div>
                 <p className="font-display text-lg font-semibold text-[#2D4128]">Assessment History</p>
@@ -191,7 +191,7 @@ export default function Assessments() {
               </div>
             </div>
 
-            <div className="mt-4 max-h-[680px] space-y-3 overflow-y-auto pr-1">
+            <div className="mt-3 max-h-[560px] space-y-2.5 overflow-y-auto pr-1">
               {isLoading && (
                 <div className="space-y-3">
                   {Array.from({ length: 3 }).map((_, index) => (
@@ -208,7 +208,7 @@ export default function Assessments() {
                     key={assessment.id}
                     type="button"
                     onClick={() => setSelectedAssessmentId(assessment.id)}
-                    className={`w-full rounded-xl border px-4 py-4 text-left transition-all ${
+                    className={`w-full rounded-xl border px-3.5 py-3 text-left transition-all ${
                       isActive
                         ? 'border-[#E5E5E5] border-l-4 border-l-[#4A6741] bg-[#E8EFE6]'
                         : 'border-[#E5E5E5] bg-white hover:bg-[#FAFAF8]'
@@ -245,7 +245,7 @@ export default function Assessments() {
         </aside>
 
         <section className="lg:col-span-2">
-          <div className="rounded-xl border border-[#E5E5E5] bg-white p-5 shadow-sm">
+          <div className="rounded-xl border border-[#E5E5E5] bg-white p-4 shadow-sm">
             {isLoading && (
               <div className="space-y-4">
                 <div className="h-20 animate-pulse rounded-xl bg-[#FAFAF8]" />
@@ -256,7 +256,7 @@ export default function Assessments() {
 
             {!isLoading && selectedAssessment && (
               <>
-                <div className="flex flex-col gap-4 border-b border-[#E5E5E5] pb-5 md:flex-row md:items-start md:justify-between">
+                <div className="flex flex-col gap-3 border-b border-[#E5E5E5] pb-4 md:flex-row md:items-start md:justify-between">
                   <div>
                     <p className="font-display text-2xl font-semibold text-[#2D4128]">{getAssessmentFullName(selectedAssessment)}</p>
                     <p className="mt-1 text-sm text-slate-500">Completed on {formatAssessmentDate(selectedAssessment.date)}</p>
@@ -269,7 +269,7 @@ export default function Assessments() {
                   </div>
                 </div>
 
-                <div className="mt-5 rounded-xl border border-blue-100 bg-blue-50 p-4">
+                <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 p-3.5">
                   <div className="flex items-start gap-3">
                     <TrendingDown className="mt-0.5 h-5 w-5 text-blue-600" />
                     <div>
@@ -280,13 +280,13 @@ export default function Assessments() {
                   </div>
                 </div>
 
-                <div className="mt-6">
+                <div className="mt-4">
                   <div className="flex items-center gap-2">
                     <AlertCircle className="h-5 w-5 text-[#4A6741]" />
                     <h3 className="font-display text-lg font-semibold text-[#2D4128]">Question Breakdown</h3>
                   </div>
 
-                  <div className="mt-4 overflow-hidden rounded-xl border border-[#E5E5E5]">
+                  <div className="mt-3 overflow-hidden rounded-xl border border-[#E5E5E5]">
                     <table className="min-w-full divide-y divide-[#E5E5E5]">
                       <thead className="bg-[#FAFAF8]">
                         <tr>

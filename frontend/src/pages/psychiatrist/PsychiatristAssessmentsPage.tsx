@@ -202,17 +202,17 @@ export default function PsychiatristAssessmentsPage() {
       title="Psychiatric Assessment"
       subtitle="Structured clinical assessment with symptom severity, medical history, and lab context."
     >
-      <section className="grid gap-4 xl:grid-cols-[2fr_1fr]">
+      <section className="grid gap-3 xl:grid-cols-[2fr_1fr]">
         <TherapistCard>
-          <div className="border-b border-ink-100 px-4 py-3">
+          <div className="border-b border-ink-100 px-3 py-2.5">
             <h3 className="font-display text-lg font-semibold text-ink-800">New Assessment</h3>
             <p className="mt-1 text-sm text-ink-500">Auto-save every 2 minutes{autosaveAt ? ` | last saved ${autosaveAt}` : ''}</p>
           </div>
 
-          <div className="space-y-4 px-4 py-4">
+          <div className="space-y-3 px-3 py-3">
             <Field label="Chief Complaint">
               <textarea
-                className="min-h-[80px] w-full rounded-lg border border-ink-100 bg-white px-3 py-2 text-sm text-ink-800 focus:border-sage-300 focus:outline-none"
+                className="min-h-[72px] w-full rounded-lg border border-ink-100 bg-white px-3 py-2 text-sm text-ink-800 focus:border-sage-300 focus:outline-none"
                 value={chiefComplaint}
                 onChange={(event) => setChiefComplaint(event.target.value)}
               />
@@ -220,7 +220,7 @@ export default function PsychiatristAssessmentsPage() {
 
             <div>
               <p className="mb-2 text-sm font-semibold text-ink-700">Symptoms Checklist (1-10)</p>
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className="grid gap-2.5 md:grid-cols-2">
                 {SYMPTOMS.map((item) => (
                   <Field key={item.key} label={item.label}>
                     <input
@@ -253,7 +253,7 @@ export default function PsychiatristAssessmentsPage() {
 
             <div>
               <p className="mb-2 text-sm font-semibold text-ink-700">Medical History</p>
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className="grid gap-2.5 md:grid-cols-2">
                 <Field label="Chronic Conditions"><input value={chronicConditions} onChange={(e) => setChronicConditions(e.target.value)} className={inputClassName} /></Field>
                 <Field label="Current Medications"><input value={currentMedications} onChange={(e) => setCurrentMedications(e.target.value)} className={inputClassName} /></Field>
                 <Field label="Allergies"><input value={allergies} onChange={(e) => setAllergies(e.target.value)} className={inputClassName} /></Field>
@@ -264,7 +264,7 @@ export default function PsychiatristAssessmentsPage() {
 
             <div>
               <p className="mb-2 text-sm font-semibold text-ink-700">Lab Results (Optional)</p>
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className="grid gap-2.5 md:grid-cols-2">
                 <Field label="CBC"><input value={cbc} onChange={(e) => setCbc(e.target.value)} className={inputClassName} /></Field>
                 <Field label="TSH"><input value={tsh} onChange={(e) => setTsh(e.target.value)} className={inputClassName} /></Field>
                 <Field label="Vitamin D"><input value={vitaminD} onChange={(e) => setVitaminD(e.target.value)} className={inputClassName} /></Field>
@@ -272,7 +272,7 @@ export default function PsychiatristAssessmentsPage() {
               </div>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid gap-2.5 md:grid-cols-2">
               <Field label="Clinical Impression">
                 <select value={clinicalImpression} onChange={(e) => setClinicalImpression(e.target.value)} className={inputClassName}>
                   {IMPRESSIONS.map((item) => (
@@ -302,12 +302,12 @@ export default function PsychiatristAssessmentsPage() {
         </TherapistCard>
 
         <TherapistCard>
-          <div className="border-b border-ink-100 px-4 py-3">
+          <div className="border-b border-ink-100 px-3 py-2.5">
             <h3 className="font-display text-lg font-semibold text-ink-800">Assessment History</h3>
           </div>
-          <ul className="space-y-2 px-4 py-4 text-sm">
+          <ul className="space-y-1.5 px-3 py-3 text-sm">
             {items.map((item) => (
-              <li key={item.id} className="rounded-lg border border-ink-100 p-3 text-ink-700">
+              <li key={item.id} className="rounded-lg border border-ink-100 p-2.5 text-ink-700">
                 <div className="font-semibold text-ink-800">{item.clinical_impression || 'No impression'}</div>
                 <div className="text-ink-500">Severity: {item.severity || '-'} | Complaint: {item.chief_complaint}</div>
               </li>

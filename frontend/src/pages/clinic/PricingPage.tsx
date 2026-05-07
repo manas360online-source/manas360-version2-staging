@@ -13,11 +13,41 @@ import {
   type ApiError,
 } from './api';
 
+const STORAGE_KEY = 'selectedFeatures';
 
+type DashboardFeatureKey =
+  | 'patient-database'
+  | 'session-notes'
+  | 'scheduling'
+  | 'progress-tracking'
+  | 'prescriptions'
+  | 'homework'
+  | 'audit-export'
+  | 'bulk-import'
+  | 'multi-therapist'
+  | 'jitsi-session';
 
+const toDashboardFeatureKeys = (slugs: string[]): DashboardFeatureKey[] => {
+  const mapped = slugs
+    .map((slug) => {
+      if (slug === 'patient-database') return 'patient-database';
+      if (slug === 'session-notes') return 'session-notes';
+      if (slug === 'scheduling') return 'scheduling';
+      if (slug === 'progress-tracking') return 'progress-tracking';
+      if (slug === 'prescriptions') return 'prescriptions';
+      if (slug === 'adherence') return 'homework';
+      if (slug === 'homework') return 'homework';
+      if (slug === 'compliance-pack') return 'audit-export';
+      if (slug === 'audit-export') return 'audit-export';
+      if (slug === 'bulk-import') return 'bulk-import';
+      if (slug === 'multi-therapist') return 'multi-therapist';
+      if (slug === 'jitsi-session') return 'jitsi-session';
+      return null;
+    })
+    .filter((item): item is DashboardFeatureKey => item !== null);
 
-
-
+  return Array.from(new Set(mapped));
+};
 
 export default function PricingPage() {
   const navigate = useNavigate();
@@ -47,10 +77,10 @@ export default function PricingPage() {
 
         if (selectedFeatureSlugs.length === 0) {
           setPricing({
-            monthlyTotal: 0,
-            billingAmount: 0,
-            discountApplied: 0,
-            breakdown: {},
+            monthly_total: 0,
+            billing_amount: 0,
+            discount_applied: 0,
+            breakdown: [],
           });
           setPricingSource(null);
           return;
@@ -61,16 +91,16 @@ export default function PricingPage() {
 
         if (isDevelopment && import.meta.env.VITE_USE_MOCK_API === 'true') {
           response = calculateSubscriptionPriceMock({
-            clinicTier: currentTier,
-            billingCycle: currentBilling,
-            selectedFeatures: selectedFeatureSlugs,
+            clinic_tier: currentTier,
+            billing_cycle: currentBilling,
+            selected_features: selectedFeatureSlugs,
           });
           setPricingSource('fallback');
         } else {
           const result = await calculateSubscriptionPriceSafe({
-            clinicTier: currentTier,
-            billingCycle: currentBilling,
-            selectedFeatures: selectedFeatureSlugs,
+            clinic_tier: currentTier,
+            billing_cycle: currentBilling,
+            selected_features: selectedFeatureSlugs,
           });
 
           response = result.pricing;
@@ -98,27 +128,14 @@ export default function PricingPage() {
   };
 
   const handleStartTrial = () => {
-    const selectedFeatureSlugs = getSelectedFeatureSlugs();
-    navigate('/my-digital-clinic/register', {
-      state: {
-        tier: currentTier,
-        billingCycle: currentBilling,
-        selectedFeatures: selectedFeatureSlugs,
-        isTrial: true,
-      },
-    });
+    alert('Starting 21-day free trial with your selected features!');
   };
 
   const handleContinue = () => {
     const selectedFeatureSlugs = getSelectedFeatureSlugs();
-    navigate('/my-digital-clinic/register', {
-      state: {
-        tier: currentTier,
-        billingCycle: currentBilling,
-        selectedFeatures: selectedFeatureSlugs,
-        isTrial: false,
-      },
-    });
+    const dashboardFeatureKeys = toDashboardFeatureKeys(selectedFeatureSlugs);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(dashboardFeatureKeys));
+    navigate('/my-digital-clinic/dashboard');
   };
 
   return (

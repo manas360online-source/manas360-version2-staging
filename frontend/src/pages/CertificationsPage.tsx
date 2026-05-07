@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import logo from '../assets/manas360_main_logo.png';
 import { getCertifications, getCertificationsErrorMessage, type Certification } from '../api/certifications';
 
 const levelRank: Record<Certification['level'], number> = {
@@ -151,33 +152,33 @@ export default function CertificationsPage() {
 				<div className="w-full border-b border-calm-sage/15 bg-charcoal/90 px-4 py-2 backdrop-blur-sm md:px-6 lg:px-10">
 					<div className="mx-auto max-w-7xl">
 						<div className="flex items-center justify-between">
-						<Link
-							to="/"
-							className="group inline-flex items-center gap-2 rounded-lg px-1 py-1 text-lg font-light tracking-wide text-cream transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-gentle-blue/60 focus:ring-offset-2 focus:ring-offset-charcoal md:text-xl lg:text-2xl"
-							aria-label="MANAS360 home"
-						>
-							<img src="/Untitled.png" alt="MANAS360 logo" className="h-6 w-6 rounded-md object-cover" />
-							<span className="font-serif">
-								MANAS<span className="font-semibold">360</span>
-							</span>
-						</Link>
-						<div className="flex items-center gap-2 sm:gap-2.5">
-							<button
-								type="button"
-								onClick={() => {
-									document.getElementById('comparison-table')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-								}}
-								className="hidden rounded-full px-3 py-1.5 text-xs font-medium tracking-wide text-cream/75 transition-all duration-300 hover:text-cream sm:inline-flex"
-							>
-								Subscribe
-							</button>
 							<Link
-								to="/auth/login"
-								className="inline-flex min-h-[34px] items-center justify-center rounded-full bg-cream px-3.5 py-1.5 text-xs font-semibold tracking-wide text-charcoal transition-all duration-300 hover:bg-white md:min-h-[36px] md:px-4"
+								to="/"
+								className="group inline-flex items-center gap-2 rounded-lg px-1 py-1 text-lg font-light tracking-wide text-cream transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-gentle-blue/60 focus:ring-offset-2 focus:ring-offset-charcoal md:text-xl lg:text-2xl"
+								aria-label="MANAS360 home"
 							>
-								Login / Signup
+								<img src={logo} alt="MANAS360 logo" className="h-6 w-6 rounded-md object-cover" />
+								<span className="font-serif">
+									MANAS<span className="font-semibold">360</span>
+								</span>
 							</Link>
-						</div>
+							<div className="flex items-center gap-2 sm:gap-2.5">
+								<button
+									type="button"
+									onClick={() => {
+										document.getElementById('comparison-table')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+									}}
+									className="hidden rounded-full px-3 py-1.5 text-xs font-medium tracking-wide text-cream/75 transition-all duration-300 hover:text-cream sm:inline-flex"
+								>
+									Subscribe
+								</button>
+								<Link
+									to="/auth/login"
+									className="inline-flex min-h-[34px] items-center justify-center rounded-full bg-cream px-3.5 py-1.5 text-xs font-semibold tracking-wide text-charcoal transition-all duration-300 hover:bg-white md:min-h-[36px] md:px-4"
+								>
+									Login / Signup
+								</Link>
+							</div>
 						</div>
 
 						<div className="mt-1.5 flex items-center justify-between gap-2 border-t border-calm-sage/20 pt-1.5 sm:gap-3">

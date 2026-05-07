@@ -41,7 +41,8 @@
   gap: 10px;
 }
 
-.premium-nav-actions button {
+.premium-nav-actions button,
+.premium-nav-btn {
   border: 1px solid #d6dce8;
   background: #ffffff;
   color: #5b6a83;
@@ -50,6 +51,16 @@
   font-weight: 700;
   font-size: 12px;
   cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  transition: all 0.2s ease;
+}
+
+.premium-nav-actions button:hover,
+.premium-nav-btn:hover {
+  background: #f8fafd;
+  border-color: #c4cedd;
 }
 
 .premium-nav-actions .premium-badge {
@@ -383,6 +394,7 @@
 }
 
 @media (max-width: 1200px) {
+
   .tool-grid.basic,
   .tool-grid.advanced {
     grid-template-columns: repeat(2, minmax(0, 1fr));

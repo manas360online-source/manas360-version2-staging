@@ -45,7 +45,7 @@ export default function PsychologistAssessmentsPage() {
       {loading ? <TherapistLoadingState title="Loading assessments" description="Fetching assessment records." /> : null}
       {error ? <TherapistErrorState title="Assessment action failed" description={error} onRetry={() => void load()} /> : null}
 
-      <TherapistCard className="p-5">
+      <TherapistCard className="p-4">
         <div className="flex items-center justify-between">
           <h3 className="font-display text-base font-bold text-ink-800">Assessments</h3>
           <TherapistButton variant="primary">
@@ -54,9 +54,9 @@ export default function PsychologistAssessmentsPage() {
           </TherapistButton>
         </div>
 
-        <div className="mt-4 space-y-2">
+        <div className="mt-3 space-y-1.5">
           {rows.map((r) => (
-            <div key={r.id} className="flex items-center justify-between gap-2 rounded-lg border border-ink-100 px-3 py-2">
+            <div key={r.id} className="flex items-center justify-between gap-2 rounded-lg border border-ink-100 px-3 py-1.5">
               <div>
                 <p className="text-sm font-semibold text-ink-800">{r.patientName || r.patient || 'Patient'}</p>
                 <p className="text-xs text-ink-500">{r.assessment_type || r.type} · {r.evaluated_at || r.date || ''}</p>

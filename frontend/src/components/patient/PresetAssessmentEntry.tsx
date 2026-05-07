@@ -1,10 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { getPresetConfig, parseUtmParams, isValidPresetEntryType } from '../../config/presetDefaults';
-import {
-  CLINICAL_ASSESSMENT_OPTIONS,
-  CLINICAL_ASSESSMENT_TEMPLATE_KEYS,
-} from '../../utils/clinicalAssessments';
+import { CLINICAL_QUESTION_BANK, CLINICAL_ASSESSMENT_OPTIONS } from '../../utils/clinicalAssessments';
 import { patientApi } from '../../api/patient';
 import { useAuth } from '../../context/AuthContext';
 import { ArrowRight, AlertTriangle, CheckCircle, ShieldAlert } from 'lucide-react';
@@ -50,6 +47,7 @@ const NRI_CONCERN_OPTIONS = [
 ] as const;
 
 const NRI_LANGUAGE_OPTIONS = ['English', 'Hindi', 'Tamil', 'Telugu', 'Kannada', 'Malayalam'] as const;
+const ALLOW_LOCAL_ASSESSMENT_BYPASS = import.meta.env.DEV || String(import.meta.env.VITE_ALLOW_LOCAL_ASSESSMENT_BYPASS || '') === 'true';
 
 const mapBrowserTimezoneToNriRegion = (timezone: string): string => {
   const tz = String(timezone || '').trim();
@@ -100,11 +98,12 @@ export const PresetAssessmentEntry = () => {
   const entryType = searchParams.get('entry');
   const presetConfig = entryType && isValidPresetEntryType(entryType) ? getPresetConfig(entryType) : null;
   const assessmentType = presetConfig?.assessmentType || 'PHQ-9';
-  const [questions, setQuestions] = useState<string[]>([]);
+  const questions = CLINICAL_QUESTION_BANK[assessmentType] || [];
   const options = CLINICAL_ASSESSMENT_OPTIONS.map((option: any) => ({ label: option.label, value: option.points }));
   const utmParams = parseUtmParams(searchParams);
   const totalQuestions = questions.length;
   const completionStep = totalQuestions + 1;
+  const isMultiQuestionLayout = entryType === 'therapist' || entryType === 'psychiatrist' || entryType === 'couples';
   const currentRoute = `${location.pathname}${location.search}`;
   const isNriEntry = useMemo(() => String(entryType || '').startsWith('nri_'), [entryType]);
   const sessionsRedirectPath = useMemo(() => {
@@ -136,7 +135,7 @@ export const PresetAssessmentEntry = () => {
     setSelectedTimezone(detectedRegion);
   }, [isNriEntry, selectedTimezone]);
 
-  const handleStart = async () => {
+  const handleStart = () => {
     if (isNriEntry) {
       if (!selectedTimezone) {
         setMetaError('Please select your timezone region.');
@@ -148,31 +147,10 @@ export const PresetAssessmentEntry = () => {
       }
     }
 
-    if (!presetConfig) {
-      setMetaError('Unable to load assessment questions.');
-      return;
-    }
-
     setMetaError(null);
+    setStep(1);
+    setAnswers([]);
     setHasError(false);
-    setIsSubmitting(true);
-
-    try {
-      if (questions.length === 0) {
-        const response = await patientApi.startStructuredAssessment({
-          templateKey: CLINICAL_ASSESSMENT_TEMPLATE_KEYS[assessmentType],
-        });
-        setQuestions(response.questions.map((question) => String(question.prompt || '')));
-      }
-      setStep(1);
-      setAnswers([]);
-    } catch (error) {
-      console.error('Unable to load assessment questions:', error);
-      setMetaError('Unable to load assessment questions. Please try again.');
-      setHasError(true);
-    } finally {
-      setIsSubmitting(false);
-    }
   };
 
   const toggleConcern = (concern: string) => {
@@ -198,6 +176,21 @@ export const PresetAssessmentEntry = () => {
     }
   };
 
+  const handleGridAnswer = (questionIndex: number, value: number) => {
+    const nextAnswers = [...answers];
+    nextAnswers[questionIndex] = value;
+    setAnswers(nextAnswers);
+  };
+
+  const handleGridSubmit = async () => {
+    if (answers.length !== totalQuestions || answers.some((value) => typeof value !== 'number')) {
+      setHasError(true);
+      return;
+    }
+
+    await submitAssessment(answers);
+  };
+
   const submitAssessment = async (finalAnswers: number[]) => {
     try {
       setIsSubmitting(true);
@@ -207,7 +200,7 @@ export const PresetAssessmentEntry = () => {
         throw new Error('Invalid preset type');
       }
 
-      if (!authLoading && !isAuthenticated) {
+      if (!authLoading && !isAuthenticated && !ALLOW_LOCAL_ASSESSMENT_BYPASS) {
         const draft: PresetAssessmentDraft = {
           entryType,
           answers: finalAnswers,
@@ -226,6 +219,11 @@ export const PresetAssessmentEntry = () => {
 
         localStorage.setItem(PRESET_ASSESSMENT_DRAFT_KEY, JSON.stringify(draft));
         navigate(`/auth/signup?next=${encodeURIComponent(currentRoute)}`, { replace: true });
+        return;
+      }
+
+      if (!authLoading && !isAuthenticated && ALLOW_LOCAL_ASSESSMENT_BYPASS) {
+        setStep(completionStep);
         return;
       }
 
@@ -317,7 +315,8 @@ export const PresetAssessmentEntry = () => {
     return () => window.clearTimeout(timer);
   }, [completionStep, navigate, step]);
 
-  const progressPercentage = step >= 1 && step < completionStep ? ((step - 1) / totalQuestions) * 100 : 0;
+  const answeredCount = answers.filter((value) => typeof value === 'number').length;
+  const progressPercentage = totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
 
   if (!presetConfig) {
     return (
@@ -338,8 +337,8 @@ export const PresetAssessmentEntry = () => {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-charcoal/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-xl overflow-hidden rounded-[24px] bg-white shadow-2xl ring-1 ring-charcoal/5">
+    <div className="min-h-screen bg-[#13292F] animate-in fade-in duration-200">
+      <div className={`mx-auto w-full ${isMultiQuestionLayout ? 'max-w-[1440px]' : 'max-w-xl'} px-4 py-6 sm:px-6`}>
         
         {/* Progress Bar Header for Questions */}
         {step >= 1 && step < completionStep && (
@@ -351,7 +350,7 @@ export const PresetAssessmentEntry = () => {
           </div>
         )}
 
-        <div className="p-8 md:p-10 relative">
+        <div className={`relative ${isMultiQuestionLayout ? 'py-4' : 'rounded-[24px] bg-white p-8 shadow-2xl ring-1 ring-charcoal/5 md:p-10'}`}>
           
           {/* STEP 0: Warm Up */}
           {step === 0 && (
@@ -433,7 +432,7 @@ export const PresetAssessmentEntry = () => {
           )}
 
           {/* STEPS 1-N: Questions */}
-          {step >= 1 && step < completionStep && (
+          {step >= 1 && step < completionStep && !isMultiQuestionLayout && (
             <div className="space-y-8 animate-in slide-in-from-right-4 fade-in duration-300">
               <div className="space-y-4 text-center">
                 <p className="text-sm font-medium tracking-wide text-teal-600 uppercase">
@@ -447,13 +446,17 @@ export const PresetAssessmentEntry = () => {
                 </h3>
               </div>
 
-              <div className="grid gap-3">
+              <div
+                className="flex gap-2.5"
+                style={{ flexWrap: 'nowrap' }}
+              >
                 {options.map((option: any) => (
                   <button
                     key={option.value}
                     disabled={isSubmitting}
                     onClick={() => handleAnswer(option.value)}
-                    className="flex w-full items-center justify-center rounded-xl border-2 border-calm-sage/30 bg-white p-5 text-lg font-medium text-charcoal transition-all hover:border-teal-400 hover:bg-teal-50 active:scale-[0.98] disabled:opacity-50"
+                    className="flex w-full items-center justify-center rounded-xl border-2 border-calm-sage/30 bg-white px-3 py-3 text-sm font-medium text-charcoal transition-all hover:border-teal-400 hover:bg-teal-50 active:scale-[0.98] disabled:opacity-50"
+                    style={{ flex: '1 1 0', minWidth: 0 }}
                   >
                     {option.label}
                   </button>
@@ -465,6 +468,71 @@ export const PresetAssessmentEntry = () => {
                   Failed to submit your response. Please try again.
                 </div>
               )}
+            </div>
+          )}
+
+          {step >= 1 && step < completionStep && isMultiQuestionLayout && (
+            <div className="space-y-5 animate-in fade-in duration-300 pb-6">
+              <div className="space-y-3">
+                <p className="text-sm font-semibold text-white/90">
+                  {answeredCount} of {totalQuestions} answered
+                </p>
+                <div className="space-y-4">
+                  {questions.map((question, index) => (
+                    <div key={`${question}-${index}`} className="rounded-[24px] border border-white/10 bg-[#13292F] p-4 md:p-5">
+                      <h3 className="text-xl md:text-2xl font-light leading-tight text-[#F8F3EA] font-serif">
+                        {index + 1}. {question}
+                      </h3>
+                      <p className="mt-2 text-xs text-white/85">Choose one answer below.</p>
+
+                      <div
+                        className="mt-4 flex gap-3"
+                        style={{ flexWrap: 'nowrap' }}
+                      >
+                        {options.map((option: any) => {
+                          const isSelected = answers[index] === option.value;
+                          return (
+                            <button
+                              key={`${question}-${option.value}`}
+                              type="button"
+                              disabled={isSubmitting}
+                              onClick={() => handleGridAnswer(index, option.value)}
+                              className="flex w-full items-center justify-between rounded-[18px] border px-4 py-3 text-left text-base font-medium transition-all disabled:opacity-50"
+                              style={{
+                                flex: '1 1 0',
+                                minWidth: 0,
+                                borderColor: isSelected ? '#3E5B60' : 'rgba(196,214,214,0.16)',
+                                background: isSelected ? '#31484D' : 'transparent',
+                                color: '#FFFFFF'
+                              }}
+                            >
+                              <span>{option.label}</span>
+                              {isSelected ? <span className="text-xl">✓</span> : null}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {hasError && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                    Please answer all questions before submitting.
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => void handleGridSubmit()}
+                  disabled={isSubmitting || answeredCount !== totalQuestions}
+                  className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl px-6 py-4 text-base font-medium text-white shadow-sm transition-all active:scale-[0.98] disabled:opacity-50"
+                  style={{ background: '#31484D' }}
+                >
+                  {isSubmitting ? 'Submitting...' : 'Submit Assessment'}
+                  {!isSubmitting ? <ArrowRight className="h-5 w-5" /> : null}
+                </button>
+              </div>
             </div>
           )}
 

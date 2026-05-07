@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Building2, BriefcaseBusiness, Globe2, Mail, ShieldCheck, User2, Users } from 'lucide-react';
 import { corporateApi } from '../../api/corporate.api';
 import { getApiErrorMessage } from '../../api/auth';
@@ -14,10 +14,9 @@ const inputClassName =
 
 export default function CorporateOnboardingPage() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { checkAuth } = useAuth();
 
-  const [mode, setMode] = useState<Mode>('create');
+  const [mode, setMode] = useState<Mode>('demo');
   const [createStep, setCreateStep] = useState<CreateStep>('details');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,20 +49,6 @@ export default function CorporateOnboardingPage() {
     }),
     [],
   );
-
-  useEffect(() => {
-    const query = new URLSearchParams(location.search);
-    const requestedMode = query.get('mode');
-    if (requestedMode === 'create' || requestedMode === 'demo') {
-      setMode(requestedMode);
-      setCreateStep('details');
-      setError(null);
-      setSuccess(null);
-      setDevOtp(null);
-      // Strip the ?mode param from the URL so tab switches work freely
-      navigate('/corporate', { replace: true });
-    }
-  }, [location.search, navigate]);
 
   const requestOtp = async (event: FormEvent) => {
     event.preventDefault();
@@ -191,21 +176,21 @@ export default function CorporateOnboardingPage() {
             <div className="inline-flex rounded-full bg-[#EFF6F3] p-1">
               <button
                 type="button"
-                onClick={() => { setMode('create'); setCreateStep('details'); setError(null); setSuccess(null); navigate('/corporate', { replace: true }); }}
-                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                  mode === 'create' ? 'bg-white text-[#1B4F49] shadow-sm' : 'text-[#4F6E69]'
-                }`}
-              >
-                Create Account
-              </button>
-              <button
-                type="button"
-                onClick={() => { setMode('demo'); setCreateStep('details'); setError(null); setSuccess(null); navigate('/corporate', { replace: true }); }}
+                onClick={() => setMode('demo')}
                 className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
                   mode === 'demo' ? 'bg-white text-[#1B4F49] shadow-sm' : 'text-[#4F6E69]'
                 }`}
               >
                 Request Demo
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('create')}
+                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                  mode === 'create' ? 'bg-white text-[#1B4F49] shadow-sm' : 'text-[#4F6E69]'
+                }`}
+              >
+                Create Account
               </button>
             </div>
 
@@ -234,11 +219,11 @@ export default function CorporateOnboardingPage() {
                     <input
                       className={inputClassName}
                       inputMode="numeric"
-                      pattern="[0-9]{4}"
-                      maxLength={4}
-                      placeholder="4-digit OTP"
+                      pattern="\\d{6}"
+                      maxLength={6}
+                      placeholder="6-digit OTP"
                       value={otp}
-                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                       required
                       autoFocus
                     />

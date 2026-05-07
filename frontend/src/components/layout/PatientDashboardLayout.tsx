@@ -3,6 +3,7 @@ import {
   Bell,
   CalendarDays,
   ClipboardList,
+  FileText,
   HeartPulse,
   Home,
   BarChart3,
@@ -16,30 +17,32 @@ import {
   X,
 } from 'lucide-react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import logo from '../../assets/manas360_main_logo.png';
 import { patientApi } from '../../api/patient';
 import { useWallet } from '@/hooks/useWallet';
 import { useAuth } from '../../context/AuthContext';
 import { getDraftStorageKey } from '../../hooks/useAssessmentFlow';
-import { FeatureGate } from '../FeatureGate';
-
-const STORAGE_KEY_MDC = 'mdc_user';
 
 const mainNavItems = [
   { to: '/patient/dashboard', label: 'Dashboard', icon: Home },
-  { to: '/patient/therapy-plan', label: 'My Therapy Plan', icon: ClipboardList, feature: 'progress-tracking' },
-  { to: '/patient/sessions', label: 'My Care', icon: CalendarDays, feature: 'scheduling' },
-  { to: '/patient/group-therapy', label: 'Group Therapy', icon: CalendarDays, badge: 'Live', feature: 'group-therapy' },
+  { to: '/patient/therapy-plan', label: 'My Therapy Plan', icon: ClipboardList },
+  { to: '/patient/sessions', label: 'My Care', icon: CalendarDays },
+  { to: '/patient/group-therapy', label: 'Group Therapy', icon: CalendarDays, badge: 'Live' },
 ];
 
+const clinicalNavItems = [
+  { to: '/patient/progress', label: 'Clinical Reports', icon: BarChart3 },
+];
 
 const selfCareNavItems = [
-  { to: '/patient/messages', label: 'Anytime Buddy (AI)', icon: MessageSquare, badge: 'AI', feature: 'ai-support' },
-  { to: '/patient/check-in', label: 'Daily Check-in', icon: HeartPulse, feature: 'daily-checkin' },
-  { to: '/patient/wellness-library', label: 'Premium Library', icon: Sparkles, feature: 'wellness-library' },
+  { to: '/patient/messages', label: 'Anytime Buddy (AI)', icon: MessageSquare, badge: 'AI' },
+  { to: '/patient/check-in', label: 'Daily Check-in', icon: HeartPulse },
+  { to: '/patient/wellness-library', label: 'Premium Library', icon: Sparkles },
 ];
 
 const progressNavItems = [
-  { to: '/patient/progress', label: 'My Progress', icon: BarChart3, feature: 'progress-tracking' },
+  { to: '/patient/progress', label: 'My Progress', icon: BarChart3 },
+  { to: '/patient/reports', label: 'Clinical Records', icon: FileText },
 ];
 
 const supportNavItems = [
@@ -60,7 +63,6 @@ type NavItem = {
   label: string;
   icon: any;
   badge?: string;
-  feature?: string;
 };
 
 export default function PatientDashboardLayout() {
@@ -71,20 +73,6 @@ export default function PatientDashboardLayout() {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const { balance } = useWallet();
-  const [mdcUser, setMdcUser] = useState<any>(null);
-  const isMdcMode = !!mdcUser;
-
-  useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY_MDC);
-    if (stored) {
-      try {
-        setMdcUser(JSON.parse(stored));
-      } catch (e) {
-        console.error('Failed to parse mdc_user', e);
-      }
-    }
-  }, []);
-
   const walletBalance = balance ? Number((balance as any)?.total_balance ?? 0) : null;
 
   const fetchUnread = useCallback(async () => {
@@ -131,7 +119,7 @@ export default function PatientDashboardLayout() {
     '/patient/insights': 'My Progress',
     '/patient/timeline': 'Patient Timeline',
     '/patient/assessment-reports': 'My Progress',
-    '/patient/reports': 'Reports',
+    '/patient/reports': 'Clinical Records',
 
     '/patient/support': 'Help Center',
     '/patient/settings': 'Settings',
@@ -140,7 +128,6 @@ export default function PatientDashboardLayout() {
     '/patient/digital-pets': 'Digital Pets Hub',
     '/patient/sleep-therapy': 'Sleep Therapy',
     '/patient/sound-therapy': 'Sound Therapy',
-    '/sound-therapy': 'Sound Therapy',
     '/patient/buddy': 'AI Buddy',
     '/patient/notifications': 'Notifications',
     '/patient/progress': 'My Progress',
@@ -163,14 +150,8 @@ export default function PatientDashboardLayout() {
       localStorage.removeItem('patient-clinical-assessment-draft-v1');
       sessionStorage.removeItem('patient-clinical-assessment-draft-v1');
     } catch { /* ignore storage errors */ }
-    
-    if (isMdcMode) {
-      localStorage.removeItem(STORAGE_KEY_MDC);
-      navigate('/mdc/login', { replace: true });
-    } else {
-      await logout();
-      navigate('/auth/login', { replace: true });
-    }
+    await logout();
+    navigate('/auth/login', { replace: true });
   };
 
   useEffect(() => {
@@ -206,7 +187,7 @@ export default function PatientDashboardLayout() {
           const Icon = item.icon;
           const active = isActive(item.to);
 
-          const link = (
+          return (
             <Link
               key={`${heading}-${item.to}-${item.label}`}
               to={item.to}
@@ -232,11 +213,6 @@ export default function PatientDashboardLayout() {
               )}
             </Link>
           );
-
-          if (item.feature) {
-            return <FeatureGate key={item.to} feature={item.feature}>{link}</FeatureGate>;
-          }
-          return link;
         })}
       </div>
     </div>
@@ -260,7 +236,7 @@ export default function PatientDashboardLayout() {
           <div className="flex h-20 items-center justify-between border-b border-white/70 px-5">
             <Link to="/patient/dashboard" className="inline-flex items-center gap-3 font-display text-lg font-bold text-charcoal">
               <img
-                src="/Untitled.png"
+                src={logo}
                 alt="MANAS360 logo"
                 className="h-10 w-10 rounded-2xl object-cover shadow-wellness-sm"
               />
@@ -282,6 +258,7 @@ export default function PatientDashboardLayout() {
 
           <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4" aria-label="Patient dashboard navigation">
             {renderNavSection('Main', mainNavItems)}
+            {renderNavSection('Clinical', clinicalNavItems)}
             {renderNavSection('Self Care', selfCareNavItems)}
             {renderNavSection('Progress', progressNavItems)}
             {renderNavSection('Support', supportNavItems)}
@@ -329,23 +306,19 @@ export default function PatientDashboardLayout() {
             </div>
 
             <div className="ml-auto flex items-center gap-2 sm:gap-3">
-              {!isMdcMode && (
-                <>
-                  <div className="inline-flex min-h-[36px] items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                    <span className="text-[10px] uppercase tracking-[0.18em] text-emerald-800/70">Wallet</span>
-                    <span>{formattedWalletBalance}</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => navigate('/crisis')}
-                    className="inline-flex min-h-[40px] items-center gap-1.5 rounded-full bg-red-50 px-4 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-100"
-                  >
-                    <LifeBuoy className="h-4 w-4" />
-                    <span className="hidden sm:inline">Crisis Support</span>
-                    <span className="sm:hidden">🆘</span>
-                  </button>
-                </>
-              )}
+              <div className="inline-flex min-h-[36px] items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                <span className="text-[10px] uppercase tracking-[0.18em] text-emerald-800/70">Wallet</span>
+                <span>{formattedWalletBalance}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate('/crisis')}
+                className="inline-flex min-h-[40px] items-center gap-1.5 rounded-full bg-red-50 px-4 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-100"
+              >
+                <LifeBuoy className="h-4 w-4" />
+                <span className="hidden sm:inline">Crisis Support</span>
+                <span className="sm:hidden">🆘</span>
+              </button>
 
               <Link
                 to="/patient/notifications"

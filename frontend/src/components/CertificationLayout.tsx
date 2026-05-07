@@ -2,33 +2,22 @@ import React from 'react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import { Menu, X, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
 // @ts-ignore
 import useEnrollmentStore from '../store/CertificationEnrollmentStore';
 
 export const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const location = useLocation();
-  const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
 
   const { enrollments } = useEnrollmentStore();
 
   const handleBack = () => {
-    if (window.history.length > 1) {
-      navigate(-1);
-      return;
-    }
-    navigate('/certifications', { replace: true });
-  };
-
-  const handleHome = () => {
-    navigate('/landing');
-  };
-
-  const handleLogout = async () => {
-    await logout();
-    navigate('/auth/login?next=/certifications', { replace: true });
+    // Get language from current hash e.g. #/en/certification-platform -> 'en'
+    const hash = window.location.hash;
+    const langMatch = hash.match(/^#\/([a-z]{2})\//);
+    const lang = langMatch ? langMatch[1] : 'en';
+    window.location.hash = `#/${lang}/home`;
   };
 
   const navLinks = [
@@ -44,23 +33,15 @@ export const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) =
 
             {/* Left Side: Back Button (Always Visible) */}
             <div className="flex items-center">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleBack}
-                  className="flex items-center gap-2 text-slate-700 hover:text-slate-900 transition-colors group"
-                >
-                  <div className="bg-slate-100 p-2 rounded-full group-hover:bg-slate-200 transition-colors">
-                    <ArrowLeft size={18} className="md:w-5 md:h-5" />
-                  </div>
-                  <span className="text-base md:text-lg font-bold font-serif">Back</span>
-                </button>
-                <button
-                  onClick={handleHome}
-                  className="text-sm font-bold text-slate-600 hover:text-slate-900"
-                >
-                  Home
-                </button>
-              </div>
+              <button
+                onClick={handleBack}
+                className="flex items-center gap-2 text-slate-700 hover:text-slate-900 transition-colors group"
+              >
+                <div className="bg-slate-100 p-2 rounded-full group-hover:bg-slate-200 transition-colors">
+                  <ArrowLeft size={18} className="md:w-5 md:h-5" />
+                </div>
+                <span className="text-base md:text-lg font-bold font-serif">Back</span>
+              </button>
             </div>
 
             {/* Desktop Nav */}
@@ -98,14 +79,6 @@ export const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) =
                   </Link>
                 </>
               )}
-              {user && (
-                <button
-                  onClick={handleLogout}
-                  className="text-sm font-bold text-slate-600 hover:text-slate-900"
-                >
-                  Logout
-                </button>
-              )}
             </div>
 
             {/* Mobile menu button */}
@@ -129,7 +102,7 @@ export const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) =
                   key={link.path}
                   to={link.path}
                   onClick={() => setIsMenuOpen(false)}
-                  className={`px-4 py-3 rounded-xl text-sm font-bold flex justify-between items-center ${location.pathname === link.path
+                  className={`block px-4 py-3 rounded-xl text-sm font-bold flex justify-between items-center ${location.pathname === link.path
                     ? 'bg-purple-50 text-purple-700'
                     : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                     }`}
@@ -159,17 +132,6 @@ export const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) =
                     Register
                   </Link>
                 </>
-              )}
-              {user && (
-                <button
-                  onClick={async () => {
-                    setIsMenuOpen(false);
-                    await handleLogout();
-                  }}
-                  className="block w-full text-left px-4 py-3 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                >
-                  Logout
-                </button>
               )}
             </div>
           </div>

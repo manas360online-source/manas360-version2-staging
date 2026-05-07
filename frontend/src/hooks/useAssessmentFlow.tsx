@@ -393,14 +393,7 @@ export const useAssessmentFlow = () => {
       [question.questionId]: optionIndex,
     };
     setStructuredAnswers(updatedAnswers);
-
-    const isLastQuestion = currentStructuredQuestionIndex >= structuredAttempt.questions.length - 1;
-    if (!isLastQuestion) {
-      setCurrentStructuredQuestionIndex((prev) => prev + 1);
-    } else {
-      await submitCurrentStructuredAssessment(updatedAnswers);
-    }
-  }, [structuredAttempt, loadingStates.assessment, structuredAnswers, currentStructuredQuestionIndex, submitCurrentStructuredAssessment]);
+  }, [structuredAttempt, loadingStates.assessment, structuredAnswers]);
 
   // Computed values
   const assessmentResumeCopy = useMemo(() => {

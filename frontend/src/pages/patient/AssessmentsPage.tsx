@@ -452,83 +452,6 @@ export default function AssessmentsPage() {
 
     setStructuredAnswers(updatedAnswers);
     setMessage('');
-
-    const isLastQuestion = currentStructuredQuestionIndex >= structuredAttempt.questions.length - 1;
-    if (!isLastQuestion) {
-      setCurrentStructuredQuestionIndex((prev) => prev + 1);
-      return;
-    }
-
-    await (async () => {
-      setLoading(true);
-      setMessage('');
-      try {
-        const answers = structuredAttempt.questions.map((question) => ({
-          questionId: question.questionId,
-          optionIndex: updatedAnswers[question.questionId],
-        }));
-        const numericAnswers = structuredAttempt.questions.map((question) => updatedAnswers[question.questionId]);
-        const [structuredResult, journeyResponse] = await Promise.all([
-          patientApi.submitStructuredAssessment(structuredAttempt.attemptId, { answers }),
-          patientApi.submitClinicalJourney({ type: selectedClinical, answers: numericAnswers }),
-        ]);
-        const journey = parseJourneyPayload(journeyResponse) ?? (await loadLatestJourney());
-        const selectedLabels = structuredAttempt.questions.map((question) => {
-          const selectedOption = question.options.find((option) => option.optionIndex === updatedAnswers[question.questionId]);
-          return `${question.position}. ${selectedOption?.label || 'Unknown'}`;
-        });
-        const normalized = normalizeResultLevel(structuredResult.severityLevel);
-
-        setMessage(`Saved: ${selectedClinical} • Score ${structuredResult.totalScore}`);
-        setResultCard({
-          type: selectedClinical,
-          score: structuredResult.totalScore,
-          level: normalized,
-          recommendations: dedupeText([
-            structuredResult.recommendation,
-            structuredResult.action,
-            ...(journey?.actions || []),
-          ]),
-          pathway: journey?.pathway,
-          selectedPathway: journey?.selectedPathway,
-          urgency: journey?.urgency,
-          recommendedProvider: journey?.recommendedProvider,
-          followUpDays: journey?.followUpDays,
-          rationale: dedupeText([
-            structuredResult.interpretation,
-            ...selectedLabels,
-            ...(journey?.rationale || []),
-          ]),
-        });
-        setAssessmentHistory((prev) => [
-          {
-            id: structuredResult.attemptId,
-            type: selectedClinical,
-            score: structuredResult.totalScore,
-            maxScore: selectedClinical === 'PHQ-9' ? 27 : 21,
-            level: normalized,
-            createdAt: new Date().toISOString(),
-          },
-          ...prev,
-        ]);
-        markSubmittedToday(selectedClinical);
-        const otherClinical: ClinicalAssessmentKey = selectedClinical === 'PHQ-9' ? 'GAD-7' : 'PHQ-9';
-        const bothDoneAfterSubmit = localStorage.getItem(lockKey('PHQ-9', todayKey)) === '1'
-          && localStorage.getItem(lockKey('GAD-7', todayKey)) === '1';
-
-        if (!bothDoneAfterSubmit) {
-          setResultCard(null);
-          setSelectedClinical(otherClinical);
-          await startStructuredAssessment(otherClinical);
-          setMessage(`Saved: ${selectedClinical} • Score ${structuredResult.totalScore}. Continue with ${otherClinical} to finish clinical screening.`);
-          return;
-        }
-
-        await loadMoodHistory();
-      } finally {
-        setLoading(false);
-      }
-    })();
   };
 
   const onSubmitDailyCheck = async () => {
@@ -610,11 +533,11 @@ export default function AssessmentsPage() {
         level: String(entry.level || 'mild').toLowerCase(),
         dateLabel: parsedDate
           ? parsedDate.toLocaleDateString('en-US', {
-              weekday: 'short',
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric',
-            })
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          })
           : entry.date || 'Unknown date',
         sortTs: parsedDate ? parsedDate.getTime() : 0,
       };
@@ -639,14 +562,14 @@ export default function AssessmentsPage() {
   }, [historyRows]);
 
   return (
-    <div className="mx-auto w-full max-w-[1400px] space-y-6 px-4 md:px-6 pb-20 lg:pb-6">
+    <div className="mx-auto w-full max-w-[1400px] space-y-4 px-4 md:px-5 pb-14 lg:pb-6">
       {/* Header */}
-      <section className="relative overflow-hidden rounded-[2rem] bg-gradient-wellness-hero p-6 shadow-wellness-md md:p-8">
+      <section className="relative overflow-hidden rounded-[1.75rem] bg-gradient-wellness-hero p-5 shadow-wellness-md md:p-6">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(133,167,154,0.14),transparent_40%),radial-gradient(circle_at_bottom_right,_rgba(30,144,255,0.08),transparent_34%)]" />
         <div className="relative z-10 max-w-3xl">
           <p className="inline-flex rounded-full bg-white/86 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-charcoal/50 shadow-wellness-sm">Clinical check-ins</p>
-          <h1 className="mt-4 font-serif text-3xl font-semibold text-charcoal md:text-5xl">Mental Health Assessments</h1>
-          <p className="mt-3 text-sm text-wellness-muted md:text-base">Complete quick daily reflections or structured PHQ-9 and GAD-7 screening in a calmer one-question-at-a-time flow.</p>
+          <h1 className="mt-3 font-serif text-3xl font-semibold text-charcoal md:text-4xl">Mental Health Assessments</h1>
+          <p className="mt-2 text-sm text-wellness-muted md:text-[15px]">Complete quick daily reflections or structured PHQ-9 and GAD-7 screening in a calmer one-question-at-a-time flow.</p>
         </div>
       </section>
 
@@ -670,7 +593,7 @@ export default function AssessmentsPage() {
         </p>
       </section>
 
-      <section className="wellness-panel p-4 md:p-6">
+      <section className="wellness-panel p-4 md:p-5">
         {mode === 'daily' ? (
           <>
             <h2 className="font-serif text-2xl font-semibold text-charcoal">Daily Assessment</h2>
@@ -709,7 +632,7 @@ export default function AssessmentsPage() {
                 </div>
               </div>
 
-                <div className="mt-4 flex items-center justify-between">
+              <div className="mt-4 flex items-center justify-between">
                 <button
                   type="button"
                   onClick={() => setCurrentDailyIndex((prev) => Math.max(prev - 1, 0))}
@@ -744,10 +667,10 @@ export default function AssessmentsPage() {
           </>
         ) : hasPremiumAssessmentAccess ? (
           <>
-            <h2 className="font-serif text-2xl font-semibold text-charcoal">Clinical Assessments</h2>
-            <p className="mt-2 text-base text-charcoal/70">Choose a clinical tool. PHQ-9 and GAD-7 now use the full structured questionnaires.</p>
+            <h2 className="font-serif text-[1.6rem] font-semibold text-charcoal">Clinical Assessments</h2>
+            <p className="mt-1.5 text-[15px] text-charcoal/70">Choose a clinical tool. PHQ-9 and GAD-7 now use the full structured questionnaires.</p>
 
-            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-2">
+            <div className="mt-3 grid grid-cols-1 gap-2.5 md:grid-cols-2 xl:grid-cols-2">
               {clinicalCards.map((item) => (
                 <button
                   key={item.key}
@@ -756,25 +679,24 @@ export default function AssessmentsPage() {
                     setSelectedClinical(item.key);
                     setScore(Math.min(score, item.max));
                   }}
-                  className={`rounded-[1.5rem] p-5 text-left transition ${
-                    selectedClinical === item.key
-                      ? 'bg-wellness-aqua shadow-wellness-sm'
-                      : 'bg-white/88 shadow-wellness-sm hover:bg-white'
-                  }`}
+                  className={`rounded-[1.25rem] p-4 text-left transition ${selectedClinical === item.key
+                    ? 'bg-wellness-aqua shadow-wellness-sm'
+                    : 'bg-white/88 shadow-wellness-sm hover:bg-white'
+                    }`}
                 >
-                  <p className="text-lg font-semibold text-charcoal">{item.key}</p>
-                  <p className="mt-2 text-sm text-charcoal/70">{item.description}</p>
+                  <p className="text-base font-semibold text-charcoal">{item.key}</p>
+                  <p className="mt-1.5 text-sm text-charcoal/70">{item.description}</p>
                 </button>
               ))}
             </div>
 
             {selectedClinical === 'PHQ-9' || selectedClinical === 'GAD-7' ? (
-              <div className="mt-4 rounded-[1.75rem] bg-white/88 p-5 shadow-wellness-sm">
+              <div className="mt-3 rounded-[1.5rem] bg-white/88 p-4 shadow-wellness-sm">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-charcoal/45">Guided screen</p>
-                    <p className="mt-2 text-xl font-semibold text-charcoal">{structuredAttempt?.template?.title || `${selectedClinical} Questionnaire`}</p>
-                    <p className="mt-2 text-sm text-charcoal/70">Please answer all questions based on your experience over the last 2 weeks.</p>
+                    <p className="mt-1.5 text-lg font-semibold text-charcoal">{structuredAttempt?.template?.title || `${selectedClinical} Questionnaire`}</p>
+                    <p className="mt-1.5 text-sm text-charcoal/70">Please answer all questions based on your experience over the last 2 weeks.</p>
                   </div>
                   <button
                     type="button"
@@ -786,27 +708,31 @@ export default function AssessmentsPage() {
                   </button>
                 </div>
 
-                <div className="mt-4 space-y-4">
+                <div className="mt-3 space-y-3">
                   {structuredAttempt?.questions?.length ? (
                     <>
-                      <div className="flex items-center justify-between rounded-2xl bg-wellness-card px-4 py-3 text-sm text-charcoal/70">
+                      <div className="flex items-center justify-between rounded-2xl bg-wellness-card px-3 py-2 text-sm text-charcoal/70">
                         <span>Question {Math.min(currentStructuredQuestionIndex + 1, structuredAttempt.questions.length)} of {structuredAttempt.questions.length}</span>
                         <span>{Object.keys(structuredAnswers).length} answered</span>
                       </div>
 
                       {structuredAttempt.questions[currentStructuredQuestionIndex] ? (
-                        <div className="rounded-[1.5rem] bg-gradient-wellness-surface p-5 shadow-wellness-sm">
-                          <p className="text-xl font-medium text-charcoal">
+                        <div className="rounded-[1.25rem] bg-gradient-wellness-surface p-4 shadow-wellness-sm">
+                          <p className="text-lg font-medium text-charcoal">
                             Q{structuredAttempt.questions[currentStructuredQuestionIndex].position}. {structuredAttempt.questions[currentStructuredQuestionIndex].prompt}
                           </p>
-                          <div className="mt-4 grid gap-3">
+                          <div
+                            className="mt-3 flex gap-2.5"
+                            style={{ flexWrap: 'nowrap' }}
+                          >
                             {structuredAttempt.questions[currentStructuredQuestionIndex].options.map((option) => (
                               <button
                                 key={`${structuredAttempt.questions[currentStructuredQuestionIndex].questionId}-${option.optionIndex}`}
                                 type="button"
                                 disabled={loading || structuredLoading || selectedClinicalLocked}
                                 onClick={() => void onStructuredOptionSelect(structuredAttempt.questions[currentStructuredQuestionIndex], option.optionIndex)}
-                                className={`rounded-full px-5 py-4 text-left text-base transition ${structuredAnswers[structuredAttempt.questions[currentStructuredQuestionIndex].questionId] === option.optionIndex ? 'bg-[#1E90FF] text-white shadow-wellness-sm' : 'bg-white text-charcoal/82 shadow-wellness-sm hover:bg-wellness-aqua'} disabled:opacity-60`}
+                                className={`rounded-full px-3 py-3 text-left text-[14px] transition ${structuredAnswers[structuredAttempt.questions[currentStructuredQuestionIndex].questionId] === option.optionIndex ? 'bg-[#1E90FF] text-white shadow-wellness-sm' : 'bg-white text-charcoal/82 shadow-wellness-sm hover:bg-wellness-aqua'} disabled:opacity-60`}
+                                style={{ flex: '1 1 0', minWidth: 0 }}
                               >
                                 <span className={`block font-medium ${structuredAnswers[structuredAttempt.questions[currentStructuredQuestionIndex].questionId] === option.optionIndex ? 'text-white' : 'text-charcoal'}`}>{option.label}</span>
                               </button>
@@ -815,7 +741,7 @@ export default function AssessmentsPage() {
                         </div>
                       ) : null}
 
-                      <div className="flex justify-start">
+                      <div className="flex items-center justify-between">
                         <button
                           type="button"
                           onClick={() => setCurrentStructuredQuestionIndex((prev) => Math.max(0, prev - 1))}
@@ -824,6 +750,43 @@ export default function AssessmentsPage() {
                         >
                           Previous
                         </button>
+
+                        {structuredAttempt.questions[currentStructuredQuestionIndex] && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const isLastQuestion = currentStructuredQuestionIndex >= structuredAttempt.questions.length - 1;
+                              if (!isLastQuestion) {
+                                setCurrentStructuredQuestionIndex((prev) => prev + 1);
+                              } else {
+                                await onSubmitClinical();
+                              }
+                            }}
+                            disabled={
+                              loading ||
+                              structuredLoading ||
+                              selectedClinicalLocked ||
+                              structuredAnswers[structuredAttempt.questions[currentStructuredQuestionIndex].questionId] === undefined
+                            }
+                            className={`rounded-full px-5 py-2 text-sm font-medium transition-smooth ${loading ||
+                              structuredLoading ||
+                              selectedClinicalLocked ||
+                              structuredAnswers[structuredAttempt.questions[currentStructuredQuestionIndex].questionId] === undefined
+                              ? 'bg-wellness-surface text-wellness-muted cursor-not-allowed'
+                              : 'bg-[#1E90FF] text-white hover:opacity-90'
+                              }`}
+                            style={
+                              loading ||
+                                structuredLoading ||
+                                selectedClinicalLocked ||
+                                structuredAnswers[structuredAttempt.questions[currentStructuredQuestionIndex].questionId] === undefined
+                                ? undefined
+                                : { backgroundColor: theme.colors.brandTopbar }
+                            }
+                          >
+                            {currentStructuredQuestionIndex >= structuredAttempt.questions.length - 1 ? 'Finish & Analyze' : 'Next'}
+                          </button>
+                        )}
                       </div>
                     </>
                   ) : null}
@@ -947,7 +910,7 @@ export default function AssessmentsPage() {
           <span className="text-sm text-charcoal/60">{historySummary.total} assessments</span>
         </div>
 
-          <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="rounded-[1.25rem] bg-white/88 p-3 shadow-wellness-sm">
             <p className="text-xs uppercase tracking-wide text-charcoal/60">Average Score</p>
             <p className="mt-1 text-lg font-semibold text-charcoal">{historySummary.averageScore}</p>
@@ -977,11 +940,10 @@ export default function AssessmentsPage() {
                     <p className="text-sm font-semibold text-charcoal">
                       {entry.score}/{entry.maxScore}
                     </p>
-                    <p className={`text-xs font-medium uppercase tracking-wide ${
-                      entry.level === 'severe' ? 'text-red-600' :
+                    <p className={`text-xs font-medium uppercase tracking-wide ${entry.level === 'severe' ? 'text-red-600' :
                       entry.level === 'moderate' ? 'text-amber-600' :
-                      'text-green-600'
-                    }`}>
+                        'text-green-600'
+                      }`}>
                       {entry.level}
                     </p>
                   </div>

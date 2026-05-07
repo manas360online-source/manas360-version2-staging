@@ -7,9 +7,9 @@ const items = ['PHQ-9', 'GAD-7'];
 export default function PsychologistSelfAssessmentsPage() {
   return (
     <TherapistPageShell title="Self Assessments" subtitle="Take personal assessments in Self Mode.">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {items.map((it) => (
-          <TherapistCard key={it} className="p-4 flex items-center justify-between">
+          <TherapistCard key={it} className="flex items-center justify-between p-3">
             <div>
               <p className="font-semibold text-ink-800">{it}</p>
               <p className="text-xs text-ink-500">Personal assessment</p>

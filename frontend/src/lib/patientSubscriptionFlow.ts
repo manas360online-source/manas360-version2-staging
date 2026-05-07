@@ -43,8 +43,8 @@ export const PATIENT_PLANS: Array<{
     name: 'Monthly',
     displayPrice: 'INR 99 / month',
     gatewayPlanKey: 'monthly',
-    trialDays: 21,
-    cta: 'Start 21-Day Trial',
+    trialDays: 3,
+    cta: 'Start 3-day Trial',
     amountMinor: 9900,
     features: [
       'Full platform access',
@@ -58,8 +58,8 @@ export const PATIENT_PLANS: Array<{
     name: 'Quarterly',
     displayPrice: 'INR 279 / quarter',
     gatewayPlanKey: 'quarterly',
-    trialDays: 21,
-    cta: 'Start 21-Day Trial',
+    trialDays: 3,
+    cta: 'Start 3-day Trial',
     badge: 'Most Chosen',
     amountMinor: 27900,
     features: [
@@ -74,8 +74,8 @@ export const PATIENT_PLANS: Array<{
     name: 'Premium Library',
     displayPrice: 'INR 299 / month',
     gatewayPlanKey: 'premium_monthly',
-    trialDays: 21,
-    cta: 'Start 21-Day Trial',
+    trialDays: 3,
+    cta: 'Start 3-day Trial',
     amountMinor: 29900,
     features: [
       'Everything in Quarterly',

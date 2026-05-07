@@ -57,9 +57,13 @@ export default function SlideOverBookingDrawer({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSubscriptionWarning, setShowSubscriptionWarning] = useState(false);
+  const [assessmentStatus, setAssessmentStatus] = useState<{ phq9Complete: boolean; gad7Complete: boolean } | null>(null);
+  const [assessmentStatusLoading, setAssessmentStatusLoading] = useState(false);
   const { balance, applyWalletToPayment } = useWallet();
   const { commitClinicAssessments } = useAssessmentFlow();
   const total = Number((balance as any)?.total_balance || 0);
+
+  const isAssessmentComplete = assessmentStatus?.phq9Complete && assessmentStatus?.gad7Complete;
 
   // Reset state only when drawer is opened.
   useEffect(() => {
@@ -69,6 +73,20 @@ export default function SlideOverBookingDrawer({
       setSelectedTime(null);
       setProviderTimeSlots(SLOT_VALUES.map((value) => ({ value, label: toDisplayTime(value), isAvailable: true })));
       setError(null);
+
+      // Fetch assessment status
+      const fetchAssessmentStatus = async () => {
+        setAssessmentStatusLoading(true);
+        try {
+          const status = await patientApi.getPatientAssessmentStatus();
+          setAssessmentStatus(status);
+        } catch (err) {
+          console.error('Failed to fetch assessment status:', err);
+        } finally {
+          setAssessmentStatusLoading(false);
+        }
+      };
+      void fetchAssessmentStatus();
     }
   }, [isOpen]);
 
@@ -191,11 +209,11 @@ export default function SlideOverBookingDrawer({
       // 3. Initiate payment for the remainder (if any)
       if (finalAmountMinor > 0) {
         try {
-          const paymentPayload: any = await patientApi.createSessionPayment({ 
-            providerId: provider.id, 
-            amountMinor: finalAmountMinor 
+          const paymentPayload: any = await patientApi.createSessionPayment({
+            providerId: provider.id,
+            amountMinor: finalAmountMinor
           });
-          
+
           const redirectUrl = paymentPayload?.redirectUrl || paymentPayload?.data?.redirectUrl;
           if (redirectUrl) {
             window.location.href = redirectUrl;
@@ -228,14 +246,14 @@ export default function SlideOverBookingDrawer({
   return (
     <>
       {/* Backdrop */}
-      <div 
+      <div
         className={`fixed inset-0 z-50 bg-charcoal/30 backdrop-blur-sm transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         onClick={onClose}
         aria-hidden="true"
       />
 
       {/* Drawer */}
-      <div 
+      <div
         className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-white shadow-xl transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
       >
         {/* Header */}
@@ -289,11 +307,10 @@ export default function SlideOverBookingDrawer({
                       <button
                         key={i}
                         onClick={() => setSelectedDate(date)}
-                        className={`flex flex-col items-center justify-center rounded-xl border p-3 transition-colors ${
-                          isSelected
-                            ? 'border-teal-500 bg-teal-50 text-teal-700'
-                            : 'border-calm-sage/20 text-charcoal/70 hover:border-teal-300 hover:bg-teal-50/50'
-                        }`}
+                        className={`flex flex-col items-center justify-center rounded-xl border p-3 transition-colors ${isSelected
+                          ? 'border-teal-500 bg-teal-50 text-teal-700'
+                          : 'border-calm-sage/20 text-charcoal/70 hover:border-teal-300 hover:bg-teal-50/50'
+                          }`}
                       >
                         <span className="text-[10px] font-bold uppercase">{date.toLocaleDateString('en-US', { weekday: 'short' })}</span>
                         <span className={`text-lg font-bold ${isSelected ? 'text-teal-700' : 'text-charcoal'}`}>
@@ -323,13 +340,12 @@ export default function SlideOverBookingDrawer({
                           setSelectedTime(slot.value);
                         }}
                         disabled={!slot.isAvailable || availabilityLoading}
-                        className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                          selectedTime === slot.value
-                            ? 'border-teal-500 bg-teal-50 text-teal-700'
-                            : !slot.isAvailable
-                              ? 'border-calm-sage/15 bg-calm-sage/5 text-charcoal/35 cursor-not-allowed'
-                              : 'border-calm-sage/20 text-charcoal/70 hover:border-teal-300 hover:bg-teal-50/50'
-                        }`}
+                        className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${selectedTime === slot.value
+                          ? 'border-teal-500 bg-teal-50 text-teal-700'
+                          : !slot.isAvailable
+                            ? 'border-calm-sage/15 bg-calm-sage/5 text-charcoal/35 cursor-not-allowed'
+                            : 'border-calm-sage/20 text-charcoal/70 hover:border-teal-300 hover:bg-teal-50/50'
+                          }`}
                       >
                         {slot.label}
                       </button>
@@ -369,7 +385,7 @@ export default function SlideOverBookingDrawer({
                     <span className="text-charcoal/60">Session Fee</span>
                     <span className="font-medium text-charcoal">₹{provider.sessionPrice || 1500}</span>
                   </div>
-                  
+
                   {total > 0 && (
                     <div className="flex justify-between text-teal-600 animate-in fade-in duration-300">
                       <span className="flex items-center">
@@ -379,9 +395,9 @@ export default function SlideOverBookingDrawer({
                       <span className="font-medium">-₹{Math.min(total, provider.sessionPrice || 1500)}</span>
                     </div>
                   )}
-                  
+
                   <div className="my-4 border-t border-dashed border-calm-sage/30" />
-                  
+
                   <div className="flex justify-between font-semibold text-lg items-center">
                     <span className="text-charcoal">Total Due</span>
                     <span className="text-teal-600">
@@ -390,7 +406,6 @@ export default function SlideOverBookingDrawer({
                   </div>
                 </div>
               </div>
-
             </div>
           )}
 
@@ -422,11 +437,11 @@ export default function SlideOverBookingDrawer({
                   Back
                 </button>
               )}
-              
+
               {step === 1 ? (
                 <button
                   onClick={() => setStep(2)}
-                  disabled={!selectedDate || !selectedTime}
+                  disabled={!selectedDate || !selectedTime || !isAssessmentComplete || assessmentStatusLoading}
                   className="flex-1 rounded-xl bg-teal-600 px-4 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
                 >
                   Continue to Wrap-Up
@@ -434,7 +449,7 @@ export default function SlideOverBookingDrawer({
               ) : (
                 <button
                   onClick={() => void handleConfirmBooking()}
-                  disabled={isLoading}
+                  disabled={isLoading || !isAssessmentComplete || assessmentStatusLoading}
                   className="flex-1 rounded-xl bg-teal-600 px-4 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50 relative overflow-hidden group"
                 >
                   {isLoading ? 'Confirming...' : 'Confirm Booking'}

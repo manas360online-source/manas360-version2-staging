@@ -67,7 +67,7 @@ const tabs: TabConfig[] = [
     label: 'Learn & Grow',
     items: [
       { icon: '📜', title: 'Certifications', description: 'Professional credential pathways', route: '/certifications' },
-      { icon: '🧑‍⚕️', title: 'Join as Therapist', description: 'Become part of the MANAS360 network', route: '/certifications' },
+      { icon: '🧑‍⚕️', title: 'Join as Therapist', description: 'Become part of the MANAS360 network', route: '/join' },
       { icon: '📚', title: 'Psychoeducation', description: 'Learn practical wellbeing skills', route: '/learn' },
       { icon: '🏞️', title: 'Wellness Retreats', description: 'Restorative retreat experiences', route: '/retreats' },
       { icon: '🛍️', title: 'Wellness Shop', description: 'Tools and resources for wellbeing', route: '/shop' },
@@ -186,15 +186,14 @@ export const MegaNav: React.FC<MegaNavProps> = ({ tone = 'dark' }) => {
                 onMouseEnter={() => handleDesktopEnter(tab.label)}
                 onFocus={() => handleDesktopEnter(tab.label)}
                 onClick={() => setActiveTab(isActive ? null : tab.label)}
-                className={`min-h-[36px] flex-1 whitespace-nowrap border-b-2 border-transparent px-2.5 py-1.5 text-[13px] font-medium tracking-wide transition-all duration-300 ease-out ${
-                  isActive
-                    ? isLight
-                      ? 'border-b-gentle-blue text-charcoal'
-                      : 'border-b-gentle-blue text-cream [text-shadow:0_0_10px_rgba(157,173,190,0.45)]'
-                    : isLight
-                      ? 'text-charcoal/70 hover:border-b-gentle-blue/70 hover:text-charcoal'
-                      : 'text-cream/80 hover:border-b-gentle-blue/80 hover:text-cream'
-                }`}
+                className={`min-h-[36px] flex-1 whitespace-nowrap border-b-2 border-transparent px-2.5 py-1.5 text-[13px] font-bold tracking-wide transition-all duration-300 ease-out ${isActive
+                  ? isLight
+                    ? 'border-b-gentle-blue text-charcoal'
+                    : 'border-b-white text-white'
+                  : isLight
+                    ? 'text-charcoal hover:border-b-gentle-blue/70 hover:text-charcoal/80'
+                    : 'text-cream hover:border-b-white/50 hover:text-white'
+                  }`}
                 aria-expanded={isActive}
                 aria-controls={`panel-${tab.label}`}
               >
@@ -204,21 +203,19 @@ export const MegaNav: React.FC<MegaNavProps> = ({ tone = 'dark' }) => {
           })}
           <Link
             to="/my-digital-clinic"
-            className={`min-h-[36px] flex-1 whitespace-nowrap border-b-2 border-transparent px-2.5 py-1.5 text-center text-[13px] font-medium tracking-wide transition-all duration-300 ease-out ${
-              isLight
-                ? 'text-charcoal/70 hover:border-b-gentle-blue/70 hover:text-charcoal'
-                : 'text-cream/80 hover:border-b-gentle-blue/80 hover:text-cream'
-            }`}
+            className={`min-h-[36px] flex-1 whitespace-nowrap border-b-2 border-transparent px-2.5 py-1.5 text-center text-[13px] font-bold tracking-wide transition-all duration-300 ease-out ${isLight
+              ? 'text-charcoal hover:border-b-gentle-blue/70 hover:text-charcoal/80'
+              : 'text-cream hover:border-b-white/50 hover:text-white'
+              }`}
           >
             MyDigitalClinic
           </Link>
           <Link
             to="/how-it-works"
-            className={`min-h-[36px] flex-1 whitespace-nowrap border-b-2 border-transparent px-2.5 py-1.5 text-center text-[13px] font-medium tracking-wide transition-all duration-300 ease-out ${
-              isLight
-                ? 'text-charcoal/70 hover:border-b-gentle-blue/70 hover:text-charcoal'
-                : 'text-cream/80 hover:border-b-gentle-blue/80 hover:text-cream'
-            }`}
+            className={`min-h-[36px] flex-1 whitespace-nowrap border-b-2 border-transparent px-2.5 py-1.5 text-center text-[13px] font-bold tracking-wide transition-all duration-300 ease-out ${isLight
+              ? 'text-charcoal hover:border-b-gentle-blue/70 hover:text-charcoal/80'
+              : 'text-cream hover:border-b-white/50 hover:text-white'
+              }`}
           >
             How It Works
           </Link>
@@ -232,12 +229,11 @@ export const MegaNav: React.FC<MegaNavProps> = ({ tone = 'dark' }) => {
             closeTimerRef.current = null;
           }
         }}
-        className={`absolute left-1/2 top-full z-40 hidden w-screen -translate-x-1/2 px-0 pt-0 transform-gpu transition-all duration-300 ease-out md:block ${
-          activeTab ? 'pointer-events-auto opacity-100 translate-y-0 scale-100' : 'pointer-events-none opacity-0 -translate-y-2 scale-[0.99]'
-        }`}
+        className={`absolute left-1/2 top-full z-40 hidden w-screen -translate-x-1/2 px-0 pt-0 transform-gpu transition-all duration-300 ease-out md:block ${activeTab ? 'pointer-events-auto opacity-100 translate-y-0 scale-100' : 'pointer-events-none opacity-0 -translate-y-2 scale-[0.99]'
+          }`}
       >
         {activeTab ? (
-          <div id={`panel-${activeTab}`} className="w-full border border-gentle-blue/40 bg-[#075869]/98 shadow-[0_0_18px_rgba(157,173,190,0.2)]">
+          <div id={`panel-${activeTab}`} className="w-full border-b border-white/10 bg-[#064E5C]/95 shadow-xl backdrop-blur-2xl">
             <MegaPanel
               items={activeItems}
               onNavigate={() => setActiveTab(null)}
@@ -252,12 +248,11 @@ export const MegaNav: React.FC<MegaNavProps> = ({ tone = 'dark' }) => {
       <div className="mt-2 flex justify-start md:hidden">
         <button
           type="button"
-          onClick={() => setMobileMenuOpen(true)}
-          className={`inline-flex min-h-[36px] items-center rounded-md border px-2.5 py-1 transition-all duration-[250ms] ease-out ${
-            isLight
-              ? 'border-calm-sage/35 bg-white/95 text-charcoal hover:bg-cream'
-              : 'border-calm-sage/35 bg-[#075869]/92 text-cream hover:bg-[#0C7C8A]/45'
-          }`}
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          className={`inline-flex min-h-[36px] items-center rounded-md border px-2.5 py-1 transition-all duration-[250ms] ease-out ${isLight
+            ? 'border-calm-sage/35 bg-white/95 text-charcoal hover:bg-cream'
+            : 'border-white/20 bg-[#064E5C]/95 text-white hover:bg-[#075869]'
+            }`}
           aria-expanded={mobileMenuOpen}
           aria-controls="mobile-left-drawer"
           aria-label="Open sidebar menu"
@@ -274,9 +269,8 @@ export const MegaNav: React.FC<MegaNavProps> = ({ tone = 'dark' }) => {
       {createPortal(
         <div
           id="mobile-left-drawer"
-          className={`fixed inset-0 z-[9999] transition-opacity duration-300 md:hidden ${
-            mobileMenuOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
-          }`}
+          className={`fixed inset-0 z-[9999] transition-opacity duration-300 md:hidden ${mobileMenuOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
+            }`}
           aria-label="Mobile mega navigation sidebar"
         >
           <div
@@ -286,41 +280,38 @@ export const MegaNav: React.FC<MegaNavProps> = ({ tone = 'dark' }) => {
           />
 
           <aside
-            className={`absolute inset-y-0 left-0 z-10 w-[85%] max-w-sm overflow-y-auto border-r border-calm-sage/15 px-3 pb-6 pt-4 shadow-soft-lg transition-transform duration-300 ease-out will-change-transform ${
-              isLight ? 'bg-cream' : 'bg-[#075869]'
-            } ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}
+            className={`absolute inset-y-0 left-0 z-10 w-[85%] max-w-sm overflow-y-auto border-r border-calm-sage/15 px-3 pb-6 pt-4 shadow-soft-lg transition-transform duration-300 ease-out will-change-transform ${isLight ? 'bg-cream' : 'bg-[#075869]'
+              } ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}
             onClick={(event) => event.stopPropagation()}
             aria-modal="true"
             role="dialog"
           >
-              <div className="mb-4 flex items-center justify-between">
-                <span className={`font-serif text-lg font-light ${isLight ? 'text-charcoal' : 'text-cream'}`}>
-                  MANAS<span className="font-semibold">360</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={closeMobileMenu}
-                  className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors duration-200 ${
-                    isLight ? 'text-charcoal/60 hover:bg-charcoal/5 hover:text-charcoal' : 'text-cream/60 hover:bg-cream/10 hover:text-cream'
+            <div className="mb-4 flex items-center justify-between">
+              <span className={`font-serif text-lg font-light ${isLight ? 'text-charcoal' : 'text-cream'}`}>
+                MANAS<span className="font-semibold">360</span>
+              </span>
+              <button
+                type="button"
+                onClick={closeMobileMenu}
+                className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors duration-200 ${isLight ? 'text-charcoal/60 hover:bg-charcoal/5 hover:text-charcoal' : 'text-cream/60 hover:bg-cream/10 hover:text-cream'
                   }`}
-                  aria-label="Close menu"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
+                aria-label="Close menu"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
 
-              <div className="space-y-4">
-                {tabs.map((tab) => (
-                  <section key={tab.label}>
-                    <h3 className={`mb-1.5 px-1 text-[11px] font-bold uppercase tracking-widest ${
-                      isLight ? 'text-charcoal/40' : 'text-cream/40'
+            <div className="space-y-4">
+              {tabs.map((tab) => (
+                <section key={tab.label}>
+                  <h3 className={`mb-1.5 px-1 text-[11px] font-bold uppercase tracking-widest ${isLight ? 'text-charcoal/40' : 'text-cream/40'
                     }`}>
-                      {tab.label}
-                    </h3>
-                    <MegaPanel items={tab.items} onNavigate={closeMobileMenu} mobile tone={tone} />
-                  </section>
-                ))}
-              </div>
+                    {tab.label}
+                  </h3>
+                  <MegaPanel items={tab.items} onNavigate={closeMobileMenu} mobile tone={tone} />
+                </section>
+              ))}
+            </div>
           </aside>
         </div>,
         document.body,

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import logo from '../assets/manas360_main_logo.png';
 import { useAuth } from '../context/AuthContext';
 import { patientApi } from '../api/patient';
 
@@ -159,7 +160,7 @@ export default function SubscribePage() {
       <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <div className="mb-5 flex items-center justify-between gap-3">
           <Link to="/" className="inline-flex items-center gap-2 text-sm font-semibold text-charcoal/80 hover:text-charcoal">
-            <img src="/Untitled.png" alt="MANAS360 logo" className="h-7 w-7 rounded-md object-cover" />
+            <img src={logo} alt="MANAS360 logo" className="h-7 w-7 rounded-md object-cover" />
             MANAS360
           </Link>
           <Link to="/" className="rounded-lg border border-calm-sage/25 bg-white px-3 py-2 text-xs font-semibold text-charcoal/80">

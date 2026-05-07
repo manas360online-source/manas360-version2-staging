@@ -1,6 +1,9 @@
 import { http } from '../lib/http';
 import {
+  CLINICAL_ASSESSMENT_OPTIONS,
+  CLINICAL_QUESTION_BANK,
   inferClinicalAssessmentType,
+  severityFromClinicalScore,
 } from '../utils/clinicalAssessments';
 
 export type JourneyPathway = 'stepped-care' | 'direct-provider' | 'urgent-care';
@@ -88,41 +91,6 @@ export type StructuredAssessmentSubmitResponse = {
   interpretation: string;
   recommendation: string;
   action: string;
-};
-
-export type FreeScreeningQuestion = {
-  questionId: string;
-  position: number;
-  prompt: string;
-  sectionKey: string;
-  options: Array<{
-    optionIndex: number;
-    label: string;
-    points: number;
-  }>;
-};
-
-export type FreeScreeningStartResponse = {
-  attemptId: string;
-  attemptToken?: string;
-  template: {
-    id: string;
-    key: string;
-    title: string;
-    status?: string;
-  };
-  questions: FreeScreeningQuestion[];
-};
-
-export type FreeScreeningSubmitResponse = {
-  attemptId: string;
-  templateKey: string;
-  totalScore: number;
-  severityLevel: string;
-  interpretation: string;
-  recommendation: string;
-  actionLabel?: string;
-  submittedAt?: string;
 };
 
 export type ActiveCbtAssignment = {
@@ -279,58 +247,72 @@ export const patientApi = {
       source: payload.source,
     })).data;
   },
-  startFreeScreening: async (payload?: { templateKey?: string }): Promise<FreeScreeningStartResponse> => {
-    const response = await http.post('/v1/free-screening/start', {
-      templateKey: payload?.templateKey,
-    });
-    return unwrapPayload<FreeScreeningStartResponse>(response.data);
-  },
-  submitFreeScreening: async (
-    attemptId: string,
-    payload: {
-      attemptToken?: string;
-      answers: Array<{ questionId: string; optionIndex: number }>;
-    },
-  ): Promise<FreeScreeningSubmitResponse> => {
-    const response = await http.post(`/v1/free-screening/${encodeURIComponent(attemptId)}/submit`, payload);
-    return unwrapPayload<FreeScreeningSubmitResponse>(response.data);
-  },
   startStructuredAssessment: async (payload: { templateKey: string }): Promise<StructuredAssessmentStartResponse> => {
-    const response = await http.post('/v1/free-screening/start/me', {
-      templateKey: payload.templateKey,
-    });
-    return unwrapPayload<StructuredAssessmentStartResponse>(response.data);
+    const type = inferClinicalAssessmentType(payload.templateKey);
+    const questions = CLINICAL_QUESTION_BANK[type].map((prompt: string, index: number) => ({
+      questionId: `${type}-${index + 1}`,
+      position: index + 1,
+      prompt,
+      sectionKey: type,
+      options: CLINICAL_ASSESSMENT_OPTIONS,
+    }));
+
+    return {
+      attemptId: `${type}-${Date.now()}`,
+      template: {
+        id: type,
+        key: payload.templateKey,
+        title: type,
+        description: `${type} standard assessment`,
+        estimatedMinutes: type === 'PHQ-9' ? 4 : 3,
+      },
+      questions,
+    };
   },
   submitStructuredAssessment: async (
     attemptId: string,
     payload: { answers: Array<{ questionId: string; optionIndex: number }> },
   ): Promise<StructuredAssessmentSubmitResponse> => {
-    const response = await http.post(`/v1/free-screening/${encodeURIComponent(attemptId)}/submit/me`, {
-      answers: payload.answers,
+    const type = inferClinicalAssessmentType(attemptId);
+    const numericAnswers = (payload.answers || []).map((item) => Number(item.optionIndex || 0));
+    const totalScore = numericAnswers.reduce((sum, score) => sum + score, 0);
+
+    await http.post('/v1/patient-journey/clinical-assessment', {
+      type,
+      answers: numericAnswers,
     });
-    return unwrapPayload<StructuredAssessmentSubmitResponse>(response.data);
+
+    return {
+      attemptId,
+      templateKey: type,
+      totalScore,
+      severityLevel: severityFromClinicalScore(type, totalScore),
+      interpretation: `${type} submitted successfully`,
+      recommendation: 'Continue with the recommended care pathway.',
+      action: 'Continue',
+    };
   },
   getStructuredAssessmentHistory: async () => {
-    const response = await http.get('/v1/free-screening/history');
+    const response = await http.get('/v1/patient/me/assessments', { params: { page: 1, limit: 50 } });
     const payload = response.data?.data ?? response.data;
     const items = Array.isArray(payload?.items) ? payload.items : [];
 
     return {
       items: items
         .filter((entry: any) => {
-          const type = String(entry?.template?.key || entry?.templateKey || '').toLowerCase();
+          const type = String(entry.type || '').toLowerCase();
           return type.includes('phq-9') || type.includes('phq9') || type.includes('gad-7') || type.includes('gad7');
         })
         .map((entry: any) => ({
-          attemptId: entry.attemptId,
-          templateKey: entry?.template?.key || entry.templateKey,
-          templateTitle: entry?.template?.title || entry.templateTitle,
-          totalScore: Number(entry.totalScore || 0),
+          attemptId: entry.id,
+          templateKey: entry.type,
+          templateTitle: entry.type,
+          totalScore: Number(entry.score || 0),
           severityLevel: String(entry.severityLevel || 'mild'),
-          interpretation: String(entry.interpretation || ''),
-          recommendation: String(entry.recommendation || ''),
-          action: String(entry.actionLabel || 'Continue'),
-          submittedAt: entry.submittedAt,
+          interpretation: '',
+          recommendation: '',
+          action: 'Continue',
+          submittedAt: entry.createdAt,
         })),
     };
   },
@@ -704,7 +686,6 @@ export const patientApi = {
       presetEntryType?: string;
       timezoneRegion?: string;
       sourceFunnel?: string;
-      selectedDate?: string;
     },
   ): Promise<SmartMatchProvidersResult> => {
     const query = new URLSearchParams();
@@ -724,7 +705,6 @@ export const patientApi = {
     if (options?.presetEntryType) query.append('entryType', options.presetEntryType);
     if (options?.timezoneRegion) query.append('timezoneRegion', options.timezoneRegion);
     if (options?.sourceFunnel) query.append('sourceFunnel', options.sourceFunnel);
-    if (options?.selectedDate) query.append('selectedDate', options.selectedDate);
     try {
       const response = (await http.get(`/v1/patient/providers/smart-match?${query}`)).data;
       const payload = response?.data ?? response;

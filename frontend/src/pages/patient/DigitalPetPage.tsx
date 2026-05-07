@@ -1,15 +1,11 @@
 import React from 'react';
-import { useSearchParams } from 'react-router-dom';
-import DigitalPetHubPage from './DigitalPetHubPage';
+import DigitalPetHub from '../../components/common/DigitalPetHub';
 
 /**
- * DigitalPetPage - Displays the Digital Pet Hub Component with navigation context
+ * DigitalPetPage - Displays the Digital Pet Hub Component
  */
 const DigitalPetPage: React.FC = () => {
-  const [searchParams] = useSearchParams();
-  const returnTo = searchParams.get('returnTo') || undefined;
-
-  return <DigitalPetHubPage returnTo={returnTo} />;
+  return <DigitalPetHub />;
 };
 
 export default DigitalPetPage;

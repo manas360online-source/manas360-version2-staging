@@ -32,7 +32,6 @@ interface ProviderSelectionStepProps {
     daysOfWeek: number[];
     timeSlots: Array<{ startMinute: number; endMinute: number }>;
   };
-  selectedDate?: Date;
   providerType?: string;
   presetEntryType?: string;
   sourceFunnel?: string;
@@ -41,12 +40,6 @@ interface ProviderSelectionStepProps {
   onBack: () => void;
   onCancel: () => void;
   onBrowseDirectory?: () => void;
-  onPreferencesChange?: (preferences: {
-    concerns: string[];
-    language: string;
-    mode: string;
-    context: 'Standard' | 'Corporate' | 'Night' | 'Buddy' | 'Crisis';
-  }) => void;
 }
 
 const CONTEXT_OPTIONS: Array<'Standard' | 'Corporate' | 'Night' | 'Buddy' | 'Crisis'> = [
@@ -132,7 +125,6 @@ const getEstimatedMatchChance = (provider: ProviderMatch): number => {
 
 export default function ProviderSelectionStep({
   availabilityPrefs,
-  selectedDate,
   providerType,
   presetEntryType,
   sourceFunnel,
@@ -141,7 +133,6 @@ export default function ProviderSelectionStep({
   onBack,
   onCancel,
   onBrowseDirectory,
-  onPreferencesChange,
 }: ProviderSelectionStepProps) {
   const nriFixedFeeMinor = getNriFixedFeeMinor(presetEntryType);
   const [providers, setProviders] = useState<ProviderMatch[]>([]);
@@ -161,15 +152,6 @@ export default function ProviderSelectionStep({
     .slice(0, 5);
 
   useEffect(() => {
-    onPreferencesChange?.({
-      concerns: parsedConcerns,
-      language: preferredLanguage,
-      mode: preferredMode,
-      context: matchContext,
-    });
-  }, [parsedConcerns, preferredLanguage, preferredMode, matchContext, onPreferencesChange]);
-
-  useEffect(() => {
     const fetchProviders = async () => {
       try {
         setLoading(true);
@@ -185,7 +167,6 @@ export default function ProviderSelectionStep({
             presetEntryType,
             sourceFunnel,
             timezoneRegion,
-            selectedDate: selectedDate?.toISOString(),
           },
         );
         const nextProviders = Array.isArray(result?.providers) ? result.providers : [];
@@ -199,7 +180,7 @@ export default function ProviderSelectionStep({
     };
 
     fetchProviders();
-  }, [availabilityPrefs, providerType, concernsInput, preferredLanguage, preferredMode, matchContext, presetEntryType, sourceFunnel, timezoneRegion, selectedDate]);
+  }, [availabilityPrefs, providerType, concernsInput, preferredLanguage, preferredMode, matchContext, presetEntryType, sourceFunnel, timezoneRegion]);
 
   const toggleProvider = (providerId: string) => {
     setSelectedIds((prev) => {

@@ -202,8 +202,3 @@ export const logout = async (): Promise<void> => {
 		headers: csrfToken ? { 'x-csrf-token': csrfToken } : undefined,
 	});
 };
-
-export const becomeProvider = async (): Promise<AuthUser> => {
-	const response = await http.post<ApiEnvelope<AuthUser>>('/v1/users/me/become-provider');
-	return response.data.data;
-};

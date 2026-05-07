@@ -121,7 +121,7 @@ const ConfigSection: React.FC<Props> = ({
         disabled={isLoading}
         className="w-full bg-green-700 text-white py-2 rounded text-sm"
       >
-        {isLoading ? 'Loading...' : 'Start 21-Day Free Trial'}
+        {isLoading ? 'Loading...' : 'Start 3 days'}
       </button>
     </div>
   );

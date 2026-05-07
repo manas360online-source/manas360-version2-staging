@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowRight, Phone } from 'lucide-react';
+import { ArrowRight, Phone, Instagram, Linkedin, MessageCircle, Youtube } from 'lucide-react';
+import logo from '../../assets/manas360_main_logo.png';
 import { companyInfo } from '../../config/companyInfo';
 import dpdpaActPdf from '../../pages/legal/DPDPA Act 2023.pdf';
 
@@ -25,6 +26,7 @@ export const Footer: React.FC = () => {
       { label: 'Find a Therapist', to: '/therapists' },
       { label: 'AI Room', to: '/ai-chat' },
       { label: 'Pricing', to: '/pricing' },
+      { label: 'Webinar-Podcast Series', to: '/webinar-podcast' },
     ],
     Company: [
       { label: 'About Us', to: '/about' },
@@ -66,7 +68,7 @@ export const Footer: React.FC = () => {
                 className="group inline-flex min-h-[44px] items-center gap-2 rounded-full bg-gradient-calm px-8 py-3 text-base font-semibold text-white shadow-soft-md transition-all duration-300 hover:scale-[1.03] hover:shadow-soft-lg"
                 aria-label="Take the 60-second mental health assessment"
               >
-                Take the 60-Second Check
+                Explore More
                 <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
               </button>
             </div>
@@ -77,11 +79,11 @@ export const Footer: React.FC = () => {
             {/* Brand column */}
             <div className="col-span-2 md:col-span-1">
               <Link
-                to="/"
+                to="/landing"
                 className="inline-flex items-center gap-2 text-lg font-light text-charcoal"
               >
                 <img
-                  src="/Untitled.png"
+                  src={logo}
                   alt="MANAS360 logo"
                   className="h-5 w-5 rounded object-cover"
                 />
@@ -96,6 +98,44 @@ export const Footer: React.FC = () => {
               <div className="mt-4 space-y-1 text-xs text-charcoal/55">
                 <p><strong className="text-charcoal/70">Email:</strong> <a href={`mailto:${companyInfo.email}`} className="underline hover:text-charcoal">{companyInfo.email}</a></p>
                 <p><strong className="text-charcoal/70">Phone:</strong> <a href={`tel:${companyInfo.phone.replace(/[^\d+]/g, '')}`} className="underline hover:text-charcoal">{companyInfo.phone}</a></p>
+              </div>
+              <div className="mt-6 flex items-center gap-3">
+                <a
+                  href="https://wa.me/919876543210"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-charcoal/5 text-charcoal/65 transition hover:bg-charcoal/10 hover:text-charcoal"
+                  aria-label="WhatsApp"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                </a>
+                <a
+                  href="https://instagram.com/manas360"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-charcoal/5 text-charcoal/65 transition hover:bg-charcoal/10 hover:text-charcoal"
+                  aria-label="Instagram"
+                >
+                  <Instagram className="h-4 w-4" />
+                </a>
+                <a
+                  href="https://youtube.com/@manas360"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-charcoal/5 text-charcoal/65 transition hover:bg-charcoal/10 hover:text-charcoal"
+                  aria-label="YouTube"
+                >
+                  <Youtube className="h-4 w-4" />
+                </a>
+                <a
+                  href="https://linkedin.com/company/manas360"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-charcoal/5 text-charcoal/65 transition hover:bg-charcoal/10 hover:text-charcoal"
+                  aria-label="LinkedIn"
+                >
+                  <Linkedin className="h-4 w-4" />
+                </a>
               </div>
             </div>
 

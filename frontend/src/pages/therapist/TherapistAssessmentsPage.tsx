@@ -90,9 +90,9 @@ export default function TherapistAssessmentsPage() {
           {loading ? <TherapistLoadingState title="Loading assessments" description="Fetching assessment records from backend." /> : null}
           {error ? <TherapistErrorState title="Assessment action failed" description={error} onRetry={() => void load()} /> : null}
 
-          <TherapistCard className="p-5">
+          <TherapistCard className="p-4">
             <h3 className="font-display text-base font-bold text-ink-800">Assign Assessment</h3>
-            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-4">
+            <div className="mt-3 grid grid-cols-1 gap-2.5 md:grid-cols-4">
               <select value={type} onChange={(event) => setType(event.target.value as AssessmentType)} className="rounded-lg border border-ink-100 bg-white px-3 py-2 text-sm text-ink-800 focus:border-sage-500 focus:ring-0">
                 <option>PHQ-9</option>
                 <option>GAD-7</option>
@@ -103,12 +103,12 @@ export default function TherapistAssessmentsPage() {
             </div>
           </TherapistCard>
 
-          <section className="grid grid-cols-1 gap-5 xl:grid-cols-3">
-            <TherapistCard className="p-5 xl:col-span-2">
+          <section className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+            <TherapistCard className="p-4 xl:col-span-2">
               <h3 className="mb-3 font-display text-base font-bold text-ink-800">Assessment Results</h3>
               <div className="space-y-2">
                 {rows.map((row) => (
-                  <div key={row.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-ink-100 px-3 py-2">
+                  <div key={row.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-ink-100 px-3 py-1.5">
                     <div>
                       <p className="text-sm font-semibold text-ink-800">{row.patient}</p>
                       <p className="text-xs text-ink-500">{row.type} · {row.date}</p>
@@ -119,7 +119,7 @@ export default function TherapistAssessmentsPage() {
               </div>
             </TherapistCard>
 
-            <TherapistCard className="p-5">
+            <TherapistCard className="p-4">
               <h3 className="mb-3 font-display text-base font-bold text-ink-800">Trend Chart (Average)</h3>
               <div className="space-y-3">
                 {trendData.map((item) => (

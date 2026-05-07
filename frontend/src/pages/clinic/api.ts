@@ -2,19 +2,22 @@ import axios, { AxiosError } from 'axios';
 import { API_BASE } from '../../lib/runtimeEnv';
 import { getAuthHeaders } from '../../utils/authToken';
 
-const API_BASE_URL = `${API_BASE}/v1/mdc`;
+const API_BASE_URL = `${API_BASE}/subscriptions`;
 
 export interface CalculatePricePayload {
-  clinicTier: 'solo' | 'small' | 'large';
-  billingCycle: 'monthly' | 'quarterly';
-  selectedFeatures: string[]; // ✅ feature slugs
+  clinic_tier: 'solo' | 'small' | 'large';
+  billing_cycle: 'monthly' | 'quarterly';
+  selected_features: string[]; // ✅ feature slugs
 }
 
 export interface PricingResponse {
-  monthlyTotal: number;
-  billingAmount: number;
-  discountApplied: number;
-  breakdown: Record<string, number>;
+  monthly_total: number;
+  billing_amount: number;
+  discount_applied: number;
+  breakdown: {
+    feature_slug: string;
+    unit_price: number;
+  }[];
 }
 
 export interface ApiError {
@@ -37,7 +40,7 @@ export const calculateSubscriptionPrice = async (
   try {
     const authHeaders = getAuthHeaders();
     const response = await axios.post<PricingResponse>(
-      `${API_BASE_URL}/calculate-pricing`,
+      `${API_BASE_URL}/calculate-price`,
       payload,
       {
         headers: {
@@ -60,41 +63,6 @@ export const calculateSubscriptionPrice = async (
     throw {
       message: errorMessage,
       code: axiosError.code,
-      status: axiosError.response?.status,
-    } as ApiError;
-  }
-};
-
-export interface RegisterClinicInput {
-  name: string;
-  phone: string;
-  email: string;
-  address?: string;
-  ownerName: string;
-  license?: string;
-  tier: 'solo' | 'small' | 'large';
-  billingCycle: 'monthly' | 'quarterly';
-  selectedFeatures: string[];
-}
-
-export const registerClinic = async (
-  payload: RegisterClinicInput
-): Promise<any> => {
-  try {
-    const response = await axios.post(
-      `${API_BASE_URL}/register`,
-      payload,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-    return response.data;
-  } catch (error) {
-    const axiosError = error as AxiosError<{ message?: string }>;
-    throw {
-      message: axiosError.response?.data?.message || 'Registration failed',
       status: axiosError.response?.status,
     } as ApiError;
   }
@@ -157,11 +125,11 @@ export const calculateSubscriptionPriceMock = (
     large: [999, 449, 299, 99, 599, 399, 449, 299, 199, 799, 249, 599],
   };
 
-  const tierPrices = FEATURE_PRICES[payload.clinicTier];
+  const tierPrices = FEATURE_PRICES[payload.clinic_tier];
 
   let monthlyTotal = 0;
 
-  const breakdown = payload.selectedFeatures.map((slug) => {
+  const breakdown = payload.selected_features.map((slug) => {
     const idx = FEATURE_INDEX_MAP[slug];
     const price = tierPrices[idx] || 0;
 
@@ -176,15 +144,15 @@ export const calculateSubscriptionPriceMock = (
   let billingAmount = monthlyTotal;
   let discountApplied = 0;
 
-  if (payload.billingCycle === 'quarterly') {
+  if (payload.billing_cycle === 'quarterly') {
     discountApplied = 10;
     billingAmount = Math.round(monthlyTotal * 3 * 0.9);
   }
 
   return {
-    monthlyTotal,
-    billingAmount,
-    discountApplied,
-    breakdown: breakdown.reduce((acc, curr) => ({ ...acc, [curr.feature_slug]: curr.unit_price }), {}),
-  } as any;
+    monthly_total: monthlyTotal,
+    billing_amount: billingAmount,
+    discount_applied: discountApplied,
+    breakdown,
+  };
 };

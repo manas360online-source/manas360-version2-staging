@@ -27,78 +27,94 @@ const NRILandingPage: React.FC = () => {
 
       <section className="nri-hero">
         <div className="nri-shell nri-hero-inner">
-          <p className="nri-kicker">FOR NRI & GLOBAL INDIAN COMMUNITY</p>
+          <p className="nri-kicker">FOR NRIS & GLOBAL INDIANS</p>
           <h1>
             Find Your <em>Janmabhoomi</em>
             <br />
-            Connection - Heal with the Right Care
+            Connection - Heal
           </h1>
           <p className="nri-subtitle">
-            Therapy in your mother tongue with Indian experts who understand NRI realities - career pressure
-            abroad, family guilt, identity shifts, and relationships across continents.
+            Therapy in your mother tongue with Indian therapists who understand your desi dilemma - career pressure
+            abroad, family guilt, identity crisis, relationship bridges across continents.
           </p>
           <div className="nri-hero-chips">
-            <span>🕒 IST + Your Local Timezone</span>
+            <span>🕒 Sessions in YOUR Timezone</span>
             <span>🗣️ Hindi · Tamil · Telugu · Kannada · English</span>
-            <span>🔒 DPDPA-aligned care</span>
-            <span>💳 USD / GBP / AED / SGD accepted</span>
+            <span>🔒 DPDPA Compliant</span>
+            <span>💳 Pay in USD</span>
             <span>👨‍👩‍👧 Gift Sessions to Family in India</span>
           </div>
         </div>
       </section>
 
       <section className="nri-shell nri-section-head">
-        <h2>Choose Your NRI Session Type</h2>
-        <p>Use the existing NRI per-session pricing. No legacy monthly bundles.</p>
+        <h2>Choose Your Plan</h2>
+        <p>All plans include 21-day free trial with AnytimeBuddy AI access</p>
       </section>
 
       <section className="nri-shell nri-plan-grid">
         <article className="nri-plan-card">
-          <span className="plan-badge starter">NRI Core</span>
-          <h3>Psychologist Session</h3>
-          <p className="plan-tagline">Focused therapy support with cultural context</p>
-          <p className="plan-price">₹2,999<span>/session</span></p>
+          <span className="plan-badge starter">Starter</span>
+          <h3>Saathi</h3>
+          <p className="plan-tagline">"Your companion on the journey"</p>
+          <p className="plan-price">$49<span>/month</span></p>
           <ul>
-            <li>1:1 psychologist session</li>
-            <li>NRI-friendly matching and timezone support</li>
+            <li>2 group sessions/month</li>
             <li>AnytimeBuddy AI support</li>
-            <li>PHQ-9 / GAD-7 check-ins</li>
+            <li>Digital Pets + Sound Library</li>
+            <li>PHQ-9 / GAD-7 monthly check-in</li>
           </ul>
-          <button type="button" className="ghost">Book Session →</button>
+          <button type="button" className="ghost">Start Free Trial →</button>
         </article>
 
         <article className="nri-plan-card featured">
-          <span className="plan-badge popular">Most Booked</span>
-          <h3>Psychiatrist Session</h3>
-          <p className="plan-tagline">Medication review and psychiatric consultation</p>
-          <p className="plan-price">₹3,499<span>/session</span></p>
+          <span className="plan-badge popular">Most Popular</span>
+          <h3>Bandham</h3>
+          <p className="plan-tagline">"The bond that heals"</p>
+          <p className="plan-price">$99<span>/month</span></p>
           <ul>
-            <li>1:1 psychiatrist consultation</li>
-            <li>Suitable for medication and clinical escalation</li>
-            <li>Timezone-aligned appointment slots</li>
-            <li>Private and compliant care journey</li>
+            <li>2 individual sessions/month</li>
+            <li>2 group sessions/month</li>
+            <li>Guided journaling with AI prompts</li>
+            <li>Gift 1 session/month to family in India</li>
           </ul>
-          <button type="button">Book Session →</button>
+          <button type="button">Start Free Trial →</button>
         </article>
 
         <article className="nri-plan-card">
-          <span className="plan-badge premium">Extended</span>
-          <h3>Therapist Session</h3>
-          <p className="plan-tagline">Structured therapy for recurring support</p>
-          <p className="plan-price">₹3,599<span>/session</span></p>
+          <span className="plan-badge premium">Premium</span>
+          <h3>Kutumbam</h3>
+          <p className="plan-tagline">"For the whole family"</p>
+          <p className="plan-price">$179<span>/month</span></p>
           <ul>
-            <li>1:1 therapist-led session</li>
-            <li>Ideal for ongoing emotional regulation work</li>
-            <li>Works with existing AI check-ins and reflections</li>
-            <li>Session-by-session flexibility</li>
+            <li>4 individual sessions/month</li>
+            <li>Unlimited group sessions</li>
+            <li>Quarterly psychiatrist consultation</li>
+            <li>Up to 3 family members in India</li>
           </ul>
-          <button type="button">Book Session →</button>
+          <button type="button">Start Free Trial →</button>
         </article>
       </section>
 
-      <section className="nri-shell nri-card-muted">
-        <h3>Session Pricing Snapshot</h3>
-        <p>Existing NRI rates in the platform: Psychologist ₹2,999/session, Psychiatrist ₹3,499/session, Therapist ₹3,599/session.</p>
+      <section className="nri-shell nri-table-wrap">
+        <h2>Feature Comparison</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Feature</th>
+              <th>Saathi ($49)</th>
+              <th>Bandham ($99)</th>
+              <th>Kutumbam ($179)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Individual sessions/month</td><td>-</td><td>2</td><td>4</td></tr>
+            <tr><td>Group sessions/month</td><td>2</td><td>2</td><td>Unlimited</td></tr>
+            <tr><td>AnytimeBuddy AI</td><td>✓</td><td>✓</td><td>✓</td></tr>
+            <tr><td>Gift sessions to India family</td><td>Screening only</td><td>1/month</td><td>3 members</td></tr>
+            <tr><td>Psychiatrist consultation</td><td>-</td><td>-</td><td>1/quarter</td></tr>
+          </tbody>
+        </table>
       </section>
 
       <section className="nri-shell nri-info-card">
@@ -123,15 +139,15 @@ const NRILandingPage: React.FC = () => {
         <h3>👨‍👩‍👧 Gift Therapy to Family Back Home</h3>
         <p>
           Pay in USD while your family receives care in their preferred language at IST-convenient hours.
-          You can sponsor sessions for family members in India based on availability and consent.
+          Kutumbam supports up to 3 family members.
         </p>
       </section>
 
       <section className="nri-cta-strip">
         <div className="nri-shell">
           <h3>Your Roots. Your Language. Your Healing.</h3>
-          <p>Book with the current NRI per-session model and get matched to the right care expert.</p>
-          <button type="button">Book NRI Session →</button>
+          <p>Start your 21-day free trial today. No payment required until your therapist match is confirmed.</p>
+          <button type="button">IN Start Free Trial - Connect to Home →</button>
         </div>
       </section>
 

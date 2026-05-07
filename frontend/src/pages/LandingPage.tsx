@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { MessageCircle, Instagram, Youtube, Linkedin, Moon, Sun } from "lucide-react";
-import { applyTheme, getStoredThemePreference, persistThemePreference, resolveTheme, type ThemePreference } from '../lib/themePreference';
-const logo = "/Logo.jpeg";
-// landingBg uses the image from the public folder (URL-encoded for spaces)
-const landingBg = "/You%20renot%20alone-Beach.jpeg";
+import { MessageCircle, Instagram, Youtube, Linkedin } from "lucide-react";
+import logo from "../assets/manas360_main_logo.png";
+import landingBg from "../assets/You renot alone-Beach.jpeg";
+import anytimeBuddyImage from "../assets/AnytimeBUDDY.jpeg";
+import hitASixerImage from "../assets/HitASixer.jpeg";
+import digitalPetImage from "../assets/DigitalPet1.jpg";
 
 type Language = "English" | "Hindi" | "Kannada" | "Tamil" | "Telugu";
 
@@ -44,7 +45,6 @@ type QuickNavMegaMenu = {
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
 
-  const [activeTheme, setActiveTheme] = useState<ThemePreference>(() => resolveTheme(getStoredThemePreference()));
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [loginDropdownOpen, setLoginDropdownOpen] = useState(false);
@@ -55,26 +55,6 @@ const LandingPage: React.FC = () => {
   const [activeQuickNav, setActiveQuickNav] = useState<string | null>(null);
   const quickNavCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const leftPanelCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    applyTheme(activeTheme);
-  }, [activeTheme]);
-
-  useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'theme-preference') {
-        setActiveTheme(resolveTheme(getStoredThemePreference()));
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
-
-  const toggleTheme = () => {
-    const nextTheme: ThemePreference = activeTheme === 'dark' ? 'light' : 'dark';
-    setActiveTheme(nextTheme);
-    persistThemePreference(nextTheme);
-  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -122,84 +102,60 @@ const LandingPage: React.FC = () => {
     navigate("/hit-a-sixer");
   };
 
-  // Route map for individual mega menu items (by item title)
-  const megaItemRoutes: Record<string, string> = {
-    // Premium Therapy Hub items
-    "1-on-1 Therapy": "/premium-theraphy",
-    "Psychiatry Consult": "/premium-theraphy",
-    "Couples Therapy": "/find-spark",
-    "Group Therapy": "/group-therapy",
-    "Sound Therapy": "/sound-therapy",
-    "Executive Coaching": "/premium-theraphy",
-    "Wellness Retreats": "/retreats",
-    // Wellness Shop is "coming soon" — no route
-    // I Need a Helping Hand items
-    "Free Screening": "/assessment",
-    "Find a Therapist": "/helping-hand",
-    "See a Psychiatrist": "/helping-hand",
-    "Specialized Care": "/specialized-care",
-    "Group Sessions": "/group-therapy",
-    "Crisis Support": "/crisis",
-    // AI Power Hub items
-    "Anytime Buddy AI": "/ai-power-hub",
-    "AnytimeBuddy Chat": "/ai-power-hub",
-    "Vent Buddy": "/ai-power-hub",
-    "AI Session Notes": "/ai-power-hub",
-    // Digital Pets items
-    "Baby Dinosaur": "/pet",
-    "Golden Retriever": "/pet",
-    "Healing Elephant": "/pet",
-    "Chintu Fox": "/pet",
-    "Name Your Pet \u2014 Adopt": "/pet",
-    // Self-Help items
-    "Mood Tracker": "/self-help",
-    "Breathing Exercises": "/self-help",
-    "Journaling Prompts": "/self-help",
-    "Sleep Guide": "/self-help",
-    "CBT Worksheets": "/self-help",
-    // Find a Spark items
-    "Find a Spark \u2014 Couples": "/find-spark",
-    "Concerned Parent": "/find-spark",
-    "Family Plan": "/find-spark",
-    "Teen & Student": "/find-spark",
-    // Corporate items
-    "Corporate Wellness": "/corporate-landing",
-    "Education Institutions": "/corporate-landing",
-    "Healthcare Units": "/corporate-landing",
-    "Government Agency": "/corporate-landing",
-    // Certify2EarnMore items
-    "Certification Hub": "/certifications",
-    "Join as Therapist": "/certifications",
-    // MyDigitalClinic items
-    "Patient Database": "/my-digital-clinic",
-    "Session Notes": "/my-digital-clinic",
-    "Scheduling": "/my-digital-clinic",
-    "Prescriptions": "/my-digital-clinic",
-    "Progress Tracking": "/my-digital-clinic",
-    "3 days": "/my-digital-clinic",
-  };
+  const handleQuickNavMegaItemClick = (menuLabel: string) => {
+    if (menuLabel === "I Need a Helping Hand") {
+      setActiveQuickNav(null);
+      navigate("/helping-hand");
+      return;
+    }
 
-  // Fallback route map for parent menu labels (used when no item-specific route exists)
-  const menuFallbackRoutes: Record<string, string> = {
-    "I Need a Helping Hand": "/helping-hand",
-    "AI Power Hub": "/ai-power-hub",
-    "Find a Spark Again": "/find-spark",
-    "Self-Help Tools": "/self-help",
-    "For Corporates / Edu / Healthcare": "/corporate-landing",
-    "Premium Therapy Hub": "/premium-theraphy",
-    "MyDigitalClinic": "/my-digital-clinic",
-    "Certify2EarnMore": "/certifications",
-    "Digital Pets4Happy Hormones": "/pet",
-  };
+    if (menuLabel === "AI Power Hub") {
+      setActiveQuickNav(null);
+      navigate("/ai-power-hub");
+      return;
+    }
 
-  const handleMegaItemNav = (itemTitle: string, parentMenu: string | null) => {
-    setActiveQuickNav(null);
-    const route = megaItemRoutes[itemTitle] || (parentMenu ? menuFallbackRoutes[parentMenu] : null);
-    if (route) navigate(route);
-  };
+    if (menuLabel === "Find a Spark Again") {
+      setActiveQuickNav(null);
+      navigate("/find-spark");
+      return;
+    }
 
-  // handleQuickNavMegaItemClick was removed because the individual mega menu items
-  // are routed via `handleMegaItemNav` and specific onClick handlers in the UI.
+    if (menuLabel === "Self-Help Tools") {
+      setActiveQuickNav(null);
+      navigate("/self-help");
+      return;
+    }
+
+    if (menuLabel === "For Corporates / Edu / Healthcare") {
+      setActiveQuickNav(null);
+      navigate("/corporate-landing");
+      return;
+    }
+
+    if (menuLabel === "Premium Therapy Hub") {
+      setActiveQuickNav(null);
+      navigate("/premium-theraphy");
+      return;
+    }
+
+    if (menuLabel === "MyDigitalClinic") {
+      setActiveQuickNav(null);
+      navigate("/my-digital-clinic");
+      return;
+    }
+
+    if (menuLabel === "Certify2EarnMore") {
+      setActiveQuickNav(null);
+      navigate("/certifications");
+      return;
+    }
+
+    if (menuLabel === "Digital Pets4Happy Hormones") {
+      setActiveQuickNav(null);
+      navigate("/pet");
+    }
+  };
 
   const footerQuickLinkRoutes: Record<string, string> = {
     "About Us": "/landing",
@@ -267,17 +223,23 @@ const LandingPage: React.FC = () => {
     ],
     []
   );
-  const quickNavItems: Array<{ icon: string; label: string }> = useMemo(
+  const featuredQuickNavItems: Array<{ icon: string; label: string }> = useMemo(
     () => [
       { icon: "\uD83D\uDC8E", label: "Premium Therapy Hub" },
-      { icon: "\u26A1", label: "AI Power Hub" },
-      { icon: "\uD83E\uDD1D", label: "I Need a Helping Hand" },
-      { icon: "\uD83D\uDC3E", label: "Digital Pets4Happy Hormones" },
+      { icon: "\u26A1", label: "AI Power Hub" }
+    ],
+    []
+  );
+  const quickNavItems: Array<{ icon: string; label: string; displayLabel?: string }> = useMemo(
+    () => [
+      { icon: "\uD83E\uDD1D", label: "I Need a Helping Hand", displayLabel: "Need a Help" },
+      { icon: "\uD83D\uDC3E", label: "Digital Pets4Happy Hormones", displayLabel: "Digital Pets" },
       { icon: "\uD83E\uDDF0", label: "Self-Help Tools" },
-      { icon: "\u2728", label: "Find a Spark Again" },
-      { icon: "\uD83C\uDFDB\uFE0F", label: "For Corporates / Edu / Healthcare" },
+      { icon: "\u2728", label: "Find a Spark Again", displayLabel: "Find Spark Again" },
+      { icon: "\uD83C\uDFDB\uFE0F", label: "For Corporates / Edu / Healthcare", displayLabel:"Corporates / Edu / Healthcare"},
       { icon: "\uD83C\uDF93", label: "Certify2EarnMore" },
-      { icon: "\uD83D\uDCCB", label: "MyDigitalClinic" }
+      { icon: "\uD83D\uDCCB", label: "MyDigitalClinic" },
+      { icon: "\uD83C\uDF0D", label: "NRI | Global Indian Hub", displayLabel: "NRI | Global Indian Hub" }
     ],
     []
   );
@@ -328,14 +290,12 @@ const LandingPage: React.FC = () => {
         subtitle: "Clinically supervised, evidence-based sessions",
         columns: 5,
         items: [
-          { icon: "🧠", title: "1-on-1 Therapy", subtitle: "Psychologist sessions from ₹699", badge: "₹699" },
-          { icon: "⚕️", title: "Psychiatry Consult", subtitle: "Medication review from ₹999", badge: "₹999" },
-          { icon: "💑", title: "Couples Therapy", subtitle: "Rebuild your relationship", badge: "₹1,499" },
-          { icon: "👥", title: "Group Therapy", subtitle: "Peer circles from ₹149", badge: "₹149" },
-          { icon: "🎵", title: "Sound Therapy", subtitle: "Raga healing + sleep tracks", badge: "20 Free" },
-          { icon: "💼", title: "Executive Coaching", subtitle: "High-performance wellness", badge: "Pro" },
-          { icon: "🏕️", title: "Wellness Retreats", subtitle: "Rishikesh, Coorg, Goa" },
-          { icon: "🛒", title: "Wellness Shop", subtitle: "Journals, tools, merch", badge: "Soon" }
+          { icon: "\uD83E\uDDE0", title: "1-on-1 Therapy", subtitle: "Psychologist sessions from \u20B9699", badge: "\u20B9699" },
+          { icon: "\u2695\uFE0F", title: "Psychiatry Consult", subtitle: "Medication review from \u20B9999", badge: "\u20B9999" },
+          { icon: "\uD83D\uDC91", title: "Couples Therapy", subtitle: "Rebuild your relationship", badge: "\u20B91,499" },
+          { icon: "\uD83D\uDC65", title: "Group Therapy", subtitle: "Peer circles from \u20B9149", badge: "\u20B9149" },
+          { icon: "\uD83C\uDFB5", title: "Sound Therapy", subtitle: "Raga healing + sleep tracks", badge: "20 Free" },
+          { icon: "\uD83D\uDCBC", title: "Executive Coaching", subtitle: "High-performance wellness", badge: "Pro" }
         ]
       },
       "Self-Help Tools": {
@@ -383,7 +343,9 @@ const LandingPage: React.FC = () => {
         columns: 4,
         items: [
           { icon: "\uD83C\uDFC6", title: "Certification Hub", subtitle: "CBT, NLP, 5Whys training", badge: "Pro" },
-          { icon: "\uD83E\uDDD1", title: "Join as Therapist", subtitle: "Earn \u20B950K-2L/month" }
+          { icon: "\uD83E\uDDD1", title: "Join as Therapist", subtitle: "Earn \u20B950K-2L/month" },
+          { icon: "\uD83C\uDFD5\uFE0F", title: "Wellness Retreats", subtitle: "Rishikesh, Coorg, Goa" },
+          { icon: "\uD83D\uDED2", title: "Wellness Shop", subtitle: "Journals, tools, merch" }
         ]
       },
       MyDigitalClinic: {
@@ -494,7 +456,7 @@ const LandingPage: React.FC = () => {
     <div
       style={{
         minHeight: "100vh",
-        backgroundImage: `linear-gradient(rgba(238, 233, 233, 0.46), rgba(223, 213, 213, 0.46)), url(${landingBg})`,
+        backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.01), rgba(241, 245, 249, 0.01)), url(${landingBg})`,
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",
@@ -613,10 +575,10 @@ const LandingPage: React.FC = () => {
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
-            width: "62px",
-            height: "62px",
-            borderRadius: "16px",
-            padding: "4px",
+            width: "93px",
+            height: "93px",
+            borderRadius: "24px",
+            padding: "6px",
             boxSizing: "border-box",
             overflow: "hidden",
             background: "rgba(255,255,255,0.92)",
@@ -636,7 +598,7 @@ const LandingPage: React.FC = () => {
               objectFit: "contain",
               objectPosition: "center",
               display: "block",
-              borderRadius: "12px",
+              borderRadius: "18px",
               background: "#FFFFFF"
             }}
           />
@@ -649,8 +611,8 @@ const LandingPage: React.FC = () => {
             top: "120px",
             transform: "none",
             zIndex: 95,
-            display: "block",
-            alignItems: "center"
+            display: "flex",
+            alignItems: "flex-start"
           }}
           onMouseEnter={openLeftPanel}
           onMouseLeave={closeLeftPanelWithDelay}
@@ -661,11 +623,11 @@ const LandingPage: React.FC = () => {
               background: "rgba(255,255,255,0.88)",
               border: "1px solid #E1E8F0",
               borderLeft: "none",
-              borderRadius: "0 18px 18px 0",
-              padding: "10px 8px 10px 6px",
+              borderRadius: "0 26px 26px 0",
+              padding: "16px 12px 16px 9px",
               boxShadow: "0 14px 36px rgba(15, 23, 42, 0.14)",
               backdropFilter: "blur(10px)",
-              width: "56px"
+              width: "85px"
             }}
           >
             {[
@@ -680,7 +642,7 @@ const LandingPage: React.FC = () => {
               { id: "brain", icon: "🧠", bg: "linear-gradient(180deg, #FDE7EF, #F4E8FF)" }
             ].map((item) => {
               if (item.divider) {
-                return <div key={item.id} style={{ height: "1px", background: "#D7DEE8", margin: "8px 6px" }} />;
+                return <div key={item.id} style={{ height: "1px", background: "#D7DEE8", margin: "12px 9px" }} />;
               }
 
               return (
@@ -688,17 +650,17 @@ const LandingPage: React.FC = () => {
                   key={item.id}
                   type="button"
                   style={{
-                    width: "36px",
-                    height: "36px",
-                    borderRadius: "11px",
+                    width: "51px",
+                    height: "51px",
+                    borderRadius: "16px",
                     border: "none",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     cursor: "pointer",
-                    margin: "4px 2px",
+                    margin: "6px 4px",
                     background: item.bg,
-                    fontSize: "18px",
+                    fontSize: "26px",
                     position: "relative"
                   }}
                   aria-label="Quick item"
@@ -708,10 +670,10 @@ const LandingPage: React.FC = () => {
                     <span
                       style={{
                         position: "absolute",
-                        top: "2px",
-                        right: "2px",
-                        width: "7px",
-                        height: "7px",
+                        top: "4px",
+                        right: "4px",
+                        width: "9px",
+                        height: "9px",
                         borderRadius: "999px",
                         background: "#22C55E",
                         border: "1.5px solid #FFFFFF"
@@ -727,73 +689,81 @@ const LandingPage: React.FC = () => {
           <div
             className="left-dock-panel"
             style={{
-              width: leftPanelOpen ? "272px" : "0px",
+              width: leftPanelOpen ? "360px" : "0px",
               opacity: leftPanelOpen ? 1 : 0,
-              overflow: "hidden",
+              overflow: leftPanelOpen ? "visible" : "hidden",
               transform: leftPanelOpen ? "translateX(0)" : "translateX(-8px)",
               transition: "width 0.22s ease, opacity 0.18s ease, transform 0.22s ease",
               pointerEvents: leftPanelOpen ? "auto" : "none"
             }}
           >
             <div
+              className="left-dock-content"
               style={{
                 marginLeft: "8px",
-                background: "rgba(255,255,255,0.92)",
-                border: "1px solid #E1E8F0",
-                borderRadius: "0 20px 20px 0",
-                boxShadow: "0 18px 40px rgba(15,23,42,0.16)",
-                padding: "12px 12px 10px",
-                maxHeight: "76vh",
-                overflowY: "auto"
+                background: "#FFFFFF",
+                border: "1px solid #D8E0EA",
+                borderRadius: "0 18px 18px 0",
+                boxShadow: "0 16px 36px rgba(15,23,42,0.12)",
+                padding: "10px 12px 9px",
+                maxHeight: "72vh",
+                overflowY: "auto",
+                boxSizing: "border-box"
               }}
             >
-              <div style={{ fontSize: "11px", fontWeight: 800, letterSpacing: "2px", color: "#0B2D5E", marginBottom: "7px" }}>QUICK ACCESS</div>
+              <div className="left-dock-section-title" style={{ fontSize: "10px", fontWeight: 900, letterSpacing: "1.8px", color: "#334155", marginBottom: "7px" }}>QUICK ACCESS</div>
 
               {[
-                { icon: "\uD83E\uDD16", title: "AnytimeBUDDY", text: "Your 24/7 AI companion", tag: "LIVE" },
-                { icon: "\uD83D\uDC3E", title: "Digital Pets", text: "Oxytocin \u2022 Serotonin \u2022 Dopamine", tag: "NEW" },
-                { icon: "\uD83C\uDFA7", title: "Sound Therapy", text: "Sleep, calm, focus" }
+                { icon: "\uD83E\uDD16", title: "AnytimeBUDDY", text: "Your 24/7 AI companion", tag: "LIVE", tagBg: "#DCFCE7", tagColor: "#0A8F4D" },
+                { icon: "\uD83D\uDC3E", title: "Digital Pets", text: "Oxytocin \u2022 Serotonin \u2022 Dopamine", tag: "NEW", tagBg: "#EDE9FE", tagColor: "#6D28D9" },
+                { icon: "\uD83C\uDFA7", title: "Sound Therapy", text: "Sleep, calm, focus \u2014 200+ tracks" }
               ].map((row) => (
-                <div key={row.title} style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "7px" }}>
-                  <div style={{ width: "36px", height: "36px", borderRadius: "12px", background: "linear-gradient(180deg,#ECF4F1,#DFE8F1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "21px", flexShrink: 0 }}>{row.icon}</div>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: "17px", color: "#2B3345", lineHeight: 1.05 }}>
-                      {row.tag ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#0A8F4D", background: "#DCFCE7", borderRadius: "999px", padding: "2px 6px", marginRight: "6px", verticalAlign: "middle" }}>{row.tag}</span> : null}
-                      <span style={{ fontSize: "17px", fontWeight: 800, color: "#1F2937", verticalAlign: "middle" }}>{row.title}</span>
+                <div key={row.title} className="left-dock-row" style={{ display: "grid", gridTemplateColumns: "36px minmax(0,1fr)", alignItems: "center", columnGap: "9px", marginBottom: "8px", minHeight: "42px" }}>
+                  <div style={{ width: "36px", height: "36px", borderRadius: "12px", background: "linear-gradient(180deg,#F1F4FF,#EEF6F5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", flexShrink: 0 }}>{row.icon}</div>
+                  <div className="left-dock-copy" style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: "14px", color: "#0F172A", lineHeight: 1.1 }}>
+                      {row.tag ? <span style={{ fontSize: "8px", fontWeight: 900, color: row.tagColor, background: row.tagBg, borderRadius: "999px", padding: "1px 5px", marginRight: "5px", verticalAlign: "middle" }}>{row.tag}</span> : null}
+                      <span className="left-dock-title-text" style={{ fontSize: "14px", fontWeight: 800, color: "#0F172A", verticalAlign: "middle" }}>{row.title}</span>
                     </div>
-                    <div style={{ fontSize: "11px", color: "#6B7280", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{row.text}</div>
+                    <div className="left-dock-desc" style={{ fontSize: "11px", color: "#475569", lineHeight: 1.3 }}>{row.text}</div>
                   </div>
                 </div>
               ))}
 
               <div style={{ height: "1px", background: "#D7DEE8", margin: "10px 2px" }} />
-              <div style={{ fontSize: "11px", fontWeight: 800, letterSpacing: "2px", color: "#0B2D5E", marginBottom: "7px" }}>WHATSAPP</div>
+              <div className="left-dock-section-title" style={{ fontSize: "10px", fontWeight: 900, letterSpacing: "1.8px", color: "#334155", marginBottom: "7px" }}>WHATSAPP</div>
 
               {[
-                { icon: "\uD83D\uDCC5", title: "WA Book Session", text: "Book therapist via WhatsApp" },
-                { icon: "\uD83D\uDCAC", title: "WA Session", text: "Text-based therapy chat" }
+                { icon: "\uD83D\uDCC5", title: "WA Book Session", text: "Book therapist via WhatsApp", tag: "LIVE", tagBg: "#DCFCE7", tagColor: "#0A8F4D" },
+                { icon: "\uD83D\uDCAC", title: "WA Session", text: "Text-based therapy chat", tag: "CHAT", tagBg: "#E0F2FE", tagColor: "#0369A1" }
               ].map((row) => (
-                <div key={row.title} style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "7px" }}>
-                  <div style={{ width: "36px", height: "36px", borderRadius: "12px", background: "linear-gradient(180deg,#ECF4F1,#DFE8F1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "21px", flexShrink: 0 }}>{row.icon}</div>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: "15px", fontWeight: 800, color: "#1F2937", lineHeight: 1.1 }}>{row.title}</div>
-                    <div style={{ fontSize: "11px", color: "#6B7280", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{row.text}</div>
+                <div key={row.title} className="left-dock-row" style={{ display: "grid", gridTemplateColumns: "36px minmax(0,1fr)", alignItems: "center", columnGap: "9px", marginBottom: "8px", minHeight: "42px" }}>
+                  <div style={{ width: "36px", height: "36px", borderRadius: "12px", background: "linear-gradient(180deg,#F1F4FF,#EEF6F5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", flexShrink: 0 }}>{row.icon}</div>
+                  <div className="left-dock-copy" style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: "14px", fontWeight: 800, color: "#0F172A", lineHeight: 1.1 }}>
+                      {row.tag ? <span style={{ fontSize: "8px", fontWeight: 900, color: row.tagColor, background: row.tagBg, borderRadius: "999px", padding: "1px 5px", marginRight: "5px", verticalAlign: "middle" }}>{row.tag}</span> : null}
+                      <span className="left-dock-title-text">{row.title}</span>
+                    </div>
+                    <div className="left-dock-desc" style={{ fontSize: "11px", color: "#475569", lineHeight: 1.3 }}>{row.text}</div>
                   </div>
                 </div>
               ))}
 
               <div style={{ height: "1px", background: "#D7DEE8", margin: "10px 2px" }} />
-              <div style={{ fontSize: "11px", fontWeight: 800, letterSpacing: "2px", color: "#0B2D5E", marginBottom: "7px" }}>FREE TOOLS</div>
+              <div className="left-dock-section-title" style={{ fontSize: "10px", fontWeight: 900, letterSpacing: "1.8px", color: "#334155", marginBottom: "7px" }}>FREE TOOLS</div>
 
               {[
-                { icon: "\uD83D\uDCDD", title: "Free Screening", text: "PHQ-9 \u2022 GAD-7 \u2022 3 min" },
-                { icon: "\uD83E\uDDE0", title: "AI Self-Service", text: "CBT \u2022 Journaling \u2022 Mood" }
+                { icon: "\uD83D\uDCDD", title: "Free Screening", text: "PHQ-9 \u2022 GAD-7 \u2022 3 min", tag: "FREE", tagBg: "#DBEAFE", tagColor: "#1D4ED8" },
+                { icon: "\uD83E\uDDE0", title: "AI Self-Service", text: "CBT \u2022 Journaling \u2022 Mood", tag: "AI", tagBg: "#FCE7F3", tagColor: "#DB2777" }
               ].map((row) => (
-                <div key={row.title} style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "7px" }}>
-                  <div style={{ width: "36px", height: "36px", borderRadius: "12px", background: "linear-gradient(180deg,#ECF4F1,#DFE8F1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "21px", flexShrink: 0 }}>{row.icon}</div>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: "15px", fontWeight: 800, color: "#1F2937", lineHeight: 1.1 }}>{row.title}</div>
-                    <div style={{ fontSize: "11px", color: "#6B7280", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{row.text}</div>
+                <div key={row.title} className="left-dock-row" style={{ display: "grid", gridTemplateColumns: "36px minmax(0,1fr)", alignItems: "center", columnGap: "9px", marginBottom: "8px", minHeight: "42px" }}>
+                  <div style={{ width: "36px", height: "36px", borderRadius: "12px", background: "linear-gradient(180deg,#F1F4FF,#EEF6F5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", flexShrink: 0 }}>{row.icon}</div>
+                  <div className="left-dock-copy" style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: "14px", fontWeight: 800, color: "#0F172A", lineHeight: 1.1 }}>
+                      {row.tag ? <span style={{ fontSize: "8px", fontWeight: 900, color: row.tagColor, background: row.tagBg, borderRadius: "999px", padding: "1px 5px", marginRight: "5px", verticalAlign: "middle" }}>{row.tag}</span> : null}
+                      <span className="left-dock-title-text">{row.title}</span>
+                    </div>
+                    <div className="left-dock-desc" style={{ fontSize: "11px", color: "#475569", lineHeight: 1.3 }}>{row.text}</div>
                   </div>
                 </div>
               ))}
@@ -814,15 +784,15 @@ const LandingPage: React.FC = () => {
           }}
         >
           {[
-            { bg: "#FFF", image: "/AnytimeBUDDY.jpeg", label: "Doctor" },
-            { bg: "#111827", image: "/HitASixer.jpeg", label: "Cricket", href: "/hit-a-sixer" },
-            { bg: "#03163A", image: "/Digital-Pet-Hub.png", label: "Digital Pet", href: "/pet" }
+            { bg: "#FFF", image: anytimeBuddyImage, label: "Doctor" },
+            { bg: "#111827", image: hitASixerImage, label: "Cricket", href: "/hit-a-sixer" },
+            { bg: "#03163A", image: digitalPetImage, label: "Digital Pet", href: "/pet" }
           ].map((item, idx) => (
             <div
               key={idx}
               style={{
-                width: "58px",
-                height: "58px",
+                width: "87px",
+                height: "87px",
                 borderRadius: "999px",
                 background: item.bg,
                 border: "5px solid rgba(255,255,255,0.9)",
@@ -855,7 +825,7 @@ const LandingPage: React.FC = () => {
                   style={{
                     width: "100%",
                     height: "100%",
-                    objectFit: "contain",
+                    objectFit: "cover",
                     objectPosition: "center",
                     display: "block",
                     borderRadius: "999px",
@@ -867,12 +837,10 @@ const LandingPage: React.FC = () => {
               )}
             </div>
           ))}
-        </div>
-
-        <div style={{ position: "fixed", right: "24px", bottom: "24px", zIndex: 120 }}>
           <button
             type="button"
             style={{
+              marginTop: "120px",
               width: "62px",
               height: "62px",
               borderRadius: "999px",
@@ -925,52 +893,73 @@ const LandingPage: React.FC = () => {
 
         <div className="brand-bar">
           <div style={{ maxWidth: "1260px", margin: "0 auto", padding: "0 16px" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: "56px", gap: "12px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", justifyContent: "center" }}>
-                {(["English", "Hindi", "Kannada", "Tamil", "Telugu"] as const).map((lang) => {
-                  const active = selectedLanguage === lang;
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: "56px", gap: "12px", padding: "8px 0" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, minWidth: 0, flexWrap: "wrap" }} onMouseEnter={keepQuickNavMenuOpen} onMouseLeave={closeQuickNavMenuWithDelay}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", justifyContent: "center" }}>
+                  {(["English", "Hindi", "Kannada", "Tamil", "Telugu"] as const).map((lang) => {
+                    const active = selectedLanguage === lang;
+                    return (
+                      <button
+                        key={lang}
+                        type="button"
+                        onClick={() => setSelectedLanguage(lang)}
+                        style={{
+                          border: "1px solid #E8EDF2",
+                          background: active ? "#0B2D5E" : "white",
+                          color: active ? "white" : "#1A1A2E",
+                          fontSize: "11px",
+                          fontWeight: 800,
+                          padding: "6px 12px",
+                          borderRadius: "16px",
+                          cursor: "pointer"
+                        }}
+                      >
+                        {languageLabelMap[lang]}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {featuredQuickNavItems.map((item) => {
+                  const menu = quickNavMegaMenus[item.label];
+                  const isActive = activeQuickNav === item.label && !!menu;
+                  const chipColor = isActive ? (menu?.accent ?? "#0B2D5E") : "#6B7280";
+                  const chipBorder = isActive ? (menu?.accent ?? "#0B2D5E") : "rgba(15, 23, 42, 0.18)";
                   return (
                     <button
-                      key={lang}
+                      key={item.label}
+                      className="featured-nav-chip"
                       type="button"
-                      onClick={() => setSelectedLanguage(lang)}
+                      onMouseEnter={() => openQuickNavMenu(item.label)}
+                      onClick={() => setActiveQuickNav((prev) => (prev === item.label ? null : item.label))}
                       style={{
-                        border: "1px solid #E8EDF2",
-                        background: active ? "#0B2D5E" : "white",
-                        color: active ? "white" : "#1A1A2E",
-                        fontSize: "11px",
-                        fontWeight: 800,
-                        padding: "6px 12px",
-                        borderRadius: "16px",
+                        ['--chip-color' as '--chip-color']: chipColor,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        fontSize: "12px",
+                        fontWeight: 900,
+                        color: chipColor,
+                        opacity: 1,
+                        whiteSpace: "nowrap",
+                        padding: "8px 14px",
+                        borderRadius: "999px",
+                        border: `1px solid ${chipBorder}`,
+                        background: "#FFFFFF",
+                        boxShadow: isActive
+                          ? "0 10px 24px rgba(15, 23, 42, 0.14)"
+                          : "0 6px 18px rgba(15, 23, 42, 0.08)",
                         cursor: "pointer"
                       }}
                     >
-                      {languageLabelMap[lang]}
+                      <span className="featured-nav-chip-icon" style={{ fontSize: "13px", color: chipColor, opacity: 1 }}>{item.icon}</span>
+                      <span className="featured-nav-chip-label" style={{ color: chipColor, opacity: 1 }}>{item.label}</span>
                     </button>
                   );
                 })}
               </div>
 
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <button
-                  type="button"
-                  onClick={toggleTheme}
-                  aria-label="Toggle theme"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    width: "36px",
-                    height: "36px",
-                    borderRadius: "50%",
-                    border: "1px solid #D5DEE9",
-                    background: "#F8FBFF",
-                    cursor: "pointer",
-                    color: "#64748B",
-                  }}
-                >
-                  {activeTheme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-                </button>
                 <button
                   type="button"
                   onClick={() => setShowSearch(true)}
@@ -1138,31 +1127,37 @@ const LandingPage: React.FC = () => {
                     const menu = quickNavMegaMenus[item.label];
                     const isActive = activeQuickNav === item.label && !!menu;
                     const accent = menu?.accent;
+                    const isNriChip = item.label === "NRI | Global Indian Hub";
+                    const chipColor = isActive && accent ? accent : "#6B7280";
+                    const chipBorder = isActive && accent ? accent : "rgba(15, 23, 42, 0.22)";
 
                     return (
                       <div
                         key={item.label}
                         onMouseEnter={() => openQuickNavMenu(item.label)}
                         className="quick-nav-chip"
-                        style={{
+                      style={{
+                          ['--chip-color' as '--chip-color']: chipColor,
                           display: "flex",
                           alignItems: "center",
                           gap: "6px",
-                          fontSize: "clamp(11px, 1vw, 13px)",
+                          width: "max-content",
+                          flex: "0 0 auto",
+                          fontSize: isNriChip ? "12px" : "clamp(11px, 1vw, 13px)",
                           fontWeight: 900,
-                          color: "#000000",
+                          color: chipColor,
                           opacity: 1,
                           cursor: "pointer",
                           whiteSpace: "nowrap",
-                          padding: "6px 10px",
+                          padding: isNriChip ? "6px 8px" : "6px 10px",
                           borderRadius: "999px",
-                          border: isActive && accent ? `1px solid ${accent}` : "1px solid rgba(15, 23, 42, 0.22)",
+                          border: `1px solid ${chipBorder}`,
                           background: "rgba(255,255,255,1)",
                           boxShadow: isActive ? "0 10px 24px rgba(15, 23, 42, 0.14)" : "0 2px 4px rgba(15,23,42,0.08)"
                         }}
                       >
-                        <span className="quick-nav-chip-icon" style={{ fontSize: "clamp(11px, 1.0vw, 13px)" }}>{item.icon}</span>
-                        <span className="quick-nav-chip-label">{item.label}</span>
+                        <span className="quick-nav-chip-icon" style={{ fontSize: isNriChip ? "12px" : "clamp(11px, 1.0vw, 13px)", color: chipColor }}>{item.icon}</span>
+                        <span className="quick-nav-chip-label" style={{ color: chipColor }}>{item.displayLabel ?? item.label}</span>
                       </div>
                     );
                   })}
@@ -1250,11 +1245,22 @@ const LandingPage: React.FC = () => {
                                   ? 0
                                   : undefined
                               }
-                              onClick={() => handleMegaItemNav(mi.title, activeQuickNav)}
+                              onClick={() => handleQuickNavMegaItemClick(activeQuickNav)}
                               onKeyDown={(e) => {
-                                if (e.key === "Enter" || e.key === " ") {
+                                if (
+                                  (activeQuickNav === "I Need a Helping Hand" ||
+                                    activeQuickNav === "AI Power Hub" ||
+                                    activeQuickNav === "Find a Spark Again" ||
+                                    activeQuickNav === "Self-Help Tools" ||
+                                    activeQuickNav === "For Corporates / Edu / Healthcare" ||
+                                    activeQuickNav === "Premium Therapy Hub" ||
+                                    activeQuickNav === "MyDigitalClinic" ||
+                                    activeQuickNav === "Certify2EarnMore" ||
+                                    activeQuickNav === "Digital Pets4Happy Hormones") &&
+                                  (e.key === "Enter" || e.key === " ")
+                                ) {
                                   e.preventDefault();
-                                  handleMegaItemNav(mi.title, activeQuickNav);
+                                  handleQuickNavMegaItemClick(activeQuickNav);
                                 }
                               }}
                               onMouseEnter={(e) => {
@@ -1323,40 +1329,55 @@ const LandingPage: React.FC = () => {
 
 
 
-      <div style={{ textAlign: "center", padding: "24px 16px 72px 16px", maxWidth: "980px", margin: "48px auto 0" }}>
+      <div
+        className="landing-hero-scope"
+        style={{
+          textAlign: "center",
+          padding: "28px 28px 72px 28px",
+          maxWidth: "980px",
+          margin: "48px auto 0",
+          background: "transparent",
+          borderRadius: "0",
+          backdropFilter: "none",
+          WebkitBackdropFilter: "none",
+          boxShadow: "none"
+        }}
+      >
         <h1
+          className="landing-hero-title"
           style={{
             fontSize: "56px",
             fontWeight: 900,
-            color: "#050B14",
+            color: "#1A1B3A",
             lineHeight: 1.05,
             margin: "16px 0 12px 0",
-            fontFamily: "Georgia, 'Times New Roman', serif"
+            fontFamily: "Georgia, 'Times New Roman', serif",
+            textShadow: "none"
           }}
         >
-          You're <span style={{ color: "#7F8000" }}>not alone</span>. Let's take
+          You're <span className="landing-hero-accent" style={{ color: "#8C8A00" }}>not alone</span>. Let's take
           <br />
-          this <span style={{ color: "#7F8000" }}>together</span>.
+          this <span className="landing-hero-accent" style={{ color: "#8C8A00" }}>together</span>.
         </h1>
-        <p style={{ fontSize: "14px", color: "#08101E", lineHeight: 1.6, margin: "0 0 8px 0", fontWeight: 900 }}>
+        <p className="landing-hero-subtitle" style={{ fontSize: "14px", color: "#2E4877", lineHeight: 1.6, margin: "0 0 8px 0", fontWeight: 700, textShadow: "none", opacity: 1, mixBlendMode: "normal" }}>
           Feeling overwhelmed? Confused? That's okay. We'll help you
           <br />
           understand your feelings in a safe, quiet space.
         </p>
-        <p style={{ fontSize: "12px", color: "#08101E", margin: "0 0 18px 0", fontWeight: 900 }}>Takes just 60 seconds.</p>
+        <p className="landing-hero-duration" style={{ fontSize: "12px", color: "#385587", margin: "0 0 18px 0", fontWeight: 800, textShadow: "none", opacity: 1, mixBlendMode: "normal" }}>Takes just 60 seconds.</p>
 
         <button
           type="button"
           onClick={handleScrollToAssess}
           style={{
-            background: "white",
-            color: "#0F172A",
+            background: "rgba(180, 204, 236, 0.24)",
+            color: "#1A1B3A",
             padding: "12px 26px",
             borderRadius: "999px",
             fontSize: "12px",
             fontWeight: 900,
             cursor: "pointer",
-            border: "1px solid rgba(232, 237, 242, 0.95)",
+            border: "1px solid rgba(11, 45, 94, 0.45)",
             boxShadow: "0 12px 30px rgba(0, 0, 0, 0.08)",
             marginBottom: "16px"
           }}
@@ -1365,6 +1386,7 @@ const LandingPage: React.FC = () => {
         </button>
 
         <div
+          className="landing-hero-meta"
           style={{
             display: "flex",
             justifyContent: "center",
@@ -1372,13 +1394,16 @@ const LandingPage: React.FC = () => {
             flexWrap: "wrap",
             fontSize: "12px",
             fontWeight: 800,
-            color: "#08101E"
+            color: "#2E4877",
+            textShadow: "none",
+            opacity: 1,
+            mixBlendMode: "normal"
           }}
         >
           {["Confidential", "No Judgment", "Immediate"].map((t) => (
             <div key={t} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <span style={{ width: "6px", height: "6px", borderRadius: "999px", background: "#0B2D5E" }} />
-              <span>{t}</span>
+              <span className="landing-hero-meta-dot" style={{ width: "6px", height: "6px", borderRadius: "999px", background: "#1A1B3A" }} />
+              <span className="landing-hero-meta-text" style={{ color: "#2E4877", opacity: 1, mixBlendMode: "normal" }}>{t}</span>
             </div>
           ))}
         </div>
@@ -1436,7 +1461,7 @@ const LandingPage: React.FC = () => {
               </div>
               <div style={{ marginTop: "14px", fontSize: "16px", fontWeight: 900, color: "#0F172A" }}>Psychologist</div>
               <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#64748B", lineHeight: 1.55 }}>Clinical &amp; counseling psychology. RCI registered. Earn ₹60K&ndash;₹2L/mo</div>
-              <button type="button" onClick={() => navigate("/provider-landing")} style={{ marginTop: "14px", border: "1.5px solid rgba(124,58,237,0.7)", background: "rgba(255,255,255,0.95)", color: "#6D28D9", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
+              <button type="button" style={{ marginTop: "14px", border: "1.5px solid rgba(124,58,237,0.7)", background: "rgba(255,255,255,0.95)", color: "#6D28D9", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
                 &#10022; Join Now
               </button>
               <div style={{ marginTop: "10px", fontSize: "11px", fontWeight: 800, color: "#64748B" }}>Discover &mdash; Plans &mdash; Profile</div>
@@ -1453,7 +1478,7 @@ const LandingPage: React.FC = () => {
               </div>
               <div style={{ marginTop: "14px", fontSize: "16px", fontWeight: 900, color: "#0F172A" }}>Psychiatrist</div>
               <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#64748B", lineHeight: 1.55 }}>Diagnosis, medication, e-prescriptions. NMC registered MDs</div>
-              <button type="button" onClick={() => navigate("/provider-landing")} style={{ marginTop: "14px", border: "1.5px solid rgba(14,165,166,0.7)", background: "rgba(255,255,255,0.95)", color: "#0F766E", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
+              <button type="button" style={{ marginTop: "14px", border: "1.5px solid rgba(14,165,166,0.7)", background: "rgba(255,255,255,0.95)", color: "#0F766E", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
                 &#10022; Join Now
               </button>
               <div style={{ marginTop: "10px", fontSize: "11px", fontWeight: 800, color: "#64748B" }}>Discover &mdash; Plans &mdash; Profile</div>
@@ -1470,7 +1495,7 @@ const LandingPage: React.FC = () => {
               </div>
               <div style={{ marginTop: "14px", fontSize: "16px", fontWeight: 900, color: "#0F172A" }}>Therapist</div>
               <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#64748B", lineHeight: 1.55 }}>CBT, DBT, REBT, integrative. Build your practice on your terms</div>
-              <button type="button" onClick={() => navigate("/provider-landing")} style={{ marginTop: "14px", border: "1.5px solid rgba(34,197,94,0.7)", background: "rgba(255,255,255,0.95)", color: "#15803D", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
+              <button type="button" style={{ marginTop: "14px", border: "1.5px solid rgba(34,197,94,0.7)", background: "rgba(255,255,255,0.95)", color: "#15803D", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
                 &#10022; Join Now
               </button>
               <div style={{ marginTop: "10px", fontSize: "11px", fontWeight: 800, color: "#64748B" }}>Discover &mdash; Plans &mdash; Profile</div>
@@ -1487,7 +1512,7 @@ const LandingPage: React.FC = () => {
               </div>
               <div style={{ marginTop: "14px", fontSize: "16px", fontWeight: 900, color: "#0F172A" }}>NLP Coach</div>
               <div style={{ marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "#64748B", lineHeight: 1.55 }}>Neuro-linguistic programming. Life coaching. Transformation specialists</div>
-              <button type="button" onClick={() => navigate("/provider-landing")} style={{ marginTop: "14px", border: "1.5px solid rgba(245,158,11,0.75)", background: "rgba(255,255,255,0.95)", color: "#B45309", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
+              <button type="button" style={{ marginTop: "14px", border: "1.5px solid rgba(245,158,11,0.75)", background: "rgba(255,255,255,0.95)", color: "#B45309", fontWeight: 900, fontSize: "12px", padding: "10px 14px", borderRadius: "999px", cursor: "pointer" }}>
                 &#10022; Join Now
               </button>
               <div style={{ marginTop: "10px", fontSize: "11px", fontWeight: 800, color: "#64748B" }}>Discover &mdash; Plans &mdash; Profile</div>
@@ -1889,10 +1914,41 @@ const LandingPage: React.FC = () => {
               >
                 &#9742; +91-8867736009
               </a>
+              <a
+                href="/webinar-podcast"
+                style={{ fontSize: "12px", opacity: 0.9, marginBottom: "8px", fontWeight: 800, display: "block", color: "inherit", textDecoration: "none" }}
+              >
+                &#127908; Webinar-Podcast Series
+              </a>
               <div style={{ fontSize: "12px", opacity: 0.9, marginBottom: "14px", fontWeight: 800 }}>&#128172; WhatsApp Support</div>
-              <div style={{ display: "flex", gap: "10px", opacity: 0.85 }}>{["wa", "ig", "in", "x"].map((s) => (
-                <div key={s} style={{ width: "28px", height: "28px", borderRadius: "8px", background: "rgba(255,255,255,0.14)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: 900 }}>{s}</div>
-              ))}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", opacity: 0.95 }}>
+                {[
+                  { key: "wa", label: <MessageCircle className="h-4 w-4" />, href: "https://wa.me/919876543210" },
+                  { key: "ig", label: <Instagram className="h-4 w-4" />, href: "https://instagram.com/manas360" },
+                  { key: "yt", label: <Youtube className="h-4 w-4" />, href: "https://youtube.com/@manas360" },
+                  { key: "in", label: <Linkedin className="h-4 w-4" />, href: "https://linkedin.com/company/manas360" }
+                ].map((s) => (
+                  <a
+                    key={s.key}
+                    href={s.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      width: "28px",
+                      height: "28px",
+                      borderRadius: "8px",
+                      background: "rgba(255,255,255,0.14)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "white",
+                      textDecoration: "none"
+                    }}
+                  >
+                    {s.label}
+                  </a>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -2061,20 +2117,165 @@ const LandingPage: React.FC = () => {
           display: none;
         }
         .quick-nav-chip {
-          color: #000000 !important;
+          color: var(--chip-color, #6B7280) !important;
           opacity: 1 !important;
           filter: none !important;
-          -webkit-text-fill-color: #000000 !important;
+          -webkit-text-fill-color: var(--chip-color, #6B7280) !important;
           text-shadow: none !important;
           background: #ffffff !important;
         }
         .quick-nav-chip-icon,
         .quick-nav-chip-label {
-          color: #000000 !important;
+          color: var(--chip-color, #6B7280) !important;
           opacity: 1 !important;
           filter: none !important;
-          -webkit-text-fill-color: #000000 !important;
+          -webkit-text-fill-color: var(--chip-color, #6B7280) !important;
           text-shadow: none !important;
+        }
+        .featured-nav-chip {
+          color: var(--chip-color, #6B7280) !important;
+          opacity: 1 !important;
+          filter: none !important;
+          -webkit-text-fill-color: var(--chip-color, #6B7280) !important;
+          text-shadow: none !important;
+          mix-blend-mode: normal !important;
+        }
+        .featured-nav-chip-label {
+          color: var(--chip-color, #6B7280) !important;
+          opacity: 1 !important;
+          filter: none !important;
+          -webkit-text-fill-color: var(--chip-color, #6B7280) !important;
+          text-shadow: none !important;
+          mix-blend-mode: normal !important;
+        }
+        .featured-nav-chip-icon {
+          color: var(--chip-color, #6B7280) !important;
+          opacity: 1 !important;
+          filter: none !important;
+          -webkit-text-fill-color: var(--chip-color, #6B7280) !important;
+          text-shadow: none !important;
+          mix-blend-mode: normal !important;
+        }
+        .landing-hero-title {
+          color: #1A1B3A !important;
+          -webkit-text-fill-color: #1A1B3A !important;
+          opacity: 1 !important;
+          text-shadow: 0 1px 2px rgba(255,255,255,0.28) !important;
+        }
+        .landing-hero-title span {
+          color: #1A1B3A !important;
+          -webkit-text-fill-color: #1A1B3A !important;
+          opacity: 1 !important;
+        }
+        .landing-hero-title .landing-hero-accent {
+          color: #7A7600 !important;
+          -webkit-text-fill-color: #7A7600 !important;
+          opacity: 1 !important;
+          text-shadow: 0 1px 2px rgba(255,255,255,0.2) !important;
+        }
+        .landing-hero-subtitle {
+          color: #2E4877 !important;
+          -webkit-text-fill-color: #2E4877 !important;
+          opacity: 1 !important;
+          text-shadow: none !important;
+        }
+        .landing-hero-duration {
+          color: #385587 !important;
+          -webkit-text-fill-color: #385587 !important;
+          opacity: 1 !important;
+          text-shadow: none !important;
+        }
+        .landing-hero-meta {
+          color: #2E4877 !important;
+          -webkit-text-fill-color: #2E4877 !important;
+          opacity: 1 !important;
+        }
+        .landing-hero-meta-text {
+          color: #2E4877 !important;
+          -webkit-text-fill-color: #2E4877 !important;
+          opacity: 1 !important;
+          text-shadow: none !important;
+        }
+        .landing-hero-meta-dot {
+          background: #1A1B3A !important;
+          opacity: 1 !important;
+        }
+        :root[data-theme='dark'] .landing-hero-scope .landing-hero-title {
+          color: #1A1B3A !important;
+          -webkit-text-fill-color: #1A1B3A !important;
+        }
+        :root[data-theme='dark'] .landing-hero-scope .landing-hero-title span {
+          color: #1A1B3A !important;
+          -webkit-text-fill-color: #1A1B3A !important;
+        }
+        :root[data-theme='dark'] .landing-hero-scope .landing-hero-title .landing-hero-accent {
+          color: #7A7600 !important;
+          -webkit-text-fill-color: #7A7600 !important;
+        }
+        :root[data-theme='dark'] .landing-hero-scope .landing-hero-subtitle {
+          color: #2E4877 !important;
+          -webkit-text-fill-color: #2E4877 !important;
+        }
+        :root[data-theme='dark'] .landing-hero-scope .landing-hero-duration {
+          color: #385587 !important;
+          -webkit-text-fill-color: #385587 !important;
+        }
+        :root[data-theme='dark'] .landing-hero-scope .landing-hero-meta,
+        :root[data-theme='dark'] .landing-hero-scope .landing-hero-meta-text {
+          color: #2E4877 !important;
+          -webkit-text-fill-color: #2E4877 !important;
+        }
+        :root[data-theme='dark'] .landing-hero-scope .landing-hero-meta-dot {
+          background: #1A1B3A !important;
+        }
+        .left-dock-content,
+        .left-dock-row {
+          opacity: 1 !important;
+          filter: none !important;
+          mix-blend-mode: normal !important;
+        }
+        .left-dock-copy {
+          display: flex !important;
+          flex-direction: column !important;
+          justify-content: center !important;
+          min-width: 0 !important;
+          overflow: hidden !important;
+        }
+        .left-dock-section-title {
+          color: #334155 !important;
+          -webkit-text-fill-color: #334155 !important;
+          opacity: 1 !important;
+          text-shadow: none !important;
+        }
+        .left-dock-title-text {
+          color: #0F172A !important;
+          -webkit-text-fill-color: #0F172A !important;
+          opacity: 1 !important;
+          filter: none !important;
+          text-shadow: none !important;
+          mix-blend-mode: normal !important;
+          font-weight: 800 !important;
+          font-size: 14px !important;
+          line-height: 1.1 !important;
+          display: inline-block !important;
+          max-width: 100% !important;
+          white-space: nowrap !important;
+          overflow: hidden !important;
+          text-overflow: ellipsis !important;
+        }
+        .left-dock-desc {
+          color: #475569 !important;
+          -webkit-text-fill-color: #475569 !important;
+          opacity: 1 !important;
+          filter: none !important;
+          text-shadow: none !important;
+          mix-blend-mode: normal !important;
+          font-size: 10px !important;
+          font-weight: 500 !important;
+          line-height: 1.25 !important;
+          white-space: nowrap !important;
+          overflow: hidden !important;
+          text-overflow: ellipsis !important;
         }
         @media (max-width: 980px) {
           .live-grid {
@@ -2104,3 +2305,7 @@ const LandingPage: React.FC = () => {
 };
 
 export default LandingPage;
+
+
+
+

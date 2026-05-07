@@ -35,7 +35,7 @@ export default function PsychiatristAssessmentTemplatesPage() {
       subtitle="Create reusable psychiatric templates used during professional-mode patient assessments."
     >
       <TherapistCard>
-        <div className="flex items-center justify-between border-b border-ink-100 px-4 py-3">
+        <div className="flex items-center justify-between border-b border-ink-100 px-3 py-2.5">
           <h3 className="font-display text-lg font-semibold text-ink-800">Template Library</h3>
           <TherapistButton onClick={addTemplate} disabled={adding}>{adding ? 'Adding...' : 'Add Template'}</TherapistButton>
         </div>
