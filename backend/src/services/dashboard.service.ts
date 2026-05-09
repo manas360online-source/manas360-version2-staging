@@ -1,0 +1,250 @@
+import { prisma } from '../config/db';
+import { redis } from '../config/redis';
+import { getTherapistDashboardCacheKey } from './therapist-dashboard-cache.service';
+
+type ListOpts = {
+  therapistUserId: string;
+  limit?: number;
+  cursor?: string; // base64(dateISO|id)
+  status?: string;
+  from?: string;
+  to?: string;
+  q?: string;
+};
+
+const DASHBOARD_SESSION_CACHE_TTL = {
+  list: 20,
+  detail: 20,
+} as const;
+
+const readJsonCache = async <T>(key: string): Promise<T | null> => {
+  try {
+    const raw = await redis.get(key);
+    if (!raw) return null;
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+};
+
+const writeJsonCache = async (key: string, payload: unknown, ttl: number): Promise<void> => {
+  try {
+    await redis.set(key, JSON.stringify(payload), ttl);
+  } catch {
+    // Best-effort cache write.
+  }
+};
+
+function decodeCursor(cursor?: string): { date: Date; id: string } | null {
+  if (!cursor) return null;
+  try {
+    const decoded = Buffer.from(cursor, 'base64').toString('utf-8');
+    const [dateStr, id] = decoded.split('|');
+    return { date: new Date(dateStr), id };
+  } catch (e) {
+    return null;
+  }
+}
+
+export async function listTherapistSessions(opts: ListOpts) {
+  const cacheKey = await getTherapistDashboardCacheKey('legacy-session-list', opts.therapistUserId, {
+    limit: opts.limit,
+    cursor: opts.cursor,
+    status: opts.status,
+    from: opts.from,
+    to: opts.to,
+    q: opts.q,
+  });
+  const cached = await readJsonCache<any>(cacheKey);
+  if (cached) return cached;
+
+  const limit = Math.min(opts.limit ?? 20, 100);
+
+  const therapist = await prisma.user.findUnique({
+    where: { id: opts.therapistUserId },
+    select: { id: true, role: true },
+  });
+  if (!therapist || String(therapist.role) !== 'THERAPIST') return { items: [], nextCursor: null };
+
+  const where: any = { therapistProfileId: String(therapist.id) };
+  if (opts.status) where.status = String(opts.status).toUpperCase();
+  if (opts.from || opts.to) {
+    where.dateTime = {} as any;
+    if (opts.from) where.dateTime.gte = new Date(opts.from);
+    if (opts.to) where.dateTime.lte = new Date(opts.to);
+  }
+
+  // patient search (best-effort, limited to therapist's patients)
+  if (opts.q) {
+    const q = new RegExp(opts.q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+    const users = await prisma.user.findMany({
+      where: {
+        OR: [
+          { firstName: { contains: opts.q, mode: 'insensitive' } },
+          { lastName: { contains: opts.q, mode: 'insensitive' } },
+          { email: { contains: opts.q, mode: 'insensitive' } },
+        ],
+      },
+      select: { id: true },
+    });
+
+    const userIds = users.map((u) => u.id);
+    const patients = await prisma.patientProfile.findMany({
+      where: { userId: { in: userIds } },
+      select: { id: true },
+    });
+    const pIds = patients.map((p) => p.id);
+    if (pIds.length === 0) return { items: [], nextCursor: null };
+    where.patientProfileId = { in: pIds.map(String) };
+  }
+
+  // keyset cursor
+  const cursor = decodeCursor(opts.cursor);
+  if (cursor) {
+    // dateTime descending cursor
+    where.dateTime = { lt: cursor.date } as any;
+  }
+
+  const docs = await prisma.therapySession.findMany({
+    where,
+    select: { id: true, bookingReferenceId: true, patientProfileId: true, dateTime: true, status: true },
+    orderBy: [{ dateTime: 'desc' }, { id: 'desc' }],
+    take: limit + 1,
+  });
+
+  const page = docs.slice(0, limit);
+  const hasNext = docs.length > limit;
+
+  // fetch patient snapshots for the page
+  const patientIds = [...new Set(page.map((d: any) => String(d.patientProfileId)))];
+  const patients = await prisma.patientProfile.findMany({
+    where: { id: { in: patientIds } },
+    select: { id: true, age: true, userId: true },
+  });
+  const users = await prisma.user.findMany({
+    where: { id: { in: patients.map((p) => p.userId) } },
+    select: { id: true, firstName: true, lastName: true },
+  });
+
+  const patientMap: Map<string, any> = new Map(patients.map((p) => [String(p.id), p]));
+  const userMap: Map<string, any> = new Map(users.map((u) => [String(u.id), u]));
+
+  const items = page.map((s: any) => {
+    const pat = patientMap.get(String(s.patientProfileId));
+    const user = pat ? userMap.get(String(pat.userId)) : null;
+    const initials = user ? `${user.firstName?.charAt(0) ?? ''}.${user.lastName?.charAt(0) ?? ''}` : null;
+    const ageRange = pat?.age ? `${Math.floor(pat.age / 10) * 10}-${Math.floor(pat.age / 10) * 10 + 9}` : null;
+    return {
+      sessionId: String(s.id),
+      scheduledAt: s.dateTime,
+      status: String(s.status).toLowerCase(),
+      patient: { id: String(s.patientProfileId), initials, ageRange },
+    };
+  });
+
+  // presence merge (best-effort)
+  try {
+    const sessionPresence = new Map<string, boolean>();
+    const patientPresence = new Map<string, boolean>();
+    const [sessionResults, patientResults] = await Promise.all([
+      Promise.all(page.map((s: any) => redis.get(`session:presence:${String(s.id)}`))),
+      Promise.all(page.map((s: any) => redis.get(`user:presence:${String(s.patientProfileId)}`))),
+    ]);
+
+    for (let i = 0; i < page.length; i++) sessionPresence.set(String(page[i].id), !!sessionResults[i]);
+    for (let i = 0; i < page.length; i++) patientPresence.set(String(page[i].patientProfileId), !!patientResults[i]);
+    items.forEach((it: any) => {
+      it.presence = { patientOnline: !!patientPresence.get(it.patient.id), sessionActive: !!sessionPresence.get(it.sessionId) };
+    });
+  } catch (e) {
+    // ignore
+  }
+
+  const nextCursor = hasNext ? Buffer.from(`${page[page.length - 1].dateTime.toISOString()}|${String(page[page.length - 1].id)}`).toString('base64') : null;
+  const payload = { items, nextCursor };
+  await writeJsonCache(cacheKey, payload, DASHBOARD_SESSION_CACHE_TTL.list);
+  return payload;
+}
+
+export async function getTherapistSessionDetail(therapistUserId: string, sessionId: string) {
+  const cacheKey = await getTherapistDashboardCacheKey('legacy-session-detail', therapistUserId, { sessionId });
+  const cached = await readJsonCache<any>(cacheKey);
+  if (cached) return cached;
+
+  const therapist = await prisma.user.findUnique({
+    where: { id: therapistUserId },
+    select: { id: true, role: true },
+  });
+  if (!therapist || String(therapist.role) !== 'THERAPIST') throw new Error('Therapist profile not found');
+
+  const session = await prisma.therapySession.findFirst({
+    where: { id: sessionId, therapistProfileId: String(therapist.id) },
+    select: {
+      id: true,
+      bookingReferenceId: true,
+      patientProfileId: true,
+      dateTime: true,
+      status: true,
+      cancelledAt: true,
+    },
+  });
+
+  if (!session) throw new Error('Session not found');
+
+  const note = await prisma.therapistSessionNote.findUnique({
+    where: { sessionId: String(session.id) },
+    select: {
+      id: true,
+      subjective: true,
+      objective: true,
+      assessment: true,
+      plan: true,
+      updatedAt: true,
+    },
+  });
+
+  const responses = note
+    ? [{
+        id: `note-${note.id}`,
+        questionId: 'clinical-note',
+        responseData: {
+          subjective: note.subjective,
+          objective: note.objective,
+          assessment: note.assessment,
+          plan: note.plan,
+        },
+        answeredAt: note.updatedAt,
+      }]
+    : [];
+
+  // presence
+  let presence = { patientOnline: false, sessionActive: false };
+  try {
+    const [sessionVal, patientVal] = await Promise.all([
+      redis.get(`session:presence:${sessionId}`),
+      redis.get(`user:presence:${String(session.patientProfileId)}`),
+    ]);
+    presence = { patientOnline: !!patientVal, sessionActive: !!sessionVal };
+  } catch (e) {}
+
+  const payload = {
+    session: {
+      id: String(session.id),
+      scheduledAt: session.dateTime,
+      status: String(session.status).toLowerCase(),
+      cancelledAt: session.cancelledAt,
+      bookingReferenceId: session.bookingReferenceId,
+      patientProfileId: String(session.patientProfileId),
+    },
+    responses: responses.map((row) => ({
+      id: row.id,
+      questionId: row.questionId,
+      answer: row.responseData,
+      createdAt: row.answeredAt,
+    })),
+    presence,
+  };
+
+  await writeJsonCache(cacheKey, payload, DASHBOARD_SESSION_CACHE_TTL.detail);
+  return payload;
+}

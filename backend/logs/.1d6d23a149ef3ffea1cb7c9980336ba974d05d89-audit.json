@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 30
+    },
+    "auditLog": "D:\\projects\\manas360-version2-staging-main\\backend\\logs\\.1d6d23a149ef3ffea1cb7c9980336ba974d05d89-audit.json",
+    "files": [
+        {
+            "date": 1777532872814,
+            "name": "D:\\projects\\manas360-version2-staging-main\\backend\\logs\\error-2026-04-30.log",
+            "hash": "37988534c2e89d29f9af5ae8a4558e47fa6ed3c134539f7995e2c36232d02616"
+        }
+    ],
+    "hashType": "sha256"
+}

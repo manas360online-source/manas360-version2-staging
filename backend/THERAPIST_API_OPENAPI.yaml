@@ -1,0 +1,1776 @@
+openapi: 3.0.0
+info:
+  title: MANAS360 Therapist API
+  version: 1.0.0
+  description: Comprehensive API for therapist profile management, document upload, lead management, session handling, and earnings tracking
+  contact:
+    name: API Support
+    email: api-support@manas360.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.manas360.com/api/v1
+    description: Production
+  - url: http://localhost:5000/api/v1
+    description: Development
+
+tags:
+  - name: Authentication
+    description: JWT authentication endpoints
+  - name: Profile
+    description: Therapist profile management
+  - name: Documents
+    description: Credential document upload and management
+  - name: Leads
+    description: Lead listing and purchase
+  - name: Sessions
+    description: Therapy session management
+  - name: Session Notes
+    description: Encrypted session notes
+  - name: Earnings
+    description: Earnings tracking and analytics
+  - name: Wallet
+    description: Wallet and transaction management
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token required for authentication
+
+  schemas:
+    # Common Schemas
+    Error:
+      type: object
+      required:
+        - error
+        - code
+        - timestamp
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+        timestamp:
+          type: string
+          format: date-time
+
+    ValidationError:
+      type: object
+      required:
+        - error
+        - errors
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+          enum: [VALIDATION_ERROR]
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 50
+        total:
+          type: integer
+          minimum: 0
+        pages:
+          type: integer
+          minimum: 0
+
+    # Therapist Profile
+    TherapistProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 2
+          maxLength: 64
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+          pattern: '^\+\d{10,15}$'
+        specialization:
+          type: string
+          minLength: 2
+          maxLength: 64
+        bio:
+          type: string
+          maxLength: 500
+        profilePhoto:
+          type: string
+          format: uri
+        profileStatus:
+          type: string
+          enum: [active, inactive, suspended]
+        walletBalance:
+          type: number
+          format: double
+          minimum: 0
+        totalEarnings:
+          type: number
+          format: double
+          minimum: 0
+        sessionsCompleted:
+          type: integer
+          minimum: 0
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # Document
+    Document:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        therapistId:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [license, degree, certification, credential]
+        fileName:
+          type: string
+        fileUrl:
+          type: string
+          format: uri
+        fileSize:
+          type: integer
+          minimum: 0
+        uploadedAt:
+          type: string
+          format: date-time
+        expiryDate:
+          type: string
+          format: date
+        verificationStatus:
+          type: string
+          enum: [pending, verified, rejected]
+
+    # Lead
+    Lead:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        patientName:
+          type: string
+        issue:
+          type: string
+        description:
+          type: string
+        expectedDuration:
+          type: string
+        preferredSessionFrequency:
+          type: string
+        budget:
+          type: number
+          format: double
+          minimum: 0
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+        status:
+          type: string
+          enum: [available, purchased, expired]
+        createdAt:
+          type: string
+          format: date-time
+
+    # Session
+    Session:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        patientId:
+          type: string
+          format: uuid
+        patientName:
+          type: string
+        patientEmail:
+          type: string
+          format: email
+        therapistId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [scheduled, in-progress, completed, cancelled]
+        scheduledAt:
+          type: string
+          format: date-time
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        duration:
+          type: integer
+          minimum: 15
+          description: Duration in minutes
+        sessionType:
+          type: string
+          enum: [video, audio, in-person]
+        meetingLink:
+          type: string
+          format: uri
+          nullable: true
+        notes:
+          type: object
+          properties:
+            count:
+              type: integer
+              minimum: 0
+            lastNoteAt:
+              type: string
+              format: date-time
+              nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # Session Note
+    SessionNote:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        sessionId:
+          type: string
+          format: uuid
+        therapistId:
+          type: string
+          format: uuid
+        content:
+          type: string
+          minLength: 10
+          maxLength: 10000
+          description: Content is encrypted server-side
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # Transaction
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        therapistId:
+          type: string
+          format: uuid
+        leadId:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          format: double
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+        type:
+          type: string
+          enum: [debit, credit]
+        status:
+          type: string
+          enum: [completed, pending, failed]
+        description:
+          type: string
+        reference:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    # Earning
+    Earning:
+      type: object
+      properties:
+        totalEarnings:
+          type: number
+          format: double
+          minimum: 0
+        pendingAmount:
+          type: number
+          format: double
+          minimum: 0
+        withdrawnAmount:
+          type: number
+          format: double
+          minimum: 0
+        completedSessions:
+          type: integer
+          minimum: 0
+        averageSessionValue:
+          type: number
+          format: double
+          minimum: 0
+        lastUpdate:
+          type: string
+          format: date-time
+
+    # Wallet
+    Wallet:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        therapistId:
+          type: string
+          format: uuid
+        balance:
+          type: number
+          format: double
+          minimum: 0
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+        totalEarnings:
+          type: number
+          format: double
+          minimum: 0
+        totalWithdrawn:
+          type: number
+          format: double
+          minimum: 0
+        lastWithdrawal:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+security:
+  - BearerAuth: []
+
+paths:
+  /therapists/me/profile:
+    post:
+      summary: Create therapist profile
+      tags:
+        - Profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, phone, specialization]
+              properties:
+                name:
+                  type: string
+                  minLength: 2
+                  maxLength: 64
+                email:
+                  type: string
+                  format: email
+                phone:
+                  type: string
+                  pattern: '^\+\d{10,15}$'
+                specialization:
+                  type: string
+                  minLength: 2
+                  maxLength: 64
+      responses:
+        '201':
+          description: Therapist profile created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  therapist:
+                    $ref: '#/components/schemas/TherapistProfile'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Conflict - Email or phone already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    get:
+      summary: Get therapist profile
+      tags:
+        - Profile
+      responses:
+        '200':
+          description: Profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  therapist:
+                    $ref: '#/components/schemas/TherapistProfile'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Profile not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    put:
+      summary: Update therapist profile
+      tags:
+        - Profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  minLength: 2
+                  maxLength: 64
+                phone:
+                  type: string
+                  pattern: '^\+\d{10,15}$'
+                specialization:
+                  type: string
+                  minLength: 2
+                  maxLength: 64
+                bio:
+                  type: string
+                  maxLength: 500
+                profilePhoto:
+                  type: string
+                  format: uri
+      responses:
+        '200':
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  therapist:
+                    $ref: '#/components/schemas/TherapistProfile'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /therapists/me/documents:
+    post:
+      summary: Upload credential document
+      tags:
+        - Documents
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, documentType]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF, PNG, or JPG file (max 5MB)
+                documentType:
+                  type: string
+                  enum: [license, degree, certification, credential]
+                expiryDate:
+                  type: string
+                  format: date
+      responses:
+        '201':
+          description: Document uploaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  document:
+                    $ref: '#/components/schemas/Document'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          description: File too large (max 5MB)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    get:
+      summary: List therapist documents
+      tags:
+        - Documents
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            maximum: 50
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [license, degree, certification, credential]
+        - name: verificationStatus
+          in: query
+          schema:
+            type: string
+            enum: [pending, verified, rejected]
+      responses:
+        '200':
+          description: Documents retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  documents:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Document'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /therapists/me/documents/{documentId}/signed-url:
+    get:
+      summary: Get signed URL for document download
+      tags:
+        - Documents
+      parameters:
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Signed URL generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  signedUrl:
+                    type: string
+                    format: uri
+                  expiresIn:
+                    type: integer
+                    description: URL expiration time in seconds
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Document not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /therapists/me/documents/{documentId}:
+    delete:
+      summary: Delete document
+      tags:
+        - Documents
+      parameters:
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Document deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  documentId:
+                    type: string
+                    format: uuid
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Document not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /therapists/me/leads:
+    get:
+      summary: List available leads
+      tags:
+        - Leads
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            maximum: 50
+        - name: specialization
+          in: query
+          schema:
+            type: string
+        - name: minBudget
+          in: query
+          schema:
+            type: number
+            minimum: 0
+        - name: maxBudget
+          in: query
+          schema:
+            type: number
+            minimum: 0
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [budget, createdAt, duration]
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [available, purchased, expired]
+      responses:
+        '200':
+          description: Leads retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  leads:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Lead'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /therapists/me/leads/{leadId}:
+    get:
+      summary: Get lead details
+      tags:
+        - Leads
+      parameters:
+        - name: leadId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Lead retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  lead:
+                    $ref: '#/components/schemas/Lead'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Lead not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /therapists/me/leads/{leadId}/purchase:
+    post:
+      summary: Purchase lead
+      tags:
+        - Leads
+      parameters:
+        - name: leadId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Lead purchased
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transaction:
+                    $ref: '#/components/schemas/Transaction'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '402':
+          description: Insufficient balance
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Lead not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Lead already purchased
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /therapists/me/sessions:
+    get:
+      summary: List therapist sessions
+      tags:
+        - Sessions
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            maximum: 50
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [scheduled, in-progress, completed, cancelled]
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [scheduledAt, createdAt]
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+      responses:
+        '200':
+          description: Sessions retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Session'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /therapists/me/sessions/{sessionId}:
+    get:
+      summary: Get session details
+      tags:
+        - Sessions
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Session retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  session:
+                    $ref: '#/components/schemas/Session'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    patch:
+      summary: Update session status
+      tags:
+        - Sessions
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [completed, cancelled]
+                cancellationReason:
+                  type: string
+                  maxLength: 255
+                completionNotes:
+                  type: string
+                  maxLength: 500
+      responses:
+        '200':
+          description: Session updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  session:
+                    $ref: '#/components/schemas/Session'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Invalid status transition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /therapists/me/sessions/{sessionId}/notes:
+    post:
+      summary: Add encrypted session note
+      tags:
+        - Session Notes
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content:
+                  type: string
+                  minLength: 10
+                  maxLength: 10000
+      responses:
+        '201':
+          description: Note created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  note:
+                    $ref: '#/components/schemas/SessionNote'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    get:
+      summary: List session notes
+      tags:
+        - Session Notes
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            maximum: 50
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [createdAt, updatedAt]
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+      responses:
+        '200':
+          description: Notes retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  notes:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        sessionId:
+                          type: string
+                          format: uuid
+                        createdAt:
+                          type: string
+                          format: date-time
+                        updatedAt:
+                          type: string
+                          format: date-time
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /therapists/me/sessions/{sessionId}/notes/{noteId}:
+    get:
+      summary: Get decrypted session note
+      tags:
+        - Session Notes
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: noteId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Note retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  note:
+                    $ref: '#/components/schemas/SessionNote'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Note not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    put:
+      summary: Update session note
+      tags:
+        - Session Notes
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: noteId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content:
+                  type: string
+                  minLength: 10
+                  maxLength: 10000
+      responses:
+        '200':
+          description: Note updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  note:
+                    $ref: '#/components/schemas/SessionNote'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Note not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Delete session note
+      tags:
+        - Session Notes
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: noteId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Note deleted
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Note not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /therapists/me/earnings:
+    get:
+      summary: Get earnings overview
+      tags:
+        - Earnings
+      parameters:
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: year
+          in: query
+          schema:
+            type: integer
+        - name: month
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+      responses:
+        '200':
+          description: Earnings overview retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  earnings:
+                    type: object
+                    properties:
+                      totalEarnings:
+                        type: number
+                        format: double
+                      pendingAmount:
+                        type: number
+                        format: double
+                      withdrawnAmount:
+                        type: number
+                        format: double
+                      completedSessions:
+                        type: integer
+                      averageSessionValue:
+                        type: number
+                        format: double
+                      monthlyBreakdown:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            month:
+                              type: string
+                            earnings:
+                              type: number
+                              format: double
+                            sessionsCompleted:
+                              type: integer
+                      lastUpdate:
+                        type: string
+                        format: date-time
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /therapists/me/earnings/history:
+    get:
+      summary: Get earnings history
+      tags:
+        - Earnings
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            maximum: 50
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [amount, completedAt]
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+      responses:
+        '200':
+          description: History retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  history:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        sessionId:
+                          type: string
+                          format: uuid
+                        patientName:
+                          type: string
+                        amount:
+                          type: number
+                          format: double
+                        currency:
+                          type: string
+                        completedAt:
+                          type: string
+                          format: date-time
+                        status:
+                          type: string
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /therapists/me/earnings/monthly:
+    get:
+      summary: Get monthly earnings breakdown
+      tags:
+        - Earnings
+      parameters:
+        - name: year
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Monthly breakdown retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  year:
+                    type: integer
+                  monthlyBreakdown:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        month:
+                          type: integer
+                        monthName:
+                          type: string
+                        earnings:
+                          type: number
+                          format: double
+                        sessionsCompleted:
+                          type: integer
+                        averageSessionValue:
+                          type: number
+                          format: double
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /therapists/me/earnings/by-type:
+    get:
+      summary: Get earnings breakdown by session type
+      tags:
+        - Earnings
+      responses:
+        '200':
+          description: Breakdown by type retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  byType:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        sessionType:
+                          type: string
+                        earnings:
+                          type: number
+                          format: double
+                        sessionsCompleted:
+                          type: integer
+                        percentage:
+                          type: number
+                          format: double
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /therapists/me/wallet:
+    get:
+      summary: Get wallet details
+      tags:
+        - Wallet
+      responses:
+        '200':
+          description: Wallet retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  wallet:
+                    $ref: '#/components/schemas/Wallet'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Wallet not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /therapists/me/wallet/transactions:
+    get:
+      summary: Get wallet transactions
+      tags:
+        - Wallet
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            maximum: 50
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [debit, credit]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [completed, pending, failed]
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Transactions retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transactions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Transaction'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
