@@ -14,6 +14,8 @@ import * as Sentry from '@sentry/node';
 import { initSentry } from './config/sentry';
 import { logger } from './utils/logger';
 import { prisma } from './config/db';
+import path from 'path';
+path.resolve(process.cwd(), '../frontend/dist')
 
 // Initialize Sentry before anything else
 initSentry();
@@ -109,6 +111,10 @@ app.get('/health', (_req, res) => {
     res.status(200).json({ status: 'OK', service: 'manas360-backend' });
 });
 
+
+
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
 // Readiness probe for AWS target groups/containers.
 app.get('/ready', async (_req, res) => {
 	try {
@@ -120,6 +126,28 @@ app.get('/ready', async (_req, res) => {
 });
 
 app.use(env.apiPrefix, apiRoutes);
+
+// Serve React frontend build in production
+const frontendDistPath = path.resolve(process.cwd(), '../frontend/dist');
+
+app.use(express.static(frontendDistPath));
+
+// React SPA fallback - API/uploads/health/ready/metrics ko skip karega
+app.get('*', (req, res, next) => {
+	const skipPaths = [
+		env.apiPrefix,
+		'/uploads',
+		'/health',
+		'/ready',
+		'/metrics',
+	];
+
+	if (skipPaths.some((prefix) => req.path.startsWith(prefix))) {
+		return next();
+	}
+
+	res.sendFile(path.join(frontendDistPath, 'index.html'));
+});
 
 // Prometheus metrics endpoint
 const collectDefaultMetrics = client.collectDefaultMetrics;
@@ -138,4 +166,3 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 export default app;
-
