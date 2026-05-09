@@ -1,10 +1,71 @@
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import heroVideo from '../../assets/HERO-BackgroundVideo (1).mp4';
 
-export const Hero: React.FC = () => {
+interface HeroProps {
+  onFinish?: () => void;
+}
+
+export const Hero: React.FC<HeroProps> = ({ onFinish }) => {
   const navigate = useNavigate();
   const NAVIGATION_DELAY_MS = 180;
+  const STALL_TIMEOUT_MS = 30000;
+  const FADE_OUT_MS = 550;
+
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const hasExitedRef = useRef(false);
+  const stallTimerRef = useRef<number | null>(null);
+  const [isExiting, setIsExiting] = useState(false);
+
+  const clearStallTimer = useCallback(() => {
+    if (stallTimerRef.current !== null) {
+      window.clearTimeout(stallTimerRef.current);
+      stallTimerRef.current = null;
+    }
+  }, []);
+
+  const destroyVideo = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    try {
+      video.pause();
+      video.removeAttribute('src');
+      const sourceEl = video.querySelector('source');
+      if (sourceEl) {
+        sourceEl.removeAttribute('src');
+      }
+      video.load();
+    } catch {
+      // Ignore cleanup errors and continue fallback navigation.
+    }
+  }, []);
+
+  const finishHero = useCallback(() => {
+    if (hasExitedRef.current) {
+      return;
+    }
+
+    hasExitedRef.current = true;
+    clearStallTimer();
+    setIsExiting(true);
+
+    window.setTimeout(() => {
+      destroyVideo();
+      if (onFinish) {
+        onFinish();
+      } else {
+        navigate('/landing', { replace: true });
+      }
+    }, FADE_OUT_MS);
+  }, [clearStallTimer, destroyVideo, navigate, onFinish]);
+
+  const startStallTimer = useCallback(() => {
+    clearStallTimer();
+    stallTimerRef.current = window.setTimeout(() => {
+      finishHero();
+    }, STALL_TIMEOUT_MS);
+  }, [clearStallTimer, finishHero]);
 
   useEffect(() => {
     const prevOverflow = document.body.style.overflow;
@@ -14,6 +75,55 @@ export const Hero: React.FC = () => {
       document.body.style.overflow = prevOverflow;
     };
   }, []);
+
+  useEffect(() => {
+    const video = videoRef.current;
+
+    if (!video) {
+      startStallTimer();
+      return () => {
+        clearStallTimer();
+      };
+    }
+
+    const handleReady = () => {
+      clearStallTimer();
+    };
+
+    const handleNeedsData = () => {
+      startStallTimer();
+    };
+
+    const handleEnd = () => {
+      finishHero();
+    };
+
+    const handleError = () => {
+      finishHero();
+    };
+
+    video.addEventListener('playing', handleReady);
+    video.addEventListener('canplay', handleReady);
+    video.addEventListener('waiting', handleNeedsData);
+    video.addEventListener('stalled', handleNeedsData);
+    video.addEventListener('ended', handleEnd);
+    video.addEventListener('error', handleError);
+
+    if (video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) {
+      startStallTimer();
+    }
+
+    return () => {
+      video.removeEventListener('playing', handleReady);
+      video.removeEventListener('canplay', handleReady);
+      video.removeEventListener('waiting', handleNeedsData);
+      video.removeEventListener('stalled', handleNeedsData);
+      video.removeEventListener('ended', handleEnd);
+      video.removeEventListener('error', handleError);
+      clearStallTimer();
+      destroyVideo();
+    };
+  }, [clearStallTimer, destroyVideo, finishHero, startStallTimer]);
 
   useEffect(() => {
     // Particles initialization from the provided HTML script
@@ -44,14 +154,14 @@ export const Hero: React.FC = () => {
     window.scrollTo({ top: window.innerHeight, behavior: 'smooth' });
   };
 
-  const handleNavigate = (path: string) => {
+  const handleNavigate = (_path: string) => {
     window.setTimeout(() => {
-      navigate(path);
+      finishHero();
     }, NAVIGATION_DELAY_MS);
   };
 
   return (
-   <div className="hero-wrapper min-h-screen h-screen flex flex-col relative overflow-hidden">
+   <div className={`hero-wrapper min-h-screen h-screen flex flex-col relative overflow-hidden ${isExiting ? 'is-exiting' : ''}`} style={{ opacity: isExiting ? 0 : 1, transition: `opacity ${FADE_OUT_MS}ms ease` }}>
       <style>{`
         :root { 
           --navy: #032467; 
@@ -272,11 +382,12 @@ export const Hero: React.FC = () => {
       {/* Background layers */}
       <div className="hero-bg">
         <video
+          ref={videoRef}
           className="hero-bg-video"
           autoPlay
-          loop
           muted
           playsInline
+          preload="auto"
         >
           <source src={heroVideo} type="video/mp4" />
         </video>
@@ -386,3 +497,11 @@ export const Hero: React.FC = () => {
 };
 
 export default Hero;
+
+
+
+
+
+
+
+

@@ -38,6 +38,139 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      (function initWatiWidget() {
+        var hashPath = (window.location.hash || '').replace(/^#/, '').split('?')[0];
+        var isHeroRoute = (window.location.pathname === '/') && (hashPath === '' || hashPath === '/');
+        if (isHeroRoute) return;
+
+        try {
+          Object.keys(window.localStorage || {}).forEach(function (key) {
+            var k = key.toLowerCase();
+            if (k.indexOf('wati') !== -1 || k.indexOf('whatsapp') !== -1) {
+              window.localStorage.removeItem(key);
+            }
+          });
+          Object.keys(window.sessionStorage || {}).forEach(function (key) {
+            var k = key.toLowerCase();
+            if (k.indexOf('wati') !== -1 || k.indexOf('whatsapp') !== -1) {
+              window.sessionStorage.removeItem(key);
+            }
+          });
+        } catch (_err) {}
+
+        var waBrandLogo = window.location.origin + '/manas360-wa-logo-small.png?v=4';
+
+        function forceWatiBrandLogo() {
+          var allImages = document.querySelectorAll('img');
+          allImages.forEach(function (img) {
+            var src = (img.getAttribute('src') || '').toLowerCase();
+            var alt = (img.getAttribute('alt') || '').toLowerCase();
+            var title = (img.getAttribute('title') || '').toLowerCase();
+            var className = (img.className || '').toString().toLowerCase();
+            var insideWatiNode = !!img.closest('[class*="wati"], [id*="wati"]');
+            var looksLikeWatiIcon =
+              src.indexOf('wati') !== -1 ||
+              src.indexOf('robot') !== -1 ||
+              alt.indexOf('wati') !== -1 ||
+              alt.indexOf('bot') !== -1 ||
+              title.indexOf('wati') !== -1 ||
+              className.indexOf('wati') !== -1;
+
+            if (insideWatiNode && looksLikeWatiIcon && img.getAttribute('src') !== waBrandLogo) {
+              img.setAttribute('src', waBrandLogo);
+              img.style.objectFit = 'cover';
+              img.style.borderRadius = '50%';
+            }
+          });
+        }
+
+        function injectWatiButtonLogoStyles() {
+          if (document.getElementById('manas360-wati-button-logo-style')) return;
+          var styleEl = document.createElement('style');
+          styleEl.id = 'manas360-wati-button-logo-style';
+          styleEl.textContent =
+            '#whatsapp-chat-widget .wa-widget-send-button{' +
+            'background-image:url("' + waBrandLogo + '") !important;' +
+            'background-size:cover !important;' +
+            'background-position:center !important;' +
+            'background-repeat:no-repeat !important;' +
+            'background-color:#ffffff !important;' +
+            'overflow:hidden !important;' +
+            '}' +
+            '#whatsapp-chat-widget .wa-widget-send-button #wa-widget-svg,' +
+            '#whatsapp-chat-widget .wa-widget-send-button #wa-widget-opened-svg{' +
+            'opacity:0 !important;' +
+            'width:0 !important;' +
+            'height:0 !important;' +
+            'margin:0 !important;' +
+            'min-width:0 !important;' +
+            'min-height:0 !important;' +
+            '}';
+          document.head.appendChild(styleEl);
+        }
+
+        function forceWatiButtonLogo() {
+          var sendButton = document.querySelector('#whatsapp-chat-widget .wa-widget-send-button');
+          if (!sendButton) return;
+          sendButton.setAttribute('aria-label', 'MANAS360 Chat');
+        }
+
+        var url = 'https://wati-integration-prod-service.clare.ai/v2/watiWidget.js?25525&v=4';
+        var script = document.createElement('script');
+        script.type = 'text/javascript';
+        script.async = true;
+        script.src = url;
+
+        var options = {
+          enabled: true,
+          chatButtonSetting: {
+            backgroundColor: '#12066f',
+            ctaText: 'Chat with us',
+            borderRadius: '25',
+            marginLeft: '0',
+            marginRight: '20',
+            marginBottom: '20',
+            ctaIconWATI: false,
+            position: 'right'
+          },
+          brandSetting: {
+            brandName: 'MANAS360.com',
+            brandSubTitle: 'undefined',
+            brandImg: waBrandLogo,
+            welcomeText: 'Hi, how can I help you? MANAS360.com',
+            messageText: 'Hello, %0A I have a question about {{page_link}}',
+            backgroundColor: '#12066f',
+            ctaText: 'Chat with us',
+            borderRadius: '25',
+            autoShow: false,
+            phoneNumber: '8867736009'
+          }
+        };
+
+        script.onload = function () {
+          if (typeof window.CreateWhatsappChatWidget === 'function') {
+            window.CreateWhatsappChatWidget(options);
+            injectWatiButtonLogoStyles();
+            forceWatiBrandLogo();
+            forceWatiButtonLogo();
+
+            var observer = new MutationObserver(function () {
+              forceWatiBrandLogo();
+              forceWatiButtonLogo();
+            });
+            observer.observe(document.body, { childList: true, subtree: true });
+
+            window.setTimeout(function () {
+              observer.disconnect();
+            }, 20000);
+          }
+        };
+
+        var firstScript = document.getElementsByTagName('script')[0];
+        firstScript.parentNode.insertBefore(script, firstScript);
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
