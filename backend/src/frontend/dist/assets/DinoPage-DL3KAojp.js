@@ -1,0 +1,1 @@
+import{j as t}from"./vendor-DvrhTn1k.js";import{a1 as i}from"./components-core-EwFIQ0vy.js";import"./vendor-icons-vw8lSY0x.js";import"./vendor-realtime-BkL6vOXg.js";import"./pages-patient-BD5mm_hQ.js";import"./pages-therapist-DrVV-sQE.js";const a=()=>t.jsx("div",{style:{width:"100%",height:"100vh"},children:t.jsx(i,{})});export{a as default};
