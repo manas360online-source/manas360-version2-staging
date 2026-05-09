@@ -42,6 +42,7 @@ interface WhatsAppMessageInput {
 		userId?: string;
 		name?: string;
 		email?: string;
+		 otp?: string;
 		therapistName?: string;
 		date?: string;
 		time?: string;
@@ -55,31 +56,34 @@ interface WhatsAppMessageInput {
 }
 
 interface WhatsAppZohoFlowPayload {
-	event: string;
-	role: string;
-	timestamp: string;
-	source: string;
-	data: {
-		userId?: string;
-		phone: string;
-		phoneNumber: string;
-		name?: string;
-		email?: string;
-		therapistName?: string;
-		date?: string;
-		time?: string;
-		meetingLink?: string;
-		detailsLink?: string;
-		amount?: string;
-		certificateName?: string;
-		specialization?: string;
-		clinicalType?: string;
-		templateName: string;
-		templateType: string;
-		userType: string;
-		variables?: Record<string, string>;
-		language: string;
-	};
+  event: string;
+  role: string;
+  timestamp: string;
+  source: string;
+  data: {
+    userId?: string;
+    phone: string;
+    phoneNumber: string;
+    name?: string;
+    email?: string;
+	   VAR1?: string;
+    otp?: string;
+    message?: string;
+    therapistName?: string;
+    date?: string;
+    time?: string;
+    meetingLink?: string;
+    detailsLink?: string;
+    amount?: string;
+    certificateName?: string;
+    specialization?: string;
+    clinicalType?: string;
+    templateName: string;
+    templateType: string;
+    userType: string;
+    variables?: Record<string, string>;
+    language: string;
+  };
 }
 
 const normalizeWatiPhoneNumber = (phoneNumber: string) => {
@@ -148,12 +152,25 @@ const buildFlowData = (input: WhatsAppMessageInput, templateName: string, normal
 		'User',
 	);
 
+const otp = getFirstNonEmpty(
+  explicit.otp,
+  variables.otp,
+  variables.code,
+  variables.verificationCode,
+);
+
+const otpText = otp ? String(otp) : undefined;
+
 	return {
-		userId: getFirstNonEmpty(explicit.userId, variables.userId),
-		phone: normalizedPhone,
-		phoneNumber: normalizedPhone,
-		name,
-		email: getFirstNonEmpty(explicit.email, variables.email),
+		 userId: getFirstNonEmpty(explicit.userId, variables.userId),
+  phone: normalizedPhone,
+  phoneNumber: normalizedPhone,
+  name,
+  email: getFirstNonEmpty(explicit.email, variables.email),
+  otp: otpText,
+  message: otpText
+    ? `Thanks for registering with MANAS360, your OTP is ${otpText}. Do not share it with anyone.`
+    : undefined,
 		therapistName: getFirstNonEmpty(explicit.therapistName, variables.therapistName),
 		date: getFirstNonEmpty(explicit.date, variables.date, variables.appointmentDate, variables.sessionDate),
 		time: getFirstNonEmpty(explicit.time, variables.time, variables.appointmentTime),
@@ -361,16 +378,23 @@ export const sendWhatsAppMessage = async (input: WhatsAppMessageInput): Promise<
 
 	// Build Zoho Flow payload
 	const flowEvent = String(input.flowEvent || '').trim() || resolveFlowEvent(input.templateType);
+const otpValue = String(input.templateVariables?.otp || "");
+
 	const payload: WhatsAppZohoFlowPayload = {
-		event: flowEvent,
-		role: String(input.flowRole || '').trim() || input.userType.toUpperCase(),
-		timestamp: new Date().toISOString(),
-		source: 'MANAS360',
-		data: {
-			...buildFlowData(input, templateDef.templateName, phone),
-			templateName: templateDef.templateName,
-		},
-	};
+  event: flowEvent,
+  role: String(input.flowRole || "").trim() || input.userType.toUpperCase(),
+  timestamp: new Date().toISOString(),
+  source: "MANAS360",
+  data: {
+    ...buildFlowData(input, templateDef.templateName, phone),
+    templateName: templateDef.templateName,
+    VAR1: otpValue,
+    otp: otpValue,
+    message: otpValue
+      ? `Thanks for registering with MANAS360, your OTP is ${otpValue} to register which should not be shared with anyone.`
+      : undefined,
+  },
+};
 
 	try {
 		await fetch(zohoFlowWebhookUrl, {

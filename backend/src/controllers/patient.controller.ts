@@ -11,6 +11,8 @@ import {
 	createPatientAssessment,
 	getMyPatientAssessmentHistory,
 	getMyMoodHistory,
+	 savePatientPreferences,
+  getPatientPreferences,
 } from '../services/patient.service';
 import { env } from '../config/env';
 
@@ -43,6 +45,9 @@ const writeJsonCache = async (key: string, payload: unknown, ttl: number): Promi
 		// Best-effort cache write.
 	}
 };
+
+
+
 
 const invalidatePatientReadCaches = async (userId: string): Promise<void> => {
 	const keys = [
@@ -140,6 +145,29 @@ const getAuthUserId = (req: Request): string => {
 	return userId;
 };
 
+
+export const savePatientPreferencesController = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  const userId = getAuthUserId(req);
+
+  const preferences = await savePatientPreferences(userId, req.body);
+
+  sendSuccess(res, preferences, 'Patient preferences saved', 200);
+};
+
+export const getPatientPreferencesController = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  const userId = getAuthUserId(req);
+
+  const preferences = await getPatientPreferences(userId);
+
+  sendSuccess(res, preferences, 'Patient preferences fetched', 200);
+};
+
 export const createPatientProfileController = async (req: Request, res: Response): Promise<void> => {
 	const userId = getAuthUserId(req);
 
@@ -150,6 +178,50 @@ export const createPatientProfileController = async (req: Request, res: Response
 	const profile = await createPatientProfile(userId, req.validatedPatientProfile);
 
 	sendSuccess(res, profile, 'Patient profile created', 201);
+};
+
+export const updatePatientPreferencesController = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  const userId = getAuthUserId(req);
+
+  const existingProfile = await prisma.patientProfile.findUnique({
+    where: { userId },
+    select: { id: true },
+  });
+
+  const data = {
+    preferredLanguage: req.body.preferredLanguage || 'en',
+    communicationChannels: req.body.communicationChannels || [],
+    therapyModes: req.body.therapyModes || [],
+    availability: req.body.availability || {},
+    timezone: req.body.timezone || 'Asia/Kolkata',
+    sessionDuration: req.body.sessionDuration || '50 min',
+    reminderTiming: req.body.reminderTiming || '1h',
+  };
+
+  const updated = existingProfile
+    ? await prisma.patientProfile.update({
+        where: { userId },
+        data,
+      })
+    : await prisma.patientProfile.create({
+        data: {
+          userId,
+          age: 25,
+          gender: 'prefer_not_to_say',
+          medicalHistory: null,
+          emergencyContact: {
+            name: 'Not provided',
+            relation: 'Not provided',
+            phone: 'Not provided',
+          },
+          ...data,
+        },
+      });
+
+  sendSuccess(res, updated, 'Preferences updated');
 };
 
 export const getMyPatientProfileController = async (req: Request, res: Response): Promise<void> => {

@@ -1,0 +1,45 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 30
+    },
+    "auditLog": "D:\\projects\\manas360-version2-staging-main -developed by kajal\\backend\\logs\\.faeeb627b8a543828f2c9f335573dd75f1a9cefe-audit.json",
+    "files": [
+        {
+            "date": 1777623232097,
+            "name": "D:\\projects\\manas360-version2-staging-main -developed by kajal\\backend\\logs\\error-2026-05-01.log",
+            "hash": "2f552d7b584e79b6cc8b3ffde966b416b08b1e702db1a92e49fd230ba98292b8"
+        },
+        {
+            "date": 1777716652701,
+            "name": "D:\\projects\\manas360-version2-staging-main -developed by kajal\\backend\\logs\\error-2026-05-02.log",
+            "hash": "5647681b9c9eabceb225921831eed1f56bf11863cf8bf767570dc4ace4746205"
+        },
+        {
+            "date": 1777952702357,
+            "name": "D:\\projects\\manas360-version2-staging-main -developed by kajal\\backend\\logs\\error-2026-05-05.log",
+            "hash": "f7257d3cfa90d87dade283552a888c13c1024a0907c15c18c78d174aa8481632"
+        },
+        {
+            "date": 1778058840952,
+            "name": "D:\\projects\\manas360-version2-staging-main -developed by kajal\\backend\\logs\\error-2026-05-06.log",
+            "hash": "1b2279fe9ca7672944d9f2d424d1bac10cba359b7338e4f37a7e9acc9a03dcda"
+        },
+        {
+            "date": 1778177427865,
+            "name": "D:\\projects\\manas360-version2-staging-main -developed by kajal\\backend\\logs\\error-2026-05-07.log",
+            "hash": "31f4609ea8f10acee2dcc8871d5c0fb5a232ef62a3d3a4ca0dddec938ab672c5"
+        },
+        {
+            "date": 1778181055683,
+            "name": "D:\\projects\\manas360-version2-staging-main -developed by kajal\\backend\\logs\\error-2026-05-08.log",
+            "hash": "e8a450e5a0edb6a74abac07f0003738f3408f90f502ede20bb17c1262d0d271e"
+        },
+        {
+            "date": 1778288036773,
+            "name": "D:\\projects\\manas360-version2-staging-main -developed by kajal\\backend\\logs\\error-2026-05-09.log",
+            "hash": "3606512c46e7915dfcbf99a004545ee654eff910eba4457068f4a114de1595ff"
+        }
+    ],
+    "hashType": "sha256"
+}

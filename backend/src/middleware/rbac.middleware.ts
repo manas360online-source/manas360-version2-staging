@@ -9,18 +9,34 @@ const db = prisma as any;
  * Extensible enum for user roles
  * Can be extended for superadmin, moderator, etc.
  */
-export type UserRole =
-	| 'patient'
-	| 'learner'
-	| 'therapist'
-	| 'psychologist'
-	| 'psychiatrist'
-	| 'coach'
-	| 'admin'
-	| 'superadmin'
-	| 'clinicaldirector'
-	| 'financemanager'
-	| 'complianceofficer';
+// export type UserRole =
+// 	| 'patient'
+// 	| 'learner'
+// 	| 'therapist'
+// 	| 'psychologist'
+// 	| 'psychiatrist'
+// 	| 'coach'
+// 	| 'admin'
+// 	| 'superadmin'
+// 	| 'clinicaldirector'
+// 	| 'financemanager'
+// 	| 'complianceofficer';
+
+
+	export type UserRole =
+  | 'patient'
+  | 'learner'
+  | 'therapist'
+  | 'psychiatrist'
+  | 'psychologist'
+  | 'coach'
+  | 'admin'
+  | 'superadmin'
+  | 'clinicaldirector'
+  | 'financemanager'
+  | 'complianceofficer';
+
+
 
 export const POLICY_VERSION = 1;
 

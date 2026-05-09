@@ -95,8 +95,13 @@ export const initiateProviderSubscriptionPayment = async (
 
 	const providerToken = toCompactToken(providerId, 8) || 'provider';
 	const transactionId = `PROV_SUB_${providerToken}_${Date.now()}`;
-	const hasPhonePeOAuth = Boolean(String(process.env.PHONEPE_CLIENT_ID || '').trim())
-		&& Boolean(String(process.env.PHONEPE_CLIENT_SECRET || '').trim());
+	// const hasPhonePeOAuth = Boolean(String(process.env.PHONEPE_CLIENT_ID || '').trim())
+	// 	&& Boolean(String(process.env.PHONEPE_CLIENT_SECRET || '').trim());
+const hasPhonePeOAuth =
+  env.nodeEnv === 'production' &&
+  Boolean(String(process.env.PHONEPE_CLIENT_ID || '').trim()) &&
+  Boolean(String(process.env.PHONEPE_CLIENT_SECRET || '').trim());
+
 	const shouldBypass = env.allowDevPaymentBypass && env.nodeEnv !== 'production' && !hasPhonePeOAuth;
 	const canFallbackWithoutGateway = shouldBypass;
 	const frontendBaseUrl = env.frontendUrl;
@@ -214,89 +219,207 @@ export const initiateProviderSubscriptionPayment = async (
  * Initiate PhonePe payment specifically for Platform Access (₹99/mo or ₹279/qtr).
  * Transaction ID prefixed with PROV_PA_ for webhook identification.
  */
+// export const initiateProviderPlatformPayment = async (
+// 	providerId: string,
+// 	billingCycle: 'monthly' | 'quarterly',
+// 	amountMinor: number,
+// 	options?: { redirectUrlOverride?: string; idempotencyKey?: string; requireGateway?: boolean },
+// ) => {
+// 	const providerToken = toCompactToken(providerId, 8) || 'provider';
+// 	const transactionId = `PROV_PA_${providerToken}_${Date.now()}`;
+// 	const hasPhonePeOAuth = Boolean(String(process.env.PHONEPE_CLIENT_ID || '').trim())
+// 		&& Boolean(String(process.env.PHONEPE_CLIENT_SECRET || '').trim());
+// 	const requireGateway = Boolean(options?.requireGateway);
+// 	const shouldBypass = !requireGateway && env.allowDevPaymentBypass && env.nodeEnv !== 'production' && !hasPhonePeOAuth;
+// 	const canFallbackWithoutGateway = shouldBypass;
+// 	const frontendBaseUrl = env.frontendUrl;
+// 	const paymentStatusBase = `${frontendBaseUrl}/#/payment/status`;
+// 	const redirectUrlTarget = String(options?.redirectUrlOverride || `${paymentStatusBase}?transactionId=${transactionId}&status=SUCCESS`).trim();
+// 	const callbackUrl = `${env.apiUrl}${env.apiPrefix}/v1/payments/phonepe/webhook`;
+
+// 	let redirectUrl: string;
+// 	try {
+// 		redirectUrl = await initiatePhonePePayment({
+// 			transactionId,
+// 			userId: providerId,
+// 			amountInPaise: amountMinor,
+// 			callbackUrl,
+// 			redirectUrl: redirectUrlTarget,
+// 			metadata: {
+// 				flow: 'provider_platform_access',
+// 				billingCycle,
+// 			},
+// 		});
+// 	} catch (error: any) {
+// 		if (!shouldBypass && !canFallbackWithoutGateway) {
+// 			throw new AppError(error?.message || 'PhonePe Payment Initiation Failed', 502);
+// 		}
+// 		logger.warn('[PhonePe] Platform access payment fallback to local redirect', {
+// 			transactionId,
+// 			nodeEnv: env.nodeEnv,
+// 			error: error?.message,
+// 		});
+// 		redirectUrl = redirectUrlTarget;
+// 	}
+
+	
+
+// 	// Create financialPayment record
+// 	try {
+// 		await prisma.providerWallet.upsert({
+// 			where: { providerId },
+// 			update: {},
+// 			create: { providerId },
+// 		}).catch(() => null);
+
+// 		await prisma.financialPayment.create({
+// 			data: {
+// 				merchantTransactionId: transactionId,
+// 				providerId,
+// 				amountMinor,
+// 				currency: 'INR',
+// 				captureIdempotencyKey: String(options?.idempotencyKey || `prov_pa:${providerId}:${billingCycle}:${new Date().toISOString().slice(0, 10)}`),
+// 				status: shouldBypass ? 'CAPTURED' : 'INITIATED',
+// 				metadata: {
+// 					type: 'provider_platform_access',
+// 					flow: 'provider_platform_access',
+// 					billingCycle,
+// 					redirectUrl,
+// 					redirectUrlOverride: String(options?.redirectUrlOverride || '').trim() || undefined,
+// 				},
+// 			},
+// 		});
+// 	} catch (error: any) {
+// 		if (String(error?.code || '') !== 'P2002') throw error;
+// 		// Duplicate idempotency — payment already initiated today, that's fine
+// 	}
+
+// 	if (shouldBypass) {
+// 		// Dev bypass: activate immediately
+// 		const { activatePlatformAccess } = await import('./platform-access.service');
+// 		await activatePlatformAccess(providerId, billingCycle, transactionId);
+// 	}
+
+// 	return {
+// 		transactionId,
+// 		redirectUrl,
+// 		billingCycle,
+// 		amountMinor,
+// 	};
+// };
+
+
+
+
 export const initiateProviderPlatformPayment = async (
-	providerId: string,
-	billingCycle: 'monthly' | 'quarterly',
-	amountMinor: number,
-	options?: { redirectUrlOverride?: string; idempotencyKey?: string; requireGateway?: boolean },
+  providerId: string,
+  billingCycle: 'monthly' | 'quarterly',
+  amountMinor: number,
+  options?: { redirectUrlOverride?: string; idempotencyKey?: string; requireGateway?: boolean },
 ) => {
-	const providerToken = toCompactToken(providerId, 8) || 'provider';
-	const transactionId = `PROV_PA_${providerToken}_${Date.now()}`;
-	const hasPhonePeOAuth = Boolean(String(process.env.PHONEPE_CLIENT_ID || '').trim())
-		&& Boolean(String(process.env.PHONEPE_CLIENT_SECRET || '').trim());
-	const requireGateway = Boolean(options?.requireGateway);
-	const shouldBypass = !requireGateway && env.allowDevPaymentBypass && env.nodeEnv !== 'production' && !hasPhonePeOAuth;
-	const canFallbackWithoutGateway = shouldBypass;
-	const frontendBaseUrl = env.frontendUrl;
-	const paymentStatusBase = `${frontendBaseUrl}/#/payment/status`;
-	const redirectUrlTarget = String(options?.redirectUrlOverride || `${paymentStatusBase}?transactionId=${transactionId}&status=SUCCESS`).trim();
-	const callbackUrl = `${env.apiUrl}${env.apiPrefix}/v1/payments/phonepe/webhook`;
+  const providerToken = toCompactToken(providerId, 8) || 'provider';
+  const transactionId = `PROV_PA_${providerToken}_${Date.now()}`;
 
-	let redirectUrl: string;
-	try {
-		redirectUrl = await initiatePhonePePayment({
-			transactionId,
-			userId: providerId,
-			amountInPaise: amountMinor,
-			callbackUrl,
-			redirectUrl: redirectUrlTarget,
-			metadata: {
-				flow: 'provider_platform_access',
-				billingCycle,
-			},
-		});
-	} catch (error: any) {
-		if (!shouldBypass && !canFallbackWithoutGateway) {
-			throw new AppError(error?.message || 'PhonePe Payment Initiation Failed', 502);
-		}
-		logger.warn('[PhonePe] Platform access payment fallback to local redirect', {
-			transactionId,
-			nodeEnv: env.nodeEnv,
-			error: error?.message,
-		});
-		redirectUrl = redirectUrlTarget;
-	}
+  const frontendBaseUrl = env.frontendUrl;
+  const redirectUrlTarget = String(
+    options?.redirectUrlOverride ||
+      `${frontendBaseUrl}/#/universal/payment-success?transactionId=${transactionId}&type=provider&status=success`
+  ).trim();
 
-	// Create financialPayment record
-	try {
-		await prisma.providerWallet.upsert({
-			where: { providerId },
-			update: {},
-			create: { providerId },
-		}).catch(() => null);
+  const isDevBypass =
+    env.nodeEnv === 'development' &&
+    String(process.env.DEV_PAYMENT_BYPASS || '').toLowerCase() === 'true';
 
-		await prisma.financialPayment.create({
-			data: {
-				merchantTransactionId: transactionId,
-				providerId,
-				amountMinor,
-				currency: 'INR',
-				captureIdempotencyKey: String(options?.idempotencyKey || `prov_pa:${providerId}:${billingCycle}:${new Date().toISOString().slice(0, 10)}`),
-				status: shouldBypass ? 'CAPTURED' : 'INITIATED',
-				metadata: {
-					type: 'provider_platform_access',
-					flow: 'provider_platform_access',
-					billingCycle,
-					redirectUrl,
-					redirectUrlOverride: String(options?.redirectUrlOverride || '').trim() || undefined,
-				},
-			},
-		});
-	} catch (error: any) {
-		if (String(error?.code || '') !== 'P2002') throw error;
-		// Duplicate idempotency — payment already initiated today, that's fine
-	}
+  if (isDevBypass) {
+    logger.warn('[PhonePe] DEV_PAYMENT_BYPASS active - skipping PhonePe', {
+      transactionId,
+    });
 
-	if (shouldBypass) {
-		// Dev bypass: activate immediately
-		const { activatePlatformAccess } = await import('./platform-access.service');
-		await activatePlatformAccess(providerId, billingCycle, transactionId);
-	}
+    await prisma.providerWallet.upsert({
+      where: { providerId },
+      update: {},
+      create: { providerId },
+    }).catch(() => null);
 
-	return {
-		transactionId,
-		redirectUrl,
-		billingCycle,
-		amountMinor,
-	};
+    await prisma.financialPayment.create({
+      data: {
+        merchantTransactionId: transactionId,
+        providerId,
+        amountMinor,
+        currency: 'INR',
+        captureIdempotencyKey: String(
+          options?.idempotencyKey ||
+            `prov_pa:${providerId}:${billingCycle}:${new Date().toISOString().slice(0, 10)}`
+        ),
+        status: 'CAPTURED',
+        metadata: {
+          type: 'provider_platform_access',
+          flow: 'provider_platform_access',
+          billingCycle,
+          redirectUrl: redirectUrlTarget,
+          devBypass: true,
+        },
+      },
+    }).catch(() => null);
+
+    const { activatePlatformAccess } = await import('./platform-access.service');
+    await activatePlatformAccess(providerId, billingCycle, transactionId);
+
+    return {
+      transactionId,
+      redirectUrl: redirectUrlTarget,
+      billingCycle,
+      amountMinor,
+      bypass: true,
+    };
+  }
+
+  const callbackUrl = `${env.apiUrl}${env.apiPrefix}/v1/payments/phonepe/webhook`;
+
+  let redirectUrl: string;
+
+  redirectUrl = await initiatePhonePePayment({
+    transactionId,
+    userId: providerId,
+    amountInPaise: amountMinor,
+    callbackUrl,
+    redirectUrl: redirectUrlTarget,
+    metadata: {
+      flow: 'provider_platform_access',
+      billingCycle,
+    },
+  });
+
+  await prisma.providerWallet.upsert({
+    where: { providerId },
+    update: {},
+    create: { providerId },
+  }).catch(() => null);
+
+  await prisma.financialPayment.create({
+    data: {
+      merchantTransactionId: transactionId,
+      providerId,
+      amountMinor,
+      currency: 'INR',
+      captureIdempotencyKey: String(
+        options?.idempotencyKey ||
+          `prov_pa:${providerId}:${billingCycle}:${new Date().toISOString().slice(0, 10)}`
+      ),
+      status: 'INITIATED',
+      metadata: {
+        type: 'provider_platform_access',
+        flow: 'provider_platform_access',
+        billingCycle,
+        redirectUrl,
+      },
+    },
+  }).catch(() => null);
+
+  return {
+    transactionId,
+    redirectUrl,
+    billingCycle,
+    amountMinor,
+  };
 };

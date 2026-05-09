@@ -74,155 +74,6 @@ const hasUsableOAuthCredentials = (): boolean => {
 	return !isPlaceholder(PHONEPE_CLIENT_ID) && !isPlaceholder(PHONEPE_CLIENT_SECRET);
 };
 
-const scheduleTokenRefresh = (expiresAt: number): void => {
-	if (tokenRefreshTimeout) {
-		clearTimeout(tokenRefreshTimeout);
-	}
-
-	const now = Date.now();
-	const refreshLeadTime = 60 * 1000; // 60 seconds before expiry
-	const timeUntilRefresh = expiresAt - now - refreshLeadTime;
-
-	if (timeUntilRefresh > 0) {
-		tokenRefreshTimeout = setTimeout(async () => {
-			logger.info('[PhonePe] Auto-refreshing OAuth token (proactive refresh)');
-			await fetchPhonePeToken();
-		}, timeUntilRefresh);
-	}
-};
-
-export const initializePhonePeTokenRefresh = async (): Promise<void> => {
-	if (!hasUsableOAuthCredentials()) {
-		logger.info('[PhonePe] OAuth credentials not configured (or placeholder); skipping token initialization');
-		return;
-	}
-
-	try {
-		logger.info('[PhonePe] Initializing OAuth token on startup');
-		const token = await fetchPhonePeToken();
-		if (token && cachedPhonePeToken) {
-			scheduleTokenRefresh(cachedPhonePeToken.expiresAt);
-			logger.info('[PhonePe] Token refresh scheduled', {
-				expiresIn: Math.round((cachedPhonePeToken.expiresAt - Date.now()) / 1000),
-				seconds: 's',
-			});
-		}
-	} catch (error: any) {
-		logger.error('[PhonePe] Token initialization failed', { error: error?.message });
-	}
-};
-
-export const cleanupPhonePeTokenRefresh = (): void => {
-	if (tokenRefreshTimeout) {
-		clearTimeout(tokenRefreshTimeout);
-		tokenRefreshTimeout = null;
-		logger.info('[PhonePe] Token refresh cleanup complete');
-	}
-};
-
-const getPhonePeOAuthUrl = (): string => {
-	if (PHONEPE_OAUTH_URL) {
-		return PHONEPE_OAUTH_URL;
-	}
-
-	if (PHONEPE_ENV === 'preprod' || PHONEPE_ENV === 'uat') {
-		return 'https://api-preprod.phonepe.com/apis/identity-manager/v1/oauth/token';
-	}
-
-	if (PHONEPE_BASE_URL.includes('api-preprod.phonepe.com')) {
-		return 'https://api-preprod.phonepe.com/apis/identity-manager/v1/oauth/token';
-	}
-
-	return 'https://api.phonepe.com/apis/identity-manager/v1/oauth/token';
-};
-
-const isPhonePeTokenExpired = (): boolean => {
-	if (!cachedPhonePeToken) return true;
-	return Date.now() >= cachedPhonePeToken.expiresAt - 5 * 60 * 1000;
-};
-
-const fetchPhonePeToken = async (): Promise<string | null> => {
-	if (!hasUsableOAuthCredentials()) {
-		logger.info('[PhonePe] OAuth credentials not configured (or placeholder); skipping token fetch.');
-		return null;
-	}
-
-	try {
-		const oauthUrl = getPhonePeOAuthUrl();
-		if (
-			(PHONEPE_ENV === 'preprod' || PHONEPE_ENV === 'uat' || PHONEPE_BASE_URL.includes('api-preprod.phonepe.com'))
-			&& oauthUrl.includes('api.phonepe.com')
-			&& !oauthUrl.includes('api-preprod.phonepe.com')
-		) {
-			logger.warn('[PhonePe] OAuth URL appears to be production while runtime is preprod/UAT. Check PHONEPE_OAUTH_URL.', {
-				oauthUrl,
-				baseUrl: PHONEPE_BASE_URL,
-				env: PHONEPE_ENV,
-			});
-		}
-
-		const payload = new URLSearchParams();
-		payload.append('client_id', PHONEPE_CLIENT_ID);
-		payload.append('client_version', PHONEPE_CLIENT_VERSION);
-		payload.append('client_secret', PHONEPE_CLIENT_SECRET);
-		payload.append('grant_type', 'client_credentials');
-
-		const response = await axios.post(oauthUrl, payload, {
-			headers: {
-				'Content-Type': 'application/x-www-form-urlencoded',
-			},
-			timeout: 15000,
-		});
-
-		const token = response.data?.access_token;
-		const expiresAt = Number(response.data?.expires_at || response.data?.expiresAt || 0) * 1000;
-		if (!token || !expiresAt) {
-			throw new Error('Invalid PhonePe OAuth response');
-		}
-
-		cachedPhonePeToken = { accessToken: token, expiresAt };
-		logger.info('[PhonePe] OAuth token fetched', { expiresAt });
-		scheduleTokenRefresh(expiresAt);
-		return token;
-	} catch (error: any) {
-		logger.error('[PhonePe] OAuth token fetch failed', {
-			message: error?.message,
-			response: error?.response?.data,
-		});
-		return null;
-	}
-};
-
-const getPhonePeAuthToken = async (): Promise<string | null> => {
-	if (isPhonePeTokenExpired()) {
-		await fetchPhonePeToken();
-	}
-	return cachedPhonePeToken?.accessToken ?? null;
-};
-
-const getPhonePeAuthorizationHeader = async (): Promise<Record<string, string>> => {
-	const token = await getPhonePeAuthToken();
-	if (!token) {
-		throw new AppError('PhonePe OAuth token unavailable. Check PHONEPE_CLIENT_ID/PHONEPE_CLIENT_SECRET and PHONEPE_OAUTH_URL.', 502);
-	}
-	return { Authorization: `O-Bearer ${token}` };
-};
-
-interface PhonePePaymentRequest {
-	merchantId: string;
-	merchantTransactionId: string;
-	merchantUserId: string;
-	amount: number;
-	redirectUrl: string;
-	redirectMode: 'POST' | 'GET';
-	callbackUrl: string;
-	mobileNumber?: string;
-	paymentInstrument: {
-		type: 'PAY_PAGE';
-	};
-	metadata?: any;
-}
-
 export const initiatePhonePePayment = async (input: {
 	transactionId: string;
 	userId: string;
@@ -345,6 +196,166 @@ export const initiatePhonePePayment = async (input: {
 		throw new AppError(withHint, 502);
 	}
 };
+
+const scheduleTokenRefresh = (expiresAt: number): void => {
+	if (tokenRefreshTimeout) {
+		clearTimeout(tokenRefreshTimeout);
+	}
+
+	const now = Date.now();
+	const refreshLeadTime = 60 * 1000; // 60 seconds before expiry
+	const timeUntilRefresh = expiresAt - now - refreshLeadTime;
+
+	if (timeUntilRefresh > 0) {
+		tokenRefreshTimeout = setTimeout(async () => {
+			logger.info('[PhonePe] Auto-refreshing OAuth token (proactive refresh)');
+			await fetchPhonePeToken();
+		}, timeUntilRefresh);
+	}
+};
+
+
+
+export const initializePhonePeTokenRefresh = async (): Promise<void> => {
+	if (!hasUsableOAuthCredentials()) {
+		logger.info('[PhonePe] OAuth credentials not configured (or placeholder); skipping token initialization');
+		return;
+	}
+
+	try {
+		logger.info('[PhonePe] Initializing OAuth token on startup');
+		const token = await fetchPhonePeToken();
+		if (token && cachedPhonePeToken) {
+			scheduleTokenRefresh(cachedPhonePeToken.expiresAt);
+			logger.info('[PhonePe] Token refresh scheduled', {
+				expiresIn: Math.round((cachedPhonePeToken.expiresAt - Date.now()) / 1000),
+				seconds: 's',
+			});
+		}
+	} catch (error: any) {
+		logger.error('[PhonePe] Token initialization failed', { error: error?.message });
+	}
+};
+
+export const cleanupPhonePeTokenRefresh = (): void => {
+	if (tokenRefreshTimeout) {
+		clearTimeout(tokenRefreshTimeout);
+		tokenRefreshTimeout = null;
+		logger.info('[PhonePe] Token refresh cleanup complete');
+	}
+};
+
+const isDevPaymentBypass = (): boolean => {
+  return (
+    env.nodeEnv === 'development' &&
+    String(process.env.DEV_PAYMENT_BYPASS || '').toLowerCase() === 'true'
+  );
+};
+
+const getPhonePeOAuthUrl = (): string => {
+	if (PHONEPE_OAUTH_URL) {
+		return PHONEPE_OAUTH_URL;
+	}
+
+	if (PHONEPE_ENV === 'preprod' || PHONEPE_ENV === 'uat') {
+		return 'https://api-preprod.phonepe.com/apis/identity-manager/v1/oauth/token';
+	}
+
+	if (PHONEPE_BASE_URL.includes('api-preprod.phonepe.com')) {
+		return 'https://api-preprod.phonepe.com/apis/identity-manager/v1/oauth/token';
+	}
+
+	return 'https://api.phonepe.com/apis/identity-manager/v1/oauth/token';
+};
+
+const isPhonePeTokenExpired = (): boolean => {
+	if (!cachedPhonePeToken) return true;
+	return Date.now() >= cachedPhonePeToken.expiresAt - 5 * 60 * 1000;
+};
+
+const fetchPhonePeToken = async (): Promise<string | null> => {
+	if (!hasUsableOAuthCredentials()) {
+		logger.info('[PhonePe] OAuth credentials not configured (or placeholder); skipping token fetch.');
+		return null;
+	}
+
+	try {
+		const oauthUrl = getPhonePeOAuthUrl();
+		if (
+			(PHONEPE_ENV === 'preprod' || PHONEPE_ENV === 'uat' || PHONEPE_BASE_URL.includes('api-preprod.phonepe.com'))
+			&& oauthUrl.includes('api.phonepe.com')
+			&& !oauthUrl.includes('api-preprod.phonepe.com')
+		) {
+			logger.warn('[PhonePe] OAuth URL appears to be production while runtime is preprod/UAT. Check PHONEPE_OAUTH_URL.', {
+				oauthUrl,
+				baseUrl: PHONEPE_BASE_URL,
+				env: PHONEPE_ENV,
+			});
+		}
+
+		const payload = new URLSearchParams();
+		payload.append('client_id', PHONEPE_CLIENT_ID);
+		payload.append('client_version', PHONEPE_CLIENT_VERSION);
+		payload.append('client_secret', PHONEPE_CLIENT_SECRET);
+		payload.append('grant_type', 'client_credentials');
+
+		const response = await axios.post(oauthUrl, payload, {
+			headers: {
+				'Content-Type': 'application/x-www-form-urlencoded',
+			},
+			timeout: 15000,
+		});
+
+		const token = response.data?.access_token;
+		const expiresAt = Number(response.data?.expires_at || response.data?.expiresAt || 0) * 1000;
+		if (!token || !expiresAt) {
+			throw new Error('Invalid PhonePe OAuth response');
+		}
+
+		cachedPhonePeToken = { accessToken: token, expiresAt };
+		logger.info('[PhonePe] OAuth token fetched', { expiresAt });
+		scheduleTokenRefresh(expiresAt);
+		return token;
+	} catch (error: any) {
+		logger.error('[PhonePe] OAuth token fetch failed', {
+			message: error?.message,
+			response: error?.response?.data,
+		});
+		return null;
+	}
+};
+
+const getPhonePeAuthToken = async (): Promise<string | null> => {
+	if (isPhonePeTokenExpired()) {
+		await fetchPhonePeToken();
+	}
+	return cachedPhonePeToken?.accessToken ?? null;
+};
+
+const getPhonePeAuthorizationHeader = async (): Promise<Record<string, string>> => {
+	const token = await getPhonePeAuthToken();
+	if (!token) {
+		throw new AppError('PhonePe OAuth token unavailable. Check PHONEPE_CLIENT_ID/PHONEPE_CLIENT_SECRET and PHONEPE_OAUTH_URL.', 502);
+	}
+	return { Authorization: `O-Bearer ${token}` };
+};
+
+interface PhonePePaymentRequest {
+	merchantId: string;
+	merchantTransactionId: string;
+	merchantUserId: string;
+	amount: number;
+	redirectUrl: string;
+	redirectMode: 'POST' | 'GET';
+	callbackUrl: string;
+	mobileNumber?: string;
+	paymentInstrument: {
+		type: 'PAY_PAGE';
+	};
+	metadata?: any;
+}
+
+
 
 export const verifyPhonePeWebhook = (reqBody: string, xVerify: string): boolean => {
 	if (!reqBody || !xVerify) {

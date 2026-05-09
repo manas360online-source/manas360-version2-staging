@@ -7,25 +7,26 @@ model CorporateAgreementTemplate {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  agreements  CorporateAgreement[]
+  agreements CorporateAgreement[]
 
   @@map("corporate_agreement_templates")
 }
 
 model CorporateAgreement {
-  id          String   @id @default(uuid())
-  templateId  String
-  email       String
-  value       String?
-  status      String   @default("Draft")
-  companyKey  String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(uuid())
+  templateId String
+  email      String
+  value      String?
+  status     String   @default("Draft")
+  companyKey String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  template    CorporateAgreementTemplate @relation(fields: [templateId], references: [id])
+  template CorporateAgreementTemplate @relation(fields: [templateId], references: [id])
 
   @@map("corporate_agreements")
 }
+
 generator client {
   provider      = "prisma-client-js"
   binaryTargets = ["native", "linux-musl-openssl-3.0.x", "linux-musl-arm64-openssl-3.0.x"]
@@ -118,7 +119,7 @@ model User {
   patientSubscription           PatientSubscription?
   phq9Assessments               PHQ9Assessment[]            @relation("UserPHQ9Assessments")
   platformAccess                PlatformAccess?
-  platformConfigsUpdated        PlatformConfig[]           @relation("PlatformConfigUpdatedBy")
+  platformConfigsUpdated        PlatformConfig[]            @relation("PlatformConfigUpdatedBy")
   prescriptionsAsPatient        Prescription[]              @relation("PrescriptionPatient")
   prescriptionsAsProvider       Prescription[]              @relation("PrescriptionProvider")
   providerExtraQuestionsCreated ProviderExtraQuestion[]
@@ -188,26 +189,26 @@ model Role {
 }
 
 model QrCode {
-  code            String   @id
-  redirectUrl     String   @map("redirect_url")
-  qrType          String?  @map("qr_type")
-  destinationUrl  String?  @map("destination_url")
-  ownerId         String?  @map("owner_id")
-  isDynamic       Boolean  @default(true) @map("is_dynamic")
-  expiresAt       DateTime? @map("expires_at")
-  lastScannedAt   DateTime? @map("last_scanned_at")
-  templateId      String   @default("classic-black") @map("template_id")
-  stylePreset     String   @default("rounded") @map("style_preset")
-  foregroundColor String   @default("#0F172A") @map("foreground_color")
-  backgroundColor String   @default("#FFFFFF") @map("background_color")
-  logoUrl         String?  @map("logo_url")
-  isActive        Boolean  @default(true) @map("is_active")
-  scanCount       Int      @default(0) @map("scan_count")
-  connectedCount  Int      @default(0) @map("connected_count")
-  createdById     String?  @map("created_by_id")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-  createdBy       User?    @relation("QrCodeCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  code            String         @id
+  redirectUrl     String         @map("redirect_url")
+  qrType          String?        @map("qr_type")
+  destinationUrl  String?        @map("destination_url")
+  ownerId         String?        @map("owner_id")
+  isDynamic       Boolean        @default(true) @map("is_dynamic")
+  expiresAt       DateTime?      @map("expires_at")
+  lastScannedAt   DateTime?      @map("last_scanned_at")
+  templateId      String         @default("classic-black") @map("template_id")
+  stylePreset     String         @default("rounded") @map("style_preset")
+  foregroundColor String         @default("#0F172A") @map("foreground_color")
+  backgroundColor String         @default("#FFFFFF") @map("background_color")
+  logoUrl         String?        @map("logo_url")
+  isActive        Boolean        @default(true) @map("is_active")
+  scanCount       Int            @default(0) @map("scan_count")
+  connectedCount  Int            @default(0) @map("connected_count")
+  createdById     String?        @map("created_by_id")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  createdBy       User?          @relation("QrCodeCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   scans           QrScan[]
   conversions     QrConversion[]
 
@@ -220,16 +221,16 @@ model QrCode {
 }
 
 model QrScan {
-  id            String   @id @default(uuid())
-  qrCodeCode    String   @map("qr_code_code")
-  scanTimestamp DateTime @default(now()) @map("scan_timestamp")
-  deviceType    String?  @map("device_type")
-  deviceOs      String?  @map("device_os")
-  ipAddress     String?  @map("ip_address")
-  sessionId     String?  @map("session_id")
-  userAgent     String?  @map("user_agent")
-  createdAt     DateTime @default(now()) @map("created_at")
-  qrCode        QrCode   @relation(fields: [qrCodeCode], references: [code], onDelete: Cascade)
+  id            String         @id @default(uuid())
+  qrCodeCode    String         @map("qr_code_code")
+  scanTimestamp DateTime       @default(now()) @map("scan_timestamp")
+  deviceType    String?        @map("device_type")
+  deviceOs      String?        @map("device_os")
+  ipAddress     String?        @map("ip_address")
+  sessionId     String?        @map("session_id")
+  userAgent     String?        @map("user_agent")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  qrCode        QrCode         @relation(fields: [qrCodeCode], references: [code], onDelete: Cascade)
   conversions   QrConversion[]
 
   @@index([qrCodeCode, scanTimestamp])
@@ -243,7 +244,7 @@ model QrConversion {
   qrScanId          String?  @map("qr_scan_id")
   sessionId         String?  @map("session_id")
   conversionType    String   @map("conversion_type")
-  attributedRevenue Decimal  @default(0) @db.Decimal(10, 2) @map("attributed_revenue")
+  attributedRevenue Decimal  @default(0) @map("attributed_revenue") @db.Decimal(10, 2)
   conversionData    Json?    @map("conversion_data")
   conversionAt      DateTime @default(now()) @map("conversion_at")
   createdAt         DateTime @default(now()) @map("created_at")
@@ -299,17 +300,17 @@ model Consent {
 }
 
 model LegalDocument {
-  id          String   @id @default(uuid())
+  id          String           @id @default(uuid())
   type        String
   version     Int
   title       String
   content     String
-  isActive    Boolean  @default(false)
-  publishedAt DateTime @default(now())
+  isActive    Boolean          @default(false)
+  publishedAt DateTime         @default(now())
   updatedById String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  updatedBy   User?    @relation("LegalDocumentUpdatedBy", fields: [updatedById], references: [id])
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  updatedBy   User?            @relation("LegalDocumentUpdatedBy", fields: [updatedById], references: [id])
   acceptances UserAcceptance[]
 
   @@unique([type, version])
@@ -319,17 +320,17 @@ model LegalDocument {
 }
 
 model UserAcceptance {
-  id          String   @id @default(uuid())
+  id          String        @id @default(uuid())
   userId      String
   documentId  String
   documentVer Int
-  acceptedAt  DateTime @default(now())
+  acceptedAt  DateTime      @default(now())
   ipAddress   String?
   userAgent   String?
-  source      String   @default("web")
-  createdAt   DateTime @default(now())
+  source      String        @default("web")
+  createdAt   DateTime      @default(now())
   document    LegalDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, documentId])
   @@index([userId, acceptedAt])
@@ -429,7 +430,7 @@ model AuthAuditLog {
 }
 
 model ProviderVerification {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   userId      String
   license     String
   licenseType String
@@ -439,15 +440,14 @@ model ProviderVerification {
   verifiedAt  DateTime?
   reviewedBy  String?
   notes       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   // relation to `User` intentionally omitted to avoid adding inverse field on User model
 
   @@index([userId])
   @@map("provider_verifications")
 }
- 
 
 model PatientProfile {
   id                           String                       @id @default(uuid())
@@ -473,46 +473,54 @@ model PatientProfile {
   therapistResourcesAssigned   TherapistResource[]
   therapistSessionNotes        TherapistSessionNote[]
   therapySessions              TherapySession[]
+  preferredLanguage    String?
+  communicationChannels String[] @default([])
+  therapyModes         String[] @default([])
+  availability         Json?
+  timezone             String?
+  sessionDuration      String?
+  reminderTiming       String?
+
 
   @@index([userId])
   @@map("patient_profiles")
 }
 
 model TherapistProfile {
-  id                  String            @id @default(uuid())
-  userId              String            @unique
-  displayName         String
-  bio                 String?
-  specializations     String[]          @default([])
-  languages           String[]          @default([])
-  yearsOfExperience   Int?              @default(0)
-  consultationFee     Int?              @default(0)
-  availability        Json?
-  averageRating       Float?            @default(0)
-  isDeleted           Boolean           @default(false)
-  deletedAt           DateTime?
-  createdAt           DateTime          @default(now())
-  updatedAt           DateTime          @updatedAt
-  registrationType    RegistrationType?
-  highestQual         String?
-  yearsExperience     Int?              @default(0)
-  hourlyRate          Int?              @default(0)
-  professionalType    String?
-  registrationNum     String?
-  contactEmail        String?
-  education           String?
-  licenseRci          String?
-  licenseNmc          String?
-  clinicalCategories  String[]          @default([])
-  corporateReady      Boolean           @default(false)
-  shiftPreferences    String[]          @default([])
-  bankDetails         Json?
-  tagline             String?
-  digitalSignature    String?
-  onboardingCompleted Boolean           @default(false)
-  isVerified          Boolean           @default(false)
-  verifiedAt          DateTime?
-  verifiedByUserId    String?
+  id                       String              @id @default(uuid())
+  userId                   String              @unique
+  displayName              String
+  bio                      String?
+  specializations          String[]            @default([])
+  languages                String[]            @default([])
+  yearsOfExperience        Int?                @default(0)
+  consultationFee          Int?                @default(0)
+  availability             Json?
+  averageRating            Float?              @default(0)
+  isDeleted                Boolean             @default(false)
+  deletedAt                DateTime?
+  createdAt                DateTime            @default(now())
+  updatedAt                DateTime            @updatedAt
+  registrationType         RegistrationType?
+  highestQual              String?
+  yearsExperience          Int?                @default(0)
+  hourlyRate               Int?                @default(0)
+  professionalType         String?
+  registrationNum          String?
+  contactEmail             String?
+  education                String?
+  licenseRci               String?
+  licenseNmc               String?
+  clinicalCategories       String[]            @default([])
+  corporateReady           Boolean             @default(false)
+  shiftPreferences         String[]            @default([])
+  bankDetails              Json?
+  tagline                  String?
+  digitalSignature         String?
+  onboardingCompleted      Boolean             @default(false)
+  isVerified               Boolean             @default(false)
+  verifiedAt               DateTime?
+  verifiedByUserId         String?
   certifications           String[]            @default([])
   baseLatitude             Float?              @map("base_latitude")
   baseLongitude            Float?              @map("base_longitude")
@@ -546,20 +554,20 @@ model ProviderDocument {
 }
 
 model PatientAssessment {
-  id               String         @id @default(uuid())
-  patientId        String
-  type             String
-  answers          Int[]
-  totalScore       Int
-  severityLevel    String
-  entryType        String?
-  sourceMetadata   String?
-  utmCampaign      String?
-  utmMedium        String?
-  utmSource        String?
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  patient          PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  id             String         @id @default(uuid())
+  patientId      String
+  type           String
+  answers        Int[]
+  totalScore     Int
+  severityLevel  String
+  entryType      String?
+  sourceMetadata String?
+  utmCampaign    String?
+  utmMedium      String?
+  utmSource      String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  patient        PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
   @@index([patientId, createdAt(sort: Desc)])
   @@index([entryType, createdAt(sort: Desc)])
@@ -852,6 +860,8 @@ model PatientMoodEntry {
   @@map("patient_mood_entries")
 }
 
+
+
 model TherapySession {
   id                       String                @id @default(uuid())
   bookingReferenceId       String                @unique
@@ -1000,7 +1010,7 @@ model SessionBookingIntent {
   durationMinute        Int                 @default(50)
   amountMinor           BigInt
   currency              String              @default("INR")
-  sourceFunnel         String?             @map("source_funnel")
+  sourceFunnel          String?             @map("source_funnel")
   razorpayPaymentId     String?
   status                BookingIntentStatus @default(PENDING)
   sessionId             String?
@@ -1748,17 +1758,17 @@ model Invoice {
 }
 
 model InvoiceEvent {
-  id             String   @id @default(uuid())
-  invoiceId      String   @map("invoice_id")
-  eventType      String   @map("event_type")
+  id             String         @id @default(uuid())
+  invoiceId      String         @map("invoice_id")
+  eventType      String         @map("event_type")
   invoiceMethod  InvoiceMethod? @map("invoice_method")
-  beforeState    Json?    @map("before_state")
-  afterState     Json?    @map("after_state")
-  actorUserId    String?  @map("actor_user_id")
-  idempotencyKey String?  @map("idempotency_key")
-  createdAt      DateTime @default(now()) @map("created_at")
-  actor          User?    @relation("InvoiceEventsActor", fields: [actorUserId], references: [id], onDelete: SetNull)
-  invoice        Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  beforeState    Json?          @map("before_state")
+  afterState     Json?          @map("after_state")
+  actorUserId    String?        @map("actor_user_id")
+  idempotencyKey String?        @map("idempotency_key")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  actor          User?          @relation("InvoiceEventsActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  invoice        Invoice        @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@index([invoiceId], map: "idx_invoice_events_invoice_id")
   @@index([idempotencyKey], map: "idx_invoice_events_idempotency_key")
@@ -1798,13 +1808,13 @@ model PayoutItem {
 }
 
 model IdempotencyKey {
-  id        String   @id
-  endpoint  String
-  actorId   String   @map("actor_id")
+  id          String   @id
+  endpoint    String
+  actorId     String   @map("actor_id")
   requestHash String   @map("request_hash")
-  response  Json
-  createdAt DateTime @default(now()) @map("created_at")
-  expiresAt DateTime @map("expires_at") // TTL: default 7 days
+  response    Json
+  createdAt   DateTime @default(now()) @map("created_at")
+  expiresAt   DateTime @map("expires_at") // TTL: default 7 days
 
   @@unique([id, endpoint, actorId])
   @@unique([endpoint, actorId, requestHash])
@@ -1814,16 +1824,16 @@ model IdempotencyKey {
 }
 
 model SwipeItemMapping {
-  id             String   @id @default(uuid())
-  serviceId      String   @unique @map("service_id")
-  serviceName    String   @map("service_name")
-  swipeItemId    String   @map("swipe_item_id")
-  baseRateMinor  BigInt   @map("base_rate_minor")
-  sacCode        String?  @map("sac_code")
-  category       String   @map("category")
-  isActive       Boolean  @default(true) @map("is_active")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  id            String   @id @default(uuid())
+  serviceId     String   @unique @map("service_id")
+  serviceName   String   @map("service_name")
+  swipeItemId   String   @map("swipe_item_id")
+  baseRateMinor BigInt   @map("base_rate_minor")
+  sacCode       String?  @map("sac_code")
+  category      String   @map("category")
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
   @@index([serviceId])
   @@index([swipeItemId])
@@ -2865,44 +2875,44 @@ model InstitutionalAgreement {
 }
 
 model Entity {
-  id          String                   @id @default(uuid())
+  id          String   @id @default(uuid())
   entity_name String
   entity_type String
   admin_name  String?
-  admin_email String                   @unique
-  created_at  DateTime                 @default(now())
+  admin_email String   @unique
+  created_at  DateTime @default(now())
 
-  contracts   Contract[]
-  agreements  InstitutionalAgreement[]
+  contracts  Contract[]
+  agreements InstitutionalAgreement[]
 }
 
 model Contract {
-  id                String   @id @default(uuid())
-  entityId          String
-  entity            Entity   @relation(fields: [entityId], references: [id])
+  id       String @id @default(uuid())
+  entityId String
+  entity   Entity @relation(fields: [entityId], references: [id])
 
-  contract_number   String   @unique
-  pricing_model     String
-  price_per_member  Float?
-  max_members       Int?
+  contract_number  String @unique
+  pricing_model    String
+  price_per_member Float?
+  max_members      Int?
 
-  start_date        DateTime
-  end_date          DateTime
+  start_date DateTime
+  end_date   DateTime
 
-  created_at        DateTime @default(now())
+  created_at DateTime @default(now())
 
   @@index([entityId])
 }
 
 model AgreementSignatureLog {
-  id          Int                    @id @default(autoincrement())
+  id           Int                    @id @default(autoincrement())
   agreement_id Int
-  event_type  String
-  actor_type  String
-  actor_name  String
-  event_data  Json?
-  created_at  DateTime               @default(now())
-  agreement   InstitutionalAgreement @relation(fields: [agreement_id], references: [id], onDelete: Cascade)
+  event_type   String
+  actor_type   String
+  actor_name   String
+  event_data   Json?
+  created_at   DateTime               @default(now())
+  agreement    InstitutionalAgreement @relation(fields: [agreement_id], references: [id], onDelete: Cascade)
 
   @@index([agreement_id])
   @@index([event_type])

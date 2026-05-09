@@ -12,6 +12,8 @@ import {
 } from '../services/smart-match.service';
 import { assertPatientHasCompletedBothPHQandGAD7 } from '../services/patient-v1.service';
 
+
+
 interface AvailabilityPrefs {
   daysOfWeek: number[];
   timeSlots: Array<{ startMinute: number; endMinute: number }>;
@@ -31,6 +33,10 @@ const parseQueryList = (value: unknown): string[] => {
 // GET /patient/providers/smart-match
 // Query available providers based on patient's availability preferences
 export const getAvailableProvidersController = async (req: Request, res: Response): Promise<void> => {
+
+console.log('✅ getAvailableProvidersController without subscription check running');
+
+
   const patientId = req.auth?.userId;
   if (!patientId) throw new AppError('Unauthorized', 401);
   await assertPatientHasCompletedBothPHQandGAD7(patientId);
@@ -41,26 +47,26 @@ export const getAvailableProvidersController = async (req: Request, res: Respons
     throw new AppError('daysOfWeek and timeSlots are required', 422);
   }
 
-  const subscription = await db.patientSubscription.findUnique({
-    where: { userId: patientId },
-    select: { status: true, planName: true, price: true },
-  });
+  // const subscription = await db.patientSubscription.findUnique({
+  //   where: { userId: patientId },
+  //   select: { status: true, planName: true, price: true },
+  // });
 
-  const status = String(subscription?.status || '').toLowerCase();
-  const statusAllowed = ['active', 'trial', 'trialing', 'grace'].includes(status);
-  if (!statusAllowed) {
-    throw new AppError('Active subscription required to use smart matching', 403);
-  }
+  // const status = String(subscription?.status || '').toLowerCase();
+  // const statusAllowed = ['active', 'trial', 'trialing', 'grace'].includes(status);
+  // if (!statusAllowed) {
+  //   throw new AppError('Active subscription required to use smart matching', 403);
+  // }
 
-  const freeLikePlan = Number(subscription?.price || 0) <= 0 || String(subscription?.planName || '').toLowerCase().includes('free');
-  if (freeLikePlan) {
-    sendSuccess(res, {
-      count: 0,
-      providers: [],
-      message: 'Smart matching is available on paid plans only.',
-    });
-    return;
-  }
+  // const freeLikePlan = Number(subscription?.price || 0) <= 0 || String(subscription?.planName || '').toLowerCase().includes('free');
+  // if (freeLikePlan) {
+  //   sendSuccess(res, {
+  //     count: 0,
+  //     providers: [],
+  //     message: 'Smart matching is available on paid plans only.',
+  //   });
+  //   return;
+  // }
 
   const concerns = parseQueryList(req.query.concerns);
   const languages = parseQueryList(req.query.languages);

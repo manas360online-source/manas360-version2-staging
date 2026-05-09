@@ -49,6 +49,8 @@ import type {
 	VerifyPhoneOtpInput,
 } from '../types/auth.types';
 
+import { sendTwoFactorOtp } from "../services/twoFactorOtp.service";
+
 const googleClient = new OAuth2Client(env.googleClientId);
 const db = prisma as any;
 
@@ -417,22 +419,28 @@ export const registerProviderProfile = async (userId: string, input: ProviderReg
 				yearsOfExperience: Math.max(0, Number(input.yearsExperience || 0)),
 				hourlyRate: Math.max(0, Number(input.hourlyRate || 0)),
 				consultationFee: Math.max(0, Number(input.hourlyRate || 0)),
-				bankDetails: input.bankDetails || undefined,
+				// bankDetails: input.bankDetails || undefined,
+				bankDetails: input.documents?.length
+  ? {
+      ...(input.bankDetails || {}),
+      credentialDocuments: input.documents,
+    }
+  : input.bankDetails || undefined,
 				tagline: input.tagline?.trim() || undefined,
 				digitalSignature: input.digitalSignature?.trim() || undefined,
 				bio: input.bio?.trim() || undefined,
 				onboardingCompleted: false,
 				isVerified: false,
 				averageRating: 0,
-				documents: input.documents?.length
-					? {
-						create: input.documents.map((document) => ({
-							userId: user.id,
-							documentType: document.documentType,
-							url: String(document.url).trim(),
-						})),
-					}
-					: undefined,
+				// documents: input.documents?.length
+				// 	? {
+				// 		create: input.documents.map((document) => ({
+				// 			userId: user.id,
+				// 			documentType: document.documentType,
+				// 			url: String(document.url).trim(),
+				// 		})),
+				// 	}
+				// 	: undefined,
 			},
 			select: {
 				id: true,
@@ -444,12 +452,12 @@ export const registerProviderProfile = async (userId: string, input: ProviderReg
 				highestQual: true,
 				hourlyRate: true,
 				isVerified: true,
-				documents: {
-					select: {
-						documentType: true,
-						url: true,
-					},
-				},
+				// documents: {
+				// 	select: {
+				// 		documentType: true,
+				// 		url: true,
+				// 	},
+				// },
 				createdAt: true,
 			},
 		});
@@ -540,21 +548,34 @@ export const registerWithPhone = async (input: RegisterPhoneInput) => {
 		  });
 
 	// Send WhatsApp OTP message (non-blocking)
-	sendWhatsAppMessage({
-		phoneNumber: user.phone,
-		templateType: 'user_otp_login',
-		userType: 'user',
-		templateVariables: { otp },
-		language: 'en',
-		flowEvent: 'USER_REGISTERED',
-		flowRole: String(role || 'PATIENT').toUpperCase(),
-		flowData: {
-			userId: String(user.id),
-			name: trimmedName || 'User',
-		},
-	}).catch((err) => {
-		console.error('[Auth] Failed to send WhatsApp OTP:', err.message);
-	});
+	const otpChannel = String(process.env.OTP_CHANNEL || "both").toLowerCase();
+
+if (otpChannel === "sms" || otpChannel === "both") {
+  sendTwoFactorOtp(user.phone, otp).catch((err) => {
+    console.error("[Auth] Failed to send 2Factor SMS OTP:", err.message);
+  });
+}
+
+
+
+if (otpChannel === "whatsapp" || otpChannel === "both") {
+sendWhatsAppMessage({
+  phoneNumber: user.phone,
+  templateType: 'user_otp_login',
+  userType: 'user',
+ templateVariables: { VAR1: String(otp), otp: String(otp) },
+  language: 'en',
+  flowEvent: 'USER_REGISTERED',
+  flowRole: String(role || 'PATIENT').toUpperCase(),
+  flowData: {
+    userId: String(user.id),
+    name: trimmedName || 'User',
+    otp: String(otp),
+  },
+}).catch((err) => {
+  console.error('[Auth] Failed to send WhatsApp OTP:', err.message);
+});
+}
 
 	return {
 		userId: String(user.id),

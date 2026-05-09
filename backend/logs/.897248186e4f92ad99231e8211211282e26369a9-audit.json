@@ -1,0 +1,45 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "D:\\projects\\manas360-version2-staging-main -developed by kajal\\backend\\logs\\.897248186e4f92ad99231e8211211282e26369a9-audit.json",
+    "files": [
+        {
+            "date": 1777623232092,
+            "name": "D:\\projects\\manas360-version2-staging-main -developed by kajal\\backend\\logs\\combined-2026-05-01.log",
+            "hash": "a0fe95b0ab98a5f0165485e9b3a8a08f6248e2d30a0852385c5fb38e7043e580"
+        },
+        {
+            "date": 1777694084277,
+            "name": "D:\\projects\\manas360-version2-staging-main -developed by kajal\\backend\\logs\\combined-2026-05-02.log",
+            "hash": "f27556f937ce3591c59007a7a1b78defaab9464a528652c75f8ac24b033b59ff"
+        },
+        {
+            "date": 1777952702347,
+            "name": "D:\\projects\\manas360-version2-staging-main -developed by kajal\\backend\\logs\\combined-2026-05-05.log",
+            "hash": "61a80fd9a3ebded4be7b2ebc4c7a8729105919a9d77d807cac218f0650c86a5b"
+        },
+        {
+            "date": 1778046297565,
+            "name": "D:\\projects\\manas360-version2-staging-main -developed by kajal\\backend\\logs\\combined-2026-05-06.log",
+            "hash": "9bac02ba9c9544cda18ccd2cdaedab591f09b767d1ab66ef846caa7a0841ffdd"
+        },
+        {
+            "date": 1778177427860,
+            "name": "D:\\projects\\manas360-version2-staging-main -developed by kajal\\backend\\logs\\combined-2026-05-07.log",
+            "hash": "833b0a573315c45c177e1845af2d82e7e1046573f05a0e77e5cd6866ed60a729"
+        },
+        {
+            "date": 1778179462624,
+            "name": "D:\\projects\\manas360-version2-staging-main -developed by kajal\\backend\\logs\\combined-2026-05-08.log",
+            "hash": "8756cbbc3d547ec5052e8b7be7be6e40b6247d2937f8871f55322d53d63a50f7"
+        },
+        {
+            "date": 1778285805331,
+            "name": "D:\\projects\\manas360-version2-staging-main -developed by kajal\\backend\\logs\\combined-2026-05-09.log",
+            "hash": "080715c500551b7a4fe6874438a774a685dad3a20a380ec77fd20b002c207e46"
+        }
+    ],
+    "hashType": "sha256"
+}

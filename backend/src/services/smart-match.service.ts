@@ -252,10 +252,28 @@ export const findMatchingProviders = async (
   limit: number = 10,
   criteria?: SmartMatchCriteria,
 ): Promise<ProviderMatch[]> => {
-  let patientSubscriptionSnapshot: Awaited<ReturnType<typeof assertPatientSmartMatchEligibility>> | null = null;
-  if (criteria?.patientUserId) {
-    patientSubscriptionSnapshot = await assertPatientSmartMatchEligibility(criteria.patientUserId);
-  }
+  // let patientSubscriptionSnapshot: Awaited<ReturnType<typeof assertPatientSmartMatchEligibility>> | null = null;
+  // if (criteria?.patientUserId) {
+  //   patientSubscriptionSnapshot = await assertPatientSmartMatchEligibility(criteria.patientUserId);
+  // }
+
+  let patientSubscriptionSnapshot: {
+  status: string;
+  planName: string;
+  price: number;
+  graceEndDate: string | null;
+} | null = null;
+
+// Onboarding flow me patient subscription check disabled.
+// Payment/session booking ke baad subscription activate hoga.
+if (criteria?.patientUserId) {
+  patientSubscriptionSnapshot = {
+    status: 'onboarding',
+    planName: 'pending',
+    price: 0,
+    graceEndDate: null,
+  };
+}
 
   const context = criteria?.context || 'Standard';
   const isNriPresetFlow = isNriPresetEntryType(criteria?.presetEntryType);
@@ -274,7 +292,9 @@ export const findMatchingProviders = async (
   const eligibleProviderSubscriptions = await prisma.providerSubscription.findMany({
     where: {
       expiryDate: { gt: new Date() },
-      plan: { notIn: ['free', 'FREE'] as any },
+      plan: {
+  not: 'free',
+},
     },
     select: {
       providerId: true,

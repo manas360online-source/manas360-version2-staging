@@ -22,6 +22,7 @@ import {
 import { requireAuth, requireCsrf } from '../middleware/auth.middleware';
 import { authRateLimiter } from '../middleware/rateLimiter.middleware';
 import { asyncHandler } from '../middleware/validate.middleware';
+import { uploadProviderCredential } from '../middleware/upload.middleware';
 
 const router = Router();
 
@@ -29,7 +30,13 @@ const router = Router();
 router.post('/register', authRateLimiter, asyncHandler(legacyRegisterController));
 router.post('/verify/email-otp', authRateLimiter, asyncHandler(legacyVerifyEmailOtpController));
 
-router.post('/provider-register', requireAuth, authRateLimiter, asyncHandler(providerRegisterController));
+router.post(
+  '/provider-register',
+  requireAuth,
+  authRateLimiter,
+  uploadProviderCredential.single('credentialScreenshot'),
+  asyncHandler(providerRegisterController)
+);
 router.post('/signup/phone', authRateLimiter, asyncHandler(signupWithPhoneController));
 router.post('/verify/phone-otp', authRateLimiter, asyncHandler(verifyPhoneOtpController));
 

@@ -30,10 +30,12 @@ app.set('trust proxy', env.trustProxy as any);
 app.use(helmet());
 
 const localDevOrigins = [
-	'http://localhost:5173',
-	'http://127.0.0.1:5173',
-	'http://localhost:3000',
-	'http://127.0.0.1:3000',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'http://localhost:5001',
+  'http://127.0.0.1:5001',
 ];
 
 const normalizeOrigin = (origin: string): string => origin.replace(/\/+$/, '');
@@ -50,30 +52,29 @@ const allowedCorsOrigins = Array.from(new Set([
 	...productionOrigins,
 ].map(normalizeOrigin)));
 
-app.use(cors({
-	origin: (origin, callback) => {
-		if (!origin) {
-			return callback(null, true);
-		}
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
 
-		const normalizedOrigin = normalizeOrigin(origin);
-		if (allowedCorsOrigins.includes(normalizedOrigin)) {
-			return callback(null, normalizedOrigin);
-		}
+    const normalizedOrigin = normalizeOrigin(origin);
 
-		logger.warn(`Blocked by CORS origin: ${origin}`);
-		return callback(new Error('Not allowed by CORS'), false);
-	},
-	methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-	allowedHeaders: [
-		'Content-Type',
-		'Authorization',
-		'x-csrf-token',
-		'x-requested-with',
-	],
-	credentials: true,
-	optionsSuccessStatus: 204,
-}));
+    if (allowedCorsOrigins.includes(normalizedOrigin)) {
+      return callback(null, true);
+    }
+
+    logger.warn(`Blocked by CORS origin: ${origin}`);
+    return callback(new Error('Not allowed by CORS'), false);
+  },
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'x-csrf-token',
+    'x-requested-with',
+  ],
+  credentials: true,
+  optionsSuccessStatus: 204,
+};
 
 // Defensive normalization in case upstream/middleware appends duplicate origin values.
 app.use((_req, res, next) => {
@@ -113,7 +114,7 @@ app.get('/health', (_req, res) => {
 
 
 
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+app.use('/uploads', cors(corsOptions), express.static(path.join(process.cwd(), 'uploads')));
 
 // Readiness probe for AWS target groups/containers.
 app.get('/ready', async (_req, res) => {
@@ -125,7 +126,7 @@ app.get('/ready', async (_req, res) => {
 	}
 });
 
-app.use(env.apiPrefix, apiRoutes);
+app.use(env.apiPrefix, cors(corsOptions), apiRoutes);
 
 // Serve React frontend build in production
 const frontendDistPath = path.resolve(process.cwd(), '../frontend/dist');
@@ -166,3 +167,4 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 export default app;
+

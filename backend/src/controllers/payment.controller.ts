@@ -505,6 +505,7 @@ export const getUniversalInvoiceController = async (req: Request, res: Response)
 			if (error instanceof AppError) throw error;
 			logger.error('[UniversalPayment.Initiate] Error', { error: error?.message, type, planId });
 			await prisma.universalCheckoutPayment.delete({ where: { id: paymentRecord.id } }).catch(() => null);
+			console.log('ersfsdkfjs', error)
 			throw new AppError('Failed to initiate universal payment: ' + error?.message, 502);
 		}
 		};

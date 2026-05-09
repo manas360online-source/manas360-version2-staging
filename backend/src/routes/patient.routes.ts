@@ -8,6 +8,9 @@ import {
 	getMyPatientProfileController,
 	getMyPrescriptionsController,
 	getMyTherapyPlanController,
+	  savePatientPreferencesController,
+  getPatientPreferencesController,
+  updatePatientPreferencesController
 } from '../controllers/patient.controller';
 import { getMyPetStateController, upsertMyPetStateController } from '../controllers/pet.controller';
 import { bookMySessionController, getMySessionHistoryController } from '../controllers/session.controller';
@@ -22,12 +25,34 @@ import {
 	validateBookSessionRequest,
 	validatePatientSessionHistoryQuery,
 	validateCreateDailyCheckInRequest,
+	
 } from '../middleware/validate.middleware';
+
+import {
+  validateCreatePatientAssessmentRequest,
+} from '../middleware/validate.middleware';
+
+import {
+  createPatientAssessmentController,
+} from '../controllers/patient.controller';
 
 const router = Router();
 
 router.post('/profile', requireAuth, requirePatientRole, ...validateCreatePatientProfileRequest, asyncHandler(createPatientProfileController));
+router.patch(
+  '/profile/preferences',
+  requireAuth,
+  requirePatientRole,
+  asyncHandler(updatePatientPreferencesController)
+);
 router.get('/me/profile', requireAuth, requirePatientRole, asyncHandler(getMyPatientProfileController));
+router.post(
+  '/assessments',
+  requireAuth,
+  requirePatientRole,
+  ...validateCreatePatientAssessmentRequest,
+  asyncHandler(createPatientAssessmentController)
+);
 router.get('/me/assessments', requireAuth, requirePatientRole, ...validatePatientAssessmentHistoryQuery, asyncHandler(getMyPatientAssessmentHistoryController));
 router.get('/me/mood-history', requireAuth, requirePatientRole, ...validatePatientMoodHistoryQuery, asyncHandler(getMyMoodHistoryController));
 router.get('/me/therapy-plan', requireAuth, requirePatientRole, asyncHandler(getMyTherapyPlanController));
@@ -51,6 +76,19 @@ router.get('/me/pets/state', requireAuth, requirePatientRole, asyncHandler(getMy
 router.put('/me/pets/state', requireAuth, requirePatientRole, asyncHandler(upsertMyPetStateController));
 router.get('/documents', requireAuth, requirePatientRole, asyncHandler(getMyDocumentsController));
 router.get('/prescriptions', requireAuth, requirePatientRole, asyncHandler(getMyPrescriptionsController));
+router.get(
+  '/preferences',
+  requireAuth,
+  requirePatientRole,
+  asyncHandler(getPatientPreferencesController)
+);
+
+router.patch(
+  '/preferences',
+  requireAuth,
+  requirePatientRole,
+  asyncHandler(savePatientPreferencesController)
+);
 
 export default router;
 

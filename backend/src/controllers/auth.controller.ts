@@ -125,61 +125,97 @@ const setAuthCookies = (req: Request, res: Response, accessToken: string, refres
 };
 
 export const providerRegisterController = async (req: Request, res: Response): Promise<void> => {
-	const userId = req.auth?.userId;
-	if (!userId) {
-		throw new AppError('Authentication required', 401);
-	}
+  const userId = req.auth?.userId;
 
-	// Ensure provider has active platform access before allowing onboarding submission
-	const platformAccessRecord = await prisma.$queryRawUnsafe(
-		`SELECT status, expiry_date FROM platform_access WHERE provider_id = $1 LIMIT 1`,
-		userId,
-	).catch(() => [] as any[]) as Array<{ status: string; expiry_date: Date | null }>;
-	const paRecord = platformAccessRecord?.[0];
-	const platformAccessActive = Boolean(
-		paRecord
-			&& paRecord.status === 'active'
-			&& paRecord.expiry_date
-			&& new Date(paRecord.expiry_date).getTime() > Date.now(),
-	);
-	if (!platformAccessActive) {
-		throw new AppError('Platform access required. Please complete platform fee payment before onboarding.', 403);
-	}
+  if (!userId) {
+    throw new AppError('Authentication required', 401);
+  }
 
-	const requiredString = (value: unknown, field: string): string => {
-		const normalized = typeof value === 'string' ? value.trim() : '';
-		if (!normalized) {
-			throw new AppError(`${field} is required`, 400);
-		}
-		return normalized;
-	};
+  const requiredString = (value: unknown, field: string): string => {
+    const normalized = typeof value === 'string' ? value.trim() : '';
+    if (!normalized) {
+      throw new AppError(`${field} is required`, 400);
+    }
+    return normalized;
+  };
 
-	const result = await registerProviderProfile(userId, {
-		professionalType: (typeof req.body.professionalType === 'string' ? req.body.professionalType.trim().toUpperCase() : undefined) as 'THERAPIST' | 'PSYCHIATRIST' | 'PSYCHOLOGIST' | 'COACH' | undefined,
-		displayName: requiredString(req.body.fullName ?? req.body.displayName, 'displayName'),
-		registrationType: (typeof req.body.registrationType === 'string'
-			? req.body.registrationType.trim().toUpperCase()
-			: typeof req.body.licenseRci === 'string' && req.body.licenseRci.trim()
-				? 'RCI'
-				: typeof req.body.licenseNmc === 'string' && req.body.licenseNmc.trim()
-					? 'NMC'
-					: 'OTHER') as 'RCI' | 'NMC' | 'STATE_COUNCIL' | 'OTHER',
-		registrationNum: requiredString(req.body.registrationNum, 'registrationNum'),
-		yearsExperience: Number(req.body.yearsOfExperience ?? req.body.yearsExperience ?? 0),
-		highestQual: requiredString(req.body.education ?? req.body.highestQual, 'highestQual'),
-		specializations: Array.isArray(req.body.specializations) ? req.body.specializations.map(String) : [],
-		languages: Array.isArray(req.body.languages) ? req.body.languages.map(String) : [],
-		hourlyRate: Number(req.body.consultationFee ?? req.body.hourlyRate ?? 0),
-		bio: typeof req.body.bio === 'string' ? req.body.bio : undefined,
-		documents: Array.isArray(req.body.documents)
-			? req.body.documents.map((document: Record<string, unknown>) => ({
-				documentType: requiredString(document?.documentType, 'documents.documentType') as 'DEGREE' | 'ID_PROOF' | 'LICENSE',
-				url: requiredString(document?.url, 'documents.url'),
-			}))
-			: [],
-	});
+  const credentialFile = req.file;
 
-	sendSuccess(res, result, 'Provider onboarding submitted', 201);
+  if (!credentialFile) {
+    throw new AppError('RCI/NMC verification screenshot is required', 400);
+  }
+
+  const latestCredentialsValid =
+    req.body.latestCredentialsValid === 'true' ||
+    req.body.latestCredentialsValid === true;
+
+  if (!latestCredentialsValid) {
+    throw new AppError('Please confirm latest credentials are valid', 400);
+  }
+
+  const registrationNum = requiredString(
+    req.body.registrationNum ?? req.body.registrationNumber,
+    'registrationNum'
+  );
+
+  const screenshotUrl = `/uploads/provider-credentials/${credentialFile.filename}`;
+
+  const result = await registerProviderProfile(userId, {
+    professionalType: (
+      typeof req.body.professionalType === 'string'
+        ? req.body.professionalType.trim().toUpperCase()
+        : 'THERAPIST'
+    ) as 'THERAPIST' | 'PSYCHIATRIST' | 'PSYCHOLOGIST' | 'COACH',
+
+    displayName: requiredString(req.body.fullName ?? req.body.displayName, 'displayName'),
+
+    registrationType: (
+      typeof req.body.registrationType === 'string'
+        ? req.body.registrationType.trim().toUpperCase()
+        : 'RCI'
+    ) as 'RCI' | 'NMC' | 'STATE_COUNCIL' | 'OTHER',
+
+    registrationNum,
+
+    yearsExperience: Number(req.body.yearsOfExperience ?? req.body.yearsExperience ?? 0),
+
+    highestQual: String(req.body.education ?? req.body.highestQual ?? 'Not provided').trim(),
+
+    specializations: Array.isArray(req.body.specializations)
+      ? req.body.specializations.map(String)
+      : typeof req.body.specializations === 'string'
+        ? req.body.specializations.split(',').map((item: string) => item.trim()).filter(Boolean)
+        : [],
+
+    languages: Array.isArray(req.body.languages)
+      ? req.body.languages.map(String)
+      : typeof req.body.languages === 'string'
+        ? req.body.languages.split(',').map((item: string) => item.trim()).filter(Boolean)
+        : [],
+
+    hourlyRate: Number(req.body.consultationFee ?? req.body.hourlyRate ?? 0),
+
+    bio: typeof req.body.bio === 'string' ? req.body.bio : undefined,
+
+    documents: [
+      {
+        documentType: 'LICENSE',
+        url: screenshotUrl,
+      },
+    ],
+  });
+
+  sendSuccess(
+    res,
+    {
+      ...result,
+      credentialScreenshotUrl: screenshotUrl,
+      status: 'ACTIVE_NOT_VERIFIED',
+      canAcceptLeads: false,
+    },
+    'Provider onboarding submitted for verification',
+    201
+  );
 };
 
 export const legacyRegisterController = async (req: Request, res: Response): Promise<void> => {

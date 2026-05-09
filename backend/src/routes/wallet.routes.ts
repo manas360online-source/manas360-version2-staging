@@ -16,7 +16,18 @@ const router = Router();
  *   get:
  *     summary: Get wallet balance
  */
-router.get('/balance', requireAuth, requireRole('patient'), asyncHandler(getWalletBalanceController));
+router.get(
+  '/balance',
+  requireAuth,
+  requireRole([
+    'patient',
+    'therapist',
+    'psychiatrist',
+    'psychologist',
+    'coach',
+  ]),
+  asyncHandler(getWalletBalanceController)
+);
 
 /**
  * @openapi
@@ -24,7 +35,13 @@ router.get('/balance', requireAuth, requireRole('patient'), asyncHandler(getWall
  *   get:
  *     summary: Get wallet transactions
  */
-router.get('/transactions', requireAuth, requireRole('patient'), asyncHandler(getWalletTransactionsController));
+router.get('/transactions', requireAuth, requireRole([
+  'patient',
+  'therapist',
+  'psychiatrist',
+  'psychologist',
+  'coach']
+), asyncHandler(getWalletTransactionsController));
 
 /**
  * @openapi
@@ -32,6 +49,12 @@ router.get('/transactions', requireAuth, requireRole('patient'), asyncHandler(ge
  *   post:
  *     summary: Apply wallet credits to a booking
  */
-router.post('/apply', requireAuth, requireRole('patient'), asyncHandler(applyWalletToPaymentController));
+router.post('/apply', requireAuth, requireRole([
+  'patient',
+  'therapist',
+  'psychiatrist',
+  'psychologist',
+  'coach']
+), asyncHandler(applyWalletToPaymentController));
 
 export default router;

@@ -1,0 +1,9 @@
+{"level":"warn","message":"[GlobalErrorHandler] API Rejection: Authentication required","path":"/api/v1/risk/6571fc4a-657e-4edb-8582-901da996177a/current","service":"manas360-backend","statusCode":401,"timestamp":"2026-05-02T03:54:44.276Z"}
+{"level":"warn","message":"[GlobalErrorHandler] API Rejection: Authentication required","path":"/api/v1/auth/me","service":"manas360-backend","statusCode":401,"timestamp":"2026-05-02T03:54:45.235Z"}
+{"level":"info","message":"[Cache] SET patient:v1:dashboard:f7dc9bf0-08a2-499b-8586-f5c3f6a055d6","service":"manas360-backend","timestamp":"2026-05-02T04:11:26.901Z"}
+{"level":"warn","message":"[GlobalErrorHandler] API Rejection: Authentication required","path":"/api/v1/auth/me","service":"manas360-backend","statusCode":401,"timestamp":"2026-05-02T05:45:54.328Z"}
+{"level":"error","message":"[PhonePe] PHONEPE_SALT_KEY is not set and OAuth credentials are not configured. Payment signing and verification will fail.","service":"manas360-backend","timestamp":"2026-05-02T10:10:59.350Z"}
+{"error":"Connection timeout","level":"warn","message":"[Redis] Connection error. Falling back to memory cache.","service":"manas360-backend","timestamp":"2026-05-02T10:11:08.313Z"}
+{"level":"info","message":"[PhonePe] OAuth credentials not configured (or placeholder); skipping token initialization","service":"manas360-backend","timestamp":"2026-05-02T10:11:08.485Z"}
+{"level":"info","message":"[CRON] Provider lead CRON jobs initialized.","service":"manas360-backend","timestamp":"2026-05-02T10:11:08.695Z"}
+{"level":"info","message":"[Redis] Connected successfully.","service":"manas360-backend","timestamp":"2026-05-02T10:11:08.787Z"}

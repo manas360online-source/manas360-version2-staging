@@ -51,6 +51,80 @@ const safeAssessmentSelect = {
 	createdAt: true,
 } as const;
 
+
+interface PatientPreferencesInput {
+  primaryLanguage: string;
+  secondaryLanguages?: string[];
+  therapyModes?: string[];
+  availability?: Record<string, string[]>;
+  timezone?: string;
+  sessionDuration?: string;
+  reminderChannels?: string[];
+  reminderTiming?: string;
+}
+
+export const savePatientPreferences = async (
+  userId: string,
+  input: PatientPreferencesInput
+) => {
+  await assertPatientUser(userId);
+
+  const patientProfile = await prisma.patientProfile.findUnique({
+    where: { userId },
+    select: { id: true },
+  });
+
+  if (!patientProfile) {
+    throw new AppError('Patient profile not found. Please create profile first.', 404);
+  }
+
+  const payload = {
+    primaryLanguage: input.primaryLanguage,
+    secondaryLanguages: input.secondaryLanguages ?? [],
+    therapyModes: input.therapyModes ?? [],
+    availability: input.availability ?? {},
+    timezone: input.timezone ?? 'Asia/Kolkata',
+    sessionDuration: input.sessionDuration ?? '45 min',
+    reminderChannels: input.reminderChannels ?? [],
+    reminderTiming: input.reminderTiming ?? '1h',
+  };
+
+  const existing = await prisma.patientPreference.findUnique({
+    where: { patientId: patientProfile.id },
+  });
+
+  if (existing) {
+    return prisma.patientPreference.update({
+      where: { patientId: patientProfile.id },
+      data: payload,
+    });
+  }
+
+  return prisma.patientPreference.create({
+    data: {
+      patientId: patientProfile.id,
+      ...payload,
+    },
+  });
+};
+
+export const getPatientPreferences = async (userId: string) => {
+  await assertPatientUser(userId);
+
+  const patientProfile = await prisma.patientProfile.findUnique({
+    where: { userId },
+    select: { id: true },
+  });
+
+  if (!patientProfile) {
+    throw new AppError('Patient profile not found. Please create profile first.', 404);
+  }
+
+  return prisma.patientPreference.findUnique({
+    where: { patientId: patientProfile.id },
+  });
+};
+
 const assertPatientUser = async (userId: string): Promise<void> => {
 	const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, role: true, /* isDeleted: true if available */ } });
 

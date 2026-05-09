@@ -1,0 +1,1 @@
+{"level":"error","message":"[PhonePe] PHONEPE_SALT_KEY is not set and OAuth credentials are not configured. Payment signing and verification will fail.","service":"manas360-backend","timestamp":"2026-05-02T10:10:59.350Z"}
